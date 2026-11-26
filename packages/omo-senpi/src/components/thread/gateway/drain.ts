@@ -1,8 +1,8 @@
 import type { DrainWakeEvent, GatewayAdmissionKind, SessionRuntimePort, WakeReason } from "./adapter"
 import { decideDelivery, effectiveLaneOf } from "./decision"
+import { createClaimedAdmitter } from "./drain-admit"
 import { intakeAdmissionPass, type IntakeAdmission } from "./intake-admission"
 import { isLockWaitExceeded } from "./lock-wait"
-import { deliverySender, renderDeliveryDisplayText, renderDeliveryText } from "./provenance"
 import type { GatewayStore } from "./store"
 import type { DeliveryRow, ProcessIdentity } from "./types"
 
@@ -94,7 +94,23 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       return { admitted }
     }
     const admission = intakeAdmissionPass(options.admitIntake)
-    for (const row of reconciled.queued) {
+    const admitClaimed = createClaimedAdmitter({
+      store: options.store,
+      runtime,
+      durableId: options.durableId,
+      self,
+      now,
+      admitted,
+      held,
+      noticeQueued,
+      ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.onAdmitted === undefined ? {} : { onAdmitted: options.onAdmitted }),
+      ...(options._test?.afterAdmit === undefined ? {} : { afterAdmit: options._test.afterAdmit }),
+    })
+    // The pass's first row that would start the idle session is admitted last, after every later row of the pass has
+    // joined it, so that one start carries them all.
+    let heldStart: { readonly row: DeliveryRow; readonly claimed: DeliveryRow } | undefined
+    for (const [index, row] of reconciled.queued.entries()) {
       const gate = runtime.admissionGate()
       const heldRevision = held.get(row.delivery_id)
       if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) {
@@ -122,86 +138,32 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         admitted.push({ delivery_id: row.delivery_id, kind: reason })
         continue
       }
+      const starts = decision.expect === "started"
       const claimed = await options.store.claim({
         now: now(),
         delivery_id: row.delivery_id,
         self,
-        lane: effectiveLaneOf(decision),
+        lane: starts && heldStart !== undefined ? "steer" : effectiveLaneOf(decision),
       })
       if (claimed.kind !== "claimed") continue
       options._test?.afterClaim?.(claimed.row)
-      // A row taken in from another device is admitted under the engine's ledger key with the sender's text as written,
-      // so the engine's own dedupe also covers the same delivery arriving live (#13037, design 5.5).
-      const ledgerId = claimed.row.ledger_id ?? null
-      const engineId = ledgerId ?? row.delivery_id
-      let result: ReturnType<SessionRuntimePort["admitExternalMessage"]>
-      try {
-        result = runtime.admitExternalMessage({
-          delivery_id: engineId,
-          text: ledgerId === null ? renderDeliveryText(claimed.row) : (claimed.row.verbatim_text ?? claimed.row.body),
-          sender: deliverySender(claimed.row),
-          display_text:
-            ledgerId === null
-              ? renderDeliveryDisplayText(claimed.row)
-              : (claimed.row.verbatim_display_text ?? claimed.row.body),
-          deliverAs: decision.deliverAs,
-          ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
-        })
-      } catch (error) {
-        await options.store.recordOutcome({
-          now: now(),
-          delivery_id: row.delivery_id,
-          self,
-          outcome: { kind: "requeue" },
-        })
-        options.log?.(
-          `admission closed for ${options.durableId}: ${error instanceof Error ? error.message : String(error)}`,
-        )
-        break
+      // A run that began while the pass waited on the store takes the held start first, so the session still sees the
+      // rows in seq order.
+      if (heldStart !== undefined && runtime.phase() !== "idle") {
+        const first = heldStart
+        heldStart = undefined
+        if ((await admitClaimed(first.row, first.claimed, {})) === "stop") break
       }
-      options._test?.afterAdmit?.(claimed.row, result.kind)
-      if (result.kind === "held_draft") {
-        await options.store.recordOutcome({
-          now: now(),
-          delivery_id: row.delivery_id,
-          self,
-          outcome: { kind: "requeue" },
-        })
-        held.set(row.delivery_id, runtime.admissionGate().editor_revision)
-        noticeQueued(row)
-        admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
-        break
+      if (starts && heldStart === undefined && index < reconciled.queued.length - 1 && runtime.phase() === "idle") {
+        heldStart = { row, claimed: claimed.row }
+        continue
       }
-      if (result.kind === "queued") noticeQueued(claimed.row)
-      if (result.kind === "turn_conflict") {
-        await options.store.recordOutcome({
-          now: now(),
-          delivery_id: row.delivery_id,
-          self,
-          outcome: { kind: "refused", reason: "turn_conflict" },
-        })
-      } else {
-        const written =
-          result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(engineId)
-        await options.store.recordOutcome({
-          now: now(),
-          delivery_id: row.delivery_id,
-          self,
-          // A delivery queued while the session waits on a question waits on that approval (#13014), as the relay leg reports it.
-          outcome: {
-            kind: written ? "applied" : "admitted",
-            admission_kind: result.kind,
-            turn_epoch: result.turn_epoch,
-            ...(result.kind === "queued" && runtime.phase() === "waiting_question"
-              ? { wait_kind: "approval" as const }
-              : {}),
-          },
-        })
-      }
-      admitted.push({ delivery_id: row.delivery_id, kind: result.kind })
-      if (result.kind === "started" || result.kind === "steered" || result.kind === "queued")
-        options.onAdmitted?.(row.delivery_id, result.kind)
+      const step = await admitClaimed(row, claimed.row, heldStart === undefined ? {} : { joinsStart: true })
+      if (step === "stop") break
     }
+    if (heldStart !== undefined) await admitClaimed(heldStart.row, heldStart.claimed, {})
+    const order = new Map(reconciled.queued.map((row, index) => [row.delivery_id, index]))
+    admitted.sort((a, b) => (order.get(a.delivery_id) ?? 0) - (order.get(b.delivery_id) ?? 0))
     return { admitted }
   }
 

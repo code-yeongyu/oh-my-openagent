@@ -96,6 +96,8 @@ const unrefSchedule = (run: () => void, ms: number): (() => void) => {
   return () => clearTimeout(timer)
 }
 
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
 /** A carry that ended: the session is no longer this carrier's, so its intake marks may now be drained. */
 const ENDED: ReadonlySet<CarrierEvaluation["kind"]> = new Set(["released", "handed_over", "closed_waiting", "held"])
 
@@ -277,12 +279,19 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind)) void reportDrained()
     },
+    onError: (error) =>
+      input.warn(`thread wake: the carrier's sweep failed and retries at its next tick: ${errorText(error)}`),
   })
   // A send calls this from the sending session's handler: the renewal timer and the woken session's connection the
   // carrier creates must still belong to the process scope, or that session's shutdown reclaims them (#13456 M1).
   const wake = (durableId: string): Promise<void> =>
     scope.runInAsyncScope(async () => {
-      const outcome = await carrier.wake(durableId)
+      const outcome = await carrier.wake(durableId).catch((error: unknown) => {
+        // Every caller (a send, the consumer, the pending sweep) answers its sender without waiting on this wake, so the
+        // failure is reported here; the requested row stays and the carrier's sweep tries it again.
+        input.warn(`thread wake: ${durableId} was not woken and is retried by the sweep: ${errorText(error)}`)
+        throw error
+      })
       // The rows a close settled during this wake leave drained marks no carry ending will report (#14273 follow-up).
       if (outcome.kind === "nothing_queued") await reportDrained()
       if (outcome.kind === "failed")
