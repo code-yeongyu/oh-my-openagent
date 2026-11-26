@@ -1,19 +1,18 @@
 # skills
 
-Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 12 skill dirs with their own authoring contract.
+Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 11 skill dirs with their own authoring contract.
 
 ## WHERE TO LOOK
 
 | Skill | Role |
 |-------|------|
-| `mass-ulw/` | Dag orchestration at repo scale (a graph sized to the request, one run per phase, file handoff between nodes, size formula, node categories). `references/planning.md` is read before the first dag: sizing, node prompt contract, verification, failure playbook. |
+| `mass-ulw/` | Dag orchestration at repo scale (a graph sized to the request, one run per phase, file handoff between nodes, size formula, node categories). `references/planning.md` is read before the first dag: sizing, node prompt contract, verification, failure playbook. `references/library.md` covers saved graphs: store a definition once and re-run it by name through `plugin/runtime/dag/library.js`. |
 | `ultrawork/` | Senpi-native ultrawork directive sources, embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). `SKILL.md` is the default directive, and its body is what `/skill:ultrawork` expands; `references/gpt.md` is the directive GPT models receive. Each is a complete prompt of its own: a change to one never reaches the other, and neither file carries markers or fragments of the other (#14441). The ultrawork component selects by receiving model (`src/components/ultrawork/directive-variants.ts`). |
 | `ulw-plan/` | Read-only planning lifecycle: draft -> plan with explicit approval; `scripts/scaffold-plan.mjs` scaffolds guarded `.omo` artifacts. |
 | `ulw-loop/` | Goal/QA lifecycle loop; component-owned native source, shipped verbatim. |
 | `ulw-research/` | Claim-graph research orchestration: claims enter `claim-graph.md` as `verified-claims`; unsupported claims stay unresolved/refuted. |
 | `hyperplan/` | Adversarial cross-critique planning; debate rounds and planner handoff must not be skipped. |
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |
-| `dag-library/` | Store a dag definition once and re-run it by name; loads through `plugin/runtime/dag/library.js`. |
 | `onboarding/` | First-run onboarding; `qa-validator.sh` pins the skill contract (front matter `name: onboarding`), `qa-savings-fixture.sh` expects `qa-savings-fixture: OK`. |
 | `visualize/` | Builds a self-contained HTML page to show inline in a thread (`show_html_page`, previewed with the OmO desktop's `desktop_html_preview`): a short router to `data-scientist` (figures, traceable query) and `frontend` (design), plus the inline-page constraints (no network, host theme tokens, scripts-off render, render-and-look in both themes at 390 px and the reply width). |
 | `omo-relay/` | Work on the account's other devices from a js eval cell: typed helpers in `scripts/sdk/` (strict TypeScript, ports over the shipped fleet client and the thread tools) run one operation on every machine, chosen machines or several threads and answer one outcome per target; `references/` hold the observed machine calls, the parallel shapes and the error codes. |

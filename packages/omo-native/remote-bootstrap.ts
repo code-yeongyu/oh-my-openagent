@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs"
 import { isAbsolute, resolve } from "node:path"
 
 import {
@@ -56,17 +57,36 @@ export function deviceServiceBootstrapSetup(options: {
   }
 }
 
+const isNpmLauncher = (argv1: string): boolean => {
+  let target = argv1
+  try {
+    target = realpathSync(argv1)
+  } catch {
+    // A path that does not resolve is judged as written.
+  }
+  return target.replaceAll("\\", "/").endsWith("/bin/omo.js")
+}
+
 /**
- * The binary the service runs to refresh its token: the omo the engine was launched from (OMO_BIN), else this
- * compiled binary, else this npm launcher script.
+ * The binary the unit renders and the service refreshes its token with: the omo that ran this command - this compiled
+ * binary, or this npm launcher script when the launcher itself runs the verb - never an older runtime's OMO_BIN the
+ * environment carries (omo#14258); OMO_BIN answers only for the engine, which is not an omo. A global npm install started
+ * under node keeps its npm-prefix bin symlink as argv[1], so the launcher is recognized by the file the path
+ * resolves to, and the unit keeps naming the path as invoked.
  */
-export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> = process.env): string {
-  const declared = env.OMO_BIN
-  if (declared !== undefined && isAbsolute(declared)) return declared
+export function omoBinaryPath(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  running: { readonly execPath?: string; readonly argv1?: string; readonly compiled?: boolean } = {},
+): string {
+  const execPath = running.execPath ?? process.execPath
+  const argv1 = running.argv1 ?? process.argv[1]
   const bun: unknown = Reflect.get(globalThis, "Bun")
   const embedded: unknown = typeof bun === "object" && bun !== null ? Reflect.get(bun, "embeddedFiles") : undefined
-  if (Array.isArray(embedded) && embedded.length > 0) return process.execPath
-  return resolve(process.argv[1] ?? process.execPath)
+  if (running.compiled ?? (Array.isArray(embedded) && embedded.length > 0)) return execPath
+  if (argv1 !== undefined && isNpmLauncher(argv1)) return resolve(argv1)
+  const declared = env.OMO_BIN
+  if (declared !== undefined && isAbsolute(declared)) return declared
+  return resolve(argv1 ?? execPath)
 }
 
 // `quietSuppressed`: the setup after `omo login` says nothing when the install changed nothing because this machine has

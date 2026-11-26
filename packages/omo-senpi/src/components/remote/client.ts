@@ -78,6 +78,8 @@ export type ClientCore = {
   readonly self: () => RemoteClient
   /** This device's operator endpoint leg (RemoteClientDeps.localSessions), loaded once; undefined when not injected. */
   readonly localSessions: () => Promise<LocalSessions | undefined>
+  /** Runs `release` when the client closes: state a member keeps per connection must not outlive the client (#14091). */
+  readonly onClose: (release: () => void) => void
 }
 
 const hostSlug = (): string =>
@@ -374,11 +376,26 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 
   let built: RemoteClient | undefined
   let closed = false
+  const releases: (() => void)[] = []
+  const onClose = (release: () => void): void => {
+    releases.push(release)
+  }
   const self = (): RemoteClient => {
     if (built === undefined) throw new Error("the remote client was used before it was built")
     return built
   }
-  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList, localSessions, self }
+  const core: ClientCore = {
+    sender,
+    timers,
+    deps,
+    dial,
+    member,
+    sessionsList,
+    devicesList,
+    localSessions,
+    self,
+    onClose,
+  }
 
   built = {
     service: {
@@ -465,6 +482,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     aliases: aliasMembers(core),
     close: () => {
       closed = true
+      for (const release of releases.splice(0)) release()
       const open = service
       service = undefined
       void open?.then(

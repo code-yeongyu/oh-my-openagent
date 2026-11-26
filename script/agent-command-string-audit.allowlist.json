@@ -98,6 +98,15 @@
     "script/qa/codex-marketplace-e2e.sh: =omo",
     "script/verify-omo-ai-payload.mjs: omo doctor",
     "script/qa/omo-native-parity-smoke.mjs: omo doctor",
+    "script/sdk-parity/descriptor-dispatch.test.ts: omo install",
+    "script/sdk-parity/goldens.json: omo ulw-loop",
+    "script/sdk-parity/native-inventory.ts: /bin/omo",
+    "script/sdk-parity/negative-controls.test.ts: /bin/omo",
+    "script/sdk-parity/rows/config.json: omo doctor x2",
+    "script/sdk-parity/rows/diagnostics.json: omo doctor",
+    "script/sdk-parity/rows/engine.json: omo install",
+    "script/sdk-parity/scenario-run.ts: /bin/omo",
+    "script/sdk-parity/section6.template.md: omo ulw-loop",
     "packages/memory-core/src/reflection/stale-holder.ts: omo doctor",
     "packages/omo-native/bin/lib/doctor-reflection-lock.js: omo doctor x5",
     "packages/omo-native/test/doctor-reflection-lock-parity.test.ts: omo doctor x2",
@@ -133,7 +142,10 @@
     "packages/omo-native/knip.workspace.jsonc: omo doctor",
     "packages/memory-core/src/retention/cap.ts: omo doctor",
     "packages/memory-core/src/retention/pass.ts: omo doctor",
-    "packages/memory-core/src/retention/size.ts: omo doctor"
+    "packages/memory-core/src/retention/size.ts: omo doctor",
+    "docs/reference/omo-sdk-first-party-design.md: omo doctor x3",
+    "docs/reference/omo-sdk-first-party-design.md: omo install",
+    "docs/reference/omo-sdk-first-party-design.md: omo ulw-loop"
   ],
   "literal-label": [
     "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",
@@ -142,6 +154,10 @@
     "packages/omo-native/test/remote-background.test.ts: /bin/omo x2",
     "packages/omo-native/test/remote-bootstrap-published-release.test.ts: /bin/omo",
     "packages/omo-native/test/remote-cli-harness.ts: /bin/omo",
-    "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo"
+    "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo",
+    "packages/device-service-core/test/cold-wake/refresh.test.ts: /bin/omo x2",
+    "packages/omo-native/bin/lib/service-auth.generated.js: /bin/omo",
+    "packages/omo-native/remote-bootstrap.ts: /bin/omo",
+    "packages/omo-native/test/remote-binary-path.test.ts: /bin/omo x2"
   ]
 }
