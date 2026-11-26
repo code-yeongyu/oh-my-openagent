@@ -2,10 +2,14 @@
 // paused, and the pause write hands this host's lease over as the previous holder (#15125).
 import { dagRunPausedEvent } from "./events"
 import { listRunRecords, recoveryJournal, type RecoverableRecord, type RecoveryContext } from "./recovery"
-import { acquireDagRun, dagRunEligibility } from "./run-acquisition"
+import { acquireDagRun, dagRunEligibility, type DagRunReservation } from "./run-acquisition"
 import type { DagRunId } from "./types"
 
-export function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: string): readonly DagRunId[] {
+export function pauseRunsForShutdown(
+  context: RecoveryContext,
+  parentSessionId: string,
+  held: ReadonlyMap<DagRunId, DagRunReservation> = new Map(),
+): readonly DagRunId[] {
   const paused: DagRunId[] = []
   for (const observed of listRunRecords(context.store)) {
     // Decided on the fresh record under the run lock like every other entry: a live run of this
@@ -14,7 +18,9 @@ export function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: 
     const acquired = acquireDagRun<RecoverableRecord>(context.store, observed.runId, {
       operation: "shutdown pause",
       probe: context,
-      reservations: context.reservations,
+      ...(held.has(observed.runId)
+        ? { reservation: held.get(observed.runId) }
+        : { reservations: context.reservations }),
       eligible: dagRunEligibility.shutdownPause(parentSessionId),
     })
     if (acquired.kind !== "acquired") continue
@@ -22,7 +28,7 @@ export function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: 
       context.stopAdmission?.(observed.runId)
       recoveryJournal(context, acquired.record).append(dagRunPausedEvent({ reason: "session_shutdown" }))
     } finally {
-      acquired.reservation?.release()
+      if (!held.has(observed.runId)) acquired.reservation?.release()
     }
     paused.push(observed.runId)
   }

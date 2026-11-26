@@ -41,6 +41,7 @@ import { createDagRuntimeControls } from "./dag-runtime-controls"
 import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler-registry"
 import { createDagRecoverySweeps } from "./dag-recovery-sweeps"
 import { createDagRunCancel } from "./dag-run-cancel"
+import { createShutdownPause } from "./dag-runtime-shutdown"
 import { registerDagPauseSource } from "./dag-runtime-pause-wiring"
 import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { PausedChildRecoveryPort } from "../../../../senpi-task/src/dag/paused-child-recovery"
@@ -559,25 +560,14 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       activeSessionId = undefined
       statusUi.dispose()
     },
-    async pauseForShutdown() {
-      await sweeps.close()
-      await reservations.whenAllFree()
-      // #8020: a committed shutdown RETIRES the schedulers instead of cancelling them (that is what
-      // `detach` does, and doing it here is what used to destroy a run on every session switch).
-      // The frontier loop must have exited before the pause is persisted, otherwise a late admission
-      // or settlement writes over the paused checkpoint. Retirement also drops the run from
-      // `schedulers`, so the #8029 in-process probe (`isRunHeldInProcess`) reports it unheld and a
-      // later recovery in this SAME process can reclaim it instead of skipping on a live lease.
-      const retiring = [...schedulers]
-      await Promise.all(retiring.map(([, owned]) => owned.scheduler.suspend()))
-      // Each retired run settles here, so nothing it still holds is written after the pause below.
-      await Promise.allSettled(retiring.map(([, owned]) => owned.running))
-      for (const [runId, owned] of retiring) {
-        if (schedulers.get(runId) === owned) schedulers.delete(runId)
-      }
-      const sessionId = activeSessionId ?? deps.engine.runtime.sessionId()
-      if (sessionId !== undefined) recovery.pauseRunsForShutdown(sessionId)
-    },
+    pauseForShutdown: createShutdownPause({
+      sweeps,
+      reservations,
+      schedulers,
+      recovery,
+      sessionId: () => activeSessionId ?? deps.engine.runtime.sessionId(),
+      sessionRuns: (sessionId) => manager.list(sessionId).map((run) => run.runId),
+    }),
     dispose() {
       unregisterPauseSource?.()
       stopObservingSchedulers()

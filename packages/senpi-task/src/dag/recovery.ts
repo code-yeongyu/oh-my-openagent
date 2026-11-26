@@ -18,7 +18,7 @@ import { readDagNodeResult } from "./results"
 import { currentNodeTask, leaseAfterEvent, releaseDagRunLease } from "./run-lease"
 import { pauseRunsForShutdown } from "./recovery-shutdown"
 import { claimOrphanedRun, claimPausedRun } from "./recovery-claim"
-import { createDagRunReservations, type DagRunReservations } from "./run-acquisition"
+import { createDagRunReservations, type DagRunHeldReservations, type DagRunReservations } from "./run-acquisition"
 import { applyDagSchedulerEvent, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
@@ -78,7 +78,7 @@ export type DagRecovery = {
     pauseSeq: number,
     credential?: ResumeCredential,
   ) => Promise<InstalledDagRun | DagRecoveryOutcome>
-  readonly pauseRunsForShutdown: (parentSessionId: string) => readonly DagRunId[]
+  readonly pauseRunsForShutdown: (parentSessionId: string, held?: DagRunHeldReservations) => readonly DagRunId[]
   readonly resumePausedRuns: (
     parentSessionId: string,
     forkSourceSessionId?: string,
@@ -153,7 +153,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
         throw error
       }
     },
-    pauseRunsForShutdown: (parentSessionId) => pauseRunsForShutdown(context, parentSessionId),
+    pauseRunsForShutdown: (parentSessionId, held) => pauseRunsForShutdown(context, parentSessionId, held),
     resumePausedRuns: (parentSessionId, forkSourceSessionId) =>
       resumePausedRuns(context, parentSessionId, forkSourceSessionId),
     installPausedRuns: (parentSessionId, adopt, forkSourceSessionId) =>
@@ -198,11 +198,9 @@ async function visitPausedRuns(
     if (observed.pause?.reason === "user_stop") continue
     const foreign = observed.parentSessionId !== parentSessionId
     if (foreign && (forkSource === undefined || normalizeSessionId(observed.parentSessionId) !== forkSource)) continue
-    // The observed filters above are fast paths only: each claim re-decides on the fresh record.
-    const claim =
-      foreign && forkSource !== undefined
-        ? claimOrphanedRun(context, observed.runId, observed.parentSessionId, parentSessionId)
-        : claimPausedRun(context, observed.runId, parentSessionId, { kind: "automatic" })
+    const claim = foreign
+      ? claimOrphanedRun(context, observed.runId, observed.parentSessionId, parentSessionId)
+      : claimPausedRun(context, observed.runId, parentSessionId, { kind: "automatic" })
     if (claim.kind === "skipped") {
       if (!foreign && claim.reason === "live_lease") {
         outcomes.push({ runId: observed.runId, kind: "skipped", reason: claim.reason, holderPid: claim.holderPid })

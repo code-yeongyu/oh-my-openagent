@@ -15,6 +15,9 @@ export type DagRunReservation = {
   readonly release: () => void
 }
 
+/** Reservations a caller already holds for runs it hands to another step, which never releases them. */
+export type DagRunHeldReservations = ReadonlyMap<DagRunId, DagRunReservation>
+
 export type DagRunReservations = {
   /** Undefined when another operation of this process already holds the run. */
   readonly reserve: (runId: DagRunId, operation: string) => DagRunReservation | undefined
