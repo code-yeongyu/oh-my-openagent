@@ -181,6 +181,16 @@ export function runBusy(runId: DagRunId, operation: string): DagNodeControlError
   })
 }
 
+/** The one holder rule (`liveForeignHolder`) with this verb's probe, for a write decided elsewhere. */
+export function foreignHolderOf(options: DagSchedulerOptions): (fresh: DagRunRecordV1) => number | undefined {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  return (fresh) => liveForeignHolder(probe, fresh)
+}
+
 export function readRecord(store: DagFileStore, runId: DagRunId): DagRunRecordV1 | null {
   return store.readCheckpoint<DagRunRecordV1>(runId)
 }

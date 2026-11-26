@@ -8,6 +8,7 @@ import {
   acquireReentryLease,
   controlJournal,
   DagNodeControlError,
+  foreignHolderOf,
   ownedRecord,
   readRecord,
   refuseUnheldActiveNodes,
@@ -175,10 +176,19 @@ function amendRetryPrompt(
   // fingerprint is the decision. The rejection itself settles on a later tick and can never be
   // observed from this synchronous verb, so it is deliberately not consulted: a swallowed rejection
   // always leaves the fingerprint untouched, which is exactly the refusal below.
+  const holder = foreignHolderOf(options)
   void manager
-    .amend({ runId: record.runId, definition, parentSessionId: record.parentSessionId })
+    .amend({ runId: record.runId, definition, parentSessionId: record.parentSessionId, holder })
     .catch(() => undefined)
   const applied = readRecord(options.store, record.runId)
+  const heldBy = applied === null ? undefined : holder(applied)
+  if (applied !== null && applied.definitionFingerprint === record.definitionFingerprint && heldBy !== undefined) {
+    throw new DagNodeControlError({
+      code: "run_not_owned",
+      message: `dag run "${record.runId}" is held by live process ${heldBy}`,
+      runId: record.runId,
+    })
+  }
   if (applied === null || applied.definitionFingerprint === record.definitionFingerprint) {
     throw new DagNodeControlError({
       code: "invalid_arguments",

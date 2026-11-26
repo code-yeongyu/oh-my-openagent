@@ -1,6 +1,5 @@
-import { defaultSignaller } from "../lifecycle/context"
 import type { DagRunRecordV1 } from "./manager"
-import type { DagNodeId } from "./types"
+import type { DagEdge, DagNodeId } from "./types"
 
 export function pausedAmendmentUnsafe(record: DagRunRecordV1, nodeId: DagNodeId): boolean {
   const node = record.nodes.find((entry) => entry.id === nodeId)
@@ -11,8 +10,17 @@ export function pausedAmendmentUnsafe(record: DagRunRecordV1, nodeId: DagNodeId)
   )
 }
 
-// "Another" live lease: this process is never one (the run's own holder or the host that paused it).
-export function liveLeaseHolder(record: DagRunRecordV1): boolean {
-  const pid = record.leaseHolderPid ?? record.previousLeaseHolderPid
-  return pid !== undefined && pid !== process.pid && defaultSignaller.isAlive(pid)
+// Every node downstream of the seeds: an amendment that changes or adds a node invalidates them.
+export function transitiveDependents(edges: readonly DagEdge[], seeds: readonly DagNodeId[]): DagNodeId[] {
+  const dependents = new Map<DagNodeId, DagNodeId[]>()
+  for (const edge of edges) dependents.set(edge.from, [...(dependents.get(edge.from) ?? []), edge.to])
+  const visited = new Set<DagNodeId>()
+  const queue = [...seeds]
+  while (queue.length > 0) {
+    const id = queue.shift() as DagNodeId
+    if (visited.has(id)) continue
+    visited.add(id)
+    queue.push(...(dependents.get(id) ?? []))
+  }
+  return [...visited]
 }

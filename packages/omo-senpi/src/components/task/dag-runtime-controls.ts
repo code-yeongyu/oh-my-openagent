@@ -13,6 +13,7 @@ import { sendToDagNode } from "../../../../senpi-task/src/dag/node-send"
 import { applyPausedDagGuidance, type PausedDagGuideCommand } from "../../../../senpi-task/src/dag/paused-controls"
 import {
   acquireReentryLease,
+  foreignHolderOf,
   refuseUnheldActiveNodes,
   runBusy,
 } from "../../../../senpi-task/src/dag/node-control-context"
@@ -98,7 +99,8 @@ export function createDagRuntimeControls(ports: {
       const { abandon } =
         current.pause?.reason === "user_stop" ? { abandon: () => undefined } : acquireReentryLease(options, runId)
       try {
-        const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
+        const holder = foreignHolderOf(options)
+        const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId, holder })
         clearAdmissionLatch(runId)
         schedulers.delete(runId)
         if (amended.pause?.reason !== "user_stop")

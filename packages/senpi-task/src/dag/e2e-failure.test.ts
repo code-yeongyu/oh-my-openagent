@@ -12,20 +12,12 @@ import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { createTaskManager } from "../manager/manager"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { createInProcessManagedRunner, createRpcManagedRunner } from "../manager/runner"
-import type {
-  AdmitResident,
-  ChildPlanner,
-  ManagedRunner,
-  ManagedStartSpec,
-  ManagerStartSpec,
-  TaskManager,
-} from "../manager/types"
+import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, TaskManager } from "../manager/types"
 import { InProcessRunner, type ChildSession } from "../runners/in-process"
 import { buildChildArgs } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecordStore, resolveStateDir, type TaskRecordStore } from "../store"
 import { createInMemoryTaskRecordStore } from "../store/__fixtures__/in-memory-record-store"
-import type { TaskRecord } from "../state"
 import { dagFingerprint } from "./fingerprint"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagWaitSurface, type DagRunResult } from "./handle"
@@ -41,6 +33,7 @@ import {
   type DagScheduler,
 } from "./scheduler"
 import { createInMemoryDagStore, journalFilesOnDisk } from "./__fixtures__/in-memory-store"
+import { noLiveHolder } from "./__fixtures__/reattached-run"
 import { createDagSkillMaterializer } from "./skills"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
@@ -79,14 +72,6 @@ function tempProject(): string {
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-e2e-failure-"))
   cleanupRoots.push(root)
   return root
-}
-
-function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
-  let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
 }
 
 function categoryNode(
@@ -393,7 +378,7 @@ function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
       return reentry
     },
     async amend(input, runId) {
-      await manager.amend({ runId, definition: input, parentSessionId })
+      await manager.amend({ holder: noLiveHolder, runId, definition: input, parentSessionId })
       const reentry = reenterDagRun({
         store,
         taskManager,

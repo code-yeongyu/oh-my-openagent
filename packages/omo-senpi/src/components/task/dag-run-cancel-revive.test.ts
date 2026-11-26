@@ -1,7 +1,7 @@
-// A cancel of a `failed` run while one of its nodes is revived: the run is already settled, so the
-// cancel has nothing to cancel (unheldCancel is not eligible on a terminal run). The revived child
-// keeps running, this host's lease stays until the revive watcher folds it, and that fold - which
-// waits for the run's reservation - is ordered after the cancel and drops the lease (#15125).
+// Pins TODAY's answer, not a desired one: a cancel of a `failed` run while one of its nodes is revived
+// is a no-op (the run is settled; unheldCancel is not eligible on a terminal run), so the revived child
+// keeps running under this host's lease until its fold drops it. The stacked cancellation PR ("cancel
+// stops every child the run owns") decides whether that changes (#15125).
 import { afterEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 
@@ -15,8 +15,8 @@ afterEach(() => {
   for (const root of cleanupRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
 })
 
-describe("DAG cancel of a failed run with a revived node", () => {
-  test("#given a revived node of a failed run #when the run is cancelled #then the run stays failed, the child keeps running under this host's lease, and its fold drops the lease", async () => {
+describe("DAG cancel of a failed run with a revived node (current behaviour, pinned)", () => {
+  test("#given a revived node of a failed run #when the run is cancelled #then today the cancel is a no-op: the run stays failed, the child keeps running under this host's lease, and its fold drops the lease", async () => {
     // given
     const run = sendRun(cleanupRoots, ["a"])
     const revived = await run.send("a")

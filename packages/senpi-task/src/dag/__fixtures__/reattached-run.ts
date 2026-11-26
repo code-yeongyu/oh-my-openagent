@@ -229,3 +229,6 @@ export function awaitJournalEvents(
     },
   }
 }
+
+/** For amendments in tests that are not about holders: no other live process holds the run. */
+export const noLiveHolder = (): undefined => undefined
