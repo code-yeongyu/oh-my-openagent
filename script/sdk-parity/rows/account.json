@@ -297,8 +297,50 @@
           "open_browser": {
             "type": "boolean"
           },
-          "onUserCode": {},
-          "onOpenUrl": {},
+          "onUserCode": {
+            "x-callback": {
+              "args": [
+                {
+                  "type": "object",
+                  "required": [
+                    "verification_uri",
+                    "user_code",
+                    "matching_code",
+                    "expires_at"
+                  ],
+                  "properties": {
+                    "verification_uri": {
+                      "type": "string"
+                    },
+                    "user_code": {
+                      "type": "string"
+                    },
+                    "matching_code": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "answer": {
+                "x-nothing": true
+              }
+            }
+          },
+          "onOpenUrl": {
+            "x-callback": {
+              "args": [
+                {
+                  "type": "string"
+                }
+              ],
+              "answer": {
+                "x-nothing": true
+              }
+            }
+          },
           "deviceName": {
             "type": "string",
             "minLength": 1

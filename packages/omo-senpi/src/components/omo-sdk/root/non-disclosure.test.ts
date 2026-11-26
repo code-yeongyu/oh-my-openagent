@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { Database } from "bun:sqlite"
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -8,7 +9,13 @@ import { type OmoPrincipal, ROOT_CALLS, type RootCallKey } from "../contract"
 import { inputAccepts } from "../contract/validate"
 import type { OmoSdkPorts } from "../options"
 import { assembleOmoSdk } from "../assembly"
+import { createGatewayStore, type GatewayStore } from "../../thread/gateway/store"
+import type { RemoteThreadSurface } from "../../thread/remote/ports"
+import type { TableScenario } from "../../../../../../script/sdk-parity/expectation"
+import { createRecorder } from "../../../../../../script/sdk-parity/fakes/recorder"
+import { remotePort } from "../../../../../../script/sdk-parity/fakes/remote"
 import type { ThreadHost } from "../../thread/tools"
+import { createThreadSdk } from "../../thread/sdk"
 import { invalidInput } from "./assemble"
 import { boundaryRefusals } from "./authority"
 
@@ -57,6 +64,36 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
+// The gateway store is read column by column, not as bytes (design lane ruling): a caller's input may sit in exactly one
+// place, the delivery payload of a send (deliveries.body, the store of record for a message that must be delivered);
+// an asset canary sits nowhere. Its WAL and shared-memory files are read through the database, not searched as bytes.
+const GATEWAY_STORE = "gateway.sqlite"
+const INPUT_ALLOWED_IN_STORE = ["deliveries.body"] as const
+
+function storeColumnsHolding(path: string, canaries: readonly string[]): string[] {
+  const db = new Database(path, { readonly: true })
+  try {
+    const tables = db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+    return tables.flatMap(({ name }) => {
+      const rows = db.query(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all() as Record<string, unknown>[]
+      const columns = new Set<string>()
+      for (const row of rows)
+        for (const [column, value] of Object.entries(row))
+          if (
+            canaries.some((canary) =>
+              String(value instanceof Uint8Array ? Buffer.from(value).toString("latin1") : value).includes(canary),
+            )
+          )
+            columns.add(`${name}.${column}`)
+      return [...columns]
+    })
+  } finally {
+    db.close()
+  }
+}
+
+const isStoreFile = (path: string) => /gateway\.sqlite(-wal|-shm)?$/.test(path)
+
 function filesUnder(root: string): string[] {
   return readdirSync(root).flatMap((name) => {
     const path = join(root, name)
@@ -88,8 +125,61 @@ function canaryHost(fault: boolean): ThreadHost {
   }
 }
 
-function canaryPorts(fault: boolean): OmoSdkPorts {
-  return {
+function faultingStore(): GatewayStore {
+  const fails = failing(CANARIES.socketSecret)
+  return new Proxy({} as GatewayStore, {
+    get: (_target, name) => (name === "dispose" ? async () => undefined : name === "then" ? undefined : fails),
+  })
+}
+
+// The scan runs only on fakes (design lane ruling after a default port reached a real keychain helper): every port the
+// root takes is listed here, the type forces the list to name every port, and the scan fails by name before any call
+// when one is missing or not a registered fake. A slice that adds calls with new ports adds their fakes here.
+const FAKES = new WeakSet<object>()
+const fake = <T extends object>(port: T): T => {
+  FAKES.add(port)
+  return port
+}
+const PORT_NAMES = {
+  session: true,
+  credentialStore: true,
+  desktopLaunch: true,
+  host: true,
+  store: true,
+  remote: true,
+  now: true,
+  deviceServiceStatus: true,
+  signInProcess: true,
+  onUnexpected: true,
+  waitClock: true,
+} as const satisfies Record<keyof OmoSdkPorts, true>
+
+function notFake(ports: OmoSdkPorts): string[] {
+  return Object.keys(PORT_NAMES).filter((name) => {
+    const port: unknown = Reflect.get(ports, name)
+    return typeof port !== "object" && typeof port !== "function" ? true : port === null || !FAKES.has(port)
+  })
+}
+
+// A remote surface whose every operation fails (or, healthy, answers nothing), at any depth; closing it is quiet.
+function fakeRemote(fault: boolean): unknown {
+  const node = (): unknown =>
+    new Proxy(function () {}, {
+      get: (_target, name) => (name === "then" ? undefined : name === "close" ? async () => undefined : node()),
+      apply: () => (fault ? failing(CANARIES.socketSecret)() : Promise.resolve(undefined)),
+    })
+  return node()
+}
+
+// Healthy, the remote answers as the real one does from the scenario drivers' fake (a device listing other threads), so
+// a thread the caller names that no device lists reaches the core's not-found answer.
+function listingRemote(): RemoteThreadSurface {
+  const scenario = { id: "scan/listing", row: "threads.list", kind: "effect", input: {}, expect: [] } as TableScenario
+  return remotePort(createRecorder(scenario)).remote
+}
+
+function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
+  return withFakes(fault, home, {
     desktopLaunch: () => false,
     credentialStore: {
       read: fault
@@ -110,9 +200,31 @@ function canaryPorts(fault: boolean): OmoSdkPorts {
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
     host: canaryHost(fault),
+    // With ports faulting the gateway store faults too; healthy, it is a store the scan builds in its own scratch agent
+    // dir, so its file is read column by column.
+    store: fault ? faultingStore() : createGatewayStore({ agentDir: home }),
+    remote: fault ? (fakeRemote(true) as RemoteThreadSurface) : listingRemote(),
+    now: () => 1_764_000_000_000,
+    // B8's logger port: the scan's canaries reach it by design (it is the local log), so it records nothing here.
+    onUnexpected: () => undefined,
     // The thread controls honour the scan's 5 ms deadline (slice T1b); a clock that never moves keeps each on its ok path.
     waitClock: { now: () => started, after: () => () => undefined },
-  }
+  })
+}
+
+function scanPorts(fault: boolean, home: string): OmoSdkPorts {
+  const ports = canaryPorts(fault, home)
+  const missing = notFake(ports)
+  if (missing.length > 0)
+    throw new Error(
+      `the scan runs only on fake ports; not a fake: ${missing.join(", ")} (add the fake for every port a call uses)`,
+    )
+  return ports
+}
+
+function withFakes(_fault: boolean, _home: string, ports: OmoSdkPorts): OmoSdkPorts {
+  for (const port of Object.values(ports)) if (typeof port === "object" || typeof port === "function") fake(port)
+  return ports
 }
 
 const started = Date.now()
@@ -127,6 +239,37 @@ const PRINCIPALS = [
 
 type Captured = { readonly key: RootCallKey; readonly answer: unknown }
 
+// Which port each call touched (reach by case, design lane ruling): every port function is wrapped to record the call
+// running when it was invoked.
+let running: RootCallKey | undefined
+const touches: { readonly key: RootCallKey; readonly port: string }[] = []
+function recorded<T>(value: T, port: string): T {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null || Array.isArray(value)) return value
+  return new Proxy(value as object, {
+    apply: (target, self, args) => {
+      if (running !== undefined) touches.push({ key: running, port })
+      return Reflect.apply(target as (...inner: unknown[]) => unknown, self, args)
+    },
+    get: (target, name, receiver) =>
+      typeof name === "symbol" || name === "then"
+        ? Reflect.get(target, name, receiver)
+        : recorded(Reflect.get(target, name, receiver), `${port}.${name}`),
+  }) as T
+}
+
+// The pure calls (the registry's closed list): they touch no port.
+const ROWS_DIR = join(import.meta.dir, "../../../../../../script/sdk-parity/rows")
+const PURE_CALLS = new Set(
+  readdirSync(ROWS_DIR)
+    .filter((name) => name.endsWith(".json"))
+    .flatMap(
+      (name) =>
+        (JSON.parse(readFileSync(join(ROWS_DIR, name), "utf8")) as { rows: { sdk?: string; pure?: true }[] }).rows,
+    )
+    .filter((row) => row.pure === true && row.sdk !== undefined)
+    .map((row) => row.sdk as string),
+)
+
 // Each call runs twice: with every optional field, and with the required ones only, so an optional field this release
 // does not build (answered not_implemented before any port) cannot hide the core behind it.
 async function drive(key: RootCallKey, member: unknown, captured: Captured[]): Promise<void> {
@@ -135,6 +278,7 @@ async function drive(key: RootCallKey, member: unknown, captured: Captured[]): P
 }
 
 async function driveOnce(key: RootCallKey, member: unknown, captured: Captured[], input: unknown): Promise<void> {
+  running = key
   try {
     const answer = (member as (input: unknown, options: unknown) => unknown)(input, { deadline_ms: 5 })
     if (typeof answer === "object" && answer !== null && Symbol.asyncIterator in answer) {
@@ -144,8 +288,29 @@ async function driveOnce(key: RootCallKey, member: unknown, captured: Captured[]
     captured.push({ key, answer: await answer })
   } catch (error) {
     captured.push({ key, answer: error })
+  } finally {
+    running = undefined
   }
 }
+
+// Built, permitted calls that answer without touching a port, with every port faulting (observed; each with its reason).
+// Permitted, built calls that still answer without a port: GAPS, each with the slice that gives the call its port. The
+// list is closed and self-retiring: once the call touches a port, the exact-list check below fails until its entry is
+// removed. config.status reads the config files under the home directly; daemon.warm opens the daemon's socket directly.
+const PORT_GAPS: readonly {
+  readonly call: RootCallKey
+  readonly principals: readonly string[]
+  readonly owner: string
+}[] = [
+  { call: "config.status", principals: ["script", "person", "session", "service"], owner: "C1b" },
+  { call: "daemon.warm", principals: ["script", "person"], owner: "C1a" },
+]
+const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+  ["script", "person", "session", "connector", "service"].map((kind) => [
+    kind,
+    PORT_GAPS.filter((gap) => gap.principals.includes(kind)).map((gap) => gap.call),
+  ]),
+)
 
 // Where a caller's own input comes back in the answer to that caller, as observed (reported to the design lane).
 const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, readonly string[]>>>> = {
@@ -183,10 +348,7 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.extensions.call",
     ],
   },
-  fault: {
-    script: ["threads.receipt", "threads.extensions.call"],
-    person: ["threads.receipt", "threads.extensions.call"],
-  },
+  fault: {},
 }
 
 describe("the non-disclosure scan over the whole root", () => {
@@ -197,6 +359,49 @@ describe("the non-disclosure scan over the whole root", () => {
       nested: [{ error: new Error(`failed with ${CANARIES.privateKey}`) }],
     }
     expect(canariesIn(planted).length).toBeGreaterThanOrEqual(3)
+  })
+
+  test("#given the scan's ports with one left at its default #then the scan refuses to run, naming it (control)", () => {
+    const home = mkdtempSync(join(tmpdir(), "non-disclosure-default-port-"))
+    directories.push(home)
+    const { remote: _remote, ...withoutRemote } = canaryPorts(true, home)
+    expect(notFake(withoutRemote)).toEqual(["remote"])
+    expect(notFake({ ...withoutRemote, remote: fakeRemote(true) as RemoteThreadSurface })).toEqual(["remote"])
+    expect(notFake(canaryPorts(true, home))).toEqual([])
+  })
+
+  test("#given a store holding canaries in two tables #when it is read column by column #then each column is named (negative control)", () => {
+    const home = mkdtempSync(join(tmpdir(), "non-disclosure-store-"))
+    directories.push(home)
+    const path = join(home, GATEWAY_STORE)
+    const db = new Database(path)
+    db.run("CREATE TABLE deliveries (body TEXT, sender TEXT)")
+    db.run("CREATE TABLE receipts (result TEXT)")
+    db.query("INSERT INTO deliveries VALUES (?, ?)").run(`hi ${INPUT_CANARY}`, "s")
+    db.query("INSERT INTO receipts VALUES (?)").run(`echo ${INPUT_CANARY} ${CANARIES.accessToken}`)
+    db.close()
+    expect(storeColumnsHolding(path, [INPUT_CANARY]).toSorted()).toEqual(["deliveries.body", "receipts.result"])
+    expect(storeColumnsHolding(path, CANARY_VALUES)).toEqual(["receipts.result"])
+  })
+
+  // The shipped thread facade's store extension operations answer an unexpected store failure with fixed text (the
+  // thread core's own mapping); the store's exception never reaches the caller.
+  test("#given the shipped thread facade and a failing store #when it registers a store extension #then no canary reaches the caller", async () => {
+    const home = mkdtempSync(join(tmpdir(), "non-disclosure-facade-"))
+    directories.push(home)
+    const facade = createThreadSdk({ agentDir: home, cwd: home, uid: 501, user: "scan", store: faultingStore() })
+    const extension = {
+      name: "x",
+      migrations: [["create table t (id)"]],
+      moduleUrl: "file:///tmp/x.js",
+      sessionCallable: [],
+    }
+    const settled = await facade.registerStoreExtension(extension as never).then(
+      (answer) => answer,
+      (error: unknown) => error,
+    )
+    expect(settled).toMatchObject({ kind: "refused", code: "internal_error" })
+    expect(canariesIn(settled)).toEqual([])
   })
 
   test("#given every call of the root #when the driver builds its inputs #then both pass the call's schema, so the scan is never refused for its input", () => {
@@ -225,13 +430,14 @@ describe("the non-disclosure scan over the whole root", () => {
           return () => void (console[level] = original)
         })
         const captured: Captured[] = []
+        touches.length = 0
         const options = {
           env: { OMO_SERVICE_API_URL: "https://accounts.example.test", HOME: home, OMO_CODING_AGENT_DIR: home },
           cwd: home,
           home,
           agentDir: home,
           ...(principal === undefined ? {} : { principal }),
-          ports: canaryPorts(fault),
+          ports: recorded(scanPorts(fault, home), "ports"),
         }
         try {
           const root = assembleOmoSdk(options, {})
@@ -245,7 +451,18 @@ describe("the non-disclosure scan over the whole root", () => {
         } finally {
           for (const undo of restore) undo()
         }
-        const written = filesUnder(home).map((path) => ({ path, text: readFileSync(path, "latin1") }))
+        const paths = filesUnder(home)
+        const written = paths
+          .filter((path) => !isStoreFile(path))
+          .map((path) => ({ path, text: readFileSync(path, "latin1") }))
+        const stores = paths.filter((path) => path.endsWith(GATEWAY_STORE))
+        expect(stores.flatMap((path) => storeColumnsHolding(path, CANARY_VALUES))).toEqual([])
+        expect(
+          stores
+            .flatMap((path) => storeColumnsHolding(path, [INPUT_CANARY]))
+            .filter((column) => !(INPUT_ALLOWED_IN_STORE as readonly string[]).includes(column)),
+        ).toEqual([])
+        const strict = captured
         const everyCanary = [...CANARY_VALUES, INPUT_CANARY]
         expect({
           answers: canariesIn(captured),
@@ -281,5 +498,20 @@ describe("the non-disclosure scan over the whole root", () => {
             .map((entry): string => entry.key)
             .filter((key, index, keys) => keys.indexOf(key) === index),
         ).toEqual([...(EXPECTED_INPUT_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? [])])
+        // Reach by case, with every port faulting: a refused cell and a pure call stop before any port; a call that is
+        // permitted and built reaches a port, unless it is named below with the reason it answers without one.
+        if (fault) {
+          const touched = (key: string) => touches.some((touch) => touch.key === key)
+          const unbuilt = (key: string) =>
+            captured
+              .filter((entry) => entry.key === key)
+              .every((entry) => (errorOf(entry) as { readonly code?: unknown } | undefined)?.code === "not_implemented")
+          expect([...refused.keys()].filter(touched)).toEqual([])
+          expect([...PURE_CALLS].filter(touched)).toEqual([])
+          const silent: string[] = (Object.keys(ROOT_CALLS) as RootCallKey[]).filter(
+            (key) => !refused.has(key) && !PURE_CALLS.has(key) && !unbuilt(key) && !touched(key),
+          )
+          expect(silent).toEqual([...(ANSWERED_WITHOUT_A_PORT[principal?.kind ?? "script"] ?? [])])
+        }
       })
 })

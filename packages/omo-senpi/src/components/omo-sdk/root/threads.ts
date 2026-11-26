@@ -1,15 +1,12 @@
-import { threadToolParamSchemas, type ThreadCreateInput } from "../../thread/contracts"
+import type { ThreadCreateInput } from "../../thread/contracts"
 import type { GatewayStore } from "../../thread/gateway/store"
 import type { ProvenanceWorkspaces } from "../../thread/gateway/provenance-resolver"
 import type { WaitClock } from "../../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "../../thread/remote/ports"
-import { createThreadCore, type ThreadCore } from "../../thread/sdk-core"
-import { refusal } from "../../thread/refusal-texts"
-import { fail } from "../../thread/sdk-core/failures"
+import type { ThreadCore } from "../../thread/sdk-core"
 import type { ThreadHost } from "../../thread/tools/ports"
 import type { Endpoint, OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
 import type * as result from "../contract/results/threads"
-import { ROOT_CALLS } from "../contract/calls"
 import { extensionFailure } from "./extension-codes"
 import type { Members, NamespaceServing } from "./members"
 import { onRoot, threadFailure } from "./thread-failures"
@@ -41,8 +38,9 @@ type Input = Readonly<Record<string, unknown>>
 
 // A field of the call's input schema the core does not act on yet is answered as not built, never silently dropped; a
 // field outside the schema is left to the core, which refuses it by name as invalid_arguments (#14316).
-function unbuilt(key: RootCallKey, input: unknown, acted: readonly string[]): OmoFailure | undefined {
+async function unbuilt(key: RootCallKey, input: unknown, acted: readonly string[]): Promise<OmoFailure | undefined> {
   if (typeof input !== "object" || input === null) return undefined
+  const { ROOT_CALLS } = await import("../contract/calls")
   const schema = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
   return notActed(
     key,
@@ -74,6 +72,25 @@ export const isAbsoluteFileUrl = (value: string): boolean => {
   }
 }
 
+// A store extension operation that throws (its store failed unexpectedly) answers internal_error with fixed text: the
+// exception's own message and stack can carry what the store held, so they never reach the caller.
+const EXTENSION_UNEXPECTED: OmoFailure = {
+  kind: "error",
+  error: {
+    code: "internal_error",
+    message: "The store extension operation failed unexpectedly.",
+    next_action: "Call it again; if it fails again, run omo doctor.",
+  },
+}
+
+async function settledExtension<T>(run: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await run()
+  } catch {
+    return undefined
+  }
+}
+
 const LIST = ["all_scope", "state", "workspace", "device", "project", "name", "archived", "idempotency_key"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope", "limit", "idempotency_key"]
 const SEND = [
@@ -86,7 +103,10 @@ const SEND = [
   "collapse_key",
   "attachments",
 ]
-const CREATE = Object.keys(threadToolParamSchemas.thread_create.properties)
+// The thread core and its contracts are imported on the first thread call, not when the entry loads (design lane ruling on
+// the runtime's cold import): a script that only signs in never evaluates them.
+const createFields = async (): Promise<readonly string[]> =>
+  Object.keys((await import("../../thread/contracts")).threadToolParamSchemas.thread_create.properties)
 /** The object prompt's fields the root acts on; `summary` has no carrier yet and `author` is slice P1a-s's. */
 const FIRST = ["message", "delivery", "expected_turn_id", "attachments"]
 
@@ -95,9 +115,10 @@ const FIRST = ["message", "delivery", "expected_turn_id", "attachments"]
  * record a send to another device becomes, so a message with attachments is refused before any effect, never sent without
  * them.
  */
-function attachmentsRefused(attachments: unknown): OmoFailure | undefined {
+async function attachmentsRefused(attachments: unknown): Promise<OmoFailure | undefined> {
   if (!Array.isArray(attachments)) return undefined
   const count = attachments.length
+  const { refusal } = await import("../../thread/refusal-texts")
   return threadFailure(
     refusal("control.send_attachments_unsupported", { count: String(count) }, { field: "attachments", count }),
   )
@@ -115,24 +136,25 @@ type FirstPrompt = {
  * sendToTarget, with the creator's authority). The prompt's own delivery and the create's top-level one name one thing,
  * so two different values are refused rather than one silently chosen.
  */
-function createWithObjectPrompt(
+async function createWithObjectPrompt(
   input: Input,
   prompt: Input,
-  create: ThreadCore["create"],
-): OmoFailure | ReturnType<ThreadCore["create"]> {
+  core: ThreadCore,
+): Promise<OmoFailure | { readonly created: Awaited<ReturnType<ThreadCore["create"]>> }> {
   const { prompt: _prompt, ...rest } = input
   const refused =
-    unbuilt("threads.create", rest, CREATE) ??
+    (await unbuilt("threads.create", rest, await createFields())) ??
     notActed(
       "threads.create",
       Object.entries(prompt)
         .filter(([field, value]) => value !== undefined && !FIRST.includes(field))
         .map(([field]) => `prompt.${field}`),
     ) ??
-    attachmentsRefused(prompt["attachments"])
+    (await attachmentsRefused(prompt["attachments"]))
   if (refused !== undefined) return refused
   const first = prompt as FirstPrompt
-  if (rest["delivery"] !== undefined && first.delivery !== undefined && rest["delivery"] !== first.delivery)
+  if (rest["delivery"] !== undefined && first.delivery !== undefined && rest["delivery"] !== first.delivery) {
+    const { fail } = await import("../../thread/sdk-core/failures")
     return threadFailure(
       fail(
         "invalid_arguments",
@@ -140,11 +162,14 @@ function createWithObjectPrompt(
         "Pass the first prompt's delivery once, as prompt.delivery.",
       ).error,
     )
+  }
   const delivery = first.delivery ?? (rest["delivery"] as FirstPrompt["delivery"])
-  return create(
-    { ...(rest as ThreadCreateInput), prompt: first.message, ...(delivery === undefined ? {} : { delivery }) },
-    first.expected_turn_id === undefined ? undefined : { expected_turn_id: first.expected_turn_id },
-  )
+  return {
+    created: await core.create(
+      { ...(rest as ThreadCreateInput), prompt: first.message, ...(delivery === undefined ? {} : { delivery }) },
+      first.expected_turn_id === undefined ? undefined : { expected_turn_id: first.expected_turn_id },
+    ),
+  }
 }
 
 const env = (options: {
@@ -174,68 +199,82 @@ export function threadsNamespace(options: {
   // slice T2's or X1b's (design lane ruling), and the refused cells are answered before this at the root's boundary.
   if (options.principal.kind !== "script" && options.principal.kind !== "person")
     return { members: {}, releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }) }
-  let core: ThreadCore | undefined
-  const thread = (): ThreadCore =>
-    (core ??= createThreadCore({
-      agentDir: options.agentDir,
-      cwd: options.cwd,
-      uid: options.uid,
-      user: options.user,
-      env: env(options),
-      ...options.threads,
-      ...options.ports,
-    }))
+  let core: Promise<ThreadCore> | undefined
+  const thread = (): Promise<ThreadCore> =>
+    (core ??= import("../../thread/sdk-core").then(({ createThreadCore }) =>
+      createThreadCore({
+        agentDir: options.agentDir,
+        cwd: options.cwd,
+        uid: options.uid,
+        user: options.user,
+        env: env(options),
+        ...options.threads,
+        ...options.ports,
+      }),
+    ))
   const members: Members = {
     "threads.list": async (input = {}) =>
-      unbuilt("threads.list", input, LIST) ?? onRoot((await thread().list(input)) as result.ThreadListResult),
+      (await unbuilt("threads.list", input, LIST)) ??
+      onRoot((await (await thread()).list(input)) as result.ThreadListResult),
     "threads.read": async (input) =>
-      unbuilt("threads.read", input, READ) ?? onRoot((await thread().read(input)) as result.ThreadReadResult),
+      (await unbuilt("threads.read", input, READ)) ??
+      onRoot((await (await thread()).read(input)) as result.ThreadReadResult),
     "threads.send": async (input) => {
       if (input?.author !== undefined)
-        return threadFailure(fail("invalid_arguments", "author is a connector's field.", "Send without author.").error)
+        return threadFailure(
+          (await import("../../thread/sdk-core/failures")).fail(
+            "invalid_arguments",
+            "author is a connector's field.",
+            "Send without author.",
+          ).error,
+        )
       return (
-        unbuilt("threads.send", input, SEND) ??
-        attachmentsRefused(input?.attachments) ??
-        onRoot(await thread().send(input))
+        (await unbuilt("threads.send", input, SEND)) ??
+        (await attachmentsRefused(input?.attachments)) ??
+        onRoot(await (await thread()).send(input))
       )
     },
     "threads.locate": async (input) => {
-      const located = await thread().locate(input)
+      const located = await (await thread()).locate(input)
       if (located.kind === "error") return threadFailure(located.error)
       return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
     },
     "threads.create": async (input) => {
       if (typeof input?.prompt === "object" && input.prompt !== null) {
-        const created = createWithObjectPrompt(input as Input, input.prompt as Input, thread().create)
-        return "kind" in created ? created : onRoot((await created) as result.ThreadCreateResult)
+        const outcome = await createWithObjectPrompt(input as Input, input.prompt as Input, await thread())
+        return "created" in outcome ? onRoot(outcome.created as result.ThreadCreateResult) : outcome
       }
       return (
-        unbuilt("threads.create", input, CREATE) ??
-        onRoot((await thread().create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult)
+        (await unbuilt("threads.create", input, await createFields())) ??
+        onRoot(
+          (await (await thread()).create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult,
+        )
       )
     },
-    "threads.receipt": async (input) => onRoot((await thread().receipt(input)) as result.ThreadReceiptResult),
+    "threads.receipt": async (input) => onRoot((await (await thread()).receipt(input)) as result.ThreadReceiptResult),
     "threads.readAfterWait": async (input) =>
-      unbuilt("threads.readAfterWait", input, [...READ, "wait_ms"]) ??
-      onRoot((await thread().readAfterWait(input)) as result.ThreadReadAfterWaitResult),
-    "threads.messages": async (input) => onRoot((await thread().messages(input)) as result.ThreadMessagesResult),
+      (await unbuilt("threads.readAfterWait", input, [...READ, "wait_ms"])) ??
+      onRoot((await (await thread()).readAfterWait(input)) as result.ThreadReadAfterWaitResult),
+    "threads.messages": async (input) =>
+      onRoot((await (await thread()).messages(input)) as result.ThreadMessagesResult),
     "threads.interrupt": async (input, wait) =>
-      onRoot((await thread().interrupt(input, wait)) as result.ThreadInterruptResult),
+      onRoot((await (await thread()).interrupt(input, wait)) as result.ThreadInterruptResult),
     "threads.close": async (input = {}, wait) =>
-      onRoot((await thread().close(input, wait)) as result.ThreadCloseResult),
-    "threads.unload": async (input, wait) => onRoot((await thread().unload(input, wait)) as result.ThreadUnloadResult),
+      onRoot((await (await thread()).close(input, wait)) as result.ThreadCloseResult),
+    "threads.unload": async (input, wait) =>
+      onRoot((await (await thread()).unload(input, wait)) as result.ThreadUnloadResult),
     "threads.rename": async (input = {}, wait) =>
-      onRoot((await thread().rename(input, wait)) as result.ThreadRenameResult),
+      onRoot((await (await thread()).rename(input, wait)) as result.ThreadRenameResult),
     "threads.setModel": async (input, wait) =>
-      onRoot((await thread().setModel(input, wait)) as result.ThreadSetModelResult),
+      onRoot((await (await thread()).setModel(input, wait)) as result.ThreadSetModelResult),
     "threads.setReasoning": async (input, wait) =>
-      onRoot((await thread().setReasoning(input, wait)) as result.ThreadSetReasoningResult),
+      onRoot((await (await thread()).setReasoning(input, wait)) as result.ThreadSetReasoningResult),
     "threads.archive": async (input, wait) =>
-      onRoot((await thread().archive(input, wait)) as result.ThreadArchiveResult),
+      onRoot((await (await thread()).archive(input, wait)) as result.ThreadArchiveResult),
     "threads.release": async (input) => {
-      const refused = unbuilt("threads.release", input, ["thread", "interrupt", "force"])
+      const refused = await unbuilt("threads.release", input, ["thread", "interrupt", "force"])
       if (refused !== undefined) return refused
-      const released = onRoot(await thread().release(input))
+      const released = onRoot(await (await thread()).release(input))
       // Design lane ruling: the root's failures are refusals; the engine's release_unsupported reply (a row with no
       // local endpoint) is answered as one. The thread facade keeps the engine's shape through its own path.
       if (released.kind === "ok" && !released.value.success && released.value.error === "release_unsupported")
@@ -261,18 +300,22 @@ export function threadsNamespace(options: {
             details: { field: "moduleUrl" },
           },
         }
-      const registered = await thread().extensions.register(input)
+      const registered = await settledExtension(async () => (await thread()).extensions.register(input))
+      if (registered === undefined) return EXTENSION_UNEXPECTED
       return registered.kind === "ok" ? registered : extensionFailure(registered)
     },
     "threads.extensions.call": async (input) => {
-      const answered = await thread().extensions.call(input.name, input.op, input.args)
+      const answered = await settledExtension(async () =>
+        (await thread()).extensions.call(input.name, input.op, input.args),
+      )
+      if (answered === undefined) return EXTENSION_UNEXPECTED
       return answered.kind === "ok" ? answered : extensionFailure(answered)
     },
     "daemon.warm": async (input = {}) => {
-      const refused = unbuilt("daemon.warm", input, [])
+      const refused = await unbuilt("daemon.warm", input, [])
       if (refused !== undefined) return refused
       try {
-        return { kind: "ok", value: await thread().warm() }
+        return { kind: "ok", value: await (await thread()).warm() }
       } catch (error) {
         // The warm's own transport error, as `omo daemon run` prints it today; slice C1a words it as the daemon core's.
         const message = error instanceof Error ? error.message : String(error)
@@ -289,7 +332,7 @@ export function threadsNamespace(options: {
     members,
     // The thread facade's release (design lane ruling on threads.release): the row its caller located, released where
     // that row is served, with no second lookup. Reachable only through the internal assembly, never the public root.
-    releaseLocated: (located, request) => thread().releaseRow(located, request),
-    dispose: async () => (core === undefined ? disposePorts() : core.dispose()),
+    releaseLocated: async (located, request) => (await thread()).releaseRow(located, request),
+    dispose: async () => (core === undefined ? disposePorts() : (await core).dispose()),
   }
 }
