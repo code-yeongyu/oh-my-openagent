@@ -82,7 +82,9 @@ pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM)
 /// [`posted_chord_refusal`] refuses a chord or hold that would post a
 /// non-modifier key under a held modifier before anything is posted. It sees
 /// only that chord's keys, so while a failed Alt release is still held in the
-/// ledger, a later plain key on this route goes out as a `WM_SYS*` message.
+/// ledger, a later plain key pressed or held on this route through the ledger
+/// goes out as a `WM_SYS*` message (typed text posts Enter with `alt_down`
+/// false).
 pub(super) fn post_key(window: Window, vk: u16, down: bool, alt_down: bool) -> CoreResult<()> {
     let (message, lparam) = key_message(vk, native::scan_code(vk), down, alt_down);
     post(window, message, usize::from(vk), lparam)
