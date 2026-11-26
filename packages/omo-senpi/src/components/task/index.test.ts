@@ -263,6 +263,8 @@ describe("omo-senpi task component wiring", () => {
         "session_start",
         ...prewarmEvents,
         ...parentModeWakeEvents,
+        // senpi's full session stop cancels this session's children (#14390)
+        "session_stop",
       ].sort(),
     )
   })
