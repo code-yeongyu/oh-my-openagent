@@ -11,6 +11,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { load } from "js-yaml"
+import { SDK_RUNTIME_FILES } from "../packages/omo-senpi/plugin/scripts/runtime-files.mjs"
 
 const checker = fileURLToPath(new URL("./release-state-paths.mjs", import.meta.url))
 const probe = fileURLToPath(new URL("../.github/scripts/base-platform-green.sh", import.meta.url))
@@ -46,6 +47,20 @@ describe("#given the release stamp's path check", () => {
     ["a runtime bundle the bundle check does not compare", "packages/omo-senpi/plugin/runtime/dag/sdk.js"],
   ])("#then %s is outside the stamp", (_name, path) => {
     expect(check(["package.json", path]).status).toBe(1)
+  })
+
+  // Every SDK runtime file is a row of the runtime-files table (slice P1c, #15031) and the bundle check rebuilds and
+  // compares each one, so a stamp that regenerates any of them must pass; the checker is self-contained, so this test is
+  // what ties a new row to the list.
+  test("#then every SDK runtime file of the runtime-files table is inside the stamp", () => {
+    const outputs = SDK_RUNTIME_FILES.map((row) => `packages/omo-senpi/plugin/${row.output}`)
+    expect(outputs.filter((path) => check(["package.json", path]).status !== 0)).toEqual([])
+  })
+
+  test("#then a file beside the SDK runtime files that is no row of the table is outside the stamp", () => {
+    const run = check(["package.json", "packages/omo-senpi/plugin/runtime/omo-sdk/stray.js"])
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain("packages/omo-senpi/plugin/runtime/omo-sdk/stray.js")
   })
 
   test("#then prepare-release-state pipes its staged stamp through the check before committing", () => {
