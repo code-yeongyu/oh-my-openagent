@@ -171,10 +171,13 @@ const usedCodes = (
   const used = new Map<string, Set<string>>()
   for (const scenario of files.flatMap((file) => file.scenarios)) {
     const row = inScope.get(scenario.row)
-    // A refusal read from the answered value (release's engine reply) is the engine's own error, not an OmoCode.
-    const fromValue = scenario.refusal_from === "value"
-    if (scenario.refusal === undefined || row === undefined || fromValue) continue
-    used.set(scenario.refusal, (used.get(scenario.refusal) ?? new Set()).add(namespaceOf(row.sdk)))
+    if (row === undefined) continue
+    // Every call of the scenario returns its code, a `then` step included.
+    for (const call of [scenario, ...(scenario.then ?? [])]) {
+      // A refusal read from the answered value (release's engine reply) is the engine's own error, not an OmoCode.
+      if (call.refusal === undefined || call.refusal_from === "value") continue
+      used.set(call.refusal, (used.get(call.refusal) ?? new Set()).add(namespaceOf(row.sdk)))
+    }
   }
   return used
 }

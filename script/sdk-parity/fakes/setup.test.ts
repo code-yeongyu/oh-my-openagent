@@ -80,8 +80,13 @@ const scenarioOf = (id: string): TableScenario => {
   if (found === undefined) throw new Error(`no scenario ${id}`)
   return found
 }
+// A `then` step's problem (`<id>#step2`) is its scenario's difference: an entry names the scenario.
 const failing = (problems: readonly string[]): string[] =>
-  [...new Set(problems.flatMap((problem) => /scenario (\S+\/\S+?)(?::| )/.exec(problem)?.[1] ?? []))].toSorted()
+  [
+    ...new Set(
+      problems.flatMap((problem) => /scenario (\S+\/\S+?)(?::| )/.exec(problem)?.[1]?.replace(/#step\d+$/, "") ?? []),
+    ),
+  ].toSorted()
 async function judged(changed: TableScenario): Promise<string[]> {
   const row = rows.find((candidate) => candidate.id === changed.row)
   if (row === undefined) throw new Error(`no row ${changed.row}`)
