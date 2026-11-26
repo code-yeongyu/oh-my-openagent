@@ -15,6 +15,7 @@ import {
 } from "../../../../senpi-task/src/dag/run-acquisition"
 import { releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
+import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
 
 export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
 
@@ -32,6 +33,8 @@ export function createDagSchedulerRegistry(ports: {
   readonly logger: ComponentLogger
   readonly isProcessAlive: (pid: number) => boolean
   readonly reservations: DagRunReservations
+  // Re-runs this session's recovery: a run whose scheduler here failed is handed to it.
+  recover(sessionId: string): Promise<void>
 }) {
   const { schedulers, store, schedulerOptions, logger } = ports
   const lease = {
@@ -42,6 +45,14 @@ export function createDagSchedulerRegistry(ports: {
 
   /** "This host holds the run": a scheduler of this runtime is running it (started or installed here). */
   const holdsRun = (runId: DagRunId): boolean => schedulers.get(runId)?.running !== undefined
+  const onSchedulerEnded = createSchedulerFailureHandler({
+    schedulerOptions,
+    reservations: ports.reservations,
+    probe: lease,
+    logger,
+    holdsRun,
+    recover: (sessionId) => ports.recover(sessionId),
+  })
 
   const register = (runId: DagRunId, initialRecord: DagRunRecordV1): void => {
     const owned: OwnedScheduler = { scheduler: createDagScheduler({ ...schedulerOptions, initialRecord }) }
@@ -53,6 +64,7 @@ export function createDagSchedulerRegistry(ports: {
     const running = run
       .then(async (record) => {
         await owned.scheduler.whenIdle()
+        onSchedulerEnded.settled(runId)
         return record
       })
       .finally(() => {
@@ -67,6 +79,8 @@ export function createDagSchedulerRegistry(ports: {
         runId,
         error: error instanceof Error ? error.message : String(error),
       })
+      // The run is left `running` with nothing driving it: hand it on (recovery, or park) at once.
+      void onSchedulerEnded.failed(runId, owned.scheduler.snapshot().parentSessionId)
     })
   }
 
