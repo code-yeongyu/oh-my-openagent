@@ -18,6 +18,7 @@ import { applyDagSchedulerEvent } from "./scheduler-projection"
 import { cancelRun, whenAdmissionIdle } from "./scheduler-cancellation"
 import { runFrontier } from "./scheduler-frontier"
 import { attachTaskSettlement, watchRevivedInScheduler, disposePromotionWatch } from "./scheduler-task-attachment"
+import { disposeSelfResumeWatches, followCompletedNodeTasks } from "./scheduler-self-resume"
 import { createInfrastructureRetries, type RetrySchedule } from "./infrastructure-retry"
 export { applyDagSchedulerEvent } from "./scheduler-projection"
 export { DAG_NODE_CONTROL_ERROR_CODES, DagNodeControlError } from "./node-control-context"
@@ -73,6 +74,8 @@ export type DagScheduler = {
   /** Retires this controller without cancelling children; await before releasing its lease. */
   readonly suspend: () => Promise<void>
   readonly snapshot: () => DagRunRecordV1
+  /** True from the moment cancel starts, before the run's cancellation is journaled. */
+  readonly cancelling: () => boolean
   readonly subscribe: (listener: DagJournalListener) => () => void
   readonly whenIdle: () => Promise<void>
   /**
@@ -146,6 +149,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
     promotionWatches: new Map<DagNodeId, () => void>(),
+    selfResumeWatches: new Map<DagNodeId, () => void>(),
   }
   // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
   // instance, and a journal cache refreshes only on its own appends. Without this subscription a
@@ -165,13 +169,17 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     if (status === "completed" || status === "failed" || status === "cancelled") unsubscribeCommits()
   })
   for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
-    context.attachedTaskIds.set(nodeId, taskId)
     attachTaskSettlement(context, nodeId, taskId)
   }
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => (running ??= runFrontier(context)),
+    run: () => {
+      if (running !== undefined) return running
+      followCompletedNodeTasks(context)
+      running = runFrontier(context).finally(() => disposeSelfResumeWatches(context))
+      return running
+    },
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     suspend: async () => {
       context.suspended = true
@@ -179,6 +187,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       context.resolveCancellationRequested()
       unsubscribeCommits()
       for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
+      disposeSelfResumeWatches(context)
       await whenAdmissionIdle(context)
       if (context.cancellationOperation !== undefined) await context.cancellationOperation
       await journal.whenIdle()
@@ -187,6 +196,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       context.attachedTaskIds.clear()
     },
     snapshot: journal.snapshot,
+    cancelling: () => context.cancellationStarted,
     subscribe: journal.subscribe,
     whenIdle: journal.whenIdle,
     retryNode: (runId, nodeIds, retryOptions) => retryDagNodes(options, runId, nodeIds, retryOptions),

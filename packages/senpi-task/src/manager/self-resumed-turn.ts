@@ -4,6 +4,7 @@ import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { buildRevived } from "../steering/engine-policy"
 import type { ManagedChildHandle } from "./child-handle"
+import type { OwnerResumeFence, OwnerResumeVerdict } from "./types"
 import { publishHostTaskStatus } from "./host-task-status"
 import { nowIso } from "./manager-helpers"
 
@@ -18,6 +19,32 @@ export type SelfResumedTurnPorts = {
     taskId: string,
   ) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
   readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
+  readonly ownerResumeFence?: OwnerResumeFence
+  readonly markRefusedStop: (taskId: string, handle: ManagedChildHandle, disposition: "retire" | "hold") => void
+  readonly stopRefusedRun: (taskId: string) => Promise<boolean>
+  readonly announce: (taskId: string) => void
+}
+
+/** Per-task listeners told that a settled task reopened itself (TaskManager.subscribeSelfResumed). */
+export function createSelfResumedListeners(): {
+  readonly subscribe: (taskId: string, listener: () => void) => () => void
+  readonly announce: (taskId: string) => void
+} {
+  const listeners = new Map<string, Set<() => void>>()
+  return {
+    subscribe(taskId, listener) {
+      const forTask = listeners.get(taskId) ?? new Set<() => void>()
+      forTask.add(listener)
+      listeners.set(taskId, forTask)
+      return () => {
+        forTask.delete(listener)
+        if (forTask.size === 0 && listeners.get(taskId) === forTask) listeners.delete(taskId)
+      }
+    },
+    announce(taskId) {
+      for (const listener of [...(listeners.get(taskId) ?? [])]) listener()
+    },
+  }
 }
 
 function reopenable(
@@ -57,13 +84,25 @@ export async function reopenSelfResumedTurn(
   const epoch = nextRunEpoch(settled)
   const reservation = ports.reserveForRevive(taskId)
   let reopened = false
+  let refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }> | undefined
   ports.store.mutate(taskId, (fresh) => {
     if (!reopenable(fresh, handle, ports) || nextRunEpoch(fresh) !== epoch) return fresh
+    // The owner answers in the same synchronous step as the reopen: whatever it journaled before is
+    // seen here, and whatever it does after sees a running record (#11381).
+    const verdict = fresh.owner?.kind === "dag" ? ports.ownerResumeFence?.(fresh) : undefined
+    if (verdict?.kind === "refuse") {
+      refusal = verdict
+      return fresh
+    }
     reopened = true
     return { ...buildRevived(fresh, nowIso(ports.now)), resumed_run_epoch: epoch }
   })
   if (!reopened) {
+    // Marked before any await: from this step on the refused turn counts as live until its stop is
+    // confirmed, for every reader of the run's live children (#11381).
+    if (refusal !== undefined) ports.markRefusedStop(taskId, handle, refusal.disposition)
     if (reservation.ok) reservation.release()
+    if (refusal !== undefined) await refuseSelfResumedRun(ports, taskId, epoch, refusal)
     return
   }
   ports.store.appendEvent(taskId, { type: "task_self_resumed", payload: { run_epoch: epoch } })
@@ -72,5 +111,27 @@ export async function reopenSelfResumedTurn(
   // A resumed run is already doing its work: a full lane may deny it a slot, but never its result.
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)
+  // Owners that folded the earlier outcome (a DAG node) re-watch the task for this run's end (omo#10487).
+  ports.announce(taskId)
   log("senpi-task child resumed on its own after its turn settled", { taskId, runEpoch: epoch })
+}
+
+async function refuseSelfResumedRun(
+  ports: SelfResumedTurnPorts,
+  taskId: string,
+  epoch: number,
+  refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }>,
+): Promise<void> {
+  const { reason, disposition } = refusal
+  ports.store.appendEvent(taskId, {
+    type: "task_self_resume_refused",
+    payload: { run_epoch: epoch, reason, disposition },
+  })
+  log("senpi-task refused a run a settled DAG child started on its own", {
+    taskId,
+    runEpoch: epoch,
+    reason,
+    disposition,
+  })
+  await ports.stopRefusedRun(taskId)
 }
