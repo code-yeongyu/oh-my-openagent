@@ -39,7 +39,11 @@ function node(id: string, dependsOn?: readonly string[]) {
  * and the checkpoint put back the way a kill leaves it: `running`, the pause never written, the
  * lease naming the dead host. That child died with its host, so nothing in the successor backs it.
  */
-async function killedHostFixture(name: string, holder: { alive: boolean }) {
+async function killedHostFixture(
+  name: string,
+  holder: { alive: boolean },
+  leftAt: "mid-node" | "between-nodes" = "mid-node",
+) {
   const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-killed-${name}-`))
   cleanupRoots.push(cwd)
   const sessionId = `session-killed-${name}`
@@ -78,21 +82,26 @@ async function killedHostFixture(name: string, holder: { alive: boolean }) {
   const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
   if (paused === null) throw new Error("expected the first runtime to leave a checkpoint")
   const { previousLeaseHolderPid: _previous, ...record } = paused
-  store.writeCheckpoint(runId, { ...record, status: "running", leaseHolderPid: FOREIGN_HOST_PID })
+  const nodes =
+    leftAt === "mid-node"
+      ? record.nodes
+      : record.nodes.map((entry) => (entry.id === "first" ? { ...entry, state: "completed" as const } : entry))
+  store.writeCheckpoint(runId, { ...record, nodes, status: "running", leaseHolderPid: FOREIGN_HOST_PID })
 
   const timers = new ManualTimers()
   const errors: string[] = []
   const pi = new FakeExtensionAPI()
+  const runner = new ScriptedRunner()
   const runtime: DagRuntime = createDagRuntime({
     pi,
-    engine: engineFor(pi, new ScriptedRunner()),
+    engine: engineFor(pi, runner),
     logger: { ...quietLogger, error: (message: string) => errors.push(message) },
     leaseWatch: { isProcessAlive: (pid) => pid === FOREIGN_HOST_PID && holder.alive, timers, intervalMs: 250 },
   })
   const eventTypes = (): readonly DagRunEvent["type"][] =>
     store.readEvents(runId, 0, { limit: 200 }).events.map((event) => event.type)
   const status = (): string => store.readCheckpoint<{ readonly status: string }>(runId)?.status ?? "missing"
-  return { runId, sessionId, timers, errors, runtime, eventTypes, status }
+  return { runId, sessionId, timers, errors, runner, runtime, eventTypes, status }
 }
 
 describe("DAG runtime recovery of a run its host left running", () => {
@@ -142,6 +151,24 @@ describe("DAG runtime recovery of a run its host left running", () => {
     // then
     expect(eventTypes()).toContain("dag.run.resumed")
     expect(result.status).toBe("failed")
+    runtime.dispose()
+  })
+
+  test("#given a run a live host holds between two nodes #when the session reopens #then this host starts none of its nodes", async () => {
+    // given - nothing is attached, so only the lease says the run is taken
+    const fixture = await killedHostFixture("live-holder-between-nodes", { alive: true }, "between-nodes")
+    const { timers, errors, runner, runtime, eventTypes, status } = fixture
+    const before = eventTypes()
+
+    // when
+    await within(runtime.attach(), "attach")
+
+    // then
+    expect(status()).toBe("running")
+    expect(eventTypes()).toEqual(before)
+    expect(runner.handles).toHaveLength(0)
+    expect(errors).toEqual([])
+    expect(timers.pending()).toBe(1)
     runtime.dispose()
   })
 })

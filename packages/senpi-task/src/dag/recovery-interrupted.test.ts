@@ -139,6 +139,32 @@ describe("DAG recovery of a run its host left running", () => {
     expect(resumedEvents(fixture.store)).toBe(0)
   })
 
+  test("#given a run left running whose node still has to launch #when two recovery sweeps overlap #then one claims it and the other leaves it to this host", async () => {
+    // given - the claimed run is still launching its child when the second sweep reads it
+    const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-interrupted-"))
+    cleanupRoots.push(directory)
+    const store = createDagFileStore(ownedTaskState(directory))
+    const manager = new LongRunningTaskManager()
+    const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(definition, {
+      slow: { state: "scheduled" },
+      next: { state: "pending" },
+    })
+    store.writeCheckpoint(runId, { ...paused, status: "running", leaseHolderPid: DEAD_HOST_PID })
+    const recovery = recoveryFor({ store, manager }, { isProcessAlive: () => false, isRunHeldInProcess: () => false })
+
+    // when
+    const [first, second] = await Promise.all([
+      recovery.resumePausedRuns(parentSessionId),
+      recovery.resumePausedRuns(parentSessionId),
+    ])
+
+    // then
+    expect(first.map((outcome) => outcome.kind)).toEqual(["resumed"])
+    expect(second).toEqual([{ runId, kind: "skipped", reason: "live_lease", holderPid: THIS_HOST_PID }])
+    expect(resumedEvents(store)).toBe(1)
+    expect(manager.startOwnedCalls).toEqual(["slow", "next"])
+  }, 30_000)
+
   for (const [given, isRunHeldInProcess] of [
     ["this process still schedules", () => true],
     ["no in-process registry can vouch for", undefined],

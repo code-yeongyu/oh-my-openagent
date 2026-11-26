@@ -581,12 +581,16 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     } finally {
       clearSubscriptions(recoveryTaskSubscriptions)
     }
+    // A run recovery left to a live holder is that holder's to schedule, whatever its nodes look like.
+    const leased = new Set<DagRunId>()
     for (const outcome of outcomes) {
-      if (outcome.kind === "skipped" && outcome.reason === "live_lease" && outcome.holderPid !== undefined) {
-        watchLiveLease(scope, { ...outcome, holderPid: outcome.holderPid })
-      }
+      if (outcome.kind !== "skipped" || outcome.reason !== "live_lease") continue
+      leased.add(outcome.runId)
+      if (outcome.holderPid !== undefined) watchLiveLease(scope, { ...outcome, holderPid: outcome.holderPid })
     }
-    for (const run of manager.list(scope.sessionId)) ensureScheduled(run.runId, scope.sessionId)
+    for (const run of manager.list(scope.sessionId)) {
+      if (!leased.has(run.runId)) ensureScheduled(run.runId, scope.sessionId)
+    }
   }
 
   const unregisterPauseSource = deps.engine.runPause?.register(

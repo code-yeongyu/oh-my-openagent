@@ -106,6 +106,10 @@ export type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskM
   readonly hostPid: number
   readonly isProcessAlive: (pid: number) => boolean
   readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
+  // Runs this recovery has claimed and is still installing. A claim writes our pid as the lease
+  // before the scheduler exists, so until the caller holds that scheduler a second sweep would
+  // read the run as ours-but-unheld and claim it again.
+  readonly installing: Set<DagRunId>
   readonly now: () => number
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
@@ -130,6 +134,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     hostPid: options.hostPid ?? process.pid,
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
     ...(options.isRunHeldInProcess === undefined ? {} : { isRunHeldInProcess: options.isRunHeldInProcess }),
+    installing: new Set(),
     now: options.now ?? Date.now,
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     ...(options.pausedChildren === undefined ? {} : { pausedChildren: options.pausedChildren }),
@@ -145,10 +150,14 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
       if (record?.pause?.pauseSeq !== pauseSeq) return { kind: "skipped", runId, reason: "not_paused" }
       const claim = claimPausedRun(context, runId, parentSessionId)
       if (claim.kind === "skipped") return { ...claim, runId }
-      return installResumedRun(
-        { ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) },
-        claim.record,
-      )
+      try {
+        return await installResumedRun(
+          { ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) },
+          claim.record,
+        )
+      } finally {
+        context.installing.delete(runId)
+      }
     },
     pauseRunsForShutdown: (parentSessionId) => pauseRunsForShutdown(context, parentSessionId),
     resumePausedRuns: (parentSessionId, forkSourceSessionId) =>
@@ -224,7 +233,11 @@ async function visitPausedRuns(
       }
       continue
     }
-    outcomes.push(await recover(claim.record, foreign))
+    try {
+      outcomes.push(await recover(claim.record, foreign))
+    } finally {
+      context.installing.delete(observed.runId)
+    }
   }
   return outcomes
 }
@@ -239,6 +252,7 @@ function normalizeSessionId(sessionId: string | undefined): string | undefined {
 function claimOrphanedRun(context: RecoveryContext, observed: RecoverableRecord, parentSessionId: string): ClaimedRun {
   const runId = observed.runId
   return context.store.withRunLock(runId, () => {
+    if (context.installing.has(runId)) return { kind: "skipped", reason: "live_lease", holderPid: context.hostPid }
     const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
     if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
     if (fresh.parentSessionId !== observed.parentSessionId) return { kind: "skipped", reason: "foreign_session" }
@@ -256,12 +270,14 @@ function claimOrphanedRun(context: RecoveryContext, observed: RecoverableRecord,
       leaseHolderPid: context.hostPid,
     }
     context.store.writeCheckpoint(runId, claimed)
+    context.installing.add(runId)
     return { kind: "claimed", record: claimed }
   })
 }
 
 function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSessionId: string): ClaimedRun {
   return context.store.withRunLock(runId, () => {
+    if (context.installing.has(runId)) return { kind: "skipped", reason: "live_lease", holderPid: context.hostPid }
     const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
     if (fresh === null) return { kind: "skipped", reason: "not_paused" }
     // A host that dies without its shutdown pause (kill, crash, power loss) leaves the run `running`.
@@ -277,6 +293,7 @@ function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSession
     }
     const claimed: RecoverableRecord = { ...fresh, leaseHolderPid: context.hostPid }
     context.store.writeCheckpoint(runId, claimed)
+    context.installing.add(runId)
     return { kind: "claimed", record: claimed }
   })
 }
