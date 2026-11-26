@@ -11,6 +11,7 @@ import {
 import { retryDagNodes } from "../../../../senpi-task/src/dag/node-retry"
 import { sendToDagNode } from "../../../../senpi-task/src/dag/node-send"
 import { applyPausedDagGuidance, type PausedDagGuideCommand } from "../../../../senpi-task/src/dag/paused-controls"
+import { refuseUnheldActiveNodes } from "../../../../senpi-task/src/dag/node-control-context"
 
 type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
 
@@ -58,6 +59,7 @@ export function createDagRuntimeControls(ports: {
 
   const amend = async (runId: DagRunId, definition: DagDefinition): Promise<DagRunSnapshot> => {
     const sessionId = ports.sessionId()
+    refuseUnheldActiveNodes(coreManager.record(runId, sessionId))
     const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
     clearAdmissionLatch(runId)
     schedulers.delete(runId)

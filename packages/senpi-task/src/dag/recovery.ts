@@ -21,7 +21,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
-import { liveChildOwner, liveForeignHolder, ownerKey, releaseDagRunLease } from "./run-lease"
+import { currentNodeTask, liveChildOwner, liveForeignHolder, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
@@ -362,10 +362,7 @@ async function reconcileNodes(
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue
     if (observed.state !== "scheduled" && observed.state !== "running" && observed.state !== "paused") continue
 
-    const owned = context.taskManager.findOwnedTask(ownerKey(journal.snapshot(), observed.id))
-    // Retrying retains taskId until the next admission batch attaches its replacement. The
-    // newest owner is authoritative even if that replacement launched before the batch committed.
-    let task = owned ?? (observed.taskId === undefined ? undefined : context.taskManager.get(observed.taskId))
+    let task = currentNodeTask(context.taskManager, journal.snapshot(), observed)
     if (task !== undefined && observed.taskId !== task.task_id) attachTask(journal, observed.id, task.task_id)
 
     if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {

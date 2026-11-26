@@ -9,7 +9,6 @@ import type {
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { ComponentLogger } from "../../extension/types"
-import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 import { releaseDagRunLease, takeDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
 
@@ -28,10 +27,10 @@ export function createDagSchedulerRegistry(ports: {
   readonly coreManager: DagManager
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
   readonly logger: ComponentLogger
-  readonly isProcessAlive?: (pid: number) => boolean
+  readonly isProcessAlive: (pid: number) => boolean
 }) {
   const { schedulers, store, coreManager, schedulerOptions, logger } = ports
-  const lease = { hostPid: process.pid, isProcessAlive: ports.isProcessAlive ?? defaultSignaller.isAlive }
+  const lease = { hostPid: process.pid, isProcessAlive: ports.isProcessAlive }
 
   const controller = (runId: DagRunId, parentSessionId: string): OwnedScheduler => {
     const existing = schedulers.get(runId)

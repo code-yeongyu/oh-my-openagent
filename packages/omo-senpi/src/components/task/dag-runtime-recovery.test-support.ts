@@ -85,6 +85,7 @@ export function within<T>(promise: Promise<T>, step: string): Promise<T> {
 
 export class ScriptedRunner implements ManagedRunner {
   readonly handles: Array<{ readonly spec: ManagedStartSpec; readonly settle: (output: string) => void }> = []
+  readonly aborted: string[] = []
   readonly #started = new Map<number, ReturnType<typeof deferred<undefined>>>()
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
@@ -96,6 +97,7 @@ export class ScriptedRunner implements ManagedRunner {
       steer: () => Promise.resolve(),
       followUp: () => Promise.resolve(),
       abort: () => {
+        this.aborted.push(spec.taskId)
         outcome.resolve({ status: "cancelled" })
         return Promise.resolve()
       },

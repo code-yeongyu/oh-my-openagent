@@ -2,9 +2,10 @@
 // on a checkpoint written before every scheduler recorded one.
 import { isTerminalRecord } from "../manager/manager-helpers"
 import type { TaskManager } from "../manager/types"
+import type { TaskRecord } from "../state"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
-import type { DagNodeId, DagRunId } from "./types"
+import type { DagNode, DagNodeId, DagRunId } from "./types"
 
 export type DagRunHolderProbe = {
   readonly taskManager: Pick<TaskManager, "get" | "findOwnedTask">
@@ -19,18 +20,28 @@ export function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
   return { kind: "dag" as const, runId: record.runId, nodeId }
 }
 
+// A node's current child: retrying retains the checkpoint's taskId until the next admission batch
+// attaches its replacement, and an admitted child exists before that batch commits, so the newest
+// owned task is authoritative and the checkpoint's taskId is only the fallback.
+export function currentNodeTask(
+  taskManager: Pick<TaskManager, "get" | "findOwnedTask">,
+  record: DagRunRecordV1,
+  node: Pick<DagNode, "id" | "taskId">,
+): TaskRecord | undefined {
+  return (
+    taskManager.findOwnedTask(ownerKey(record, node.id)) ??
+    (node.taskId === undefined ? undefined : taskManager.get(node.taskId))
+  )
+}
+
 // A run checkpointed before schedulers recorded a lease names no holder, so the process that still
 // owns its active children stands in for it. Lifecycle reconcile runs first and takes over the
 // children of a dead owner, so a child still under a live foreign pid means that process runs it.
-// Each node's child is resolved the way reconcile resolves it (newest owned task first: the
-// checkpoint's taskId may still name a prior attempt), and an ended child holds nothing even though
-// its resident record keeps the pid of the host that ran it.
+// An ended child holds nothing even though its resident record keeps the pid of the host that ran it.
 export function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): number | undefined {
   for (const node of record.nodes) {
     if (node.state !== "scheduled" && node.state !== "running") continue
-    const task =
-      probe.taskManager.findOwnedTask(ownerKey(record, node.id)) ??
-      (node.taskId === undefined ? undefined : probe.taskManager.get(node.taskId))
+    const task = currentNodeTask(probe.taskManager, record, node)
     if (task === undefined || isTerminalRecord(task)) continue
     const owner = task.host_pid
     if (owner !== undefined && owner !== probe.hostPid && probe.isProcessAlive(owner)) return owner

@@ -41,7 +41,7 @@ import { createDagSkillMaterializer } from "../../../../senpi-task/src/dag/skill
 import {
   createPausedNodeCancel,
   endedChildClosure,
-  endPausedRunChildren,
+  endUnheldRunChildren,
   type PausedNodeHoldPort,
 } from "./dag-paused-cancel"
 import { createDagRuntimeControls } from "./dag-runtime-controls"
@@ -49,6 +49,7 @@ import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler
 import type { PausedChildRecoveryPort } from "../../../../senpi-task/src/dag/paused-child-recovery"
 import { createDagRunPauseSource, type DagGuidanceDelivery } from "./dag-run-pause-source"
 import { ownedSubtree } from "./engine-run-pause"
+import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 
 const EVENT_PAGE_SIZE = 1000
 const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled"])
@@ -122,6 +123,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const recoveryTaskSubscriptions = new Map<string, () => void>()
   const activityTaskSubscriptions = new Map<string, () => void>()
   const leaseWatch = createDagLeaseWatch(deps.leaseWatch ?? {})
+  const isProcessAlive = deps.leaseWatch?.isProcessAlive ?? defaultSignaller.isAlive
   const leaseWatches = new Map<DagRunId, () => void>()
   let mutationListener = (): void => undefined
   let durableEventListener = (_event: DagRunEvent): void => undefined
@@ -213,18 +215,19 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     coreManager,
     schedulerOptions,
     logger: deps.logger,
-    ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
+    isProcessAlive,
   })
+  const holders = { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive }
 
   const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
     const sessionId = deps.engine.runtime.sessionId() ?? ""
     const record = coreManager.record(runId, sessionId)
     if (TERMINAL_RUN_STATUSES.has(record.status)) return
-    // A user-stopped run has no live scheduler holding its children: end each paused child first,
-    // journal the run cancelled, and only then let the parent's fence for the run go.
+    // A run no scheduler here holds (user-stopped, parked, or left by a dead host) has its children
+    // ended first; a user-stopped run then lets the parent's fence for the run go.
     const userStopped = record.status === "paused" && record.pause?.reason === "user_stop"
-    if (userStopped) await endPausedRunChildren(deps.engine.manager, record, childClosure)
+    if (!schedulers.has(runId)) await endUnheldRunChildren(deps.engine.manager, record, childClosure, holders)
     await controller(runId, sessionId).scheduler.cancel(runId, reason)
     if (!userStopped) return
     const runRef = { kind: "dag" as const, id: runId }
@@ -434,7 +437,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     taskManager,
     ...(deps.pausedChildren === undefined ? {} : { pausedChildren: deps.pausedChildren }),
-    ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
+    isProcessAlive,
     // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
     // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
     // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.

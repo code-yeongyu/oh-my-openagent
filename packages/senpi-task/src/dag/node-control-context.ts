@@ -75,6 +75,23 @@ export function ownedRecord(options: DagSchedulerOptions, runId: DagRunId): DagR
   return record
 }
 
+/**
+ * A run paused for any reason but the user's Stop that still records active nodes has children no
+ * scheduler holds (a parked run, #15125). Only recovery may reattach them; a control verb that built
+ * another scheduler over them would hold none of them either.
+ */
+export function refuseUnheldActiveNodes(record: DagRunRecordV1): void {
+  if (record.status !== "paused" || record.pause?.reason === "user_stop") return
+  const active = record.nodes.filter((node) => node.state === "scheduled" || node.state === "running")
+  if (active.length === 0) return
+  throw new DagNodeControlError({
+    code: "run_still_active",
+    message: `dag run "${record.runId}" has active nodes whose children no scheduler holds; recovery must reattach them first`,
+    runId: record.runId,
+    nodeIds: active.map((node) => node.id),
+  })
+}
+
 export function readRecord(store: DagFileStore, runId: DagRunId): DagRunRecordV1 | null {
   return store.readCheckpoint<DagRunRecordV1>(runId)
 }

@@ -5,7 +5,13 @@ import type { DagJournal } from "./journal"
 import type { DagRunEventPayload } from "./types"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagManager, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
-import { controlJournal, DagNodeControlError, ownedRecord, readRecord } from "./node-control-context"
+import {
+  controlJournal,
+  DagNodeControlError,
+  ownedRecord,
+  readRecord,
+  refuseUnheldActiveNodes,
+} from "./node-control-context"
 import { createDagScheduler, type DagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { TERMINAL_DAG_RUN_STATUSES, type DagNode, type DagNodeId, type DagNodeState, type DagRunId } from "./types"
 
@@ -81,6 +87,7 @@ export function retryDagNodes(
   retryOptions?: DagRetryOptions,
 ): DagRunReentry {
   const record = ownedRecord(options, runId)
+  refuseUnheldActiveNodes(record)
   if (record.status === "running" || record.status === "pending") {
     throw new DagNodeControlError({
       code: "run_still_active",

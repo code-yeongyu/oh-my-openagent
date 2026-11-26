@@ -187,4 +187,27 @@ describe("DAG runtime recovery of a run its host left running", () => {
     expect(eventTypes()).toEqual(before)
     runtime.dispose()
   })
+
+  test("#given a run a live host holds #when the successor cancels it #then the cancel is refused and the run is left to its holder", async () => {
+    // given
+    const fixture = await killedHostFixture("live-holder-cancel", { alive: true }, "between-nodes")
+    const { runId, runtime, eventTypes, status } = fixture
+    await within(runtime.attach(), "attach")
+    const before = eventTypes()
+
+    // when
+    const refusal = await within(
+      runtime.cancel(runId).then(
+        () => undefined,
+        (error: unknown) => error,
+      ),
+      "runtime.cancel",
+    )
+
+    // then
+    expect(refusal).toEqual(expect.objectContaining({ code: "run_not_owned" }))
+    expect(status()).toBe("running")
+    expect(eventTypes()).toEqual(before)
+    runtime.dispose()
+  })
 })
