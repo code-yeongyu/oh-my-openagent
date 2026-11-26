@@ -9,7 +9,7 @@
 // counts blocked with its reason printed, never pass; exit 1 when any scenario failed, 3 when
 // nothing passed and nothing failed (an all-blocked set proves nothing), else 0.
 //
-// Every session (xvfb, xvfb-nobus, none, xorg) is one file under sessions/ and every
+// Every session (xvfb, xvfb-nobus, none, xorg, sway, weston) is one file under sessions/ and every
 // scenario declares how its session is admitted; a scenario that declares no admission is
 // refused, and the driver never connects to a display it did not start. One JSON line per
 // scenario, then the cleanup receipts (`procs 0`, `dir REMOVED <path>`); exit 0 iff every
@@ -24,28 +24,36 @@ import { Engine } from "./linux/lib/engine.ts"
 import { Processes } from "./linux/lib/procs.ts"
 import { failed, isAdmit, verdict, type Scenario, type SessionName, type Stage } from "./linux/lib/scenario.ts"
 import { admission, setExitCode, setLine, type Outcome } from "./linux/lib/set.ts"
+import { libeiConnectKeymapReconnect } from "./linux/scenarios/libei-connect-keymap-reconnect.ts"
 import { noDisplay } from "./linux/scenarios/no-display.ts"
 import { occluderOracle } from "./linux/scenarios/occluder-oracle.ts"
+import { waylandHoldRefusedReleaseUnproven } from "./linux/scenarios/wayland-hold-refused-release-unproven.ts"
 import { xftDpiScale } from "./linux/scenarios/xft-dpi-scale.ts"
 import { start as startNone } from "./linux/sessions/none.ts"
+import { start as startSway } from "./linux/sessions/sway.ts"
+import { start as startWeston } from "./linux/sessions/weston.ts"
 import { start as startXorg } from "./linux/sessions/xorg.ts"
 import { start as startXvfbNoBus } from "./linux/sessions/xvfb-nobus.ts"
 import { start as startXvfb } from "./linux/sessions/xvfb.ts"
 
 type SessionModule = { start(procs: Processes, runDir: string): Promise<Stage> }
 
-// sway, weston, gnome and kde are owed by rows 52, 53 (DEFERRED-LEGS).
+// gnome and kde are owed by row 53 (DEFERRED-LEGS).
 const SESSIONS: Partial<Record<SessionName, SessionModule>> = {
   none: { start: startNone },
   xvfb: { start: startXvfb },
   "xvfb-nobus": { start: startXvfbNoBus },
   xorg: { start: startXorg },
+  sway: { start: startSway },
+  weston: { start: startWeston },
 }
 
 const SCENARIOS: Record<string, Scenario> = {
   "xft-dpi-scale": xftDpiScale,
   "occluder-oracle": occluderOracle,
   "no-display": noDisplay,
+  "libei-connect-keymap-reconnect": libeiConnectKeymapReconnect,
+  "wayland-hold-refused-release-unproven": waylandHoldRefusedReleaseUnproven,
 }
 
 const { values } = parseArgs({
@@ -113,8 +121,9 @@ try {
       continue
     }
     // OMO_COMPUTER_RUNTIME_DIR is a fake-backend seam: the engine refuses it with a real
-    // backend, so a live session passes only the stage's own environment.
-    const engine = new Engine(binary, { ...stage.env, OMO_COMPUTER_BACKEND: "x11" })
+    // backend, so a live session passes only the stage's own environment. The X sessions run
+    // the x11 backend; a Wayland session names its own in its environment.
+    const engine = new Engine(binary, { OMO_COMPUTER_BACKEND: "x11", ...stage.env })
     let outcome: Outcome
     try {
       outcome = { kind: "ran", result: verdict(name, stage.session, await scenario.run({ procs, stage, engine })) }

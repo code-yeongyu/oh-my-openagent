@@ -69,7 +69,8 @@ impl Session {
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         let url_detail = self.url_stages(&mut plan, &mutation);
         let pausing = object.then_some(ceiling);
-        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages.clone(), pausing) {
+        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages.clone(), pausing)
+        {
             Ok(admission) => admission,
             Err(blocked) => {
                 let detail = match blocked.stage.as_str() {

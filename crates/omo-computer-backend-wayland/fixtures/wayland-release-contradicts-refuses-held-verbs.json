@@ -1,0 +1,83 @@
+{
+  "name": "wayland-release-contradicts-refuses-held-verbs",
+  "about": "SP-W measured NO release on socket close for this compositor: every verb that holds a key or button for any interval is refused with nextCall naming the action route; reads and the action verbs stay; backgroundReach reads ax_only.",
+  "compositor": "gnome",
+  "ledger": {
+    "release-on-close": "CONTRADICTS"
+  },
+  "capabilities": {
+    "releaseHelper": {
+      "available": false,
+      "reason": "wayland_release_unproven"
+    },
+    "backgroundReach": "ax_only"
+  },
+  "steps": [
+    {
+      "verb": "key.down",
+      "kind": "hold",
+      "keys": [
+        [
+          "shift",
+          true
+        ]
+      ],
+      "expect": {
+        "refused": {
+          "code": "StopPathUnavailable",
+          "reason": "release_helper_unavailable",
+          "nextCall": "el.setValue(text)"
+        }
+      }
+    },
+    {
+      "verb": "press",
+      "kind": "holding_input",
+      "keys": [
+        [
+          "a",
+          true
+        ],
+        [
+          "a",
+          false
+        ]
+      ],
+      "expect": {
+        "refused": {
+          "code": "StopPathUnavailable",
+          "reason": "release_helper_unavailable",
+          "nextCall": "el.setValue(text)"
+        }
+      }
+    },
+    {
+      "verb": "type",
+      "kind": "holding_input",
+      "keys": [
+        [
+          "b",
+          true
+        ],
+        [
+          "b",
+          false
+        ]
+      ],
+      "expect": {
+        "refused": {
+          "code": "StopPathUnavailable",
+          "reason": "release_helper_unavailable",
+          "nextCall": "el.setValue(text)"
+        }
+      }
+    },
+    {
+      "verb": "el.click",
+      "kind": "ax_action",
+      "expect": {
+        "delivered": true
+      }
+    }
+  ]
+}

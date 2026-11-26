@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url"
 
 const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url))
 
-function targetDir(): string {
+/** Cargo's target directory: `CARGO_TARGET_DIR`, else the workspace's, else `<repo>/target`. */
+export function targetDir(): string {
   const fromEnv = process.env.CARGO_TARGET_DIR
   if (fromEnv !== undefined && fromEnv !== "") return fromEnv
   const asked = spawnSync("cargo", ["metadata", "--format-version", "1", "--no-deps"], {

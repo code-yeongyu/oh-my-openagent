@@ -23,6 +23,10 @@ use crate::{Session, POINT_REQUIRED};
 
 const BAD_KEY: omo_computer_core::backend::Refusal =
     omo_computer_core::backend::Refusal::bare(omo_computer_core::error::EngineCode::InvalidKey);
+const RELEASE_HELPER_UNAVAILABLE: omo_computer_core::backend::Refusal = omo_computer_core::backend::Refusal::new(
+    omo_computer_core::error::EngineCode::StopPathUnavailable,
+    omo_computer_core::error::Reason::ReleaseHelperUnavailable,
+);
 
 impl Session {
     /// The backend's clock, or the session's machine clock when the backend has none (the
@@ -36,6 +40,15 @@ impl Session {
 
     fn session_tag(&self) -> u64 {
         self.opened.as_ref().map_or(0, |opened| opened.tag)
+    }
+
+    /// Rows 51/57: with the release helper unavailable nothing lifts what the engine's death
+    /// leaves down, so a hold is refused before anything is sent.
+    fn release_helper_gate(&self) -> Result<(), Refused> {
+        match self.backend.capabilities().release_helper {
+            Some(helper) if !helper.available => Err(Refused::from(RELEASE_HELPER_UNAVAILABLE)),
+            Some(_) | None => Ok(()),
+        }
     }
 
     fn hold_call(&mut self, method: Method, target: &str, call: (Vec<Point>, Option<String>, bool), events: Vec<InputEvent>, frame: (Option<String>, FrameCheck), authority: &CallAuthority) -> Result<ExecReply, Refused> {
@@ -77,6 +90,7 @@ impl Session {
     /// # Errors
     /// The frame check or the funnel's refusal.
     pub fn mouse_down(&mut self, params: MouseDownParams) -> Result<ExecReply, Refused> {
+        self.release_helper_gate()?;
         let button = params.button.unwrap_or(Button::Left);
         let at = params.x.zip(params.y).map(|(x, y)| At { x, y });
         let (origin, check) = self.press_point(&params.target, at, params.frame_id.as_deref())?;
@@ -115,6 +129,7 @@ impl Session {
     /// # Errors
     /// `InvalidKey` for a chord that does not parse, or the funnel's refusal.
     pub fn key_down(&mut self, params: KeyDownParams) -> Result<ExecReply, Refused> {
+        self.release_helper_gate()?;
         let keys = chord_keys(&params.chord).map_err(|_| Refused::from(BAD_KEY))?;
         let authority = CallAuthority { call_id: params.call_id.clone(), run_generation: params.run_generation };
         let events = keys.iter().map(|key| key_event(key, true)).collect();
@@ -153,9 +168,9 @@ impl Session {
     pub fn hold_keys(&mut self, params: HoldKeysParams) -> Result<ExecReply, Refused> {
         HoldLedger::admit(params.duration).map_err(|_| hold_duration())?;
         let chord = params.keys.join("+");
-        let before = self.funnel.control.holds.held();
+        let mark = self.funnel.control.holds.mark();
         let down = self.key_down(KeyDownParams { target: params.target.clone(), chord, frame_id: None, force: None, call_id: None, run_generation: None, observe_after: None });
-        self.hold_then_release(params.duration, &before, down)
+        self.hold_then_release(params.duration, mark, down)
     }
 
     /// v1 `holdMouse`: the left button goes down at the point, stays down `duration` ms, and
@@ -165,28 +180,30 @@ impl Session {
     /// `InvalidArguments{hold_duration}` past 100 s, or the funnel's refusal.
     pub fn hold_mouse(&mut self, params: HoldMouseParams) -> Result<ExecReply, Refused> {
         HoldLedger::admit(params.duration).map_err(|_| hold_duration())?;
-        let before = self.funnel.control.holds.held();
+        let mark = self.funnel.control.holds.mark();
         let down = self.mouse_down(MouseDownParams { target: params.target.clone(), button: None, x: Some(params.x), y: Some(params.y), frame_id: None, call_id: None, run_generation: None, observe_after: None });
-        self.hold_then_release(params.duration, &before, down)
+        self.hold_then_release(params.duration, mark, down)
     }
 
-    /// Holds for `duration_ms`, then releases exactly what this call pressed (the holds not in
-    /// `before`); a stop during the hold ends it at once and answers the stop.
-    fn hold_then_release(&mut self, duration_ms: u64, before: &[Held], down: Result<ExecReply, Refused>) -> Result<ExecReply, Refused> {
-        let pressed: Vec<Held> = self.funnel.control.holds.held().into_iter().filter(|held| !before.contains(held)).collect();
+    /// Holds for `duration_ms`, then releases exactly what this call pressed (the presses at or
+    /// after `mark`, never an earlier hold of the same key or button: review L7 of #13360); a stop
+    /// during the hold ends it at once and answers the stop.
+    fn hold_then_release(&mut self, duration_ms: u64, mark: u64, down: Result<ExecReply, Refused>) -> Result<ExecReply, Refused> {
         let stopped = if down.is_ok() { self.hold_watching_stop(duration_ms) } else { None };
-        self.funnel.control.holds.release(self.backend.as_mut(), &pressed);
+        self.funnel.control.holds.release_from(self.backend.as_mut(), mark);
         stopped.map_or(down, |refusal| Err(Refused::from(refusal)))
     }
 
     /// Waits `duration_ms` in short ticks, checking the stop latch on each (the pause's
-    /// pattern); on a backend without a clock the wait is real time.
+    /// pattern) and releasing any hold that reached the 100 s bound meanwhile (review L8 of
+    /// #13360); on a backend without a clock the wait is real time.
     fn hold_watching_stop(&mut self, duration_ms: u64) -> Option<omo_computer_core::backend::Refusal> {
         let mut waited: u64 = 0;
         loop {
             if let Some(crate::intervention::Stop::Refused(refusal)) = self.latched() {
                 return Some(refusal);
             }
+            self.release_expired_holds();
             if waited >= duration_ms {
                 return None;
             }
