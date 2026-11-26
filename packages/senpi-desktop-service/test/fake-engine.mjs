@@ -176,6 +176,8 @@ function handle(request) {
     case "stopPath.start":
     case "stopPath.status":
       return reply(id, status())
+    case "session.viewerStatus":
+      return reply(id, { ...status(), pictureState: process.env.FAKE_ENGINE_PICTURE_STATE })
     case "stopPath.stop":
       suspended = true
       control = { active: false }

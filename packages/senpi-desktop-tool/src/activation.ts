@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import type { DesktopCapabilities, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import type { DesktopService } from "@oh-my-opencode/senpi-desktop-service"
 import { type ComputerHostContext, sessionOpenParams } from "./session"
@@ -12,6 +13,7 @@ export type ComputerService = Pick<
   | "onAudit"
   | "capabilities"
   | "stopPathStatus"
+  | "viewerStatus"
   | "stop"
   | "resume"
   | "close"
@@ -36,6 +38,7 @@ export class ComputerDisabledError extends Error {
 }
 
 interface OpenedSession {
+  readonly id: string
   /** JSON of the `session.open` params; re-opening resets captures and AX refs, so only a change re-opens. */
   readonly key: string
   readonly done: Promise<DesktopCapabilities>
@@ -81,6 +84,10 @@ export class ComputerHandle {
   /** Whether an engine session is open (started by an activation, not yet closed). */
   get running(): boolean {
     return this.#opened !== undefined
+  }
+
+  get computerSessionId(): string | undefined {
+    return this.#opened?.id
   }
 
   /** Session-scoped override of `computer.enabled`; never persisted. */
@@ -148,7 +155,10 @@ export class ComputerHandle {
   async #ensureOpen(settings: ComputerSettings, context: ComputerHostContext): Promise<void> {
     const params = sessionOpenParams(settings, context)
     const key = JSON.stringify(params)
-    if (this.#opened?.key !== key) this.#opened = { key, done: this.#service.open(params) }
+    if (this.#opened?.key !== key) {
+      // Reconfiguration is not a close. The next activation after close gets a fresh identity.
+      this.#opened = { key, id: this.#opened?.id ?? randomUUID(), done: this.#service.open(params) }
+    }
     const opened = this.#opened
     try {
       await opened.done

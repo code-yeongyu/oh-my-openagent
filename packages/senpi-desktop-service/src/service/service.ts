@@ -144,6 +144,19 @@ export class DesktopService {
     return this.#stopPath(await this.#live(), "stopPath.status", {})
   }
 
+  /** Viewer metadata is best effort. Never revive a dead child just to paint the app. */
+  async viewerStatus(): Promise<unknown> {
+    const connection = this.#connection
+    if (connection?.rpc.alive !== true) return undefined
+    try {
+      const result = await connection.rpc.request("session.viewerStatus", {}, { timeoutMs: CAPABILITIES_TIMEOUT_MS })
+      return this.#connection === connection ? result : undefined
+    } catch (error) {
+      if (error instanceof DesktopEngineRpcError && error.rpcCode === -32601) return undefined
+      throw error
+    }
+  }
+
   async stop(): Promise<StopPathStatus> {
     return this.#stopPath(await this.#live(), "stopPath.stop", { source: "host-relay" })
   }
