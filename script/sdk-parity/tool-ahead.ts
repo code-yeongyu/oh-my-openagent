@@ -41,6 +41,9 @@ function widens(before: FieldSchema, after: FieldSchema, path: string): string[]
 
 export function toolSchemaAheadProblems(before: Params, after: Params, ahead: ToolAhead, tool: string): string[] {
   const problems: string[] = []
+  for (const key of ahead.widened ?? [])
+    if (before.properties?.[key] !== undefined && after.properties?.[key] === undefined)
+      problems.push(`${tool}.${key}: removed`)
   if (sorted(before.required) !== sorted(after.required)) problems.push(`${tool}: required changed`)
   const [a, b] = [before.properties ?? {}, after.properties ?? {}]
   for (const key of Object.keys(a)) {
@@ -53,6 +56,51 @@ export function toolSchemaAheadProblems(before: Params, after: Params, ahead: To
   for (const key of Object.keys(b))
     if (a[key] === undefined && ahead.fields?.includes(key) !== true)
       problems.push(`${tool}.${key}: added but not listed`)
+  return problems
+}
+
+export function descriptorAheadProblems(before: Row, after: Row, ahead: ToolAhead): string[] {
+  const problems: string[] = []
+  const at = after.id
+  const listed = new Set(ahead.fields ?? [])
+  if (sorted(before.input.required) !== sorted(after.input.required)) problems.push(`${at}: required changed`)
+  for (const name of Object.keys(before.input.properties))
+    if (after.input.properties[name] === undefined) problems.push(`${at}: input ${name} removed`)
+    else if (
+      listed.has(name) &&
+      !after.tool.some(
+        (entry) =>
+          entry.reads.includes(name) &&
+          !before.tool.some(
+            (old) => old.name === entry.name && old.branch === entry.branch && old.reads.includes(name),
+          ),
+      )
+    )
+      problems.push(`${at}: listed field ${name} already exists on the base and no branch newly reads it`)
+  for (const name of listed)
+    if (after.input.required.includes(name)) problems.push(`${at}: listed field ${name} is required`)
+  for (const name of ahead.widened ?? [])
+    if (before.input.properties[name] === undefined) problems.push(`${at}: widened field ${name} is not on the base`)
+  for (const old of before.tool) {
+    const next = after.tool.find((entry) => entry.name === old.name && entry.branch === old.branch)
+    if (next === undefined) {
+      problems.push(`${at}: tool ${old.name} branch ${old.branch} removed`)
+      continue
+    }
+    for (const name of old.reads)
+      if (!next.reads.includes(name)) problems.push(`${at}: ${old.name}/${old.branch} no longer reads ${name}`)
+    for (const [alias, field] of Object.entries(old.aliases ?? {}))
+      if (next.aliases?.[alias] !== field)
+        problems.push(`${at}: ${old.name}/${old.branch} alias ${alias} removed or remapped`)
+  }
+  if (ahead.aliases !== true)
+    for (const entry of after.tool)
+      for (const alias of Object.keys(entry.aliases ?? {}))
+        if (
+          before.tool.find((old) => old.name === entry.name && old.branch === entry.branch)?.aliases?.[alias] ===
+          undefined
+        )
+          problems.push(`${at}: alias ${alias} added without aliases: true`)
   return problems
 }
 

@@ -55,13 +55,53 @@ describe("negative controls: the tool-ahead rule", () => {
   })
 
   test("#given an added field the entry does not list #then it fails", () => {
-    const report = run("thread_list", {}, { bogus: { type: "string" } })
-    expect(named(report.failures, "thread_list")[0]).toContain("thread_list.bogus: added but not listed")
+    const report = run("thread_list", {}, { state: { type: "array" } })
+    expect(named(report.failures, "thread_list")[0]).toContain("thread_list.state: added but not listed")
   })
 
   test("#given the entry already on the merge base #then it admits nothing", () => {
     const report = run("thread_list", {}, { query: { type: "string" } }, unresolved.entries)
     expect(named(report.failures, "thread_list").length).toBeGreaterThan(0)
+  })
+
+  test("#given a widened field whose type changes #then it fails", () => {
+    const report = run(
+      "thread_read",
+      { wait_ms: { type: "integer", minimum: 1 } },
+      { wait_ms: { type: "number", minimum: 0 } },
+    )
+    expect(named(report.failures, "thread_read")[0]).toContain("thread_read.wait_ms: type")
+  })
+
+  const descriptor = (edit: (row: Row) => Row) =>
+    gateReport(
+      input({
+        base: { ...input().base, unresolved: withoutAhead(unresolved.entries) },
+        head: { ...input().head, rows: rows.map((row) => (row.id === "threads.list" ? edit(row) : row)) },
+      }),
+    ).failures.filter((line) => line.startsWith("threads.list: its descriptor changed"))
+
+  test("#given a declared alias remapped to another field the branch reads #then it fails", () => {
+    expect(
+      descriptor((row) => ({ ...row, tool: row.tool.map((entry) => ({ ...entry, aliases: { search: "state" } })) })),
+    ).toHaveLength(1)
+  })
+
+  test("#given a listed field dropped from the branch and the row input #then it fails", () => {
+    const { query: _query, ...properties } = list.input.properties
+    expect(
+      descriptor((row) => ({
+        ...row,
+        input: { ...row.input, properties },
+        tool: row.tool.map((entry) => ({ ...entry, reads: entry.reads.filter((name) => name !== "query") })),
+      })),
+    ).toHaveLength(1)
+  })
+
+  test("#given a listed field made required #then it fails", () => {
+    expect(
+      descriptor((row) => ({ ...row, input: { ...row.input, required: [...row.input.required, "query"] } })),
+    ).toHaveLength(1)
   })
 
   test("#given an alias to a field its branch does not read #then the row is refused", () => {

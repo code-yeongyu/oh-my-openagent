@@ -183,12 +183,20 @@ export async function readThread(
   callerId: string,
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
-  if (value.limit === undefined || value.limit <= THREAD_READ_MAX_LIMIT)
-    return readThreadWithin(options, current, value, callerId, signal)
-  const result = await readThreadWithin(options, current, { ...value, limit: THREAD_READ_MAX_LIMIT }, callerId, signal)
-  return result.kind === "ok" && "items" in result
-    ? { ...result, reduced: { limit: { requested: value.limit, used: THREAD_READ_MAX_LIMIT } } }
-    : result
+  const clamped = value.limit !== undefined && value.limit > THREAD_READ_MAX_LIMIT
+  const result = await readThreadWithin(
+    options,
+    current,
+    clamped ? { ...value, limit: THREAD_READ_MAX_LIMIT } : value,
+    callerId,
+    signal,
+  )
+  if (result.kind !== "ok" || !("items" in result)) return result
+  return {
+    ...result,
+    ...(clamped ? { reduced: { limit: { requested: value.limit as number, used: THREAD_READ_MAX_LIMIT } } } : {}),
+    ...(value.wait_ms === 0 ? { wait: { outcome: "not_waited", status: "wait_ms_zero", waited_ms: 0 } } : {}),
+  }
 }
 
 async function readThreadWithin(
@@ -222,8 +230,7 @@ async function readLive(
   value: ThreadReadInput,
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
-  let wait: ThreadWaitOutcome | undefined =
-    value.wait_ms === 0 ? { outcome: "not_waited", status: "wait_ms_zero", waited_ms: 0 } : undefined
+  let wait: ThreadWaitOutcome | undefined
   if (value.wait_ms !== undefined && value.wait_ms > 0) {
     try {
       wait = await control.waitSettled(value.wait_ms, signal)

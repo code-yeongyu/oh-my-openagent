@@ -4,7 +4,13 @@ import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
-import { aliasScenarioProblems, freshAhead, toolSchemaAheadProblems, withoutAhead } from "./tool-ahead"
+import {
+  aliasScenarioProblems,
+  descriptorAheadProblems,
+  freshAhead,
+  toolSchemaAheadProblems,
+  withoutAhead,
+} from "./tool-ahead"
 import { schemaDifferences, type DiscoveredTool } from "./tool-check"
 
 // The changed-capability gate of design 7.4 (amendments 2 and 3). A demonstrated change fails it: a descriptor or tool-schema
@@ -90,6 +96,18 @@ export function candidateDigest(head: string, ids: readonly string[]): string {
 export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
+// A row answers for the fields its tool branch reads or is chosen by; a tool field no branch reads is toolProblems' to
+// refuse, so another branch's new field does not change this row.
+function branchSchema(
+  parameters: DiscoveredTool["parameters"],
+  fields: ReadonlySet<string>,
+): DiscoveredTool["parameters"] {
+  return {
+    properties: Object.fromEntries(Object.entries(parameters.properties ?? {}).filter(([name]) => fields.has(name))),
+    required: (parameters.required ?? []).filter((name) => fields.has(name)),
+  }
+}
+
 export function gateReport(input: GateInput): GateReport {
   const baseRowsText = new Set((input.presentation.base ?? []).map((row) => JSON.stringify(row)))
   const added = input.presentation.head.filter((row) => !baseRowsText.has(JSON.stringify(row)))
@@ -115,6 +133,7 @@ export function gateReport(input: GateInput): GateReport {
     const admitted =
       ahead !== undefined &&
       before !== undefined &&
+      descriptorAheadProblems(before, row, ahead).length === 0 &&
       descriptorOf(withoutAhead(before, ahead)) === descriptorOf(withoutAhead(row, ahead))
     if (admitted && descriptorOf(before) !== descriptorOf(row)) toolAhead.push(row.id)
     if (!initialization && !admitted && (before === undefined || descriptorOf(before) !== descriptorOf(row))) {
@@ -124,9 +143,11 @@ export function gateReport(input: GateInput): GateReport {
       flagged.add(row.id)
     }
     for (const entry of row.tool) {
-      const [a, b] = [input.base.tools, input.head.tools].map(
-        (tools) => tools.find((tool) => tool.name === entry.name)?.parameters,
-      )
+      const branchFields = new Set([...entry.reads, ...entry.when.present, ...entry.when.absent])
+      const [a, b] = [input.base.tools, input.head.tools].map((tools) => {
+        const parameters = tools.find((tool) => tool.name === entry.name)?.parameters
+        return parameters === undefined ? undefined : branchSchema(parameters, branchFields)
+      })
       const moved = a !== undefined && b !== undefined ? schemaDifferences(a, b, entry.name) : []
       const beyond =
         ahead !== undefined && a !== undefined && b !== undefined

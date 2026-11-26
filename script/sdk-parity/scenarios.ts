@@ -85,7 +85,11 @@ function aliasScenarios(rows: readonly Row[]): ToolScenario[] {
       for (const [alias, field] of Object.entries(entry.aliases ?? {})) {
         const id = `alias-${entry.name}-${alias}`
         const values = ALIAS_VALUES[field]
-        if (seen.has(id) || values === undefined) continue
+        if (values === undefined)
+          throw new Error(
+            `scenarios.ts: alias ${alias} of ${entry.name} maps to ${field}, which ALIAS_VALUES has no sample for`,
+          )
+        if (seen.has(id)) continue
         seen.add(id)
         const args = ALIAS_BASE_ARGS[entry.name] ?? {}
         const [value, other] = values

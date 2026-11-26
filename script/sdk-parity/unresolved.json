@@ -167,15 +167,7 @@
       "id": "devices.list",
       "gap": "no conformance scenario of its inputs yet",
       "slice": "P1b",
-      "issue": "new",
-      "toolAhead": {
-        "pr": "#15076",
-        "until": "T1b",
-        "fields": [
-          "query",
-          "limit"
-        ]
-      }
+      "issue": "new"
     },
     {
       "id": "devices.rename",
@@ -571,14 +563,7 @@
       "id": "threads.aliases.set",
       "gap": "partial: remote module `aliases.*`",
       "slice": "T1c",
-      "issue": "new",
-      "toolAhead": {
-        "pr": "#15076",
-        "until": "T1b",
-        "fields": [
-          "all_scope"
-        ]
-      }
+      "issue": "new"
     },
     {
       "id": "threads.archive",
@@ -736,17 +721,7 @@
       "id": "threads.receipt",
       "gap": "no SDK call",
       "slice": "T1b",
-      "issue": "new",
-      "toolAhead": {
-        "pr": "#15076",
-        "until": "T1b",
-        "fields": [
-          "limit"
-        ],
-        "widened": [
-          "wait_ms"
-        ]
-      }
+      "issue": "new"
     },
     {
       "id": "threads.release",
