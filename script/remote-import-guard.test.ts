@@ -79,13 +79,18 @@ const sdkRemoteValueReaches = (root: string) => {
     .flatMap((fact) =>
       fact.edges
         .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
+        // A type-only edge is erased. An edge with no names is a runtime path: `export * from` or a namespace import
+        // ("*"), or a bare side-effect import.
+        .filter((edge) => !edge.typeOnly && (edge.names.length === 0 || edge.names.some((named) => !named.typeOnly)))
         .map((edge) => ({
           file: fact.file,
           target: resolve(fact.file, edge.specifier),
-          values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
+          values:
+            edge.names.length === 0
+              ? [edge.whole ? "*" : "(side-effect)"]
+              : edge.names.filter((named) => !named.typeOnly).map((named) => named.name),
         })),
     )
-    .filter((reach) => reach.values.length > 0)
 }
 
 const SDK_REMOTE_VALUE_REACHES = [
@@ -151,7 +156,11 @@ describe("the omo SDK's one device listing", () => {
 
       put(`${sdk}/devices/index.ts`, 'import { remoteClientForSession } from "../../remote/index.ts"\nimport { openSessions } from "../../remote/sessions.ts"\n')
       put(`${sdk}/contract/other-codes.ts`, 'import { REMOTE_CODES } from "../../remote/codes.ts"\n')
+      put(`${sdk}/contract/everything.ts`, 'export * from "../../remote/sessions.ts"\n')
+      put(`${sdk}/contract/warm.ts`, 'import "../../remote/sessions.ts"\n')
       const grown = scan()
+      expect(grown).toContainEqual({ file: `${sdk}/contract/everything.ts`, target: `${remote}/sessions.ts`, values: ["*"] })
+      expect(grown).toContainEqual({ file: `${sdk}/contract/warm.ts`, target: `${remote}/sessions.ts`, values: ["(side-effect)"] })
       expect(grown).not.toEqual(SDK_REMOTE_VALUE_REACHES)
       expect(grown).toContainEqual({ file: `${sdk}/devices/index.ts`, target: `${remote}/sessions.ts`, values: ["openSessions"] })
       expect(grown).toContainEqual({ file: `${sdk}/contract/other-codes.ts`, target: `${remote}/codes.ts`, values: ["REMOTE_CODES"] })
