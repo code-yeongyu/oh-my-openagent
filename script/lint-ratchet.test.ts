@@ -186,9 +186,10 @@ it("still counts a violating file that .eslintignore lists", () => {
     counts: { "script/hidden.test.ts": { "omo-testing/no-module-mock": 1 } },
     unparsed: [],
     skipped: 0,
+    findings: {},
   })
 })
 
 it("reports a file hidden by the ratchet config's ignorePatterns as skipped, not as zero findings", () => {
-  expect(hiddenByIgnorePatterns).toEqual({ counts: {}, unparsed: [], skipped: 1 })
+  expect(hiddenByIgnorePatterns).toEqual({ counts: {}, unparsed: [], skipped: 1, findings: {} })
 })

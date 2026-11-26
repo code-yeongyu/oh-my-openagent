@@ -1,0 +1,3404 @@
+{
+  "packages/ast-grep-mcp/src/sg-runner.test.ts": {
+    "timeout": [
+      4000,
+      4000,
+      4000,
+      4000,
+      4000,
+      4000,
+      4000,
+      4000
+    ]
+  },
+  "packages/ast-grep-mcp/src/tools/scan.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/device-service-core/test/local-api/conformance/runner.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/device-service-core/test/local-api/la17-exact-windows-dacl.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/git-bash-mcp/src/runner.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/isolation-core/src/git/command.test.ts": {
+    "timeout": [
+      20000,
+      20000,
+      20000
+    ]
+  },
+  "packages/lsp-core/src/lsp/bun-project-checks.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/lsp-tools-mcp/test/initialize-timeout.test.ts": {
+    "timeout": [
+      10000,
+      5000
+    ]
+  },
+  "packages/mcp-client-core/src/mcp-oauth/callback-server.test.ts": {
+    "unresolved": 4
+  },
+  "packages/mcp-client-core/src/skill-mcp-manager/abort-signal.test.ts": {
+    "timeout": [
+      15000,
+      15000
+    ]
+  },
+  "packages/mcp-client-core/src/skill-mcp-manager/env-grants-cross-process.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/mcp-client-core/src/skill-mcp-manager/env-grants-store.test.ts": {
+    "timeout": [
+      15000,
+      15000
+    ]
+  },
+  "packages/memory-core/src/compile/compile.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/concurrency/auto-maintenance.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/concurrency/sigkill-takeover.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ],
+    "unresolved": 1
+  },
+  "packages/memory-core/src/concurrency/two-process.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/crdt/loro-runtime-packaging.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/memory-core/src/facts/agreement-recovery.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/agreements-replay.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction-legacy-header.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction-person-aliases.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction-person-lifecycle.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction-receipts.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction-retired-ledger.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction-routing-gate.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/extraction.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/facts/queue-parked.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/facts/recovery.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/exec-fsmonitor.test.ts": {
+    "timeout": [
+      360000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/git/exec-pipe-holder.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/git/exec-timeout.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/git/open-file-holders-slow-lsof.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/repo-commit-times.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/repo-head-reftable.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/git/repo-head.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/git/repo-lock-sweep-authorization.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/repo-lock-sweep-handoff.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/repo-lock-sweep-orphan.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/repo-lock-sweep.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/repo.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/test-repo-config.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/git/timeout-diagnostics.test.ts": {
+    "timeout": [
+      90000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/journal/lock.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/journal/store.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/memory-core/src/locks/process-start-time.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/locks/subprocess-contention.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/memfs/hooks-secret.test.ts": {
+    "timeout": [
+      60000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/memfs/hooks-teardown.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/recall/bm25-persist.test.ts": {
+    "unresolved": 7
+  },
+  "packages/memory-core/src/recall/provider-git-budget.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/receipts/receipts.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/reflection/description-preflight.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/soul/watermark.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/memory-core/src/sync/account/account-chain.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/account/engine-roundtrip.test.ts": {
+    "unresolved": 3
+  },
+  "packages/memory-core/src/sync/account/genesis-replication.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/account/pairing-flows.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/account/phrase-notice.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/account/revoke-rotation-races.test.ts": {
+    "unresolved": 5
+  },
+  "packages/memory-core/src/sync/account/revoke-rotation-settler.test.ts": {
+    "unresolved": 6
+  },
+  "packages/memory-core/src/sync/account/revoke-rotation.test.ts": {
+    "unresolved": 6
+  },
+  "packages/memory-core/src/sync/account/session.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/crypto/receiver-parity.test.ts": {
+    "timeout": [
+      60000
+    ],
+    "unresolved": 2
+  },
+  "packages/memory-core/src/sync/engine/adapters/http-transport.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/memory-core/src/sync/engine/engine-capture-key-symmetry.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-capture-symlink.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-clone.test.ts": {
+    "unresolved": 2
+  },
+  "packages/memory-core/src/sync/engine/engine-converge.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-crash.test.ts": {
+    "unresolved": 5
+  },
+  "packages/memory-core/src/sync/engine/engine-durability.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-fuzz.test.ts": {
+    "timeout": [
+      180000,
+      180000,
+      180000,
+      120000,
+      120000
+    ]
+  },
+  "packages/memory-core/src/sync/engine/engine-harness-dispose.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-idle.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-join-adopt.test.ts": {
+    "unresolved": 6
+  },
+  "packages/memory-core/src/sync/engine/engine-journaled-recovery.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/engine/engine-legacy-journal.test.ts": {
+    "unresolved": 3
+  },
+  "packages/memory-core/src/sync/engine/engine-normalized-name.test.ts": {
+    "unresolved": 2
+  },
+  "packages/memory-core/src/sync/engine/engine-offline-count.test.ts": {
+    "unresolved": 6
+  },
+  "packages/memory-core/src/sync/engine/engine-offline.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-outbox-journal.test.ts": {
+    "unresolved": 5
+  },
+  "packages/memory-core/src/sync/engine/engine-oversized-item.test.ts": {
+    "timeout": [
+      180000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/engine/engine-oversized-legacy.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/engine/engine-oversized-peer.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/engine/engine-push-bounded.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-push-shape.test.ts": {
+    "unresolved": 2
+  },
+  "packages/memory-core/src/sync/engine/engine-real-store.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-received-key-escape.test.ts": {
+    "unresolved": 3
+  },
+  "packages/memory-core/src/sync/engine/engine-received-key-liveness.test.ts": {
+    "unresolved": 3
+  },
+  "packages/memory-core/src/sync/engine/engine-received-key-metadata.test.ts": {
+    "unresolved": 4
+  },
+  "packages/memory-core/src/sync/engine/engine-received-key-symlink.test.ts": {
+    "unresolved": 3
+  },
+  "packages/memory-core/src/sync/engine/engine-received-key-upgrade.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-rejoin-outgoing.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-render-reads.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-review.test.ts": {
+    "unresolved": 10
+  },
+  "packages/memory-core/src/sync/engine/engine-shown-failure.test.ts": {
+    "unresolved": 1
+  },
+  "packages/memory-core/src/sync/engine/engine-space-move.test.ts": {
+    "unresolved": 2
+  },
+  "packages/memory-core/src/sync/engine/engine-status.test.ts": {
+    "unresolved": 14
+  },
+  "packages/memory-core/src/sync/engine/engine-tamper.test.ts": {
+    "unresolved": 6
+  },
+  "packages/memory-core/src/sync/engine/engine-triggers.test.ts": {
+    "unresolved": 10
+  },
+  "packages/memory-core/src/sync/engine/open.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/item/casefold-packaging.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/memory-core/src/sync/item/convergence.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/item/idempotence.r3.test-support.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/memory-core/src/sync/item/render-for-disk.property.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/memory-core/src/sync/item/roundtrip.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/mirror-hook-pipes.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/memory-core/src/sync/mirror.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/redact.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/sync/space/adopt-commit.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/space/adopt-deletion-gate.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/space/adopt-preservation.test-support.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/space/adopt-readback.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/space/adopt-replay.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/memory-core/src/sync/wire-fixture-bind.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/memory-core/src/tools/memory-apply-patch-provenance.test.ts": {
+    "unresolved": 2
+  },
+  "packages/memory-core/src/tools/memory-apply-patch-validation.test.ts": {
+    "unresolved": 5
+  },
+  "packages/memory-core/src/tools/memory-claim-receipts.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/tools/memory-legacy-header.test.ts": {
+    "timeout": [
+      120000,
+      60000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/memory-core/src/tools/write-with-pipe-holding-hook.test.ts": {
+    "timeout": [
+      90000
+    ]
+  },
+  "packages/omo-codex/plugin/components/bootstrap/test/environment.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-codex/src/install/codex-cache-install.test.ts": {
+    "timeout": [
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-codex/src/install/codex-cache-windows-command-shim.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-codex/src/install/install-codex-git-bash-preflight.test.ts": {
+    "unresolved": 6
+  },
+  "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts": {
+    "unresolved": 2
+  },
+  "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-codex/src/install/install-codex-packaged.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts": {
+    "timeout": [
+      30000,
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-codex/src/install/install-codex.test.ts": {
+    "unresolved": 5
+  },
+  "packages/omo-codex/src/install/lazycodex-install-surface.test.ts": {
+    "unresolved": 4
+  },
+  "packages/omo-native/test/account-cli-entry.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-native/test/account-cli.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-native/test/bun-global-upgrade.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-native/test/child-process-signal.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-native/test/compile-entry-exit-status.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-native/test/compile-prebuilds.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-native/test/compiled-ca-trust.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-native/test/compiled-kill-guard-dispatch.test.ts": {
+    "timeout": [
+      120000,
+      120000,
+      120000
+    ]
+  },
+  "packages/omo-native/test/compiled-setup-binary.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-native/test/computer-use-doctor.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-native/test/device-service-pin-served.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-native/test/doctor-migration.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-native/test/keychain-helper-build.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-native/test/keychain-helper-session.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-native/test/launcher-private-fd-pair.test.ts": {
+    "timeout": [
+      150000
+    ]
+  },
+  "packages/omo-native/test/launcher.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-native/test/linux-trust-containers.test.ts": {
+    "timeout": [
+      900000
+    ]
+  },
+  "packages/omo-native/test/memory-sync-boot-claim.test.ts": {
+    "timeout": [
+      300000,
+      300000
+    ]
+  },
+  "packages/omo-native/test/openssl-default-file.test.ts": {
+    "timeout": [
+      240000
+    ]
+  },
+  "packages/omo-native/test/openssl-hash-dir.test.ts": {
+    "timeout": [
+      60000,
+      30000
+    ]
+  },
+  "packages/omo-native/test/packed-install.test.ts": {
+    "timeout": [
+      240000,
+      240000
+    ]
+  },
+  "packages/omo-native/test/payload.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-native/test/provisioned-handoff-private-fds.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-native/test/provisioned-handoff-startup-pipe.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-native/test/provisioned-handoff.test.ts": {
+    "timeout": [
+      180000
+    ]
+  },
+  "packages/omo-native/test/self-update-held-package.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/omo-native/test/sync-cli-phrase-pty.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-native/test/sync-phrase-tty-pty.test.ts": {
+    "timeout": [
+      40000
+    ]
+  },
+  "packages/omo-native/test/trust-stage.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/agents/per-agent-prompt-parity.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/accounts-closed.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/cli-roundtrip.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/closed-device-login.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/commands-review.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/credential-lock-held.test.ts": {
+    "timeout": [
+      40000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/credential-lock-torn.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/logout-outcomes.test.ts": {
+    "timeout": [
+      15000,
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/refresh-process.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      10000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/session-machine-reconcile.test.ts": {
+    "timeout": [
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-opencode/src/cli/service-auth/versioned-keystore.test.ts": {
+    "timeout": [
+      8000
+    ]
+  },
+  "packages/omo-opencode/src/cli/worktree-sweep/worktree-sweep.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/dependency-security.test.ts": {
+    "timeout": [
+      90000
+    ]
+  },
+  "packages/omo-opencode/src/features/mcp-oauth/callback-server.test.ts": {
+    "unresolved": 9
+  },
+  "packages/omo-opencode/src/features/team-mode/integration.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/hooks/atlas/index.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/omo-opencode/src/hooks/shared/prompt-async-gate-live-routing.test.ts": {
+    "timeout": [
+      5000,
+      5000
+    ]
+  },
+  "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/hooks/todo-continuation-enforcer/opencode-overload-continuation.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/omo-opencode/src/hooks/todo-continuation-enforcer/todo-continuation-enforcer.test.ts": {
+    "timeout": [
+      60000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      20000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-opencode/src/index.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-opencode/src/plugin-handlers/config-handler.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/omo-opencode/src/plugin/normalize-tool-arg-schemas.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-opencode/src/shared/live-server-route.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/omo-opencode/src/shared/markdown-link-audit.test.ts": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-opencode/src/shared/mock-module-lifecycle-audit.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-opencode/src/shared/opencode-adapter-bun-runtime-audit.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-opencode/src/shared/opencode-coupling-audit.test.ts": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-opencode/src/tools/delegate-task/category-dispatch.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/omo-opencode/src/tools/delegate-task/sync-session-poller.deleted-session.test.ts": {
+    "timeout": [
+      5000,
+      5000
+    ]
+  },
+  "packages/omo-opencode/src/tools/delegate-task/tools.test.ts": {
+    "timeout": [
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-opencode/src/tools/look-at/tools.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/plugin/scripts/bounded-stage.test.mjs": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/plugin/scripts/build-artifact.test.mjs": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/plugin/scripts/build-extension.test.mjs": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/plugin/scripts/stage-agent-toolkit.test.mjs": {
+    "unresolved": 10
+  },
+  "packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs": {
+    "unresolved": 4
+  },
+  "packages/omo-senpi/scripts/qa/task-rpc-diagnostics.test.mjs": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-senpi/scripts/qa/task-rpc-e2e.windows.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/scripts/qa/task-runtime-fallback-e2e.windows.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/scripts/qa/thread-tools/engine-version.test.mjs": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/bundle-purity.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-senpi/src/components/comment-checker/comment-checker.stdin-pipe.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/engine-probe-phase.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/engine-probe.test.ts": {
+    "timeout": [
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/index.passive-status.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/launch-refusal.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/permission-child.test.ts": {
+    "timeout": [
+      120000,
+      120000,
+      120000,
+      120000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/permission-event.test.ts": {
+    "timeout": [
+      120000,
+      120000,
+      120000,
+      120000,
+      120000,
+      120000,
+      120000,
+      120000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/permission-events.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-senpi/src/components/computer-use/permission-registry.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/omo-senpi/src/components/config-watch/index.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/desktop-toolkit/host-tool-routes.test.ts": {
+    "timeout": [
+      5000,
+      5000
+    ]
+  },
+  "packages/omo-senpi/src/components/desktop-toolkit/lifecycle.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/omo-senpi/src/components/desktop-toolkit/thread-tools.test.ts": {
+    "timeout": [
+      5000,
+      5000
+    ]
+  },
+  "packages/omo-senpi/src/components/lsp/post-edit-diagnostics.test.ts": {
+    "unresolved": 9
+  },
+  "packages/omo-senpi/src/components/memory/commands/agreements.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/commands/doctor-receipts.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/src/components/memory/commands/init.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/commands/memory-repository.test.ts": {
+    "timeout": [
+      20000,
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/commands/people-ask.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/commands/people-gate.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/commands/people-selection.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/commands/people.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/compaction-survival.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/desktop-sync/channel-compiled.test.ts": {
+    "timeout": [
+      90000,
+      90000,
+      90000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/device-session-wiring.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/device-session/account-source-freshness.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/device-session/revoke-session.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/device-session/selected-account-source.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/dream-selector.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-agreement-flow.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-applied-recovery.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-apply-rpc.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-consent.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-drain.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-engine-boundary.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-failure-streaks.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-launch-gating.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-oversized-runner.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-payload-cap.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-payload-cleanup.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-payload-oversize.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-provider.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-run-prune.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-runner-abort.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-runner-locking.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-runner-people.test.ts": {
+    "timeout": [
+      90000,
+      90000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-runner.test.ts": {
+    "timeout": [
+      90000,
+      60000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-secret-screening.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/facts-wiring.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/identity-runtime.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/index-engine.test.ts": {
+    "timeout": [
+      300000,
+      300000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/index-selection.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/journal-wiring.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/kibitzer/delivery-idle.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/memory-claim-receipt.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/memory-maintenance.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/nudge-wiring.test.ts": {
+    "timeout": [
+      60000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/palace/entry-collector.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/palace/history-collector.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/palace/people.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/palace/reflection-collector.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/project-memory-recall.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/prompt-agreements-cache.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/prompt-pinning-expiry.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/prompt-pinning-sync.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/prompt-pinning.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/prompt-recall-interference.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/prompt.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/recall-drain.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/recall-reingestion.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/recall-session-read.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/recall-transcript-mentions.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/recall-wiring.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sandbox-absent-paths.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sandbox-bwrap-probe.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sandbox-deferred-probe.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sandbox-engine-trust.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sandbox.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/shutdown-work-composition.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/src/components/memory/shutdown-work-settled.test.ts": {
+    "unresolved": 2
+  },
+  "packages/omo-senpi/src/components/memory/status.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sync-device-names-wiring.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sync-rpc-wire.test.ts": {
+    "timeout": [
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/sync-rpc-worker.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/tools-operations.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/tools-write-notice.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/usage-ledgers-wiring.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-notice-inputs.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-pressure-dream.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-reflection-stale-lock.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-reflection-stale-reaper.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-runtime-stale-ctx.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-runtime.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring-shutdown.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/src/components/memory/wiring-write-notice.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/wiring.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/hold-lock-lifecycle.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/model-preflight.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-finalization-cleanup.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-finalization-crash.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-finalization-park.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-finalization-race.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-finalization-target.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-quarantine.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation-failure-detail.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation-ghost.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation-liveness.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation-stranded.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation-sweep.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation-wait-policy.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation.test-support.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-terminal-claim.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-terminal-precedence.integration.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-terminal-precedence.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/run-tip-recovery.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/runner-finalization.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/runner-model-chain.integration.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/senpi-command.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/spawn-supervisor-env.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/spawn-supervisor-queued.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/spawn-supervisor.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      5000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/supervisor-slot.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/memory/worker/supervisor-test-signals.test.ts": {
+    "timeout": [
+      3000
+    ]
+  },
+  "packages/omo-senpi/src/components/onboarding/claim-takeover-race.test.ts": {
+    "timeout": [
+      120000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/onboarding/history-background.test.ts": {
+    "timeout": [
+      20000,
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-senpi/src/components/onboarding/tui-memory-flow.test.ts": {
+    "timeout": [
+      90000,
+      90000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/remote/tui/run-omo.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/src/components/task/dag-cancel-node-production.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/dag-cancel-run-production.test.ts": {
+    "timeout": [
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/dag-e2e-lifecycle.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/dag-native-guidance.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/dag-rpc-handlers.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/dag-runtime.test.ts": {
+    "timeout": [
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      15000,
+      15000,
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/dag-stop-integrated.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/engine-native-pause.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/engine-paused-birth.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/engine-workpool-pause.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/package-extensions-lifecycle.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/run-pause-human-restart.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/task/task-inprocess-ancestry.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/telemetry/ingest-key.test.ts": {
+    "timeout": [
+      2000
+    ]
+  },
+  "packages/omo-senpi/src/components/telemetry/omo-native-disabled-load.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/component.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/cross-process.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/engine.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      30000,
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/extension-authorizer.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/extension-session-await.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/receipt-write-failure.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/store-extension-lifecycle.test.ts": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/store-extension-session-paths.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/gateway/store-extensions-concurrency.test.ts": {
+    "timeout": [
+      30000,
+      5000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/published-endpoint.test.ts": {
+    "timeout": [
+      30000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/remote/remote-anchor-e2e.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/components/thread/tools/extension-tools.test.ts": {
+    "timeout": [
+      10000,
+      10000
+    ]
+  },
+  "packages/omo-senpi/src/components/ultrawork/ultrawork-packaged-reload.test.ts": {
+    "timeout": [
+      90000
+    ]
+  },
+  "packages/omo-senpi/src/computer-use-lazy-runtime.test.ts": {
+    "unresolved": 1
+  },
+  "packages/omo-senpi/src/engine-compact-delta-package-probe.test.ts": {
+    "unresolved": 3
+  },
+  "packages/omo-senpi/src/extension/compose-cold-pi-tui.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/extension/compose.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/extension/hand-browser-placement.test.ts": {
+    "timeout": [
+      90000
+    ]
+  },
+  "packages/omo-senpi/src/extension/prewarm-diagnostics-engine.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/omo-senpi/src/extension/prompt-cache-preview.test.ts": {
+    "timeout": [
+      90000,
+      90000,
+      90000
+    ]
+  },
+  "packages/omo-senpi/src/hermetic-types.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "packages/omo-senpi/src/otlp-sidecar.test.ts": {
+    "timeout": [
+      45000
+    ]
+  },
+  "packages/omo-senpi/src/posthog-packed-install.test.ts": {
+    "timeout": [
+      240000
+    ]
+  },
+  "packages/omo-senpi/test-support/split-local-session.test.ts": {
+    "timeout": [
+      30000,
+      8000
+    ]
+  },
+  "packages/openclaw-core/src/__tests__/reply-listener-process.real-process.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-engine/test/conformance.test.ts": {
+    "unresolved": 1
+  },
+  "packages/senpi-desktop-engine/test/engine-headless.test.ts": {
+    "unresolved": 2
+  },
+  "packages/senpi-desktop-engine/test/launch-refusal.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/senpi-desktop-engine/test/mcp-client.test.ts": {
+    "unresolved": 4
+  },
+  "packages/senpi-desktop-service/test/display.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-service/test/engine.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-service/test/holds.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-service/test/launch-refusal-exclusions.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/senpi-desktop-service/test/launch-refusal.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/senpi-desktop-service/test/legacy-capabilities.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-service/test/observe.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-service/test/request-too-large.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-service/test/zoom.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-desktop-tool/test/launch-refusal.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/senpi-desktop-tool/test/permission-guidance.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts": {
+    "unresolved": 1
+  },
+  "packages/senpi-task/src/dag/e2e-failure.test.ts": {
+    "unresolved": 2
+  },
+  "packages/senpi-task/src/dag/manager.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/dag/recovery-nonblocking.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/dag/recovery-orphaned.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/dag/scheduler-infra-retry.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-task/src/lazy/senpi-barrel-load-failure.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/admission-lease-handoff.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/admission-lease-wait.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/batch-admission-race.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/deferred-revival-lifecycle.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/deferred-revival.test.ts": {
+    "timeout": [
+      10000,
+      10000,
+      10000,
+      10000,
+      10000,
+      10000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/idle-cold-revive.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/senpi-task/src/lifecycle/reconcile-revival-race.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/senpi-task/src/manager/designated-models-only-runners.test.ts": {
+    "timeout": [
+      90000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/senpi-task/src/manager/designated-models-only.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/manager/held-admissions.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/manager/manager-claim.test.ts": {
+    "unresolved": 1
+  },
+  "packages/senpi-task/src/manager/manager-respawn-host-reconciliation.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/senpi-task/src/manager/pause-resume-allocation.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/manager/pause-resume-capacity.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/manager/pause-resume-fence.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/manager/start-busy-host.test.ts": {
+    "timeout": [
+      15000,
+      15000
+    ]
+  },
+  "packages/senpi-task/src/manager/start-refusal-order.test.ts": {
+    "timeout": [
+      10000
+    ]
+  },
+  "packages/senpi-task/src/runners/builtin-chain-thinking-level.test.ts": {
+    "timeout": [
+      30000,
+      20000,
+      20000
+    ]
+  },
+  "packages/senpi-task/src/runners/explicit-pin.integration.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/runners/in-process-access-terminated-error.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "packages/senpi-task/src/runners/in-process-caller-settings.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/runners/in-process-dialog-forwarding.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/senpi-task/src/runners/in-process/child-shutdown.integration.test.ts": {
+    "timeout": [
+      120000
+    ],
+    "unresolved": 3
+  },
+  "packages/senpi-task/src/runners/rpc-host/handle-detached.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/runners/rpc-host/handle-reattach-reconciliation.test.ts": {
+    "timeout": [
+      5000,
+      5000
+    ]
+  },
+  "packages/senpi-task/src/runners/rpc-host/host-request-auth.test.ts": {
+    "timeout": [
+      20000,
+      10000
+    ]
+  },
+  "packages/senpi-task/src/runners/rpc-host/liveness.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/senpi-task/src/runners/rpc-host/reconcile-turn.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/senpi-task/src/runners/rpc-process.windows.test.ts": {
+    "unresolved": 1
+  },
+  "packages/senpi-task/src/runners/rpc/handle-detached.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/team/member-extension/boot-dependencies.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/team/member-extension/residency.test.ts": {
+    "unresolved": 1
+  },
+  "packages/senpi-task/src/team/member-extension/workpool-startup.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/team/tasks.test.ts": {
+    "timeout": [
+      15000
+    ]
+  },
+  "packages/senpi-task/src/tools/task/lease-parking.test.ts": {
+    "timeout": [
+      25000,
+      25000,
+      25000,
+      25000,
+      25000
+    ]
+  },
+  "packages/senpi-task/src/tools/task/typed-handle.test.ts": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "packages/shared-skills/bundled-skill-scripts-write-nothing.test.ts": {
+    "timeout": [
+      120000,
+      120000
+    ]
+  },
+  "packages/shared-skills/skills/debugging/references/scripts/dap.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "packages/shared-skills/skills/programming/scripts/typescript/new-project.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "packages/shared-skills/skills/ulw-research/scripts/value-mode-unit-classes.test.ts": {
+    "timeout": [
+      120000,
+      120000,
+      120000,
+      120000
+    ]
+  },
+  "packages/skills-loader-core/src/features/builtin-skills/skills/dev-browser.test.ts": {
+    "timeout": [
+      20000,
+      20000,
+      20000,
+      20000,
+      20000,
+      20000
+    ]
+  },
+  "packages/team-core/src/team-mailbox/consumer-lease.test.ts": {
+    "timeout": [
+      2000
+    ]
+  },
+  "packages/team-core/src/team-mailbox/poll.test.ts": {
+    "timeout": [
+      15000,
+      15000
+    ]
+  },
+  "packages/team-core/src/team-state-store/lock-lease-race.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/team-core/src/team-state-store/lock-lease.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/team-core/src/team-state-store/locks-exclusion.test.ts": {
+    "timeout": [
+      60000,
+      30000
+    ]
+  },
+  "packages/team-core/src/team-state-store/locks-reclaim.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/team-core/src/team-state-store/locks-worker.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/team-core/src/team-state-store/locks.test.ts": {
+    "timeout": [
+      2000
+    ]
+  },
+  "packages/team-core/src/team-tasklist/claim.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/team-core/src/team-tasklist/list.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/team-core/src/team-tasklist/store.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/team-core/src/team-tasklist/update.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/telemetry-core/src/activity-state.concurrency.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-entry.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-kill.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-retry.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-sender.test.ts": {
+    "timeout": [
+      30000,
+      30000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-spool-processes.test.ts": {
+    "timeout": [
+      120000,
+      60000,
+      60000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-spool-purge.test.ts": {
+    "timeout": [
+      5000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-spool-recovery.test.ts": {
+    "timeout": [
+      60000,
+      30000,
+      30000
+    ]
+  },
+  "packages/telemetry-core/src/otlp-timeout.test.ts": {
+    "timeout": [
+      70000,
+      40000,
+      40000,
+      30000
+    ]
+  },
+  "packages/telemetry-core/src/root-types-entry.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "packages/utils/src/ast-grep/sg-probe-contract.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/utils/src/ast-grep/sg-resolution.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "packages/utils/src/prompt-async-gate.test.ts": {
+    "timeout": [
+      10000,
+      2000
+    ]
+  },
+  "postinstall.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "script/agent-command-string-audit.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "script/build-cli-node.test.ts": {
+    "timeout": [
+      120000,
+      120000,
+      60000
+    ]
+  },
+  "script/build-omo-binary.test.ts": {
+    "timeout": [
+      900000,
+      60000,
+      60000,
+      30000
+    ]
+  },
+  "script/build-omo-native.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "script/build-omob.test.ts": {
+    "timeout": [
+      120000
+    ]
+  },
+  "script/changelog-fragments-cli.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "script/ci-job-summary-workflow.test.ts": {
+    "unresolved": 1
+  },
+  "script/ci-test-timeout.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "script/embedded-payload-probe.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "script/engine-sidecar-sources.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "script/gpt-mini-reference-audit.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "script/installer/channel-maintenance.ts": {
+    "unresolved": 2
+  },
+  "script/keychain-helper-publish-main-workflow.test.ts": {
+    "unresolved": 3
+  },
+  "script/keychain-helper-release-workflow.test.ts": {
+    "unresolved": 2
+  },
+  "script/keychain-helper-release.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "script/knip-coverage.test.ts": {
+    "timeout": [
+      600000,
+      600000
+    ]
+  },
+  "script/knip-entry-exports.test.ts": {
+    "timeout": [
+      600000,
+      600000
+    ]
+  },
+  "script/knip-next-route-segment.test.ts": {
+    "timeout": [
+      600000
+    ]
+  },
+  "script/latest-model-ids-audit.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "script/no-raw-tls-client.test.ts": {
+    "timeout": [
+      60000
+    ]
+  },
+  "script/omo-native-trust-mutations.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "script/omob-refresh.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "script/package-layout-exclusion.test.ts": {
+    "timeout": [
+      20000,
+      20000
+    ]
+  },
+  "script/package-layout.test.ts": {
+    "timeout": [
+      15000,
+      15000,
+      15000,
+      15000,
+      15000,
+      15000
+    ]
+  },
+  "script/package-log-commands.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "script/package-registration-audit.test.ts": {
+    "timeout": [
+      20000
+    ]
+  },
+  "script/publish-gate-reuse-ci-basis-waiver.test.ts": {
+    "unresolved": 5
+  },
+  "script/publish-readiness-budget.test.ts": {
+    "unresolved": 5
+  },
+  "script/publish-release-platform-workflow.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "script/publish-release-tag-child-path.test.ts": {
+    "unresolved": 4
+  },
+  "script/qa/computer/conformance/fixtures/fixture-process.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "script/qa/computer/conformance/preflight.test.ts": {
+    "timeout": [
+      90000
+    ]
+  },
+  "script/qa/computer/replay.test.ts": {
+    "timeout": [
+      120000,
+      120000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "script/qa/omo-native-telemetry-drive.test.mjs": {
+    "timeout": [
+      15000
+    ]
+  },
+  "script/release-assets-verify-workflow.test.ts": {
+    "timeout": [
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000,
+      30000
+    ]
+  },
+  "script/release-desktop-engine-target.test.ts": {
+    "timeout": [
+      30000
+    ]
+  },
+  "script/senpi-hooks-state-errors.test.ts": {
+    "timeout": [
+      60000,
+      60000,
+      60000
+    ]
+  },
+  "script/senpi-hooks-state.test.ts": {
+    "timeout": [
+      60000,
+      60000
+    ]
+  },
+  "script/senpi-worker-compile.test.ts": {
+    "timeout": [
+      45000
+    ]
+  },
+  "script/sync-lazycodex-marketplace.test.ts": {
+    "timeout": [
+      15000
+    ],
+    "unresolved": 3
+  },
+  "script/test-environment-isolation.test.ts": {
+    "unresolved": 2
+  },
+  "test-support/posthog-test-guard-installed.test.ts": {
+    "timeout": [
+      30000
+    ]
+  }
+}
