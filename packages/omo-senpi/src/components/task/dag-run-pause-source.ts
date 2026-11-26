@@ -106,6 +106,7 @@ export function createDagRunPauseSource(ports: {
           if (entered.ticket.check().kind === "held") {
             await installed.scheduler.suspend()
             await installed.settled
+            installed.release()
             throw new RunPauseAdmissionHeld()
           }
           ports.adopt(installed)

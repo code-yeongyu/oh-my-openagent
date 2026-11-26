@@ -136,7 +136,9 @@ export function retryDagNodes(
       const journal = controlJournal(options, current)
       journal.append({ type: "dag.node.retry-staged", nodeIds: targets })
       const staged = journal.snapshot()
+      // Staging starts no run: the scheduler only fills the return shape, so it stops listening at once.
       const scheduler = createDagScheduler({ ...options, initialRecord: staged })
+      void scheduler.suspend()
       return { record: staged, scheduler, run: Promise.resolve(staged) }
     }
     // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.

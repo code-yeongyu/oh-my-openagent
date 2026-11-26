@@ -1,6 +1,6 @@
 import { cancelPausedDagNode } from "../../../../senpi-task/src/dag/paused-controls"
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/node-control-context"
-import { currentNodeTask, liveForeignHolder, type DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
+import { currentNodeTask } from "../../../../senpi-task/src/dag/run-lease"
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagNodeId, DagRunId } from "../../../../senpi-task/src/dag/types"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
@@ -31,7 +31,7 @@ export function endedChildClosure(manager: ChildLookup): PausedNodeHoldPort {
 }
 
 /** Every node's current child of a run no scheduler holds is ended before the run is journaled cancelled. */
-async function endPausedRunChildren(
+export async function endPausedRunChildren(
   manager: NodeChildLookup,
   record: DagRunRecordV1,
   closure: PausedNodeHoldPort,
@@ -42,28 +42,6 @@ async function endPausedRunChildren(
     await manager.cancelTask(task.task_id, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
     await closure.closeHold(task.task_id, "run_cancelled")
   }
-}
-
-/**
- * Cancel of a run no scheduler of this runtime holds (user-stopped, parked, or left running by a dead
- * host): a fresh scheduler's cancel knows none of its children, so they are ended here first. A run
- * another live process holds is that process's to cancel.
- */
-export async function endUnheldRunChildren(
-  manager: NodeChildLookup,
-  record: DagRunRecordV1,
-  closure: PausedNodeHoldPort,
-  holders: DagRunHolderProbe,
-): Promise<void> {
-  const holder = liveForeignHolder(holders, record)
-  if (holder !== undefined) {
-    throw new DagNodeControlError({
-      code: "run_not_owned",
-      message: `dag run "${record.runId}" is held by live process ${holder}`,
-      runId: record.runId,
-    })
-  }
-  await endPausedRunChildren(manager, record, closure)
 }
 
 export function createPausedNodeCancel(

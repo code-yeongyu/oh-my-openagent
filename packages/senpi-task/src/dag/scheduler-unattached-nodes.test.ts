@@ -18,7 +18,7 @@ import {
 import type { DagDefinition } from "./graph"
 import { subscribeDagJournal } from "./journal"
 import { createDagRecovery } from "./recovery"
-import { createDagScheduler, reenterDagRun } from "./scheduler"
+import { createDagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
@@ -85,7 +85,8 @@ describe("DAG scheduler over active nodes it does not hold", () => {
     await parked[0]?.run()
 
     for (let round = 0; round < 2; round += 1) {
-      // when - a re-entry parks again; its commit reaches every subscriber before this probe
+      // when - the run is taken up again (as a recovery install puts it back to running) and parks
+      // again; that commit reaches every subscriber before this probe
       const seen = parked.map((scheduler) => scheduler.snapshot().checkpointSeq)
       let unsubscribe = (): void => undefined
       const committed = new Promise<void>((resolve) => {
@@ -93,15 +94,19 @@ describe("DAG scheduler over active nodes it does not hold", () => {
           if (event.type === "dag.run.paused") resolve()
         })
       })
-      const reentry = reenterDagRun({ store, taskManager: manager, initialRecord })
-      await reentry.run
+      const current = store.readCheckpoint<typeof initialRecord>(runId)
+      if (current === null) throw new Error("expected a checkpoint")
+      const taken = { ...current, status: "running" as const }
+      store.writeCheckpoint(runId, taken)
+      const next = createDagScheduler({ store, taskManager: manager, initialRecord: taken })
+      await next.run()
       await committed
       unsubscribe()
 
       // then
-      expect(reentry.scheduler.snapshot().status).toBe("paused")
+      expect(next.snapshot().status).toBe("paused")
       expect(parked.map((scheduler) => scheduler.snapshot().checkpointSeq)).toEqual(seen)
-      parked.push(reentry.scheduler)
+      parked.push(next)
     }
   })
 })

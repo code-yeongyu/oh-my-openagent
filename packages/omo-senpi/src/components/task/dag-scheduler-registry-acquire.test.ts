@@ -65,14 +65,12 @@ describe("DAG scheduler registry acquisition of a pending run", () => {
           return base.withRunLock(lockedRunId, operation)
         },
       }
-      const coreManager = createDagManager({ store })
       const taskManager = new LongRunningTaskManager()
       const schedulers = new Map<DagRunId, OwnedScheduler>()
       const isProcessAlive = (pid: number): boolean => pid === process.pid
       const registry = createDagSchedulerRegistry({
         schedulers,
         store,
-        coreManager,
         schedulerOptions: { store, taskManager, isProcessAlive },
         logger: quietLogger,
         isProcessAlive,

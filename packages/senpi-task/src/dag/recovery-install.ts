@@ -27,7 +27,7 @@ export async function installRecoveredDag(
   context: RecoveryContext,
   claimed: RecoverableRecord,
   effects: InstallEffects,
-): Promise<InstalledDagRun> {
+): Promise<Omit<InstalledDagRun, "release">> {
   try {
     if (claimed.pause?.reason === "user_stop" && context.pausedChildren !== undefined) {
       await recoverPausedDagChildren(

@@ -1,6 +1,5 @@
 import type {
   DagFileStore,
-  DagManager,
   DagRunId,
   DagRunRecordV1,
   DagScheduler,
@@ -25,13 +24,12 @@ export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promi
 export function createDagSchedulerRegistry(ports: {
   readonly schedulers: Map<DagRunId, OwnedScheduler>
   readonly store: DagFileStore
-  readonly coreManager: DagManager
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
   readonly logger: ComponentLogger
   readonly isProcessAlive: (pid: number) => boolean
   readonly reservations: DagRunReservations
 }) {
-  const { schedulers, store, coreManager, schedulerOptions, logger } = ports
+  const { schedulers, store, schedulerOptions, logger } = ports
   const lease = {
     taskManager: schedulerOptions.taskManager,
     hostPid: process.pid,
@@ -41,19 +39,11 @@ export function createDagSchedulerRegistry(ports: {
   /** "This host holds the run": a scheduler of this runtime is running it (started or installed here). */
   const holdsRun = (runId: DagRunId): boolean => schedulers.get(runId)?.running !== undefined
 
-  const schedulerFor = (runId: DagRunId, parentSessionId: string): OwnedScheduler => ({
-    scheduler: createDagScheduler({ ...schedulerOptions, initialRecord: coreManager.record(runId, parentSessionId) }),
-  })
   const register = (runId: DagRunId, initialRecord: DagRunRecordV1): void => {
     const owned: OwnedScheduler = { scheduler: createDagScheduler({ ...schedulerOptions, initialRecord }) }
     schedulers.set(runId, owned)
     track(runId, owned, owned.scheduler.run())
   }
-
-  // A verb on a run this host does not hold gets a throwaway carrier that never enters `schedulers`,
-  // so a refused or non-adopting verb can never make the run read as held here.
-  const controller = (runId: DagRunId, parentSessionId: string): OwnedScheduler =>
-    holdsRun(runId) ? (schedulers.get(runId) as OwnedScheduler) : schedulerFor(runId, parentSessionId)
 
   const track = (runId: DagRunId, owned: OwnedScheduler, run: Promise<DagRunRecordV1>): void => {
     const running = run
@@ -113,6 +103,14 @@ export function createDagSchedulerRegistry(ports: {
   const adoptInstalled = (installed: InstalledDagRun): void => {
     const record = store.readCheckpoint<DagRunRecordV1>(installed.runId)
     if (record === null) throw new Error("installed DAG checkpoint is missing")
+    // The claim's reservation ends only now that this runtime holds the installed scheduler.
+    try {
+      adoptInstalledRun(installed, record)
+    } finally {
+      installed.release()
+    }
+  }
+  const adoptInstalledRun = (installed: InstalledDagRun, record: DagRunRecordV1): void => {
     adoptReentry(installed.runId, {
       scheduler: installed.scheduler,
       record,
@@ -124,5 +122,5 @@ export function createDagSchedulerRegistry(ports: {
     })
   }
 
-  return { holdsRun, controller, ensureScheduled, adoptReentry, adoptInstalled }
+  return { holdsRun, ensureScheduled, adoptReentry, adoptInstalled }
 }
