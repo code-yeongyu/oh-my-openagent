@@ -3,7 +3,7 @@ import { addGuidance, changeGuidance, type Guidance } from "../pause/guidance"
 import type { DagRunRecordV1 } from "./manager"
 import { controlJournal, DagNodeControlError, ownedRecord } from "./node-control-context"
 import type { DagSchedulerOptions } from "./scheduler"
-import type { DagNodeId, DagRunId } from "./types"
+import type { DagNodeId, DagRunEventPayload, DagRunId } from "./types"
 
 export { pausedAmendmentUnsafe } from "./amend-safety"
 
@@ -31,7 +31,7 @@ export function applyPausedDagGuidance(
       })
       const guidance = changed.find((entry) => entry.id === command.id)
       if (guidance === undefined) throw new Error("guidance change did not retain its record")
-      controlJournal(options, record).append({
+      appendWhileStopped(options, record, {
         type: command.kind === "remove" ? "dag.guidance.removed" : "dag.guidance.edited",
         guidance,
       })
@@ -39,6 +39,28 @@ export function applyPausedDagGuidance(
     }
     default:
       throw new Error(`Unexpected guidance command: ${command satisfies never}`)
+  }
+}
+
+/**
+ * Writes for a user-stopped-run control only while the run is still stopped by the same Stop,
+ * re-decided on the fresh record under the journal's run lock (#15125); otherwise nothing is written
+ * and the control is refused. The journal's own duplicate-transition skip stays silent.
+ */
+function appendWhileStopped(options: DagSchedulerOptions, record: DagRunRecordV1, payload: DagRunEventPayload): void {
+  const pauseSeq = record.pause?.pauseSeq
+  let resumed = false
+  const journal = controlJournal(options, record, undefined, (fresh) => {
+    resumed = fresh.status !== "paused" || fresh.pause?.reason !== "user_stop" || fresh.pause.pauseSeq !== pauseSeq
+    return resumed
+  })
+  journal.append(payload)
+  if (resumed) {
+    throw new DagNodeControlError({
+      code: "run_not_user_paused",
+      message: "the run is no longer stopped by the user",
+      runId: record.runId,
+    })
   }
 }
 
@@ -76,7 +98,7 @@ export function guidePausedDag(
   }
   const guidance = addGuidance(record.guidance ?? [], input).find((entry) => entry.id === input.id)
   if (guidance === undefined) throw new Error("guidance was not created")
-  controlJournal(options, record).append({ type: "dag.guidance.added", guidance })
+  appendWhileStopped(options, record, { type: "dag.guidance.added", guidance })
   return guidance
 }
 
@@ -97,8 +119,7 @@ export async function cancelPausedDagNode(
       nodeIds: [nodeId],
     })
   if (node.state === "completed" || node.state === "cancelled") return
-  const journal = controlJournal(options, record)
-  journal.append({ type: "dag.node.cancel_requested", nodeId })
+  appendWhileStopped(options, record, { type: "dag.node.cancel_requested", nodeId })
   if (node.taskId !== undefined) {
     const task = options.taskManager.get(node.taskId)
     const result = await options.taskManager.cancelTask(
@@ -131,7 +152,7 @@ export async function cancelPausedDagNode(
       runId,
     })
   }
-  controlJournal(options, fresh).append({
+  appendWhileStopped(options, fresh, {
     type: "dag.node.transitioned",
     nodeId,
     from: current.state,
