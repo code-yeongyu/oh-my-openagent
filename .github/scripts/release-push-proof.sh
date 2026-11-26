@@ -5,12 +5,14 @@
 RELEASE_PUSH_PROOF_HELPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/release-push-proof.mjs"
 
 # An exact overall-green push is only a candidate. Keep its run attempt so a
-# rerun cannot substitute jobs from a different attempt of the same run.
+# rerun cannot substitute jobs from a different attempt of the same run. A run
+# the release dispatched on its own release-ci/<sha> ref (#15094) tests the same
+# commit with the same ci.yml and counts the same way.
 select_green_push() {
   jq -r --arg sha "$1" '
     [
       .workflow_runs[]
-      | select(.event == "push" and .head_sha == $sha and .status == "completed" and .conclusion == "success")
+      | select((.event == "push" or .event == "workflow_dispatch") and .head_sha == $sha and .status == "completed" and .conclusion == "success")
     ]
     | sort_by(.created_at, .id)
     | last

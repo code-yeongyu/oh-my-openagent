@@ -57,9 +57,19 @@ const GH_STUB = [
   '      [ -n "$PERMISSION_API_DOWN" ] && return 1',
   '      local entry; for entry in $ROLES; do [ "${entry%%=*}" = "$login" ] && { printf "%s\\n" "${entry#*=}"; return 0; }; done',
   '      printf "none\\n" ;;',
+  // The step reads every event for the SHA and filters itself. An unpinned release has only its pull-request run 42. A
+  // pinned one (SOURCE_SHA set) has a pull-request run 43 and the run it may count: 41 at the pin (event PIN_EVENT,
+  // still running with PIN_RED_JOB already failed when that is set), 42 at the prepared stamp.
+  '    *"/actions/runs/41/jobs?filter=latest"*) printf \'{"jobs":[{"name":"%s","status":"completed","conclusion":"failure"},{"name":"typecheck","status":"in_progress","conclusion":null}]}\' "$PIN_RED_JOB" | jq -r "$filter" ;;',
   '    *"actions/workflows/ci.yml/runs"*)',
-  '      local sha id=42 event=pull_request conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) event=push; conclusion="$PUSH_CONCLUSION"; if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then conclusion="$STAMP_PUSH_CONCLUSION"; else id=41; fi ;; esac; done',
-  '      printf \'{"workflow_runs":[{"id":%s,"run_attempt":2,"event":"%s","head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$id" "$event" "$sha" "$conclusion" ;;',
+  '      local sha id=41 event="$PIN_EVENT" status=completed conclusion="\\"$PUSH_CONCLUSION\\"" pr=42; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; esac; done',
+  '      [ -n "$SOURCE_SHA" ] && pr=43',
+  '      local runs; runs=$(printf \'{"id":%s,"run_attempt":2,"event":"pull_request","head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}\' "$pr" "$sha" "$CI_CONCLUSION")',
+  '      if [ -n "$SOURCE_SHA" ]; then',
+  '        if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then id=42; event=push; conclusion="\\"$STAMP_PUSH_CONCLUSION\\""; elif [ -n "$PIN_RED_JOB" ]; then status=in_progress; conclusion=null; fi',
+  '        runs="$runs,$(printf \'{"id":%s,"run_attempt":2,"event":"%s","head_sha":"%s","status":"%s","conclusion":%s,"created_at":"2026-01-01T00:00:00Z","html_url":"u"}\' "$id" "$event" "$sha" "$status" "$conclusion")"',
+  "      fi",
+  '      printf \'{"workflow_runs":[%s]}\' "$runs" ;;',
   '    *"/actions/runs/41/attempts/2/jobs?"*) cat "$PIN_JOBS" ;;',
   '    *"/actions/runs/42/attempts/2/jobs?"*) cat "$STAMP_JOBS" ;;',
   '    *"/contents/.github/workflows/ci.yml?ref="*) cat "$CI_YML" ;;',
@@ -105,6 +115,10 @@ interface Dispatch {
   readonly ciConclusion?: string
   readonly runLegs?: "success" | "failure" | "skipped"
   readonly baseLegs?: "success" | "failure" | "skipped"
+  /** The event of the pin's own run 41: a dev push or the release's release-ci/<sha> dispatch. */
+  readonly pinEvent?: "push" | "workflow_dispatch"
+  /** Run 41 is still in progress and this job of it already failed. */
+  readonly pinRedJob?: string
   // Replaces the step's own LC_ALL=C. Git Bash on windows-latest keeps classifying UTF-8 characters under LC_ALL=C, so
   // its [[:print:]] matches "\u00e9" (#13955); a UTF-8 locale reproduces that on any host.
   readonly classLocale?: string
@@ -187,6 +201,8 @@ function dispatch(input: Dispatch): Outcome {
       CI_CONCLUSION: input.ciConclusion ?? "success",
       RUN_LEGS: input.runLegs ?? "success",
       BASE_LEGS: input.baseLegs ?? "success",
+      PIN_EVENT: input.pinEvent ?? "push",
+      PIN_RED_JOB: input.pinRedJob ?? "",
     },
   })
   if (result.error) throw result.error
@@ -240,15 +256,35 @@ describe("#given a pinned release", () => {
   test("#when only non-push CI is green #then neither dispatch can proceed", () => {
     for (const prepared of ["", fixture.sha.T]) {
       const result = dispatch({ pin: fixture.sha.B, prepared, pushConclusion: "failure" })
-      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f per_page=100`)
       expect(result.status).not.toBe(0)
     }
+  })
+
+  test("#when the pin's green run is the one the release dispatched on release-ci/<sha> #then it counts like a push run", () => {
+    const result = dispatch({
+      pin: fixture.sha.B,
+      prepared: fixture.sha.T,
+      ciConclusion: "failure",
+      pinEvent: "workflow_dispatch",
+    })
+    expect(result.status, result.output).toBe(0)
+    expect(result.output).toContain(`CI workflow run 41 ran and passed required validation for ${fixture.sha.B}.`)
+  })
+
+  test("#when the pin's run is still going but a job already failed #then the gate refuses now, naming the job", () => {
+    const result = dispatch({ pin: fixture.sha.B, prepared: fixture.sha.T, pinRedJob: "test (windows-latest, 2/2)" })
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain(
+      `CI run 41 for ${fixture.sha.B} is still running but already failed: test (windows-latest, 2/2)=failure.`,
+    )
+    expect(result.ghCalls.match(/actions\/workflows\/ci\.yml\/runs/g)?.length).toBe(1)
   })
 
   test("#when the merged stamp is version-only #then only the pinned push run is needed", () => {
     const result = dispatch({ pin: fixture.sha.B.toUpperCase(), prepared: fixture.sha.T, ciConclusion: "failure" })
     expect(result.status, result.output).toBe(0)
-    expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+    expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f per_page=100`)
     expect(result.ghCalls).not.toContain(`head_sha=${fixture.sha.T}`)
   })
 
@@ -260,9 +296,9 @@ describe("#given a pinned release", () => {
         ciConclusion: "success",
         stampPushConclusion,
       })
-      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.A} -f event=push`)
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.A} -f per_page=100`)
       expect(result.status === 0).toBe(stampPushConclusion === "success")
-      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f per_page=100`)
     }
   })
 

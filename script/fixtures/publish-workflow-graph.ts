@@ -70,6 +70,14 @@ export const PRE_TAG_WRITERS: Readonly<Record<string, PreTagWriter>> = {
     reason: "runs on the parent run only; it creates the tag itself, then dispatches the child on it",
     guard: "inputs.prepared_release_sha == ''",
   },
+  "pin-ci": {
+    reason: "creates refs/heads/release-ci/<sha> at the pinned source and dispatches ci.yml on it, so the gate waits on a run no dev merge can cancel (#15094); it publishes nothing",
+    guard: "inputs.prepared_release_sha == ''",
+  },
+  "unpin-ci": {
+    reason: "deletes the release-ci/<sha> ref pin-ci created once gate-reuse is done; it publishes nothing",
+    guard: "inputs.prepared_release_sha == ''",
+  },
 }
 
 /** Actions that only set up the runner or move artifacts inside the run. */

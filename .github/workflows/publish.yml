@@ -69,7 +69,62 @@ permissions:
   actions: write
 
 jobs:
+  # A pinned release owns the CI run its gate waits on (#15094). ci.yml keeps only the newest pending dev push run,
+  # so a later merge could cancel the pin's own push run while it waits; a run dispatched on refs/heads/release-ci/<sha>
+  # is alone in its concurrency group. GITHUB_TOKEN may create the ref and dispatch, and a ref it creates starts no
+  # push run. Skipped when a green run already exists or the pin's ci.yml predates the dispatch trigger.
+  pin-ci:
+    if: inputs.source_sha != '' && inputs.prepared_release_sha == '' && inputs.lazycodex_only != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: write
+    outputs:
+      pinned: ${{ steps.pin.outputs.pinned }}
+    steps:
+      - name: Dispatch CI on the pinned source's own ref
+        id: pin
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          echo "pinned=false" >> "$GITHUB_OUTPUT"
+          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_sha is not a full commit SHA; gate-reuse refuses it."
+            exit 0
+          fi
+          green="$(gh api --method GET "repos/${GH_REPO}/actions/workflows/ci.yml/runs" -f head_sha="$SOURCE_SHA" -f per_page=100 \
+            --jq '[.workflow_runs[] | select((.event == "push" or .event == "workflow_dispatch") and .status == "completed" and .conclusion == "success")] | length')"
+          if [ "$green" != "0" ]; then
+            echo "A green CI run already exists for ${SOURCE_SHA}; nothing to dispatch."
+            exit 0
+          fi
+          triggers="$(gh api -H "Accept: application/vnd.github.raw+json" "repos/${GH_REPO}/contents/.github/workflows/ci.yml?ref=${SOURCE_SHA}" \
+            | yq -o=json | jq -c '.on | keys')"
+          if ! jq -e 'index("workflow_dispatch")' <<< "$triggers" > /dev/null; then
+            echo "ci.yml at ${SOURCE_SHA} has no workflow_dispatch trigger (${triggers}); gate-reuse waits for its dev push run."
+            exit 0
+          fi
+          ref="release-ci/${SOURCE_SHA}"
+          if ! gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/heads/${ref}" -f sha="$SOURCE_SHA" > /dev/null; then
+            existing="$(gh api "repos/${GH_REPO}/git/ref/heads/${ref}" --jq .object.sha)"
+            if [ "$existing" != "$SOURCE_SHA" ]; then
+              echo "::error::refs/heads/${ref} exists at ${existing}, not ${SOURCE_SHA}."
+              exit 1
+            fi
+          fi
+          gh workflow run ci.yml --ref "$ref"
+          echo "pinned=true" >> "$GITHUB_OUTPUT"
+          echo "Dispatched ci.yml on ${ref}." >> "$GITHUB_STEP_SUMMARY"
+
   gate-reuse:
+    needs: [pin-ci]
+    # pin-ci is skipped for every release that is not a pinned parent run; that must not skip this gate.
+    if: ${{ !failure() && !cancelled() }}
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9932.
     runs-on: ubuntu-24.04
     outputs:
@@ -291,13 +346,16 @@ jobs:
 
           # Unpinned releases can also use the release-state PR's CI at the prepared SHA.
           # Pinned releases require a push and proof that its heavy validation actually ran.
+          # A pinned release counts a dev push run or the run it dispatched on its own release-ci/<sha> ref (pin-ci, #15094).
           wait_for_ci() {
-            local sha="$1" event="${2:-}" push_run
-            if [ "$event" = "push" ]; then set -- -f "event=push"; else set --; fi
+            local sha="$1" event="${2:-}" push_run events='["push","workflow_dispatch"]'
+            if [ "$event" != "push" ]; then events='null'; fi
             for attempt in $(seq 1 120); do
               RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
                 "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
-                -f head_sha="$sha" "$@" -f per_page=100)"
+                -f head_sha="$sha" -f per_page=100)"
+              RUNS="$(jq --argjson events "$events" \
+                '.workflow_runs |= map(select($events == null or (.event as $e | $events | index($e))))' <<< "$RUNS")"
 
               if [ "$event" = "push" ]; then
                 push_run="$(select_green_push "$sha" <<< "$RUNS")"
@@ -334,6 +392,19 @@ jobs:
                 fi
                 echo "Its macOS/Windows legs did not run; base ${PLATFORM_BASE} proved them and the delta is the release stamp only."
                 return 0
+              fi
+
+              # Fail fast: a job that already concluded red in a run still in progress decides the outcome now, not when
+              # the run ends (the 5.1.84 cut's run went red at minute 11 of 66). A cancelled job is not a verdict.
+              if [ "$event" = "push" ]; then
+                for active in $(jq -r --arg sha "$sha" '.workflow_runs[] | select(.head_sha == $sha and .status != "completed") | .id' <<< "$RUNS"); do
+                  RED="$(retry_gh "Read CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${active}/jobs?filter=latest&per_page=100" \
+                    --jq '[.jobs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure")) | "\(.name)=\(.conclusion)"] | join(", ")')"
+                  if [ -n "$RED" ]; then
+                    echo "::error::CI run ${active} for ${sha} is still running but already failed: ${RED}."
+                    return 1
+                  fi
+                done
               fi
 
               ACTIVE_COUNT="$(jq -r --arg sha "$sha" '
@@ -395,6 +466,23 @@ jobs:
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The release-ci ref only names the run's commit; the run and its record stay after the ref is gone.
+  unpin-ci:
+    needs: [pin-ci, gate-reuse]
+    if: always() && inputs.prepared_release_sha == '' && needs.pin-ci.outputs.pinned == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Delete the pinned source's CI ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/release-ci/${SOURCE_SHA}"
 
   preflight-trust:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9933.
