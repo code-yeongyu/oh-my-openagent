@@ -324,6 +324,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     for (const entry of ALLOWLIST) {
       expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
     }
-    // The whole-tree scan takes ~10 s; the preload's 20 s default reaches only the first file of a multi-file run.
-  }, 60_000)
+    // Measured whole-tree scan (2026-11-26, 5,737 files): 13 s at load 15; 41 to 52 s, and 69 to 72 s when contended,
+    // at load 45. The limit is three times the worst measurement so a loaded receipt host cannot turn a pass red.
+  }, 216_000)
 })

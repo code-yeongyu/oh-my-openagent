@@ -185,18 +185,23 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
           bindings.declare(spec.name, name === "default" ? { module, specifier } : { module, member: name, specifier })
       }
   }
+  const flows = list.flatMap(flowTargets)
+  const initialized = list.filter(
+    (node): node is ts.VariableDeclaration | ts.ParameterDeclaration =>
+      (ts.isVariableDeclaration(node) || ts.isParameter(node)) && node.initializer !== undefined,
+  )
   let changed: boolean
   do {
     changed = false
     const bind = (name: ts.Identifier, value: Binding): void => {
       if (bindings.declare(name, value)) changed = true
     }
-    for (const node of list) {
-      for (const [name, flow, how] of flowTargets(node)) {
-        const value = kind(flow)
-        if (value && (how === "assign" ? bindings.assign(name, value) : bindings.declare(name, value))) changed = true
-      }
-      if (!(ts.isVariableDeclaration(node) || ts.isParameter(node)) || !node.initializer) continue
+    for (const [name, flow, how] of flows) {
+      const value = kind(flow)
+      if (value && (how === "assign" ? bindings.assign(name, value) : bindings.declare(name, value))) changed = true
+    }
+    for (const node of initialized) {
+      if (!node.initializer) continue
       const init = unwrap(node.initializer),
         value = kind(init)
       if (

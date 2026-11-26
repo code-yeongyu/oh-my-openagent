@@ -59,15 +59,14 @@ function bindingNames(name: ts.BindingName): ts.Identifier[] {
   return name.elements.flatMap((element) => (ts.isBindingElement(element) ? bindingNames(element.name) : []))
 }
 
-function mentionsArguments(fn: ts.Node): boolean {
-  let found = false
-  const visit = (node: ts.Node): void => {
-    if (found) return
-    if (ts.isIdentifier(node) && node.text === "arguments") found = true
-    else ts.forEachChild(node, visit)
+function argumentsUsers(nodes: readonly ts.Node[]): Set<ts.Node> {
+  const users = new Set<ts.Node>()
+  for (const node of nodes) {
+    if (!ts.isIdentifier(node) || node.text !== "arguments") continue
+    for (let scope: ts.Node | undefined = node.parent; scope && !users.has(scope); scope = scope.parent)
+      if (isFunctionScope(scope)) users.add(scope)
   }
-  ts.forEachChild(fn, visit)
-  return found
+  return users
 }
 
 function declarationsOf(node: ts.Node, argumentsUsers: Set<ts.Node>): Declaration[] {
@@ -146,13 +145,13 @@ export function createBindingScopes<T>(nodes: readonly ts.Node[], globals: Reado
   const implicitGlobals = new Map<string, T>()
   const byScope = new Map<ts.Node, Map<string, Declaration[]>>()
   const byText = new Map<string, Declaration[]>()
-  const argumentsUsers = new Set(nodes.filter((node) => isFunctionScope(node) && mentionsArguments(node)))
+  const usersOfArguments = argumentsUsers(nodes)
   const index = <K>(map: Map<K, Declaration[]>, key: K, declaration: Declaration): void => {
     const list = map.get(key)
     if (list) list.push(declaration)
     else map.set(key, [declaration])
   }
-  for (const declaration of nodes.flatMap((node) => declarationsOf(node, argumentsUsers))) {
+  for (const declaration of nodes.flatMap((node) => declarationsOf(node, usersOfArguments))) {
     index(byText, declaration.name.text, declaration)
     const names = byScope.get(declaration.scope) ?? new Map<string, Declaration[]>()
     byScope.set(declaration.scope, names)
