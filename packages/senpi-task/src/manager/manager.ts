@@ -61,7 +61,7 @@ import {
   routeAroundSpentLimits,
   type UsageLimitMemory,
 } from "./usage-limit-memory"
-import { boundedProbeOutcome } from "./usage-limit-probe"
+import { boundedProbeOutcome, recordRunLimit } from "./usage-limit-probe"
 import { prepareLimitRevival } from "./usage-limit-revival"
 import { createProbeRequestSignal } from "../runners/probe-request"
 import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
@@ -1779,28 +1779,14 @@ class TaskManagerImpl implements TaskManager {
     readonly runStats: TaskRunStats | undefined
     readonly timestamp: string
   }): Promise<boolean> {
-    if (this.workpools.ownsTask(input.taskId)) return false
-    // A silent probe rung ends child-unresponsive: that outcome is walkable only for the task that is probing (#11383).
-    const probeTimedOut =
-      input.outcome.status === "error" &&
-      input.outcome.failure.kind === "child-unresponsive" &&
-      this.#limits.probeOf(input.taskId, input.epoch) !== undefined &&
-      (input.runStats?.tool_calls ?? 0) === 0
-    if (input.outcome.status !== "error" || !(isChainWalkable(input.outcome, input.runStats) || probeTimedOut)) {
-      return false
-    }
-
+    if (input.outcome.status !== "error") return false
     const record = this.#tryLoad(input.taskId)
     const route = record?.resolved_model
-    if (route !== undefined)
-      this.#limits.settle(
-        input.taskId,
-        route.provider,
-        route.model_id,
-        input.outcome.failure.message,
-        probeTimedOut,
-        input.epoch,
-      )
+    const run = { taskId: input.taskId, epoch: input.epoch, outcome: input.outcome, runStats: input.runStats }
+    const probeTimedOut = recordRunLimit(this.#limits, run, route)
+    if (this.workpools.ownsTask(input.taskId)) return false
+    if (!(isChainWalkable(input.outcome, input.runStats) || probeTimedOut)) return false
+
     const candidates =
       record == null ? undefined : runtimeFallbackCandidates(record, input.outcome.failure.message, this.#limits)
     const nextModel = candidates?.remaining[0]

@@ -1,8 +1,35 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildEvent, ManagedChildHandle, RunnerOutcome } from "./child-handle"
-import type { UsageLimitProbe } from "./usage-limit-memory"
+import { isModelTurnFailure } from "./model-refusals"
+import type { UsageLimitMemory, UsageLimitProbe } from "./usage-limit-memory"
 import { PROBE_REQUEST_EVENT } from "../runners/probe-request"
+import type { ResolvedModelRecord, TaskRunStats } from "../state"
+
+/**
+ * Remembers what a failed run proved about its route's usage limit (#11383), whoever walks the chain and whether or not
+ * the run may walk it: a turn that already ran a tool is not replayed, yet later tasks still route around the limit. A
+ * silent probe rung ends child-unresponsive, which counts only for the run that is probing; the result says whether
+ * this outcome was that probe timeout.
+ */
+export function recordRunLimit(
+  limits: UsageLimitMemory,
+  run: {
+    readonly taskId: string
+    readonly epoch: number
+    readonly outcome: Extract<RunnerOutcome, { readonly status: "error" }>
+    readonly runStats: TaskRunStats | undefined
+  },
+  route: ResolvedModelRecord | undefined,
+): boolean {
+  const probeTimedOut =
+    run.outcome.failure.kind === "child-unresponsive" &&
+    limits.probeOf(run.taskId, run.epoch) !== undefined &&
+    (run.runStats?.tool_calls ?? 0) === 0
+  if (route !== undefined && (isModelTurnFailure(run.outcome) || probeTimedOut))
+    limits.settle(run.taskId, route.provider, route.model_id, run.outcome.failure.message, probeTimedOut, run.epoch)
+  return probeTimedOut
+}
 
 function answered(event: ManagedChildEvent): boolean {
   if (event.type === "message_update") return true
