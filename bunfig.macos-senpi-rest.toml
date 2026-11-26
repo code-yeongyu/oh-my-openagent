@@ -1,0 +1,8 @@
+# macOS Senpi part "rest" (ci-senpi-posix.sh rest): bunfig.toml plus components/thread and components/memory, which the
+# "core" step runs. Keep every other setting identical to bunfig.toml.
+[test]
+preload = ["./test-env.ts", "./test-setup.ts"]
+pathIgnorePatterns = ["dist/**", "packages/web/**", "packages/get-worker/**", "packages/lsp-tools-mcp/**", "packages/lsp-daemon/**", "packages/senpi-desktop-*/**", "packages/omo-computer-*/**", "packages/omo-codex/plugin/**", "packages/omo-codex/scripts/**", "packages/shared-skills/upstreams/**", "packages/omo-senpi/src/components/thread/**", "packages/omo-senpi/src/components/memory/**"]
+
+[loader]
+".md" = "text"

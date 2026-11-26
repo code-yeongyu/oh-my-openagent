@@ -5,17 +5,19 @@ set -euo pipefail
 # builds the plugin the tests read, part one also runs the one-off pack, daemon and typecheck steps, and the package tests are
 # split by Bun's --shard using a private timing copy that Bun rewrites. Mode names stay lowercase letters and the blocks stay flat
 # if-blocks of plain commands: the local-receipt reader parses this file in its default mode without running it.
+# core / rest (macOS): two steps of one job, split by measured macOS file time; core runs components/thread and
+# components/memory, rest every other package test (bunfig.macos-senpi-rest.toml) plus the one-off steps.
 mode="${1:-all}"
 case "$mode" in
-  all|one|two) ;;
+  all|one|two|core|rest) ;;
   *)
-    printf '%s\n' "ci-senpi-posix.sh: expected all, one, or two" >&2
+    printf '%s\n' "ci-senpi-posix.sh: expected all, one, two, core, or rest" >&2
     exit 2
     ;;
 esac
 junit() { if [ -n "${CI_JUNIT_DIR:-}" ]; then mkdir -p "$CI_JUNIT_DIR"; printf '%s\n' --reporter=junit "--reporter-outfile=$CI_JUNIT_DIR/$1.xml"; fi; }
 bun run build:senpi-plugin
-if [ "$mode" = "all" ] || [ "$mode" = "one" ]; then
+if [ "$mode" = "all" ] || [ "$mode" = "one" ] || [ "$mode" = "rest" ]; then
   PACK_DIR="$RUNNER_TEMP/omo-senpi-pack"
   mkdir -p "$PACK_DIR"
   npm pack --pack-destination "$PACK_DIR" packages/omo-senpi/plugin
@@ -31,4 +33,10 @@ if [ "$mode" = "two" ]; then
 fi
 if [ "$mode" = "all" ]; then
   bun test --timeout 20000 packages/omo-senpi $(junit senpi)
+fi
+if [ "$mode" = "core" ]; then
+  bun test --timeout 20000 ./packages/omo-senpi/src/components/thread ./packages/omo-senpi/src/components/memory $(junit senpi-core)
+fi
+if [ "$mode" = "rest" ]; then
+  bun --config=bunfig.macos-senpi-rest.toml test --timeout 20000 packages/omo-senpi $(junit senpi-rest)
 fi

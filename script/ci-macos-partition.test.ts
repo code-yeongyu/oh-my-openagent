@@ -8,13 +8,15 @@ import { discoverTestFiles } from "./ci-test-discovery.ts"
 // Windows shard-1 invocation in ci.yml (`bun test packages/omo-opencode packages/memory-core`), shard 2 is
 // ci-root-shard-2.sh in its unsplit `all` mode (the serial quarantine, then the remainder). Each macOS job's files are
 // derived from its root test steps in ci.yml, the bunfig each command names, and the shard-2 script modes.
-// The LSP, Codex and Senpi suites are whole steps, each pinned to exactly one job by ci-macos-combined.test.ts.
+// The LSP and Codex suites are whole steps and the Senpi suite two steps (core / rest, checked below), each pinned to
+// exactly one job by ci-macos-combined.test.ts.
 
 const stepSchema = z.object({ id: z.string().optional(), run: z.string().optional() })
 const { jobs } = z
   .object({ jobs: z.record(z.string(), z.object({ "runs-on": z.unknown(), steps: z.array(stepSchema) })) })
   .parse(Bun.YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")))
 const shard2Script = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
+const senpiScript = readFileSync(new URL("../.github/scripts/ci-senpi-posix.sh", import.meta.url), "utf8")
 
 interface Invocation {
   readonly config: string
@@ -46,20 +48,24 @@ function parseBunTest(line: string): Invocation {
   return { config, filters }
 }
 
-// The bun commands of every flat if-block of ci-root-shard-2.sh whose condition names this mode.
-function shard2Invocations(mode: string): Invocation[] {
-  const blocks = [...shard2Script.matchAll(/^if (.+); then\n([\s\S]*?)^fi$/gm)]
+// The bun test commands of every flat if-block of a mode script whose condition names this mode.
+function modeInvocations(script: string, name: string, mode: string): Invocation[] {
+  const blocks = [...script.matchAll(/^if (.+); then\n([\s\S]*?)^fi$/gm)]
   const selected = blocks.filter(([, condition = ""]) =>
-    [...condition.matchAll(/"\$mode" = "([a-z]+)"/g)].some(([, name]) => name === mode),
+    [...condition.matchAll(/"\$mode" = "([a-z]+)"/g)].some(([, modeName]) => modeName === mode),
   )
-  if (selected.length === 0) throw new Error(`ci-root-shard-2.sh has no ${mode} block`)
+  if (selected.length === 0) throw new Error(`${name} has no ${mode} block`)
   return selected.flatMap(([, , body = ""]) =>
     body
       .split("\n")
       .map((line) => line.trim())
-      .filter((line) => line.startsWith("bun "))
+      .filter((line) => line.startsWith("bun ") && / test /.test(line) && !line.includes(" ./.agents/"))
       .map(parseBunTest),
   )
+}
+
+function shard2Invocations(mode: string): Invocation[] {
+  return modeInvocations(shard2Script, "ci-root-shard-2.sh", mode)
 }
 
 function stepInvocations(run: string): Invocation[] {
@@ -131,6 +137,41 @@ describe("macOS root test partition across the parallel macOS jobs (#14849)", ()
 
   test("#given the macOS jobs #when every root step's files are counted #then each reference file runs exactly once", () => {
     const ran = counts([...macos.values()].flat())
+    const expected = new Set(reference)
+    expect({
+      duplicated: [...ran]
+        .filter(([, count]) => count > 1)
+        .map(([file]) => file)
+        .sort(),
+      missing: reference.filter((file) => !ran.has(file)).sort(),
+      unexpected: [...ran.keys()].filter((file) => !expected.has(file)).sort(),
+    }).toEqual({ duplicated: [], missing: [], unexpected: [] })
+  })
+})
+
+// The macOS Senpi steps (ci-senpi-posix.sh core / rest) against the unsplit suite of its `all` mode.
+function macosSenpiParts(): Map<string, string[]> {
+  const result = new Map<string, string[]>()
+  for (const step of jobs["macos-combined-2"]?.steps ?? []) {
+    const mode = /^bash \.github\/scripts\/ci-senpi-posix\.sh ([a-z]+)$/.exec(step.run?.trim() ?? "")?.[1]
+    if (mode !== undefined) result.set(mode, files(modeInvocations(senpiScript, "ci-senpi-posix.sh", mode)))
+  }
+  return result
+}
+
+describe("macOS Senpi partition across the steps of macos-combined-2", () => {
+  const reference = files(modeInvocations(senpiScript, "ci-senpi-posix.sh", "all"))
+  const parts = macosSenpiParts()
+
+  test("#given the macOS Senpi steps #when their files are compared #then there are two parts sharing no file", () => {
+    expect([...parts.keys()]).toEqual(["core", "rest"])
+    const rest = new Set(parts.get("rest"))
+    expect((parts.get("core") ?? []).filter((file) => rest.has(file))).toEqual([])
+  })
+
+  test("#given the macOS Senpi steps #when their files are counted #then each file of the unsplit suite runs exactly once", () => {
+    expect(reference.length).toBeGreaterThan(0)
+    const ran = counts([...parts.values()].flat())
     const expected = new Set(reference)
     expect({
       duplicated: [...ran]
