@@ -1,4 +1,6 @@
+import type { AdapterRules } from "./remote-import-guard-adapter"
 import type { GuardRules } from "./remote-import-guard-check"
+import adapterOffenders from "./remote-import-guard-adapter-offenders.json"
 
 // Design "one remote module" v6, sections 1 and 12 (guard G1). L0 is the vendored relay-daemon local-API client, L1 the
 // device service (device-service-core), L1m the vendored bunshin relay transport, L2 `omo-senpi/src/components/remote`.
@@ -53,6 +55,52 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
 }
 
 type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
+
+// Family A (#14943 design 7.5): the adapters of both editions' CLIs and the thread tools, and the layers an adapter may
+// not reach. The SDK entries end the walk: the thread SDK, the omo SDK and the remote module's index.
+const THREAD = "packages/omo-senpi/src/components/thread/"
+const NATIVE = "packages/omo-native/"
+const OPENCODE_CLI = "packages/omo-opencode/src/cli/"
+const NATIVE_ADAPTER =
+  /^packages\/omo-native\/(?:(?:remote|account|sync)-[^/]+\.ts|service-auth-command\.ts|launcher-commands\.ts|compile-entry\.ts|compile-args\.ts)$/
+const LAUNCHER_ADAPTER =
+  /^packages\/omo-native\/bin\/lib\/(?:launcher|thread|thread-args|daemon[a-z-]*|update-args|engine-commands|host-status|retired-command|setup-import|doctor)\.js$/
+const OPENCODE_ADAPTER = new Set([
+  `${OPENCODE_CLI}cli-program.ts`,
+  `${OPENCODE_CLI}runtime-commands.ts`,
+  `${OPENCODE_CLI}cleanup-command.ts`,
+  `${OPENCODE_CLI}mcp-oauth/index.ts`,
+  `${OPENCODE_CLI}service-auth/commands.ts`,
+  `${OPENCODE_CLI}account-keys/commands.ts`,
+])
+const LOOP_ADAPTER = /^packages\/omo-codex\/plugin\/components\/ulw-loop\/src\/cli[a-z-]*\.ts$/
+// The tool definitions; the `tools/*-ops.ts` bodies and helpers they reach are the threads core (design 3.1).
+const TOOL_ADAPTER = /^packages\/omo-senpi\/src\/components\/thread\/tools(?:\.ts|\/extension-tools\.ts)$/
+
+export const ADAPTER_RULES: AdapterRules = {
+  adapter: (file) =>
+    NATIVE_ADAPTER.test(file) ||
+    LAUNCHER_ADAPTER.test(file) ||
+    OPENCODE_ADAPTER.has(file) ||
+    LOOP_ADAPTER.test(file) ||
+    TOOL_ADAPTER.test(file),
+  testFile: isTestFile,
+  sdkEntries: [`${THREAD}sdk.ts`, "packages/omo-senpi/src/components/omo-sdk/index.ts", `${REMOTE}index.ts`],
+  forbidden: [
+    `${THREAD}address/`,
+    "packages/thread-address-core/",
+    `${THREAD}gateway/`,
+    `${THREAD}control/`,
+    `${THREAD}remote/`,
+    REMOTE,
+    DEVICE_SERVICE_CORE,
+    BUNSHIN_TS_RELAY,
+    `${OPENCODE_CLI}service-auth/`,
+    `${OPENCODE_CLI}account-keys/`,
+    `${NATIVE}device-service-handoff.ts`,
+  ],
+  forbiddenBuiltins: ["net", "tls", "http", "https", "http2", "dgram", "ws"],
+}
 
 // Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
 // removes a use also removes its row.
@@ -151,6 +199,10 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
 }
+
+// Family A offenders (a JSON record so the gate and the test can read the merge base's copy): today's adapters reach these
+// layers; the slice named moves each onto the SDK and removes its row, and the record may only shrink against the base.
+export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = adapterOffenders
 
 // Non-literal `import()` sites outside tests, frozen at their count per file (v6 section 12): any new one fails.
 export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
