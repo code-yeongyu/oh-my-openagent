@@ -206,30 +206,24 @@ describe("nested input at the root's boundary", async () => {
     })
     return { reads, value }
   }
+  const callInput = (value: unknown) => ({ name: "probe.ext", op: "ping", args: { nested: value } })
+  const callAt = (own: Record<string, unknown>) => (own["args"] as Record<string, unknown>)["nested"]
+  const registerInput = (value: unknown) => ({
+    name: "probe.ext",
+    migrations: [],
+    moduleUrl: "file:///probe/ext.js",
+    sessionCallable: [{ op: "ping", parameters: { field: value }, toolName: "probe_tool", description: "d" }],
+  })
+  const registerAt = (own: Record<string, unknown>) =>
+    ((own["sessionCallable"] as Record<string, unknown>[])[0]?.["parameters"] as Record<string, unknown>)["field"]
   const FREE_DATA: readonly [
     RootCallKey,
     string,
     (value: unknown) => Record<string, unknown>,
     (own: Record<string, unknown>) => unknown,
   ][] = [
-    [
-      "threads.extensions.call",
-      "args",
-      (value) => ({ name: "probe.ext", op: "ping", args: { nested: value } }),
-      (own) => (own["args"] as Record<string, unknown>)["nested"],
-    ],
-    [
-      "threads.extensions.register",
-      "sessionCallable[].parameters.*",
-      (value) => ({
-        name: "probe.ext",
-        migrations: [],
-        moduleUrl: "file:///probe/ext.js",
-        sessionCallable: [{ op: "ping", parameters: { field: value }, toolName: "probe_tool", description: "d" }],
-      }),
-      (own) =>
-        ((own["sessionCallable"] as Record<string, unknown>[])[0]?.["parameters"] as Record<string, unknown>)["field"],
-    ],
+    ["threads.extensions.call", "args", callInput, callAt],
+    ["threads.extensions.register", "sessionCallable[].parameters.*", registerInput, registerAt],
   ]
 
   for (const [key, path, inputWith, at] of FREE_DATA)
@@ -248,6 +242,90 @@ describe("nested input at the root's boundary", async () => {
       expect(received).toEqual({ probe: "first" })
       expect(reads.count).toBe(1)
     })
+
+  // Security review 6080461306, L1 and L2: one case per any-value field that holds free data (not a callback, a signal or
+  // bytes). "clone" fields get the store's structured clone; "copy" fields the plain copy with the cycle and depth refusal.
+  const FREE_PATHS: readonly {
+    key: RootCallKey
+    path: string
+    mode: "clone" | "copy"
+    input: (value: unknown) => Record<string, unknown>
+    at: (own: Record<string, unknown>) => unknown
+  }[] = [
+    { key: "threads.extensions.call", path: "args", mode: "clone", input: callInput, at: callAt },
+    {
+      key: "threads.extensions.register",
+      path: "sessionCallable[].parameters.*",
+      mode: "clone",
+      input: registerInput,
+      at: registerAt,
+    },
+    {
+      key: "threads.extensions.sessionCall",
+      path: "args",
+      mode: "copy",
+      input: (value) => ({ name: "probe.ext", op: "ping", args: value }),
+      at: (own) => own["args"],
+    },
+    {
+      key: "daemon.warm",
+      path: "context.*",
+      mode: "copy",
+      input: (value) => ({ context: { field: value } }),
+      at: (own) => (own["context"] as Record<string, unknown>)["field"],
+    },
+    {
+      key: "toolkit.steer",
+      path: "proposals",
+      mode: "copy",
+      input: (value) => ({ kind: "add_subgoal", source: "cli", evidence: "e", rationale: "r", proposals: value }),
+      at: (own) => own["proposals"],
+    },
+  ]
+
+  test("#given the call table #then every any-value field holding free data has a case", async () => {
+    const callbacksSignalsBytes = /(?:^|\.)(?:signal|confirm|on[A-Z]\w*|bytes)$/
+    const found: string[] = []
+    for (const key of Object.keys(ROOT_CALL_ANSWERS) as RootCallKey[])
+      for (const path of (await inputShape(key)).anyValue)
+        if (!callbacksSignalsBytes.test(path)) found.push(`${key}:${path}`)
+    expect(FREE_PATHS.map(({ key, path }) => `${key}:${path}`).toSorted()).toEqual(found.toSorted())
+  })
+
+  for (const { key, path, mode, input, at } of FREE_PATHS) {
+    test(`#given nested plain data under ${key}:${path} #when the boundary admits it #then every object and array level is a copy`, async () => {
+      // given
+      const value = { outer: { list: [{ leaf: 1 }] } }
+
+      // when
+      const own = await admitted(key, input(value))
+
+      // then
+      const received = at(own ?? {}) as typeof value
+      expect(received).toEqual(value)
+      expect(received).not.toBe(value)
+      expect(received.outer).not.toBe(value.outer)
+      expect(received.outer.list).not.toBe(value.outer.list)
+      expect(received.outer.list[0]).not.toBe(value.outer.list[0])
+    })
+
+    if (mode === "clone")
+      test(`#given a class instance under ${key}:${path} #when the boundary admits it #then the member receives its structured clone`, async () => {
+        const value = new Probe()
+        const received = at((await admitted(key, input(value))) ?? {})
+        expect(received).not.toBe(value)
+        expect(Object.getPrototypeOf(received)).toBe(Object.prototype)
+        expect(received).toEqual({ field: "x" })
+      })
+    else
+      for (const [label, make] of [
+        ["a cycle", cycle],
+        ["a nesting 40 deep", () => Array.from({ length: 40 }).reduce<unknown>((inner) => ({ inner }), {})],
+      ] as const)
+        test(`#given ${label} under ${key}:${path} #when the boundary admits it #then the input is refused`, async () => {
+          expect(await admitted(key, input(make()))).toBeUndefined()
+        })
+  }
 
   test("#given an extension call whose nested args change on a second read #when the root runs the call #then the caller's object is read once", async () => {
     const sdk = root()
