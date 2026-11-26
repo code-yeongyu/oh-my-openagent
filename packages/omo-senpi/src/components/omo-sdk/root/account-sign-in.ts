@@ -6,7 +6,7 @@ import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import type { CallOptions, OmoFailure, OmoPrincipal, OmoValue, RootCallInput } from "../contract"
 import { OMO_CODE_REGISTRY } from "../contract/codes"
 import type { OmoResult } from "../result"
-import { assertedExpectation, BEHAVIOUR_CHANGES, type Expectation } from "../contract/behaviour-changes"
+import type { Expectation } from "../contract/behaviour-changes"
 import { launchBlocked } from "./account"
 import type { MemberOf } from "./members"
 import { invalidInput } from "./assemble"
@@ -27,10 +27,14 @@ export type InProcessSignIn = (
 ) => Promise<CallOutcome<CoreSignedIn, SignInFailure>>
 
 // B4 (security design 10): replace from a session is refused once the change's evidence exists; until then today's
-// behaviour holds. The behaviour-change table decides, so the root and its scenario never disagree.
-const B4 = BEHAVIOUR_CHANGES.find((change) => change.id === "B4")
-if (B4 === undefined) throw new Error("the behaviour-change table has no B4")
-const REPLACE_FROM_SESSION = assertedExpectation(B4)
+// behaviour holds. The behaviour-change table decides, so the root and its scenario never disagree. The table loads
+// only when a session asks to replace, so it stays off the SDK runtime's static import path.
+async function replaceFromSessionExpectation(): Promise<Expectation> {
+  const { assertedExpectation, BEHAVIOUR_CHANGES } = await import("../contract/behaviour-changes")
+  const b4 = BEHAVIOUR_CHANGES.find((change) => change.id === "B4")
+  if (b4 === undefined) throw new Error("the behaviour-change table has no B4")
+  return assertedExpectation(b4)
+}
 
 const isRootInput = (input: SignInOptions | RootInput): input is RootInput => "method" in input
 
@@ -85,7 +89,6 @@ export function accountSignIn(
   // A session's sign-in runs only through the shipped launcher child until slice A2a moves the device-service setup
   // into a core the engine imports (script/sdk-parity/child-backed-members.json), whatever the entry supplies.
   const { access, custody } = options
-  const replaceFromSession = options.replaceFromSession ?? REPLACE_FROM_SESSION
   const inProcess = options.principal.kind === "session" ? undefined : options.inProcess
   const origin = access.origin
   function signIn(options: SignInOptions): Promise<OmoResult<SignedIn>>
@@ -94,7 +97,11 @@ export function accountSignIn(
     input: SignInOptions | RootInput,
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
-    if (input.replace === true && principalIsSession() && replaceFromSession.outcome === "refuse") {
+    if (
+      input.replace === true &&
+      principalIsSession() &&
+      (options.replaceFromSession ?? (await replaceFromSessionExpectation())).outcome === "refuse"
+    ) {
       await custody.refused("account.signIn", "sender_not_allowed").catch(() => false)
       return failed("sender_not_allowed", "A session cannot replace this machine's earlier device.", {
         principal: "session",

@@ -1,4 +1,3 @@
-import { accountWhoami } from "@oh-my-opencode/account-core/calls/whoami"
 import { type AccountAccess, failure, SIGN_IN } from "../access"
 import { ok, type OmoResult, refused } from "../result"
 import { runSignIn, type SignedIn, type SignInOptions } from "./sign-in"
@@ -40,6 +39,8 @@ export function createAccountApi(
       const blocked = access.blockedReason()
       if (blocked !== undefined) return blocked
       try {
+        // The body loads on the first whoami, off the SDK runtime's static import path (P1b cold-import decision).
+        const { accountWhoami } = await import("@oh-my-opencode/account-core/calls/whoami")
         const read = await accountWhoami({ store: access.store(), session: access.session() })
         if (read.kind === "refused") return refused("signed_out", "this device is not signed in", SIGN_IN)
         const { device, account } = read.value
