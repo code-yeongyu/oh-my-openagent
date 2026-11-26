@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { statSync } from "node:fs"
 import path from "node:path"
 import {
   type AllowlistEntry,
@@ -12,6 +13,29 @@ import {
   readSourceFile,
   WORKSPACE_ROOT,
 } from "./no-raw-tls-client-scan"
+
+const CHUNK_BYTES = 1_000_000
+
+function chunkBySize(files: readonly string[], budget: number): string[][] {
+  const chunks: string[][] = []
+  let current: string[] = []
+  let size = 0
+  for (const file of files) {
+    let bytes = 0
+    try {
+      bytes = statSync(path.join(WORKSPACE_ROOT, file)).size
+    } catch {}
+    if (current.length > 0 && size + bytes > budget) {
+      chunks.push(current)
+      current = []
+      size = 0
+    }
+    current.push(file)
+    size += bytes
+  }
+  if (current.length > 0) chunks.push(current)
+  return chunks
+}
 
 // Reviewed allowlist. Each entry pins one exact call: the repo-relative
 // file, the detected call's normalized text (whitespace collapsed outside
@@ -304,27 +328,53 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     })
   })
 
-  test("#given shipped production source #when scanned #then no raw TLS client call exists outside the reviewed allowlist", () => {
-    const files = collectShippedSourceFiles()
-    expect(files.length).toBeGreaterThan(1000)
-    const scan: ScanItem[] = []
-    for (const file of files) {
-      const content = readSourceFile(path.join(WORKSPACE_ROOT, file))
-      if (content !== null) scan.push({ path: file, content })
-    }
-    // Built-runtime entries are skipped when no build ran: the omowright
-    // runtime is gitignored build output, and CI always builds before
-    // running tests, so absence locally means there is nothing to guard.
-    const effective = ALLOWLIST.filter(
-      (entry) => scan.some((item) => item.path === entry.file) || !isKnownBuiltRuntime(entry.file),
-    )
-    const verdict = evaluateShippedSource(scan, effective)
-    expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
-    expect(verdict.stale, STALE_GUIDANCE).toEqual([])
+  // The whole shipped tree is scanned in chunks of at most CHUNK_BYTES of source, one case per chunk, at the default
+  // test limit. Measured 2026-11-26: about 0.5 ms per KB on a calm host, so a chunk is about half a second; the
+  // largest single file (1.5 MB) is about 1.4 s. The partition and coverage cases below prove no file is skipped.
+  const corpus = collectShippedSourceFiles()
+  const chunks = chunkBySize(corpus, CHUNK_BYTES)
+  const chunkCases = chunks.map((files, index) => [index + 1, files] as const)
+
+  test("#given the shipped tree #when it is chunked #then every file is in exactly one chunk", () => {
+    expect(corpus.length).toBeGreaterThan(1000)
+    expect(chunks.flat()).toEqual(corpus)
+    expect(new Set(chunks.flat()).size).toBe(corpus.length)
+  })
+
+  test("#given the reviewed allowlist #then every entry has a reason and names a scanned file or an unbuilt runtime", () => {
     for (const entry of ALLOWLIST) {
       expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
+      expect(
+        corpus.includes(entry.file) || isKnownBuiltRuntime(entry.file),
+        entry.file + ": stale allowlist entry (no longer scanned)",
+      ).toBe(true)
     }
-    // Measured whole-tree scan (2026-11-26, 5,737 files): 13 s at load 15; 41 to 52 s, and 69 to 72 s when contended,
-    // at load 45. The limit is three times the worst measurement so a loaded receipt host cannot turn a pass red.
-  }, 216_000)
+  })
+
+  test.each(chunkCases)(
+    "#given shipped production source chunk %i #when scanned #then no raw TLS client call exists outside the reviewed allowlist",
+    (_chunk, files) => {
+      const scan: ScanItem[] = []
+      for (const file of files) {
+        const content = readSourceFile(path.join(WORKSPACE_ROOT, file))
+        if (content !== null) scan.push({ path: file, content })
+      }
+      // Built-runtime entries are skipped when no build ran: the omowright runtime is gitignored build output, and
+      // CI always builds before running tests, so absence locally means there is nothing to guard.
+      const entries = ALLOWLIST.filter(
+        (entry) =>
+          files.includes(entry.file) &&
+          (scan.some((item) => item.path === entry.file) || !isKnownBuiltRuntime(entry.file)),
+      )
+      const verdict = evaluateShippedSource(scan, entries)
+      expect(verdict.offenders, OFFENDER_GUIDANCE).toEqual([])
+      expect(verdict.stale, STALE_GUIDANCE).toEqual([])
+    },
+  )
+
+  test("#given the chunk list #then one case is generated per chunk and the cases cover the whole shipped tree", () => {
+    expect(chunkCases.length).toBe(chunks.length)
+    expect(chunkCases.map(([index]) => index)).toEqual(chunks.map((_, index) => index + 1))
+    expect(chunkCases.flatMap(([, files]) => files)).toEqual(corpus)
+  })
 })

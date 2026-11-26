@@ -2215,9 +2215,6 @@
   "script/latest-model-ids-audit.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "script/no-raw-tls-client.test.ts": {
-    "omo-testing/no-flake-masking": 1
-  },
   "script/omo-native-trust-mutations.test.ts": {
     "omo-testing/no-flake-masking": 4
   },
