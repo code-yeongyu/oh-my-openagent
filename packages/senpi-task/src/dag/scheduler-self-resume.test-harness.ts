@@ -131,15 +131,14 @@ export class SelfResumingTaskManager implements TaskManager {
     return this.#signal(this.#started, nodeId).promise
   }
 
-  taskOf(nodeId: string): TaskRecord {
-    return this.#byNode(nodeId).record
-  }
+  taskOf = (nodeId: string): TaskRecord => this.#byNode(nodeId).record
 
-  complete(nodeId: string, status: TaskStatus = "completed"): void {
+  complete(nodeId: string, status: TaskStatus = "completed", runStats?: TaskRecord["run_stats"]): void {
     const task = this.#byNode(nodeId)
     task.record = {
       ...task.record,
       status,
+      ...(runStats === undefined ? {} : { run_stats: runStats }),
       ...(status === "completed" ? { final_response: `done ${nodeId}` } : { error_message: `${status} ${nodeId}` }),
     }
     task.completion.resolve(task.record)
