@@ -6695,6 +6695,31 @@
       ]
     },
     {
+      "id": "threads.interrupt/caller-cancels",
+      "row": "threads.interrupt",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.interrupt",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
       "id": "threads.close/session-live",
       "row": "threads.close",
       "kind": "effect",
@@ -6788,6 +6813,31 @@
       ]
     },
     {
+      "id": "threads.close/caller-cancels",
+      "row": "threads.close",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
       "id": "threads.setModel/session-live",
       "row": "threads.setModel",
       "kind": "effect",
@@ -6871,6 +6921,32 @@
       ]
     },
     {
+      "id": "threads.setModel/caller-cancels",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1",
+        "model": "opus"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
       "id": "threads.setReasoning/session-live",
       "row": "threads.setReasoning",
       "kind": "effect",
@@ -6952,6 +7028,32 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "threads.setReasoning/caller-cancels",
+      "row": "threads.setReasoning",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1",
+        "level": "high"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
     },
     {
       "id": "threads.rename/session-live",
@@ -7043,6 +7145,37 @@
       ]
     },
     {
+      "id": "threads.rename/caller-cancels",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
       "id": "threads.archive/session-live",
       "row": "threads.archive",
       "kind": "effect",
@@ -7123,6 +7256,31 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "threads.archive/caller-cancels",
+      "row": "threads.archive",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "set_archived",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.archive",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
     },
     {
       "id": "threads.handoff/session-live",

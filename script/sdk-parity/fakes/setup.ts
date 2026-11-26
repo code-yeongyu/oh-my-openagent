@@ -118,7 +118,14 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
   }
-  return { root: callScoped(root, begin, end), rootAs, calls: recorder.calls }
+  return { root: callScoped(root, begin, end), rootAs, calls: recorder.calls, after: atCallStart }
+}
+
+// The fakes' virtual clock (conformance-run.ts `after`): no fake advances it, so it stands at the call's start. An abort
+// at 0 ms fires there, before the call; one at a later virtual time needs a fake that advances it, which none is yet.
+function atCallStart(ms: number, fire: () => void): void {
+  if (ms !== 0) throw new Error(`the fakes' clock does not advance; an abort after ${ms} ms of virtual time cannot run`)
+  fire()
 }
 
 export function scenarioRuns(
