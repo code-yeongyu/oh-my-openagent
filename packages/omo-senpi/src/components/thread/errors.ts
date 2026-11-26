@@ -44,6 +44,7 @@ export const THREAD_ERROR_CODES = [
   "relay_requires_paid_plan",
   "alias_taken",
   "gateway_schema_too_new",
+  "not_applied",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]
@@ -62,6 +63,8 @@ export type ThreadToolFailure = {
   readonly message: string
   readonly next_action: string
   readonly details?: Readonly<Record<string, unknown>>
+  /** True when the call left this device and its effect could not be read back (design 4.4); absent otherwise. */
+  readonly uncertain?: boolean
 }
 
 export function threadToolFailure(

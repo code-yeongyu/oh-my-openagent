@@ -717,7 +717,7 @@
     },
     {
       "id": "threads.setModel",
-      "gap": "partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`)",
+      "gap": "partial: `setModel` answers applied, after the next compaction, partial, not_applied or uncertain and honours its key (#14939); its core ignores `signal` and `deadline_ms`",
       "slice": "T1b",
       "issue": "new"
     },

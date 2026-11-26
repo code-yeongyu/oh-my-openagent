@@ -59,6 +59,7 @@ import {
   closeThread,
   interruptThread,
   NOT_LIVE,
+  modelSwitchEffectId,
   setModelOn,
   setThinkingLevelOn,
 } from "./control/operations"
@@ -94,6 +95,13 @@ import { currentResult, threadRow } from "./tools/thread-row"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
+
+/**
+ * The tools whose run under a key may repeat after an uncertain answer, because the repeat cannot act twice:
+ * thread_create finds the thread its first run made (#14060), and thread_set_model's switch carries an effect id the
+ * holder answers from its ledger (#14939).
+ */
+const RETRIES_UNCERTAIN: ReadonlySet<ThreadToolName> = new Set(["thread_create", "thread_set_model"])
 /** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A reply to a sender on another device resolves on that device alone and reads no view of this one. */
@@ -207,7 +215,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     // A send owns its idempotency: the gateway engine's receipt is written in the delivery's own
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
     const receipted = !(name === "thread_send" || name === "thread_handoff")
-    // An earlier run under this key failed after it may have acted: only thread_create may run again, and it decides (#14060).
+    // An earlier run under this key failed after it may have acted: only a RETRIES_UNCERTAIN tool may run again.
     let retrying: { readonly error_note: string | null } | undefined
     if (receipted) {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
@@ -232,7 +240,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           ...scope,
           now: at,
           args_hash: hashArgs(value),
-          retry_uncertain: name === "thread_create",
+          retry_uncertain: RETRIES_UNCERTAIN.has(name),
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -370,12 +378,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (refusal === undefined) return await failed(error)
       result = { kind: "error", error: refusal }
     }
+    // A model switch whose reply was lost is undecided the same way: the repeat is answered from the holder's effect ledger.
     // A create that may have made its thread (its open's reply was lost) has no answer yet: its receipt stays uncertain,
     // so a retry under the key runs the create again, which finds that thread or answers uncertain again (#14060). The
     // note keeps the first uncertain answer's cause (#14569); a retry that fails in any way has not settled what the
     // first run made, so its receipt stays uncertain under that same note and its error is never replayed as final.
     const undecided =
-      name === "thread_create" &&
+      RETRIES_UNCERTAIN.has(name) &&
       result.kind === "error" &&
       (result.error.code === "idempotency_uncertain" || retrying !== undefined)
         ? (retrying?.error_note ?? uncertainNote(result.error))
@@ -515,11 +524,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     ...metadata("thread_set_model"),
     parameters: threadToolParamSchemas.thread_set_model,
     execute: (id: string, args: ThreadSetModelInput, _signal, _onUpdate, ectx) =>
-      execute("thread_set_model", id, args, ectx, async (current, value, _operationId, callerId) => {
+      execute("thread_set_model", id, args, ectx, async (current, value, operationId, callerId) => {
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
         if (located.kind === "error") return located.result
         if (located.kind === "not_live") return NOT_LIVE
-        return await setModelOn(located.control, value.model, value.provider)
+        return await setModelOn(located.control, value.model, value.provider, {
+          effectId: modelSwitchEffectId(`session:${callerId}`, operationId),
+        })
       }),
   }
   const setReasoning: AnyTool = {

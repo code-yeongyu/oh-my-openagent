@@ -226,8 +226,17 @@ function verbLines(
     if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
-  if (verb === "model" && "model" in result && result.model !== undefined)
-    return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
+  if (verb === "model" && "model_switch" in result) {
+    const asked = `${result.model.provider}/${result.model.id}`
+    if (result.model_switch === "applied") return [`${label} now uses ${asked}.`]
+    const { model, thinking_level } = result.in_effect
+    return [
+      `${label} switches to ${asked} at its next compaction; it stays on ${model.provider}/${model.id} (${thinking_level}) until then.`,
+      ...(result.pending.thinking_level === undefined
+        ? []
+        : [`Thinking level ${result.pending.thinking_level} was not sent; set it once the switch lands.`]),
+    ]
+  }
   if (verb === "interrupt" && "interrupted" in result) {
     if (!result.interrupted) return [`Nothing was running on ${label}.`]
     const { background } = result

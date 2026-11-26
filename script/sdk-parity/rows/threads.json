@@ -3137,7 +3137,7 @@
         "`threads.setModel({ thread, model, provider?, idempotency_key?, all_scope? })`",
         "`omo remote model <s> <provider/id>`; `omo host session model <ref> <provider/id>`",
         "`thread_set_model`",
-        "partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`)",
+        "partial: outcomes and the key built (#14939); `signal` and `deadline_ms` not honoured (T1b)",
         "CLI planned (T3): `omo thread model`",
         "T1b"
       ]

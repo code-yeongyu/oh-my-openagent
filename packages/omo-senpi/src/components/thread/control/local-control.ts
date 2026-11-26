@@ -48,8 +48,8 @@ export function createLocalControl(
     setName: (name) => port.setSessionName(routing, name, threadId),
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),
     getModelState: async () => sessionModelState(await port.getState(routing, threadId)),
-    setModel: async (provider, id) => {
-      const selected = await port.setModel(routing, provider, id, threadId)
+    setModel: async (provider, id, options) => {
+      const selected = await port.setModel(routing, provider, id, threadId, options?.effectId)
       return { provider: selected.provider, id: selected.id }
     },
     getAvailableThinkingLevels: () => port.getAvailableThinkingLevels(routing),

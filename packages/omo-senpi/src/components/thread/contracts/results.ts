@@ -411,11 +411,40 @@ export type ThreadRenameResult =
     } & ThreadLocalAliasNote)
   | ThreadDataError
 
+/** A thread's model and thinking level as its holder's state reports them. */
+export type ThreadModelInEffect = { readonly model: ThreadModel; readonly thinking_level: string }
+
+/**
+ * A model switch the holder keeps until its next compaction (#14939). The holder keeps only the model: a requested
+ * thinking level is not sent while the old model runs, so `thinking_level` is what the call asked for and the caller
+ * sends once the switch lands.
+ */
+export type ThreadPendingModelSwitch = {
+  readonly model: ThreadModel
+  readonly thinking_level?: string
+  readonly thinking_level_sent?: false
+}
+
+/**
+ * `model` is the model the call asked for. `model_switch` says whether it is in effect (`applied`) or held until the
+ * holder's next compaction (`after_compaction`); `in_effect` is the holder's state read after the switch settled.
+ */
 export type ThreadSetModelResult =
   | {
       readonly kind: "ok"
       readonly thread: string
-      readonly model: { readonly provider: string; readonly id: string }
+      readonly model: ThreadModel
+      readonly model_switch: "applied"
+      readonly in_effect: ThreadModelInEffect
+      readonly device?: string
+    }
+  | {
+      readonly kind: "ok"
+      readonly thread: string
+      readonly model: ThreadModel
+      readonly model_switch: "after_compaction"
+      readonly in_effect: ThreadModelInEffect
+      readonly pending: ThreadPendingModelSwitch
       readonly device?: string
     }
   | ThreadDataError

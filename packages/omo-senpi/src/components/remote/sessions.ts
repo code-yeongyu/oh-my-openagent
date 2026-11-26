@@ -752,13 +752,15 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           setModelOn(
             {
               ...control,
-              setModel: async (provider, id) => {
+              setModel: async (provider, id, switchOptions) => {
+                const effectId = switchOptions?.effectId
                 const outcome = await legOf(svc).remote.sessions.sessionCommand(device, session, {
                   type: "set_model",
                   sessionId: session,
                   provider,
                   modelId: id,
                   scope: "session",
+                  ...(effectId === undefined ? {} : { effectId }),
                 })
                 if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
                 const reply = replyData(outcome.response)

@@ -17,6 +17,8 @@ const isOp = (port: string, op: string): boolean =>
 
 export function createRecorder(scenario: TableScenario): Recorder {
   const observed: ObservedCall[] = []
+  // How many calls each stated result has answered: matching results are consumed in order, the last one repeating.
+  const answered = new Map<Expectation, number>()
   const expectations: readonly Expectation[] = [
     ...scenario.expect,
     ...(scenario.then ?? []).flatMap((step) => step.expect),
@@ -27,14 +29,17 @@ export function createRecorder(scenario: TableScenario): Recorder {
       // A fake that reaches for an op outside the contract is a fake bug, never evidence.
       if (!isOp(port, op)) throw new Error(`fake ${port}: ${op} is not a port operation`)
       observed.push({ port, op, args })
-      const stated = expectations.find(
+      const matching = expectations.filter(
         (expectation) =>
           expectation.port === port &&
           expectation.op === op &&
           Object.hasOwn(expectation, "result") &&
           (expectation.args === undefined || isSubsetOf(expectation.args, args)),
       )
-      return stated === undefined ? {} : { result: stated.result }
+      const stated = matching.find((expectation) => !answered.has(expectation)) ?? matching.at(-1)
+      if (stated === undefined) return {}
+      answered.set(stated, (answered.get(stated) ?? 0) + 1)
+      return { result: stated.result }
     },
     given: (port) =>
       Object.assign({}, ...(scenario.given ?? []).filter((given) => given.port === port).map((given) => given.state)),

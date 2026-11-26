@@ -347,8 +347,18 @@ error code. A script acts as itself, never as a session: `self` (and a `close` o
 answers `caller_context_missing`, a thread it creates records no creator session, and a `create` `prompt` is
 sent as the script's own command-line message with the creator's authority. `create` makes a new thread on this
 device under an id derived from `idempotency_key`, so a repeat under the same key reopens that thread instead of
-making another, and `rename` passes the key to the alias registry; the SDK keeps no tool receipt, so any other
-repeated call runs again.
+making another, `rename` passes the key to the alias registry, and `set_model` sends its switch under an effect id
+derived from the key, so the session answers a repeat from its own record of that switch and switches nothing
+again; the SDK keeps no tool receipt, so any other repeated call runs again.
+
+`set_model` answers `model_switch: "applied"` when the model is in effect, or `"after_compaction"` when the session
+holds the switch until its next compaction: `in_effect` names the model and level it still runs on, `pending` the
+model it will switch to, and a thinking level asked with it (`provider/id:high`) is listed there with
+`thinking_level_sent: false`. The switch has landed when `list` (or `omo thread list --json`) shows the thread's
+`model` as the asked one; set the level then with the agent tool `thread_set_reasoning` (the SDK has no reasoning call
+yet). A session that answered and
+shows the switch not in effect is `not_applied` (safe to repeat); one whose state cannot be read back is
+`idempotency_uncertain` with `uncertain: true`.
 
 ```js
 const created = await sdk.create({ name: "nightly-build" })

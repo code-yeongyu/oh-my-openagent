@@ -14,6 +14,7 @@ import { runs as deviceRuns } from "../runs/devices"
 import { runs as threadRuns } from "../runs/threads"
 import { loadScenarioTable } from "../scenario-table"
 import { fsPort, processPort } from "./process-fs"
+import type { ThreadHost } from "../../../packages/omo-senpi/src/components/thread/tools/ports"
 import { createRecorder } from "./recorder"
 import { FAKE_HOME_PREFIX, scenarioSetup } from "./setup"
 
@@ -44,6 +45,7 @@ const ROWS = [
   "threads.locate",
   "threads.release",
   "threads.rename",
+  "threads.setModel",
   "config.status",
 ]
 const table = loadScenarioTable()
@@ -91,9 +93,9 @@ async function judged(changed: TableScenario): Promise<string[]> {
 }
 
 describe("P1b scenario drivers over the real omo SDK root", () => {
-  test("#given the three runs modules #then every table scenario of the eight rows has exactly one run", () => {
+  test("#given the three runs modules #then every table scenario of the driven rows has exactly one run", () => {
     expect(RUNS.map((run) => run.scenario.id).toSorted()).toEqual(scenarios.map((s) => s.id).toSorted())
-    expect(RUNS).toHaveLength(57)
+    expect(RUNS).toHaveLength(93)
   })
 
   test("#given the differences record #then it is sorted, complete per entry, and names only rows still unresolved", () => {
@@ -154,6 +156,100 @@ describe("negative controls: a wrong expectation is reported for each fake famil
       expect((await judged(wrong(id, index, change))).length).toBeGreaterThan(0)
     },
   )
+
+  // #14939: the outcome a model switch answers is the core's classification, so a root whose classifier answers the wrong
+  // outcome must fail exactly the scenarios that state one: after_compaction and applied swapped, partial_commit answered
+  // as not_applied.
+  const misclassified = (answer: unknown): unknown => {
+    const ok = answer as { kind?: string; model_switch?: string; error?: { code?: string } }
+    if (ok.kind === "ok" && ok.model_switch === "after_compaction") return { ...ok, model_switch: "applied" }
+    if (ok.kind === "ok" && ok.model_switch === "applied") return { ...ok, model_switch: "after_compaction" }
+    if (ok.kind === "error" && ok.error?.code === "partial_commit")
+      return { ...ok, error: { ...ok.error, code: "not_applied" } }
+    return answer
+  }
+  const withSetModel = (root: unknown, map: (answer: unknown) => unknown): unknown =>
+    new Proxy(Object(root), {
+      get: (target, key) => {
+        const value = Reflect.get(target, key) as unknown
+        if (key !== "threads") return value
+        return new Proxy(Object(value), {
+          get: (threads, member) => {
+            const call = Reflect.get(threads, member) as unknown
+            if (member !== "setModel" || typeof call !== "function") return call
+            return async (...args: unknown[]) => map(await Reflect.apply(call, threads, args))
+          },
+        })
+      },
+    })
+  test("#given a root whose classifier answers the wrong outcome #when every threads.setModel scenario runs #then exactly the scenarios that state an outcome fail", async () => {
+    const setModel = scenarios.filter((scenario) => scenario.row === "threads.setModel")
+    const runs: ScenarioRun[] = setModel.map((scenario) => ({
+      scenario,
+      setup: () => {
+        const real = scenarioSetup(scenario)
+        return { ...real, root: withSetModel(real.root, misclassified) }
+      },
+    }))
+    const row = rows.find((candidate) => candidate.id === "threads.setModel")
+    if (row === undefined) throw new Error("no threads.setModel row")
+    const wrong = failing(conformanceProblems([row], NONE, await runEffectScenarios(rows, runs), CONTEXT))
+    const states = (answer: Readonly<Record<string, unknown>> | undefined): boolean =>
+      answer !== undefined && "model_switch" in answer
+    // Each call that states an outcome fails on its own: the scenario, and a later step as `<id>#step<n>`.
+    const stating = setModel
+      .flatMap((scenario) => [
+        ...(scenario.refusal === "partial_commit" || states(scenario.answer) ? [scenario.id] : []),
+        ...(scenario.then ?? []).flatMap((step, index) =>
+          states(step.answer) ? [`${scenario.id}#step${index + 2}`] : [],
+        ),
+      ])
+      .toSorted()
+    expect(stating.length).toBeGreaterThan(0)
+    expect(wrong).toEqual(stating)
+  })
+
+  test("#given threads.setModel/idempotent-repeat #when the adapter drops the effect id before the holder #then the scenario fails", async () => {
+    const scenario = scenarioOf("threads.setModel/idempotent-repeat")
+    const dropEffect = (host: ThreadHost): ThreadHost => {
+      const strip =
+        (port: ThreadHost): ThreadHost["setModel"] =>
+        (session, provider, id, durable) =>
+          port.setModel(session, provider, id, durable)
+      return {
+        ...host,
+        setModel: strip(host),
+        ...(host.endpoint === undefined
+          ? {}
+          : { endpoint: (socket: string) => ({ ...host.endpoint?.(socket), setModel: strip(host) }) }),
+      } as ThreadHost
+    }
+    expect(await judged(scenario)).toEqual([])
+    const [record] = await runEffectScenarios(rows, [
+      { scenario, setup: () => scenarioSetup(scenario, { wrapHost: dropEffect }) },
+    ])
+    const row = rows.find((candidate) => candidate.id === scenario.row)
+    if (row === undefined || record === undefined) throw new Error("no record")
+    expect(
+      conformanceProblems([row], NONE, [record], CONTEXT).filter((problem) => problem.includes(scenario.id)).length,
+    ).toBeGreaterThan(0)
+  })
+
+  test("#given two stated results for one operation #when it is called three times #then each answers in turn and the last repeats", () => {
+    const recorder = createRecorder({
+      ...scenarioOf("threads.setModel/applied-here-suffix"),
+      expect: [
+        { port: "host", op: "get_state", result: { model: "openai/m-0" } },
+        { port: "host", op: "get_state", result: { model: "anthropic/m-1" } },
+      ],
+    })
+    const read = () => recorder.record("host", "get_state", { thread: "t-1" }).result
+    expect([read(), read(), read()]).toEqual([
+      { model: "openai/m-0" },
+      { model: "anthropic/m-1" },
+      { model: "anthropic/m-1" },
+    ])
+  })
 
   test("#given process and fs calls #when expected wrongly #then expectationProblems reports them", async () => {
     const recorder = createRecorder(scenarioOf("config.status/reads-config-files"))

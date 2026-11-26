@@ -62,6 +62,10 @@ async function owner(duplicate: false | "other" | "self" = false) {
             data: {
               models: [MODEL],
               ...MODEL,
+              // get_state's fields (#14939): the switch to MODEL is in effect.
+              model: MODEL,
+              thinkingLevel: "off",
+              pendingModelSwitch: null,
               isStreaming: false,
               disposition: "started",
               turnId: "turn-42",

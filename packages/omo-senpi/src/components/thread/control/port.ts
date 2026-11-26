@@ -7,18 +7,24 @@ import type { ThreadCloseAnswer, ThreadCloseOptions } from "../tools/ports"
 import { threadModel } from "../tools/thread-state"
 import type { ThreadModel, ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
+/** `pendingModel`: the switch the holder keeps until its next compaction (senpi `pendingModelSwitch`), when one is held. */
 export type SessionModelState = {
   readonly model: ThreadModel
   readonly thinkingLevel: string
+  readonly pendingModel?: ThreadModel
 }
 
 export function sessionModelState(state: {
   readonly model?: unknown
   readonly thinkingLevel?: unknown
+  readonly pendingModelSwitch?: unknown
 }): SessionModelState | undefined {
   const { thinkingLevel } = state
   const { model } = threadModel(state.model)
-  return model !== undefined && typeof thinkingLevel === "string" ? { model, thinkingLevel } : undefined
+  const { model: pendingModel } = threadModel(state.pendingModelSwitch)
+  return model !== undefined && typeof thinkingLevel === "string"
+    ? { model, thinkingLevel, ...(pendingModel === undefined ? {} : { pendingModel }) }
+    : undefined
 }
 
 /**
@@ -49,7 +55,12 @@ export type SessionControl = {
   }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
   /** A fresh `get_state` snapshot of the model and level, for restoring a refused compound switch. */
   readonly getModelState: () => Promise<SessionModelState | undefined>
-  readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
+  /** `effectId`: the holder's effect ledger answers a repeat under it without switching again. */
+  readonly setModel: (
+    provider: string,
+    id: string,
+    options?: { readonly effectId?: string },
+  ) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /**
    * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`), never the device's remembered level for the

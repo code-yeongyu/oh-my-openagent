@@ -13,7 +13,15 @@ import {
 } from "../contracts"
 import { createThread } from "../control/create"
 import { locateControl } from "../control/locate"
-import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "../control/operations"
+import {
+  answered,
+  closeOptions,
+  closeThread,
+  interruptThread,
+  modelSwitchEffectId,
+  NOT_LIVE,
+  setModelOn,
+} from "../control/operations"
 import { controlIdentity } from "../control/port"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "../control/prompt-start"
 import { renameThread } from "../control/rename"
@@ -106,7 +114,15 @@ export function createControls(context: ThreadCoreContext) {
         const found = await located(value.thread, value.all_scope)
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE
-        return await setModelOn(found.control, value.model, value.provider)
+        // #14939: the key is the switch's effect id, so a repeat under it is answered from the holder's effect ledger.
+        return await setModelOn(
+          found.control,
+          value.model,
+          value.provider,
+          value.idempotency_key === undefined
+            ? {}
+            : { effectId: modelSwitchEffectId(principal, value.idempotency_key) },
+        )
       }),
   }
 }

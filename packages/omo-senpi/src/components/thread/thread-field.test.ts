@@ -36,17 +36,22 @@ const session = (routing: string, durable: string, name: string): ThreadHostSess
 function tools(sessions: ThreadHostSession[]) {
   const [first] = sessions
   if (first === undefined) throw new Error("the scan needs a session")
+  // The model and level the engine reports in every get_state; a switch is applied at once (#14939).
+  let model = { provider: "openai", id: "gpt-previous" }
   const host: ThreadHost = {
     socket: SOCKET,
     listSessions: async () => sessions,
     openSession: async () => first,
     getMessages: async () => [{ role: "user", content: "hello" }],
-    getState: async () => ({ isStreaming: false }),
+    getState: async () => ({ isStreaming: false, model, thinkingLevel: "off" }),
     prompt: async () => ({ turnId: "turn-1" }),
     interrupt: async () => ({ interrupted: false }),
     setSessionName: async () => {},
     setSessionArchived: async () => {},
-    setModel: async (_sessionId, provider, id) => ({ provider, id, name: "Model" }),
+    setModel: async (_sessionId, provider, id) => {
+      model = { provider, id }
+      return { provider, id, name: "Model" }
+    },
     getAvailableModels: async () => [{ provider: "openai", id: "gpt-x", name: "GPT X" }],
     setThinkingLevel: async () => {},
     getAvailableThinkingLevels: async () => ["off", "high"],

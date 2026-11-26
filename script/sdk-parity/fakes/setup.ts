@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { assembleOmoSdk } from "../../../packages/omo-senpi/src/components/omo-sdk/assembly"
 import type { OmoSdkOptions } from "../../../packages/omo-senpi/src/components/omo-sdk/options"
 import type { CoreLoaders } from "../../../packages/omo-senpi/src/components/omo-sdk/root/members"
+import type { ThreadHost } from "../../../packages/omo-senpi/src/components/thread/tools/ports"
 import type { ScenarioRun, ScenarioSetup } from "../conformance-run"
 import type { TableScenario } from "../expectation"
 import { loadScenarioTable } from "../scenario-table"
@@ -34,6 +35,8 @@ export type SetupOptions = {
   /** The engine was launched by the desktop app: a fact of the fixture the table states no `given` for yet. */
   readonly desktopLaunch?: boolean
   readonly cores?: (fakes: ScenarioFakes) => CoreLoaders
+  /** A control's change to what reaches the host fake (#14939: an adapter that drops the effect id). */
+  readonly wrapHost?: (host: ThreadHost) => ThreadHost
 }
 
 const FIXED_NOW = 1_764_000_000_000
@@ -97,7 +100,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     ...(scenario.root as Partial<OmoSdkOptions> | undefined),
     ports: {
       ...accountPorts(recorder, { desktopLaunch: options.desktopLaunch === true }),
-      host: hostPort(recorder, { agentDir, cwd: home, elsewhere }),
+      host: (options.wrapHost ?? ((host: ThreadHost) => host))(hostPort(recorder, { agentDir, cwd: home, elsewhere })),
       store: storePort(recorder, () => FIXED_NOW),
       remote: remote.remote,
       now: () => FIXED_NOW,

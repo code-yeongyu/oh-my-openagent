@@ -172,8 +172,23 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
         details: [...(typeof r.alias === "string" ? [`alias: ${r.alias}`] : []), ...device(r)],
       }
     case "thread_set_model": {
-      const model = (r.model ?? {}) as { readonly provider?: string; readonly id?: string }
-      return { tone: "success", headline: `${target} now uses ${model.provider}/${model.id}`, details: device(r) }
+      type Model = { readonly provider?: string; readonly id?: string }
+      const name = (value: unknown) => `${(value as Model | undefined)?.provider}/${(value as Model | undefined)?.id}`
+      if (r.model_switch !== "after_compaction")
+        return { tone: "success", headline: `${target} now uses ${name(r.model)}`, details: device(r) }
+      const inEffect = (r.in_effect ?? {}) as { readonly model?: unknown; readonly thinking_level?: unknown }
+      const pending = (r.pending ?? {}) as { readonly thinking_level?: unknown }
+      return {
+        tone: "success",
+        headline: `${target} switches to ${name(r.model)} at its next compaction`,
+        details: [
+          `still on ${name(inEffect.model)} (${text(inEffect.thinking_level)}) until then`,
+          ...(typeof pending.thinking_level === "string"
+            ? [`thinking level ${pending.thinking_level} not sent; set it once the switch lands`]
+            : []),
+          ...device(r),
+        ],
+      }
     }
     case "thread_set_reasoning":
       return {

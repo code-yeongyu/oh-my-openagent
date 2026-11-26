@@ -19,6 +19,8 @@ describe("thread_set_model on another device", () => {
       kind: "ok",
       thread: "dur-on-b",
       model: { provider: "anthropic", id: "claude-opus" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "anthropic", id: "claude-opus" }, thinking_level: "off" },
       device: "b",
     })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
@@ -27,9 +29,47 @@ describe("thread_set_model on another device", () => {
         "session",
         "b",
         "rk-on-b",
-        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus", scope: "session" },
+        {
+          type: "set_model",
+          sessionId: "rk-on-b",
+          provider: "anthropic",
+          modelId: "claude-opus",
+          scope: "session",
+          effectId: expect.stringMatching(/^set_model:[0-9a-f]{40}$/),
+        },
       ],
+      ["session", "b", "rk-on-b", { type: "get_state", sessionId: "rk-on-b" }],
     ])
+  })
+
+  test("#14939 #given b parks the switch and the reply to it is lost #when thread_set_model repeats under the same idempotency key #then the repeat answers the pending outcome and b took the switch once", async () => {
+    const a = account({ parksModelSwitch: true, setModelLosesReply: 1 })
+    const { run } = surface(a.remote)
+    const args = { thread: "dur-on-b", model: "opus:high", idempotency_key: "switch-1" }
+    expect(await run("thread_set_model", args)).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_uncertain" },
+    })
+    expect(await run("thread_set_model", args)).toEqual({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      model: { provider: "anthropic", id: "claude-opus" },
+      model_switch: "after_compaction",
+      in_effect: { model: { provider: "openai", id: "gpt-6" }, thinking_level: "off" },
+      pending: {
+        model: { provider: "anthropic", id: "claude-opus" },
+        thinking_level: "high",
+        thinking_level_sent: false,
+      },
+    })
+    const effects = a.sent
+      .filter((entry) => entry.rpc?.["type"] === "set_model")
+      .map((entry) => entry.rpc?.["effectId"])
+    expect(effects).toHaveLength(2)
+    expect(typeof effects[0]).toBe("string")
+    expect(effects[1]).toBe(effects[0])
+    expect(a.modelSwitches()).toBe(1)
   })
 
   test("#given b refuses the command #when thread_set_model targets b's thread #then the refusal is typed and set_model is never sent", async () => {
