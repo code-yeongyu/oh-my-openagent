@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { afterEach, expect, test } from "bun:test"
 
 import sdkLocateBase from "./testing/sdk-locate.base.json"
 import { sdkOn, type Cleanups } from "./testing/entries"
@@ -25,22 +25,31 @@ const ADDRESSES = [
   ]),
 ]
 const BASE: Readonly<Record<string, unknown>> = sdkLocateBase.answers
+const CELLS = [{}, { prefixTwin: true }].flatMap((setup) =>
+  [undefined, true].flatMap((all_scope) =>
+    ADDRESSES.map((address) => ({ setup, all_scope, address, key: JSON.stringify([setup, all_scope, address]) })),
+  ),
+)
 
-test("#given every address form, both scopes and both fixtures #when the shipped SDK locates it #then it answers the base branch's answer byte for byte", async () => {
-  const answers: Record<string, unknown> = {}
-  for (const setup of [{}, { prefixTwin: true }])
-    for (const all_scope of [undefined, true])
-      for (const address of ADDRESSES) {
-        const cleanups: Cleanups = []
-        const td = createTwoDevices({ ...setup, sessionFiles: true })
-        cleanups.push(td.cleanup)
-        answers[JSON.stringify([setup, all_scope, address])] = await sdkOn(td, cleanups).locate({
-          thread: address,
-          ...(all_scope === undefined ? {} : { all_scope }),
-        })
-        for (const cleanup of cleanups.reverse()) await cleanup()
-      }
-  const written = JSON.parse(JSON.stringify(answers).split(process.cwd()).join("<cwd>")) as Record<string, unknown>
-  expect(Object.keys(written)).toHaveLength(180)
-  expect(written).toEqual(BASE)
+const cleanups: Cleanups = []
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
+
+test("#given the table of cells #then it has every captured cell and no other", () => {
+  expect(CELLS).toHaveLength(180)
+  expect(CELLS.map((cell) => cell.key).toSorted()).toEqual(Object.keys(BASE).toSorted())
+})
+
+test.each(CELLS.map((cell) => [cell.key, cell] as const))(
+  "#given the cell %s #when the shipped SDK locates it #then it answers the base branch's answer byte for byte",
+  async (key, { setup, all_scope, address }) => {
+    const td = createTwoDevices({ ...setup, sessionFiles: true })
+    cleanups.push(td.cleanup)
+    const answer = await sdkOn(td, cleanups).locate({
+      thread: address,
+      ...(all_scope === undefined ? {} : { all_scope }),
+    })
+    expect(JSON.parse(JSON.stringify(answer).split(process.cwd()).join("<cwd>"))).toEqual(BASE[key])
+  },
+)

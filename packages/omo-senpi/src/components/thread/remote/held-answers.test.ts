@@ -40,7 +40,42 @@ const unresolvedRows = (): ReadonlySet<string> =>
     ),
   )
 
+const REPO_ROOT = join(import.meta.dir, "../../../../../..")
+
+/** An entry whose rows are empty is retired by its slice's removal of `retiredWith`: listed without that export, it fails. */
+function retirementProblems(
+  held: Readonly<Record<string, object>>,
+  exists: (file: string, symbol: string) => boolean,
+): string[] {
+  return Object.entries(held).flatMap(([site, entry]) => {
+    const rows = Reflect.get(entry, "rows") as readonly string[]
+    const retired = Reflect.get(entry, "retiredWith") as { readonly file: string; readonly symbol: string } | undefined
+    if (rows.length > 0) return []
+    if (retired === undefined) return [`${site}: names no row and no retiredWith export, so nothing retires it`]
+    return exists(retired.file, retired.symbol)
+      ? []
+      : [`${site}: ${retired.symbol} left ${retired.file}; its slice removes this entry in the same commit`]
+  })
+}
+
+const exportedIn = (file: string, symbol: string): boolean =>
+  new RegExp(`^export (?:async )?(?:function|const) ${symbol}\\b`, "m").test(
+    readFileSync(join(REPO_ROOT, file), "utf8"),
+  )
+
 describe("the held-answers list (design lane ruling on T1a)", () => {
+  test("#given the entries no parity row names #when their retiring export is looked up #then each still exists", () => {
+    expect(retirementProblems(HELD_ANSWERS, exportedIn)).toEqual([])
+  })
+
+  test("#given an entry whose export is gone, and one with neither rows nor an export #when checked #then each is named", () => {
+    const gone = { rows: [], retiredWith: { file: "x.ts", symbol: "gone" } }
+    expect(retirementProblems({ "site-a": gone, "site-b": { rows: [] } }, () => false)).toEqual([
+      "site-a: gone left x.ts; its slice removes this entry in the same commit",
+      "site-b: names no row and no retiredWith export, so nothing retires it",
+    ])
+  })
+
   test("#given the list and the unresolved record #when compared #then no entry was added, none left early and none outlived its rows", () => {
     expect(listProblems(HELD_ANSWERS, unresolvedRows())).toEqual([])
   })
