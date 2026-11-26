@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TaskRecord } from "../state"
 import { claimantAlive, type LifecycleContext } from "./context"
 import { observeRecordOwners } from "./owner-process"
-import { retriesStopped } from "./deferred-revival"
+import { retriesStopped, stopAwareRetryContext } from "./deferred-revival"
 import { PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { isHostSessionRecord } from "./host-session"
 import type { IdleReclaimerTimer, LifecycleDeps } from "./port"
@@ -101,7 +101,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
         if (other.task_id !== record.task_id) excludeTaskIds.add(other.task_id)
       const revival = reconcileScopedRevival(
         {
-          ...context,
+          ...stopAwareRetryContext(context, record.parent_session_id),
           deferUnresumable: true,
           reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds },
         },

@@ -41,6 +41,19 @@ export function retriesStopped(context: LifecycleContext, parentSessionId: strin
   return disposedContexts.has(context) || stoppedSessions.get(context)?.has(parentSessionId) === true
 }
 
+/**
+ * The context a retry hands to a scoped reconcile pass for `parentSessionId`. The pass waits again inside (owner
+ * observation, admission lease, respawn), and every one of its `reconciliationActive` checks must see this session's
+ * stop, so admission itself is stop-aware; a retry's own post-attempt suspend stays only a fallback.
+ */
+export function stopAwareRetryContext(context: LifecycleContext, parentSessionId: string): LifecycleContext {
+  const active = context.reconcileActive
+  return {
+    ...context,
+    reconcileActive: () => active?.() !== false && !retriesStopped(context, parentSessionId),
+  }
+}
+
 /** Retry only this resumed session's child, using the same fenced admission as session_start. */
 export async function retryDeferredScopedChild(
   context: LifecycleContext,
@@ -97,7 +110,7 @@ export async function retryDeferredScopedChild(
     }
     const outcomes = await reconcileScopedRevival(
       {
-        ...context,
+        ...stopAwareRetryContext(context, parentSessionId),
         deferUnresumable: context.registry.ownsRecord?.(fresh) === true || context.deferUnresumable,
         reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds },
       },

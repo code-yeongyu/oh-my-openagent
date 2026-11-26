@@ -16,22 +16,28 @@ const REUSED_START = "linux-proc-start-ticks:200"
 
 /**
  * Reading a foreign owner's start identity is a wait. This view answers the claimant's own identity until it is held;
- * then the next read parks until released and reports a different process under the pid, so the owner reads as gone.
+ * from then on it reports a different process under the pid (the owner reads as gone), and read number `parkAt` after
+ * the hold parks until released, so a test can act inside exactly that observation.
  */
 function heldOwnerView() {
-  let held = false
+  let heldReads: number | undefined
+  let parkAt = 1
   const entered = Promise.withResolvers<undefined>()
   const release = Promise.withResolvers<undefined>()
   const view = createOwnerProcessView(async () => {
-    if (!held) return CLAIMED_START
-    entered.resolve(undefined)
-    await release.promise
+    if (heldReads === undefined) return CLAIMED_START
+    heldReads += 1
+    if (heldReads === parkAt) {
+      entered.resolve(undefined)
+      await release.promise
+    }
     return REUSED_START
   })
   return {
     view,
-    hold: () => {
-      held = true
+    hold: (options: { readonly parkAt?: number } = {}) => {
+      heldReads = 0
+      parkAt = options.parkAt ?? 1
     },
     entered: entered.promise,
     release: () => release.resolve(undefined),
@@ -176,4 +182,39 @@ describe("owner observation is a wait boundary for every recovery path (#12077)"
       h.lifecycle.dispose?.()
     }
   })
+
+  // The scoped pass the retries hand the child to observes the owner again before admission. That inner wait must see the
+  // same stop: admission itself is stop-aware, and the post-attempt suspend is only a fallback.
+  for (const retry of ["deferred scoped retry", "live-parent recovery"] as const) {
+    test(`#given a ${retry} past its own owner check #when the session shuts down during the scoped pass's owner observation #then nothing is admitted or revived`, async () => {
+      // given
+      const h = harness({ parent: "parent-1", residency: "rpc_detached", reattach: true })
+      try {
+        if (retry === "deferred scoped retry") {
+          await h.lifecycle.reconcileOnSessionStart("parent-1")
+          await h.retryWaiting
+          h.owner.hold({ parkAt: 2 })
+          h.releaseRetry()
+        } else {
+          Object.assign(h.fixture.registry, {
+            ownsRecord: (record: { readonly parent_session_id: string }) => record.parent_session_id === "parent-1",
+          })
+          h.owner.hold({ parkAt: 2 })
+          h.notifyMutation()
+        }
+        await h.owner.entered
+
+        // when
+        await h.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
+        h.owner.release()
+        await settled()
+
+        // then
+        expect(h.fixture.respawned).toEqual([])
+        expect(h.store.load(h.taskId)).toMatchObject({ status: "running", residency_state: "rpc_detached" })
+      } finally {
+        h.lifecycle.dispose?.()
+      }
+    })
+  }
 })
