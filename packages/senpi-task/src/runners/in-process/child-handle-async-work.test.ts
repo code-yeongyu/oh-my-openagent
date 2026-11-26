@@ -191,4 +191,18 @@ describe("createChildHandle pending async work from the engine lifecycle (omo#10
     expect(outcome.failure.kind).toBe("async_work_pending")
     expect(outcome.failure.message).toContain("senpi-codemode: 1 [eval cell]")
   })
+
+  test("#given a held turn #when the parent aborts the child #then the outcome is cancelled, not the abandoned work", async () => {
+    // given
+    const h = harness()
+    await h.endTurnWithDetachedCell()
+
+    // when
+    await h.handle.abort()
+    await flushSettlement()
+
+    // then
+    expect(h.settled()).toEqual({ status: "cancelled" })
+    await h.handle.dispose()
+  })
 })

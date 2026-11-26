@@ -18,7 +18,6 @@ import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
 import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
-import { pendingWorkOf } from "../runners/pending-async-work"
 import { classifyResumeFailure, failure, hostRefusal, isTeamRuntimeUnavailable } from "./respawn-failure"
 
 const CONTINUATION_MESSAGE = HOST_RESPAWN_CONTINUATION
@@ -285,8 +284,7 @@ async function continueInterruptedTurn(
 async function adoptFinishedTurn(record: TaskRecord, sessionPath: string, handle: RpcChildHandle): Promise<void> {
   if (isTerminalRecord(record) || handle.adoptFinishedTurn === undefined) return
   const tail = await sessionTailReconciliation(sessionPath)
-  if (tail?.finishedText !== undefined)
-    await handle.adoptFinishedTurn(tail.finishedText, pendingWorkOf(tail.workEvidence))
+  if (tail?.finishedText !== undefined) await handle.adoptFinishedTurn(tail.finishedText, tail.workEvidence)
 }
 
 async function cleanupFailure(handle: RpcChildHandle, reason: string): Promise<RespawnResult> {

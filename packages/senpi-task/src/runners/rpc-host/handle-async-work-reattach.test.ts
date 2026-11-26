@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
@@ -129,7 +129,7 @@ describe("re-joining a child whose turn waits on its own async work (omo#10487)"
       const h = harness()
 
       // when
-      await h.handle.adoptFinishedTurn?.(PROGRESS_NOTE)
+      await h.handle.adoptFinishedTurn?.(PROGRESS_NOTE, "unrecorded")
       await flushSettlement()
 
       // then
@@ -162,5 +162,47 @@ describe("re-joining a child whose turn waits on its own async work (omo#10487)"
     if (outcome?.status !== "error") throw new Error("expected the typed failure")
     expect(outcome.failure.kind).toBe("async_work_pending")
     await h.handle.dispose()
+  })
+
+  test("#given a fresh attached handle #when the transcript records the cell pending after the note but the live engine reports none #then the note is held and then ends as async_work_pending", async () => {
+    // given - the durable record names the cell; the re-joined engine reports nothing pending
+    const sessionPath = progressNoteTranscript()
+    appendFileSync(
+      sessionPath,
+      `${JSON.stringify({ type: "custom", customType: "session-lifecycle", data: { ...lifecycleSnapshot(DETACHED_CELL_WAITS), sessionId: "durable-1" } })}\n`,
+    )
+    const port = fakeSessionPort()
+    const scheduler = createManualSettlementScheduler()
+    const handle = createHostSessionHandle({
+      client: { ...port, getState: () => Promise.resolve({ ...PENDING_STATE, lifecycle: lifecycleSnapshot() }) },
+      session: { ...FAKE_SESSION, sessionPath },
+      taskId: "st_10487_durable",
+      heartbeatIntervalMs: 600_000,
+      now: () => 7,
+      closeGraceMs: 25,
+      openDisposition: "attached",
+      settlementScheduler: scheduler.scheduler,
+    })
+    let settled: RunnerOutcome | undefined
+    void handle.waitForOutcome().then((outcome) => {
+      settled = outcome
+    })
+
+    // when
+    await handle.reconcileTurn({})
+    await flushSettlement()
+
+    // then - held on the recorded work, not adopted as the answer
+    expect(settled).toBeUndefined()
+
+    // when - the confirmation reads the drained, idle session
+    scheduler.runNext()
+    await flushSettlement()
+
+    // then
+    expect(settled?.status).toBe("error")
+    if (settled?.status !== "error") throw new Error("expected the typed failure")
+    expect(settled.failure.kind).toBe("async_work_pending")
+    await handle.dispose()
   })
 })

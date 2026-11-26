@@ -17,7 +17,7 @@ import { classifyChildExit } from "./exit-mapping"
 import { createHandleListeners } from "../rpc-host/handle-listeners"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
-import { abandonedAsyncWorkOutcome } from "../pending-async-work"
+import { finishedTurnOutcome, pendingWorkOf } from "../pending-async-work"
 import { exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
 import { sessionIsIdle, type TurnSettlementScheduler } from "./turn-settlement"
 import { createTurnTracking } from "./turn-tracking"
@@ -264,11 +264,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       return () => void unsubscribe()
     },
     subscribeExtensionEvents: client.extensionEvents.subscribe,
-    adoptFinishedTurn: async (finalResponse, held) => {
+    adoptFinishedTurn: async (finalResponse, evidence) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       // This process reopened the session from its file: the work the answer waited on died with the
       // process that started it (omo#10487).
-      if (held !== undefined) return settleTurn(abandonedAsyncWorkOutcome(held))
+      if (pendingWorkOf(evidence) !== undefined) return settleTurn(finishedTurnOutcome(finalResponse, evidence))
       const response = await client.send({ type: "get_state" }).catch(() => undefined)
       if (
         response === undefined ||
@@ -278,8 +278,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       )
         return
       tracking.observeState(response.data)
-      if (turnOutcome === undefined && settlement.pending() === undefined)
-        settlement.adopt({ status: "completed", finalResponse })
+      if (turnOutcome === undefined && settlement.pending() === undefined) settlement.adopt(finalResponse, evidence)
     },
     onSelfResumed: (listener) => {
       resumedListeners.add(listener)

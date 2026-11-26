@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
-import { abandonedAsyncWorkOutcome } from "../pending-async-work"
+import { finishedTurnOutcome, pendingWorkOf } from "../pending-async-work"
 import { exitTurnOutcome, promptFailureOutcome } from "../rpc/turn-outcome"
 import { sessionIsIdle } from "../rpc/turn-settlement"
 import { createTurnTracking } from "../rpc/turn-tracking"
@@ -102,9 +102,10 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     lastInputId: () => options.inputStore?.load(taskId)?.last_effect_id,
     port: () => client,
     observeState: tracking.observeState,
-    settle: (settled, held) => {
-      if (settled.status === "completed") finalText = settled.finalResponse
-      settlement.adopt(settled, held)
+    settle: (outcome) => settlement.finish(outcome),
+    adopt: (finalResponse, evidence) => {
+      finalText = finalResponse
+      settlement.adopt(finalResponse, evidence)
     },
     continuing: () => {
       continuationState = "pending_delivery"
@@ -417,16 +418,16 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     reconcileTurn: (record) =>
       reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),
     onReconciled: reconciliation.subscribe,
-    adoptFinishedTurn: async (finalResponse, held) => {
+    adoptFinishedTurn: async (finalResponse, evidence) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       // A session reopened from its file runs nothing the old one started (omo#10487).
-      if (held !== undefined && openDisposition === "reopened") return settleTurn(abandonedAsyncWorkOutcome(held))
+      if (openDisposition === "reopened" && pendingWorkOf(evidence) !== undefined)
+        return settleTurn(finishedTurnOutcome(finalResponse, evidence))
       // A state read that fails is not proof of idleness, and must never cost the reattach: stay busy.
       const state = await client.getState().catch(() => undefined)
       if (state === undefined || !sessionIsIdle(state)) return
       tracking.observeState(state)
-      if (turnOutcome === undefined && settlement.pending() === undefined)
-        settlement.adopt({ status: "completed", finalResponse }, held)
+      if (turnOutcome === undefined && settlement.pending() === undefined) settlement.adopt(finalResponse, evidence)
     },
     waitForIdle: () => waiters.waitForIdle(reachedIdle || outcome !== undefined),
     hasExited: () => outcome !== undefined,

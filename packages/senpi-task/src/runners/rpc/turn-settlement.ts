@@ -2,7 +2,13 @@ import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { createAsyncWorkHold } from "../async-work-hold"
-import { finishedTurnOutcome, type PendingAsyncWork } from "../pending-async-work"
+import {
+  finishedTurnOutcome,
+  pendingWorkOf,
+  type PendingAsyncWork,
+  type PendingWorkEvidence,
+  type UnfinishedOutcome,
+} from "../pending-async-work"
 import { agentEndOutcome } from "./turn-outcome"
 
 type AgentEndEvent = Extract<AgentSessionEvent, { readonly type: "agent_end" }>
@@ -78,9 +84,13 @@ export type TurnSettlement = {
   // An outcome read outside the event stream (a re-joined session's reconciliation, a finished
   // transcript) ends the turn exactly as an `agent_end` then `agent_idle` would: a completed outcome
   // is held while the engine still reports the child's own async work (omo#10487). Re-offering the
-  // note a hold already keeps back leaves that hold alone. `held` is the work a durable record names
-  // as pending after that answer: it holds the note when the live engine reports none (omo#10487).
-  readonly adopt: (outcome: RunnerOutcome, held?: PendingAsyncWork) => void
+  // note a hold already keeps back leaves that hold alone. `evidence` is what a durable record says
+  // about the child's own work after that answer: its pending work holds the note when the live
+  // engine reports none (omo#10487).
+  readonly adopt: (finalResponse: string, evidence: PendingWorkEvidence) => void
+  // An end read outside the event stream that is not an answer (cancelled, failed): it replaces any
+  // held turn and its confirmations at once.
+  readonly finish: (outcome: UnfinishedOutcome) => void
   // The session that owned the held turn's work is gone (reopened from its file): the turn ends as
   // that abandoned work. `false` when no turn is held on async work.
   readonly abandon: () => boolean
@@ -265,16 +275,18 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
       disarmConfirmation()
     },
     reconfirmHeld: rearm,
-    adopt: (outcome, durableWork) => {
+    adopt: (finalResponse, evidence) => {
       const keptBack =
-        asyncWork?.holding() === true &&
-        held?.status === "completed" &&
-        outcome.status === "completed" &&
-        outcome.finalResponse === held.finalResponse
+        asyncWork?.holding() === true && held?.status === "completed" && finalResponse === held.finalResponse
       if (keptBack) return
       clearConfirmation()
-      held = outcome
-      atIdle(durableWork)
+      held = { status: "completed", finalResponse }
+      atIdle(pendingWorkOf(evidence))
+    },
+    finish: (outcome) => {
+      clearConfirmation()
+      held = undefined
+      input.settle(outcome)
     },
     abandon: () => {
       const outcome = asyncWork?.abandoned()

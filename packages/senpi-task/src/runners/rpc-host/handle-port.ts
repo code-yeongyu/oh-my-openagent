@@ -12,7 +12,7 @@ import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked, HostSessionReplaced } from "./session-client"
 import type { TransportRecoveryOptions } from "./transport-recovery"
 import type { CatalogModelIdentity } from "../pinned-model-equivalence"
-import type { PendingAsyncWork } from "../pending-async-work"
+import type { PendingWorkEvidence } from "../pending-async-work"
 import type { TurnSettlementScheduler } from "../rpc/turn-settlement"
 import type { TaskRecord } from "../../state"
 import type { HostTurnReconciliation, ReconciledTurnNotice } from "./reconcile-turn"
@@ -141,7 +141,7 @@ export type HostSessionChildHandle = RpcChildHandle & {
   /** A reattach left a turn that was in flight at the loss running on the new port. */
   onTurnResumed(listener: () => void): () => void
   onSelfResumed(listener: () => void): () => void
-  adoptFinishedTurn(finalResponse: string, held?: PendingAsyncWork): Promise<void>
+  adoptFinishedTurn(finalResponse: string, evidence: PendingWorkEvidence): Promise<void>
   startInitialPrompt(text: string): Promise<void>
   /** The connection is down and being recovered: nothing sent to the child can land yet. */
   transportRecovering(): boolean

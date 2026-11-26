@@ -90,6 +90,11 @@ function describePendingAsyncWork(work: PendingAsyncWork): string {
   return parts.join("; ")
 }
 
+/** Any end of a turn but a completed answer. */
+export type UnfinishedOutcome = Exclude<RunnerOutcome, { readonly status: "completed" }>
+
+type FailedOutcome = Extract<RunnerOutcome, { readonly status: "error" }>
+
 /**
  * What is known about the child's own async work when a turn's last answer is classified for good
  * (omo#10487): the pending work the engine reported, `"none-pending"` when it reported none, or
@@ -114,11 +119,11 @@ export function finishedTurnOutcome(finalResponse: string, evidence: PendingWork
 
 // What a held turn amounts to once the session that owned its work is gone (teardown, a reopened
 // session): the same typed outcome everywhere, never the interim note.
-export function abandonedAsyncWorkOutcome(work: PendingAsyncWork): RunnerOutcome {
+export function abandonedAsyncWorkOutcome(work: PendingAsyncWork): FailedOutcome {
   return asyncWorkPendingOutcome(work, "the child stopped before that work settled")
 }
 
-export function asyncWorkPendingOutcome(work: PendingAsyncWork, why: string): RunnerOutcome {
+export function asyncWorkPendingOutcome(work: PendingAsyncWork, why: string): FailedOutcome {
   return {
     status: "error",
     failure: {
