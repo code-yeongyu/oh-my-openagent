@@ -150,6 +150,9 @@ impl<O: CaptureOs> Backend for Win32Backend<O> {
             height: record.height,
             mime: ImageMime::Png,
             bytes,
+            route: Some(record.route),
+            occluders_visible: None,
+            cursor: None,
         })
     }
 }
