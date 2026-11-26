@@ -2,7 +2,7 @@ import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import type { CallOptions, OmoValue, RootCallInput } from "../contract"
 import type { OmoResult } from "../result"
 import type { MemberOf } from "./members"
-import { invalidInput, isPlainInput } from "./assemble"
+import { accepts, invalidInput, isPlainInput } from "./assemble"
 import { notImplemented } from "./not-implemented"
 
 type RootSignedIn =
@@ -10,7 +10,15 @@ type RootSignedIn =
 type RootInput = RootCallInput<"account.signIn">
 type SignIn = AccountApi["signIn"] & MemberOf<"account.signIn">
 
-const isRootInput = (input: SignInOptions | RootInput): input is RootInput => "method" in input
+// The `method` probe runs a proxy's `has` trap; one that throws takes the root path, whose checked schema read answers
+// the refusal (review 6075306724 L1).
+const isRootInput = (input: SignInOptions | RootInput): input is RootInput => {
+  try {
+    return "method" in input
+  } catch {
+    return true
+  }
+}
 
 // One key, two contracts: the shipped `signIn(options)` answers its own shape, and the root's call (slice P1a-s) names a
 // method and answers the security design's shape (5.4). The device-code flow is the one both run; the browser method
@@ -25,8 +33,7 @@ export function accountSignIn(account: AccountApi, origin: string): SignIn {
     // Bad input answers a refusal and never throws: the object-shape check comes before the `method` read.
     if (!isPlainInput(input)) return { kind: "error", error: invalidInput("account.signIn") }
     if (!isRootInput(input)) return account.signIn(input)
-    if (!(await import("../contract/validate")).inputAccepts("account.signIn", input))
-      return { kind: "error", error: invalidInput("account.signIn") }
+    if (!(await accepts("account.signIn", input))) return { kind: "error", error: invalidInput("account.signIn") }
     if (input.method !== "device_code" || input.open_browser !== undefined || input.onOpenUrl !== undefined)
       return (await notImplemented("account.signIn")()) as OmoValue<RootSignedIn>
     const signal = input.signal ?? callOptions?.signal

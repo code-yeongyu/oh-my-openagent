@@ -108,10 +108,15 @@ async function checkedInput(key: RootCallKey, input: unknown): Promise<unknown> 
 
 // The call table's schemas load on the first checked call, not when the root is built (design lane ruling on the
 // runtime's cold import); contract/eager-tables.test.ts builds them all so a bad schema still fails in CI.
-async function accepts(key: RootCallKey, input: unknown): Promise<boolean> {
+export async function accepts(key: RootCallKey, input: unknown): Promise<boolean> {
   if (!isPlainInput(input)) return false
   const { inputAccepts } = await import("../contract/validate")
-  return inputAccepts(key, await checkedInput(key, input))
+  try {
+    return inputAccepts(key, await checkedInput(key, input))
+  } catch {
+    // The schema check reads the caller's object; a getter or proxy trap that throws there is a malformed input.
+    return false
+  }
 }
 
 // An omitted input is the empty input; any other value, null included, is checked as given.
@@ -122,9 +127,15 @@ const inputOf = (args: readonly unknown[]): unknown => (args[0] === undefined ? 
  * instance would satisfy a schema with no required field as if it were the empty input, so the boundary refuses it.
  */
 export const isPlainInput = (input: unknown): input is Record<string, unknown> => {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) return false
-  const prototype: unknown = Object.getPrototypeOf(input)
-  return prototype === Object.prototype || prototype === null
+  if (typeof input !== "object" || input === null) return false
+  try {
+    // Both run the caller's code for a proxy; a trap that throws makes the input not a plain object.
+    if (Array.isArray(input)) return false
+    const prototype: unknown = Object.getPrototypeOf(input)
+    return prototype === Object.prototype || prototype === null
+  } catch {
+    return false
+  }
 }
 
 function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[]): Call {
