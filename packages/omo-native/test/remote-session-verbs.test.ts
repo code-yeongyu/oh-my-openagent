@@ -197,3 +197,59 @@ describe("omo remote session verbs take every address form", () => {
     }
   })
 })
+
+// omo#13905: a close that closed nothing is a typed failure, and send can take its text from stdin, never argv.
+describe("omo remote close and send stdin (#13905)", () => {
+  test("#given a session its device no longer runs #when close names it #then it fails typed with a non-zero exit, never ok with closed:false", async () => {
+    const td = createTwoDevices()
+    // The device no longer holds the session: every record naming it is refused unknown_session (the 5.1.72 case).
+    const remote = {
+      ...td.remote,
+      sessions: {
+        ...td.remote.sessions,
+        sessionCommand: async () => ({ kind: "refused", reason: "unknown_session" }) as const,
+      },
+    } as typeof td.remote
+    try {
+      const result = await run(["close", `${B.id}/${T.bLive}`, "--json"], undefined, undefined, undefined, remote)
+      expect(parsed(result.out)).toMatchObject({ kind: "error", error: { code: "not_found" } })
+      expect(result.code).toBe(REMOTE_EXIT.failed)
+    } finally {
+      await td.cleanup()
+    }
+  })
+
+  test("#given send <target> - #when stdin holds the text #then the prompt is those exact bytes and argv carries none of it", async () => {
+    const td = createTwoDevices()
+    const text = "--first line\nzweite Zeile, 한국어\n"
+    try {
+      const args = ["send", `${B.id}/${T.bLive}`, "-", "--no-wait", "--json"]
+      const result = await run(args, undefined, undefined, undefined, td.remote, { readStdin: async () => text })
+      expect(result.code).toBe(REMOTE_EXIT.ok)
+      expect(args.join(" ")).not.toContain("first line")
+      expect(JSON.stringify(td.account.sent)).toContain(JSON.stringify(text).slice(1, -1))
+    } finally {
+      await td.cleanup()
+    }
+  })
+
+  test("#given send <target> - #when stdin is empty #then it is a usage error and nothing is sent", async () => {
+    const td = createTwoDevices()
+    try {
+      const result = await run(
+        ["send", `${B.id}/${T.bLive}`, "-", "--no-wait"],
+        undefined,
+        undefined,
+        undefined,
+        td.remote,
+        {
+          readStdin: async () => "",
+        },
+      )
+      expect(result.code).toBe(REMOTE_EXIT.usage)
+      expect(td.account.sent).toEqual([])
+    } finally {
+      await td.cleanup()
+    }
+  })
+})

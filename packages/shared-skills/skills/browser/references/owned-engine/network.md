@@ -25,13 +25,14 @@ reason.
 ## Collecting through infinite scroll
 
 ```js
-for await (const batch of omowright.collectWhileScrolling(page, snoop, { minItems: 200, maxScrolls: 10, extract: (json) => json.items })) {
-  items.push(...batch)
+for await (const item of omowright.collectWhileScrolling(page, snoop, { minItems: 200, maxScrolls: 10, extract: (json) => json.items })) {
+  items.push(item)                           // one extracted item per iteration, already de-duplicated
 }
 ```
 
 Scroll, collect what is new, stop on a target count or a scroll ceiling. Bound both, so a page
-that keeps producing cannot run forever.
+that keeps producing cannot run forever. A round ends when the next response lands; `settleMs`
+(default 800) only bounds a round in which nothing arrives, so leave it unset.
 
 ## Flight traces
 

@@ -245,6 +245,20 @@ describe("findDiskSessions", () => {
     ])
     expect(findDiskSessions(join(agentDir, "missing"), "lane", { all_scope: true })).toEqual([])
   })
+
+  test("#given a sibling directory whose path extends the workspace's (<root>-tmp) #when a name is looked up in the workspace's scope #then only sessions in the workspace or below it are found (#14893)", () => {
+    const agentDir = agentDirectory()
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "thread-offline-sibling-")))
+    cleanups.push(() => rmSync(base, { recursive: true, force: true }))
+    const root = join(base, "fix-guard")
+    mkdirSync(join(root, "packages"), { recursive: true })
+    mkdirSync(join(base, "fix-guard-tmp"), { recursive: true })
+    const atRoot = sessionFile(agentDir, "dur-root", root, "lane")
+    const below = sessionFile(agentDir, "dur-below", join(root, "packages"), "lane")
+    sessionFile(agentDir, "dur-sibling", join(base, "fix-guard-tmp"), "lane")
+    const found = findDiskSessions(join(agentDir, "sessions"), "lane", { workspaceRoots: [root] })
+    expect(found.map((session) => session.session_path).sort()).toEqual([atRoot, below].sort())
+  })
 })
 
 describe("thread send to a session this process never saw alive", () => {

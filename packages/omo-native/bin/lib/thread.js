@@ -291,7 +291,7 @@ export async function runThreadCommand(args, options) {
   }
   try {
     const scope = parsed.flags.has("--all-scope") ? { all_scope: true } : {}
-    const result = await command.call(loaded.sdk, parsed.positionals, parsed.options, scope)
+    const result = await command.call(loaded.sdk, parsed.positionals, parsed.options, scope, parsed.flags)
     const exitCode = threadExitCode(result)
     if (result.kind !== "ok") {
       if (json) stdout.write(`${JSON.stringify(result)}\n`)
