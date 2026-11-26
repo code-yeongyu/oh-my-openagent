@@ -55,6 +55,8 @@ pub enum DeafReason {
     Xi2RawUnavailable,
     HookInstallFailed,
     ListenerParked,
+    /// A-IS-62: the configured stop chord cannot be armed or read back (A-IS-63).
+    ChordUnarmable,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

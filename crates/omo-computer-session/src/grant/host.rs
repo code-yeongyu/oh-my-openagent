@@ -146,14 +146,16 @@ impl Session {
         if self.funnel.control.lease_epoch.is_some_and(|taken| taken != epoch) {
             self.end_lease(LeaseEnd::Stop);
         }
+        // Row 50 (review M1): the lease-end key, read after the listener poll that hears it on
+        // X11 and before the call plans; a press with no lease is consumed and ends nothing.
+        if self.backend.take_lease_end() && self.funnel.control.lease_epoch.is_some() {
+            self.end_lease(LeaseEnd::UserEsc);
+        }
     }
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
     pub(crate) fn end_lease(&mut self, why: LeaseEnd) {
-        self.funnel.control.presence.end(why);
-        self.funnel.control.slot.release(&self.funnel.control.token);
-        self.funnel.control.lease_epoch = None;
-        self.funnel.control.lease_hook.lease_ended(self.backend.as_mut(), why);
+        self.funnel.control.end_lease(self.backend.as_mut(), why);
     }
 
     /// Installs the lease-end hook a later row's state lives in (R45).
@@ -265,6 +267,10 @@ impl Session {
     /// Arms the configured chord (R70av), or a deaf listener when it cannot be read or parsed: the
     /// stop path then reads deaf at once, never live or stale.
     pub(crate) fn arm_configured_chord(&mut self) -> omo_computer_core::results::StopPathStatus {
+        // Review L4: poll the armed listener before it is replaced, so a stop chord or Escape
+        // already queued on its connection latches instead of being dropped with it.
+        let backend = &mut self.backend;
+        self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
         if let Some(chord) = self.configured_chord() {
             // R70av: the one chord seam; a chord the backend cannot arm reads deaf at once.
             if self.backend.set_stop_chord(Some(&chord)).is_ok() {
@@ -273,12 +279,13 @@ impl Session {
             }
         }
         self.funnel.control.armed_chord = Some(String::new());
+        // R70an(B): the binding shape of an unarmable chord - deaf, with its reason, never absent.
         self.guard.start(
             Err(Refusal::new(
                 omo_computer_core::error::EngineCode::StopPathUnavailable,
                 omo_computer_core::error::Reason::Deaf,
             )),
-            None,
+            Some(omo_computer_core::capabilities::DeafReason::ChordUnarmable),
         )
     }
 

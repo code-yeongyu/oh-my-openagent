@@ -13,8 +13,8 @@ mod tests;
 
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use omo_computer_core::backend::{Backend, Delivered, InputEvent, Route};
-use omo_computer_core::holds::{Held, HoldLedger};
+use omo_computer_core::backend::{Backend, Delivered, Route};
+use omo_computer_core::holds::{Held, HoldLedger, Release};
 
 pub(crate) use hook::with_holds;
 pub(crate) use refuse::{hold_duration, scroll_steps};
@@ -57,46 +57,65 @@ impl SharedLedger {
         self.lock().holds.next_deadline()
     }
 
+    /// The mark of the next press; [`Self::release_from`] with it releases exactly what was
+    /// pressed after it (review L7 of #13360).
+    pub(crate) fn mark(&self) -> u64 {
+        self.lock().holds.mark()
+    }
+
     /// Releases every hold through the single post site, last press first; a key the user
     /// holds physically is left down.
     pub(crate) fn release_all(&self, backend: &mut dyn Backend) -> Delivered {
-        let (events, tag) = {
-            let mut ledger = self.lock();
-            (ledger.holds.release_all(&backend.user_held_keys()), ledger.tag)
-        };
-        post(backend, events, tag)
+        let user_held = backend.user_held_keys();
+        self.post(backend, |holds| holds.take_all(&user_held))
     }
 
     /// Releases only `which` (the holds one call pressed), last press first; every other
     /// hold stays held.
     pub(crate) fn release(&self, backend: &mut dyn Backend, which: &[Held]) -> Delivered {
-        let (events, tag) = {
-            let mut ledger = self.lock();
-            (ledger.holds.release(which, &backend.user_held_keys()), ledger.tag)
-        };
-        post(backend, events, tag)
+        let user_held = backend.user_held_keys();
+        self.post(backend, |holds| holds.take_held(which, &user_held))
+    }
+
+    /// Releases exactly the holds pressed at or after `mark`, never an earlier hold of the
+    /// same key or button.
+    pub(crate) fn release_from(&self, backend: &mut dyn Backend, mark: u64) -> Delivered {
+        let user_held = backend.user_held_keys();
+        self.post(backend, |holds| holds.take_from(mark, &user_held))
     }
 
     /// Releases the holds that reached the bound at `now_ms` (R49): the ledger keeps the
     /// rest, and a later `up` of a released hold answers `partial` with nothing sent.
     pub(crate) fn release_expired(&self, backend: &mut dyn Backend, now_ms: u64) -> Delivered {
-        let (events, tag) = {
-            let mut ledger = self.lock();
-            let expired = ledger.holds.expired(now_ms);
-            if expired.is_empty() {
-                return Delivered { count: 0, of: 0 };
-            }
-            (ledger.holds.release(&expired, &backend.user_held_keys()), ledger.tag)
-        };
-        post(backend, events, tag)
+        let user_held = backend.user_held_keys();
+        self.post(backend, |holds| {
+            let expired = holds.expired(now_ms);
+            if expired.is_empty() { Vec::new() } else { holds.take_held(&expired, &user_held) }
+        })
     }
-}
 
-fn post(backend: &mut dyn Backend, events: Vec<InputEvent>, tag: u64) -> Delivered {
-    let of = u32::try_from(events.len()).unwrap_or(u32::MAX);
-    let count = events
-        .into_iter()
-        .filter(|event| crate::intervention::post_one(backend, event.clone(), tag, Route::ForegroundHid).is_ok())
-        .count();
-    Delivered { count: u32::try_from(count).unwrap_or(u32::MAX), of }
+    /// Takes the releases `which` plans and posts them through the single post site; a hold
+    /// whose release any post of failed goes back into the ledger, so the next exit path
+    /// releases it again (review L9 of #13360).
+    fn post(&self, backend: &mut dyn Backend, which: impl FnOnce(&mut HoldLedger) -> Vec<Release>) -> Delivered {
+        let (releases, tag) = {
+            let mut ledger = self.lock();
+            let releases = which(&mut ledger.holds);
+            (releases, ledger.tag)
+        };
+        let (mut count, mut of) = (0_u32, 0_u32);
+        for release in releases {
+            of = of.saturating_add(u32::try_from(release.events.len()).unwrap_or(u32::MAX));
+            let sent = release
+                .events
+                .iter()
+                .filter(|event| crate::intervention::post_one(backend, (*event).clone(), tag, Route::ForegroundHid).is_ok())
+                .count();
+            count = count.saturating_add(u32::try_from(sent).unwrap_or(u32::MAX));
+            if sent < release.events.len() {
+                self.lock().holds.restore(release);
+            }
+        }
+        Delivered { count, of }
+    }
 }

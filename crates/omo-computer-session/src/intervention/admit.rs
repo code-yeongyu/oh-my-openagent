@@ -87,7 +87,9 @@ impl Session {
         ceiling_ms: Option<u64>,
     ) -> Result<Admission, Blocked> {
         let window = window_of(&call.target);
-        let mut admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages.clone());
+        let mut admitted = self
+            .guard
+            .admit_on_with(self.backend.as_mut(), call, stages.clone());
         let mut paused = Vec::new();
         let mut pid = None;
         let may_pause = admitted
@@ -113,8 +115,8 @@ impl Session {
             }
         }
         if let Err(refused) = admitted {
-            let crashed = refused.gate == Gate::Target
-                && exited(self.backend.as_ref(), window).is_some();
+            let crashed =
+                refused.gate == Gate::Target && exited(self.backend.as_ref(), window).is_some();
             let refusal = if crashed { WINDOW_NOT_FOUND } else { refused.refusal };
             let mut out = Refused::from(refusal).with_paused(paused);
             // R54, R60b: a refused drag point names the point and the refusing stage's pair, its

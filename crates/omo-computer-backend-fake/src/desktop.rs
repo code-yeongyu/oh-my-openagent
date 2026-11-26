@@ -40,6 +40,10 @@ impl Backend for FakeBackend {
         self.record_input(input, route)
     }
 
+    fn take_lease_end(&mut self) -> bool {
+        self.scripted_take_lease_end()
+    }
+
     fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
         self.scripted_stop_listener()
     }

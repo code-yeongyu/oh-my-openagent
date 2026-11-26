@@ -32,7 +32,8 @@ pub(crate) fn shell(session: &mut Session) -> Result<&mut dyn omo_computer_core:
         .ok_or(Refusal::bare(omo_computer_core::error::EngineCode::AxUnsupported))
 }
 
-/// The app a window belongs to, bound to its code identity.
+/// The app a window belongs to, bound to its executable path and its code identity, as the
+/// funnel binds it (review M3 of #13347): a path-only consent entry checks the path.
 pub(crate) fn window_app(session: &mut Session, window: &str) -> Option<AppTarget> {
     let found = session
         .backend
@@ -42,9 +43,10 @@ pub(crate) fn window_app(session: &mut Session, window: &str) -> Option<AppTarge
         .into_iter()
         .find(|w| w.id == window)?;
     let identity = session.backend.code_identity(found.identity.pid);
+    let path = session.backend.executable_path(found.identity.pid);
     Some(AppTarget {
         app_key: found.app_key,
-        bound: BoundIdentity::new(None, identity),
+        bound: BoundIdentity::new(path, identity),
     })
 }
 
