@@ -1,5 +1,5 @@
 import ts from "@typescript/typescript6"
-import { createBindingScopes } from "./no-raw-tls-client-scope"
+import { createBindingScopes, flowTargets } from "./no-raw-tls-client-scope"
 
 export type AllowlistEntry = { file: string; call: string; count: number; reason: string }
 export type ScanItem = { path: string; content: string }
@@ -156,7 +156,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const name = member(node)
       const base = kind(node.expression)
-      if (base?.module === "globalThis" && name) return globals.get(name)
+      if (base?.module === "globalThis" && name) return bindings.globalProperty(name)
       if (base && name && CLIENTS[base.module]?.includes(name)) return { ...base, member: name }
       if (base?.member && (name === "call" || name === "apply")) return base
     }
@@ -192,7 +192,11 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
       if (bindings.declare(name, value)) changed = true
     }
     for (const node of list) {
-      if (!ts.isVariableDeclaration(node) || !node.initializer) continue
+      for (const [name, flow, how] of flowTargets(node)) {
+        const value = kind(flow)
+        if (value && (how === "assign" ? bindings.assign(name, value) : bindings.declare(name, value))) changed = true
+      }
+      if (!(ts.isVariableDeclaration(node) || ts.isParameter(node)) || !node.initializer) continue
       const init = unwrap(node.initializer),
         value = kind(init)
       if (
@@ -319,7 +323,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
         add(node, "Bun.connect reference")
     }
     if (
-      ts.isVariableDeclaration(node) &&
+      (ts.isVariableDeclaration(node) || ts.isParameter(node)) &&
       ts.isObjectBindingPattern(node.name) &&
       kind(node.initializer)?.module === "Bun" &&
       node.name.elements.some((e) => (e.propertyName ?? e.name).getText(source).replace(/["']/g, "") === "connect")

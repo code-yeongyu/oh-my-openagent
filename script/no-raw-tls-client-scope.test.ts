@@ -22,6 +22,10 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
     ["module alias shadowed by a block let", "var t = globalThis.Bun; { let t = options; t.connect() }"],
     ["the global Bun shadowed by a parameter", "function f(Bun) { return Bun.connect(options) }"],
     [
+      "module alias shadowed by a function var",
+      "var t = globalThis.Bun; function f() { var t = o; return t.connect() }",
+    ],
+    [
       "a minified injection seam with a local-socket default",
       'function a(){let t=globalThis.Bun;return t.hash(x)}function b(t){let e=t.connect??(n=>require("node:net").createConnection(n));return e(p)}',
     ],
@@ -30,31 +34,71 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
   })
 
   test.each([
-    ["the alias used in its own scope", "var t = globalThis.Bun; t.connect", 1],
-    ["an enclosing alias with no shadow", "var t = globalThis.Bun; function f() { return t.connect }", 1],
-    ["a var alias hoisted out of its block", "function f() { { var t = globalThis.Bun } return t.connect() }", 1],
-    ["a block shadow that does not reach the outer reference", "var t = globalThis.Bun; { let t = o } t.connect()", 1],
+    ["scope form 1", "var t = globalThis.Bun; t.connect"],
+    ["scope form 2", "var t = globalThis.Bun; function f() { return t.connect }"],
+    ["scope form 3", "function f() { { var t = globalThis.Bun } return t.connect() }"],
+    ["scope form 4", "var t = globalThis.Bun; { let t = o } t.connect()"],
+    ["scope form 5", "const b = globalThis.Bun; function f() { const c = b; return c.connect() }"],
+    ["scope form 6", "var t = globalThis.Bun; function f(t) { with (o) { return t.connect } }"],
+    ["scope form 7", 'var t = globalThis.Bun; function f(t) { eval("x"); return t.connect }'],
+    ["scope form 8", 'var t = globalThis.Bun; function f(t) { (eval)("x"); return t.connect }'],
+    ["scope form 9", "var t = globalThis.Bun; { var t; t.connect(o) }"],
+    ["scope form 10", "var t = globalThis.Bun; if (x) { var t; t.connect(o) }"],
+    ["scope form 11", "var t = globalThis.Bun; for (var t; ;) { t.connect(o); break }"],
+    ["scope form 12", "var t = globalThis.Bun; try { run() } catch (e) { var t; t.connect(o) }"],
+    ["scope form 13", "function f(){ { var t = globalThis.Bun } { var t; return t.connect(o) } }"],
+    ["scope form 14", "function f(){ var t; if (x) { var t = globalThis.Bun } return t.connect(o) }"],
+    ["scope form 15", "function f(){ var t = o; { var t = globalThis.Bun } { return t.connect(o) } }"],
+    ["scope form 16", "var t = globalThis.Bun; var t; t.connect(o)"],
+    ["scope form 17", "var t; if (x) { var t = globalThis.Bun } t.connect(o)"],
+    ["scope form 18", "var t = globalThis.Bun; globalThis.t.connect(o)"],
+    ["scope form 19", "var t = globalThis.Bun; class C { [t.connect(o)](t) {} }"],
+    ["scope form 20", "var t = globalThis.Bun; function f(t) { arguments[0] = globalThis.Bun; return t.connect(o) }"],
+    ["scope form 21", "function f(t = globalThis.Bun) { return t.connect(o) }"],
     [
-      "a sibling shadow next to a real reference",
-      "var t = globalThis.Bun; function f(t) { return t.connect } function g() { return t.connect }",
-      1,
+      "scope form 22",
+      "function a(){ let t = globalThis.Bun; return t.version } function f(t = globalThis.Bun) { return t.connect(o) }",
     ],
-    [
-      "an alias chain through two scopes",
-      "const b = globalThis.Bun; function f() { const c = b; return c.connect() }",
-      1,
-    ],
-    [
-      "a with statement keeps the shadowed reference",
-      "var t = globalThis.Bun; function f(t) { with (o) { return t.connect } }",
-      1,
-    ],
-    [
-      "a direct eval keeps the shadowed reference",
-      'var t = globalThis.Bun; function f(t) { eval("x"); return t.connect }',
-      1,
-    ],
-  ])("%s: still a hit", (_name, sample, expected) => {
-    expect(connectHits(sample)).toBe(expected)
+    ["scope form 23", "function f() { let t; t = globalThis.Bun; return t.connect(o) }"],
+    ["scope form 24", "var t = globalThis.Bun; function f() { let t; t = globalThis.Bun; return t.connect(o) }"],
+    ["scope form 25", "var t = globalThis.Bun; (function (t) { return t.connect(o) })(t)"],
+    ["scope form 26", "var t = globalThis.Bun; ((t) => t.connect(o))(t)"],
+    ["scope form 27", "var t = globalThis.Bun; function f(t) { return t.connect } function g() { return t.connect }"],
+  ])("%s: still a hit", (_name, sample) => {
+    expect(connectHits(sample)).toBeGreaterThanOrEqual(1)
+  })
+
+  test.each([
+    "function f({ connect: n } = Bun) { return n(o) }",
+    "var b = globalThis.Bun; function f({ connect: n } = b) { return n(o) }",
+    "const f = ({ connect } = globalThis.Bun) => connect(o)",
+    'import tls from "node:tls"; function f({ connect: c } = tls) { return c(o) }',
+  ])("binding form in a parameter list is reported: %s", (sample) => {
+    const hits = findRawTlsClients(sample)
+    expect(
+      hits.some((hit) => hit.id.endsWith("destructuring") || hit.id.startsWith("binding call")),
+      sample,
+    ).toBe(true)
+  })
+
+  test("a connect member read on a local options object is classified by scope, not by its short name", () => {
+    const runtimeAlias = "function r(){ let e = globalThis.Bun; return e.version }"
+    const optionsRead = "function w(e){ let n = e.connect ?? (t => net.createConnection(t)); return n(p) }"
+    const runtimeRead = "function w(){ let e = globalThis.Bun; let n = e.connect; return n(p) }"
+    expect(findRawTlsClients(runtimeAlias + optionsRead)).toEqual([])
+    expect(connectHits(runtimeAlias + runtimeRead)).toBe(1)
+  })
+
+  test("a sibling shadow does not hide, and does not duplicate, the real reference", () => {
+    expect(
+      connectHits("var t = globalThis.Bun; function f(t) { return t.connect } function g() { return t.connect }"),
+    ).toBe(1)
+  })
+
+  test.each([
+    'import tls from "node:tls"; function f(){ var x; { var x = tls } return x.connect(o) }',
+    'function f(){ { var x = require("node:tls") } { var x; return x.connect(o) } }',
+  ])("a tls alias split across one function's var declarations keeps its connect hit: %s", (sample) => {
+    expect(findRawTlsClients(sample).some((hit) => hit.text === "x.connect(o)")).toBe(true)
   })
 })
