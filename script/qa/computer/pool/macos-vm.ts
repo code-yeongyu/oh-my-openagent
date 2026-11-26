@@ -9,7 +9,6 @@
 
 import { type Hypervisor, sweepGuests, teardown } from "./macos-vm-ops.ts"
 import {
-  GUEST_RUN_FLAGS,
   type GuestListing,
   guestRunArgv,
   MACOS_MAJORS,
@@ -17,7 +16,7 @@ import {
   planGuest,
   type PoolHost,
 } from "./macos-vm-plan.ts"
-import { bringUp, UP_HOLD_TAG, type UpSteps } from "./macos-vm-up.ts"
+import { bringUp, guestProcessPattern, UP_HOLD_TAG, type UpSteps } from "./macos-vm-up.ts"
 
 type Ran = { readonly code: number; readonly stdout: string; readonly stderr: string }
 
@@ -83,9 +82,8 @@ function commandHypervisor(command: string): Hypervisor {
   }
 }
 
-// Live processes for a guest: an --up's hold, the clone that creates it and the run that boots it (all end in its name).
 function guestProcesses(name: string): number | null {
-  const found = run("/usr/bin/pgrep", ["-f", `(${UP_HOLD_TAG}|clone [^ ]+|${GUEST_RUN_FLAGS.join(" ")}) ${name}$`])
+  const found = run("/usr/bin/pgrep", ["-f", guestProcessPattern(name)])
   if (found.code === 1) return 0
   if (found.code !== 0) return null
   return found.stdout.split("\n").filter((line) => line !== "").length

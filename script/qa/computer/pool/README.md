@@ -9,8 +9,8 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
 
 1. `bun script/qa/computer/pool/macos-vm.ts --up <15|26> --run-id <id>` clones the recorded base image
    of that major into a guest named `omo-cu-macos<major>-<id>` and starts it headless with clipboard bridging off
-   (`run --no-graphics --no-clipboard`). The guest registers
-   itself as an ephemeral runner with the labels `computer-live-macos` and `macos-<major>`. `--up` waits up
+   (`run --no-graphics --no-clipboard`), printing `console host <user|none>: headless no-clipboard guest` first. The guest
+   registers itself as an ephemeral runner with the labels `computer-live-macos` and `macos-<major>`. `--up` waits up
    to 120 s for the hypervisor to list the guest as running; a guest that never runs is deleted and `--up`
    exits 1.
 2. The job on that runner builds the engine and its helper bundle with a run-local ad-hoc identity, grants
@@ -23,10 +23,11 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
    SCENARIO <name> route=<...> BLOCKED reason=<why it cannot run here> durationMs=<measured>
    ```
 
-   then one summary line, `SET macos pass=<n> fail=<n> blocked=<n> degraded=<n>[ reason=<reasons>] hostLoad=<1-min load> cores=<n> p99Ms=<n>`.
-   A pass on a host whose 1-minute load exceeds its core count reads `DEGRADED` on its line and counts in `degraded=`,
-   never in `pass=`; `p99Ms` is the nearest-rank p99 of the scenarios' `durationMs` (the slowest one at today's set
-   size). A set with a failure, or with no scenario at all, exits 1; a set where nothing passed (every scenario
+   then one summary line, `SET macos pass=<n> fail=<n> blocked=<n> degraded=<n>[ reason=<reasons>] hostLoad=<max leg load> cores=<n> p99Ms=<n>`.
+   Each scenario carries the host's 1-minute load sampled while it ran; a pass whose load exceeds the core count, or
+   whose load is missing or not a number, reads `DEGRADED` on its line and counts in `degraded=`, never in `pass=`.
+   `hostLoad=` is the highest load any leg ran under. `p99Ms` is the nearest-rank p99 of the `durationMs` of the legs
+   that ran (blocked legs are left out; the slowest one at today's set size). A set with a failure, or with no scenario at all, exits 1; a set where nothing passed (every scenario
    blocked) exits 3, and so does a set whose passes are all degraded, so a job never shows green while nothing green
    ran. Before the macOS backend exists every scenario reads `BLOCKED reason=backend_not_built`, which is the honest
    starting state.
@@ -69,8 +70,11 @@ images. The last line is `sweep: <n> deleted, <n> not deleted, <n> kept`, counte
 command, or has no base image for the major. A host with a logged-in console user may run the pool (R-S4-1), only
 under the ruling's conditions: the guest is started headless with `--no-graphics --no-clipboard`, the run has zero
 host-input legs (no events into the host session, no GUI app launched in the console session), and the SET line
-records the host's 1-minute load, its core count and the set's p99; a leg run while the host load exceeds the core
-count is reported `DEGRADED`, never `PASS`.
+records the highest leg load, the core count and the set's p99; a leg run while the host load exceeds the core count
+is reported `DEGRADED`, never `PASS`. Zero host-input legs holds by construction, not by a check: every leg runs on
+the runner inside the guest, and no route targets the host. The host reader is `readHostLoad()` in `live-set.ts`
+(`os.loadavg()[0]` and `os.availableParallelism()`, refusing a non-finite reading); the scenario runner that calls it
+for each leg lands with part 2 of this row.
 
 The first setup of a base image is a hands-on step, done once per major by a person at that Mac: sign in,
 then allow Accessibility and Screen Recording for the QA identity. Every later guest is a headless clone.

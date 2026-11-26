@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import type { GuestListing, GuestPlan } from "./macos-vm-plan.ts"
+import { type GuestListing, type GuestPlan, guestRunArgv } from "./macos-vm-plan.ts"
 import { type Hypervisor, sweepGuests } from "./macos-vm-ops.ts"
-import { bringUp, type UpSteps } from "./macos-vm-up.ts"
+import { bringUp, guestProcessPattern, type UpSteps } from "./macos-vm-up.ts"
 
 const plan: GuestPlan = {
   kind: "plan",
@@ -66,7 +66,10 @@ describe("up holds its guest from before the clone until the wait ends", () => {
     ])
     expect(host.removed).toEqual([])
     expect(result).toEqual({
-      lines: ["GUEST omo-cu-macos15-5 macos=15 labels=computer-live-macos,macos-15 running pid=4242"],
+      lines: [
+        "console host none: headless no-clipboard guest",
+        "GUEST omo-cu-macos15-5 macos=15 labels=computer-live-macos,macos-15 running pid=4242",
+      ],
       errors: [],
       exitCode: 0,
     })
@@ -77,7 +80,7 @@ describe("up holds its guest from before the clone until the wait ends", () => {
     const host = poolHost({ neverRuns: true })
     const result = await bringUp(host.hypervisor, host.steps, instantClock(), plan, 120_000)
     expect(result).toEqual({
-      lines: ["guest DELETED omo-cu-macos15-5"],
+      lines: ["console host none: headless no-clipboard guest", "guest DELETED omo-cu-macos15-5"],
       errors: ["macos-vm: guest omo-cu-macos15-5 is not-running after 120 s"],
       exitCode: 1,
     })
@@ -87,7 +90,27 @@ describe("up holds its guest from before the clone until the wait ends", () => {
   test("a failed clone exits 1 with its reason and releases the hold", async () => {
     const host = poolHost({ cloneFails: true })
     const result = await bringUp(host.hypervisor, host.steps, instantClock(), plan, 120_000)
-    expect(result).toEqual({ lines: [], errors: ["macos-vm: clone failed: no such base image"], exitCode: 1 })
+    expect(result).toEqual({
+      lines: ["console host none: headless no-clipboard guest"],
+      errors: ["macos-vm: clone failed: no such base image"],
+      exitCode: 1,
+    })
     expect(host.holds.size).toBe(0)
+  })
+})
+
+describe("up on a host with a signed-in console user (R-S4-1)", () => {
+  test("the receipt names the console user beside the headless no-clipboard guest", async () => {
+    const host = poolHost()
+    const result = await bringUp(host.hypervisor, host.steps, instantClock(), { ...plan, consoleHost: "someone" }, 1)
+    expect(result.lines[0]).toBe("console host someone: headless no-clipboard guest")
+  })
+})
+
+describe("guest process pattern", () => {
+  test("matches the command line of the run the --up spawns, and no other guest's", () => {
+    const pattern = new RegExp(guestProcessPattern("omo-cu-macos15-5"))
+    expect(pattern.test(["/opt/hv/bin/vmctl", ...guestRunArgv("omo-cu-macos15-5")].join(" "))).toBe(true)
+    expect(pattern.test(["/opt/hv/bin/vmctl", ...guestRunArgv("omo-cu-macos15-50")].join(" "))).toBe(false)
   })
 })
