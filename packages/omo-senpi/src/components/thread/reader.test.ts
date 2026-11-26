@@ -1,5 +1,6 @@
-import { afterAll, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { afterAll, describe, expect, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -11,7 +12,7 @@ import {
   type ThreadReadSourceRef,
   type ThreadTranscriptReadResult,
 } from "./reader"
-import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES } from "./index"
+import { THREAD_READ_MAX_BYTES } from "./index"
 
 // ---------------------------------------------------------------------------
 // Real temp files: every jsonl case below writes actual bytes to disk under a
@@ -111,7 +112,7 @@ describe("readTranscript tail mode", () => {
     ])
 
     const defaulted = expectOk(readTranscript(jsonlSource(path), { mode: "tail" }))
-    expect(defaulted.items.length).toBe(THREAD_TAIL_DEFAULT_ITEMS)
+    expect(defaulted.items.length).toBe(60)
     expect(idOf(defaulted.items[defaulted.items.length - 1])).toBe("e299")
 
     const overCap = readTranscript(jsonlSource(path), { mode: "tail", tail_items: THREAD_TAIL_MAX_ITEMS + 1 })
@@ -120,7 +121,7 @@ describe("readTranscript tail mode", () => {
     expectNextAction(overCap)
 
     const atCap = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: THREAD_TAIL_MAX_ITEMS }))
-    expect(atCap.items.length).toBe(THREAD_TAIL_MAX_ITEMS)
+    expect(atCap.items.length).toBe(200)
   })
 
   test("a budget smaller than the window returns the newest entries in file order, and next_cursor pages older ones until the window start", () => {
@@ -147,6 +148,59 @@ describe("readTranscript tail mode", () => {
     expect(pages.reverse().flat()).toEqual(entries.slice(-20).map(idOf))
   })
 
+  test("#14418: a tail read of a large session file reads its window from the end, not the whole file", () => {
+    const dir = makeTempDir()
+    const entries = [sessionHeader(), ...Array.from({ length: 3000 }, (_, i) => messageEntry(i, "z".repeat(2000)))]
+    const path = writeJsonl(dir, "large.jsonl", entries)
+    const fileBytes = fs.statSync(path).size
+
+    const reads = spyOn(fs, "readSync")
+    try {
+      const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", max_bytes: THREAD_READ_MAX_BYTES }))
+      expect(result.items.map(idOf)).toEqual(entries.slice(-THREAD_TAIL_DEFAULT_ITEMS).map(idOf))
+      const bytes = reads.mock.results.reduce(
+        (sum, read) => sum + (read.type === "return" && typeof read.value === "number" ? read.value : 0),
+        0,
+      )
+      // The window's 60 entries of ~2 KB each, plus at most one chunk read past the window's first line.
+      expect(bytes).toBeLessThan(THREAD_TAIL_DEFAULT_ITEMS * 2200 + 65536)
+      expect(bytes).toBeLessThan(fileBytes / 10)
+      // The older entries were never read, so the read cannot count them.
+      expect(result.total_items).toBeNull()
+    } finally {
+      reads.mockRestore()
+    }
+  })
+
+  test("a tail read rebuilds lines longer than a read chunk and multi-byte text split across chunks", () => {
+    const dir = makeTempDir()
+    const long = { ...messageEntry(1), message: { role: "assistant", content: "한글".repeat(70_000) } }
+    const entries = [sessionHeader(), messageEntry(0), long, messageEntry(2), "{ torn", messageEntry(3)]
+    const path = writeJsonl(dir, "long-line.jsonl", entries)
+
+    const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", max_bytes: THREAD_READ_MAX_BYTES }))
+    expect(result.items).toEqual(entries.filter((entry) => typeof entry !== "string") as Entry[])
+    expect(result.total_items).toBe(5)
+    expect(result.skipped_lines).toBe(1)
+  })
+
+  test("the cursor of a session file's tail window goes stale when the file is appended under it", () => {
+    const dir = makeTempDir()
+    const entries = [sessionHeader(), ...Array.from({ length: 30 }, (_, i) => messageEntry(i, "y".repeat(400)))]
+    const path = writeJsonl(dir, "tail-stale.jsonl", entries)
+
+    const first = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: 20, max_bytes: 2048 }))
+    const cursor = first.next_cursor as string
+    expect(
+      expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor })).items.length,
+    ).toBeGreaterThan(0)
+
+    appendFileSync(path, `${JSON.stringify(messageEntry(30))}\n`)
+    const result = readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor })
+    expect(expectError(result).error.code).toBe("cursor_stale")
+    expectNextAction(result)
+  })
+
   test("a tail shorter than the transcript is not a truncation of the byte budget", () => {
     const dir = makeTempDir()
     const path = writeJsonl(dir, "short-tail.jsonl", [sessionHeader(), messageEntry(0), messageEntry(1)])
@@ -165,7 +219,7 @@ describe("readTranscript status mode", () => {
     const result = expectOk(readTranscript(jsonlSource(path), { mode: "status" }))
 
     expect(result.items).toEqual([])
-    expect(result.total_items).toBe(4)
+    expect(result.total_items).toBeNull()
     expect(result.truncated).toBe(false)
     expect(result.next_cursor).toBeNull()
     expect(result.encoded_bytes).toBe(0)
@@ -236,10 +290,10 @@ describe("readTranscript byte budget", () => {
     const path = writeJsonl(dir, "cap.jsonl", [sessionHeader(), messageEntry(0)])
 
     const defaulted = expectOk(readTranscript(jsonlSource(path), { mode: "page" }))
-    expect(defaulted.max_bytes).toBe(THREAD_READ_DEFAULT_BYTES)
+    expect(defaulted.max_bytes).toBe(128 * 1024)
 
     const atCap = expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: THREAD_READ_MAX_BYTES }))
-    expect(atCap.max_bytes).toBe(THREAD_READ_MAX_BYTES)
+    expect(atCap.max_bytes).toBe(1024 * 1024)
 
     const overCap = readTranscript(jsonlSource(path), { mode: "page", max_bytes: THREAD_READ_MAX_BYTES + 1 })
     const failure = expectError(overCap)
@@ -513,5 +567,178 @@ describe("readTranscript source reporting", () => {
 
     const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: 1 }))
     expect(result.items[0]).toEqual(entry)
+  })
+})
+
+describe("readTranscript bounded file window", () => {
+  test("decides the tail byte window before opening and never reads beyond 1 MiB", () => {
+    const path = writeJsonl(makeTempDir(), "bounded.jsonl", ["x".repeat(3 * THREAD_READ_MAX_BYTES), messageEntry(0)])
+    const size = fs.statSync(path).size
+    const stat = spyOn(fs, "statSync")
+    const open = spyOn(fs, "openSync")
+    const reads = spyOn(fs, "readSync")
+    try {
+      const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", max_bytes: 1024 }))
+      expect(result.items.map(idOf)).toEqual(["e0"])
+      const bytes = reads.mock.results.reduce(
+        (sum, r) => sum + (r.type === "return" && typeof r.value === "number" ? r.value : 0),
+        0,
+      )
+      expect(bytes).toBeLessThanOrEqual(THREAD_READ_MAX_BYTES)
+      expect(result.total_items).toBeNull()
+      expect(stat.mock.invocationCallOrder[0]).toBeLessThan(open.mock.invocationCallOrder[0] ?? 0)
+      for (const call of reads.mock.calls)
+        expect(Number(Array.from(call).at(4))).toBeGreaterThanOrEqual(size - THREAD_READ_MAX_BYTES)
+    } finally {
+      reads.mockRestore()
+      open.mockRestore()
+      stat.mockRestore()
+    }
+  })
+
+  test("bounds a tail containing only malformed lines", () => {
+    const path = writeJsonl(makeTempDir(), "malformed-window.jsonl", ["bad\n".repeat(THREAD_READ_MAX_BYTES)])
+    const reads = spyOn(fs, "readSync")
+    try {
+      const result = readTranscript(jsonlSource(path), { mode: "tail" })
+      const bytes = reads.mock.results.reduce(
+        (sum, r) => sum + (r.type === "return" && typeof r.value === "number" ? r.value : 0),
+        0,
+      )
+      expect(bytes).toBeLessThanOrEqual(THREAD_READ_MAX_BYTES)
+      expect(expectError(result).error.code).toBe("message_too_large")
+    } finally {
+      reads.mockRestore()
+    }
+  })
+
+  test("rejects an oversized cursor window before opening the file", () => {
+    const path = writeJsonl(makeTempDir(), "forged.jsonl", [messageEntry(0)])
+    const open = spyOn(fs, "openSync")
+    try {
+      const cursor = Buffer.from("t1t:123.abc:1:201").toString("base64url")
+      const result = readTranscript(jsonlSource(path), { mode: "page", cursor })
+      expect(open).not.toHaveBeenCalled()
+      expect(expectError(result).error.code).toBe("cursor_invalid")
+    } finally {
+      open.mockRestore()
+    }
+  })
+
+  test("status stats a file without opening or reading its contents", () => {
+    const path = writeJsonl(makeTempDir(), "metadata.jsonl", [messageEntry(0)])
+    const open = spyOn(fs, "openSync")
+    const reads = spyOn(fs, "readSync")
+    const stat = spyOn(fs, "statSync")
+    try {
+      const result = expectOk(readTranscript(jsonlSource(path), { mode: "status" }))
+      expect(open).not.toHaveBeenCalled()
+      expect(reads).not.toHaveBeenCalled()
+      expect(stat).toHaveBeenCalledWith(path)
+      expect(result.items).toEqual([])
+      expect(result.total_items).toBeNull()
+      expect(result.skipped_lines).toBe(0)
+    } finally {
+      stat.mockRestore()
+      reads.mockRestore()
+      open.mockRestore()
+    }
+  })
+
+  test("status with a tail cursor remains metadata only", () => {
+    const path = writeJsonl(makeTempDir(), "status-cursor.jsonl", [messageEntry(0), messageEntry(1)])
+    const first = expectOk(readTranscript(jsonlSource(path), { max_bytes: 1 }))
+    if (first.next_cursor === null) throw new Error("expected tail cursor")
+    const open = spyOn(fs, "openSync")
+    try {
+      const result = expectOk(readTranscript(jsonlSource(path), { mode: "status", cursor: first.next_cursor }))
+      expect(open).not.toHaveBeenCalled()
+      expect(result.items).toEqual([])
+      expect(result.next_cursor).toBeNull()
+    } finally {
+      open.mockRestore()
+    }
+  })
+
+  test("cursor pages retain the original window and skipped-line count", () => {
+    const path = writeJsonl(makeTempDir(), "skip-window.jsonl", [
+      "{bad",
+      messageEntry(0),
+      messageEntry(1),
+      messageEntry(2),
+    ])
+    const first = expectOk(readTranscript(jsonlSource(path), { tail_items: 60, max_bytes: 1 }))
+    const seen = [...first.items]
+    expect(first.skipped_lines).toBe(1)
+    let cursor = first.next_cursor
+    while (cursor !== null) {
+      const page = expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: 1, cursor }))
+      expect(page.skipped_lines).toBe(1)
+      expect(page.total_items).toBe(3)
+      seen.unshift(...page.items)
+      cursor = page.next_cursor
+      expect(seen.length).toBeLessThanOrEqual(3)
+    }
+    expect(seen.map(idOf)).toEqual(["e0", "e1", "e2"])
+  })
+
+  test("a tail cursor goes stale when the file shrinks", () => {
+    const path = writeJsonl(makeTempDir(), "shrink.jsonl", [messageEntry(0), messageEntry(1)])
+    const first = expectOk(readTranscript(jsonlSource(path), { max_bytes: 1 }))
+    if (first.next_cursor === null) throw new Error("expected tail cursor")
+    fs.truncateSync(path, 0)
+    expect(expectError(readTranscript(jsonlSource(path), { mode: "page", cursor: first.next_cursor })).error.code).toBe(
+      "cursor_stale",
+    )
+  })
+
+  test("a tail cursor goes stale when the file is replaced with identical bytes", () => {
+    const dir = makeTempDir()
+    const entries = [messageEntry(0), messageEntry(1)]
+    const path = writeJsonl(dir, "replace.jsonl", entries)
+    const first = expectOk(readTranscript(jsonlSource(path), { max_bytes: 1 }))
+    if (first.next_cursor === null) throw new Error("expected tail cursor")
+    fs.renameSync(writeJsonl(dir, "replacement.jsonl", entries), path)
+    expect(expectError(readTranscript(jsonlSource(path), { mode: "page", cursor: first.next_cursor })).error.code).toBe(
+      "cursor_stale",
+    )
+  })
+
+  test("a tail cursor goes stale when same-size window content changes", () => {
+    const dir = makeTempDir()
+    const entries = [messageEntry(0), messageEntry(1)]
+    const path = writeJsonl(dir, "content.jsonl", entries)
+    const first = expectOk(readTranscript(jsonlSource(path), { max_bytes: 1 }))
+    if (first.next_cursor === null) throw new Error("expected tail cursor")
+    writeJsonl(dir, "content.jsonl", [
+      messageEntry(0),
+      { ...messageEntry(1), message: { role: "assistant", content: "edit-1" } },
+    ])
+    expect(expectError(readTranscript(jsonlSource(path), { mode: "page", cursor: first.next_cursor })).error.code).toBe(
+      "cursor_stale",
+    )
+  })
+
+  test("a tail cursor goes stale when a parent branch changes at the same size", () => {
+    const dir = makeTempDir()
+    const path = writeJsonl(dir, "branch.jsonl", [messageEntry(0), messageEntry(1)])
+    const first = expectOk(readTranscript(jsonlSource(path), { max_bytes: 1 }))
+    if (first.next_cursor === null) throw new Error("expected tail cursor")
+    writeJsonl(dir, "branch.jsonl", [messageEntry(0), { ...messageEntry(1), parentId: "e9" }])
+    expect(expectError(readTranscript(jsonlSource(path), { mode: "page", cursor: first.next_cursor })).error.code).toBe(
+      "cursor_stale",
+    )
+  })
+
+  test("a malformed tail cursor is rejected without opening a file", () => {
+    const path = writeJsonl(makeTempDir(), "malformed-cursor.jsonl", [messageEntry(0)])
+    const open = spyOn(fs, "openSync")
+    try {
+      const cursor = Buffer.from("t1t:123.abc::2").toString("base64url")
+      expect(expectError(readTranscript(jsonlSource(path), { mode: "page", cursor })).error.code).toBe("cursor_invalid")
+      expect(open).not.toHaveBeenCalled()
+    } finally {
+      open.mockRestore()
+    }
   })
 })

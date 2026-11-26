@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url"
 
 import { integerOption, parseArgs, stateOption, THREAD_EXIT, THREAD_STATES } from "./thread-args.js"
 import { escapeForDisplay } from "./display-escape.js"
+import { isReadCursor } from "./thread-read-cursor.js"
 import { humanLines } from "./thread-output.js"
 
 export { THREAD_EXIT } from "./thread-args.js"
@@ -267,6 +268,16 @@ export async function runThreadCommand(args, options) {
       `Run omo thread --help for the ${name} options.`,
     )
     return THREAD_EXIT.usage
+  }
+  if (name === "read" && parsed.options["--cursor"] !== undefined && !isReadCursor(parsed.options["--cursor"])) {
+    refuse(
+      options,
+      json,
+      "cursor_invalid",
+      "omo thread read: the cursor was not issued by the reader.",
+      "Run omo thread read without --cursor to get a fresh cursor.",
+    )
+    return THREAD_EXIT.refused
   }
   const loaded = await loadThreadSdk(options)
   if (loaded.error !== undefined && loaded.code === "internal_error") {
