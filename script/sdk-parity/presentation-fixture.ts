@@ -10,18 +10,18 @@ import { SCENARIOS } from "./scenarios"
 // delta fails.
 
 export const IDS = ["native-remote-help", "native-remote-unknown", "native-remote-open-no-device"]
-export const scenarios = SCENARIOS.filter((scenario) => IDS.includes(scenario.id))
+const scenarios = SCENARIOS.filter((scenario) => IDS.includes(scenario.id))
 const committed = JSON.parse(text("script/sdk-parity/goldens.json")) as Record<string, Outcome>
 export const base = Object.fromEntries(IDS.map((id) => [id, committed[id] ?? {}]))
 export const BEFORE = "  send <session> <text> [--steer|--follow-up] [--no-wait]"
 export const AFTER = "  send <session> <text|-> [--steer|--follow-up] [--no-wait]"
 
-export type Edit = (outcome: Outcome, id: string) => Outcome
+export type Edit = (outcome: Outcome, id?: string) => Outcome
 export const onStreams =
   (change: (stream: string) => string): Edit =>
   (outcome) => ({ ...outcome, stdout: change(`${outcome["stdout"]}`), stderr: change(`${outcome["stderr"]}`) })
 export const train12 = onStreams((stream) => stream.replace(`${BEFORE}\n`, `${AFTER}\n`))
-export const headWith = (edit: Edit) => Object.fromEntries(IDS.map((id) => [id, edit(base[id] ?? {}, id)]))
+const headWith = (edit: Edit) => Object.fromEntries(IDS.map((id) => [id, edit(base[id] ?? {}, id)]))
 
 export const ROW: PresentationRow = {
   verb: "remote send",
