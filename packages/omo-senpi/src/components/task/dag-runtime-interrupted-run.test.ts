@@ -6,14 +6,18 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import { createDagFileStore, type DagRunEvent, type DagRunRecordV1 } from "@oh-my-opencode/senpi-task/dag"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
-import { FOREIGN_HOST_PID, ManualTimers, ScriptedRunner, within } from "./dag-runtime-recovery.test-support"
-import { composeTaskEngine } from "./engine"
-import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
+import {
+  dagNode as node,
+  FOREIGN_HOST_PID,
+  ManualTimers,
+  recoveryEngine,
+  ScriptedRunner,
+  within,
+} from "./dag-runtime-recovery.test-support"
 
 const cleanupRoots: string[] = []
 
@@ -22,16 +26,6 @@ afterEach(() => {
 })
 
 const quietLogger = { info: () => undefined, warn: () => undefined, error: () => undefined }
-
-function node(id: string, dependsOn?: readonly string[]) {
-  return {
-    id,
-    prompt: id,
-    subagent_type: "explore",
-    model: "omo-mock/mock-1",
-    ...(dependsOn === undefined ? {} : { dependsOn }),
-  }
-}
 
 /**
  * The run a killed host leaves behind, and the runtime of the session that reopens it. The first
@@ -48,33 +42,18 @@ async function killedHostFixture(
   cleanupRoots.push(cwd)
   const sessionId = `session-killed-${name}`
   const store = createDagFileStore({ project_dir: cwd })
-  const engineFor = (pi: FakeExtensionAPI, runner: ScriptedRunner) => {
-    const engine = composeTaskEngine({
-      pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
-      cwd,
-      sharedParentTools: () => [],
-      runnerFactories: { inProcess: () => runner, process: () => runner },
-    })
-    engine.runtime.captureFrom({
-      modelRegistry: createTeamServiceTestModelRegistry(),
-      sessionManager: { getSessionId: () => sessionId },
-    })
-    return engine
+  const engineFor = (pi: FakeExtensionAPI, runner: ScriptedRunner) => recoveryEngine(cwd, sessionId, pi, runner)
+  const startParams = {
+    parentSessionId: sessionId,
+    rootSessionId: sessionId,
+    definition: { key: `killed-${name}`, name: "killed host", nodes: [node("first"), node("second", ["first"])] },
   }
 
   const firstPi = new FakeExtensionAPI()
   const firstRunner = new ScriptedRunner()
   const firstRuntime = createDagRuntime({ pi: firstPi, engine: engineFor(firstPi, firstRunner), logger: quietLogger })
   await within(firstRuntime.attach(), "first attach")
-  const started = await within(
-    firstRuntime.manager.start({
-      parentSessionId: sessionId,
-      rootSessionId: sessionId,
-      definition: { key: `killed-${name}`, name: "killed host", nodes: [node("first"), node("second", ["first"])] },
-    }),
-    "manager.start",
-  )
+  const started = await within(firstRuntime.manager.start(startParams), "manager.start")
   const runId = started.snapshot.runId
   await within(firstRunner.whenStarted(1), "the first child starting")
   await firstRuntime.pauseForShutdown()
@@ -101,7 +80,8 @@ async function killedHostFixture(
   const eventTypes = (): readonly DagRunEvent["type"][] =>
     store.readEvents(runId, 0, { limit: 200 }).events.map((event) => event.type)
   const status = (): string => store.readCheckpoint<{ readonly status: string }>(runId)?.status ?? "missing"
-  return { runId, sessionId, timers, errors, runner, runtime, eventTypes, status }
+  const startAgain = () => within(runtime.manager.start(startParams), "same-key manager.start")
+  return { runId, sessionId, timers, errors, runner, runtime, eventTypes, status, startAgain }
 }
 
 describe("DAG runtime recovery of a run its host left running", () => {
@@ -169,6 +149,26 @@ describe("DAG runtime recovery of a run its host left running", () => {
     expect(runner.handles).toHaveLength(0)
     expect(errors).toEqual([])
     expect(timers.pending()).toBe(1)
+    runtime.dispose()
+  })
+
+  test("#given a run a live host holds between two nodes #when the successor starts the same key #then the reused run is left to its holder", async () => {
+    // given
+    const fixture = await killedHostFixture("live-holder-same-key", { alive: true }, "between-nodes")
+    const { runId, errors, runner, runtime, eventTypes, status, startAgain } = fixture
+    await within(runtime.attach(), "attach")
+    const before = eventTypes()
+
+    // when
+    const result = await startAgain()
+
+    // then
+    expect(result.reused).toBe(true)
+    expect(result.snapshot.runId).toBe(runId)
+    expect(status()).toBe("running")
+    expect(eventTypes()).toEqual(before)
+    expect(runner.handles).toHaveLength(0)
+    expect(errors).toEqual([])
     runtime.dispose()
   })
 })
