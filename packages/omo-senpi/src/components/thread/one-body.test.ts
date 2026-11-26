@@ -7,12 +7,15 @@ import { defaultWorld, PEER, SESSION_ID } from "../../../../device-service-core/
 import { assembleOmoSdk } from "../omo-sdk/assembly"
 import { createLocalSessions } from "../remote/local-sessions"
 import { handleOf } from "../remote/seams"
+import * as relaySessions from "../remote/sessions"
+import * as localMembers from "../remote/sessions-local-members"
 import { clientOn, closeClients, fakeClock, startOwner } from "../remote/testing/fake-service"
 import * as createBody from "./control/create"
 import * as operations from "./control/operations"
 import * as renameBody from "./control/rename"
 import * as lazyOps from "./remote/lazy-ops"
 import * as sdkCore from "./sdk-core"
+import * as sendBook from "./sdk-core/send-book"
 import * as sdkSend from "./sdk-send"
 import { createThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -101,24 +104,30 @@ const ACTING_RECORDS = new Set([
   "open_session",
 ])
 
-const trace = { depth: 0, reached: [] as string[], outside: [] as string[] }
+const trace = { depth: 0, open: [] as string[], reached: [] as string[], outside: [] as string[] }
 const reset = () => {
   trace.depth = 0
+  trace.open = []
   trace.reached = []
   trace.outside = []
 }
 function within<T>(name: string, run: () => T): T {
   trace.reached.push(name)
   trace.depth++
+  trace.open.push(name)
+  const leave = () => {
+    trace.depth--
+    trace.open.splice(trace.open.lastIndexOf(name), 1)
+  }
   let result: T
   try {
     result = run()
   } catch (error) {
-    trace.depth--
+    leave()
     throw error
   }
-  if (result instanceof Promise) return result.finally(() => trace.depth--) as T
-  trace.depth--
+  if (result instanceof Promise) return result.finally(leave) as T
+  leave()
   return result
 }
 const acted = (what: string) => {
@@ -181,8 +190,10 @@ function holder() {
     },
   })
   const ports = { host: s.host, store: s.store, remote: a.remote }
-  const root = assembleOmoSdk({ agentDir: s.agentDir, cwd: process.cwd(), uid: 501, user: "qa", ports }, {})
-  const sdk = createThreadSdk({ agentDir: s.agentDir, cwd: process.cwd(), uid: 501, user: "qa", ...ports })
+  // A create's first prompt on the scripted holder never starts a turn, so its start wait is cut short.
+  const threads = { firstPromptWaitMs: 1 }
+  const root = assembleOmoSdk({ agentDir: s.agentDir, cwd: process.cwd(), uid: 501, user: "qa", ports, threads }, {})
+  const sdk = createThreadSdk({ agentDir: s.agentDir, cwd: process.cwd(), uid: 501, user: "qa", ...ports, ...threads })
   return { a, s, root, sdk, ports }
 }
 type Holder = ReturnType<typeof holder>
@@ -296,19 +307,45 @@ describe("one body per call (#14951 D2)", () => {
 })
 
 // The remote module's session members (components/remote): the relay leg (another device, through the device service)
-// and the this-device leg (this device's operator endpoint). A member listed in OWN_LOGIC holds its own logic today
-// instead of the thread body for its call; the list is the finding, reported and not moved (D2), and this test fails when
-// a member leaves it or a new one joins it.
-const OWN_LOGIC: Readonly<Record<string, string>> = {
-  "relay open":
-    "remote/sessions.ts:595 openOnce: its own open_session (createRelaySessionHost, :618), not createThread",
-  "relay send": "remote/sessions.ts:457 deliverTo: its own relay delivery, not sendThread",
-  "relay archive": "remote/sessions.ts:796 archive: control.setArchived + listed, not archiveThread",
-  "here send": "remote/sessions-local-members.ts:158 send: port.prompt with its own steer/queue rules",
-  "here interrupt": "remote/sessions-local-members.ts:92 interrupt: interruptOver on the port, not interruptThread",
-  "here setReasoning": "remote/sessions-local-members.ts:98 setReasoning: port.setThinkingLevel",
-  "here close": "remote/sessions-local-members.ts:71 close: port.closeSession",
-  "here archive": "remote/sessions-local-members.ts:113 archive: port.setSessionArchived",
+// and the this-device leg (this device's operator endpoint). A member pinned in OWN_LOGIC holds its own logic today
+// instead of the thread body for its call; it is reported and not moved (D2), and slice T1r moves it (design lane ruling
+// 5). The pin is keyed by member name and only shrinks: the test fails when a member not pinned holds its own logic
+// (the list grew), when a pinned member now reaches its body (the entry no longer applies: delete it and lower
+// OWN_LOGIC_CEILING), and when the pin holds more entries than the ceiling.
+const T1R = "#15056 (slice T1r)"
+type OwnLogic = { readonly holds: string; readonly owner: string }
+const OWN_LOGIC: Readonly<Record<string, OwnLogic>> = {
+  "relay open": {
+    holds: "remote/sessions.ts openOnce: its own open_session (createRelaySessionHost), not createThread",
+    owner: T1R,
+  },
+  "relay send": { holds: "remote/sessions.ts deliverTo: its own relay delivery, not sendThread", owner: T1R },
+  "relay archive": {
+    holds: "remote/sessions.ts archive: control.setArchived + listed, not archiveThread",
+    owner: T1R,
+  },
+  "here send": { holds: "remote/sessions-local-members.ts send: port.prompt with its own steer/queue rules", owner: T1R },
+  "here interrupt": {
+    holds: "remote/sessions-local-members.ts interrupt: interruptOver on the port, not interruptThread",
+    owner: T1R,
+  },
+  "here setReasoning": { holds: "remote/sessions-local-members.ts setReasoning: port.setThinkingLevel", owner: T1R },
+  "here close": { holds: "remote/sessions-local-members.ts close: port.closeSession", owner: T1R },
+  "here archive": { holds: "remote/sessions-local-members.ts archive: port.setSessionArchived", owner: T1R },
+}
+/** The pin's size when it was ruled shrink-only; lower it as entries leave, never raise it. */
+const OWN_LOGIC_CEILING = 8
+
+function pinProblems(own: readonly string[], pin: Readonly<Record<string, OwnLogic>>): string[] {
+  const pinned = Object.keys(pin)
+  return [
+    ...own.filter((name) => !pinned.includes(name)).map((name) => `${name}: holds its own logic and is not pinned`),
+    ...pinned
+      .filter((name) => !own.includes(name))
+      .map((name) => `${name}: reaches its thread body now; the entry no longer applies`),
+    ...(pinned.length > OWN_LOGIC_CEILING ? [`the pin holds ${pinned.length} entries, above ${OWN_LOGIC_CEILING}`] : []),
+    ...pinned.filter((name) => pin[name]?.owner !== T1R).map((name) => `${name}: owner is not ${T1R}`),
+  ].toSorted()
 }
 
 describe("the remote module's session members (#14951 D2)", () => {
@@ -384,6 +421,120 @@ describe("the remote module's session members (#14951 D2)", () => {
       const judged = await verdict(call, run)
       if (!judged.body || judged.outside.length > 0) own.push(name)
     }
-    expect(own.sort()).toEqual(Object.keys(OWN_LOGIC).sort())
+    expect(pinProblems(own, OWN_LOGIC)).toEqual([])
+  })
+
+  test("#given the pin #when a member joins the own-logic list or a pinned one reaches its body #then the pin fails, naming it", () => {
+    const own = Object.keys(OWN_LOGIC)
+    expect(pinProblems([...own, "relay interrupt"], OWN_LOGIC)).toEqual([
+      "relay interrupt: holds its own logic and is not pinned",
+    ])
+    expect(pinProblems(own.filter((name) => name !== "here close"), OWN_LOGIC)).toEqual([
+      "here close: reaches its thread body now; the entry no longer applies",
+    ])
+    const grown = { ...OWN_LOGIC, "relay interrupt": { holds: "interruptOver", owner: T1R } }
+    expect(pinProblems([...own, "relay interrupt"], grown)).toEqual([
+      `the pin holds ${OWN_LOGIC_CEILING + 1} entries, above ${OWN_LOGIC_CEILING}`,
+    ])
+  })
+})
+// Ruling 5 ii: no keyed surface (the thread_* tools, createThreadSdk, the root, omo thread) reaches the remote module's send
+// members (the relay client's send and open, both over sessions.ts deliverTo, and this device's sessions-local-members
+// send) except through the one send body (sdk-send sendThread / sendToTarget, the send book), so the receipt book cannot
+// be bypassed. Each member is wrapped where its factory builds it, and each call records the bodies open at that moment.
+const SEND_BODIES = ["sendThread", "sendToTarget", "throughSendBook"]
+
+describe("keyed surfaces reach the remote send members only through the one body (ruling 5 ii)", () => {
+  const calls: { readonly member: string; readonly open: readonly string[] }[] = []
+  const directories: string[] = []
+
+  beforeEach(() => {
+    calls.length = 0
+    const watched =
+      <F extends (...args: never[]) => unknown>(member: string, body: F): F =>
+      ((...args: Parameters<F>) => {
+        calls.push({ member, open: [...trace.open] })
+        return body(...args)
+      }) as F
+    const bodies: ReadonlyArray<readonly [Record<string, unknown>, string]> = [
+      [sdkSend, "sendToTarget"],
+      [sendBook, "throughSendBook"],
+    ]
+    for (const [module, name] of bodies) {
+      const body = module[name] as (...args: unknown[]) => unknown
+      spyOn(module, name as never).mockImplementation(((...args: unknown[]) =>
+        within(name, () => body(...args))) as never)
+    }
+    const relay = relaySessions.sessionMembers
+    spyOn(relaySessions, "sessionMembers").mockImplementation((core) => {
+      const members = relay(core)
+      return { ...members, send: watched("relay send", members.send), open: watched("relay open", members.open) }
+    })
+    const here = localMembers.localSessionMembers
+    spyOn(localMembers, "localSessionMembers").mockImplementation((hostOn) => {
+      const members = here(hostOn)
+      return { ...members, send: watched("here send", members.send) }
+    })
+  })
+  afterEach(async () => {
+    await closeClients()
+    for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  })
+
+  const outsideTheBody = () =>
+    calls.filter((call) => !call.open.some((body) => SEND_BODIES.includes(body))).map((call) => call.member)
+
+  const KEYED: ReadonlyArray<readonly [string, (h: Holder, thread: string) => Promise<unknown>]> = [
+    ["tool thread_send", (h, thread) => h.s.run("thread_send", { thread, message: "hi", idempotency_key: "k-1" })],
+    ["tool thread_create", (h) => h.s.run("thread_create", { name: "made", prompt: "hi" })],
+    ["facade send", (h, thread) => h.sdk.send({ thread, text: "hi", idempotency_key: "k-1" })],
+    ["facade create", (h) => h.sdk.create({ name: "made", prompt: "hi" })],
+    ["root send", (h, thread) => h.root.threads.send({ thread, message: "hi", idempotency_key: "k-1" })],
+    ["root create", (h) => h.root.threads.create({ name: "made", prompt: "hi" })],
+    ["cli send", (h, thread) => cli(h, ["send", thread, "hi"])],
+  ]
+
+  test.each(KEYED.flatMap(([name, run]) => ["dur-local", "dur-on-b"].map((thread) => [name, thread, run] as const)))(
+    "#given %s to %s #when it runs #then no remote send member is called outside the one send body",
+    async (_name, thread, run) => {
+      reset()
+      await run(holder(), thread)
+      expect(outsideTheBody()).toEqual([])
+    },
+  )
+
+  test("#given a caller that sends through the remote client itself #when it runs #then each member's call is seen outside the body", async () => {
+    const owner = await startOwner(defaultWorld())
+    const agentDir = mkdtempSync(join(tmpdir(), "one-body-keyed-"))
+    directories.push(agentDir)
+    const host: ThreadHost = {
+      socket: join(agentDir, "rpc.sock"),
+      listSessions: async () => [{ sessionId: "rpc-1", durableSessionId: "dur-selected", cwd: "/w", name: "target" }],
+      openSession: async () => ({ sessionId: "rpc-2", durableSessionId: "dur-made" }) as never,
+      getMessages: async () => [],
+      getState: async () => ({ isStreaming: false }),
+      prompt: async () => ({ turnId: "1" }),
+      interrupt: async () => ({ interrupted: true }) as never,
+      setSessionName: async () => undefined,
+      setModel: async (_s, provider, id) => ({ provider, id }),
+      getAvailableModels: async () => [],
+      setThinkingLevel: async () => undefined,
+      getAvailableThinkingLevels: async () => [],
+    }
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      localSessions: async () => createLocalSessions(async () => host),
+    })
+    reset()
+    await client.sessions.send(handleOf(PEER, SESSION_ID), { text: "hi" })
+    await client.sessions.send(handleOf("dev-self", "dur-selected"), { text: "hi" })
+    await client.sessions.open({ device: PEER, workspace: "/work" })
+    // A send to this device passes the relay client's send, which hands it to this device's member.
+    expect([...new Set(outsideTheBody())].toSorted()).toEqual(["here send", "relay open", "relay send"])
+    // The same call made inside the body is not flagged.
+    reset()
+    calls.length = 0
+    await within("sendToTarget", () => client.sessions.send(handleOf(PEER, SESSION_ID), { text: "again" }))
+    expect(calls.map((call) => call.member)).toEqual(["relay send"])
+    expect(outsideTheBody()).toEqual([])
   })
 })
