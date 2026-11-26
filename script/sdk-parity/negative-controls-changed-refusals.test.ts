@@ -43,6 +43,12 @@ describe("negative controls: the changed-refusal list", () => {
     ["its message changes", refusal("new", "invalid_arguments", "another message")],
     ["its code changes", refusal("new", "not_found")],
     ["it becomes an acceptance", { result: { kind: "ok" } }],
+    [
+      "its error gains another key",
+      { result: { kind: "error", error: { ...refusal("new").result.error, kind: "error" } } },
+    ],
+    ["its result gains another key", { result: { ...refusal("new").result, device: "d1" } }],
+    ["the outcome gains another key", { ...refusal("new"), threw: "boom" }],
   ])("#given a declared refusal where %s #then it fails", (_how, after) => {
     expect(failing(judge(refusal("old"), after))[0]).toContain("is declared in script/sdk-parity/changed-refusals.json")
   })
@@ -129,6 +135,7 @@ describe("negative controls: a bound entry", () => {
 
   test.each([
     ["any other message change", threw(0, " and something else"), {}],
+    ["another outcome key beside the message", { ...threw(0), result: { kind: "ok" } }, {}],
     ["a minimum that did not move", threw(0), { headMin: 1 }],
     ["a row whose entry does not widen the field", threw(0), { widened: false }],
   ])("#given %s #then it fails", (_how, after, options) => {

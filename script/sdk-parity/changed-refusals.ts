@@ -44,6 +44,19 @@ function refusalOf(outcome: Outcome | undefined): Refusal | undefined {
   return { code: result.error.code, message: result.error.message }
 }
 
+// The outcome with the parts an entry may change taken out: next_action and details of a refusal, or the host's message.
+function withoutAdvice(outcome: Outcome): string {
+  const { result, ...rest } = outcome as { result?: { error?: Record<string, unknown> } & Record<string, unknown> }
+  if (result?.error === undefined) return JSON.stringify(outcome)
+  const { next_action: _next, details: _details, ...error } = result.error
+  return JSON.stringify({ ...rest, result: { ...result, error } })
+}
+
+function withoutThrew(outcome: Outcome): string {
+  const { threw: _threw, ...rest } = outcome as Record<string, unknown>
+  return JSON.stringify(rest)
+}
+
 function minimumOf(tools: readonly DiscoveredTool[], tool: string, field: string): unknown {
   return (
     tools.find((entry) => entry.name === tool)?.parameters.properties?.[field] as { minimum?: unknown } | undefined
@@ -73,6 +86,7 @@ export function changedRefusalProblem(
     )
       return `the tool's ${field} minimum did not move from ${from} to ${to}`
     const [a, b] = [before.threw, after.threw]
+    if (withoutThrew(before) !== withoutThrew(after)) return "it changed beyond the host's message"
     if (typeof a !== "string" || typeof b !== "string" || !a.includes(`>= ${from}`))
       return `both trees must refuse it in the host with the bound >= ${from} on the base`
     return a.split(`>= ${from}`).join(`>= ${to}`) === b ? undefined : "its refusal changed beyond the declared bound"
@@ -81,7 +95,7 @@ export function changedRefusalProblem(
   if (a === undefined || b === undefined) return "it is no longer a refusal on both trees"
   if (a.code !== b.code) return "its error code changed"
   if (a.message !== b.message) return "its message changed"
-  return undefined
+  return withoutAdvice(before) === withoutAdvice(after) ? undefined : "it changed beyond next_action and details"
 }
 
 export function changedRefusalEntryProblems(
