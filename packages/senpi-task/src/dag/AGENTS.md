@@ -49,13 +49,14 @@ Recovery resolves the newest owned task of the node's CURRENT `execAttempt` (`re
 - **Resume fence.** A settled child runs again only through the manager's self-resume reopen. The manager asks `owner-resume-fence.ts` inside the record mutation, and the answer rests on the run's checkpoint, which every journal append rewrites synchronously. That gives same-process ordering for the process holding the run; exclusion across processes is the run lease's job.
   - `retire` covers a superseded or removed claim and a cancelled or cancelling run, and ends the child.
   - `hold` covers a current claim of a failed or completed run. It stops only the unsolicited turn and keeps the child resident and send-revivable.
+  - The decision is one function, `selfResumeVerdict`. The scheduler holding the run asks the same verdict before a node re-opens to follow an allowed turn (`scheduler-self-resume.ts`, told through `TaskManager.subscribeSelfResumed` only when the fence allowed it), so no allowed turn goes unfollowed and no refused turn re-opens a node. A turn allowed while no scheduler holds the run (a paused run) is followed by the scheduler that next holds it; recovery re-opens a completed node for an ended self-resumed run only through `resolveRecoveredNodeTask`.
 - **Refused turn, stop not confirmed.** The manager marks this (`manager/refused-stops.ts`) in the same step as the refusal, and clears it only when the runner confirms: for a hold, the abort settled and the turn's outcome was observed; for a retire, the teardown settled; or the handle is gone.
   - Until then the task counts as live everywhere (`TaskManager.selfResumeStopPending`). A timed-out or rejected step keeps it (`task_self_resume_stop_unconfirmed`).
   - A cancel awaits or re-issues the stop; a hold becomes a retire once the run is cancelled or cancelling.
   - A send awaits the stop and answers the retryable `unresponsive` while it is unconfirmed.
   - The marker is in memory. An in-process child's turn dies with its process; a host-session child's turn that outlives the process is not re-fenced by a new process (see the #15135 report).
 - **Stopping and admitting.**
-  - Run cancel drains the run's whole live set to a fixed point and fails with `DagRunChildrenLiveError` while a child stays live.
+  - Run cancel drains the run's whole live set to a fixed point and fails with `DagRunChildrenLiveError` while a child stays live. A child is asked again only when it is live after an answer that found it stopped (it started a turn on its own meanwhile); an answer that found it still running is reported, not repeated. Only the first stop of an attached child on the run it was attached on defers its in-process teardown (`abort: "skip"`, bound by `expectedRunEpoch`); a self-resumed run is cancelled outright.
   - Admission and recovery never start a node while a rule-1 child survives its stop; the ready nodes fail with the retryable `stale_attempt_alive`.
   - The owned start refuses start and reuse while another live claim exists.
   - Recovery stops stale claims before it returns a current one, and reads the current claim again after any awaited stop.
