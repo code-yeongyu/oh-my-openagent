@@ -4,14 +4,16 @@ import { join } from "node:path"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagScheduler } from "./scheduler"
 import { installRecoveredDag } from "./recovery-install"
+import { reconcileCompletedNode } from "./recovery-completed-node"
+import { resolveRecoveredNodeTask } from "./recovery-attempt"
+import { startFailure, startSpec, taskOwner } from "./recovery-start"
+import { fenceStaleLiveChildren } from "./child-gate"
 import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 
 import { defaultSignaller } from "../lifecycle/context"
-import type { ManagerStartSpec, TaskManager } from "../manager/types"
+import type { TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
-import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
 import {
-  dagNodeReusedEvent,
   dagNodeRetriedEvent,
   dagNodeTaskAttachedEvent,
   dagNodeTransitionedEvent,
@@ -19,8 +21,8 @@ import {
   dagRunResumedEvent,
 } from "./events"
 import { createDagJournal, type DagJournal } from "./journal"
-import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
+import type { OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
 import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
@@ -315,33 +317,32 @@ async function reconcileNodes(
       .filter((entry) => entry.record.status === "pending" && entry.queue_position !== undefined)
       .map((entry) => entry.record.task_id),
   )
+  // No scheduler or admission fence exists yet: the child gate's rule 1 runs before any start (#11381).
+  const fencing = fenceStaleLiveChildren(context.taskManager, journal.snapshot())
+  const staleLive = fencing instanceof Promise ? await fencing : fencing
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
-      const result = readDagNodeResult({ store: context.store, runId: journal.snapshot().runId, nodeId: observed.id })
-      if (result !== null) {
-        reusedOutputs.set(observed.id, result.output)
-        if (observed.taskId !== undefined) {
-          journal.append(
-            dagNodeReusedEvent({
-              nodeId: observed.id,
-              taskId: observed.taskId,
-              sourceRunId: journal.snapshot().runId,
-            }),
-          )
-        }
-      }
+      const failCompleted = (nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void =>
+        failNode(journal, nodeId, code, message, context.now, pendingErrors)
+      const reopening = reconcileCompletedNode(
+        { ...context, journal, reusedOutputs, reattachedTasks, staleLive, failNode: failCompleted },
+        observed,
+      )
+      if (reopening instanceof Promise) await reopening
       continue
     }
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue
     if (observed.state !== "scheduled" && observed.state !== "running" && observed.state !== "paused") continue
 
-    const owned = context.taskManager.findOwnedTask(ownerKey(journal.snapshot(), observed.id))
-    // Retrying retains taskId until the next admission batch attaches its replacement. The
-    // newest owner is authoritative even if that replacement launched before the batch committed.
-    let task = owned ?? (observed.taskId === undefined ? undefined : context.taskManager.get(observed.taskId))
+    const resolving = resolveRecoveredNodeTask(context.taskManager, journal.snapshot(), observed, staleLive)
+    const resolved = resolving instanceof Promise ? await resolving : resolving
+    if (resolved.kind === "fail") {
+      failNode(journal, observed.id, resolved.code, resolved.message, context.now, pendingErrors)
+      continue
+    }
+    let task = resolved.kind === "task" ? resolved.task : undefined
     if (task !== undefined && observed.taskId !== task.task_id) attachTask(journal, observed.id, task.task_id)
-
-    if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {
+    if (resolved.kind === "start") {
       const result = await context.taskManager.startOwned(
         {
           ...startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
@@ -615,73 +616,10 @@ function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {
     .filter((record): record is RecoverableRecord => record !== null)
 }
 
-function startSpec(record: DagRunRecordV1, nodeId: DagNodeId, sessionDepth: number): ManagerStartSpec {
-  const node = nodeById(record, nodeId)
-  const persisted = persistedNode(record, nodeId)
-  return {
-    prompt: persisted.effectivePrompt,
-    ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
-    parent_session_id: record.parentSessionId,
-    root_session_id: record.rootSessionId,
-    depth: sessionDepth + 1,
-    ...(node.route.kind === "category"
-      ? { category: node.route.category }
-      : { subagent_type: node.route.agent, ...(node.route.model === undefined ? {} : { model: node.route.model }) }),
-    name: node.id,
-    ...(persisted.description === undefined ? {} : { description: persisted.description }),
-    run_in_background: true,
-  }
-}
-
-function taskOwner(record: DagRunRecordV1, nodeId: DagNodeId): DagTaskOwner {
-  // Keyed on the persisted execAttempt, NEVER the display attempt: reattach bumps the display
-  // attempt with no new execution, and an attempt-keyed fingerprint would then compute a value the
-  // persisted owner record does not hold - a spurious owner_conflict on an untouched resume.
-  const execAttempt = nodeById(record, nodeId).execAttempt
-  return {
-    kind: "dag",
-    runId: record.runId,
-    nodeId,
-    fingerprint: dagFingerprint(
-      ownerFingerprintInput({
-        definitionFingerprint: record.definitionFingerprint,
-        nodeId,
-        ...(execAttempt === undefined ? {} : { execAttempt }),
-      }),
-    ),
-  }
-}
-
-function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
-  return { kind: "dag" as const, runId: record.runId, nodeId }
-}
-
 function nodeById(record: DagRunRecordV1, nodeId: DagNodeId) {
   const node = record.nodes.find((entry) => entry.id === nodeId)
   if (node === undefined) throw new Error(`unknown DAG node "${nodeId}"`)
   return node
-}
-
-function persistedNode(record: DagRunRecordV1, nodeId: DagNodeId): DagPersistedNode {
-  const node = record.definition.nodes.find((entry) => entry.id === nodeId)
-  if (node === undefined) throw new Error(`missing persisted definition for DAG node "${nodeId}"`)
-  return node
-}
-
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "held" }>): {
-  readonly code: DagNodeErrorCode
-  readonly message: string
-} {
-  switch (result.kind) {
-    case "depth_denied":
-      return { code: "depth_denied", message: result.reason }
-    case "plan_unresolved":
-      return { code: "plan_unresolved", message: result.error.message }
-    case "start_failed":
-      return { code: "start_failed", message: result.error_message }
-    case "owner_conflict":
-      return { code: "start_failed", message: `DAG task owner conflicts with existing task ${result.task_id}` }
-  }
 }
 
 function taskFailure(
