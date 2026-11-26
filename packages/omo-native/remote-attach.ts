@@ -59,21 +59,28 @@ function authenticate(socket: Socket, secret: Buffer, onAuthenticated: () => voi
   socket.once("close", () => clearTimeout(timer))
 }
 
-function serveLines(socket: Socket, onLine: (line: string) => void): void {
+/** `maxLineChars` is injectable so a test can prove the per-line bound without sending 64 MiB. */
+export function serveLines(socket: Socket, onLine: (line: string) => void, maxLineChars = MAX_LINE_CHARS): void {
   let buffer = ""
   socket.setEncoding("utf8")
   socket.on("data", (chunk: string) => {
     buffer += chunk
-    if (buffer.length > MAX_LINE_CHARS) {
-      socket.destroy()
-      return
-    }
+    // omo#11999: the bound is per LINE. A chunk may hold many complete small lines whose total passes it; those are
+    // served. Only a single line grown past the bound (a peer that never sends LF) ends the connection.
     let newline = buffer.indexOf("\n")
     while (newline !== -1) {
       const line = buffer.slice(0, newline).replace(/\r$/, "")
       buffer = buffer.slice(newline + 1)
+      if (line.length > maxLineChars) {
+        socket.destroy()
+        return
+      }
       if (line) onLine(line)
       newline = buffer.indexOf("\n")
+    }
+    if (buffer.length > maxLineChars) {
+      socket.destroy()
+      return
     }
   })
 }

@@ -9,6 +9,7 @@ import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/_
 import { createLiveThreadSurface, resolveThreadSocket, THREAD_SOCKET_ENV_NAMES } from "./live-surface"
 import type { ThreadHost } from "./tools"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 /** An engine that cannot enumerate endpoints: the surface reaches the legacy socket alone. */
 const NO_ENUMERATION = async () => undefined
@@ -24,7 +25,7 @@ async function withRpc(
   exercise: (surface: ThreadHost, frames: Array<Record<string, unknown>>) => Promise<void>,
   preamble: (requestId: string) => Array<Record<string, unknown>> = () => [],
 ): Promise<void> {
-  const directory = mkdtempSync("/tmp/thread-rpc-")
+  const directory = shortTempDir("thread-rpc-")
   const socketPath = join(directory, "rpc.sock")
   const frames: Array<Record<string, unknown>> = []
   const sockets = new Set<Socket>()

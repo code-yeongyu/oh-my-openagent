@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { HostSessionClient } from "./session-client"
+import { HostSessionClient, HostSessionDetachedError } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 import { createSenpiRpcClient } from "./session-transport"
 
@@ -36,6 +36,50 @@ describe("HostSessionClient connection lifetime", () => {
     } finally {
       host.cutConnections()
       await closing
+    }
+  })
+
+  test("#given an open still dialing #when teardown detaches #then the open ends refused and leaves no connection on the host", async () => {
+    // given: the dial is held after the client exists and before it is bound, the window a slow transport widens (#14906)
+    const host = await harness.fakeHost()
+    const dialing = Promise.withResolvers<void>()
+    const continueDial = Promise.withResolvers<void>()
+    const client = new HostSessionClient({
+      socketPath: host.socketPath,
+      ports: {
+        probeProtocolInfo: () => host.probeProtocolInfo(),
+        createClient: async (options) => {
+          const rpc = await createSenpiRpcClient(options)
+          const start = rpc.start.bind(rpc)
+          rpc.start = async () => {
+            dialing.resolve()
+            await continueDial.promise
+            await start()
+          }
+          return rpc
+        },
+      },
+    })
+    const pending = client.open(childOpenInput("/tmp/sessions/lifetime-detach-while-dialing.jsonl")).then(
+      () => "opened",
+      (error: unknown) => error,
+    )
+    try {
+      await dialing.promise
+
+      // when
+      await client.detach()
+      continueDial.resolve()
+      const outcome = await pending
+
+      // then
+      expect(outcome).toBeInstanceOf(HostSessionDetachedError)
+      await host.waitForConnections(0)
+      expect(host.commands.filter((command) => command.type === "open_session")).toHaveLength(0)
+    } finally {
+      continueDial.resolve()
+      await pending
+      await client.detach()
     }
   })
 
