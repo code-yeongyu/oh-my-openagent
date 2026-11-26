@@ -225,6 +225,12 @@ export const CONTROL_TEXTS = {
     guidance:
       "The prompt is stored on device {device} and runs when {thread} wakes: do not send it again. Check it with thread_read (tool.thread_read({{ thread }}) in an eval cell).",
   },
+  "control.send_attachments_unsupported": {
+    code: "unsupported",
+    message:
+      "A thread message carries no attachments yet: the delivery to a thread on this device and the relay record to another device have no field for them, so the {count} attachment(s) were not sent and nothing was delivered.",
+    next_action: "Send the message without attachments, or put what they hold into the message text.",
+  },
   "control.create_prompt_undelivered": {
     code: "internal_error",
     message: "The thread was created, but its first prompt was not delivered: {error}.",

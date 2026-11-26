@@ -458,6 +458,13 @@ const GOLDENS: readonly Golden[] = [
     next: PICK_EXACT,
   },
   {
+    id: "control.send_attachments_unsupported",
+    slots: { count: "2" },
+    message:
+      "A thread message carries no attachments yet: the delivery to a thread on this device and the relay record to another device have no field for them, so the 2 attachment(s) were not sent and nothing was delivered.",
+    next: "Send the message without attachments, or put what they hold into the message text.",
+  },
+  {
     id: "control.address_name_conflict",
     slots: { name: "peer", thread: "dur-peer" },
     message: 'A thread named "peer" (dur-peer) already exists.',

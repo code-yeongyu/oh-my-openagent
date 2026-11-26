@@ -1,9 +1,10 @@
-import { threadToolParamSchemas } from "../../thread/contracts"
+import { threadToolParamSchemas, type ThreadCreateInput } from "../../thread/contracts"
 import type { GatewayStore } from "../../thread/gateway/store"
 import type { ProvenanceWorkspaces } from "../../thread/gateway/provenance-resolver"
 import type { WaitClock } from "../../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import { createThreadCore, type ThreadCore } from "../../thread/sdk-core"
+import { refusal } from "../../thread/refusal-texts"
 import { fail } from "../../thread/sdk-core/failures"
 import type { ThreadHost } from "../../thread/tools/ports"
 import type { Endpoint, OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
@@ -11,7 +12,6 @@ import type * as result from "../contract/results/threads"
 import { ROOT_CALLS } from "../contract/calls"
 import { extensionFailure } from "./extension-codes"
 import type { Members, NamespaceServing } from "./members"
-import { notImplemented } from "./not-implemented"
 import { onRoot, threadFailure } from "./thread-failures"
 
 /** The thread options of design 4.1: the facade's own options of the same meaning. */
@@ -44,9 +44,15 @@ type Input = Readonly<Record<string, unknown>>
 function unbuilt(key: RootCallKey, input: unknown, acted: readonly string[]): OmoFailure | undefined {
   if (typeof input !== "object" || input === null) return undefined
   const schema = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
-  const fields = Object.entries(input as Input)
-    .filter(([field, value]) => value !== undefined && schema.includes(field) && !acted.includes(field))
-    .map(([field]) => field)
+  return notActed(
+    key,
+    Object.entries(input as Input)
+      .filter(([field, value]) => value !== undefined && schema.includes(field) && !acted.includes(field))
+      .map(([field]) => field),
+  )
+}
+
+function notActed(key: RootCallKey, fields: readonly string[]): OmoFailure | undefined {
   if (fields.length === 0) return undefined
   return {
     kind: "error",
@@ -70,8 +76,76 @@ export const isAbsoluteFileUrl = (value: string): boolean => {
 
 const LIST = ["all_scope", "state", "workspace", "device", "project", "name", "archived", "idempotency_key"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope", "limit", "idempotency_key"]
-const SEND = ["thread", "message", "delivery", "expected_turn_id", "all_scope", "idempotency_key", "collapse_key"]
+const SEND = [
+  "thread",
+  "message",
+  "delivery",
+  "expected_turn_id",
+  "all_scope",
+  "idempotency_key",
+  "collapse_key",
+  "attachments",
+]
 const CREATE = Object.keys(threadToolParamSchemas.thread_create.properties)
+/** The object prompt's fields the root acts on; `summary` has no carrier yet and `author` is slice P1a-s's. */
+const FIRST = ["message", "delivery", "expected_turn_id", "attachments"]
+
+/**
+ * No leg carries an attachment yet: the gateway delivery on this device has no field for one, and neither has the relay
+ * record a send to another device becomes, so a message with attachments is refused before any effect, never sent without
+ * them.
+ */
+function attachmentsRefused(attachments: unknown): OmoFailure | undefined {
+  if (!Array.isArray(attachments)) return undefined
+  const count = attachments.length
+  return threadFailure(
+    refusal("control.send_attachments_unsupported", { count: String(count) }, { field: "attachments", count }),
+  )
+}
+
+type FirstPrompt = {
+  readonly message: string
+  readonly delivery?: ThreadCreateInput["delivery"]
+  readonly expected_turn_id?: string
+  readonly attachments?: readonly unknown[]
+}
+
+/**
+ * A create with the object prompt: the create plus one send of those inputs, delivered as the string prompt is (the same
+ * sendToTarget, with the creator's authority). The prompt's own delivery and the create's top-level one name one thing,
+ * so two different values are refused rather than one silently chosen.
+ */
+function createWithObjectPrompt(
+  input: Input,
+  prompt: Input,
+  create: ThreadCore["create"],
+): OmoFailure | ReturnType<ThreadCore["create"]> {
+  const { prompt: _prompt, ...rest } = input
+  const refused =
+    unbuilt("threads.create", rest, CREATE) ??
+    notActed(
+      "threads.create",
+      Object.entries(prompt)
+        .filter(([field, value]) => value !== undefined && !FIRST.includes(field))
+        .map(([field]) => `prompt.${field}`),
+    ) ??
+    attachmentsRefused(prompt["attachments"])
+  if (refused !== undefined) return refused
+  const first = prompt as FirstPrompt
+  if (rest["delivery"] !== undefined && first.delivery !== undefined && rest["delivery"] !== first.delivery)
+    return threadFailure(
+      fail(
+        "invalid_arguments",
+        `delivery is ${String(rest["delivery"])} and prompt.delivery is ${first.delivery}; the first prompt takes one.`,
+        "Pass the first prompt's delivery once, as prompt.delivery.",
+      ).error,
+    )
+  const delivery = first.delivery ?? (rest["delivery"] as FirstPrompt["delivery"])
+  return create(
+    { ...(rest as ThreadCreateInput), prompt: first.message, ...(delivery === undefined ? {} : { delivery }) },
+    first.expected_turn_id === undefined ? undefined : { expected_turn_id: first.expected_turn_id },
+  )
+}
 
 const env = (options: {
   readonly env: Readonly<Record<string, string | undefined>>
@@ -119,7 +193,11 @@ export function threadsNamespace(options: {
     "threads.send": async (input) => {
       if (input?.author !== undefined)
         return threadFailure(fail("invalid_arguments", "author is a connector's field.", "Send without author.").error)
-      return unbuilt("threads.send", input, SEND) ?? onRoot(await thread().send(input))
+      return (
+        unbuilt("threads.send", input, SEND) ??
+        attachmentsRefused(input?.attachments) ??
+        onRoot(await thread().send(input))
+      )
     },
     "threads.locate": async (input) => {
       const located = await thread().locate(input)
@@ -127,7 +205,10 @@ export function threadsNamespace(options: {
       return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
     },
     "threads.create": async (input) => {
-      if (typeof input?.prompt === "object") return notImplemented("threads.create")() as Promise<OmoFailure>
+      if (typeof input?.prompt === "object" && input.prompt !== null) {
+        const created = createWithObjectPrompt(input as Input, input.prompt as Input, thread().create)
+        return "kind" in created ? created : onRoot((await created) as result.ThreadCreateResult)
+      }
       return (
         unbuilt("threads.create", input, CREATE) ??
         onRoot((await thread().create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult)
