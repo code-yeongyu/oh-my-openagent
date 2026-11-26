@@ -324,7 +324,10 @@ const OWN_LOGIC: Readonly<Record<string, OwnLogic>> = {
     holds: "remote/sessions.ts archive: control.setArchived + listed, not archiveThread",
     owner: T1R,
   },
-  "here send": { holds: "remote/sessions-local-members.ts send: port.prompt with its own steer/queue rules", owner: T1R },
+  "here send": {
+    holds: "remote/sessions-local-members.ts send: port.prompt with its own steer/queue rules",
+    owner: T1R,
+  },
   "here interrupt": {
     holds: "remote/sessions-local-members.ts interrupt: interruptOver on the port, not interruptThread",
     owner: T1R,
@@ -343,7 +346,9 @@ function pinProblems(own: readonly string[], pin: Readonly<Record<string, OwnLog
     ...pinned
       .filter((name) => !own.includes(name))
       .map((name) => `${name}: reaches its thread body now; the entry no longer applies`),
-    ...(pinned.length > OWN_LOGIC_CEILING ? [`the pin holds ${pinned.length} entries, above ${OWN_LOGIC_CEILING}`] : []),
+    ...(pinned.length > OWN_LOGIC_CEILING
+      ? [`the pin holds ${pinned.length} entries, above ${OWN_LOGIC_CEILING}`]
+      : []),
     ...pinned.filter((name) => pin[name]?.owner !== T1R).map((name) => `${name}: owner is not ${T1R}`),
   ].toSorted()
 }
@@ -429,9 +434,12 @@ describe("the remote module's session members (#14951 D2)", () => {
     expect(pinProblems([...own, "relay interrupt"], OWN_LOGIC)).toEqual([
       "relay interrupt: holds its own logic and is not pinned",
     ])
-    expect(pinProblems(own.filter((name) => name !== "here close"), OWN_LOGIC)).toEqual([
-      "here close: reaches its thread body now; the entry no longer applies",
-    ])
+    expect(
+      pinProblems(
+        own.filter((name) => name !== "here close"),
+        OWN_LOGIC,
+      ),
+    ).toEqual(["here close: reaches its thread body now; the entry no longer applies"])
     const grown = { ...OWN_LOGIC, "relay interrupt": { holds: "interruptOver", owner: T1R } }
     expect(pinProblems([...own, "relay interrupt"], grown)).toEqual([
       `the pin holds ${OWN_LOGIC_CEILING + 1} entries, above ${OWN_LOGIC_CEILING}`,
@@ -450,8 +458,7 @@ describe("keyed surfaces reach the remote send members only through the one body
 
   beforeEach(() => {
     calls.length = 0
-    const watched =
-      <F extends (...args: never[]) => unknown>(member: string, body: F): F =>
+    const watched = <F extends (...args: never[]) => unknown>(member: string, body: F): F =>
       ((...args: Parameters<F>) => {
         calls.push({ member, open: [...trace.open] })
         return body(...args)

@@ -38,7 +38,12 @@ const SURFACES: ReadonlyArray<readonly [string, (w: World, thread: string) => Pr
   ["root create", (w) => w.root.threads.create({ name: "made", prompt: { message: "hi", attachments: [ATTACHMENT] } })],
 ]
 
-type Refused = { readonly code: string; readonly message: string; readonly next_action: string; readonly details?: unknown }
+type Refused = {
+  readonly code: string
+  readonly message: string
+  readonly next_action: string
+  readonly details?: unknown
+}
 const errorOf = (answer: unknown): Refused => {
   const value = answer as { readonly error?: Refused }
   if (value.error === undefined) throw new Error(`not a refusal: ${JSON.stringify(answer)}`)
