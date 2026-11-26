@@ -20,6 +20,7 @@ fn batch_halts_with_skip_text_and_one_frame() {
     );
     let captures = Arc::clone(&backend.captures);
     let mut session = run.session(Box::new(backend));
+    let opened_with = captures.load(Ordering::SeqCst);
     let steps = vec![
         BatchStep::Click(Box::new(click("b-1"))),
         BatchStep::Click(Box::new(params(
@@ -51,7 +52,7 @@ fn batch_halts_with_skip_text_and_one_frame() {
     }
     assert!(outcome.final_frame.is_ok(), "{:?}", outcome.final_frame);
     assert_eq!(
-        captures.load(Ordering::SeqCst),
+        captures.load(Ordering::SeqCst) - opened_with,
         1,
         "exactly one appended final frame"
     );
