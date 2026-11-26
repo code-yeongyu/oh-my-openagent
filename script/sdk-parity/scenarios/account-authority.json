@@ -627,6 +627,106 @@
       ]
     },
     {
+      "id": "account.show/identity-read-refuses-connector",
+      "row": "account.show",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.show/identity-read-refuses-service",
+      "row": "account.show",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signInCheck/identity-read-refuses-connector",
+      "row": "account.signInCheck",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signInCheck/identity-read-refuses-service",
+      "row": "account.signInCheck",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "account.signOut/sign-out-refuses-connector",
       "row": "account.signOut",
       "input": {},

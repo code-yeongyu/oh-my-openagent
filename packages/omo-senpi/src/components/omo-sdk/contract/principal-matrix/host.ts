@@ -3,6 +3,10 @@ import { allow, columns, type MatrixLine, NA, refuse } from "./types"
 // Section 4.3 of the security design (#14945): daemon, diagnostics, install, engine, MCP.
 const SCANNED = "as an eval-cell read, once a canary scan shows its output cannot carry a credential"
 
+/** Revision 22's row of the two conditions on `install.setup.apply`. */
+export const SETUP_APPLY_CONDITIONS_ROW =
+  "The conditions on `install.setup.apply`, for the principals the row above allows: it applies only a plan that this root's own `install.setup.plan` call answered, never a plan a caller composed or altered, and it asks the caller's consent callback before each stage's write; a stage without consent writes nothing"
+
 export const HOST_LINES: readonly MatrixLine[] = [
   {
     section: "4.3",
@@ -42,6 +46,18 @@ export const HOST_LINES: readonly MatrixLine[] = [
       "engine.trust.ensure",
     ],
     cells: columns({ people: allow(), session: refuse(), connector: refuse(), service: refuse() }),
+  },
+  {
+    section: "4.3",
+    capability: SETUP_APPLY_CONDITIONS_ROW,
+    slug: "setup-apply-conditions",
+    rows: ["install.setup.apply"],
+    cells: columns({
+      people: allow("under both conditions"),
+      session: refuse("sender_not_allowed", { note: "new, as above" }),
+      connector: refuse("sender_not_allowed", { note: "new" }),
+      service: refuse(),
+    }),
   },
   {
     section: "4.3",
