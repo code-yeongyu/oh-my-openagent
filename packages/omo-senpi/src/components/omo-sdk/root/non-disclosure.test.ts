@@ -110,8 +110,12 @@ function canaryPorts(fault: boolean): OmoSdkPorts {
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
     host: canaryHost(fault),
+    // The thread controls honour the scan's 5 ms deadline (slice T1b); a clock that never moves keeps each on its ok path.
+    waitClock: { now: () => started, after: () => () => undefined },
   }
 }
+
+const started = Date.now()
 
 const PRINCIPALS = [
   undefined,
