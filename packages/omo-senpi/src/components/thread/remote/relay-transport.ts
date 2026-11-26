@@ -15,7 +15,7 @@ import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { replyData } from "./remote-ops"
 import { resolveTypedDevice } from "../address/device"
-import { chainCountLimitFailure, engineNotReady, outcomeFailure } from "./outcome"
+import { chainCountLimitFailure, engineNotReady, LOST_ANSWER, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
 import { reopenParkedRow } from "./reopen-parked"
 import { callMutation, observeCallDispatch, outsideCallDeadline } from "../../call-budget/call-deadline"
@@ -114,15 +114,17 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
 
 const ADMIT_RECORD = "admit_external_message"
 
-// The get_state probe is read-only and runs before any record is sent: one that ends uncertain changed nothing on that
-// device, so it is a transport failure that is safe to retry, never idempotency_uncertain (#12925).
+// The get_state probe is read-only and runs before any record is sent, so this call sends no record when it fails. A
+// probe whose answer was lost (it ended uncertain, or the port refused it with a lost-answer reason) still says the
+// device is losing answers, which proves nothing about what reached it: the send is uncertain and the caller reads the
+// thread before sending again, as for a lost answer to the record itself (#15093, which superseded #12925's retry).
 function probeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>, device: string): Failure {
-  if (outcome.kind !== "uncertain") return outcomeFailure(outcome, device)
+  if (outcome.kind !== "uncertain" && !LOST_ANSWER.has(outcome.reason)) return outcomeFailure(outcome, device)
   return fail(
-    "host_unavailable",
-    `Device ${device} did not answer the state read (${outcome.reason}); nothing was sent there.`,
-    "Retry; nothing needs to be checked first.",
-    { device, reason: outcome.reason },
+    "idempotency_uncertain",
+    `Device ${device} lost its answer to the state read before sending (${escapeForDisplay(outcome.reason)}); this call sent no record, but an earlier send to it may have arrived unconfirmed.`,
+    "Read the thread (tool.thread_read({ thread }) in an eval cell) before sending the message again.",
+    { device, reason: escapeForDisplay(outcome.reason), sent: false },
   )
 }
 

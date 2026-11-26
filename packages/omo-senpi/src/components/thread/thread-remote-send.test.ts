@@ -174,6 +174,29 @@ describe("remote == local: the same call answers the same on b as on this device
     },
   )
 
+  // #15093: the state read before the record is a read, so the port answers its lost answer as a refusal. Its reason
+  // still says the device is losing answers, which proves nothing about what reached it: the send answers
+  // idempotency_uncertain (read first), as a lost answer to the record does, naming that this call sent no record.
+  test.each([
+    [
+      "the read's answer was lost after it left (refused delivered_unconfirmed)",
+      { kind: "refused", reason: "delivered_unconfirmed" },
+    ],
+    ["the read's request was gone (refused request_gone)", { kind: "refused", reason: "request_gone" }],
+    ["the read ended uncertain (request_gone)", { kind: "uncertain", reason: "request_gone" }],
+  ] as const)(
+    "#given %s #when a message is sent #then the send answers idempotency_uncertain naming the reason and that no record was sent",
+    async (_label, probe) => {
+      const a = account({ stateOutcomes: [probe] })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain", details: { device: "b", reason: probe.reason, sent: false } },
+      })
+      expect(commands(a.sent)).toEqual(["get_state"])
+    },
+  )
+
   test.each([
     ["capability_missing", "scope_denied"],
     ["host_detached", "host_unavailable"],
@@ -268,7 +291,9 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     expect(String(record["text"])).toContain(" requested=steer effective=steer ")
   })
 
-  test("#given b's get_state ends uncertain #when a steer probes b #then nothing was written, so it is host_unavailable with no admit record, and a retry under the same key probes again and steers", async () => {
+  // #12925 with #15093: the lost probe answer is idempotency_uncertain (read first, `sent: false`), never "changed nothing";
+  // this call wrote no record, so its key stays free and a retry under it probes again and sends.
+  test("#given b's get_state ends uncertain #when a steer probes b #then nothing was written, so it is idempotency_uncertain naming sent false with no admit record, and a retry under the same key probes again and steers", async () => {
     const a = account({
       engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" },
       stateOutcomes: [{ kind: "uncertain", reason: "unconfirmed" }],
@@ -283,7 +308,7 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     } as const
     expect(await run("thread_send", args)).toMatchObject({
       kind: "error",
-      error: { code: "host_unavailable", details: { device: "b", reason: "unconfirmed" } },
+      error: { code: "idempotency_uncertain", details: { device: "b", reason: "unconfirmed", sent: false } },
     })
     expect(commands(a.sent)).toEqual(["get_state"])
     expect(await run("thread_send", args)).toMatchObject({
@@ -295,7 +320,7 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     expect(commands(a.sent)).toEqual(["get_state", "get_state", ADMIT])
   })
 
-  test("#given b's get_state ends uncertain #when a default-mode send probes b #then nothing was written, so it is host_unavailable with no admit record, and a retry under the same key probes again and sends", async () => {
+  test("#given b's get_state ends uncertain #when a default-mode send probes b #then nothing was written, so it is idempotency_uncertain naming sent false with no admit record, and a retry under the same key probes again and sends", async () => {
     const a = account({
       engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" },
       stateOutcomes: [{ kind: "uncertain", reason: "unconfirmed" }],
@@ -304,7 +329,7 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     const args = { thread: "dur-on-b", message: "x", idempotency_key: "k-probe-auto" } as const
     expect(await run("thread_send", args)).toMatchObject({
       kind: "error",
-      error: { code: "host_unavailable", details: { device: "b", reason: "unconfirmed" } },
+      error: { code: "idempotency_uncertain", details: { device: "b", reason: "unconfirmed", sent: false } },
     })
     expect(commands(a.sent)).toEqual(["get_state"])
     expect(await run("thread_send", args)).toMatchObject({
