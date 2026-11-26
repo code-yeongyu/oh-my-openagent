@@ -6,7 +6,7 @@ use omo_computer_core::backend::{
     BackendResult, CaptureOptions, FrameBytes, Refusal, Target, WindowFilter, WindowList,
 };
 use omo_computer_core::error::{EngineCode, Reason};
-use omo_computer_core::observation::ImageMime;
+use omo_computer_core::observation::{CursorMode, ImageMime};
 use omo_computer_core::results::DisplayInfo;
 
 use super::enumerate;
@@ -97,6 +97,16 @@ impl<O: CaptureOs> Capturer<O> {
             height: image.height(),
             mime: ImageMime::Png,
             bytes,
+            // No macOS route has a `CaptureRoute` name and no macOS tier crops a root window, so both
+            // stay unreported. The cursor flag reaches the capture request itself: the OS draws its own
+            // pointer into the still when asked, and the SkyLight route is taken only when it is not.
+            route: None,
+            occluders_visible: None,
+            cursor: Some(if options.cursor {
+                CursorMode::Os
+            } else {
+                CursorMode::None
+            }),
         })
     }
 
