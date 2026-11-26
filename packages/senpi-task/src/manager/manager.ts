@@ -232,6 +232,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #names = new NameRegistry()
   readonly #taskSequence = new TaskSequence()
   readonly #allocateNickname: ReturnType<typeof createNicknameAllocator>
+  readonly #warnedNicknameConflicts = new Set<string>()
   readonly #live = new Map<string, LiveTask>()
   // Children whose teardown rejected and that have no pid or daemon session for the orphan path. They
   // are resident for the lifecycle (eviction, idle reclaim, shutdown and TTL see them and retry their
@@ -616,15 +617,6 @@ class TaskManagerImpl implements TaskManager {
 
     const requestedName = normalizeSpecName(spec.name)
     spec.admission?.assertOpen()
-    const reservation = reserveTaskNickname(spec, plan, this.#options.config.nicknames, this.#allocateNickname)
-    const nickname =
-      reservation === undefined
-        ? undefined
-        : await reservation.catch((error: unknown) => {
-            this.#options.onNicknameAllocationError?.(error)
-            return undefined
-          })
-    spec.admission?.assertOpen()
     const requestedRegistration =
       requestedName === undefined ? undefined : this.#names.register(spec.parent_session_id, requestedName)
 
@@ -639,7 +631,6 @@ class TaskManagerImpl implements TaskManager {
             name: "",
             executionMode,
             taskSeq: this.#taskSequence.next(spec.parent_session_id),
-            ...(nickname === undefined ? {} : { nickname }),
           }),
           ...(owner === undefined ? {} : { owner }),
         },
@@ -702,17 +693,38 @@ class TaskManagerImpl implements TaskManager {
       isolation = prepared
     }
     try {
-      const renamedRecord: TaskRecord =
-        registration.name === claimed.name ? claimed : { ...claimed, name: registration.name }
-      const effectiveRecord: TaskRecord = {
-        ...renamedRecord,
+      const nicknames = this.#options.config.nicknames
+      const configuredModelIds = nicknames?.models === undefined ? undefined : this.#options.nicknameModelIds?.()
+      const reservation = reserveTaskNickname(spec, effectivePlan, nicknames, this.#allocateNickname, {
+        ...(configuredModelIds === undefined ? {} : { configuredModelIds }),
+        onConflict: (conflict) => {
+          const key = JSON.stringify([conflict.modelId.toLowerCase(), conflict.rules])
+          if (this.#warnedNicknameConflicts.has(key)) return
+          this.#warnedNicknameConflicts.add(key)
+          try {
+            this.#options.onNicknameConflict?.(conflict)
+          } catch (error) {
+            log("senpi-task nickname conflict warning failed", { error: String(error) })
+          }
+        },
+      })
+      const nickname =
+        reservation === undefined
+          ? undefined
+          : await reservation.catch((error: unknown) => {
+              this.#options.onNicknameAllocationError?.(error)
+              return undefined
+            })
+      const launchFields = {
+        name: registration.name,
         model: effectivePlan.model,
         ...(effectivePlan.resolved_model === undefined ? {} : { resolved_model: effectivePlan.resolved_model }),
         ...(effectivePlan.fallback_models === undefined ? {} : { fallback_models: effectivePlan.fallback_models }),
         ...(isolation === undefined ? {} : { isolation: isolation.spec }),
+        ...(nickname === undefined ? {} : { nickname }),
       }
       managedSpec = buildManagedSpec({
-        record: effectiveRecord,
+        record: { ...claimed, ...launchFields },
         spec,
         plan: effectivePlan,
         cwd: isolation === undefined ? this.#options.cwd : isolation.handle.mergedDir,
@@ -724,11 +736,41 @@ class TaskManagerImpl implements TaskManager {
       // launch facts (effective prompt, instructions, tool names, cwd) - never executable tools,
       // extensions, or member env.
       const spawnSpec = buildSpawnSpecV1(managedSpec)
-      finalRecord = {
-        ...effectiveRecord,
+      const persist = {
+        ...launchFields,
         spawn_spec: isolation === undefined ? spawnSpec : { ...spawnSpec, isolation: isolation.spec },
       }
-      this.#options.store.replace(finalRecord)
+      finalRecord = { ...claimed, ...persist }
+      if (reservation === undefined) {
+        this.#options.store.replace(finalRecord)
+      } else {
+        // Waiting for the nickname lock gives steering and cancellation time to update the claim.
+        const stored = this.#options.store.mutate(claimed.task_id, (fresh) =>
+          fresh.status === "pending" &&
+          fresh.host_pid === claimed.host_pid &&
+          fresh.notification.run_epoch === claimed.notification.run_epoch
+            ? { ...fresh, ...persist }
+            : fresh,
+        )
+        if (
+          stored === null ||
+          stored.status !== "pending" ||
+          stored.host_pid !== claimed.host_pid ||
+          stored.notification.run_epoch !== claimed.notification.run_epoch
+        ) {
+          if (isolation !== undefined) await this.#isolation.discard(claimed.task_id)
+          return this.#failSpawn({
+            claimed: finalRecord,
+            registration,
+            spec,
+            executionMode,
+            lease,
+            error_message: "task stopped before launch",
+            claimLost: true,
+          })
+        }
+        finalRecord = stored
+      }
       if (isolation !== undefined) this.#isolation.bind(finalRecord.task_id, isolation.handle, isolation.baseline)
       if (spec.run_in_background === true) this.#background.add(finalRecord.task_id)
     } catch {
@@ -1612,19 +1654,22 @@ class TaskManagerImpl implements TaskManager {
     readonly lease: { release(): void } | undefined
     readonly error_message: string
     readonly failure_kind?: Extract<StartResult, { kind: "start_failed" }>["failure_kind"]
+    readonly claimLost?: true
   }): StartResult {
     const { claimed, registration, spec, executionMode, lease } = input
     lease?.release()
     if (registration.name !== claimed.name) this.#names.release(spec.parent_session_id, registration.name)
     this.#background.delete(claimed.task_id)
-    const timestamp = nowIso(this.#now)
-    const started = this.#options.store.transition(claimed.task_id, { type: "start", timestamp })
-    const failed = this.#options.store.transition(claimed.task_id, {
-      type: "fail",
-      timestamp,
-      error_message: input.error_message,
-    })
-    if (!started.applied || !failed.applied) throw new Error("spawn bookkeeping failure transitions were not applied")
+    if (!input.claimLost) {
+      const timestamp = nowIso(this.#now)
+      const started = this.#options.store.transition(claimed.task_id, { type: "start", timestamp })
+      const failed = this.#options.store.transition(claimed.task_id, {
+        type: "fail",
+        timestamp,
+        error_message: input.error_message,
+      })
+      if (!started.applied || !failed.applied) throw new Error("spawn bookkeeping failure transitions were not applied")
+    }
     return {
       kind: "start_failed",
       task_id: claimed.task_id,

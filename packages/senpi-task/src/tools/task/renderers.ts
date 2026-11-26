@@ -48,13 +48,13 @@ export function formatTaskStatus(status: string): string {
 
 export function taskResultLines(details: TaskToolDetails): readonly string[] {
   const mode = details.run_in_background === undefined ? undefined : formatTaskMode(details.run_in_background)
-  return [taskResultLine(details, mode), ...(details.items ?? []).map(taskItemResultLine)]
+  return details.items?.length ? details.items.map(taskItemResultLine) : [taskResultLine(details, mode)]
 }
 
 export function renderTaskResultLines(details: TaskToolDetails, theme: RendererTheme): readonly string[] {
   const mode =
     details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
-  return [taskResultLine(details, mode), ...(details.items ?? []).map(taskItemResultLine)]
+  return details.items?.length ? details.items.map(taskItemResultLine) : [taskResultLine(details, mode)]
 }
 
 export function renderTaskResultComponent(details: TaskToolDetails, theme: RendererTheme): LinesComponent {
@@ -64,12 +64,14 @@ export function renderTaskResultComponent(details: TaskToolDetails, theme: Rende
       if (width <= 0) return [""]
       const mode =
         details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
+      if (details.items?.length) {
+        return details.items.map((item) =>
+          truncateToWidth(theme.fg(statusThemeColor(item.status), taskItemResultLineForWidth(item, width)), width, ELLIPSIS),
+        )
+      }
       const line = taskResultLineForWidth(details, mode, width)
       const aggregate = truncateToWidth(theme.fg(statusThemeColor(details.status), line), width, ELLIPSIS)
-      const items = (details.items ?? []).map((item) =>
-        truncateToWidth(theme.fg(statusThemeColor(item.status), taskItemResultLine(item)), width, ELLIPSIS),
-      )
-      return [aggregate, ...items]
+      return [aggregate]
     },
     invalidate: (): void => {},
   }
@@ -153,50 +155,83 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
 function taskItemResultLine(item: TaskToolItemDetail): string {
   const name = optionalRendererText(item.name)
   const error = optionalRendererText(item.error_message)
+  const id = optionalRendererText(item.task_id)
   return joinRendererTokens([
-    "item",
-    name === undefined ? undefined : `name:${name}`,
-    taskTargetToken(item),
-    formatTaskStatus(item.status),
+    name === undefined || name === id ? undefined : `name:${name}`,
     optionalRendererText(item.nickname),
     taskIdToken(item),
+    taskTargetToken(item),
+    formatTaskStatus(item.status),
     item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
     error === undefined ? undefined : `error:${excerptRendererText(error, TASK_REASON_EXCERPT_WIDTH)}`,
   ])
 }
 
 function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefined, width: number): string {
-  const requiredWithoutTarget = [
-    "task",
-    taskDowngradeToken(details),
-    fallbackCountToken(details),
-    mode,
-    formatTaskStatus(details.status),
-  ].filter((token): token is string => token !== undefined)
-  const requiredSpaces = requiredWithoutTarget.length + 1
-  const targetWidth = Math.max(
-    0,
-    width - requiredWithoutTarget.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
-  )
-  const required = [
-    "task",
-    compactTargetToken(details, targetWidth),
-    taskDowngradeToken(details),
-    fallbackCountToken(details),
-    mode,
-    formatTaskStatus(details.status),
-  ].filter((token): token is string => token !== undefined)
-  let line = required.join(" ")
-
-  for (const token of taskResultOptionalTokens(details)) {
-    const candidate = `${line} ${token}`
-    if (rendererVisibleWidth(candidate) > width) break
-    line = candidate
+  const nickname = optionalRendererText(details.nickname)
+  let line: string
+  if (nickname === undefined) {
+    const requiredWithoutTarget = [
+      "task",
+      taskDowngradeToken(details),
+      fallbackCountToken(details),
+      mode,
+      formatTaskStatus(details.status),
+    ].filter((token): token is string => token !== undefined)
+    const requiredSpaces = requiredWithoutTarget.length + 1
+    const targetWidth = Math.max(
+      0,
+      width - requiredWithoutTarget.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
+    )
+    const required = [
+      "task",
+      compactTargetToken(details, targetWidth),
+      taskDowngradeToken(details),
+      fallbackCountToken(details),
+      mode,
+      formatTaskStatus(details.status),
+    ].filter((token): token is string => token !== undefined)
+    line = required.join(" ")
+    const optional = [taskIdToken(details), ...taskResultTrailingTokens(details)].filter(
+      (token): token is string => token !== undefined,
+    )
+    for (const token of optional) {
+      const candidate = `${line} ${token}`
+      if (rendererVisibleWidth(candidate) > width) break
+      line = candidate
+    }
+  } else {
+    line = taskResultNicknameLineForWidth(details, mode, nickname, width)
   }
   const summary = runStatsCardSummary(details.run_stats)
   if (summary.length > 0 && rendererVisibleWidth(`${line}${summary}`) <= width) {
     line = `${line}${summary}`
   }
+  return line
+}
+
+function taskResultNicknameLineForWidth(
+  details: TaskToolDetails,
+  mode: string | undefined,
+  nickname: string,
+  width: number,
+): string {
+  const id = widthLimitedToken(taskIdToken(details), width)
+  const label = widthLimitedToken(nickname, remainingRendererWidth(id ?? "", width))
+  let budget = joinRendererTokens([label, id])
+  const fit = (token: string | undefined): string | undefined => {
+    if (token === undefined || rendererVisibleWidth(token) > remainingRendererWidth(budget, width)) return undefined
+    budget = joinRendererTokens([budget, token])
+    return token
+  }
+  const status = fit(formatTaskStatus(details.status))
+  const prefix = fit("task")
+  const fittedMode = fit(mode)
+  const tier = fit(taskDowngradeToken(details))
+  const fallback = fit(fallbackCountToken(details))
+  const target = widthLimitedToken(taskTargetToken(details), remainingRendererWidth(budget, width))
+  let line = joinRendererTokens([prefix, target, tier, fallback, fittedMode, status, label, id])
+  for (const token of taskResultTrailingTokens(details)) line = appendCompactToken(line, token, width, token.startsWith("reason:"))
   return line
 }
 
@@ -206,14 +241,49 @@ function compactTargetToken(details: TargetIdentity, maxWidth: number): string |
   return excerptRendererText(token, maxWidth)
 }
 
-function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
+function taskItemResultLineForWidth(item: TaskToolItemDetail, width: number): string {
+  const idToken = widthLimitedToken(taskIdToken(item), width)
+  const nickname = optionalRendererText(item.nickname)
+  const nicknameToken = widthLimitedToken(nickname, remainingRendererWidth(idToken ?? "", width))
+  let line = joinRendererTokens([nicknameToken, idToken])
+  const status = formatTaskStatus(item.status)
+  const statusFits = rendererVisibleWidth(status) <= remainingRendererWidth(line, width)
+  const contentWidth = statusFits ? width - rendererVisibleWidth(status) - (line.length > 0 ? 1 : 0) : width
+  const name = optionalRendererText(item.name)
+  if (name !== undefined && name !== optionalRendererText(item.task_id)) {
+    line = appendCompactToken(line, `name:${name}`, contentWidth, true)
+  }
+  line = appendCompactToken(line, taskTargetToken(item), contentWidth, true)
+  if (statusFits) line = joinRendererTokens([line, status])
+  if (item.queue_position !== undefined) line = appendCompactToken(line, `queue:${item.queue_position}`, width)
+  const error = optionalRendererText(item.error_message)
+  if (error !== undefined) line = appendCompactToken(line, `error:${error}`, width, true)
+  return line
+}
+
+function taskResultTrailingTokens(details: TaskToolDetails): readonly string[] {
   const reason = optionalRendererText(details.reason)
   return [
-    optionalRendererText(details.nickname),
-    taskIdToken(details),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ].filter((token): token is string => token !== undefined)
+}
+
+function widthLimitedToken(token: string | undefined, maxWidth: number): string | undefined {
+  if (token === undefined || maxWidth <= 0) return undefined
+  return rendererVisibleWidth(token) <= maxWidth ? token : excerptRendererText(token, maxWidth)
+}
+
+function remainingRendererWidth(line: string, width: number): number {
+  return Math.max(0, width - rendererVisibleWidth(line) - (line.length > 0 ? 1 : 0))
+}
+
+function appendCompactToken(line: string, token: string | undefined, width: number, clip = false): string {
+  if (token === undefined) return line
+  const available = remainingRendererWidth(line, width)
+  if (rendererVisibleWidth(token) <= available) return joinRendererTokens([line, token])
+  if (!clip || available <= 0) return line
+  return joinRendererTokens([line, excerptRendererText(token, available)])
 }
 
 export {

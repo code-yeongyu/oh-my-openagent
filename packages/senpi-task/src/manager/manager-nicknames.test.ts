@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { baseSpec, cleanupProjects, makeManager, settings } from "./__fixtures__/manager-fakes"
+import type { NicknameWildcardConflict } from "./types"
 
 afterEach(cleanupProjects)
 
@@ -44,13 +45,13 @@ test.each([
     name: "equivalent patterns",
     rules: { "mock/gpt-**": "general", "mock/gpt-*": "luna" },
     model: "gpt-6-luna",
-    expected: "Selene",
+    expected: "Io",
   },
   {
     name: "incomparable patterns",
     rules: { "mock/gpt-6*": "fast", "mock/*-luna": "luna" },
     model: "gpt-6-luna",
-    expected: "Selene",
+    expected: "Io",
   },
   { name: "category fallback", rules: { "other/*": "fast" }, model: "gpt-6-luna", expected: "Io" },
 ])("persists the selected nickname with $name", async ({ rules, model, expected }) => {
@@ -76,6 +77,46 @@ test.each([
   if (task.kind !== "started") throw new Error(`expected started task, got ${task.kind}`)
   expect(task.nickname).toBe(expected)
   expect(store.load(task.task_id)?.nickname).toBe(expected)
+})
+
+test("warns once per model when an unresolved wildcard tie needs the alphabetical rule", async () => {
+  const conflicts: NicknameWildcardConflict[] = []
+  const { manager } = makeManager({
+    config: settings({
+      nicknames: {
+        sets: { broad: ["Ceres"], narrow: ["Selene"], general: ["Io"] },
+        models: { "mock/gpt-*": "broad", "mock/*luna": "narrow" },
+        default: "general",
+      },
+    }),
+    onNicknameConflict: (conflict) => conflicts.push(conflict),
+    planner: (spec) => ({
+      kind: "resolved",
+      plan: {
+        model: `mock/${spec.prompt}`,
+        resolved_model: {
+          provider: "mock",
+          model_id: spec.prompt,
+          display: `mock/${spec.prompt}`,
+          source: "category",
+        },
+      },
+    }),
+  })
+
+  const first = await manager.start(baseSpec({ prompt: "gpt-luna" }))
+  const repeated = await manager.start(baseSpec({ prompt: "gpt-luna" }))
+  const different = await manager.start(baseSpec({ prompt: "gpt-alt-luna" }))
+  const unmatched = await manager.start(baseSpec({ prompt: "other" }))
+
+  expect(first).toMatchObject({ kind: "started", nickname: "Selene" })
+  expect(repeated).toMatchObject({ kind: "started", nickname: "Selene II" })
+  expect(different).toMatchObject({ kind: "started", nickname: "Selene III" })
+  expect(unmatched).toMatchObject({ kind: "started", nickname: "Io" })
+  expect(conflicts.map(({ modelId, chosenSet }) => [modelId, chosenSet])).toEqual([
+    ["mock/gpt-luna", "narrow"],
+    ["mock/gpt-alt-luna", "narrow"],
+  ])
 })
 
 test("a shared pool continues across conversations and manager recreation while counts stay conversation-local", async () => {

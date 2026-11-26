@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
-import { baseSpec, cleanupProjects, flush, makeManager, settings } from "./__fixtures__/manager-fakes"
+import { awaitWithinTestBudget } from "../../../../test-support/test-deadline"
+import { createTaskRecordStore } from "../store"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+import { withTaskRecordLockAsync } from "../store/record-lock"
+import { baseSpec, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import type { ResolvedChildPlan } from "./types"
 
 const primary = {
@@ -37,18 +42,27 @@ describe("TaskManager spawn spill admission", () => {
   test("#given a full primary and free fallback #when spawning #then every launch fact uses the fallback", async () => {
     const { manager, store, inProcess } = makeManager({
       planner: planner(spillPlan()),
-      config: settings({ default_concurrency: 1, max_depth: 1 }),
+      config: settings({
+        default_concurrency: 1,
+        max_depth: 1,
+        nicknames: {
+          sets: { primary: ["Selene"], fallback: ["Helios"] },
+          models: { [primary.display]: "primary", [fallback.display]: "fallback" },
+        },
+      }),
     })
     const holder = await manager.start(baseSpec({ name: "holder", model: primary.display }))
     if (holder.kind !== "started") throw new Error("expected holder")
+    expect(holder.nickname).toBe("Selene")
 
     const result = await manager.start(baseSpec({ name: "spill" }))
 
-    expect(result).toMatchObject({ kind: "started", status: "running", resolved_model: fallback })
+    expect(result).toMatchObject({ kind: "started", status: "running", resolved_model: fallback, nickname: "Helios" })
     if (result.kind !== "started") throw new Error("expected spill")
     const record = store.load(result.task_id)
     expect(record).toMatchObject({
       model: fallback.display,
+      nickname: "Helios",
       requested_model: primary,
       resolved_model: fallback,
       fallback_models: [],
@@ -76,6 +90,52 @@ describe("TaskManager spawn spill admission", () => {
     expect(result).toMatchObject({ kind: "started", status: "pending", queue_position: 1, resolved_model: primary })
     if (result.kind !== "started") throw new Error("expected pending")
     expect(store.load(result.task_id)).toMatchObject({ model: primary.display, resolved_model: primary })
+  })
+
+  test("#given a nickname reservation is waiting #when its claimed task is cancelled #then it never launches", async () => {
+    const project = tempProject()
+    const store = createTaskRecordStore(ownedTaskState(project))
+    const { promise: claimed, resolve: claim } = Promise.withResolvers<string>()
+    const { manager, inProcess } = makeManager({
+      project,
+      store: {
+        ...store,
+        save(record) {
+          store.save(record)
+          claim(record.task_id)
+        },
+      },
+      planner: planner(spillPlan()),
+      config: settings({
+        global_concurrency: 1,
+        nicknames: { sets: { moon: ["Selene"] }, default: "moon" },
+      }),
+    })
+
+    const { promise: held, resolve: acquired } = Promise.withResolvers<undefined>()
+    const { promise: released, resolve: release } = Promise.withResolvers<undefined>()
+    const lock = withTaskRecordLockAsync(join(project, "task-nicknames.json"), () => {
+      acquired(undefined)
+      return released
+    })
+    const [result, taskId] = await (async () => {
+      try {
+        await awaitWithinTestBudget(Promise.race([held, lock]), "nickname lock acquisition")
+        const starting = manager.start(baseSpec())
+        const taskId = await awaitWithinTestBudget(claimed, "task claim before nickname assignment")
+        expect(await manager.cancelTask(taskId)).toMatchObject({ kind: "cancelled", task_id: taskId })
+        release(undefined)
+        return [await starting, taskId] as const
+      } finally {
+        release(undefined)
+        await lock
+      }
+    })()
+
+    expect(result).toMatchObject({ kind: "start_failed", task_id: taskId })
+    expect(store.load(taskId)?.status).toBe("cancelled")
+    expect(inProcess.startedSpecs).toHaveLength(0)
+    expect(await manager.start(baseSpec())).toMatchObject({ kind: "started", status: "running" })
   })
 
   test("#given provider-collapsed candidates #when the provider lane is full #then the fallback cannot bypass it", async () => {

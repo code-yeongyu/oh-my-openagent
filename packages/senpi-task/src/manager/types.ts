@@ -277,6 +277,13 @@ export type TrustedRespawnLaunch = {
 
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
+export type NicknameWildcardConflict = {
+  readonly modelId: string
+  readonly rules: readonly { readonly key: string; readonly set: string }[]
+  readonly chosenKey: string
+  readonly chosenSet: string
+}
+
 export type TaskManagerOptions = {
   readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
   readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
@@ -295,6 +302,10 @@ export type TaskManagerOptions = {
   readonly config: OmoTaskSettings
   readonly nicknameAgentHome?: string
   readonly onNicknameAllocationError?: (error: unknown) => void
+  // Effective model ids from omo.json, used only to rank overlapping nickname wildcard rules.
+  readonly nicknameModelIds?: () => ReadonlySet<string>
+  // Called for unresolved wildcard pool conflicts; the manager deduplicates per model/conflict.
+  readonly onNicknameConflict?: (conflict: NicknameWildcardConflict) => void
   readonly cwd: string
   readonly now?: () => number
   readonly scheduleExitConfirmation?: ExitConfirmationSchedule

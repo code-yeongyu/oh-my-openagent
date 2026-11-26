@@ -187,7 +187,7 @@ describe("taskResultLines", () => {
     },
   )
 
-  test(" w2batch #given aggregate item details #when rendered #then each item receives its own ordered result line", () => {
+  test("#given aggregate item details #when rendered #then each item receives its own ordered result line", () => {
     // given
     const details = {
       task_id: "st_batch_1",
@@ -197,20 +197,30 @@ describe("taskResultLines", () => {
         { task_id: "st_batch_1", name: "alpha", status: "completed" },
         { task_id: "", name: "beta", status: "error", error_message: "depth limit" },
         { task_id: "st_batch_3", name: "gamma", status: "pending", queue_position: 2 },
+        { task_id: "st_batch_4", name: "st_batch_4", nickname: "Rhea", subagent_type: "explore", status: "running" },
       ],
     }
 
     // when
     const lines = taskResultLines(details)
+    const themedLines = renderTaskResultLines(details, ANSI_THEME)
+    const compactLines = renderTaskResultComponent(details, ANSI_THEME).render(72).map(Bun.stripANSI)
 
     // then
     expect(lines).toHaveLength(4)
-    expect(lines[1]).toContain("alpha")
-    expect(lines[1]).toContain("completed")
-    expect(lines[2]).toContain("beta")
-    expect(lines[2]).toContain("depth limit")
-    expect(lines[3]).toContain("gamma")
-    expect(lines[3]).toContain("queue:2")
+    expect(themedLines).toHaveLength(4)
+    expect(compactLines).toHaveLength(4)
+    expect(lines[0]).toContain("alpha")
+    expect(lines[0]).toContain("completed")
+    expect(lines[1]).toContain("beta")
+    expect(lines[1]).toContain("depth limit")
+    expect(lines[2]).toContain("gamma")
+    expect(lines[2]).toContain("queue:2")
+    expect(lines[3]).not.toContain("item")
+    expect(lines[3]).not.toContain("name:st_batch_4")
+    expect(lines[3]).toContain("Rhea id:st_batch_4 agent:explore running")
+    expect(compactLines[1]).toContain("error:depth limit")
+    for (const line of compactLines) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
   })
 
   test("#given a result detail #when rendered #then task_id and status appear", () => {
@@ -249,10 +259,47 @@ describe("taskResultLines", () => {
     // then
     expect(singleLine).toContain(" Selene the Second id:st_single")
     expect(compact).toContain(" Selene the Second")
-    expect(compact).not.toContain("st_single")
-    expect(batchLines[0]).toContain("id:st_batch")
-    expect(batchLines[1]).toContain("name:canonical-item")
-    expect(batchLines[1]).toContain(" Helios id:st_batch_item")
+    expect(compact).toContain("id:st_single")
+    expect(compact.indexOf("Selene the Second")).toBeLessThan(compact.indexOf("id:st_single"))
+    expect(batchLines).toHaveLength(1)
+    expect(batchLines[0]).toContain("name:canonical-item")
+    expect(batchLines[0]).toContain("Helios id:st_batch_item")
+    expect(batchLines[0].split(" ")).not.toContain("item")
+    expect(batchLines[0]).not.toContain("id:st_batch ")
+    for (const [detail, id] of [[single, "id:st_single"], [batch, "id:st_batch_item"]] as const) {
+      const [exactFit] = renderTaskResultComponent(detail, ANSI_THEME).render(id.length)
+      expect(Bun.stripANSI(exactFit ?? "")).toBe(id)
+    }
+  })
+
+  test("#given a compact batch row with a wide Unicode nickname #when rendered #then identity survives before clipped details", () => {
+    // given
+    const details = {
+      task_id: "st_batch",
+      status: "error",
+      mode: "spawn" as const,
+      items: [
+        {
+          task_id: "st_01a2172b",
+          name: "st_01a2172b",
+          nickname: "界Rhea",
+          subagent_type: "explore",
+          status: "running",
+          error_message: "depth limit after nested delegation",
+        },
+      ],
+    }
+
+    // when
+    const [rendered = ""] = renderTaskResultComponent(details, ANSI_THEME).render(40)
+    const line = Bun.stripANSI(rendered)
+
+    // then
+    expect(line).toContain("界Rhea")
+    expect(line).toContain("id:st_01a2172b")
+    expect(line.indexOf("界Rhea")).toBeLessThan(line.indexOf("id:st_01a2172b"))
+    expect(line).toContain("running")
+    expect(rendererVisibleWidth(rendered)).toBeLessThanOrEqual(40)
   })
 
   test("#given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {

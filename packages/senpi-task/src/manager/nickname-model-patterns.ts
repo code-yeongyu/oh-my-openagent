@@ -1,7 +1,16 @@
+import type { NicknameWildcardConflict } from "./types"
+
 type Rule = {
   readonly key: string
   readonly set: string
   readonly pattern: string
+}
+
+export type WildcardNicknameOptions = {
+  readonly configuredModelIds?: ReadonlySet<string>
+  readonly preferredSet?: string
+  readonly defaultSet?: string
+  readonly onConflict?: (conflict: NicknameWildcardConflict) => void
 }
 
 // An offset is a state before a token; the final offset accepts. A star has
@@ -64,7 +73,11 @@ function strictSubset(left: string, right: string): boolean {
   return rightHasExtra
 }
 
-export function wildcardNicknameSet(models: Readonly<Record<string, string>>, modelId: string): string | undefined {
+export function wildcardNicknameSet(
+  models: Readonly<Record<string, string>>,
+  modelId: string,
+  options: WildcardNicknameOptions = {},
+): string | undefined {
   const model = modelId.toLowerCase()
   const matching: Rule[] = []
   for (const [key, set] of Object.entries(models)) {
@@ -75,9 +88,52 @@ export function wildcardNicknameSet(models: Readonly<Record<string, string>>, mo
     if (matches(pattern, model)) matching.push({ key, set, pattern })
   }
 
-  // Only compare keys after removing every strict superset. Sorting by a
-  // specificity comparator would be invalid: containment is a partial order.
-  return matching
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
-    .find((rule) => !matching.some((other) => strictSubset(other.pattern, rule.pattern)))?.set
+  if (matching.length === 0) return undefined
+
+  // Containment is a partial order: remove every rule whose language contains another match.
+  let candidates = matching.filter(
+    (rule) => !matching.some((other) => strictSubset(other.pattern, rule.pattern)),
+  )
+
+  // Configured IDs break ties that the complete wildcard languages cannot distinguish.
+  const configuredModels = new Set(
+    [...(options.configuredModelIds ?? []), modelId].map((id) => id.toLowerCase()),
+  )
+  const configuredMatches = new Map(
+    candidates.map((rule) => [
+      rule,
+      [...configuredModels].filter((configuredModel) => matches(rule.pattern, configuredModel)),
+    ]),
+  )
+  candidates = candidates.filter((rule) => {
+    const ruleModels = configuredMatches.get(rule) ?? []
+    return !candidates.some((other) => {
+      const otherModels = configuredMatches.get(other) ?? []
+      return (
+        other !== rule &&
+        otherModels.length < ruleModels.length &&
+        otherModels.every((configuredModel) => ruleModels.includes(configuredModel))
+      )
+    })
+  })
+
+  const mostLiteral = Math.max(...candidates.map((rule) => [...rule.key].filter((char) => char !== "*").length))
+  candidates = candidates.filter((rule) => [...rule.key].filter((char) => char !== "*").length === mostLiteral)
+  candidates.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+
+  const pools = new Set(candidates.map((rule) => rule.set))
+  if (pools.size === 1) return candidates[0]?.set
+
+  if (options.preferredSet !== undefined) return options.preferredSet
+  if (options.defaultSet !== undefined && pools.has(options.defaultSet)) return options.defaultSet
+
+  const winner = candidates[0]
+  if (winner === undefined) return undefined
+  options.onConflict?.({
+    modelId,
+    rules: candidates.map(({ key, set }) => ({ key, set })),
+    chosenKey: winner.key,
+    chosenSet: winner.set,
+  })
+  return winner.set
 }

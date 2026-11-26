@@ -101,33 +101,26 @@ There is no `team_wait` tool. When the next step depends on a reply, send with `
 
 ### Worker nicknames
 
-`task.nicknames` is optional. Define each set once and reference it from any
-number of model IDs or wildcard patterns, exact agent names, or exact category names:
+`task.nicknames` is optional. To give workers nicknames from one pool:
 
 ```jsonc
 {
   "task": {
     "nicknames": {
-      "sets": {
-        "moon": ["Selene", "Io", "Callisto"],
-        "sun": ["Helios", "Flare", "Corona"],
-        "general": ["Atlas", "Kite", "Moss"]
-      },
-      "models": {
-        "chatgpt-subscription/*": "general",
-        "chatgpt-subscription/gpt-*-luna*": "moon",
-        "chatgpt-subscription/gpt-6.2-sol": "sun"
-      },
-      "agents": { "explore": "moon" },
-      "categories": { "writing": "general" },
-      "default": "general"
+      "sets": { "moon": ["Selene", "Io", "Callisto"] },
+      "default": "moon"
     }
   }
 }
 ```
 
-The resolved spawn model takes priority. An exact `provider/model` key wins
-before any wildcards. In a wildcard, `*` matches zero or more characters,
+You can also map model IDs or wildcard patterns with `models`, exact agent
+names with `agents`, or exact category names with `categories`. Each entry
+names a pool in `sets`.
+
+The initial model selected for launch takes priority, including when the
+primary model is at capacity and another model starts instead. An exact
+`provider/model` key wins before any wildcards. In a wildcard, `*` matches zero or more characters,
 including `/`, and matching ignores case. A pattern with `/` matches the full
 `provider/model` ID; a pattern without `/` can match model IDs across providers,
 including the part after a gateway's nested vendor prefix. Other characters
@@ -135,12 +128,19 @@ are literal.
 
 Among matching wildcard rules, a narrower rule (one that matches a strict
 subset of another rule's IDs) wins over the broader rule, regardless of
-declaration order. If multiple rules remain because they match identical or
-overlapping sets and none is narrower than another, the lexicographically first
-key wins. Use an exact key to override that choice for a particular model.
+declaration order. For remaining rules, compare only the model IDs named in the
+effective config, not the provider's live catalog: a rule that matches a strict
+subset of another rule's configured IDs wins. If that still doesn't decide,
+prefer the rule with more fixed characters as written.
+
+If the tied rules name the same pool, OmO uses it without warning. If they name
+different pools, OmO tries the requested agent or category's nickname mapping,
+then uses `default` only if it names one of the tied pools for this model.
+Otherwise OmO picks the alphabetically first tied rule and warns once for that
+model and conflict. Use an exact model key to settle the choice explicitly.
 
 If no model rule matches, OmO tries the requested agent or category, then
-`default`. No match means no nickname. Use nonempty sets with printable labels
+`default` as usual. No match means no nickname. Use nonempty sets with printable labels
 of at most 32 UTF-16 code units after trimming. Nickname occurrences use
 `task.nicknames.occurrence_style`, one of `#`, `roman`, `full`, or `arabic`;
 the default is `roman`. The first occurrence has no suffix. For the twenty-second
@@ -167,10 +167,13 @@ linked native task record or an `omo.task.updated` task snapshot. Older or
 unconfigured tasks omit it.
 
 Stock Senpi displays nicknames in task spawn, send, cancel, and output
-results. The spawn card uses the nickname in its `id:` label when one is
-available. Tool clients can read the optional `nickname` alongside `name` and
+results. Spawn cards show nicknames beside the real `id:` label. Batch results
+show one row per worker without repeating the first worker's ID in a separate
+summary row. On narrow terminals, spawn cards trim other details before the
+nickname and preserve the full ID when it fits. Tool clients can read the
+optional `nickname` alongside `name` and
 `task_id` on a resolved result or batch item, or in `task_output`'s
-`details.snapshot`. The handle and task ID are still the only task addresses.
+`details.snapshot`. Task controls still use the real `name` or `task_id`.
 Team mail from a known nicknamed worker can show a `Message from` notification;
 the hidden mailbox delivery and its acknowledgment are unchanged.
 

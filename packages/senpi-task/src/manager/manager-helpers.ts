@@ -5,7 +5,13 @@ import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, 
 import type { ResolvedModelRecord } from "../state"
 import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
-import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
+import type {
+  ManagedStartSpec,
+  ManagerStartSpec,
+  NicknameWildcardConflict,
+  ResolvedChildPlan,
+  StartResult,
+} from "./types"
 import type { ExecutionMode } from "./execution-mode"
 import type { createNicknameAllocator } from "./nickname-allocation"
 import { wildcardNicknameSet } from "./nickname-model-patterns"
@@ -59,21 +65,31 @@ export function reserveTaskNickname(
   plan: ResolvedChildPlan,
   nicknames: OmoTaskSettings["nicknames"],
   allocate: ReturnType<typeof createNicknameAllocator>,
+  options: {
+    readonly configuredModelIds?: ReadonlySet<string>
+    readonly onConflict?: (conflict: NicknameWildcardConflict) => void
+  } = {},
 ): Promise<string | undefined> | undefined {
   if (nicknames === undefined) return undefined
   const agentType = spec.subagent_type ?? plan.agentType
   const category = spec.category ?? plan.category
   const model = plan.resolved_model
   const modelId = model === undefined ? undefined : `${model.provider}/${model.model_id}`
-  const set =
-    ownValue(nicknames.models, modelId) ??
-    (modelId === undefined || nicknames.models === undefined
-      ? undefined
-      : wildcardNicknameSet(nicknames.models, modelId)) ??
-    (spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
+  const exactSet = ownValue(nicknames.models, modelId)
+  const preferredSet =
+    spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
       ? ownValue(nicknames.agents, agentType)
-      : ownValue(nicknames.categories, category)) ??
-    nicknames.default
+      : ownValue(nicknames.categories, category)
+  const wildcardSet =
+    exactSet !== undefined || modelId === undefined || nicknames.models === undefined
+      ? undefined
+      : wildcardNicknameSet(nicknames.models, modelId, {
+          ...(options.configuredModelIds === undefined ? {} : { configuredModelIds: options.configuredModelIds }),
+          ...(preferredSet === undefined ? {} : { preferredSet }),
+          defaultSet: nicknames.default,
+          ...(options.onConflict === undefined ? {} : { onConflict: options.onConflict }),
+        })
+  const set = exactSet ?? wildcardSet ?? preferredSet ?? nicknames.default
   if (set === undefined) return undefined
   const pool = ownValue(nicknames.sets, set)
   if (pool === undefined) return undefined
