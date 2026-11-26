@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { assembleOmoSdk } from "../assembly"
 import { ROOT_CALL_ANSWERS } from "../contract/call-answers"
 import type { RootCallKey } from "../contract"
-import { inputShape, invalidInput } from "./assemble"
+import { admitted, inputShape, invalidInput } from "./assemble"
 
 // Security read of b01f3fbdd4, N1, and the design lane's ruling: the boundary copies plain objects and arrays all the way
 // down, each field read once, and below the top level a value where the schema asks for an object or array must be plain
@@ -191,6 +191,112 @@ describe("nested input at the root's boundary", async () => {
     expect({ branchReads, skillReads }).toEqual({ branchReads: 1, skillReads: 1 })
     expect(JSON.stringify(failure ?? null)).not.toContain("caller-thrown-text")
     await sdk.dispose()
+  })
+
+  // LEAD ruling (1), 20:36Z: free data under the built members' any-value fields is copied too. Each case puts a counting
+  // object at the any-value field; the boundary reads it once, and what the member receives is the copy.
+  const counting = () => {
+    const reads = { count: 0 }
+    const value = Object.defineProperty({}, "probe", {
+      enumerable: true,
+      get() {
+        reads.count += 1
+        return reads.count === 1 ? "first" : "changed"
+      },
+    })
+    return { reads, value }
+  }
+  const FREE_DATA: readonly [
+    RootCallKey,
+    string,
+    (value: unknown) => Record<string, unknown>,
+    (own: Record<string, unknown>) => unknown,
+  ][] = [
+    [
+      "threads.extensions.call",
+      "args",
+      (value) => ({ name: "probe.ext", op: "ping", args: { nested: value } }),
+      (own) => (own["args"] as Record<string, unknown>)["nested"],
+    ],
+    [
+      "threads.extensions.register",
+      "sessionCallable[].parameters.*",
+      (value) => ({
+        name: "probe.ext",
+        migrations: [],
+        moduleUrl: "file:///probe/ext.js",
+        sessionCallable: [{ op: "ping", parameters: { field: value }, toolName: "probe_tool", description: "d" }],
+      }),
+      (own) =>
+        ((own["sessionCallable"] as Record<string, unknown>[])[0]?.["parameters"] as Record<string, unknown>)["field"],
+    ],
+  ]
+
+  for (const [key, path, inputWith, at] of FREE_DATA)
+    test(`#given a counting object under ${key}'s any-value field ${path} #when the boundary admits it #then it is read once and the member receives a copy holding the first value`, async () => {
+      // given
+      expect((await inputShape(key)).anyValue.has(path)).toBe(true)
+      const { reads, value } = counting()
+
+      // when
+      const own = await admitted(key, inputWith(value))
+
+      // then
+      expect(own).toBeDefined()
+      const received = at(own as Record<string, unknown>)
+      expect(received).not.toBe(value)
+      expect(received).toEqual({ probe: "first" })
+      expect(reads.count).toBe(1)
+    })
+
+  test("#given an extension call whose nested args change on a second read #when the root runs the call #then the caller's object is read once", async () => {
+    const sdk = root()
+    const { reads, value } = counting()
+    await failureOf(sdk.threads.extensions.call({ name: "probe.ext", op: "ping", args: { nested: value } } as never))
+    expect(reads.count).toBe(1)
+    await sdk.dispose()
+  })
+
+  test("#given extension args holding a class instance, a Map, a Date and bytes #when the boundary admits them #then the member receives their structured clone, as the store makes it", async () => {
+    class Point {
+      constructor(readonly x: number) {}
+    }
+    const args = { point: new Point(1), map: new Map([["k", 1]]), at: new Date(0), bytes: new Uint8Array([1]) }
+    const own = await admitted("threads.extensions.call", { name: "probe.ext", op: "ping", args })
+    const received = own?.["args"] as Record<string, unknown>
+    expect(received).toEqual(structuredClone(args))
+    expect(received["map"]).not.toBe(args.map)
+    expect(Object.getPrototypeOf(received["point"])).toBe(Object.prototype)
+  })
+
+  for (const [label, args] of [
+    ["a function", { run: () => undefined }],
+    ["a proxy", { inner: new Proxy({}, {}) }],
+    [
+      "a getter that throws",
+      Object.defineProperty({}, "inner", {
+        enumerable: true,
+        get() {
+          throw new Error("caller-thrown-text")
+        },
+      }),
+    ],
+  ] as const)
+    test(`#given extension args holding ${label} #when the root runs the call #then it answers the fixed invalid_arguments with no caller text`, async () => {
+      const sdk = root()
+      const failure = await failureOf(sdk.threads.extensions.call({ name: "probe.ext", op: "ping", args } as never))
+      expect(failure).toEqual({ code: "invalid_arguments", message: invalidInput("threads.extensions.call").message })
+      await sdk.dispose()
+    })
+
+  test("#given attachment bytes under an any-value field #when the boundary admits them #then the member receives the same bytes object", async () => {
+    const bytes = new Uint8Array([1, 2, 3])
+    const own = await admitted("threads.send", {
+      thread: "t",
+      message: "m",
+      attachments: [{ bytes, name: "a.bin" }],
+    })
+    expect((own?.["attachments"] as Record<string, unknown>[])[0]?.["bytes"]).toBe(bytes)
   })
 
   test("#given the call table #then the fields that accept any value are exactly the reviewed list", async () => {

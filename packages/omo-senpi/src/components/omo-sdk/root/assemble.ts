@@ -150,7 +150,19 @@ const childPath = (path: string, key: string) => (path === "" ? key : `${path}.$
  * What the boundary needs of a call's input schema: the field paths it describes, and among them those that accept any
  * value. A path is a field name, `a.b` below it, `a[]` for an array's items and `a.*` for a pattern's keys.
  */
-export type InputShape = { readonly described: ReadonlySet<string>; readonly anyValue: ReadonlySet<string> }
+export type InputShape = {
+  readonly described: ReadonlySet<string>
+  readonly anyValue: ReadonlySet<string>
+  readonly cloned: ReadonlySet<string>
+}
+
+// The any-value fields whose member clones the value with structuredClone (the store's extension facade does): the
+// boundary makes that clone once, so every field is read there, a value that cannot be cloned answers the fixed
+// invalid_arguments, and the member receives only the clone (LEAD ruling (1), the coordinator's direction of 20:38Z).
+const CLONED_AT: Partial<Record<RootCallKey, readonly string[]>> = {
+  "threads.extensions.call": ["args"],
+  "threads.extensions.register": ["sessionCallable[].parameters.*"],
+}
 
 function copyFields(
   value: object,
@@ -179,7 +191,9 @@ function copyFields(
 // unknown key, which the schema or the call refuses by name, or a shipped convention such as deviceService.status's
 // first-argument signal); where the schema describes an object or array it must be plain or an array.
 function copyValue(value: unknown, path: string, shape: InputShape, ancestors: Set<object>, depth: number): unknown {
-  if (shape.anyValue.has(path) || typeof value !== "object" || value === null) return value
+  if (shape.cloned.has(path)) return structuredClone(value)
+  if (shape.anyValue.has(path)) return copyFree(value, ancestors, depth)
+  if (typeof value !== "object" || value === null) return value
   const array = Array.isArray(value)
   if (!array && !isPlainInput(value)) {
     if (shape.described.has(path)) throw new Error("input_shape")
@@ -195,6 +209,37 @@ function copyValue(value: unknown, path: string, shape: InputShape, ancestors: S
       items.push(copyValue((value as unknown[])[index], `${path}[]`, shape, ancestors, depth + 1))
     copied = items
   } else copied = copyFields(value, path, shape, ancestors, depth)
+  ancestors.delete(value)
+  return copied
+}
+
+// Free data under a field that accepts any value (an extension's args, its tools' parameters): plain objects and arrays
+// are copied all the way down, each field read once, so the member never reads the caller's object; any other value (a
+// function, an AbortSignal, attachment bytes) is kept by identity, at any depth. The same cycle and depth refusal.
+function copyFree(value: unknown, ancestors: Set<object>, depth: number): unknown {
+  if (typeof value !== "object" || value === null) return value
+  const array = Array.isArray(value)
+  if (!array && !isPlainInput(value)) return value
+  if (ancestors.has(value) || depth > MAX_INPUT_DEPTH) throw new Error("input_shape")
+  ancestors.add(value)
+  let copied: unknown
+  if (array) {
+    const items: unknown[] = []
+    const length = (value as unknown[]).length
+    for (let index = 0; index < length; index += 1)
+      items.push(copyFree((value as unknown[])[index], ancestors, depth + 1))
+    copied = items
+  } else {
+    const out: Record<string, unknown> = {}
+    for (const key of Object.getOwnPropertyNames(value))
+      Object.defineProperty(out, key, {
+        value: copyFree((value as Record<string, unknown>)[key], ancestors, depth + 1),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
+    copied = out
+  }
   ancestors.delete(value)
   return copied
 }
@@ -234,7 +279,7 @@ export async function inputShape(key: RootCallKey): Promise<InputShape> {
   const described = new Set<string>()
   const anyValue = new Set<string>()
   collectShape(ROOT_CALLS[key].input, "", described, anyValue)
-  const shape = { described, anyValue }
+  const shape = { described, anyValue, cloned: new Set(CLONED_AT[key] ?? []) }
   shapes.set(key, shape)
   return shape
 }
