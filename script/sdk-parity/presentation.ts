@@ -89,6 +89,7 @@ export function presentationProblems(
   after: Outcome,
   rows: readonly PresentationRow[],
   goldens: Goldens,
+  matched: Set<string> = new Set(),
 ): string[] {
   if (scenario.surface === "tool" || scenario.surface === "loop-parse" || scenario.usage === undefined)
     return ["the scenario declares no usage block"]
@@ -129,12 +130,13 @@ export function presentationProblems(
       const [lineA = "", lineB = ""] = [linesA[blockA.start + index], linesB[blockB.start + index]]
       if (lineA === lineB) continue
       const name = `${command} ${verb.slice(verb.indexOf(" ") + 1)}`
-      const covered = named.some(
+      const covering = named.filter(
         (row) =>
           row.verb === name &&
           row.changes.some((change) => change.before === lineA.trimEnd() && change.after === lineB.trimEnd()),
       )
-      if (!covered)
+      for (const row of covering) matched.add(row.verb)
+      if (covering.length === 0)
         problems.push(
           `${stream}: usage line ${JSON.stringify(lineB.trimEnd())} of ${name} changed with no row naming that verb and this before/after`,
         )

@@ -33,11 +33,13 @@ describe("presentation rows: a row owns only the scenarios it names", () => {
     ])
   })
 
-  test("#given two rows for different verbs of the same scenario #then both stand and neither is refused", () => {
+  test("#given two rows for different verbs of the same scenario #then both stand, and only the row that matched a changed line is reported and digested", () => {
     const close = { ...ROW, verb: "remote close", changes: [{ before: "a", after: "b" }] }
     const report = run(train12, [ROW, close])
     expect(report.failures).toEqual([])
     expect(report.presentation).toEqual(IDS.toSorted())
+    expect(report.presentationRows).toEqual(IDS.toSorted().map((id) => `${id}#presentation=remote send`))
+    expect(report.digest).toBe(run(train12).digest)
   })
 
   test("#given the row already on the merge base #then it does not clear the delta: only a row the pull request adds counts", () => {

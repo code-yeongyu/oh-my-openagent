@@ -127,11 +127,11 @@ export function gateReport(input: GateInput): GateReport {
     // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
     if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
-      const notPresentation = presentationProblems(scenario, before, after, added, input.goldens)
+      const matched = new Set<string>()
+      const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
       if (notPresentation.length === 0) {
         presentation.push(scenario.id)
-        const verbs = added.filter((entry) => entry.scenarios.includes(scenario.id)).map((entry) => entry.verb)
-        presentationRows.push(`${scenario.id}#presentation=${verbs.toSorted().join("+")}`)
+        presentationRows.push(`${scenario.id}#presentation=${[...matched].toSorted().join("+")}`)
         continue
       }
       const why =
