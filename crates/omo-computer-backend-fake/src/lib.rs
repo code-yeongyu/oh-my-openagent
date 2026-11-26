@@ -31,6 +31,7 @@ pub use capabilities::BACKEND_NAME;
 pub use clock::{ClockSeamInvalid, FakeClock, CLOCK_SEAM};
 pub use desktop::MAX_COMPOSITE_PIXELS;
 pub use faults::Fault;
+pub use frame::{CROSSHAIR_GRAY, POINTER_GRAY};
 pub use method::FakeMethod;
 pub use persona::Persona;
 pub use scenario::{
