@@ -115,7 +115,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
   }
-  return { root: callScoped(root, begin, end), calls: recorder.calls }
+  return { root: callScoped(root, begin, end), calls: recorder.calls, sandbox: scenarioRoot }
 }
 
 export function scenarioRuns(

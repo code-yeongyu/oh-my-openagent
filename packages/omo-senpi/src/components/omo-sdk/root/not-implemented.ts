@@ -1,5 +1,5 @@
 import type { OmoFailure, OmoStream, RootCallKey } from "../contract"
-import { ROOT_CALLS } from "../contract/calls"
+import { ROOT_CALL_ANSWERS } from "../contract/call-answers"
 
 // Design 4.4: a call whose slice has not landed answers not_implemented as data. It never counts as built: a scenario
 // that runs into it fails (script/sdk-parity/conformance.ts), so its row stays in unresolved.json.
@@ -23,6 +23,6 @@ function endedStream(failure: OmoFailure["error"]): OmoStream<never, never> {
 
 export function notImplemented(key: RootCallKey): (...args: unknown[]) => unknown {
   const failure = failureOf(key)
-  if (ROOT_CALLS[key].answer === "stream") return () => endedStream(failure.error)
+  if (ROOT_CALL_ANSWERS[key] === "stream") return () => endedStream(failure.error)
   return async () => failure
 }

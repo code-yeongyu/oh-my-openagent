@@ -8,18 +8,6 @@
       "retires_with": "C1b"
     },
     {
-      "id": "threads.extensions.register/authority-base",
-      "differs": "The table's placeholder moduleUrl \"x-moduleUrl\" is not a file URL, so the root refuses it invalid_arguments before store.register_extension (omo-sdk/root/threads.ts:149).",
-      "owner": "P1b",
-      "retires_with": "P1b"
-    },
-    {
-      "id": "threads.extensions.register/authority-session-callable",
-      "differs": "The table's placeholder moduleUrl \"x-moduleUrl\" is not a file URL, so the root refuses it invalid_arguments before store.register_extension (omo-sdk/root/threads.ts:149).",
-      "owner": "P1b",
-      "retires_with": "P1b"
-    },
-    {
       "id": "threads.locate/on-other-device",
       "differs": "The address is resolved over the account listing (sessions.list, aliases.resolve), never through remote sessions.resolve (sdk-core/reads.ts:70).",
       "owner": "T1a",
