@@ -65,6 +65,7 @@
     "packages/omo-senpi/src/components/telemetry/posthog-runtime.ts",
     "packages/omo-senpi/src/components/telemetry/session-summary-recovery.ts",
     "packages/omo-senpi/src/components/thread/live-surface.ts",
+    "packages/omo-senpi/src/components/thread/sdk-core/runtime-entry.ts",
     "packages/omo-senpi/src/components/thread/wake/wake-runtime.ts",
     "packages/omo-senpi/src/extension/omo-task.ts",
     "packages/openclaw-core/src/reply-listener-injection.ts",
