@@ -6,7 +6,7 @@ export function ownedClaims(records: readonly TaskRecord[], scope: DagTaskOwnerS
   return records.filter(
     (record) =>
       record.owner?.kind === scope.kind &&
-      record.owner.runId === scope.runId &&
+      (scope.runId === undefined || record.owner.runId === scope.runId) &&
       (scope.nodeId === undefined || record.owner.nodeId === scope.nodeId),
   )
 }

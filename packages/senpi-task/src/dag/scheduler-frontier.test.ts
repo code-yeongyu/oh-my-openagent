@@ -240,7 +240,11 @@ class FrontierFakeManager implements TaskManager {
     if (owner.nodeId === undefined) {
       return [...this.#tasks.values()].map((entry) => entry.record).filter((task) => task.owner?.runId === owner.runId)
     }
-    const record = this.findOwnedTask({ ...owner, nodeId: owner.nodeId })
+    const record = this.findOwnedTask({
+      kind: owner.kind,
+      runId: owner.runId ?? ("*" as DagRunId),
+      nodeId: owner.nodeId,
+    })
     return record === undefined ? [] : [record]
   }
 

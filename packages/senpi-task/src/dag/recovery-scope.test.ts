@@ -92,9 +92,12 @@ class SettledTasks implements TaskManager {
     )
   }
   findOwnedTasks(owner: DagTaskOwnerScope) {
-    this.touches.push(owner.runId)
+    this.touches.push(owner.runId ?? "*")
     return [...this.tasks.values()].filter(
-      (task) => task.owner?.runId === owner.runId && (owner.nodeId === undefined || task.owner.nodeId === owner.nodeId),
+      (task) =>
+        task.owner !== undefined &&
+        (owner.runId === undefined || task.owner.runId === owner.runId) &&
+        (owner.nodeId === undefined || task.owner.nodeId === owner.nodeId),
     )
   }
   async waitFor(id: string) {

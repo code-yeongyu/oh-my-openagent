@@ -138,12 +138,7 @@ async function waitAction(deps: DagToolDeps, params: DagToolInput, runId: string
     )
   }
   const result = await deps.wait(runId as DagRunId, parentSessionId)
-  const owed = result.snapshot.outstandingStop
-  const stop =
-    owed === undefined
-      ? ""
-      : ` Its stop is outstanding: child ${owed.liveTaskIds.join(", ")} is still live; cancel again.`
-  return toolResult(`Dag run ${runId} finished with status ${result.status}.${stop}`, {
+  return toolResult(`Dag run ${runId} finished with status ${result.status}.${stopNotice(result.snapshot)}`, {
     kind: "waited",
     run_id: runId,
     result,
@@ -162,6 +157,13 @@ async function cancelAction(deps: DagToolDeps, runId: string, reason?: string): 
   })
 }
 
+// A settled run that still owns a live child owes a stop (#11381): every answer that shows the run says so.
+function stopNotice(snapshot: { readonly outstandingStop?: { readonly liveTaskIds: readonly string[] } }): string {
+  const owed = snapshot.outstandingStop
+  if (owed === undefined) return ""
+  return ` Its stop is outstanding: child ${owed.liveTaskIds.join(", ")} is still live; cancel the run again.`
+}
+
 export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   try {
     if (params.action === "start") return await startAction(deps, params)
@@ -174,7 +176,7 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       case "attach": {
         const handle = deps.manager.attach(runId as DagRunId, deps.parentSessionId())
         const snapshot = handle.snapshot()
-        return toolResult(`Attached to dag run ${runId} (${snapshot.status}).`, {
+        return toolResult(`Attached to dag run ${runId} (${snapshot.status}).${stopNotice(snapshot)}`, {
           kind: "attached",
           run_id: runId,
           snapshot,
@@ -183,7 +185,7 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
         return toolResult(
-          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`,
+          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${stopNotice(snapshot)}${quietNodesNotice(snapshot.nodes, Date.now())}`,
           {
             kind: "snapshot",
             run_id: runId,

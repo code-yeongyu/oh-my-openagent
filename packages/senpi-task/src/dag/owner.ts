@@ -22,8 +22,8 @@ export type DagTaskOwner = {
 }
 
 export type DagTaskOwnerKey = Pick<DagTaskOwner, "kind" | "runId" | "nodeId">
-/** An owner key, or a whole run when the node is omitted. */
-export type DagTaskOwnerScope = Pick<DagTaskOwner, "kind" | "runId"> & { readonly nodeId?: DagNodeId }
+/** An owner key, a whole run when the node is omitted, or every DAG-owned task when the run is omitted too. */
+export type DagTaskOwnerScope = Pick<DagTaskOwner, "kind"> & { readonly runId?: DagRunId; readonly nodeId?: DagNodeId }
 
 type ReusedOwnedStart = {
   readonly kind: "started"

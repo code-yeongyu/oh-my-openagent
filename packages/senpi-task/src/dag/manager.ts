@@ -15,6 +15,7 @@ import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
 import { projectSnapshot } from "./run-snapshot"
 import {
+  batchedOwnedTaskReader,
   drainOutstandingStop,
   outstandingRunStop,
   outstandingStopRefusal,
@@ -174,6 +175,8 @@ export type DagRunSummary = {
   readonly createdAt: string
   readonly updatedAt: string
   readonly counts: DagNodeCounts
+  /** A settled run that still owns a live child owes a stop (#11381); the same derivation as the snapshot. */
+  readonly outstandingStop?: DagRunSnapshot["outstandingStop"]
 }
 
 export type DagStartResult = {
@@ -255,8 +258,9 @@ export function createDagManager(options: DagManagerOptions): DagManager {
     if (target?.parentSessionId !== params.parentSessionId) return undefined
     return outstandingRunStop(options.ownedTasks, target) === undefined ? undefined : target
   }
+  const ownedReader = options.ownedTasks === undefined ? undefined : batchedOwnedTaskReader(options.ownedTasks)
   const snapshotOf = (record: DagRunRecordV1): DagRunSnapshot =>
-    withOutstandingStop(projectSnapshot(record, store.stateDir), options.ownedTasks, record)
+    withOutstandingStop(projectSnapshot(record, store.stateDir), ownedReader, record)
   // list() sits on the DAG widget's 1Hz repaint path AND on the runtime mutation listener that
   // fires for every checkpoint write, so parsing each checkpoint in the runs directory made one
   // frame re-read the whole of DAG history: 710 checkpoints / 68MB / 473ms per call on a real
@@ -374,7 +378,10 @@ export function createDagManager(options: DagManagerOptions): DagManager {
         if (byUpdated !== 0) return byUpdated
         return a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0
       })
-      return summaries.slice(0, limit)
+      return summaries.slice(0, limit).map((summary) => {
+        const outstandingStop = outstandingRunStop(ownedReader, summary)
+        return outstandingStop === undefined ? summary : { ...summary, outstandingStop }
+      })
     },
     history(params) {
       ownedRecord(params.runId, params.parentSessionId)

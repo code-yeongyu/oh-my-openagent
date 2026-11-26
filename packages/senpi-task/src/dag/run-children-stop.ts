@@ -22,7 +22,7 @@ export class DagRunChildrenLiveError extends Error {
 /** Keyed by run, not by today's nodes: an amendment can remove a node whose child still runs. */
 export function liveRunChildren(
   taskManager: Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending">,
-  record: DagRunRecordV1,
+  record: Pick<DagRunRecordV1, "runId">,
 ): readonly TaskRecord[] {
   return taskManager
     .findOwnedTasks({ kind: "dag", runId: record.runId })
