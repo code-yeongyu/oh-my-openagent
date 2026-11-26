@@ -73,6 +73,8 @@ export interface RemoteCommandDependencies {
   readonly packageRoot?: string
   /** `status` only: this device's units as its service manager reports them, read by remote-cli (omo#13594). */
   readonly localUnits?: LocalStatus
+  /** `send <target> -`: the message text from stdin; this process's stdin by default. Test seam (omo#13905). */
+  readonly readStdin?: () => Promise<string>
 }
 
 /** This device's real account read, local API and stdio: every dependency the local verbs need. */
