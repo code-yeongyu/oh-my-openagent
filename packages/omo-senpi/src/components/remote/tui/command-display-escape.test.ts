@@ -140,14 +140,14 @@ describe("/remote display escaping", () => {
           })
       }
     }
-  }, 60_000)
+  })
 
   it("#given ordinary text in every answer field #when /remote renders #then it appears unchanged", async () => {
     for (const text of ORDINARY) {
       const shown = (await everyShown(text)).map((entry) => entry.text).join("\n")
       expect(shown.split(text).length - 1).toBeGreaterThanOrEqual(20)
     }
-  }, 60_000)
+  })
 
   it("#given a picked row #when it is sent to #then the omo argv still carries the raw value", async () => {
     for (const fixture of DISPLAY_UNSAFE.slice(0, 3)) {
