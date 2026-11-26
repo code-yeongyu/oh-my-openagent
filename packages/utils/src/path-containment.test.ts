@@ -2,7 +2,12 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
-import { containedRelativePath, isDarwinAutomountTriggerPath, isPathInside, resolveSegmentwise } from "./path-containment"
+import {
+  containedRelativePath,
+  isDarwinAutomountTriggerPath,
+  isPathInside,
+  resolveSegmentwise,
+} from "./path-containment"
 
 const shortHome = String.raw`C:\Users\RUNNER~1`
 const longHome = String.raw`C:\Users\runneradmin`
@@ -216,26 +221,29 @@ describe("resolveSegmentwise resolves in the order open(2) does", () => {
   test.each([
     { platform: "linux", root: "/", target: "/denied" },
     { platform: "win32", root: "C:\\", target: "C:\\denied" },
-  ] as const)("propagates an lstat failure instead of treating it as a missing $platform entry", ({ platform, root, target }) => {
-    const missing = Object.assign(new Error("missing"), { code: "ENOENT" })
-    const denied = Object.assign(new Error("denied"), { code: "EACCES" })
-    const realpath = (path: string) => {
-      if (path === root) return root
-      throw missing
-    }
-    const lstat = (path: string) => {
-      if (path === root) return directory()
-      throw denied
-    }
+  ] as const)(
+    "propagates an lstat failure instead of treating it as a missing $platform entry",
+    ({ platform, root, target }) => {
+      const missing = Object.assign(new Error("missing"), { code: "ENOENT" })
+      const denied = Object.assign(new Error("denied"), { code: "EACCES" })
+      const realpath = (path: string) => {
+        if (path === root) return root
+        throw missing
+      }
+      const lstat = (path: string) => {
+        if (path === root) return directory()
+        throw denied
+      }
 
-    let caught: unknown
-    try {
-      resolveSegmentwise(target, { platform, realpath, lstat })
-    } catch (error) {
-      caught = error
-    }
-    expect(caught).toBe(denied)
-  })
+      let caught: unknown
+      try {
+        resolveSegmentwise(target, { platform, realpath, lstat })
+      } catch (error) {
+        caught = error
+      }
+      expect(caught).toBe(denied)
+    },
+  )
 })
 
 const pathErrorCode = (operation: () => unknown): unknown => {
@@ -251,19 +259,25 @@ test("#given an empty path #when segment-wise resolution runs #then it throws EN
   expect(pathErrorCode(() => resolveSegmentwise(""))).toBe("ENOENT")
 })
 
-test.each(["/", "/.", "/.."])("#given a regular file #when its POSIX path ends with %s #then resolution throws ENOTDIR", (suffix) => {
-  const { inside } = symlinkFixture()
-  const file = join(inside, "workspace", "note.md")
+test.each(["/", "/.", "/.."])(
+  "#given a regular file #when its POSIX path ends with %s #then resolution throws ENOTDIR",
+  (suffix) => {
+    const { inside } = symlinkFixture()
+    const file = join(inside, "workspace", "note.md")
 
-  expect(pathErrorCode(() => resolveSegmentwise(`${file}${suffix}`))).toBe("ENOTDIR")
-})
+    expect(pathErrorCode(() => resolveSegmentwise(`${file}${suffix}`))).toBe("ENOTDIR")
+  },
+)
 
-test.if(process.platform !== "win32")("#given a directory #when its POSIX path ends in slash #then resolution succeeds", () => {
-  const { inside } = symlinkFixture()
-  const directory = join(inside, "workspace")
+test.if(process.platform !== "win32")(
+  "#given a directory #when its POSIX path ends in slash #then resolution succeeds",
+  () => {
+    const { inside } = symlinkFixture()
+    const directory = join(inside, "workspace")
 
-  expect(resolveSegmentwise(`${directory}/`)).toBe(fs.realpathSync.native(directory))
-})
+    expect(resolveSegmentwise(`${directory}/`)).toBe(fs.realpathSync.native(directory))
+  },
+)
 
 test("#given an injected resolver for complete paths #when containment compares child and parent #then both inputs are resolved whole", () => {
   const child = "/virtual/repo/note.md"
@@ -276,7 +290,8 @@ test("#given an injected resolver for complete paths #when containment compares 
   const realpath = (input: string): string => {
     calls.push(input)
     const canonical = canonicalPaths.get(input)
-    if (canonical === undefined) throw Object.assign(new Error(`unexpected resolver input: ${input}`), { code: "EINVAL" })
+    if (canonical === undefined)
+      throw Object.assign(new Error(`unexpected resolver input: ${input}`), { code: "EINVAL" })
     return canonical
   }
 

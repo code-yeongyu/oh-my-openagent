@@ -21,13 +21,28 @@ const readStringField = (body: KeyringBody, key: string): string => {
   return typeof value === "string" ? value : "";
 };
 
+type Survivable = SyncRecoveryKey["survivable"];
+
+// A mapped type: adding a label to SyncRecoveryKey without listing it here does not compile.
+const SURVIVABLE_LABELS: { readonly [K in Survivable]: K } = {
+  synced: "synced",
+  roaming: "roaming",
+  phrase: "phrase",
+};
+const KNOWN_LABELS: ReadonlyArray<Survivable> = Object.values(SURVIVABLE_LABELS);
+
+const survivableOf = (body: KeyringBody): Survivable => {
+  const value: unknown = Reflect.get(body, "survivable");
+  return KNOWN_LABELS.find((label) => label === value) ?? "synced";
+};
+
 const enrolledKey = (body: KeyringBody, credentialId: string): SyncRecoveryKey => ({
   credential_id: credentialId,
   rp_id: readStringField(body, "rp_id"),
   enrollment_nonce: readStringField(body, "enrollment_nonce"),
   sealing_public_key: readStringField(body, "sealing_public_key"),
   signing_public_key: readStringField(body, "signing_public_key"),
-  survivable: Reflect.get(body, "survivable") === "roaming" ? "roaming" : "synced",
+  survivable: survivableOf(body),
 });
 
 const authorityOf = (state: ForkState): Authority => ({

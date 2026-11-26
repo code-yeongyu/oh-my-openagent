@@ -11,6 +11,7 @@ import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-adm
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
+import { readProcessTreeCpuSeconds } from "../platform/process-tree-cpu"
 import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
 import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
@@ -21,6 +22,15 @@ const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 const RETRY_FALLBACK_COMMAND_CAPABILITY = "retry_fallback_command"
 /** How long a child's start waits for the engine to answer its fallback chain before the start fails. */
 const DEFAULT_FALLBACK_CHAIN_DEADLINE_MS = 10_000
+// #13165: the engine's cold start (spawn until it answers get_protocol_info) is bounded by its CPU progress, not by
+// the chain deadline: a slow runner stretches the boot's wall time, not the CPU it needs. A boot that makes no CPU
+// progress for the stall window, or burns past the CPU cap, is stuck; the outer bound holds even when the CPU cannot
+// be read (another runtime, a refused handle).
+const DEFAULT_STARTUP_STALL_MS = 10_000
+const DEFAULT_STARTUP_CPU_CAP_S = 120
+const DEFAULT_STARTUP_OUTER_BOUND_MS = 10 * 60_000
+const STARTUP_SAMPLE_MS = 250
+const STARTUP_PROGRESS_EPSILON_S = 0.02
 
 export type RpcProcessRunnerOptions = {
   readonly terminateChild?: CreateRpcChildHandleOptions["terminateChild"]
@@ -29,6 +39,10 @@ export type RpcProcessRunnerOptions = {
   readonly buildSpawn?: (spec: RpcRunnerSpec) => RpcSpawnDescriptor
   readonly heartbeatIntervalMs?: number
   readonly fallbackChainDeadlineMs?: number
+  readonly startupStallMs?: number
+  readonly startupCpuCapS?: number
+  readonly startupOuterBoundMs?: number
+  readonly readCpuSeconds?: (pid: number) => number | null
   readonly onMalformedLine?: MalformedLineHandler
   readonly now?: () => number
   readonly modelAdmission?: RpcModelAdmission
@@ -59,6 +73,7 @@ export class RpcProcessRunner {
   private readonly inheritedExtensions: readonly string[]
   private readonly onWarning: (message: string, token?: string) => void | (() => void)
   private readonly fallbackChainDeadlineMs: number
+  private readonly startupBounds: StartupBounds
   private readonly pendingTeardowns = new Set<Promise<void>>()
   private readonly terminateChild: CreateRpcChildHandleOptions["terminateChild"]
   private readonly options: RpcProcessRunnerOptions
@@ -76,6 +91,12 @@ export class RpcProcessRunner {
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []
     this.fallbackChainDeadlineMs = options.fallbackChainDeadlineMs ?? DEFAULT_FALLBACK_CHAIN_DEADLINE_MS
+    this.startupBounds = {
+      stallMs: options.startupStallMs ?? DEFAULT_STARTUP_STALL_MS,
+      cpuCapS: options.startupCpuCapS ?? DEFAULT_STARTUP_CPU_CAP_S,
+      outerBoundMs: options.startupOuterBoundMs ?? DEFAULT_STARTUP_OUTER_BOUND_MS,
+      readCpuSeconds: options.readCpuSeconds ?? readProcessTreeCpuSeconds,
+    }
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
@@ -111,7 +132,7 @@ export class RpcProcessRunner {
     try {
       // The chain is a launch-time setting: senpi refuses it once the session has a turn, so it goes before
       // the resumed session is switched in and before the first prompt.
-      await this.applyFallbackChain(client, spec)
+      await this.applyFallbackChain(client, spec, child.pid)
       resume = spec.resumeSessionPath === undefined ? undefined : client.switchSession(spec.resumeSessionPath)
       if (resume === undefined) {
         await handle.startInitialPrompt(spec.prompt)
@@ -178,16 +199,26 @@ export class RpcProcessRunner {
   // written to a settings file (#9582). Without it the engine would walk its own fallback settings (the
   // user's chains, senpi's shipped chains) to models outside the child's designated chain, so a chain the
   // engine does not hold fails the start before the first prompt: no model runs for that child (#12006).
-  private async applyFallbackChain(client: RpcProtocolClient, spec: RpcRunnerSpec): Promise<void> {
+  private async applyFallbackChain(
+    client: RpcProtocolClient,
+    spec: RpcRunnerSpec,
+    pid: number | undefined,
+  ): Promise<void> {
     const retryFallback = childRetryFallbackProfile(spec)
     if (retryFallback === undefined || spec.model === undefined) return
-    // Past the deadline the start fails, so a probe answered late must not send the chain after it.
+    // Past a bound the start fails, so an answer that arrives late must not send the chain after it.
     const expired = new AbortController()
-    const outcome = await withDeadline(
-      this.sendFallbackChain(client, retryFallback, expired.signal),
-      this.fallbackChainDeadlineMs,
-      expired,
-    )
+    const ready = await withStartupProgress(engineAcceptsFallbackChain(client), pid, this.startupBounds, expired)
+    const outcome =
+      typeof ready === "object"
+        ? ready
+        : ready
+          ? await withDeadline(
+              this.sendFallbackChain(client, retryFallback, expired.signal),
+              this.fallbackChainDeadlineMs,
+              expired,
+            )
+          : "unsupported"
     if (outcome === "applied") return
     const chain = designatedChainText(spec.model, spec.fallbackModels ?? [])
     // A child that died or whose pipe failed is a transport failure: the start keeps its exit/transport
@@ -205,7 +236,9 @@ export class RpcProcessRunner {
           ]
         : outcome === "timeout"
           ? ["timeout", `no answer within ${this.fallbackChainDeadlineMs} ms`]
-          : ["refused", outcome.refused]
+          : "startup" in outcome
+            ? ["timeout", outcome.startup]
+            : ["refused", outcome.refused]
     throw new DesignatedChainNotHeldError({
       reason: kind,
       models: [spec.model, ...(spec.fallbackModels ?? [])],
@@ -219,15 +252,66 @@ export class RpcProcessRunner {
     client: RpcProtocolClient,
     retryFallback: NonNullable<ReturnType<typeof childRetryFallbackProfile>>,
     expired: AbortSignal,
-  ): Promise<"applied" | "unsupported" | { readonly refused: string }> {
+  ): Promise<"applied" | { readonly refused: string }> {
     try {
-      if (!(await engineAcceptsFallbackChain(client))) return "unsupported"
       if (expired.aborted) return { refused: "deadline passed" }
       const response = await client.send({ type: "set_retry_fallback", retryFallback })
       return response.success ? "applied" : { refused: `refused: ${response.error}` }
     } catch (error) {
       return { refused: `refused: ${error instanceof Error ? error.message : String(error)}` }
     }
+  }
+}
+
+interface StartupBounds {
+  readonly stallMs: number
+  readonly cpuCapS: number
+  readonly outerBoundMs: number
+  readonly readCpuSeconds: (pid: number) => number | null
+}
+
+// Races the engine's first answer against its boot's progress. Resolves with the answer, or with a startup failure
+// that names the bound that ended the wait.
+async function withStartupProgress<T>(
+  work: Promise<T>,
+  pid: number | undefined,
+  bounds: StartupBounds,
+  expired: AbortController,
+): Promise<T | { readonly startup: string }> {
+  let sampler: ReturnType<typeof setInterval> | undefined
+  let outer: ReturnType<typeof setTimeout> | undefined
+  const bounded = new Promise<{ readonly startup: string }>((resolve) => {
+    const fail = (startup: string) => {
+      expired.abort()
+      resolve({ startup })
+    }
+    outer = setTimeout(
+      () => fail(`no answer within the ${bounds.outerBoundMs} ms startup outer bound`),
+      bounds.outerBoundMs,
+    )
+    if (pid === undefined) return
+    let lastCpu = -1
+    let lastAdvance = Date.now()
+    sampler = setInterval(() => {
+      const cpu = bounds.readCpuSeconds(pid)
+      if (cpu === null) return
+      if (cpu > bounds.cpuCapS) {
+        fail(
+          `the engine used ${cpu.toFixed(1)} s of CPU starting up without answering, over the ${bounds.cpuCapS} s cap`,
+        )
+      } else if (cpu >= lastCpu + STARTUP_PROGRESS_EPSILON_S) {
+        lastCpu = cpu
+        lastAdvance = Date.now()
+      } else if (Date.now() - lastAdvance >= bounds.stallMs) {
+        fail(`the engine made no CPU progress for ${Math.round((Date.now() - lastAdvance) / 1000)} s before answering`)
+      }
+    }, STARTUP_SAMPLE_MS)
+  })
+  try {
+    return await Promise.race([work, bounded])
+  } finally {
+    clearInterval(sampler)
+    clearTimeout(outer)
   }
 }
 

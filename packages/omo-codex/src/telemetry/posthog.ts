@@ -11,6 +11,7 @@ import type {
 } from "@oh-my-opencode/telemetry-core"
 
 import { getActivityStateDir } from "./data-path"
+import { isOmoConfigTelemetryEnabled } from "./config-gate"
 import { writeTelemetryDiagnostic } from "./diagnostics"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
 import { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCodexTelemetryProductConfig } from "./product-identity"
@@ -66,6 +67,10 @@ function resolveActivityStateProvider(options: CreatePostHogClientOptions): Acti
 }
 
 function createPostHogClient(source: PostHogSource, options: CreatePostHogClientOptions = {}): PostHogClient {
+  if (!isOmoConfigTelemetryEnabled(options.env ?? process.env)) {
+    return NO_OP_POSTHOG
+  }
+
   const client = createTelemetryClient({
     diagnostics: writeTelemetryDiagnostic,
     env: options.env ?? process.env,

@@ -58,7 +58,8 @@ export function containedRelativePath(
 ): string | undefined {
   const paths = (options.platform ?? process.platform) === "win32" ? win32 : posix
   // Injected filesystems own whole-path resolution; the native resolver needs the segment-wise walk.
-  const resolve = options.realpath ?? ((input: string) => resolveSegmentwise(input, { ...options, allowMissing: false }))
+  const resolve =
+    options.realpath ?? ((input: string) => resolveSegmentwise(input, { ...options, allowMissing: false }))
   const canonicalChild = paths.normalize(resolve(child))
   const canonicalParent = paths.normalize(resolve(parent))
   const relative = paths.relative(canonicalParent, canonicalChild)

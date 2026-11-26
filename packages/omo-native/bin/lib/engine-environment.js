@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs"
 import { delimiter, isAbsolute, join, relative, sep } from "node:path"
-import { canonicalAgentDir } from "./agent-dir.js"
+import { canonicalAgentDir, ensureAgentDir } from "./agent-dir.js"
 import { OMO_BRAND_LOGO } from "./brand-logo.generated.js"
 import { HERDR_AGENT_MARKER } from "./herdr-agent-hint.js"
 import {
@@ -46,6 +46,9 @@ function brandProfile() {
     userAgent: "omo",
     originator: "omo",
     ...(changelog ? { changelog } : {}),
+    // The plugin spawnSenpi prepends with --extension: the engine's own, never a user flag an attaching start
+    // could not apply to a host-held session (#14465).
+    extensions: [join(packageRoot, "plugin")],
     update: {
       packageName: "omo-ai",
       distTag: releaseChannel(),
@@ -92,6 +95,7 @@ export function senpiEnvironment(senpiRoot, overrides = {}) {
   // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
   // tool inherits the same state instead of falling back to its own home.
   const agentDir = canonicalAgentDir(env)
+  ensureAgentDir(agentDir)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load

@@ -307,7 +307,12 @@ function classifyTarget(
   const rawAbsolute = isAbsolute(rawPath) ? rawPath : `${cwd}${sep}${rawPath}`
   const canonical = canonicalizeThroughLinks(rawAbsolute)
   // An unresolved traversal within a memory area is not provably ours.
-  if (canonical === undefined && rawAbsolute.split(sep).includes("..") && roots.deniedRoots.some((root) => isWithin(root, lexical))) return { kind: "inside" }
+  if (
+    canonical === undefined &&
+    rawAbsolute.split(sep).includes("..") &&
+    roots.deniedRoots.some((root) => isWithin(root, lexical))
+  )
+    return { kind: "inside" }
   const candidates = uniquePaths([lexical, canonical])
   const deniedRoots = uniquePaths(roots.deniedRoots.flatMap((root) => [root, canonicalizeThroughLinks(root)]))
   const ownRoots = uniquePaths([roots.ownRoot, canonicalizeThroughLinks(roots.ownRoot)])

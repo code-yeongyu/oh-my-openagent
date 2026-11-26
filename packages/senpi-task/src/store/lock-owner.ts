@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs"
-import { createRequire } from "node:module"
 import { hostname } from "node:os"
 
 import { pidLiveness } from "../lifecycle/pid-liveness"
+import { readProcessStartIdentity } from "../platform/native-process"
+
+export { readProcessStartIdentity }
 
 /**
  * Who holds a task record lock, and the proof that it is gone. A lock is removed by anyone but its
@@ -88,115 +89,4 @@ function startIdentitiesConflict(recorded: string, actual: string): boolean {
   const scheme = (identity: string): string => identity.slice(0, Math.max(0, identity.indexOf(":")))
   const recordedScheme = scheme(recorded)
   return recordedScheme.length > 0 && recordedScheme === scheme(actual) && recorded !== actual
-}
-
-export function readProcessStartIdentity(pid: number): string | null {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return null
-  switch (process.platform) {
-    case "linux":
-      return readLinuxStartIdentity(pid)
-    case "darwin":
-      return readDarwinStartIdentity(pid)
-    case "win32":
-      return readWin32StartIdentity(pid)
-    default:
-      return null
-  }
-}
-
-function readLinuxStartIdentity(pid: number): string | null {
-  try {
-    const stat = readFileSync(`/proc/${pid}/stat`, "utf8")
-    const fields = stat
-      .slice(stat.lastIndexOf(")") + 2)
-      .trim()
-      .split(/\s+/)
-    const startTicks = fields[19]
-    return startTicks === undefined ? null : `linux-proc-start-ticks:${startTicks}`
-  } catch {
-    return null
-  }
-}
-
-type BunFfi = typeof import("bun:ffi")
-let ffi: BunFfi | null | undefined
-
-function loadFfi(): BunFfi | null {
-  if (ffi !== undefined) return ffi
-  try {
-    ffi = process.versions.bun === undefined ? null : (createRequire(import.meta.url)("bun:ffi") as BunFfi)
-  } catch {
-    ffi = null
-  }
-  return ffi
-}
-
-const PROC_PIDTBSDINFO = 3
-/** sizeof(struct proc_bsdinfo) on 64-bit darwin; a short read means the flavor was rejected. */
-const PROC_BSDINFO_SIZE = 136
-/** Byte offset of `pbi_start_tvsec` inside struct proc_bsdinfo. */
-const START_TVSEC_OFFSET = 120
-let procPidInfo: ((pid: number, buffer: Uint8Array) => number) | null | undefined
-
-function readDarwinStartIdentity(pid: number): string | null {
-  if (procPidInfo === undefined) {
-    const loaded = loadFfi()
-    try {
-      const library = loaded?.dlopen("/usr/lib/libSystem.B.dylib", {
-        proc_pidinfo: { args: ["i32", "i32", "u64", "ptr", "i32"], returns: "i32" },
-      })
-      procPidInfo =
-        library === undefined
-          ? null
-          : (target, buffer) =>
-              Number(library.symbols.proc_pidinfo(target, PROC_PIDTBSDINFO, 0n, buffer, PROC_BSDINFO_SIZE))
-    } catch {
-      procPidInfo = null
-    }
-  }
-  if (procPidInfo === null) return null
-  const buffer = new Uint8Array(PROC_BSDINFO_SIZE)
-  if (procPidInfo(pid, buffer) !== PROC_BSDINFO_SIZE) return null
-  const seconds = new DataView(buffer.buffer).getBigUint64(START_TVSEC_OFFSET, true)
-  return seconds > 0n ? `proc-start-epoch:${seconds}` : null
-}
-
-const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-type Kernel32 = {
-  readonly OpenProcess: (access: number, inherit: number, pid: number) => unknown
-  readonly GetProcessTimes: (handle: unknown, ...times: BigUint64Array[]) => number
-  readonly CloseHandle: (handle: unknown) => number
-}
-let kernel32: Kernel32 | null | undefined
-
-function readWin32StartIdentity(pid: number): string | null {
-  if (kernel32 === undefined) {
-    try {
-      kernel32 =
-        (loadFfi()?.dlopen("kernel32.dll", {
-          OpenProcess: { args: ["u32", "i32", "u32"], returns: "ptr" },
-          GetProcessTimes: { args: ["ptr", "ptr", "ptr", "ptr", "ptr"], returns: "i32" },
-          CloseHandle: { args: ["ptr"], returns: "i32" },
-        }).symbols as Kernel32 | undefined) ?? null
-    } catch {
-      kernel32 = null
-    }
-  }
-  if (kernel32 === null) return null
-  const handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
-  if (handle === null || handle === 0 || handle === 0n) return null
-  try {
-    const creation = new BigUint64Array(1)
-    const ok = kernel32.GetProcessTimes(
-      handle,
-      creation,
-      new BigUint64Array(1),
-      new BigUint64Array(1),
-      new BigUint64Array(1),
-    )
-    const filetime = creation[0] ?? 0n
-    return ok === 0 || filetime === 0n ? null : `win32-creation-filetime:${filetime}`
-  } finally {
-    kernel32.CloseHandle(handle)
-  }
 }

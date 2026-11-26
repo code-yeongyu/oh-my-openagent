@@ -344,7 +344,11 @@ test("#given a link out of own memory, an unresolvable segment and dot-dot #when
   const setup = fixture()
   const foreignRepo = dirname(dirname(setup.foreignFile))
   mkdirSync(join(foreignRepo, "subdir"), { recursive: true })
-  symlinkSync(join(foreignRepo, "subdir"), join(setup.own.identityPaths.repo, "link-to-other"), process.platform === "win32" ? "junction" : "dir")
+  symlinkSync(
+    join(foreignRepo, "subdir"),
+    join(setup.own.identityPaths.repo, "link-to-other"),
+    process.platform === "win32" ? "junction" : "dir",
+  )
 
   const raw = relative(setup.workspace, setup.own.identityPaths.repo) + "/link-to-other/missing/../system/persona.md"
   const result = await dispatch(setup, "vendor_read", { path: raw })

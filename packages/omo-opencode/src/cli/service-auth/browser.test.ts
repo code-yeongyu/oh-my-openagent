@@ -25,7 +25,7 @@ test.each(["darwin", "win32", "linux"] as const)(
   },
 )
 
-test("auth commands expose device, no-browser, and service overrides", () => {
+test("auth commands expose device, no-browser, replace, and service overrides", () => {
   const program = new Command()
   configureServiceAuthCommands(program, true)
   expect(program.commands.map((command) => command.name())).toEqual(["login", "logout", "whoami"])
@@ -33,7 +33,7 @@ test("auth commands expose device, no-browser, and service overrides", () => {
   expect(login?.options.map((option) => option.long)).toEqual([
     "--device",
     "--no-browser",
-    "--new-device",
+    "--replace",
     "--api",
     "--accounts",
   ])

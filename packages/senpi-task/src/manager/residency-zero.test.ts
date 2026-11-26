@@ -14,6 +14,7 @@ import {
 import { createTaskManager } from "./manager"
 import type { SpawnAdmission, TaskManager } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -34,7 +35,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
 // residency-unlimited.test.ts, only the cap value differs.
 function makeZeroCapManager(): TaskManager {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const runner = new FakeRunner()
   const config = settings({
     default_concurrency: 16,

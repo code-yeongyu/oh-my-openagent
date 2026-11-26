@@ -7,6 +7,7 @@ import { expect } from "bun:test"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+import { syncRequestHeaders } from "../../contract-version.ts"
 import { gitRepo } from "../../engine/engine-harness.test-support.ts"
 import { type DeviceSync, openDeviceSync } from "../../engine/open.ts"
 import { deviceKeyring } from "../../genesis/vector.test-support.ts"
@@ -176,7 +177,7 @@ export async function revokeWorld(options: { readonly stream?: boolean } = {}) {
 
   /** A request made with `device`'s bearer, the way a client reaches the revoke routes. */
   const call = (device: WorldDevice, method: string, path: string) =>
-    fetch(`${f.server.url}${path}`, { method, headers: { authorization: `Bearer ${device.token}` } })
+    fetch(`${f.server.url}${path}`, { method, headers: syncRequestHeaders(device.token) })
 
   return {
     f,

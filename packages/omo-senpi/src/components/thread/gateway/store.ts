@@ -3,12 +3,12 @@ import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
+import { isConnectionLost } from "./connection-lost"
 import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS, GATEWAY_STORE_IDLE_RETIRE_MS } from "./constants"
-import type { GatewayResolve } from "./engine"
-import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store-api"
-export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
+export type { DeliveryView, GatewayStore, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
+import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
 export type {
   DeclaredSessionOp,
   SessionCallableOp,
@@ -22,7 +22,7 @@ export type {
   StoreExtensionSessionApi,
   StoreExtensionTransaction,
 } from "./store-extensions"
-import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity, Provenance } from "./types"
+import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity } from "./types"
 
 export type GatewayStoreOptions = {
   readonly agentDir: string
@@ -33,14 +33,6 @@ export type GatewayStoreOptions = {
   readonly now?: () => number
   /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
   readonly workerModuleUrl?: string | URL
-  /**
-   * Resolves extension enqueue targets through the caller's live-and-disk address book (`createExtensionResolver`).
-   * The creator passes it: a store module that loaded the resolver itself would carry the engine's live surface into
-   * every bundle that opens a store, the shipped `omo` CLI included, which only writes receipts and never resolves.
-   */
-  readonly resolveTarget?: GatewayResolve
-  /** Sender-owned resolution for deliveries created by extension transactions. */
-  readonly senderProvenance?: () => Promise<Provenance>
   /** Test seams only: a shorter busy timeout and lock-wait bound, commit-boundary hooks, and the module location the worker is resolved from. */
   readonly _test?: GatewayStoreTestHooks & {
     readonly busyTimeoutMs?: number
@@ -77,19 +69,17 @@ type Pending = {
 }
 
 type WorkerMessage =
-  | {
-      readonly type: "resolve"
-      readonly id: number
-      readonly address: string
-      readonly request: Parameters<GatewayResolve>[1]
-    }
-  | { readonly type: "provenance"; readonly id: number }
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
   | {
       readonly type: "response"
       readonly id: number
       readonly ok: false
-      readonly error: { readonly message: string; readonly stack?: string; readonly code?: string }
+      readonly error: {
+        readonly message: string
+        readonly stack?: string
+        readonly code?: string
+        readonly details?: Readonly<Record<string, unknown>>
+      }
     }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
@@ -127,18 +117,11 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   let idleTimer: ReturnType<typeof setTimeout> | undefined
   /** The close-and-terminate of a retired worker, until it settles: `dispose` waits for it. */
   let retiring: Promise<void> | undefined
+  /** Set by `dispose` while calls are in flight: the last one to settle releases it. */
+  let callsSettled: (() => void) | undefined
   const idleRetireMs = options._test?.idleRetireMs ?? GATEWAY_STORE_IDLE_RETIRE_MS
-  const resolveTarget = options.resolveTarget
   /** The registrations the current worker holds, restored on the next worker after one exits. */
   const registrations = new Map<string, RetainedRegistration>()
-
-  const resolveExtensionTarget: GatewayResolve = async (address, request) => {
-    if (resolveTarget === undefined)
-      throw new Error(
-        "this gateway store was created without an extension resolver (resolveTarget); it cannot resolve an extension target",
-      )
-    return await resolveTarget(address, request)
-  }
 
   /** Fails the requests posted to one worker; a successor's requests are not its to fail. */
   function failAll(owner: Worker, error: Error): void {
@@ -176,41 +159,6 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     worker = spawned
     spawned.unref()
     spawned.on("message", (message: WorkerMessage) => {
-      if (message.type === "provenance") {
-        void (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })).then(
-          (value) => {
-            if (worker === spawned)
-              spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: true, value })
-          },
-          (error: unknown) => {
-            if (worker === spawned)
-              spawned.postMessage({
-                type: "provenance_resolved",
-                id: message.id,
-                ok: false,
-                error: error instanceof Error ? error.message : String(error),
-              })
-          },
-        )
-        return
-      }
-      if (message.type === "resolve") {
-        void resolveExtensionTarget(message.address, message.request).then(
-          (value) => {
-            if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value })
-          },
-          (error: unknown) => {
-            if (worker === spawned)
-              spawned.postMessage({
-                type: "resolution",
-                id: message.id,
-                ok: false,
-                error: error instanceof Error ? error.message : String(error),
-              })
-          },
-        )
-        return
-      }
       if (message.type === "event") {
         for (const listener of listeners) listener(message.event)
         return
@@ -225,6 +173,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
           Object.assign(new Error(message.error.message), {
             workerStack: message.error.stack,
             ...(message.error.code === undefined ? {} : { code: message.error.code }),
+            ...(message.error.details === undefined ? {} : { details: message.error.details }),
           }),
         )
     })
@@ -314,7 +263,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     options._test?.onWorkerRetiring?.(idle)
   }
 
-  /** Holds the worker from retiring for the whole call, its open included, then re-arms the idle timer. */
+  /**
+   * Holds the worker from retiring, and `dispose` from closing it, for the whole call, its open included, then
+   * re-arms the idle timer.
+   */
   async function track<T>(run: () => Promise<T>): Promise<T> {
     callsInFlight += 1
     cancelIdleRetire()
@@ -322,14 +274,50 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       return await run()
     } finally {
       callsInFlight -= 1
+      if (callsInFlight === 0) callsSettled?.()
       armIdleRetire()
     }
   }
 
+  /**
+   * Detaches a worker whose connection was lost and closes it. The close must finish before a fresh worker
+   * opens: SQLite shares one wal-index mapping per database file across a process's connections, so a
+   * connection opened beside the lost one would inherit its stale `-shm` mapping.
+   */
+  function discardLostWorker(lost: Worker): void {
+    if (worker !== lost) return
+    cancelIdleRetire()
+    worker = undefined
+    opened = undefined
+    const closed = post("close", null, lost)
+      .catch(() => undefined)
+      .then(() => lost.terminate())
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+    const settled: Promise<void> = Promise.all([retiring, closed])
+      .then(() => undefined)
+      .finally(() => {
+        if (retiring === settled) retiring = undefined
+      })
+    retiring = settled
+  }
+
+  /** One retry on a fresh connection when the worker's connection was lost (`CONNECTION_LOST_CODE`). */
   function call<T>(op: string, args?: unknown): Promise<T> {
     return track(async () => {
       await start()
-      return (await post(op, args)) as T
+      const served = worker
+      try {
+        return (await post(op, args)) as T
+      } catch (error) {
+        if (served === undefined || !isConnectionLost(error)) throw error
+        discardLostWorker(served)
+        await retiring
+        await start()
+        return (await post(op, args)) as T
+      }
     })
   }
 
@@ -347,42 +335,36 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     now,
     identity: () => track(async () => (await start()).self),
     enqueue: (request) => call("enqueue", request),
+    intake: (request) => call("intake", request),
+    woken: createWokenFacade(call, now),
+    sessionWait: createSessionWaitFacade(call, now),
+    intakeMarks: createIntakeMarkFacade(call, now),
     reconcile: (request) => call("reconcile", request),
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),
     refuseQueued: (request) => call("refuse_queued", request),
+    refuseReturned: (request) => call("refuse_returned", request),
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
-    deliveryReceipt: (request) => call("delivery_receipt", request),
-    recoverDelivery: (request) => call("recover_delivery", request),
+    receiptOutcome: (request) => call("receipt_outcome", request),
+    refusalNotices: (now) => call("refusal_notices", now),
+    claimRefusalNotice: (request) => call("claim_refusal_notice", request),
+    remoteReceipt: (request) => call("remote_receipt", request),
+    reconcileRemoteReceipt: (request) => call("reconcile_remote_receipt", request),
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
+    backlogs: (durableIds) => call("backlogs", { targets: durableIds, now: now() }),
     journalMode: () => call("journal_mode"),
     stats: () => call("stats"),
     legacyMigrated: () => track(async () => (await start()).legacy_migrated),
     toolReceiptBegin: (request) => call("tool_receipt_begin", request),
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
     toolReceiptRevise: (request) => call("tool_receipt_revise", request),
-    bind: (request) => call("bind", request),
-    unbind: (request) => call("unbind", request),
-    rebind: (request) => call("rebind", request),
-    listBindings: (request) => call("list_bindings", request),
-    bindingView: (request) => call("binding_view", request),
+    toolReceiptRelease: (request) => call("tool_receipt_release", request),
     registerIncarnation: (request) => call("register_incarnation", request),
     clearEndpoint: (request) => call("clear_endpoint", request),
     sessionOwner: (durableId) => call("session_owner", durableId),
-    report: (request) => call("report", request),
-    emitCompletions: (request) => call("emit_completions", request),
-    pendingCompletionArms: (durableId) => call("pending_completion_arms", durableId),
-    latestCompletionArm: (durableId) => call("latest_completion_arm", durableId),
-    readOutbox: (request) => call("read_outbox", request),
-    ackOutbox: (request) => call("ack_outbox", request),
-    claimAnswer: (request) => call("claim_answer", request),
-    releaseAnswer: (request) => call("release_answer", request),
-    confirmAnswer: (request) => call("confirm_answer", request),
-    markPriorDelivered: (request) => call("mark_prior_delivered", request),
-    closeQuestion: (request) => call("close_question", request),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -392,6 +374,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       if (disposed) return
       disposed = true
       cancelIdleRetire()
+      // A call already admitted finishes before the close: a close posted under it would reach the worker between the
+      // call's open and its own request, and the call would fail with "the gateway store is not open". Calls made from
+      // here on are refused as disposed by `start`.
+      if (callsInFlight > 0)
+        await new Promise<void>((resolve) => {
+          callsSettled = resolve
+        })
       // A worker retired just before still holds its database until its close settles; a caller that
       // removes the agent directory after `dispose` must find it closed.
       await retiring

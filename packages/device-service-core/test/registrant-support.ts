@@ -1,9 +1,10 @@
 import { afterEach, beforeEach } from "bun:test"
-import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, watch } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { connectDeviceService, type DeviceService } from "../src/index.ts"
 import { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant } from "../src/registrant.ts"
+import { type EndpointWatch, watchEndpointFile } from "../src/registrant-watch.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 import { deviceKeys } from "./local-api/support.ts"
@@ -109,6 +110,27 @@ export const start = (
   const registrant = startAgentDirRegistrant({ version: "5.1.60", agentDir: AGENT_DIR, ...options })
   registrants.push(registrant)
   return registrant
+}
+
+// The real endpoint watch over a directory watch whose reports never arrive, like a macOS watch whose notification
+// is late or lost (#12733). Arming and the settle re-check are the production ones; a settle runs when the test says so.
+export function deafWatch() {
+  const settles: (() => void)[] = []
+  const watchEndpoint: EndpointWatch = (endpointPath, onChange) =>
+    watchEndpointFile(endpointPath, onChange, {
+      watch: (target) => watch(target, { persistent: false }, () => {}),
+      schedule: (run) => {
+        settles.push(run)
+        return () => {
+          const at = settles.indexOf(run)
+          if (at >= 0) settles.splice(at, 1)
+        }
+      },
+    })
+  const runSettles = (): void => {
+    for (const run of settles.splice(0)) run()
+  }
+  return { watchEndpoint, runSettles }
 }
 
 export async function otherClient(stateDir: string): Promise<DeviceService> {

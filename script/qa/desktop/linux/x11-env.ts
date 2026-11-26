@@ -4,9 +4,10 @@
 // PRIMARY selection. Every read here is an independent process (xprop, xwininfo,
 // xdotool, the target xterm's own shell), never the engine.
 //
-// The target needs `allowSendEvents` so background `XSendEvent` input is accepted, and xterm then
-// forces mouse tracking and title ops off. So a click is observed as a middle-button paste: xterm
-// inserts PRIMARY on Btn2 release, and the shell's `read` counts the pasted line.
+// The target runs with `allowSendEvents`, so a background `XSendEvent` click would be observable if
+// one were sent; the engine refuses background input to xterm because no client can read that
+// setting (omo#9109). xterm then forces mouse tracking and title ops off, so a click is observed as a
+// middle-button paste: xterm inserts PRIMARY on Btn2 release, and the shell's `read` counts the line.
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 

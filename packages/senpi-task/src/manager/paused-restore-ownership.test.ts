@@ -18,6 +18,7 @@ import {
   tempProject,
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -34,7 +35,7 @@ class RestoringRunner extends FakeRunner {
 
 async function pausedOnAnotherHost(firstHostAlive: boolean) {
   const cwd = tempProject()
-  const store = createTaskRecordStore({ project_dir: cwd })
+  const store = createTaskRecordStore(ownedTaskState(cwd))
   const first = new FakeRunner()
   const before = createTaskManager({
     cwd,

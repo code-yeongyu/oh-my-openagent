@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
@@ -17,9 +17,9 @@ import {
 } from "./build-extension.mjs"
 import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
-import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
+import { createBuildFixture, outputPathsIn, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 import {
-  SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
+  SENPI_GPT_ULTRAWORK_DIRECTIVE,
   SENPI_ULTRAWORK_DIRECTIVE,
 } from "../../src/components/ultrawork/generated-directive.ts"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
@@ -41,6 +41,8 @@ setDefaultTimeout(90_000)
 const PACKED_STAGE_CAPS = { pack: 25_000, untar: 10_000, probe: 20_000 }
 const PACKED_TEST_TIMEOUT_MS = Object.values(PACKED_STAGE_CAPS).reduce((sum, cap) => sum + cap, 0) + 35_000
 
+// #13965: the cold builds run once as setup, bounded by their progress and CPU use, not this hook's outer bound.
+beforeAll(() => fixture.warmBuilds(), BUILD_HOOK_OUTER_BOUND_MS)
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
 
@@ -250,25 +252,32 @@ describe("checkExtensionCurrent", () => {
     expect(advisorRuntime).not.toMatch(/^[\t ]+$/m)
   })
 
-  // Generated payload confinement (#9913): the shared directive parts are dropped from every bundle
-  // that imports the ultrawork module without using the directives. The probe is a line both
-  // directives share, read from the generated module rather than pinned here.
+  // Generated payload confinement (#9913): the directives are dropped from every bundle that imports
+  // the ultrawork module without using them. Each probe is the longest plain line of one variant,
+  // read from the generated module rather than pinned here.
   test("#given the split extension build #when bundles are inspected #then only the main entry carries the ultrawork directive text", async () => {
     // given
     const outputs = await sharedOutputs()
-    const sharedLine = SENPI_ULTRAWORK_DIRECTIVE.split("\n")
-      .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line) && SENPI_ASTRA_ULTRAWORK_DIRECTIVE.includes(line))
-      .sort((left, right) => right.length - left.length)[0]
+    const probes = [SENPI_ULTRAWORK_DIRECTIVE, SENPI_GPT_ULTRAWORK_DIRECTIVE].map(
+      (directive) =>
+        directive
+          .split("\n")
+          .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line))
+          .sort((left, right) => right.length - left.length)[0],
+    )
 
     // when
-    const carriers = []
+    const carriers = probes.map(() => [])
     for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
-      if ((await readFile(path, "utf8")).includes(sharedLine)) carriers.push(name)
+      const bundle = await readFile(path, "utf8")
+      probes.forEach((probe, index) => {
+        if (bundle.includes(probe)) carriers[index].push(name)
+      })
     }
 
     // then
-    expect(sharedLine.length).toBeGreaterThan(40)
-    expect(carriers).toEqual(["outputPath"])
+    for (const probe of probes) expect(probe.length).toBeGreaterThan(40)
+    expect(carriers).toEqual([["outputPath"], ["outputPath"]])
   })
 
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
@@ -374,9 +383,84 @@ describe("checkExtensionCurrent", () => {
 
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
     const { mainInputs, threadClientInputs } = await sharedOutputs()
-    const suffix = "/components/thread/live-surface.ts"
-    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
-    expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    for (const suffix of ["/components/thread/live-surface.ts", "/components/thread/remote/receipt.ts"]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
+  })
+
+  // #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside the engine,
+  // so no senpi loader alias resolves a bare `typebox` there, and the compiled runtime ships no node_modules.
+  test("#given the thread client copied into a plugin layout with no node_modules #when Node imports it the way the omo CLI does #then it loads and exposes the CLI remote surface", async () => {
+    const { threadClientOutputPath } = await sharedOutputs()
+    const work = await mkdtemp(join(tmpdir(), "omo-thread-client-cli-load-"))
+    try {
+      const sidecar = join(work, "plugin", "extensions", "omo-thread-client.js")
+      await mkdir(dirname(sidecar), { recursive: true })
+      await cp(join(pluginRoot, "package.json"), join(work, "plugin", "package.json"))
+      await cp(threadClientOutputPath, sidecar)
+      const probe = join(work, "thread-client-probe.mjs")
+      await writeFile(
+        probe,
+        [
+          'import { pathToFileURL } from "node:url"',
+          `const client = await import(pathToFileURL(${JSON.stringify(sidecar)}).href)`,
+          'if (typeof client.createCliRemoteSurface !== "function") throw new Error("createCliRemoteSurface missing")',
+          'console.log("thread-client-ok")',
+        ].join("\n"),
+      )
+      const run = await runBoundedStage(
+        "node probe",
+        "node",
+        [probe],
+        { cwd: parse(work).root },
+        PACKED_STAGE_CAPS.probe,
+      )
+      expect(run.stdout, run.stderr).toContain("thread-client-ok")
+      expect(run.status, run.stderr).toBe(0)
+    } finally {
+      removeTestRootBestEffort(work)
+    }
+  })
+
+  test("#given the lazy session wake #when bundle inputs are inspected #then the carrier, the consumer and the device-service client are confined to their sidecar", async () => {
+    const { mainInputs, wakeInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/wake/wake-runtime.ts",
+      "/components/thread/wake/runtime.ts",
+      "/components/thread/wake/carrier.ts",
+      "/components/thread/wake/carrier-connection.ts",
+      "/components/thread/wake/consumer-start.ts",
+      "/components/thread/consumer/consumer.ts",
+      "/components/thread/consumer/device-service-port.ts",
+      "/components/thread/gateway/same-device-wake.ts",
+    ]) {
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        wakeInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
+    }
+  })
+
+  test("#given thread_create's folder and worktree code #when bundle inputs are inspected #then it lives only in the thread client sidecar", async () => {
+    const { mainInputs, threadClientInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/control/local-open.ts",
+      "/components/thread/worktree/thread-worktree.ts",
+      "/components/thread/worktree/discard-worktree.ts",
+      "/components/thread/worktree/failures.ts",
+      "/components/thread/worktree/worktree-rpc.ts",
+      "/components/thread/worktree/remote-worktree.ts",
+      "/components/thread/remote/create-folder.ts",
+      "/components/thread/remote/plan-create.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
   })
 
   test("#given lazy session-summary recovery #when bundle inputs are inspected #then the recovery sweep is confined to its sidecar", async () => {
@@ -718,6 +802,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
+    expect(main).toContain('import("#omo-wake-runtime")')
     expect(main).toContain('import("#omo-telemetry-recovery-runtime")')
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
@@ -747,10 +832,12 @@ describe("checkExtensionCurrent", () => {
       "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
+      "#omo-wake-runtime": "./extensions/omo-wake.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
       "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
+      "#omo-sdk": "./runtime/omo-sdk/sdk.js",
     })
   })
 })

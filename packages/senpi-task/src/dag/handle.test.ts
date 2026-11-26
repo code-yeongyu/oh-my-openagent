@@ -10,6 +10,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeCounts, DagNodeId, DagRunEvent, DagRunId, DagRunStatus } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "ses_parent"
@@ -130,7 +131,7 @@ function fixture(
   nodes: readonly DagNode[],
   overrides: { readonly cancel?: (id: DagRunId, reason?: string) => void } = {},
 ): Fixture {
-  const store = createDagFileStore({ project_dir: tempProject() })
+  const store = createDagFileStore(ownedTaskState(tempProject()))
   const initial = record(nodes)
   store.writeCheckpoint(runId, initial)
   const journal = createDagJournal<DagRunRecordV1>({ store, runId, initialCheckpoint: initial, applyEvent })
@@ -283,7 +284,7 @@ describe("createDagWaitSurface wait terminal projection", () => {
 
   test("#given a run terminalizes during live subscription setup #when wait registers #then the final checkpoint read resolves without an event callback", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const running = record([node("plan", { state: "running", taskId: "task-plan" })])
     store.writeCheckpoint(runId, running)
     store.writeResult(runId, "plan", "plan output")

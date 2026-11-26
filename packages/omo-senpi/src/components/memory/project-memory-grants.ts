@@ -63,7 +63,10 @@ export function isGrantedProjectMemoryRead(
   const canonicalPath = options.realpath ?? realpathSync.native
   const lstat = options.lstat ?? lstatSync
   // A macOS automount trigger is never a granted repo note, and resolving it can park the host loop (#11545).
-  if (!windows && isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform }))
+  if (
+    !windows &&
+    isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform })
+  )
     return false
   const resolve = (input: string) => {
     if (input !== target) return canonicalPath(input)

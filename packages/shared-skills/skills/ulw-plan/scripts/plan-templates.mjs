@@ -147,10 +147,10 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
 
 ## Execution strategy
 ### Parallel execution waves
-> Target 5-8 todos per wave. Fewer than 3 (except the final) means you under-split.
+> Two todos share a wave unless one reads what the other produces or both write the same file, generated artifact, schema, port or branch; shared setup (install, codegen, fixture, test server) is ONE todo the others depend on; every edge names its reason.
 
 ### Dependency matrix
-| Todo | Depends on | Blocks | Can parallelize with |
+| Todo | Writes (files, shared state) | Depends on (reason) | Blocks |
 | --- | --- | --- | --- |
 
 ## Todos
@@ -162,7 +162,7 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
   Parallelization: Wave <N> | Blocked by: <...> | Blocks: <...>
   References (executor has NO interview context - be exhaustive): <src/path:lines>
   Acceptance criteria (agent-executable): <exact command or assertion>
-  QA scenarios (name the exact tool + invocation): happy + failure, Evidence <attemptDir>/task-1-${slug}.<ext>
+  QA scenarios (name the exact tool + invocation; time and failures driven through a fake clock or an injected fault, never a real wait or outage): happy + failure, Evidence <attemptDir>/task-1-${slug}.<ext>
   Commit: <Y/N> | <type>(<scope>): <summary>
 
 ## Final verification wave

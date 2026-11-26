@@ -3,12 +3,13 @@ import * as credentialLock from "./credential-lock"
 import {
   createCredentialStore,
   CredentialIdentityChanged,
+  CredentialStoreError,
   type CredentialStore,
   InvalidCredentialState,
 } from "./keystore"
 import type { Credentials } from "./protocol"
 import { createSession, SessionEnded } from "./session"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { fakeApi, grant, memorySecrets, noOwnDevice, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const NOW = Date.parse("2030-01-01T00:00:00Z")
 const captured: Credentials = { ...grant, ...privateKeys, accountId: "account-a", credentialGeneration: "generation-a" }
@@ -26,7 +27,7 @@ async function tokenHarness(snapshot: Credentials, authoritative = snapshot) {
     bodies.push(await request.json())
     return Response.json({ ...grant, accessToken: "refreshed-access" })
   })
-  const api = fakeApi(refresh)
+  const api = fakeApi((request) => noOwnDevice(request) ?? refresh(request))
   const store = {
     read: mock(async () => snapshot),
     readAuthoritative: mock(async () => current),
@@ -115,7 +116,7 @@ describe("credential lifecycle", () => {
     const error = await session.accessToken(sameIdentity).catch((error) => error)
     expect(error).toBeInstanceOf(InvalidCredentialState)
     expect(error.message).toBe(
-      "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.",
+      "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again from the OmO desktop app on this computer, or with omo login in a terminal.",
     )
     expect(lock).not.toHaveBeenCalled()
   })
@@ -162,6 +163,8 @@ describe("credential lifecycle", () => {
     const permit = Promise.withResolvers<void>()
     let refreshes = 0
     const api = fakeApi(async (request) => {
+      const listed = noOwnDevice(request)
+      if (listed !== undefined) return listed
       expect(new URL(request.url).pathname).toBe("/v1/session/refresh")
       expect(await request.json()).toEqual({ refreshToken: grant.refreshToken })
       refreshes++
@@ -226,6 +229,71 @@ describe("credential lifecycle", () => {
       home: await temporaryHome(),
     }).logout()
     expect(secrets.values.size).toBe(0)
+  })
+
+  test("a store that fails the logout read is called exactly once and rejects as store-unavailable", async () => {
+    const secrets = memorySecrets()
+    const api = fakeApi(() => new Response(null, { status: 204 }))
+    const base = secrets.store(api)
+    const failingRead = mock(async () => {
+      throw new CredentialStoreError("stalled keyring")
+    })
+    const store = {
+      ...base,
+      read: mock(base.read.bind(base)),
+      readAuthoritative: failingRead,
+      write: mock(base.write.bind(base)),
+      clear: mock(base.clear.bind(base)),
+    } satisfies CredentialStore
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    })
+    await expect(session.logout()).rejects.toBeInstanceOf(CredentialStoreError)
+    expect(failingRead).toHaveBeenCalledTimes(1)
+    expect(store.read).toHaveBeenCalledTimes(0)
+    expect(store.write).toHaveBeenCalledTimes(0)
+    expect(store.clear).toHaveBeenCalledTimes(0)
+  })
+
+  test("a corrupt stored item is still cleared by logout, and logout does not report success", async () => {
+    const secrets = memorySecrets()
+    const api = fakeApi(() => new Response(null, { status: 204 }))
+    const base = secrets.store(api)
+    await base.write({ ...grant, ...privateKeys })
+    const store = {
+      ...base,
+      readAuthoritative: mock(async () => {
+        throw new InvalidCredentialState("stored sign-in is unreadable")
+      }),
+      clear: mock(base.clear.bind(base)),
+    } satisfies CredentialStore
+    const signedOut = await createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).logout()
+    expect(signedOut).toBe(false)
+    expect(store.clear).toHaveBeenCalledTimes(1)
+    expect(secrets.values.size).toBe(0)
+  })
+
+  test("logout reports success and clears the item when the service answers device_revoked", async () => {
+    const secrets = memorySecrets()
+    const api = fakeApi(() => refusal("device_revoked", undefined, 410))
+    const store = secrets.store(api)
+    await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
+    const revoked = await createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).logout()
+    expect(revoked).toBe(true)
+    expect(await store.read()).toBeNull()
   })
 
   test("a failed rotation persistence never releases the new access token", async () => {

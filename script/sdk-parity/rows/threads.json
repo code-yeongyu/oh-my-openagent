@@ -1,0 +1,3296 @@
+{
+  "domain": "threads",
+  "rows": [
+    {
+      "id": "threads.adopt",
+      "kind": "capability",
+      "sdk": "threads.adopt",
+      "today": "partial",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "adopt"
+          ],
+          "flags": {
+            "--interrupt": "interrupt=true",
+            "--force": "force=true",
+            "--json": "render"
+          },
+          "positionals": {
+            "s": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it ends in replacing a terminal process"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "addressScope": "this_device",
+      "addressReason": "adopt ends in replacing a terminal process on this device through release, so on another device it answers unsupported (release_unsupported underneath; N/bin/lib/daemon-adopt.js:33-47)"
+    },
+    {
+      "id": "threads.aliases.clear",
+      "kind": "capability",
+      "sdk": "threads.aliases.clear",
+      "today": "partial",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {
+        "tool": "Tool omits a bare `resolve`: every tool input already takes an alias"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.aliases.resolve",
+      "kind": "capability",
+      "sdk": "threads.aliases.resolve",
+      "today": "partial",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "alias"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {
+        "tool": "Tool omits a bare `resolve`: every tool input already takes an alias"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.aliases.set",
+      "kind": "capability",
+      "sdk": "threads.aliases.set",
+      "today": "partial",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "alias"
+        ]
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_rename",
+          "branch": "alias",
+          "when": {
+            "present": [
+              "alias"
+            ],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "alias"
+          ]
+        },
+        {
+          "name": "thread_create",
+          "branch": "alias",
+          "when": {
+            "present": [
+              "alias"
+            ],
+            "absent": []
+          },
+          "reads": [
+            "alias"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.archive",
+      "kind": "capability",
+      "sdk": "threads.archive",
+      "today": "no",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_archive",
+          "branch": "archive",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "archived",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.attach",
+      "kind": "capability",
+      "sdk": "threads.attach",
+      "today": "partial",
+      "slices": [
+        "T1c",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "attach"
+          ],
+          "flags": {},
+          "positionals": {
+            "s": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: answering another session's approval dialog is an authority decision, and no ruling gives a session that authority over a peer"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.close",
+      "kind": "capability",
+      "sdk": "threads.close",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "graceful": {
+            "type": "boolean"
+          },
+          "wait_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "thread",
+            "close"
+          ],
+          "flags": {
+            "--force": "force=true",
+            "--graceful": "graceful=true",
+            "--wait-ms": "wait_ms",
+            "--idempotency-key": "idempotency_key",
+            "--all-scope": "all_scope=true",
+            "--json": "render"
+          },
+          "positionals": {
+            "t": "thread"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "close"
+          ],
+          "flags": {
+            "--force": "force=true",
+            "--graceful": "graceful=true",
+            "--wait-ms": "wait_ms",
+            "--json": "render"
+          },
+          "positionals": {
+            "s": "thread"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "close"
+          ],
+          "flags": {},
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_close",
+          "branch": "close",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "idempotency_key",
+            "all_scope",
+            "force",
+            "graceful",
+            "wait_ms"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.create",
+      "kind": "capability",
+      "sdk": "threads.create",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "worktree": {
+            "type": "object",
+            "properties": {
+              "branch": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "base": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "additionalProperties": false
+          },
+          "fork_from": {
+            "type": "string"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "minItems": 1,
+            "maxItems": 16
+          },
+          "model": {
+            "type": "string",
+            "minLength": 3
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "off"
+              },
+              {
+                "type": "string",
+                "const": "minimal"
+              },
+              {
+                "type": "string",
+                "const": "low"
+              },
+              {
+                "type": "string",
+                "const": "medium"
+              },
+              {
+                "type": "string",
+                "const": "high"
+              },
+              {
+                "type": "string",
+                "const": "xhigh"
+              },
+              {
+                "type": "string",
+                "const": "max"
+              }
+            ]
+          },
+          "permission_preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "full-access"
+              },
+              {
+                "type": "string",
+                "const": "workspace"
+              },
+              {
+                "type": "string",
+                "const": "accept-edits"
+              },
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "string",
+                "const": "read-only"
+              },
+              {
+                "type": "string",
+                "const": "ask"
+              }
+            ]
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32768
+              },
+              {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "maxLength": 32768
+                  },
+                  "delivery": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "steer"
+                      },
+                      {
+                        "type": "string",
+                        "const": "follow_up"
+                      }
+                    ],
+                    "default": "auto"
+                  },
+                  "expected_turn_id": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "path"
+                          ],
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "mime": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "bytes",
+                            "name"
+                          ],
+                          "properties": {
+                            "bytes": {},
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "mime": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1
+                  },
+                  "author": {
+                    "type": "object",
+                    "required": [
+                      "platform_user_id",
+                      "display"
+                    ],
+                    "properties": {
+                      "platform_user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "display": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              }
+            ]
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "string",
+                "const": "steer"
+              },
+              {
+                "type": "string",
+                "const": "follow_up"
+              }
+            ],
+            "default": "auto"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "launch_spec": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "open"
+          ],
+          "flags": {
+            "--project": "cwd",
+            "--model": "model",
+            "--thinking": "reasoning",
+            "--permission-preset": "permission_preset",
+            "--worktree": "worktree=true",
+            "--branch": "worktree.branch",
+            "--base": "worktree.base",
+            "--prompt": "prompt",
+            "--steer": "prompt.delivery=steer",
+            "--follow-up": "prompt.delivery=follow_up",
+            "--json": "render"
+          },
+          "positionals": {
+            "device": "device"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "open"
+          ],
+          "flags": {
+            "--cwd": "cwd",
+            "--model": "model",
+            "--name": "name",
+            "--prompt": "prompt",
+            "--launch-spec": "launch_spec"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_create",
+          "branch": "create",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "device",
+            "alias",
+            "name",
+            "cwd",
+            "worktree",
+            "fork_from",
+            "skills",
+            "model",
+            "reasoning",
+            "permission_preset",
+            "prompt",
+            "delivery",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {
+        "prompt": "widens: the SDK also takes the prompt object form ({ message, delivery?, expected_turn_id?, summary?, attachments?, author? }); the tool takes the string form"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.entries",
+      "kind": "capability",
+      "sdk": "threads.entries",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string",
+            "minLength": 1
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tail": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "read"
+          ],
+          "flags": {
+            "--tail": "tail",
+            "--since": "since"
+          },
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: raw entries are unbounded engine records; the tool's read is the budgeted, model-shaped projection"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.extensions.call",
+      "kind": "capability",
+      "sdk": "threads.extensions.call",
+      "today": "yes",
+      "slices": [
+        "P1b",
+        "shipped"
+      ],
+      "input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "args": {}
+        },
+        "required": [
+          "args",
+          "name",
+          "op"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "CLI and tool omitted: a connector registers its extension from its own process",
+        "cli": "CLI and tool omitted: a connector registers its extension from its own process"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.extensions.register",
+      "kind": "capability",
+      "sdk": "threads.extensions.register",
+      "today": "yes",
+      "slices": [
+        "P1b",
+        "shipped"
+      ],
+      "input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "migrations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "moduleUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sessionCallable": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "op",
+                    "parameters",
+                    "toolName",
+                    "description"
+                  ],
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {}
+                      }
+                    },
+                    "targetArg": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "toolName": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "await": {
+                      "type": "object",
+                      "required": [
+                        "statusOp",
+                        "expireOp",
+                        "timeoutMs"
+                      ],
+                      "properties": {
+                        "statusOp": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expireOp": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "timeoutMs": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "wake": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "op",
+                    "parameters",
+                    "internal"
+                  ],
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {}
+                      }
+                    },
+                    "targetArg": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "internal": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "wakeDir": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "migrations",
+          "moduleUrl",
+          "name"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "CLI and tool omitted: a connector registers its extension from its own process",
+        "cli": "CLI and tool omitted: a connector registers its extension from its own process"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.extensions.sessionCall",
+      "kind": "capability",
+      "sdk": "threads.extensions.sessionCall",
+      "today": "no",
+      "slices": [
+        "T1e",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "args": {}
+        },
+        "required": [
+          "name",
+          "op",
+          "args"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "CLI omitted: a session operation has no caller outside a session",
+        "cli": "CLI omitted: a session operation has no caller outside a session"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.extensions.sessionOps",
+      "kind": "capability",
+      "sdk": "threads.extensions.sessionOps",
+      "today": "no",
+      "slices": [
+        "T1e",
+        "S0"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "CLI omitted: a session operation has no caller outside a session",
+        "cli": "CLI omitted: a session operation has no caller outside a session"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.follow",
+      "kind": "capability",
+      "sdk": "threads.follow",
+      "today": "partial",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "required": [
+              "thread",
+              "delivery_id"
+            ],
+            "properties": {
+              "thread": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delivery_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turn_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {
+        "tool": "Tool omitted: a tool result is one bounded payload and nothing streams into a model call"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.get",
+      "kind": "capability",
+      "sdk": "threads.get",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "state"
+          ],
+          "flags": {},
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {
+        "tool": "T2"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.handoff",
+      "kind": "capability",
+      "sdk": "threads.handoff",
+      "today": "no",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "exact"
+              },
+              {
+                "type": "string",
+                "const": "fuzzy"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 32768
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "string",
+                "const": "steer"
+              },
+              {
+                "type": "string",
+                "const": "follow_up"
+              }
+            ],
+            "default": "auto"
+          },
+          "expected_turn_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message",
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_handoff",
+          "branch": "handoff",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "match",
+            "message",
+            "delivery",
+            "expected_turn_id",
+            "summary",
+            "idempotency_key",
+            "all_scope"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.interrupt",
+      "kind": "capability",
+      "sdk": "threads.interrupt",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "interrupt"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {
+            "s": "thread"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "abort"
+          ],
+          "flags": {},
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_interrupt",
+          "branch": "interrupt",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "turn_id",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.list",
+      "kind": "capability",
+      "sdk": "threads.list",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "all_scope": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "opening"
+                },
+                {
+                  "type": "string",
+                  "const": "running"
+                },
+                {
+                  "type": "string",
+                  "const": "idle"
+                },
+                {
+                  "type": "string",
+                  "const": "inactive"
+                },
+                {
+                  "type": "string",
+                  "const": "archived"
+                }
+              ]
+            },
+            "minItems": 1
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "thread",
+            "list"
+          ],
+          "flags": {
+            "--all-scope": "all_scope=true",
+            "--state": "state",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "sessions"
+          ],
+          "flags": {
+            "--device": "device",
+            "--project": "project",
+            "--state": "state",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "list"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_list",
+          "branch": "list",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "all_scope",
+            "state",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.locate",
+      "kind": "capability",
+      "sdk": "threads.locate",
+      "today": "yes",
+      "slices": [
+        "shipped"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool and CLI omitted: resolution is internal to every verb, and the holder is on the list row",
+        "cli": "Tool and CLI omitted: resolution is internal to every verb, and the holder is on the list row"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.messages",
+      "kind": "capability",
+      "sdk": "threads.messages",
+      "today": "no",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "read"
+          ],
+          "flags": {
+            "--messages": "when"
+          },
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: same reason"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.read",
+      "kind": "capability",
+      "sdk": "threads.read",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "thread",
+            "read"
+          ],
+          "flags": {
+            "--limit": "limit",
+            "--max-bytes": "max_bytes",
+            "--cursor": "cursor",
+            "--all-scope": "all_scope=true",
+            "--json": "render"
+          },
+          "positionals": {
+            "t": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_read",
+          "branch": "plain",
+          "when": {
+            "present": [],
+            "absent": [
+              "delivery_id",
+              "wait_ms"
+            ]
+          },
+          "reads": [
+            "thread",
+            "cursor",
+            "max_bytes",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.readAfterWait",
+      "kind": "capability",
+      "sdk": "threads.readAfterWait",
+      "today": "no",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "wait_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread",
+          "wait_ms"
+        ]
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_read",
+          "branch": "wait",
+          "when": {
+            "present": [
+              "wait_ms"
+            ],
+            "absent": [
+              "delivery_id"
+            ]
+          },
+          "reads": [
+            "thread",
+            "wait_ms",
+            "cursor",
+            "max_bytes",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.receipt",
+      "kind": "capability",
+      "sdk": "threads.receipt",
+      "today": "no",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "delivery_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "all_scope": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "delivery_id",
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_read",
+          "branch": "receipt",
+          "when": {
+            "present": [
+              "delivery_id"
+            ],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "delivery_id",
+            "all_scope"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.release",
+      "kind": "capability",
+      "sdk": "threads.release",
+      "today": "yes",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "move": {
+            "type": "object",
+            "required": [
+              "id",
+              "target"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "adopt"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it takes a session away from its host"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "addressScope": "this_device",
+      "addressReason": "release hands a session to a local process on this device. On another device it answers release_unsupported in the engine reply's value (T/sdk.ts:508-511)"
+    },
+    {
+      "id": "threads.rename",
+      "kind": "capability",
+      "sdk": "threads.rename",
+      "today": "yes",
+      "slices": [
+        "T1b",
+        "shipped"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": []
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_rename",
+          "branch": "rename",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "name",
+            "alias",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.resolve",
+      "kind": "capability",
+      "sdk": "threads.resolve",
+      "today": "partial",
+      "slices": [
+        "T1a"
+      ],
+      "input": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "address"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool and CLI omitted: resolution is part of each verb; kept because the remote facade has it",
+        "cli": "Tool and CLI omitted: resolution is part of each verb; kept because the remote facade has it"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.runToCompletion",
+      "kind": "capability",
+      "sdk": "threads.runToCompletion",
+      "today": "no",
+      "slices": [
+        "OC1b",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "port"
+                ],
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "attach_url"
+                ],
+                "properties": {
+                  "attach_url": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "on_complete": {
+            "type": "object",
+            "required": [
+              "command"
+            ],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "signal": {}
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "run"
+          ],
+          "flags": {
+            "-a": "agent",
+            "--agent": "agent",
+            "-m": "model",
+            "--model": "model",
+            "-d": "directory",
+            "--directory": "directory",
+            "-p": "endpoint.port",
+            "--port": "endpoint.port",
+            "--attach": "endpoint.attach_url",
+            "--on-complete": "on_complete.command",
+            "--json": "render",
+            "--no-timestamp": "render",
+            "--verbose": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {
+            "message": "message"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1b). The existing exit mapping and cancellation are the descriptor's projection"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.send",
+      "kind": "capability",
+      "sdk": "threads.send",
+      "today": "partial",
+      "slices": [
+        "T1a",
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 32768
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "string",
+                "const": "steer"
+              },
+              {
+                "type": "string",
+                "const": "follow_up"
+              }
+            ],
+            "default": "auto"
+          },
+          "expected_turn_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "collapse_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "path"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "name"
+                  ],
+                  "properties": {
+                    "bytes": {},
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
+          "author": {
+            "type": "object",
+            "required": [
+              "platform_user_id",
+              "display"
+            ],
+            "properties": {
+              "platform_user_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display": {
+                "type": "string",
+                "minLength": 1
+              },
+              "user_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "message",
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "thread",
+            "send"
+          ],
+          "flags": {
+            "--mode": "delivery",
+            "--expected-turn": "expected_turn_id",
+            "--idempotency-key": "idempotency_key",
+            "--collapse-key": "collapse_key",
+            "--all-scope": "all_scope=true",
+            "--json": "render"
+          },
+          "positionals": {
+            "t": "thread",
+            "text": "message"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "send"
+          ],
+          "flags": {
+            "--steer": "delivery=steer",
+            "--follow-up": "delivery=follow_up",
+            "--no-wait": "when",
+            "--json": "render"
+          },
+          "positionals": {
+            "s": "thread",
+            "text": "message"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "prompt"
+          ],
+          "flags": {},
+          "positionals": {
+            "ref": "thread",
+            "text|@file": "message"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "steer"
+          ],
+          "flags": {},
+          "positionals": {
+            "ref": "thread",
+            "text|@file": "message"
+          },
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_send",
+          "branch": "send",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "message",
+            "delivery",
+            "expected_turn_id",
+            "summary",
+            "idempotency_key",
+            "collapse_key",
+            "all_scope"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.sendAndFollow",
+      "kind": "capability",
+      "sdk": "threads.sendAndFollow",
+      "today": "partial",
+      "slices": [
+        "T1c"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 32768
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "auto"
+              },
+              {
+                "type": "string",
+                "const": "steer"
+              },
+              {
+                "type": "string",
+                "const": "follow_up"
+              }
+            ],
+            "default": "auto"
+          },
+          "expected_turn_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "collapse_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "path"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "name"
+                  ],
+                  "properties": {
+                    "bytes": {},
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
+          "author": {
+            "type": "object",
+            "required": [
+              "platform_user_id",
+              "display"
+            ],
+            "properties": {
+              "platform_user_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display": {
+                "type": "string",
+                "minLength": 1
+              },
+              "user_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "message",
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "send"
+          ],
+          "flags": {
+            "--steer": "delivery=steer",
+            "--follow-up": "delivery=follow_up",
+            "--timeout": "deadline_ms",
+            "--json": "render"
+          },
+          "positionals": {
+            "s": "thread",
+            "text": "message"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: nothing streams into a model call; an agent sends, then reads after a wait"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.setModel",
+      "kind": "capability",
+      "sdk": "threads.setModel",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "model"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {
+            "s": "thread",
+            "provider/id": "model"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "model"
+          ],
+          "flags": {},
+          "positionals": {
+            "ref": "thread",
+            "provider/id": "model"
+          },
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_set_model",
+          "branch": "set_model",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "model",
+            "provider",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.setReasoning",
+      "kind": "capability",
+      "sdk": "threads.setReasoning",
+      "today": "no",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "off"
+              },
+              {
+                "type": "string",
+                "const": "minimal"
+              },
+              {
+                "type": "string",
+                "const": "low"
+              },
+              {
+                "type": "string",
+                "const": "medium"
+              },
+              {
+                "type": "string",
+                "const": "high"
+              },
+              {
+                "type": "string",
+                "const": "xhigh"
+              },
+              {
+                "type": "string",
+                "const": "max"
+              }
+            ]
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "session"
+              },
+              {
+                "type": "string",
+                "const": "turn"
+              }
+            ]
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "thread"
+        ]
+      },
+      "cli": [],
+      "tool": [
+        {
+          "name": "thread_set_reasoning",
+          "branch": "set_reasoning",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": [
+            "thread",
+            "level",
+            "scope",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      ],
+      "planned": {
+        "cli": "T3"
+      },
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "threads.unload",
+      "kind": "capability",
+      "sdk": "threads.unload",
+      "today": "no",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "clear_queue": {
+            "type": "boolean"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "refuse"
+              },
+              {
+                "type": "string",
+                "const": "detach"
+              }
+            ]
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "unload"
+          ],
+          "flags": {
+            "--interrupt": "interrupt=true",
+            "--force": "force=true",
+            "--clear-queue": "clear_queue=true",
+            "--children": "children"
+          },
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: an agent ends a peer through the close ladder, which chooses the step and reports what it dropped; choosing the raw step lets a session detach another session's children, which no ruling grants"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "addressScope": "this_device",
+      "addressReason": "the host command unloads a session of this device's session host only. On another device the host answers its generic unknown_session (not_found): the call cannot tell another device from a mistyped reference (engine dist/modes/rpc/session-registry.js:141,147)"
+    },
+    {
+      "id": "threads.wait",
+      "kind": "capability",
+      "sdk": "threads.wait",
+      "today": "partial",
+      "slices": [
+        "T1b"
+      ],
+      "input": {
+        "properties": {
+          "thread": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "required": [
+              "thread",
+              "delivery_id"
+            ],
+            "properties": {
+              "thread": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delivery_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turn_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "idle"
+              },
+              {
+                "type": "string",
+                "const": "done"
+              }
+            ]
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "session",
+            "wait"
+          ],
+          "flags": {
+            "--until": "until",
+            "--timeout": "deadline_ms"
+          },
+          "positionals": {
+            "ref": "thread"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "CLI planned (T3): `omo thread wait`"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.1",
+      "position": 1,
+      "ids": [
+        "threads.list"
+      ],
+      "cells": [
+        "`threads.list({ all_scope?, workspace?, state?, device?, project?, name?, archived?, idempotency_key? })`",
+        "`omo thread list [--all-scope] [--state ...]` (repeatable or comma-separated); `omo remote sessions [--device] [--project] [--state running\\|idle\\|ended]`; `omo host session list`",
+        "`thread_list { all_scope?, state?, idempotency_key? }`",
+        "partial: no `workspace`, `device`, `project`, `name`, `archived` in the thread SDK (remote module has them, `R/types.ts:68, 233-239`)",
+        "Tool omits the five filters: rows carry `device`, `cwd`, `name` and status, and the listing is one bounded payload the model filters",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 2,
+      "ids": [
+        "threads.resolve"
+      ],
+      "cells": [
+        "`threads.resolve({ address, all_scope?, workspace? })` answering the session row",
+        "none (implicit in every verb)",
+        "none",
+        "partial: remote module `sessions.resolve`",
+        "Tool and CLI omitted: resolution is part of each verb; kept because the remote facade has it",
+        "T1a"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 3,
+      "ids": [
+        "threads.read"
+      ],
+      "cells": [
+        "`threads.read({ thread, cursor?, max_bytes?, all_scope?, idempotency_key?, limit? })`: the bounded transcript projection",
+        "`omo thread read <t> [--all-scope] [--limit] [--max-bytes] [--cursor]`",
+        "`thread_read` (plain branch)",
+        "partial: no `idempotency_key`; `--limit` is sliced in the CLI (`N/bin/lib/thread.js:92-95`)",
+        "None",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 4,
+      "ids": [
+        "threads.readAfterWait"
+      ],
+      "cells": [
+        "`threads.readAfterWait({ thread, wait_ms, cursor?, max_bytes?, all_scope?, idempotency_key? })`: wait for the turn to end, then read, with the `wait` block",
+        "none",
+        "`thread_read { wait_ms }` (wait branch)",
+        "**no**",
+        "CLI planned (T3): `omo thread read --wait-ms`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 5,
+      "ids": [
+        "threads.receipt"
+      ],
+      "cells": [
+        "`threads.receipt({ thread, delivery_id, all_scope? })`: the outcome of the caller's own delivery to that exact thread; reads no conversation, sends nothing, wakes nothing, and runs before read admission",
+        "none",
+        "`thread_read { thread, delivery_id }` (receipt branch)",
+        "**no**",
+        "CLI planned (T3): `omo thread receipt`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 6,
+      "ids": [
+        "threads.entries"
+      ],
+      "cells": [
+        "`threads.entries({ thread, since?, before?, tail?, limit?, max_bytes? })`: raw session entries by entry id. `since` is an entry id, not the read cursor",
+        "`omo host session read <ref> [--tail N] [--since <entryId>]`",
+        "none",
+        "partial: remote module `sessions.read(thread, { before, tail })`",
+        "Tool omitted: raw entries are unbounded engine records; the tool's read is the budgeted, model-shaped projection. CLI planned (T3)",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 7,
+      "ids": [
+        "threads.messages"
+      ],
+      "cells": [
+        "`threads.messages({ thread })`: the engine's message list",
+        "`omo host session read <ref> --messages`",
+        "none",
+        "**no**",
+        "Tool omitted: same reason. CLI planned (T3)",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 8,
+      "ids": [
+        "threads.get"
+      ],
+      "cells": [
+        "`threads.get({ thread })`: model, reasoning, approval mode, turn, pending dialogs and queue",
+        "`omo host session state <ref>`",
+        "none",
+        "partial: remote module `sessions.get`",
+        "Tool planned (T2): the `thread_list` row gains `reasoning` and `pending`, which it lacks today (`T/contracts/results.ts:89-107`); until then the tool surface is narrower and the conformance test does not claim three-way equality for this row. CLI planned (T3): `omo thread state`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 9,
+      "ids": [
+        "threads.wait"
+      ],
+      "cells": [
+        "`threads.wait({ thread, from?, until?, deadline_ms? })`; `from` is a send's receipt and anchors the wait on the turn that answers it",
+        "`omo host session wait <ref> [--until idle\\|done] [--timeout]`",
+        "none (the wait branch of `thread_read` is its own row)",
+        "partial: remote module `sessions.wait`; the local wait is inside the tool body",
+        "CLI planned (T3): `omo thread wait`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 10,
+      "ids": [
+        "threads.follow"
+      ],
+      "cells": [
+        "`threads.follow({ thread, from? })`: status changes, turn ends and the turn's stream",
+        "none by itself",
+        "none",
+        "partial: remote module `sessions.follow`",
+        "Tool omitted: a tool result is one bounded payload and nothing streams into a model call. CLI planned (T3): `omo thread follow`",
+        "T1c"
+      ]
+    },
+    {
+      "table": "6.1",
+      "position": 11,
+      "ids": [
+        "threads.locate"
+      ],
+      "cells": [
+        "`threads.locate({ thread, all_scope? })`",
+        "none",
+        "none",
+        "yes",
+        "Tool and CLI omitted: resolution is internal to every verb, and the holder is on the list row",
+        "shipped"
+      ]
+    },
+    {
+      "table": "6.11",
+      "position": 2,
+      "ids": [
+        "threads.runToCompletion"
+      ],
+      "cells": [
+        "`threads.runToCompletion({ message, agent?, model?, directory?, session_id?, endpoint?: { port } \\| { attach_url }, on_complete?: { command }, signal? })`: one operation that opens or reuses a session on that edition's server, sends the message, and waits until the run is complete by that edition's rule (the todos and child sessions are done and the run did meaningful work), then runs `on_complete`. It streams the run's events and answers `{ session_id, success, duration_ms, message_count, summary }` (`C/run/types.ts:4-29`, `C/run/runner.ts:145-177`). `port` and `attach_url` exclude each other. `on_complete` runs a command as the caller's OS user after completion; it is an effect of the operation, so who may pass it is a row of the security design",
+        "`run <message> [-a\\|--agent] [-m\\|--model] [-d\\|--directory] [-p\\|--port] [--attach <url>] [--session-id] [--on-complete <command>] [--json] [--no-timestamp] [--verbose]`",
+        "**no**",
+        "Planned (OC1b). The existing exit mapping and cancellation are the descriptor's projection",
+        "OC1b, after S0"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 1,
+      "ids": [
+        "threads.send"
+      ],
+      "cells": [
+        "`threads.send({ thread, message, delivery?, expected_turn_id?, summary?, idempotency_key?, collapse_key?, all_scope?, attachments?, author? })`. `author` only from a connector",
+        "`omo thread send <t> <text> [--all-scope] [--mode] [--expected-turn] [--idempotency-key] [--collapse-key]`; `omo remote send <s> <text> [--steer\\|--follow-up] --no-wait`; `omo host session prompt\\|steer <ref> <text\\|@file>`",
+        "`thread_send` (all fields but `attachments`, `author`)",
+        "partial: own target construction (#13016); `summary` and attachments only in the remote module; the facade's names are `text`, `mode`",
+        "Tool omits `attachments` and `author`: a session's message is text plus its provenance header, and `author` is a connector's identity field",
+        "T1a (locator), T1b (inputs)"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 2,
+      "ids": [
+        "threads.sendAndFollow"
+      ],
+      "cells": [
+        "`threads.sendAndFollow({ ...send inputs, deadline_ms? })`: one operation that sends and streams the answer, the receipt first",
+        "`omo remote send <s> <text> [--steer\\|--follow-up] [--timeout]` (its default)",
+        "none",
+        "partial: remote module `sessions.send` then `follow` with the promised receipt (`R/follow.ts`)",
+        "Tool omitted: nothing streams into a model call; an agent sends, then reads after a wait",
+        "T1c"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 3,
+      "ids": [
+        "threads.create"
+      ],
+      "cells": [
+        "`threads.create({ thread?, device?, alias?, name?, cwd?, worktree?: { branch?, base? }, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key?, launch_spec? })`. `prompt` is a string, or `{ message, delivery?, expected_turn_id?, summary?, attachments?, author? }` (the remote module's `first`). `thread` (open an existing thread on whichever device holds it, optionally with `prompt`) never with `device`; `fork_from` on a host open is refused `unsupported` (`fork_unsupported`) until the engine forks on open (a terminal process forks through `engine.launch`, 6.9); a wider `permission_preset` is `scope_denied`",
+        "`omo remote open <device> [--project] [--model] [--thinking] [--permission-preset] [--worktree [--branch] [--base]] [--prompt [--steer\\|--follow-up]]`; `omo host session open --cwd [--model] [--name] [--prompt] [--launch-spec]`",
+        "`thread_create` (all fields but `launch_spec` and the object form of `prompt`)",
+        "partial: the thread SDK creates; `omo remote open` skips the create orchestration (#13016 OMO-CTL-26); no `launch_spec`, no prompt metadata",
+        "Tool omits `launch_spec` (which launch spec a host starts from is the installation's choice) and the prompt's attachments and author (as for send). CLI planned (T3): `omo thread create`, with `--thinking` kept as the spelling of `reasoning`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 4,
+      "ids": [
+        "threads.interrupt"
+      ],
+      "cells": [
+        "`threads.interrupt({ thread, turn_id?, all_scope?, idempotency_key? })`",
+        "`omo remote interrupt <s>`; `omo host session abort <ref>`",
+        "`thread_interrupt`",
+        "partial: the key is accepted and not honoured outside the tool's receipt",
+        "CLI planned (T3): `omo thread interrupt`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 5,
+      "ids": [
+        "threads.close"
+      ],
+      "cells": [
+        "`threads.close({ thread?, force?, graceful?, wait_ms?, idempotency_key?, all_scope? })`. `thread` omitted or `self` means the calling session and is `caller_context_missing` for any other principal",
+        "`omo thread close <t> [--all-scope] [--force \\| --graceful [--wait-ms]] [--idempotency-key]`; `omo remote close <s> [--force] [--graceful] [--wait-ms]`; `omo host session close <ref>`",
+        "`thread_close`",
+        "partial: the key is accepted and not honoured (`T/sdk.ts:488-495`)",
+        "None",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 6,
+      "ids": [
+        "threads.unload"
+      ],
+      "cells": [
+        "`threads.unload({ thread, interrupt?, force?, clear_queue?, children?: \"refuse\" \\| \"detach\" })`: takes the session out of its host and keeps it resumable. It is not a close",
+        "`omo host session unload <ref> [--interrupt] [--force] [--clear-queue] [--children refuse\\|detach]`",
+        "none",
+        "**no**",
+        "Tool omitted: an agent ends a peer through the close ladder, which chooses the step and reports what it dropped; choosing the raw step lets a session detach another session's children, which no ruling grants. CLI planned (T3)",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 7,
+      "ids": [
+        "threads.release"
+      ],
+      "cells": [
+        "`threads.release({ thread, interrupt?, force?, move?: { id, target } })`, answering the engine's release reply (session path, attachments, what was dropped)",
+        "part of `omo daemon adopt`",
+        "none",
+        "yes on the facade (`release(located, request)`, `T/sdk.ts:153-156, 508-517`)",
+        "Tool omitted: it takes a session away from its host. CLI: reached through adopt",
+        "T1c"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 8,
+      "ids": [
+        "threads.adopt"
+      ],
+      "cells": [
+        "`threads.adopt({ thread, interrupt?, force? })`: one operation that releases and answers the launch plan: session path, working directory, and the queued prompts to replay in order",
+        "`omo daemon adopt <s> [--interrupt] [--force] [--json]`",
+        "none",
+        "partial: `locate` and `release`; the launch plan is built in the CLI (`N/bin/lib/daemon-adopt.js:118-155`)",
+        "Tool omitted: it ends in replacing a terminal process. That replacement stays in the CLI; the plan is SDK data",
+        "T1c"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 9,
+      "ids": [
+        "threads.setModel"
+      ],
+      "cells": [
+        "`threads.setModel({ thread, model, provider?, idempotency_key?, all_scope? })`",
+        "`omo remote model <s> <provider/id>`; `omo host session model <ref> <provider/id>`",
+        "`thread_set_model`",
+        "partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`)",
+        "CLI planned (T3): `omo thread model`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 10,
+      "ids": [
+        "threads.setReasoning"
+      ],
+      "cells": [
+        "`threads.setReasoning({ thread, level, scope?, idempotency_key?, all_scope? })`",
+        "none",
+        "`thread_set_reasoning`",
+        "**no** in the thread SDK; remote module only",
+        "CLI planned (T3): `omo thread reasoning`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 11,
+      "ids": [
+        "threads.rename"
+      ],
+      "cells": [
+        "`threads.rename({ thread?, name?, alias?, idempotency_key?, all_scope? })`, `thread` optional as for close",
+        "none",
+        "`thread_rename`",
+        "yes",
+        "CLI planned (T3): `omo thread rename`",
+        "shipped; key semantics T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 12,
+      "ids": [
+        "threads.aliases.resolve",
+        "threads.aliases.set",
+        "threads.aliases.clear"
+      ],
+      "cells": [
+        "`threads.aliases.resolve({ alias })`, `.set({ thread?, alias })` with `thread` optional as for close, because the tool lets a session omit it, `.clear({ thread })`",
+        "none",
+        "`thread_rename { alias }`, `thread_create { alias }`",
+        "partial: remote module `aliases.*`",
+        "CLI planned (T3) through `omo thread rename --alias`. Tool omits a bare `resolve`: every tool input already takes an alias",
+        "T1c"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 13,
+      "ids": [
+        "threads.archive"
+      ],
+      "cells": [
+        "`threads.archive({ thread, archived?, idempotency_key?, all_scope? })`",
+        "none",
+        "`thread_archive`",
+        "**no** in the thread SDK; remote module only",
+        "CLI planned (T3): `omo thread archive`",
+        "T1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 14,
+      "ids": [
+        "threads.handoff"
+      ],
+      "cells": [
+        "`threads.handoff({ thread, match?, message, delivery?, expected_turn_id?, summary?, idempotency_key?, all_scope? })`",
+        "none",
+        "`thread_handoff`",
+        "**no**",
+        "CLI planned (T3): `omo thread handoff`, exact unless `--match fuzzy`",
+        "T1c"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 15,
+      "ids": [
+        "threads.attach"
+      ],
+      "cells": [
+        "`threads.attach({ thread })` answering `{ snapshot, events, read, pending, answer, command, serveEndpoint, detach }`; the served endpoint closes when the attach ends, including when the connection drops",
+        "`omo remote attach <s>` (TUI); `omo remote answer` arrives with #14890",
+        "none",
+        "partial: remote module `attach`",
+        "Tool omitted: answering another session's approval dialog is an authority decision, and no ruling gives a session that authority over a peer",
+        "T1c, after S0"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 16,
+      "ids": [
+        "threads.extensions.register",
+        "threads.extensions.call"
+      ],
+      "cells": [
+        "`threads.extensions.register({ name, migrations, moduleUrl, sessionCallable?, wakeDir? })` answering `{ version }`; `.call({ name, op, args })`",
+        "none",
+        "none",
+        "yes on the facade (`T/gateway/store-extensions.ts:42-49`)",
+        "CLI and tool omitted: a connector registers its extension from its own process",
+        "shipped; root wiring P1b"
+      ]
+    },
+    {
+      "table": "6.2",
+      "position": 17,
+      "ids": [
+        "threads.extensions.sessionOps",
+        "threads.extensions.sessionCall"
+      ],
+      "cells": [
+        "`threads.extensions.sessionOps()` listing the declared session operations with their input schemas; `.sessionCall({ name, op, args })`, which runs the operation as the root's session principal, the caller the engine resolved, and then its declared await. Refused for every other principal",
+        "none",
+        "`ext_<extension>_<tool>`, one per declared operation, registered at session start",
+        "**no**: the session channel is reachable only from the session's own extension tools today (`T/gateway/store-extensions.ts:107-139`)",
+        "CLI omitted: a session operation has no caller outside a session",
+        "T1e, after S0"
+      ]
+    },
+    {
+      "table": "6.8",
+      "kind": "pointer",
+      "position": 18,
+      "ids": [
+        "threads.create",
+        "threads.close",
+        "threads.unload",
+        "threads.setModel",
+        "threads.send",
+        "threads.interrupt",
+        "threads.entries",
+        "threads.messages",
+        "threads.get",
+        "threads.list",
+        "threads.wait"
+      ],
+      "cells": [
+        "Host sessions",
+        "`omo host session open\\|close\\|unload\\|model\\|prompt\\|steer\\|abort\\|read\\|state\\|list\\|wait [--socket] [--rpc-key-root]`",
+        "the thread tools",
+        "partial",
+        "The `threads.*` rows of 6.1 and 6.2; the endpoint is the root's `endpoint`",
+        "T1b"
+      ]
+    }
+  ]
+}

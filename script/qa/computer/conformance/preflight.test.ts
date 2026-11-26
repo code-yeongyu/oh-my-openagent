@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { Environment } from "./preflight.ts"
+import { removeTreeSync } from "../../../../test-support/remove-tree"
+import { type Environment, repoPath } from "./preflight.ts"
 
 const runScript = join(import.meta.dir, "run.ts")
 
@@ -12,7 +13,9 @@ function withDir(body: (dir: string) => void): void {
   try {
     body(dir)
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    // Windows keeps a just-run compiled engine image locked briefly after it exits, and Bun ignores rmSync's
+    // retries (omo#11135), so the bounded EBUSY/EPERM retry lives in the shared helper.
+    removeTreeSync(dir, { maxRetries: 10, retryDelay: 500 })
   }
 }
 
@@ -29,6 +32,15 @@ function run(dir: string, engine: string) {
 }
 
 describe("environment preflight [ADP-3]", () => {
+  test("a prerequisite path is printed with forward slashes, so the same run reads identically on every OS", () => {
+    expect(repoPath("/repo", "/repo/script\\qa\\computer\\conformance\\drivers\\legacy.ts")).toBe(
+      "script/qa/computer/conformance/drivers/legacy.ts",
+    )
+    expect(repoPath("/repo", "/repo/script/qa/computer/conformance/drivers/engine.ts")).toBe(
+      "script/qa/computer/conformance/drivers/engine.ts",
+    )
+  })
+
   test("a missing engine ends the run as ENVIRONMENT_ERROR before any cell, never as a smaller green matrix", () => {
     withDir((dir) => {
       const result = run(dir, join(dir, "no-such-engine"))
@@ -66,12 +78,21 @@ describe("environment preflight [ADP-3]", () => {
 
   test("an engine that answers engine.hello on the fake backend passes the stdio probe", () => {
     withDir((dir) => {
-      const engine = join(dir, "engine")
-      writeFileSync(engine, `#!/bin/sh\nread line\necho '{"jsonrpc":"2.0","id":1,"result":{}}'\n`)
-      chmodSync(engine, 0o755)
+      // A real executable on every OS: a one-line Bun script compiled for this host.
+      const source = join(dir, "engine.ts")
+      writeFileSync(
+        source,
+        `for await (const _ of console) {\n  console.log('{"jsonrpc":"2.0","id":1,"result":{}}')\n  break\n}\n`,
+      )
+      const engine = join(dir, process.platform === "win32" ? "engine.exe" : "engine")
+      const built = Bun.spawnSync(["bun", "build", "--compile", source, "--outfile", engine])
+      expect(built.exitCode, built.stderr.toString()).toBe(0)
       const { environment } = run(dir, engine)
       expect(environment.checks.find((check) => check.name === "engine-stdio")?.ok).toBe(true)
       expect(environment.checks.find((check) => check.name === "engine-binary")?.ok).toBe(true)
     })
-  })
+    // 60 s for the compile and the run, plus withDir's worst-case cleanup: removeTreeSync's linear backoff
+    // sleeps 500 ms x (1 + ... + 10) = 27.5 s synchronously, so a slow Windows cleanup surfaces as its own
+    // error instead of as this test's timeout.
+  }, 90_000)
 })
