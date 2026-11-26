@@ -61,7 +61,13 @@ export type ThreadLocateResult = Ok<{ readonly located: LocatedThread }>
 
 export type ThreadEntriesResult = Ok<{ readonly page: ReadPage }>
 
-export type ThreadMessagesResult = Ok<{ readonly messages: readonly JsonObject[] }>
+/** The newest messages that fit the read's byte budget, oldest first; `truncated` when older ones did not fit. */
+export type ThreadMessagesResult = Ok<{
+  readonly messages: readonly JsonObject[]
+  readonly truncated: boolean
+  readonly total_items: number
+  readonly max_bytes: number
+}>
 
 export type ThreadGetResult = Ok<{ readonly session: SessionDetail }>
 

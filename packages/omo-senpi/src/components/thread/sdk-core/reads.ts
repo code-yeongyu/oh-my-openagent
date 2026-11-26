@@ -9,6 +9,7 @@ import { locateControl } from "../control/locate"
 import { NOT_LIVE } from "../control/operations"
 import { controlIdentity, controlRefusalOf } from "../control/port"
 import type { ThreadTranscriptEntry } from "../reader"
+import { readBudget, takeWithinBudget } from "../read-budget"
 import { readReceipt } from "../remote/lazy-ops"
 import type { ThreadCoreContext } from "./context"
 import { type Failure, fail } from "./failures"
@@ -87,16 +88,22 @@ const LIST_KEYS = [
 const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope", "limit", "idempotency_key"] as const
 const LOCATE_KEYS = ["thread", "all_scope"] as const
 const RECEIPT_KEYS = ["thread", "delivery_id", "all_scope"] as const
-const MESSAGES_KEYS = ["thread", "all_scope"] as const
+const MESSAGES_KEYS = ["thread", "all_scope", "max_bytes"] as const
 
 export type CoreReceiptRequest = Scoped & { readonly thread: string; readonly delivery_id: string }
 export type CoreReadAfterWaitRequest = CoreReadRequest & { readonly wait_ms: number }
+type CoreMessagesRequest = Scoped & { readonly thread: string; readonly max_bytes?: number }
 export type CoreMessagesResult =
   | {
       readonly kind: "ok"
       readonly thread: string
       readonly device?: string
+      /** The newest messages that fit `max_bytes`, oldest first. */
       readonly messages: readonly ThreadTranscriptEntry[]
+      /** Older messages did not fit the budget; `total_items` counts them all. */
+      readonly truncated: boolean
+      readonly total_items: number
+      readonly max_bytes: number
     }
   | Failure
 
@@ -234,17 +241,29 @@ export function createReads(context: ThreadCoreContext) {
         ),
       )
     })
-  // The engine's whole message list for a live thread, wherever it is held (no tool has it: a session reads the bounded
-  // transcript); a thread no engine holds answers as every control does.
-  const messages = (request: Scoped & { readonly thread: string }): Promise<CoreMessagesResult> =>
+  // The engine's message list for a live thread, wherever it is held (no tool has it: a session reads the bounded
+  // transcript), cut to the read's own byte budget from the newest message back, as thread_read's first read is; a thread
+  // no engine holds answers as every control does.
+  const messages = (request: CoreMessagesRequest): Promise<CoreMessagesResult> =>
     context.guard(async () => {
       const refused = unknownKeys(request, MESSAGES_KEYS)
       if (refused !== undefined) return refused
+      const budget = readBudget(request.max_bytes)
+      if (budget.kind === "error") return budget
       const located = await locateControl(controls, await view(), request.thread, request.all_scope, UNKNOWN_CALLER)
       if (located.kind === "error") return located.result as Failure
       if (located.kind === "not_live") return NOT_LIVE as Failure
       try {
-        return { kind: "ok", ...controlIdentity(located.control), messages: await located.control.getMessages() }
+        const all = await located.control.getMessages()
+        const { selected } = takeWithinBudget(all, budget.maxBytes, "end")
+        return {
+          kind: "ok",
+          ...controlIdentity(located.control),
+          messages: selected,
+          truncated: selected.length < all.length,
+          total_items: all.length,
+          max_bytes: budget.maxBytes,
+        }
       } catch (error) {
         // A control's typed refusal (another device's answer included) is the call's answer, as in every control.
         const refusal = controlRefusalOf(error)

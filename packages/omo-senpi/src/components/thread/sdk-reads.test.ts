@@ -212,12 +212,19 @@ describe("threads.readAfterWait", () => {
 
 describe("threads.messages", () => {
   test.each(["dur-local", "dur-on-b"])(
-    "#given a live thread %s #when the root asks for its messages #then it answers the engine's whole message list",
+    "#given a live thread %s whose messages fit the default budget #when the root asks for its messages #then it answers every one, not truncated",
     async (thread) => {
       const { root } = rootOn()
-      const answer = (await root.threads.messages({ thread })) as { kind: string; messages?: readonly unknown[] }
+      const answer = (await root.threads.messages({ thread })) as {
+        kind: string
+        messages?: readonly unknown[]
+        truncated?: boolean
+        total_items?: number
+      }
       expect(answer.kind).toBe("ok")
       expect(answer.messages?.length).toBeGreaterThan(0)
+      expect(answer.truncated).toBe(false)
+      expect(answer.total_items).toBe(answer.messages?.length)
     },
   )
 
