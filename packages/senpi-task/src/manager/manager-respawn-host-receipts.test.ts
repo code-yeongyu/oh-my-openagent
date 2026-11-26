@@ -33,10 +33,13 @@ describe("receipt-driven host respawn lifecycle", () => {
         if (result.applied) statuses.push(result.record.status)
         return result
       }
-      expect(await f.manager.reattach(f.record, f.result.handle)).toEqual({ ok: true })
+      // The revival ends once the continued run reopened the record, so the run's start is released first (#15125).
+      const revival = f.manager.reattach(f.record, f.result.handle)
       expect(f.store.load(f.record.task_id)?.final_response).toBeUndefined()
       expect(f.store.load(f.record.task_id)?.error_message).toBeUndefined()
       f.startContinuation()
+      expect(await revival).toEqual({ ok: true })
+      expect(f.store.load(f.record.task_id)).toMatchObject({ status: "running", resumed_run_epoch: 1 })
       await f.resumed
       expect(statuses).toContain("interrupted")
       expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(2)
