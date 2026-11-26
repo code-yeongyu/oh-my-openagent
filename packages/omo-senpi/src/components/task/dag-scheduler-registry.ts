@@ -15,6 +15,7 @@ import {
 } from "../../../../senpi-task/src/dag/run-acquisition"
 import { releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
+import type { PausedNodeHoldPort } from "./dag-paused-cancel"
 import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
 
 export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
@@ -35,6 +36,8 @@ export function createDagSchedulerRegistry(ports: {
   readonly reservations: DagRunReservations
   // Re-runs this session's recovery: a run whose scheduler here failed is handed to it.
   recover(sessionId: string): Promise<void>
+  // Ends a parked run's live children (the unheld road cancel takes).
+  readonly closure: PausedNodeHoldPort
 }) {
   const { schedulers, store, schedulerOptions, logger } = ports
   const lease = {
@@ -51,6 +54,8 @@ export function createDagSchedulerRegistry(ports: {
     probe: lease,
     logger,
     holdsRun,
+    children: schedulerOptions.taskManager,
+    closure: ports.closure,
     recover: (sessionId) => ports.recover(sessionId),
   })
 
@@ -75,12 +80,10 @@ export function createDagSchedulerRegistry(ports: {
       // A scheduler that failed holds nothing any more; a settled or retired one leaves its lease to
       // the write that ends its holding (terminal, park, Stop, or the shutdown pause).
       releaseDagRunLease(store, runId, lease.hostPid)
-      logger.error("omo-senpi dag scheduler failed", {
-        runId,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error("omo-senpi dag scheduler failed", { runId, error: message })
       // The run is left `running` with nothing driving it: hand it on (recovery, or park) at once.
-      void onSchedulerEnded.failed(runId, owned.scheduler.snapshot().parentSessionId)
+      void onSchedulerEnded.failed(runId, owned.scheduler.snapshot().parentSessionId, message)
     })
   }
 

@@ -203,6 +203,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     scheduler.subscribe(publishSchedulerEvent)
   })
 
+  const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)
   const { holdsRun, ensureScheduled, adoptReentry, adoptInstalled } = createDagSchedulerRegistry({
     schedulers,
     store,
@@ -211,10 +212,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     isProcessAlive,
     reservations,
     recover: (sessionId) => sweeps.recover({ sessionId }),
+    closure: childClosure,
   })
   const holders = { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive }
-
-  const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)
   const cancelRun = createDagRunCancel({
     store,
     schedulerOptions,
