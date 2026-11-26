@@ -616,7 +616,7 @@ async function buildEntry(
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
     await minifyBundle(output)
-    return await attachBuildMarker({
+    const inputs = await attachBuildMarker({
       output,
       entry,
       metafile,
@@ -625,8 +625,10 @@ async function buildEntry(
       buildSettings: digestSettingsFor(externals, builtinModuleNames),
       buildScriptPath,
     })
-  } finally {
+    // Kept only for a build that succeeded, so a failed build's own error is what the caller sees.
     if (keepMetafile !== undefined) await copyFile(metafile, keepMetafile)
+    return inputs
+  } finally {
     await rm(metafile, { force: true })
   }
 }

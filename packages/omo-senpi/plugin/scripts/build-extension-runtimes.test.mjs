@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
+import { buildOmoSdkRuntime, omoSenpiBuildDefines } from "./build-extension-core.mjs"
 import { checkExtensionCurrent } from "./build-extension.mjs"
 import {
   difference,
@@ -198,6 +199,21 @@ describe("the provisioned SDK root runtime's cold import (P1b decision)", () => 
   test("#given the runtime entry #then the deferred modules are on no static import path", async () => {
     const { reached } = await staticModuleSet()
     expect(reached.filter((path) => DEFERRED.some((part) => path.includes(part)))).toEqual([])
+  })
+})
+
+describe("the root runtime build's kept metafile", () => {
+  // Review 6074228823: the copy runs only after a successful build, and the build's own metafile is removed either way.
+  test("#given a metafile destination that cannot be written #when the root runtime builds #then the build rejects and leaves no metafile beside its output", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omo-sdk-keep-metafile-"))
+    perTestRoots.push(dir)
+    const output = join(dir, "sdk.js")
+    await expect(
+      buildOmoSdkRuntime(output, omoSenpiBuildDefines("0.0.0-test"), {
+        keepMetafile: join(dir, "missing", "meta.json"),
+      }),
+    ).rejects.toThrow()
+    expect(existsSync(`${output}.meta.json`)).toBe(false)
   })
 })
 
