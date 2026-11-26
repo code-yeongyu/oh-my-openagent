@@ -36,6 +36,14 @@ export interface MemoryEngineSession {
 
 const normalizedRepos = new Set<string>()
 
+/**
+ * Repository creations in flight in this process. A preparation that finds one joins it instead of queueing on the
+ * writer lock: creating takes longer than a writer's lock wait on slow hosts (on Windows git init plus the hooked seed
+ * commit runs past the 5 s default), and the queued caller then failed with a lock contention for a repository that
+ * was about to exist (#14188). Callers that join never see `created`.
+ */
+const repoCreations = new Map<string, Promise<boolean>>()
+
 export interface MemoryEngineSessionOptions {
   readonly lockWaitTimeoutMs?: number
   readonly lockRetryDelayMs?: number
@@ -53,18 +61,25 @@ export async function prepareMemoryEngineSession(
   const lock = createMemoryWriterLock(identity, identityPaths, options)
   const author: GitCommitAuthor = { agentId: identity, authorName: identity }
   let created = false
-  if (!existsSync(join(identityPaths.repo, ".git"))) {
-    await lock("memory-write", async () => {
-      if (!existsSync(join(identityPaths.repo, ".git"))) {
-        await repo.init({
-          seedFiles: buildDefaultSeedFiles(),
-          installHooks: (dir) => {
-            installHooks(dir, { checker: memoryHookChecker() })
-          },
-        })
-        created = true
-      }
+  const inFlight = repoCreations.get(identityPaths.repo)
+  if (inFlight !== undefined) await inFlight
+  else if (!existsSync(join(identityPaths.repo, ".git"))) {
+    const creation = lock("memory-write", async () => {
+      if (existsSync(join(identityPaths.repo, ".git"))) return false
+      await repo.init({
+        seedFiles: buildDefaultSeedFiles(),
+        installHooks: (dir) => {
+          installHooks(dir, { checker: memoryHookChecker() })
+        },
+      })
+      return true
     })
+    repoCreations.set(identityPaths.repo, creation)
+    try {
+      created = await creation
+    } finally {
+      repoCreations.delete(identityPaths.repo)
+    }
   }
   const createdField = created ? ({ created: true } as const) : {}
   if (normalizedRepos.has(identityPaths.repo)) return { repo, lock, author, ...createdField }

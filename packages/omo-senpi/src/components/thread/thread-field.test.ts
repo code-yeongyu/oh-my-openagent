@@ -45,11 +45,12 @@ function tools(sessions: ThreadHostSession[]) {
     prompt: async () => ({ turnId: "turn-1" }),
     interrupt: async () => ({ interrupted: false }),
     setSessionName: async () => {},
+    setSessionArchived: async () => {},
     setModel: async (_sessionId, provider, id) => ({ provider, id, name: "Model" }),
     getAvailableModels: async () => [{ provider: "openai", id: "gpt-x", name: "GPT X" }],
     setThinkingLevel: async () => {},
     getAvailableThinkingLevels: async () => ["off", "high"],
-    closeSession: async () => "closed",
+    closeSession: async () => ({ outcome: "closed", dropped_deliveries: [] }),
   }
   const agentDir = mkdtempSync(join(tmpdir(), "thread-field-"))
   directories.push(agentDir)
@@ -128,13 +129,14 @@ describe("one field names a session (#14044 4a)", () => {
       thread_rename: await run("thread_rename", { thread, name: "peer renamed" }),
       thread_set_model: await run("thread_set_model", { thread, model: "openai/gpt-x" }),
       thread_set_reasoning: await run("thread_set_reasoning", { thread, level: "high" }),
+      thread_archive: await run("thread_archive", { thread }),
       thread_close: await run("thread_close", { thread }),
       thread_create: await run("thread_create", { name: "fresh" }),
     }
 
-    // then: every verb is either scanned here or a relay tool, addressed by binding, never by session
+    // then: every verb is scanned here
     const unscanned = (Object.keys(threadToolParamSchemas) as ThreadToolName[]).filter(
-      (name) => answers[name] === undefined && !inputNames(name).includes("binding_id"),
+      (name) => answers[name] === undefined,
     )
     expect(unscanned).toEqual([])
     expect(typeof thread).toBe("string")

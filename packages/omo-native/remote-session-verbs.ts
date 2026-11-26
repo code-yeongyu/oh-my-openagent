@@ -3,13 +3,20 @@ import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contra
 import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import {
   answered,
+  closeOptions,
   closeThread,
   interruptThread,
   setModelOn,
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
-import { type LocalSessions, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
+import {
+  handleOf,
+  type LocalSessions,
+  remoteClientForPerson,
+  resolveTypedAddress,
+  resolveTypedDevice,
+} from "../omo-senpi/src/components/remote/index"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -21,25 +28,28 @@ import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/
 import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/components/thread/gateway/engine"
 import { createLocalTransport } from "../omo-senpi/src/components/thread/gateway/local-transport"
 import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gateway/pipeline"
-import { createdDeviceRow, namedDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
+import { createdDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { openedResult } from "../omo-senpi/src/components/thread/tools/thread-row"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
-import {
-  rowThreadId,
-  type RemoteSessionRow,
-  type RemoteThreadSurface,
-} from "../omo-senpi/src/components/thread/remote/ports"
-import { resolveSessionTarget } from "./remote-session-target"
-import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
+import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import { followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { sendWaitNotice, sessionVerbLines } from "./remote-render"
+import {
+  personNextAction,
+  refusalLines,
+  sendWaitNotice,
+  sessionEndedLine,
+  sessionVerbLines,
+  undeliveredPromptLines,
+} from "./remote-render"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { localPermissionPreset } from "./remote-permission-preset"
-import type { SessionArgs } from "./remote-session-args"
+import { STDIN_TEXT, type SessionArgs } from "./remote-session-args"
 
 /**
  * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
@@ -78,6 +88,9 @@ const deviceServiceSurface = (
   chain: { stamp: (record) => record },
 })
 
+// The relay failure every `omo remote` verb answers before resolving, attach included (#14305 delta review H1).
+export { remoteAvailable }
+
 /**
  * The command's one device-service connection, lent to its remote client: the client's account reads ride it, and the
  * client's close() leaves it open for the command, which closes it itself.
@@ -108,19 +121,53 @@ export async function runSession(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const remote = (
-    dependencies.remote ??
-    ((service) =>
-      deviceServiceSurface(service, dependencies.connect, dependencies.stateDir, dependencies.localSessions))
-  )(service)
-  // The client holds its own device-service connection; a command that left it open would keep the process alive. The
-  // sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
+  const remote = oneDeviceListing(
+    (
+      dependencies.remote ??
+      ((service) =>
+        deviceServiceSurface(service, dependencies.connect, dependencies.stateDir, dependencies.localSessions))
+    )(service),
+  )
+  // The client borrows the command's connection; closing it releases the client and leaves that connection to the command.
+  // The sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
   // connection the port dialed itself, never the command's borrowed one.
   try {
     return await runSessionOn(remote, args, json, dependencies)
   } finally {
     remote.client.close()
     await remote.sessions.close?.()
+  }
+}
+
+/**
+ * The surface with the account's device list read once for the command (#13432): resolving the typed device and the
+ * verb's own online check then share one listing, so naming a device costs no extra round trip.
+ */
+function oneDeviceListing(remote: RemoteThreadSurface): RemoteThreadSurface {
+  let listing: ReturnType<RemoteThreadSurface["client"]["devices"]["list"]> | undefined
+  const devices = { ...remote.client.devices, list: () => (listing ??= remote.client.devices.list()) }
+  return { ...remote, client: { ...remote.client, devices } }
+}
+
+type Named = <T extends object>(result: T) => T
+
+const isEntry = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null
+
+/**
+ * A listing key the person typed names the session at the fields that name it - `thread`, `link` and a refusal's
+ * `details.thread` - as before the address module. Nothing else in the answer changes: a reply's text keeps every id.
+ */
+function namedBy<T extends object>(result: T, key: string, title: string): T {
+  const error = "error" in result ? result.error : undefined
+  const details = isEntry(error) ? error["details"] : undefined
+  return {
+    ...result,
+    ...("thread" in result ? { thread: key } : {}),
+    ...("link" in result ? { link: threadLink(key, title) } : {}),
+    ...(isEntry(error) && isEntry(details) && "thread" in details
+      ? { error: { ...error, details: { ...details, thread: key } } }
+      : {}),
   }
 }
 
@@ -131,41 +178,64 @@ async function runSessionOn(
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const show: Show = (result, label) => {
-    if (json) dependencies.output(JSON.stringify(result))
+    // A next action naming the agents' eval-only thread_list reads the CLI verb in --json too: scripts run the CLI.
+    if (json)
+      dependencies.output(
+        JSON.stringify(
+          result.kind === "error"
+            ? { ...result, error: { ...result.error, next_action: personNextAction(result.error.next_action) } }
+            : result,
+        ),
+      )
     if (result.kind === "error") {
       if (!json && label !== "" && NO_SUCH_SESSION.has(String(result.error.details?.["reason"]))) {
-        dependencies.error(`omo remote: no session ${label} on this account.`)
+        dependencies.error(escapeForDisplay(`omo remote: no session ${label} on this account.`))
         dependencies.error("Run omo remote sessions to see them.")
       } else if (!json) {
-        dependencies.error(`omo remote: ${result.error.message}`)
-        dependencies.error(result.error.next_action)
+        for (const line of refusalLines(result.error)) dependencies.error(line)
       }
       return REMOTE_EXIT.failed
     }
     if (!json) for (const line of sessionVerbLines(args.verb, label, result)) dependencies.output(line)
     return REMOTE_EXIT.ok
   }
+  // omo remote needs the relay: a device service that is off, signed out or not set up is host_unavailable naming its
+  // state, for every verb. The address module would read those states as "no relay here" and search this device's
+  // (empty) book, answering not_found (#14305 delta review H1).
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return show(unavailable, "")
   if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
-  const label = args.target.device === undefined ? args.target.session : `${args.target.device}/${args.target.session}`
-  // `<device>/<session>` is addressed directly, as the SDK does (the port locates a durable id its listing lags on); a
-  // bare durable id is found in the account listing (omo#13707).
-  const resolved = await resolveSessionTarget(remote, args.target)
-  if (resolved.kind === "error") return show(resolved, label)
-  const { row } = resolved
-  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
-  // The device is found online once, before its control is used, as the thread tools' locate does (A3).
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return show(offline, label)
+  // The typed text is resolved by the one address resolver (#14305): a bare thread id, name, alias or id prefix, or
+  // `<device>/<thread>` with the device by id, name, prefix or `here`. A send needs only the address (its delivery
+  // queues); the control verbs need the device online, refused there by the resolver itself.
+  const resolved = await resolveTypedAddress(remote, args.target, {
+    need: args.verb === "send" ? "address" : "online",
+  })
+  if (resolved.kind === "error") return show(resolved, args.target)
+  const { row } = resolved.where
+  // A listing key the person typed names the session in every --json answer (the ended one and the link included), as
+  // before the address module; the row itself keeps its durable id.
+  const typedKey = args.target === row.session_id || args.target.endsWith(`/${row.session_id}`)
+  const named: Named = typedKey ? (result) => namedBy(result, row.session_id, row.title) : (result) => result
+  const answer: Show = (result, label) => show(named(result), label)
+  // The output names the session by its address, whatever the person typed for it.
+  const label = resolved.address
+  if (args.verb === "send") {
+    const text = args.text === STDIN_TEXT ? await (dependencies.readStdin ?? readProcessStdin)() : args.text
+    if (text === "") {
+      dependencies.error("omo remote send: stdin was empty; pipe the message text in, or pass it as an argument")
+      return REMOTE_EXIT.usage
+    }
+    return sendTo(remote, row, { ...args, text }, { label, json, show: answer, named }, dependencies)
+  }
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
-      return show(await answered(() => setModelOn(control, args.model, undefined)), label)
+      return answer(await answered(() => setModelOn(control, args.model, undefined)), label)
     case "interrupt":
-      return show(await answered(() => interruptThread(control, undefined)), label)
+      return answer(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return show(await answered(() => closeThread(control)), label)
+      return answer(cliClose(await answered(() => closeThread(control, closeOptions(args))), label), label)
   }
 }
 
@@ -180,12 +250,14 @@ async function openOn(
     mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
-    dependencies.error(error.message)
+    dependencies.error(escapeForDisplay(error.message))
     return REMOTE_EXIT.usage
   }
   // One open through the shared create path (#13409): the model and thinking level are the engine's launch profile on the
   // open_session frame, so a model the device cannot run refuses the open and no session is left behind.
-  const open = await createRelaySessionHost(remote, args.device).open({
+  const device = await resolveTypedDevice(remote.client, args.device)
+  if (device.kind === "error") return show(device, "")
+  const open = await createRelaySessionHost(remote, device.device).open({
     permissionPreset: mode,
     ...(args.project === undefined ? {} : { cwd: args.project }),
     ...(args.model === undefined ? {} : { provider: args.model.provider, modelId: args.model.modelId }),
@@ -200,12 +272,12 @@ async function openOn(
   } as ThreadToolResult
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
-  const label = `${args.device}/${open.thread.thread_id}`
-  const row = createdDeviceRow(args.device, open.thread)
+  const label = handleOf(device.device, open.thread.thread_id)
+  const row = createdDeviceRow(device.device, open.thread)
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {
-    sent = await delivery.deliver(row, label, args.prompt, args.delivery ?? "auto")
+    sent = await delivery.deliver(row, label, args.prompt, args.delivery)
   } finally {
     await delivery.dispose()
   }
@@ -219,8 +291,7 @@ async function openOn(
   else {
     for (const line of sessionVerbLines("open", "", opened)) dependencies.output(line)
     if (sent.kind === "error") {
-      dependencies.error(`omo remote: opened ${label}, but its first prompt was not delivered: ${sent.error.message}`)
-      dependencies.error(`${sent.error.next_action} Send it again with omo remote send ${label} <text>.`)
+      for (const line of undeliveredPromptLines(label, sent.error)) dependencies.error(line)
     }
   }
   return sent.kind === "error" ? REMOTE_EXIT.failed : REMOTE_EXIT.ok
@@ -288,8 +359,8 @@ function personDelivery(remote: RemoteThreadSurface, dependencies: RemoteCommand
       }
     return {
       kind: "ok",
-      thread: rowThreadId(row),
-      link: threadLink(rowThreadId(row), row.title),
+      thread: row.durable_id ?? "",
+      link: threadLink(row.durable_id ?? "", row.title),
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,
       device: row.device,
@@ -315,7 +386,12 @@ async function sendTo(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
   args: Extract<SessionArgs, { readonly verb: "send" }>,
-  { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
+  {
+    label,
+    json,
+    show,
+    named,
+  }: { readonly label: string; readonly json: boolean; readonly show: Show; readonly named: Named },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const delivery = personDelivery(remote, dependencies)
@@ -324,7 +400,7 @@ async function sendTo(
   const deliver = () => delivery.deliver(row, label, args.text, args.delivery, clientMessageId)
   const nothingToSteer = (result: ThreadToolResult): number | undefined => {
     if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
-    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+    dependencies.error(escapeForDisplay(`omo remote: nothing is running on ${label} to steer.`))
     dependencies.error("Send without --steer to start a turn.")
     return REMOTE_EXIT.failed
   }
@@ -355,19 +431,54 @@ async function sendTo(
     // The ok send always carries its delivery; without one the attach's own end still settles the follow below.
     if ("delivery" in sent)
       follow.aim(sent.delivery.kind === "started" ? "started" : sent.delivery.kind === "steered" ? "steered" : "queued")
-    // A send that waits behind a running turn says so at once (#13268); stdout stays the answer alone, so this is stderr.
+    // A send that waits behind a running turn says so at once (#13268); under --json the notice rides the final
+    // JSON value instead of stderr, so one JSON value always carries it (#13425).
     const waitNotice = sendWaitNotice(label, sent)
-    if (waitNotice !== null && !json) dependencies.error(waitNotice)
-    const end = await follow.settled
+    if (waitNotice !== null && !json) dependencies.error(escapeForDisplay(waitNotice))
+    // #13425: the settle wait is bounded (--timeout seconds, default 120); a turn that never settles answers a
+    // typed timeout instead of hanging the person at this terminal.
+    const waitMs = args.timeout_seconds !== undefined ? args.timeout_seconds * 1000 : 120_000
+    let settleTimer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<"__omo_send_timeout__">((resolve) => {
+      settleTimer = setTimeout(() => resolve("__omo_send_timeout__"), waitMs)
+      settleTimer.unref?.()
+    })
+    const end = await Promise.race([follow.settled, timedOut]).finally(() => {
+      if (settleTimer !== undefined) clearTimeout(settleTimer)
+    })
+    const queuedNoticeField = waitNotice === null ? {} : { queued_notice: waitNotice }
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
-    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
+    if (json && end === "settled") dependencies.output(JSON.stringify(named({ ...sent, reply, ...queuedNoticeField })))
+    if (end === "__omo_send_timeout__") {
+      if (json)
+        dependencies.output(
+          JSON.stringify(
+            named({
+              ...sent,
+              kind: "timeout",
+              waited_ms: waitMs,
+              ...queuedNoticeField,
+              next_action: "The message was delivered; read the thread to see its answer when the turn settles.",
+            }),
+          ),
+        )
+      else
+        dependencies.error(
+          escapeForDisplay(
+            `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+          ),
+        )
+      return REMOTE_EXIT.failed
+    }
     if (end === "interrupted") {
-      dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
+      dependencies.error(escapeForDisplay(`omo remote: the turn on ${label} was interrupted before it finished.`))
       return REMOTE_EXIT.failed
     }
     if (end !== "settled") {
-      dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
+      if (json)
+        dependencies.output(JSON.stringify(named({ ...sent, kind: "session_ended", end, ...queuedNoticeField })))
+      else dependencies.error(sessionEndedLine(row.device, String(end)))
       return REMOTE_EXIT.failed
     }
     return REMOTE_EXIT.ok
@@ -376,4 +487,42 @@ async function sendTo(
     if (follow !== undefined && !("kind" in follow)) follow.stop()
     await delivery.dispose()
   }
+}
+
+/**
+ * A close the engine refused because the thread has messages it has not read (omo#14234) names the CLI's own option:
+ * the tool's hint says `force: true`, which this command takes as `--force`, and the ids (or `unavailable`) are printed.
+ */
+function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
+  // omo#13905: the shared close body answers a session its device does not hold as ok with closed:false. For the CLI that
+  // is a failed close: a script must never read an id or route miss as success while the session may still run.
+  if (result.kind === "ok" && "closed" in result && result.closed === false)
+    return {
+      kind: "error",
+      error: {
+        code: "not_found",
+        message: `${label} is not open on its device, so nothing was closed.`,
+        next_action: "Run omo remote sessions to see the sessions each device holds, then close one by its address.",
+        details: { thread: label },
+      },
+    }
+  if (result.kind !== "error" || result.error.details?.["pending_deliveries"] === undefined) return result
+  const pending = result.error.details["pending_deliveries"]
+  const ids = Array.isArray(pending)
+    ? `messages it has not read: ${pending.join(", ")}`
+    : "message ids: unavailable on that device's engine"
+  return {
+    ...result,
+    error: {
+      ...result.error,
+      next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.`,
+    },
+  }
+}
+
+/** The whole of this process's stdin as UTF-8, for `omo remote send <target> -` (omo#13905). */
+async function readProcessStdin(): Promise<string> {
+  const chunks: Buffer[] = []
+  for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  return Buffer.concat(chunks).toString("utf8")
 }

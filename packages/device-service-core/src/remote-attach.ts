@@ -15,6 +15,7 @@ import type {
   SnapshotBody,
 } from "./local-api/protocol.ts"
 import { realTimers, type Timers } from "./timers.ts"
+import { UnsettledCommandError } from "./unsettled-command.ts"
 
 /** How an attach ended: a service-reported reason, the connection closing, or this client's own detach. */
 export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
@@ -137,6 +138,9 @@ export function openAttach(
 ): Promise<RemoteAttach> {
   // Events of the new attach can arrive before its handle is known, so they wait here until the response names it.
   const early: AttachEvent[] = []
+  // omo#11999: the replay buffer for a listener that subscribes between the snapshot and detach is bounded; the
+  // oldest records drop, the newest always replay.
+  const ATTACH_HISTORY_MAX = 512
   const history: RemoteAttachEvent[] = []
   const listeners = new Set<(event: RemoteAttachEvent) => void>()
   let handle: string | undefined
@@ -186,6 +190,7 @@ export function openAttach(
       resolveSnapshot(remote.snapshot)
     }
     history.push(remote)
+    if (history.length > ATTACH_HISTORY_MAX) history.splice(0, history.length - ATTACH_HISTORY_MAX)
     for (const listener of [...listeners]) {
       try {
         listener(remote)
@@ -235,6 +240,7 @@ export function openAttach(
             const { waitMs = ATTACH_COMMAND_WAIT_MS, accepts } = options
             // Minted here, before sending, so a state that arrives ahead of the answer is not missed.
             const commandId = randomBytes(16).toString("base64url")
+            let progress: CommandStateEvent["state"] | undefined
             const settle = (): void => {
               stopState()
               cancelWait()
@@ -247,7 +253,10 @@ export function openAttach(
             }
             const stopState = client.onEvent((event) => {
               if (event.kind !== "session.command_state" || event.command_id !== commandId) return
-              if (PROGRESS_STATES.has(event.state)) return
+              if (PROGRESS_STATES.has(event.state)) {
+                progress = event.state
+                return
+              }
               // Taken before settling: the last command of an ended attach releases the channel that holds the reply.
               const response = delegated.takeReply(commandId)
               settle()
@@ -258,11 +267,7 @@ export function openAttach(
             const cancelWait = timers.after(waitMs, () => {
               settle()
               delegated.forget(commandId)
-              reject(
-                new LocalApiError("request_timeout", `no final state for command ${commandId} within ${waitMs} ms`, {
-                  command_id: commandId,
-                }),
-              )
+              reject(new UnsettledCommandError(commandId, waitMs, progress))
             })
             commands.add(end)
             client

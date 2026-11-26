@@ -17,7 +17,7 @@ import {
 const RELAYD_SYSTEMD_UNIT = "omo-relay-daemon.service"
 const COLD_WAKE_DROP_IN = "50-omo-cold-wake.conf"
 
-const unitDir = (home: string): string => join(home, ".config", "systemd", "user")
+export const unitDir = (home: string): string => join(home, ".config", "systemd", "user")
 const dropInPath = (home: string): string => join(unitDir(home), `${RELAYD_SYSTEMD_UNIT}.d`, COLD_WAKE_DROP_IN)
 
 const ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: "\r", "\\": "\\", '"': '"' }

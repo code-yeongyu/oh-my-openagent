@@ -1,0 +1,8 @@
+# macOS root shard 1b (#14849): bunfig.toml plus memory-core's sync and memfs trees, which shard 1a runs as its
+# own step. Keep every other setting identical to bunfig.toml.
+[test]
+preload = ["./test-env.ts", "./test-setup.ts"]
+pathIgnorePatterns = ["dist/**", "packages/web/**", "packages/get-worker/**", "packages/lsp-tools-mcp/**", "packages/lsp-daemon/**", "packages/senpi-desktop-*/**", "packages/omo-computer-*/**", "packages/omo-codex/plugin/**", "packages/omo-codex/scripts/**", "packages/shared-skills/upstreams/**", "packages/memory-core/src/sync/**", "packages/memory-core/src/memfs/**"]
+
+[loader]
+".md" = "text"

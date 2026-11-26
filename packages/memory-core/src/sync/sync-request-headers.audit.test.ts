@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { parseSync } from "oxc-parser"
 
@@ -19,6 +19,8 @@ const CLIENT_SCOPES = [
   "packages/omo-opencode/src/cli/service-auth/**/*.ts",
   "packages/omo-opencode/src/cli/account-keys/**/*.ts",
 ]
+// Bun.Glob yields native separators (backslashes on Windows); every comparison below is against POSIX paths.
+const posixPath = (file: string): string => file.split(sep).join("/")
 const AUTHORIZATION = /^authorization$/i
 const BEARER = /^bearer\s/i
 
@@ -76,10 +78,11 @@ test("the audit passes headers built by syncRequestHeaders and code that only me
 
 test("no sync or account client builds an authorization header except through syncRequestHeaders (#13691)", async () => {
   const files = new Set<string>()
-  for (const scope of CLIENT_SCOPES) for await (const file of new Bun.Glob(scope).scan({ cwd: REPO })) files.add(file)
+  for (const scope of CLIENT_SCOPES)
+    for await (const file of new Bun.Glob(scope).scan({ cwd: REPO })) files.add(posixPath(file))
   // Any other source file that names a floored route is a sync client too, wherever it lives.
   for await (const file of new Bun.Glob("packages/*/src/**/*.ts").scan({ cwd: REPO }))
-    if ((await Bun.file(join(REPO, file)).text()).includes(FLOORED_ROUTE_PREFIX)) files.add(file)
+    if ((await Bun.file(join(REPO, file)).text()).includes(FLOORED_ROUTE_PREFIX)) files.add(posixPath(file))
 
   const offenders: string[] = []
   for (const file of files) {

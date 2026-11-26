@@ -64,46 +64,24 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "xhigh",
     },
   ],
+  // The three GPT deep lanes run one exact model each (#14155): no older GPT, no Fast tier and no other
+  // family behind it. The single rung lists every provider serving that exact id, in preference order
+  // (subscription, then API key, then OpenCode Zen); Copilot does not serve GPT-6.2 and GPT-6.2 Sol is
+  // served only on the two OpenAI lanes. A registry without the model leaves the lane gated off.
   ultrabrain: [
-    // Each GPT-6.2 rung keeps GPT-6 Astra right behind it, so a registry without 6.2 (an older engine
-    // catalog) resolves what it did before; Copilot does not serve 6.2 and keeps its GPT-6 Astra rung.
-    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "max" },
-    { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
     {
       providers: ["chatgpt-subscription", "openai", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.gptAstra,
       variant: "max",
     },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6-astra", variant: "max" },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-5.6-sol", variant: "max" },
   ],
   "deep-low": [
-    // GPT-6.2 Sol leads at the same medium effort on the ChatGPT subscription and OpenAI lanes (plain,
-    // then the Fast tier), then GPT-6.1 Sol for a registry without 6.2. GPT-5.6 Sol stays behind them
-    // so Copilot, OpenCode Zen and a registry without either still resolve the lane.
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
-    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
-    {
-      providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
-    },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" },
   ],
   "deep-high": [
     {
       providers: ["chatgpt-subscription", "openai", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.gptAstra,
-      variant: "high",
-    },
-    {
-      providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
-      model: "gpt-6-astra",
       variant: "high",
     },
   ],

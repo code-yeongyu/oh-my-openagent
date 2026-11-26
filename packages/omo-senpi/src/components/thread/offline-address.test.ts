@@ -229,39 +229,6 @@ describe("thread send with no live endpoint anywhere", () => {
   })
 })
 
-describe("store-only operations with no live endpoint", () => {
-  test("#given no endpoint of the agent dir answers and the sessions exist only on disk #when the CLI binds, lists, reports and rebinds by id and by name #then every call resolves the sessions instead of host_unavailable", async () => {
-    const agentDir = agentDirectory()
-    sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
-    sessionFile(agentDir, "dur-next", process.cwd(), "next-tui")
-    const sdk = sdkOver(agentDir)
-    const bound = await sdk.bind({
-      session: "dur-gone",
-      binding: { platform: "custom", account_id: "bot", chat_id: "c1", thread_id: "t1" },
-    })
-    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-    expect(bound.binding.session_durable_id).toBe("dur-gone")
-    const listed = await sdk.bindings({ session: "gone-tui" })
-    expect(listed.kind === "ok" ? listed.bindings.map((binding) => binding.binding_id) : listed).toEqual([
-      bound.binding.binding_id,
-    ])
-    expect(
-      await sdk.report({
-        session: "gone-tui",
-        kind: "milestone",
-        text: "still here",
-        binding_id: bound.binding.binding_id,
-      }),
-    ).toMatchObject({ kind: "ok", cursor: 1 })
-    const moved = await sdk.rebind({
-      binding_id: bound.binding.binding_id,
-      expected_revision: bound.binding.revision,
-      session: "next-tui",
-    })
-    expect(moved).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-next", revision: 2 } })
-  })
-})
-
 describe("findDiskSessions", () => {
   test("#given sessions in the caller's workspace and in another directory #when looked up by name and by id #then a name is read only in the workspace's session directories unless all_scope, and an id is found by its file name anywhere", () => {
     const agentDir = agentDirectory()
@@ -277,6 +244,20 @@ describe("findDiskSessions", () => {
       { durable_id: "dur-far", cwd: elsewhere, name: "lane", source_host: null },
     ])
     expect(findDiskSessions(join(agentDir, "missing"), "lane", { all_scope: true })).toEqual([])
+  })
+
+  test("#given a sibling directory whose path extends the workspace's (<root>-tmp) #when a name is looked up in the workspace's scope #then only sessions in the workspace or below it are found (#14893)", () => {
+    const agentDir = agentDirectory()
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "thread-offline-sibling-")))
+    cleanups.push(() => rmSync(base, { recursive: true, force: true }))
+    const root = join(base, "fix-guard")
+    mkdirSync(join(root, "packages"), { recursive: true })
+    mkdirSync(join(base, "fix-guard-tmp"), { recursive: true })
+    const atRoot = sessionFile(agentDir, "dur-root", root, "lane")
+    const below = sessionFile(agentDir, "dur-below", join(root, "packages"), "lane")
+    sessionFile(agentDir, "dur-sibling", join(base, "fix-guard-tmp"), "lane")
+    const found = findDiskSessions(join(agentDir, "sessions"), "lane", { workspaceRoots: [root] })
+    expect(found.map((session) => session.session_path).sort()).toEqual([atRoot, below].sort())
   })
 })
 
@@ -366,7 +347,7 @@ describe("thread send to a session this process never saw alive", () => {
     expect(wakes).toEqual([])
   })
 
-  test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and not_found unless all_scope, with nothing written", async () => {
+  test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and scope_denied unless all_scope, with nothing written", async () => {
     const agentDir = agentDirectory()
     const elsewhere = realpathSync(mkdtempSync(join(tmpdir(), "thread-offline-elsewhere-")))
     cleanups.push(() => rmSync(elsewhere, { recursive: true, force: true }))
@@ -384,7 +365,7 @@ describe("thread send to a session this process never saw alive", () => {
     })
     expect(await sdk.send({ thread: "far-lane", text: "x" })).toMatchObject({
       kind: "error",
-      error: { code: "not_found" },
+      error: { code: "scope_denied" },
     })
     const store = storeAt(agentDir)
     expect(await store.list()).toEqual([])

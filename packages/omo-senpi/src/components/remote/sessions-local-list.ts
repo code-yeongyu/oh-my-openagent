@@ -43,7 +43,8 @@ export async function localSessionRows(
       project: session.cwd,
       path: session.sessionPath ?? "",
       state: session.status === "closing" || session.status === "closed" ? "ended" : "running",
-      archived: false,
+      archived: session.archived === true,
+      ...(session.model === undefined ? {} : { model: `${session.model.provider}/${session.model.id}` }),
       updated_ms: updatedMs(session),
       source: "live",
     }

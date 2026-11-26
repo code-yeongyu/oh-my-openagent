@@ -43,7 +43,7 @@ Recovery resolves the newest owned task before consulting the checkpoint's `task
 - Policy is fixed inside the definition fingerprint: `dependency-frontier` wave admission (was `strict-barrier` before 2026-08-25), `continue-independent` failure handling, filesystem-only dependency data.
 - Run reuse keys on the SUBMITTED definition (canonicalized). Amendments preserve eligible node state and invalidate affected dependents.
 - Boundary events are sequenced by the journal writer; live telemetry rides the unsequenced `omo.dag.activity` channel as a separate union.
-- Node target rules mirror the task tool: category XOR `subagent_type`, model only with an agent route, error codes `both_targets` / `no_target` / `category_with_model`.
+- Node target rules mirror the task tool: category XOR `subagent_type`, model only with a custom agent route, error codes `both_targets` / `no_target` / `category_with_model` / `agent_with_model`.
 
 ## Anti-patterns
 

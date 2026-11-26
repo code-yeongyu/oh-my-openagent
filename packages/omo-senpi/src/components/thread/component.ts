@@ -2,13 +2,14 @@ import { AsyncResource } from "node:async_hooks"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
+import { resolveErrorStreakSettings, resolveHomeDir } from "@oh-my-opencode/omo-config-core"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
+import { loadSenpiOmoConfig } from "../config-resolution"
+import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
-import { gatewayDatabasePath } from "./gateway/paths"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
-import { resolveProvenance } from "./gateway/provenance-resolver"
 import { registerCreateReceivers } from "./create-receivers"
 import {
   controlSessionOf,
@@ -19,26 +20,21 @@ import {
   type ControlEndpointRegistrantOptions,
   type SessionControlActionsPort,
 } from "./gateway/registration"
-import { createExtensionResolver } from "./gateway/extension-resolver"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
+import { loadSenpiProjector } from "./remote/senpi-projector"
 import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
-import { stampThisDevice } from "./remote/this-device"
+import { thisDeviceId } from "./remote/this-device"
+import type { AgentEndFacts } from "./run-alerts/error-streak"
+import { createRunAlerts, type RunAlertsOptions } from "./run-alerts/run-alerts"
 import type { IntakeAdmission } from "./gateway/intake-admission"
-import type { SameDeviceWake } from "./gateway/same-device-wake"
+import { lazySameDeviceWake } from "./wake/lazy-same-device-wake"
 import type { ThreadWakeOptions } from "./wake/runtime"
-
-/**
- * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
- * for `agent_settled` handlers before the session goes idle, so the store (whose write lock another
- * process may hold) never holds the settle: past this bound the write continues in the background,
- * retried after the store's busy timeout while another process keeps the lock, and logged.
- */
-export const COMPLETION_SETTLE_WAIT_MS = 250
+import { ledgerDevice } from "./delivery-ledger"
 
 /**
  * The wake's process-level async scope, captured while senpi imports omo.js. The wake sidecar is first imported
@@ -50,22 +46,8 @@ const wakeProcessScope = new AsyncResource("omo-thread-wake-carrier")
 /** The files the pre-gateway mailbox kept its queue in (`gateway/legacy-mailbox.ts`). */
 const LEGACY_MAILBOX_FILES = ["mailbox.jsonl", "mailbox.json"] as const
 
-async function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    await Promise.race([
-      work,
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, ms)
-      }),
-    ])
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 export type ThreadComponentOptions = Partial<
-  Omit<ThreadToolSurfaceOptions, "callerSessionId" | "callerWorkspaceRoot" | "store" | "onCompletionArmed">
+  Omit<ThreadToolSurfaceOptions, "callerSessionId" | "callerWorkspaceRoot" | "store">
 > & {
   readonly callerSessionId?: () => string
   readonly callerWorkspaceRoot?: () => string
@@ -76,36 +58,23 @@ export type ThreadComponentOptions = Partial<
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
   /** Test seams of the session wake (#13037): the carrier, the consumer and their switches. */
   readonly wake?: ThreadWakeOptions
+  /** Test seams of the error-streak alerts (#14430): the clock, this device's id, the webhook client and the retry pause. */
+  readonly operatorAlerts?: Pick<RunAlertsOptions, "now" | "device" | "fetch" | "delay">
 }
 
 /**
  * `cause`: the newest delivery whose message the model has taken into its context (a send from this
  * run continues its causal root). A delivery admitted but still waiting in a queue is not a cause yet.
- * `consumed`: the deliveries the model has taken into its context since its last final answer (an
- * assistant message without a tool call), read from the engine's own `message_start` of each
- * delivery's custom message. senpi drains a queued follow-up after that answer and before
- * `agent_settled`, so the follow-up starts a new group: a report without `binding_id` goes to the
- * binding of the message the current answer is for, never to the thread the session started on.
- * Any other `user` or `custom` message after a final answer also starts a new group: a prompt typed
- * in the terminal, and equally an extension's message that starts a turn (a delegated task's result,
- * or a `sendUserMessage`), which keeps none of the bound messages taken up before it.
- * `local`: a `user` message is in the group. senpi 2026.9.30 gives a prompt, steer or follow-up typed
- * in the terminal and an extension's `sendUserMessage` (a non-blocking ask_user answer, a stop-hook
- * follow-up, `/remember`) the same shape, with no field naming its source, so every one counts as
- * typed input. Together with a bound message the answer then has two possible origins, and while the
- * session has another outbound binding a report without `binding_id` is refused rather than sent to
- * the bound thread (`store-relay-ops.ts` `reportBindingDefault`); with that thread's binding as the
- * only one it goes there. Never a misroute: an input the session cannot attribute makes an implicit
- * report refuse when several bindings exist.
+ * A `user` or `custom` message after a final answer (an assistant message without a tool call) starts
+ * a new group: a prompt typed in the terminal, and equally an extension's message that starts a turn
+ * (a delegated task's result, or a `sendUserMessage`).
  */
 type RunContext = {
   turn: number
   cause: string | undefined
   chainHop: number
-  consumed: string[]
   replyTo: string[]
   replySenders: { session_id: string; name?: string; device?: string }[]
-  local: boolean
   answered: boolean
 }
 
@@ -124,7 +93,12 @@ function messageOf(event: unknown): EngineMessage | undefined {
 type DeliveryDetails = {
   readonly delivery_id?: unknown
   readonly chain_count?: unknown
-  readonly sender?: { readonly kind?: unknown; readonly session_id?: unknown; readonly name?: unknown }
+  readonly sender?: {
+    readonly kind?: unknown
+    readonly session_id?: unknown
+    readonly name?: unknown
+    readonly platform?: unknown
+  }
 }
 
 /** senpi `external-admission.js` `deliveryIdOf`: the delivery a `session_control_delivery` message carries. */
@@ -135,12 +109,16 @@ function deliveryOf(message: EngineMessage):
       readonly agentSender: string | undefined
       readonly senderName: string | undefined
       readonly device: string | undefined
+      readonly rpcInput: boolean
     }
+  | "malformed"
   | undefined {
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
   const details = (message.details ?? undefined) as DeliveryDetails | undefined
   const id = details?.delivery_id
-  if (typeof id !== "string") return undefined
+  // A delivery message without a string id is malformed: after an answer it starts a new group with nobody approved,
+  // and it never passes as a turn the engine started, which would keep the earlier group's allowance (#13056).
+  if (typeof id !== "string") return "malformed"
   const count = details?.chain_count
   return {
     id,
@@ -153,26 +131,10 @@ function deliveryOf(message: EngineMessage):
       typeof details?.sender?.name === "string" && details.sender.name.trim() !== ""
         ? details.sender.name.trim()
         : undefined,
-    device: deliveryDevice(id),
-  }
-}
-
-/**
- * The device a delivery came from, as the receiving side attested it in the delivery's id: `device:<device>/<id>` names
- * it (URI-encoded); `rpc:local/<id>` and a bare row id name no device (amendment A4.3.1 of #13037). Those are this
- * device's deliveries, or another device's admitted on a connection that declared no remote origin (#14048), so a reply
- * that finds no such session here resolves account-wide (`tools.ts` `locate`).
- */
-function deliveryDevice(id: string): string | undefined {
-  if (!id.startsWith("device:")) return undefined
-  const rest = id.slice("device:".length)
-  const slash = rest.indexOf("/")
-  const part = slash === -1 ? rest : rest.slice(0, slash)
-  // A device part that is not valid URI encoding is kept as written: it names no listed device, so a reply to it is not_found.
-  try {
-    return decodeURIComponent(part)
-  } catch {
-    return part
+    device: ledgerDevice(id),
+    // senpi admits a `prompt`/`steer`/`follow_up` sent over the session's RPC socket as this same message, under the
+    // client's `clientMessageId` and with this sender it stamps itself (`session-control-input-commands.js`).
+    rpcInput: details?.sender?.kind === "external" && details.sender.platform === "rpc",
   }
 }
 
@@ -183,39 +145,47 @@ function callsTools(message: EngineMessage): boolean {
   )
 }
 
+/** A final answer was given: the next input starts a new group, and nothing of the earlier one survives. */
+function startGroup(run: RunContext): void {
+  run.cause = undefined
+  run.replyTo = []
+  run.replySenders = []
+  run.chainHop = 0
+  run.answered = false
+}
+
 /**
  * Decision 0027 section 6 (#13042): the reply allowance belongs to the consumed delivery and lasts for the work that
  * delivery started - the consuming turn and every later turn the engine starts on its own (a reminder, a goal
  * continuation, a monitor wake: a custom message that is no delivery). It ends when a new message starts work after
  * a final answer: a person's message (role user, which is also how a loop tick or a schedule arrives, so those end
  * it too) or any delivery, whose own sender the new group then holds. A delivery that joins running work adds its
- * sender. The run's deliveries (`consumed`, the implicit target of a report) end with the final answer in every
- * order: an engine-started message that arrives after the answer and before the settle keeps the allowance, not them.
+ * sender. An engine-started message that arrives after the answer and before the settle keeps the allowance.
+ * The same-account bound is not enforced here: a delivery reaches this component only after the engine's admission
+ * accepted it for this account, so the allowance a consumed delivery grants rests on that admission (#13044, #13056).
  */
 function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   const delivery = deliveryOf(message)
+  if (delivery === "malformed") {
+    // Like a delivery it ends an answered group (nothing of the earlier group survives) and, unlike a valid one, adds
+    // no sender; while work is running it joins it as a valid delivery would, adding nothing and keeping the hop.
+    if (run.answered) startGroup(run)
+    return
+  }
   if (message.role === "custom" && delivery === undefined) {
-    if (run.answered) run.consumed = []
     run.answered = false
     return
   }
-  if (run.answered) {
-    run.cause = undefined
-    run.consumed = []
-    run.replyTo = []
-    run.replySenders = []
-    run.chainHop = 0
-    run.local = false
-    run.answered = false
-  }
-  if (message.role === "user") run.local = true
+  if (run.answered) startGroup(run)
   if (delivery === undefined) return
+  // RPC input is typed input, never a delivery this session received: its id is the client's to choose, so it is no
+  // cause and no reply sender, and a send from its run starts a new causal root (#12317).
+  if (delivery.rpcInput) return
   // Every consumed delivery is the cause of the run's next send, on either transport (decision 0027 section 3); one no row
   // here holds starts a new root there and its hop count continues the chain (K8).
   run.cause = delivery.id
   run.chainHop = Math.max(run.chainHop, delivery.chainCount)
-  if (!run.consumed.includes(delivery.id)) run.consumed.push(delivery.id)
   if (delivery.agentSender !== undefined && !run.replyTo.includes(delivery.agentSender))
     run.replyTo.push(delivery.agentSender)
   if (
@@ -255,26 +225,9 @@ function waitingQuestionCallOf(event: unknown): string | undefined {
     : undefined
 }
 
-/** senpi `ask-user/notify.js` ASK_USER_CLOSED_EVENT: every terminal outcome of an ask_user question, `{ requestId, status, resolvedBy? }`. */
-const ASK_USER_CLOSED_EVENT = "ask-user:closed"
-/** senpi `ask-user/notify.js` ASK_USER_ASKED_EVENT: a question opened, `{ ctx, request: { requestId, ... }, variant }`. */
-const ASK_USER_ASKED_EVENT = "ask-user:asked"
-/** Recently closed ask_user requests remembered for a question report still being written or not yet started; bounded. */
-const CLOSED_REQUESTS_KEPT = 64
-
-/** The ask_user request a `thread_report` call relays as a question (`kind: "question"` with `request_id`). */
-function relayedQuestionOf(event: unknown): { readonly call: string; readonly request: string } | undefined {
-  const { toolCallId, toolName, args } = (event ?? {}) as {
-    readonly toolCallId?: unknown
-    readonly toolName?: unknown
-    readonly args?: unknown
-  }
-  if (toolName !== "thread_report" || typeof toolCallId !== "string") return undefined
-  const { kind, request_id } = (args ?? {}) as { readonly kind?: unknown; readonly request_id?: unknown }
-  return kind === "question" && typeof request_id === "string" && request_id.length > 0
-    ? { call: toolCallId, request: request_id }
-    : undefined
-}
+/** senpi's `session_shutdown { closed: true }`: a graceful close ended the session on request (omo#14313). */
+const closedOnRequest = (event: unknown): boolean =>
+  typeof event === "object" && event !== null && (event as { readonly closed?: unknown }).closed === true
 
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)
@@ -297,7 +250,6 @@ function registerControlEndpoint(
   options: ThreadComponentOptions,
   store: GatewayStore,
   agentDir: () => string,
-  onCommandWake: (durableId: string) => Promise<void>,
   admitIntake: NonNullable<ControlEndpointRegistrantOptions["admitIntake"]>,
 ) {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
@@ -307,7 +259,6 @@ function registerControlEndpoint(
     control,
     agentDir,
     store,
-    onCommandWake,
     admitIntake,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
     log: (line) => ctx.logger.warn(line),
@@ -329,7 +280,7 @@ function registerControlEndpoint(
   pi.on("session_before_compact", () => registrant.noteCompaction(true))
   pi.on("session_compact", () => registrant.noteCompaction(false))
   // A steer into a session waiting on a question is `not_steerable` (`decision.ts`): the answer comes
-  // through the question itself (`thread_answer`), never as a delivery.
+  // through the question itself, never as a delivery.
   pi.on("tool_execution_start", (event) => {
     const id = waitingQuestionCallOf(event)
     if (id !== undefined) registrant.noteQuestion(id, true)
@@ -344,9 +295,7 @@ function registerControlEndpoint(
 /**
  * Component registration follows task's factory/register pattern. Production constructs a client
  * for the existing Senpi multi-session socket; an injected host remains available as a test seam.
- * One gateway store serves the tools (receipts, bindings, outbox) and the control endpoint; a
- * completion armed through `thread_report` is written when the session settles, never at an
- * `agent_end`, and a session that armed nothing never touches the store when it settles.
+ * One gateway store serves the tools' receipts and the control endpoint.
  */
 export function createThreadComponent(options: ThreadComponentOptions = {}): OmoSenpiComponent {
   return {
@@ -365,27 +314,18 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         options.remote ??
         createDefaultRemoteSurface({
           version: createOmoNativeProductConfig().packageVersion,
-          // One surface serves every session of this engine, so its client acts as the engine's host instance.
+          // One surface serves every session of this engine, so its client acts as the engine's host instance: engine-wide,
+          // never per session. The thread surface calls only service.status and devices.list, which never read it.
           sender: { kind: "session", id: runtimeInstance ?? UNKNOWN_CALLER },
           log: (line) => ctx.logger.warn(line),
           permissionPreset: () => pi.getPermissionPreset?.(),
+          loadProjector: loadSenpiProjector,
         })
       registerRemoteMonitorTargets(pi, remote)
       const store =
         options.store ??
         createGatewayStore({
           agentDir: agentDir(),
-          resolveTarget: createExtensionResolver(agentDir()),
-          senderProvenance: () =>
-            stampThisDevice(
-              resolveProvenance({
-                cwd: callerWorkspaceRoot(),
-                env: options.env,
-                loadWorkspaces: loadProvenanceWorkspaces,
-                onWarning: onProvenanceWarning,
-              }),
-              remote,
-            ),
           legacyMailboxDirectories: [legacyMailbox],
           ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
         })
@@ -408,30 +348,10 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         turn: 0,
         cause: undefined,
         chainHop: 0,
-        consumed: [],
         replyTo: [],
         replySenders: [],
-        local: false,
         answered: true,
       }
-      const completions = createCompletionTracker(
-        (durableId, outcome, throughArmSeq) =>
-          store.emitCompletions({
-            now: store.now(),
-            session_durable_id: durableId,
-            outcome,
-            through_arm_seq: throughArmSeq,
-          }),
-        {
-          retryAfterMs: () => store.busyTimeoutMs,
-          onWriteFailed: (error, retrying) =>
-            ctx.logger.warn(
-              retrying
-                ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
-                : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`,
-            ),
-        },
-      )
       const sessionsDirectory = options.sessionsDirectory ?? (() => join(agentDir(), "sessions"))
       // The running wake is the process's (one per agent directory, latched), so it opens its own store and never
       // borrows this component's: this session's shutdown disposes that one, and every later wake would fail on it.
@@ -443,25 +363,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       // lives in its own sidecar (#omo-wake-runtime -> extensions/omo-wake.js): the main bundle carries only the lazy
       // shells below, and a load that fails answers as if no wake exists rather than taking the send down with it.
       const wakeRuntime = (): Promise<typeof import("#omo-wake-runtime")> => import("#omo-wake-runtime")
-      let sameDeviceBuilt: Promise<SameDeviceWake> | undefined
-      const sameDeviceWake: SameDeviceWake = {
-        afterSend: async (result) => {
-          sameDeviceBuilt ??= wakeRuntime().then((module) =>
-            module.createSameDeviceWake({
-              options: wakeOptions,
-              store,
-              agentDir,
-              sessionsDirectory,
-              cwd: callerWorkspaceRoot,
-              warn,
-            }),
-          )
-          return await sameDeviceBuilt.then(
-            (wake) => wake.afterSend(result),
-            () => result,
-          )
-        },
-      }
+      const sameDeviceWake = lazySameDeviceWake({
+        options: wakeOptions,
+        store,
+        agentDir,
+        sessionsDirectory,
+        cwd: callerWorkspaceRoot,
+        warn,
+      })
       let admissionBuilt: Promise<(device: string) => Promise<IntakeAdmission>> | undefined
       const wakeAdmission = async (device: string): Promise<IntakeAdmission> => {
         admissionBuilt ??= wakeRuntime().then((module) => module.intakeAdmission(wakeOptions, agentDir))
@@ -489,87 +398,30 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           callerName: () => pi.getSessionName?.(),
           callerCause: () => run.cause,
           callerChainHop: () => run.chainHop,
-          callerRunDeliveries: () => [...run.consumed],
           callerReplyTargets: () => [...run.replyTo],
           callerReplySenders: () => [...run.replySenders],
-          callerRunHasLocalInput: () => run.local,
-          onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
           remote,
         },
         (line) => ctx.logger.warn(line),
       )
-      // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
-      // crash before its write), or made by another process (`omo thread report ... completion`) - is
-      // picked up at session_start and on a `wake` command, and written at this session's next settle.
-      // Only a store that already exists is read, and the read takes no write lock.
-      const pickUpArms = async (durableId: string): Promise<void> => {
-        if (!existsSync(gatewayDatabasePath(agentDir()))) return
-        try {
-          const latest = await store.latestCompletionArm(durableId)
-          if (latest !== null) completions.arm(durableId, latest)
-        } catch (error) {
-          ctx.logger.warn(
-            `thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`,
-          )
-        }
-      }
-      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms, wakeAdmission)
-      // A question this session relayed to a chat thread and then closed itself (answered here, timed out,
-      // cancelled) is closed in the store too, so the connector stops holding that thread's later rows behind
-      // it. Only a session that relayed a question touches the store for it; an answer that came through
-      // thread_answer finds its question no longer pending and changes nothing.
-      // An engine without an extension event bus never says a question closed; nothing to track then.
-      const events = pi.events
-      if (events !== undefined) {
-        const reporting = new Map<string, { readonly request: string; readonly durableId: string }>()
-        const relayed = new Map<string, string>()
-        const closedEarly = new Set<string>()
-        const closeRelayed = (request: string, durableId: string): void => {
-          void store
-            .closeQuestion({ now: store.now(), session_durable_id: durableId, ui_request_id: request })
-            .catch((error: unknown) =>
-              ctx.logger.warn(
-                `thread gateway: the relayed question ${request} was not closed: ${error instanceof Error ? error.message : String(error)}`,
-              ),
-            )
-        }
-        pi.on("tool_execution_start", (event, eventCtx) => {
-          const question = relayedQuestionOf(event)
-          const durableId = durableIdOf(eventCtx)
-          if (question !== undefined && durableId !== undefined)
-            reporting.set(question.call, { request: question.request, durableId })
-        })
-        pi.on("tool_execution_end", (event) => {
-          const call = (event as { readonly toolCallId?: unknown } | undefined)?.toolCallId
-          const report = typeof call === "string" ? reporting.get(call) : undefined
-          if (report === undefined || typeof call !== "string") return
-          reporting.delete(call)
-          // Closed while its report was still being written: close the row that report just wrote.
-          if (closedEarly.delete(report.request)) closeRelayed(report.request, report.durableId)
-          else relayed.set(report.request, report.durableId)
-        })
-        events.on(ASK_USER_ASKED_EVENT, (payload) => {
-          // A new question under a request id that closed before it was relayed: that close is not this question's.
-          const request = (payload as { readonly request?: { readonly requestId?: unknown } } | undefined)?.request
-            ?.requestId
-          if (typeof request === "string") closedEarly.delete(request)
-        })
-        events.on(ASK_USER_CLOSED_EVENT, (payload) => {
-          // Also fired when a relayed thread_answer resolved it: closing first is harmless, the relay's confirm then records that answer.
-          const request = (payload as { readonly requestId?: unknown } | undefined)?.requestId
-          if (typeof request !== "string") return
-          const durableId = relayed.get(request)
-          if (durableId !== undefined) {
-            relayed.delete(request)
-            closeRelayed(request, durableId)
-            return
-          }
-          // Not relayed yet: its report may be running or may not have started (ask_user closed before the model
-          // called thread_report), so remember the close for whichever report names it next.
-          closedEarly.add(request)
-          if (closedEarly.size > CLOSED_REQUESTS_KEPT) closedEarly.delete(closedEarly.values().next().value as string)
-        })
-      }
+      const alertEnv = options.env ?? process.env
+      const alerts = createRunAlerts({
+        // User layer only: loading from $HOME walks no project layer, so a cloned repo's .omo/omo.json cannot pick the
+        // env var a webhook URL is read from, or add threads that receive messages sent as this session.
+        settings: () =>
+          resolveErrorStreakSettings(loadSenpiOmoConfig({ cwd: resolveHomeDir(alertEnv), env: alertEnv }).config),
+        env: alertEnv,
+        now: Date.now,
+        sendAs: tools.sendAs,
+        sessionName: () => pi.getSessionName?.(),
+        device: async () => {
+          const here = await thisDeviceId(remote)
+          return "device" in here ? here.device : undefined
+        },
+        log: { info: (line) => ctx.logger.info(line), warn: (line) => ctx.logger.warn(line) },
+        ...options.operatorAlerts,
+      })
+      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, wakeAdmission)
       let legacyImportStarted = false
       const importLegacyMailbox = async (): Promise<void> => {
         if (legacyImportStarted || !LEGACY_MAILBOX_FILES.some((file) => existsSync(join(legacyMailbox, file)))) return
@@ -615,8 +467,6 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       pi.on("session_start", (_event, eventCtx) => {
         startWake(eventCtx)
         void importLegacyMailbox()
-        const durableId = durableIdOf(eventCtx)
-        if (durableId !== undefined) void pickUpArms(durableId)
       })
       pi.on("agent_start", () => {
         run.turn++
@@ -631,34 +481,31 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
-        if (durableId !== undefined) completions.agentEnd(durableId, event as AgentEndFacts)
+        if (durableId !== undefined) alerts.agentEnd(durableId, event as AgentEndFacts)
       })
-      pi.on("agent_settled", async (_event, eventCtx) => {
-        const durableId = durableIdOf(eventCtx)
+      pi.on("agent_settled", (_event, eventCtx) => {
         // A settle alone keeps the consumed delivery's senders, hop and cause (#13042): the next input decides whether
-        // the work continues (noteInput). The run's deliveries end with the run: a report without binding_id after it
-        // must name its thread.
-        run.consumed = []
-        run.local = false
+        // the work continues (noteInput).
         run.answered = true
-        if (durableId === undefined) return
-        // A failed write is reported (and retried) by the tracker's onWriteFailed.
-        await waitAtMost(
-          completions.settled(durableId).then(
-            () => undefined,
-            () => undefined,
-          ),
-          COMPLETION_SETTLE_WAIT_MS,
-        )
+        const durableId = durableIdOf(eventCtx)
+        if (durableId !== undefined) alerts.settled(durableId)
       })
-      pi.on("session_shutdown", async () => {
-        completions.dispose()
+      pi.on("session_shutdown", async (event, eventCtx) => {
+        const endedId = durableIdOf(eventCtx)
+        if (endedId !== undefined) alerts.ended(endedId)
         tools.dispose()
         await registrant
           ?.stop()
           .catch((error: unknown) =>
             ctx.logger.warn(
               `thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
+        const durableId = durableIdOf(eventCtx)
+        if (closedOnRequest(event) && durableId !== undefined)
+          await settleGracefulClose(store, durableId, returnedAtClose(eventCtx)).catch((error: unknown) =>
+            ctx.logger.warn(
+              `thread gateway: the graceful close's unread messages were not answered: ${error instanceof Error ? error.message : String(error)}`,
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)

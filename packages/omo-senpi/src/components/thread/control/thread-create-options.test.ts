@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
-import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import { createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 
 // omo#13409 / omo#13410: thread_create takes the new thread's model, reasoning level, approval mode and first prompt in
 // the one create call, on this device and on another device alike. The model rides on the open_session frame (the
@@ -71,14 +71,10 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     expect(openSession).not.toHaveBeenCalled()
   })
 
-  test("#given create options with an existing thread #when opened #then invalid_arguments: they apply to a new thread only", async () => {
+  test("#given launch options with an existing thread #when opened #then invalid_arguments: they apply to a new thread only; a prompt is not a launch option and goes to the thread (#14335)", async () => {
     const a = account()
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b", model: "anthropic/claude-opus-5-5" })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
-    })
-    expect(await run("thread_create", { thread: "dur-on-b", prompt: "go" })).toMatchObject({
       kind: "error",
       error: { code: "invalid_arguments" },
     })
@@ -183,7 +179,7 @@ describe("thread_create with a first prompt (#13410)", () => {
     const { run, enqueuedRequests } = surface(a.remote)
     const result = (await run("thread_create", { prompt: "build it" })) as { prompt?: Record<string, unknown> }
     expect(result).toMatchObject({ kind: "ok", thread: "dur-created-here" })
-    expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
+    expect(result.prompt).toMatchObject({ delivery: { kind: "started" } })
     // #14045: the row carries the creator's authority, so the new thread's drain admits it as its own first message;
     // a later thread_send from the same session does not.
     await run("thread_send", { thread: "dur-created-here", message: "and then this" })
@@ -196,7 +192,8 @@ describe("thread_create with a first prompt (#13410)", () => {
     const args = { device: "studio", prompt: "build it", idempotency_key: "create-and-start-1" }
     const first = await run("thread_create", args)
     const replay = await run("thread_create", args)
-    expect(replay).toEqual(first)
+    const expectedReplay = { ...first, deduplicated: true }
+    expect(replay).toEqual(expectedReplay)
     expect(types(a.sent).filter((type) => type === "open_session")).toHaveLength(1)
     expect(types(a.sent).filter((type) => type === "admit_external_message")).toHaveLength(1)
   })
@@ -220,5 +217,196 @@ describe("thread_create with a first prompt (#13410)", () => {
     }
     expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b" })
     expect(result.prompt).toMatchObject({ error: { code: expect.any(String) } })
+  })
+})
+
+// The held-thread report: thread_create({ prompt }) answered ok while its first prompt never ran (no client attached, the
+// new session's control endpoint never drained the row). A create with a prompt either runs it or fails, typed.
+describe("thread_create whose first prompt does not start", () => {
+  test("#given a new session here whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
+    const a = account()
+    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
+    const result = await run("thread_create", { name: "never-drained", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "prompt_not_started",
+        details: { thread: "dur-created-here", delivery_id: expect.any(String), state: "queued" },
+      },
+    })
+    // The prompt was taken once: the thread exists and the next step is a read or a send to it, never a second create.
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+  })
+
+  test("#given b answers the prompt queued behind a turn #when created on b with a prompt #then the create answers ok with the prompt queued: b admitted it, so it runs after that turn (#14363 review M1)", async () => {
+    const queued = {
+      kind: "ok",
+      response: {
+        type: "response",
+        id: null,
+        command: "admit_external_message",
+        success: true,
+        data: { kind: "queued", turnId: "turn-b" },
+      },
+    } as const
+    const a = account({ admitOutcome: queued })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { device: "studio", prompt: "build it" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-new-on-b",
+      prompt: { delivery: { kind: "queued" } },
+    })
+  })
+})
+
+// #14363 review M1: a first prompt the target ADMITTED to its follow-up queue (a follow_up to a busy thread, an auto send
+// while the thread waits on a question) runs after what it waits on. The create answers ok with that delivery at once,
+// never prompt_not_started with a resend that would deliver it twice.
+describe("thread_create whose first prompt the thread admitted to its queue", () => {
+  // A create that waited for the start would hold the call for this long and miss the test's own timeout.
+  const LONG_WAIT_MS = 60_000
+
+  test("#given the live thread here runs a turn #when thread_create opens it with a follow_up prompt #then ok at once, the prompt queued and taken once", async () => {
+    const a = account()
+    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: LONG_WAIT_MS, localDrainsIn: "mid_turn" })
+    const result = (await run("thread_create", {
+      thread: "dur-local",
+      prompt: "after this",
+      delivery: "follow_up",
+    })) as {
+      prompt?: { delivery?: { waiting_on?: unknown } }
+    }
+    expect(result).toMatchObject({ kind: "ok", deduplicated: true, prompt: { delivery: { kind: "queued" } } })
+    expect(result.prompt?.delivery?.waiting_on).toBeUndefined()
+    expect(enqueuedRequests("dur-local")).toHaveLength(1)
+  })
+
+  test("#given the live thread here waits on a question #when thread_create opens it with a prompt #then ok at once, the prompt queued waiting on that approval", async () => {
+    const a = account()
+    const { run } = surface(a.remote, { firstPromptWaitMs: LONG_WAIT_MS, localDrainsIn: "waiting_question" })
+    expect(await run("thread_create", { thread: "dur-local", prompt: "after the answer" })).toMatchObject({
+      kind: "ok",
+      deduplicated: true,
+      prompt: { delivery: { kind: "queued", waiting_on: { kind: "approval" } } },
+    })
+  })
+
+  test("#given the live thread on b runs a turn #when thread_create opens it with a follow_up prompt #then ok, the prompt queued on b", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "turn-b" } })
+    const { run } = surface(a.remote)
+    expect(
+      await run("thread_create", { thread: "dur-on-b", prompt: "after this", delivery: "follow_up" }),
+    ).toMatchObject({ kind: "ok", deduplicated: true, prompt: { delivery: { kind: "queued" } } })
+  })
+
+  // #14363 delta review L1: b stored the prompt for a session its host parked and wakes it with the delivery, as a
+  // thread_send to it answers. The create answers that same state, never prompt_not_started with a resend that would
+  // wake the session with two copies.
+  test("#given b parked the thread its listing reads live #when thread_create opens it with a prompt, twice under one key #then ok, the prompt queued waiting on b's wake with a do-not-resend next_action, and one wake carries it", async () => {
+    const a = account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
+    const { run } = surface(a.remote)
+    const args = { thread: "dur-on-b", prompt: "carry on", idempotency_key: "create-wake-1" }
+    const first = await run("thread_create", args)
+    expect(first).toMatchObject({
+      kind: "ok",
+      deduplicated: true,
+      prompt: { delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } } },
+    })
+    expect((first as { prompt?: { next_action?: string } }).prompt?.next_action).toEqual(
+      expect.stringContaining("thread_read"),
+    )
+    expect(await run("thread_create", args)).toEqual(first)
+    expect(a.sent.filter((entry) => entry.via === "wake")).toHaveLength(1)
+  })
+
+  test("#given the live thread on b waits on a question #when thread_create opens it with a prompt #then ok, the prompt queued waiting on that approval on b", async () => {
+    const a = account({
+      engine: {
+        ...ENGINE,
+        streaming: true,
+        currentTurnId: "turn-b",
+        pendingQuestions: [{ id: "q-1", kind: "permission" }],
+      },
+    })
+    const { run } = surface(a.remote)
+    expect(
+      await run("thread_create", { thread: "dur-on-b", prompt: "after the answer", delivery: "follow_up" }),
+    ).toMatchObject({
+      kind: "ok",
+      deduplicated: true,
+      prompt: { delivery: { kind: "queued", waiting_on: { kind: "approval", device: "b" } } },
+    })
+  })
+})
+
+// #14335 / #14289: a create that opens a thread live already answered `deduplicated` from placement and returned
+// before its prompt was sent: ok, with the prompt dropped. The prompt goes to the live thread and the create answers
+// its real delivery, or fails prompt_not_started.
+describe("thread_create naming a thread that is live already, with a prompt", () => {
+  test("#given b runs the thread #when thread_create opens it with a prompt #then nothing is opened, the prompt is admitted on b once, and the create answers its delivery", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b", prompt: "carry on" })
+    expect(result).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      deduplicated: true,
+      prompt: { delivery: { kind: "started" } },
+    })
+    expect(types(a.sent).filter((type) => type === "open_session")).toEqual([])
+    expect(types(a.sent).filter((type) => type === "admit_external_message")).toHaveLength(1)
+  })
+
+  test("#given a thread live here that does not drain #when thread_create opens it with a prompt #then the prompt is taken once and the create fails prompt_not_started, never ok with the prompt dropped", async () => {
+    const a = account()
+    const { run, openSession, enqueuedRequests } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-local", prompt: "carry on" })).toMatchObject({
+      kind: "error",
+      error: { code: "prompt_not_started", details: { thread: "dur-local", state: "queued" } },
+    })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(enqueuedRequests("dur-local")).toHaveLength(1)
+  })
+})
+
+// The owner's live lost-prompt case: thread_create({ ..., message: "<brief>" }) answered ok with no prompt and no error,
+// because an unknown field was dropped silently. A field a tool does not take is refused, naming it and the field meant.
+describe("thread tool fields the tool does not take", () => {
+  test("#given a create that passes its brief as message #when created #then invalid_arguments names message, suggests prompt, and nothing is created", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    const here = await run("thread_create", { name: "misnamed-here", message: "build it" })
+    const there = await run("thread_create", { name: "misnamed-there", device: "studio", message: "build it" })
+    for (const result of [here, there])
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments", details: { field: "message", suggestion: "prompt" } },
+      })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given a create with a name and no prompt #when created #then the result says prompt null: nothing was sent", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { name: "no-prompt-here" })).toMatchObject({ kind: "ok", prompt: null })
+    expect(await run("thread_create", { name: "no-prompt-there", device: "studio" })).toMatchObject({
+      kind: "ok",
+      prompt: null,
+    })
+  })
+
+  test("#given a send with a field thread_send does not take #when sent #then invalid_arguments names the field and nothing is delivered", async () => {
+    const a = account()
+    const { run, enqueuedFor } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-local", message: "hi", priority: "high" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "priority" } },
+    })
+    expect(await run("thread_send", { thread: "dur-local", prompt: "hi" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "prompt", suggestion: "message" } },
+    })
+    expect(enqueuedFor("dur-local")).toBe(0)
   })
 })

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -9,6 +9,7 @@ import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAl
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 type Frame = Record<string, unknown>
 type Answer = (frame: Frame) => Record<string, unknown>
@@ -20,12 +21,12 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 
 function tempDir(prefix: string): string {
   // Short /tmp paths: a unix socket path is capped near 104 bytes on darwin.
-  const directory = mkdtempSync(join("/tmp", prefix))
+  const directory = shortTempDir(prefix)
   cleanups.push(async () => rmSync(directory, { recursive: true, force: true }))
   return directory
 }
 
-async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly frames: Frame[] }> {
+async function endpoint(socketPath: string, answer: Answer, protocol: Frame = {}): Promise<{ readonly frames: Frame[] }> {
   const frames: Frame[] = []
   const sockets = new Set<Socket>()
   const transport = fakeHostTransport(socketPath)
@@ -40,7 +41,7 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
       if (newline < 0) return
       const frame = JSON.parse(buffer.slice(0, newline)) as Frame
       buffer = buffer.slice(newline + 1)
-      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
+      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: protocol })}\n`); return }
       frames.push(frame)
       socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
     })
@@ -129,8 +130,9 @@ describe("thread tools across host endpoints", () => {
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
     const shard = join(dir, "i-0123456789abcdef.sock")
-    await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")))
-    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")))
+    // Each endpoint names the engine it runs; an older host names only its package version (#14278).
+    await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")), { serverVersion: "5.1.79", engineVersion: "2026.11.19-3" })
+    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")), { serverVersion: "5.1.70" })
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)] })
 
     // when
@@ -140,6 +142,9 @@ describe("thread tools across host endpoints", () => {
     expect(listed.kind).toBe("ok")
     const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; surface?: string; status: string }>
     expect(threads.map((thread) => [thread.thread, thread.surface, thread.status]).sort()).toEqual([["dur-desktop", "desktop", "live"], ["dur-terminal", "daemon", "live"]])
+    // Every row names the engine version of the host that holds it.
+    const engines = Object.fromEntries((threads as ReadonlyArray<{ thread: string; engine_version?: string }>).map((thread) => [thread.thread, thread.engine_version]))
+    expect(engines).toEqual({ "dur-terminal": "2026.11.19-3", "dur-desktop": "5.1.70" })
   })
 
   test("#given both endpoints hold a session routed as rpc-1 #when thread_send and thread_read target the i-* thread #then every per-session request dials the i-* socket and none reaches the legacy one", async () => {
@@ -242,7 +247,7 @@ describe("thread tools across host endpoints", () => {
     expect(w.dialed).not.toContain(shard)
   })
 
-  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages forward to the end", async () => {
+  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages from the newest message back to the start", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -257,20 +262,21 @@ describe("thread tools across host endpoints", () => {
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, false, [desktopJsonl])] })
 
     // when
-    const contents: string[] = []
+    const pages: string[][] = []
     let reads = 0
     let cursor: string | undefined
     do {
       const page = await w.run("thread_read", { thread: "dur-desktop", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) })
       expect(page).toMatchObject({ kind: "ok", source: "session_jsonl" })
       reads += 1
-      contents.push(...(page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
+      pages.push((page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
       cursor = (page as { next_cursor?: string }).next_cursor
     } while (cursor !== undefined && reads < 20)
 
     // then
     expect(reads).toBeGreaterThan(1)
-    expect(contents).toEqual(texts.map((text) => JSON.stringify(text)))
+    expect(pages[0]?.at(-1)).toBe(JSON.stringify(texts.at(-1)))
+    expect(pages.reverse().flat()).toEqual(texts.map((text) => JSON.stringify(text)))
   })
 
   test("#given the legacy endpoint stopped answering after it claimed a session file #when thread_list and thread_read run #then its thread is listed from disk as resumable on the legacy socket and reads from JSONL, while the live i-* thread stays live", async () => {

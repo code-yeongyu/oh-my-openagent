@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import {
   checkNameConflict,
+  fuzzyContenders,
   fuzzyMatch,
   normalizeThreadName,
   resolveTarget,
@@ -15,6 +16,7 @@ import {
   type ThreadNameConflictResult,
   type ThreadResolveResult,
 } from "./addressing"
+import { DISPLAY_UNSAFE, ORDINARY } from "@oh-my-opencode/utils/testing/display-unsafe"
 import type { ThreadErrorCode } from "./index"
 
 // ---------------------------------------------------------------------------
@@ -340,6 +342,88 @@ describe("resolveTarget malformed input", () => {
   })
 })
 
+describe("typed references holding a control or format character", () => {
+  const entries = [thread({ thread_id: "t-1", name: "ab" }), thread({ thread_id: "t-2", name: "a b" })]
+  const holdsControl = (text: string) => /\p{Cc}/u.test(text.replace(/[\t\n\v\f\r]/g, " "))
+
+  test("#given every display fixture holding a control character as a target, a fuzzy query and a new name #when checked #then each is refused with the same text and the value is not echoed", () => {
+    const controls = DISPLAY_UNSAFE.filter(holdsControl)
+    expect(controls.length).toBeGreaterThan(0)
+    for (const fixture of controls) {
+      const refusals = [
+        ["thread address", resolveTarget(entries, fixture, { callerWorkspaceRoot: CALLER })],
+        ["fuzzy query", fuzzyMatch(entries, `${fixture}cd`)],
+        ["thread name", checkNameConflict(entries, fixture)],
+      ] as const
+      for (const [what, result] of refusals) {
+        const error = expectError(result, "invalid_arguments")
+        expect({ fixture, message: error.message }).toEqual({
+          fixture,
+          message: `The ${what} contains control characters.`,
+        })
+        expect(error.next_action).not.toContain(fixture)
+      }
+    }
+  })
+
+  test("#given a thread named with each fixture holding no control character but whitespace controls #when addressed by that exact name #then it resolves: format characters stay addressable (#13304)", () => {
+    const formats = DISPLAY_UNSAFE.filter((fixture) => !holdsControl(fixture))
+    expect(formats.length).toBeGreaterThan(0)
+    for (const [index, name] of formats.entries()) {
+      const named = [thread({ thread_id: `f-${index}`, name })]
+      const result = resolveTarget(named, name, { callerWorkspaceRoot: CALLER })
+      expect({ name, resolved: result.kind === "ok" ? result.entry.thread_id : result.kind }).toEqual({
+        name,
+        resolved: `f-${index}`,
+      })
+    }
+  })
+
+  test("#given a typed reference holding each whitespace control #when resolved #then it folds into a space as at dev and the thread is found", () => {
+    for (const control of ["\t", "\n", "\v", "\f", "\r"]) {
+      const result = resolveTarget(entries, `a${control}b`, { callerWorkspaceRoot: CALLER })
+      expect({ control, found: result.kind === "ok" ? result.entry.thread_id : result.kind }).toEqual({
+        control,
+        found: "t-2",
+      })
+    }
+  })
+
+  test("#given a typed reference holding another C0 control or DEL #when resolved #then it is refused with dev's refusal text", () => {
+    for (const control of ["\u0000", "\u0007", "\u001b", "\u001f", "\u007f"]) {
+      const error = expectError(
+        resolveTarget(entries, `a${control}b`, { callerWorkspaceRoot: CALLER }),
+        "invalid_arguments",
+      )
+      expect({ control, message: error.message }).toEqual({
+        control,
+        message: "The thread address contains control characters.",
+      })
+    }
+  })
+
+  test("#given a typed reference holding a C1 control #when resolved #then it is refused (new: dev accepted it)", () => {
+    for (const control of ["\u0080", "\u009b", "\u009f"]) {
+      const error = expectError(
+        resolveTarget(entries, `a${control}b`, { callerWorkspaceRoot: CALLER }),
+        "invalid_arguments",
+      )
+      expect({ control, message: error.message }).toEqual({
+        control,
+        message: "The thread address contains control characters.",
+      })
+    }
+  })
+
+  test("#given ordinary names #when resolved by name #then each resolves", () => {
+    const named = ORDINARY.map((name, index) => thread({ thread_id: `o-${index}`, name }))
+    for (const [index, name] of ORDINARY.entries()) {
+      const result = resolveTarget(named, name, { callerWorkspaceRoot: CALLER })
+      expect(result.kind === "ok" ? result.entry.thread_id : result.kind).toBe(`o-${index}`)
+    }
+  })
+})
+
 // ---------------------------------------------------------------------------
 // NFKC normalization
 // ---------------------------------------------------------------------------
@@ -498,6 +582,30 @@ describe("fuzzyMatch scan cap", () => {
     expect(result.kind).toBe("ok")
     if (result.kind !== "ok") throw new Error("expected ok")
     expect(result.entry.thread_id).toBe("t-hit")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fuzzyContenders: the accept floor minus the margin
+// ---------------------------------------------------------------------------
+
+describe("fuzzyContenders contender floor", () => {
+  // Unique-trigram ascii runs again, so set and multiset dice agree. The floor is 0.72 - 0.08 = 0.64.
+  // q        = "abcdefghijklmnopqrstuv"            (20 trigrams)
+  // atFloor  = "abcdefghijklmnopqr" + 14 new chars  (30 trigrams, 16 shared -> 32/50 = 0.64)
+  // below    = "abcdefghijklmnopq" + 12 new chars   (27 trigrams, 15 shared -> 30/47 = 0.6383)
+  // above    = "abcdefghijklmnopqwxyza"            (20 trigrams, 15 shared -> 0.75)
+  const QUERY = "abcdefghijklmnopqrstuv"
+  const entries = [
+    thread({ thread_id: "t-below", name: "abcdefghijklmnopqwxyz01234567" }),
+    thread({ thread_id: "t-floor", name: "abcdefghijklmnopqrwxyz0123456789" }),
+    thread({ thread_id: "t-above", name: "abcdefghijklmnopqwxyza" }),
+  ]
+
+  test("#given rows at 0.6383, exactly 0.64 and 0.75 #when filtered #then the floor row is kept, the row just below it is dropped, and input order holds on every call", () => {
+    const first = fuzzyContenders(entries, QUERY).map((entry) => entry.thread_id)
+    expect(first).toStrictEqual(["t-floor", "t-above"])
+    expect(fuzzyContenders(entries, QUERY).map((entry) => entry.thread_id)).toStrictEqual(first)
   })
 })
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -15,6 +15,7 @@ import {
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 type Frame = Record<string, unknown>
 
@@ -24,7 +25,7 @@ afterEach(async () => {
 })
 
 function tempDir(prefix: string): string {
-  const directory = mkdtempSync(join("/tmp", prefix))
+  const directory = shortTempDir(prefix)
   cleanups.push(async () => rmSync(directory, { recursive: true, force: true }))
   return directory
 }
@@ -314,7 +315,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(threads.find((thread) => thread.thread === "dur-tui")).toMatchObject({
       name: "my-tui",
       surface: "tui",
-      alive: true,
+      state: "idle",
       status: "live",
       created_at: "2026-09-28T04:19:00.000Z",
     })
@@ -438,7 +439,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     expect(terminal.frames.filter((frame) => frame.type === "get_protocol_info")).toHaveLength(1)
   })
 
-  test("#given the engine reports a stopped terminal live_unresponsive #when thread_list runs #then the terminal is not dialed and its thread shows alive false with error_note live_unresponsive from disk", async () => {
+  test("#given the engine reports a stopped terminal live_unresponsive #when thread_list runs #then the terminal is not dialed and its thread shows inactive with error_note live_unresponsive from disk", async () => {
     // given
     const dir = tempDir("thr-tui-")
     const legacy = join(dir, "rpc.sock")
@@ -479,7 +480,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     // then
     expect(threads.find((thread) => thread.thread === "dur-tui")).toMatchObject({
       status: "resumable",
-      alive: false,
+      state: "inactive",
       error_note: "live_unresponsive",
       name: "my-tui",
       created_at: "2026-09-28T04:19:00.000Z",
@@ -509,7 +510,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
 
     // then
     const gone = threads.find((thread) => thread.thread === "dur-gone")
-    expect(gone).toMatchObject({ status: "resumable", alive: false, error_note: "dead", surface: "tui" })
+    expect(gone).toMatchObject({ status: "resumable", state: "inactive", error_note: "dead", surface: "tui" })
     expect(JSON.stringify(gone)).not.toContain("host_unavailable")
     expect(w.dialed).not.toContain(tui)
   })

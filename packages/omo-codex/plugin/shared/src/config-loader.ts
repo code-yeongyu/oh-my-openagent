@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 
 import {
+  isOmoTelemetryEnabled,
   loadOmoConfig,
   type LoadOmoConfigOptions,
   type MigrationEnvironment,
@@ -31,7 +32,7 @@ export type CodexOmoConfig = OmoConfig & {
 
 function resolveHomeDir(options: CodexOmoConfigOptions): string {
   const env = options.env ?? process.env
-  return options.homeDir ?? env.HOME ?? env.USERPROFILE ?? homedir()
+  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir()
 }
 
 function environmentWithHome(env: OmoConfigEnv, homeDir: string): OmoConfigEnv {
@@ -48,6 +49,19 @@ function migrationEnvironment(homeDir: string, env: OmoConfigEnv): MigrationEnvi
 /** Runs only the legacy config.jsonc transaction before Codex reads omo.jsonc. */
 export function runCodexStartupMigration(options: CodexStartupMigrationOptions): CodexStartupMigrationResult {
   return runCodexConfigMigration(options)
+}
+
+/**
+ * The telemetry gate for plugin components (#14920): `telemetry.enabled` in the unified config, read
+ * without the migration transaction so an observability-only caller stays side-effect free. An
+ * unreadable config keeps the documented default (on).
+ */
+export function isCodexTelemetryConfigEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    return isOmoTelemetryEnabled(loadOmoConfig({ env, harness: "codex" }).config)
+  } catch {
+    return true
+  }
 }
 
 function migrationWarnings(result: CodexStartupMigrationResult): readonly string[] {

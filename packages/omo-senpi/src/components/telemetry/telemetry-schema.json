@@ -3112,7 +3112,6 @@
           "ast-grep",
           "browser",
           "coding-agent-sessions",
-          "dag-library",
           "data-scientist",
           "debugging",
           "eval-integrity",
@@ -3123,6 +3122,7 @@
           "init-deep",
           "lsp-setup",
           "mass-ulw",
+          "omo-relay",
           "onboarding",
           "programming",
           "refactor",
@@ -3949,5 +3949,5 @@
       }
     }
   },
-  "sha256": "cd502bf04812d9c5078f911fc5ad801e5f60a5446a940f05f3a6ecd92a90b7b6"
+  "sha256": "d7d2f5c8f6c803b98338d8027f0b1b670b8d7bcc6c94e2385c63bf0ff2e8da65"
 }

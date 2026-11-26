@@ -1,0 +1,313 @@
+{
+  "native-thread-usage": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo thread: expects a subcommand\nusage: omo thread <list|send|read|close> [options] [--json]\n\n  list      [--all-scope] [--state opening|running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)\n  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>]\n  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]\n  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]\n\n  <target>/<session> takes a thread id, session id, alias, exact name, unique id prefix,\n                or <device>/<thread> (device: id, here, name or unique device id prefix)\n\n  --all-scope  resolve sessions in every workspace, not only this directory's\n  --json       print the result as one JSON value\n"
+  },
+  "native-thread-help": {
+    "exit": 0,
+    "stdout": "usage: omo thread <list|send|read|close> [options] [--json]\n\n  list      [--all-scope] [--state opening|running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)\n  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>]\n  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]\n  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]\n\n  <target>/<session> takes a thread id, session id, alias, exact name, unique id prefix,\n                or <device>/<thread> (device: id, here, name or unique device id prefix)\n\n  --all-scope  resolve sessions in every workspace, not only this directory's\n  --json       print the result as one JSON value\n",
+    "stderr": ""
+  },
+  "native-thread-list-bad-state": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo thread list: --state must be one of opening, running, idle, inactive, archived, got 'bogus'\n"
+  },
+  "native-thread-send-arity": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo thread send: expects 2 argument(s), got 1\n"
+  },
+  "native-daemon-help": {
+    "exit": 0,
+    "stdout": "usage: omo daemon <run|adopt|status|stop|handoff|gc|rollback-prepare> [options]\n\n  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)\n  adopt     take a session a host holds into this terminal (--interrupt, --force)\n  status    report who is serving and which sessions exist\n  stop      end the daemon; --drain lets in-flight work finish first\n  handoff   hand the socket to this build, keeping live sessions\n  gc        remove dead endpoint state; --prune-store-index drops missing store paths\n  rollback-prepare migrate retained task records back to rpc.sock before downgrading\n\n  --json            print the engine's JSON line instead of a summary\n  --no-upgrade      never hand off, even from an older build\n  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)\n  --include-workers include subagent sessions in status\n  --all             apply stop to every discovered endpoint\n  --wait            with stop --drain --all, wait for generations and claims to end\n",
+    "stderr": ""
+  },
+  "native-daemon-attach-retired": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo daemon: unknown subcommand 'attach'\nomo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\nusage: omo daemon <run|adopt|status|stop|handoff|gc|rollback-prepare> [options]\n\n  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)\n  adopt     take a session a host holds into this terminal (--interrupt, --force)\n  status    report who is serving and which sessions exist\n  stop      end the daemon; --drain lets in-flight work finish first\n  handoff   hand the socket to this build, keeping live sessions\n  gc        remove dead endpoint state; --prune-store-index drops missing store paths\n  rollback-prepare migrate retained task records back to rpc.sock before downgrading\n\n  --json            print the engine's JSON line instead of a summary\n  --no-upgrade      never hand off, even from an older build\n  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)\n  --include-workers include subagent sessions in status\n  --all             apply stop to every discovered endpoint\n  --wait            with stop --drain --all, wait for generations and claims to end\n"
+  },
+  "native-daemon-foreground-retired": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo daemon: --foreground is unsupported; the engine host always detaches\n"
+  },
+  "native-remote-help": {
+    "exit": 0,
+    "stdout": "usage: omo remote <command> [--json]\n  status                                   the device service's connection state\n  devices                                  the devices on this account\n  sessions [--device D] [--project P] [--state running|idle|ended]\n                                           sessions across the account's devices\n  enable | disable                         turn remote sessions on or off for this device\n  control [on|off]                         whether your other signed-in devices can view and command this\n                                           device's sessions (on unless you turn it off)\n  wake [on|off|default]                    whether sessions on this device that are not running may be started\n                                           by a message from your other signed-in devices; on unless turned off\n  bootstrap                                set up this device's service for your sign-in (every omo start runs it)\n  attach <session>                         open a session in the terminal UI; also takes <device>/<session>\n  open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]\n       [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]]\n                                           start a session on another device; prints <device>/<session>; it runs\n                                           in MODE (default: this device's own setting, else full-access), on the\n                                           model and thinking level given (a model it cannot run opens nothing),\n                                           in a new git worktree of P with --worktree, and is handed TEXT first\n  send <session> <text|-> [--steer|--follow-up] [--no-wait]\n                                           send a message and print the answer as it arrives (--steer: into the\n                                           running turn; --no-wait: return once the session took it).\n                                           Use the thread value from open --json, or <device>/<session>.\n  model <session> <provider/id>            switch the model; also takes <device>/<session>\n  interrupt <session>                      stop the running turn; also takes <device>/<session>\n  close <session> [--force]                end the session; --force also drops messages it has not read\n",
+    "stderr": ""
+  },
+  "native-remote-unknown": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo remote: unknown command bogus\nusage: omo remote <command> [--json]\n  status                                   the device service's connection state\n  devices                                  the devices on this account\n  sessions [--device D] [--project P] [--state running|idle|ended]\n                                           sessions across the account's devices\n  enable | disable                         turn remote sessions on or off for this device\n  control [on|off]                         whether your other signed-in devices can view and command this\n                                           device's sessions (on unless you turn it off)\n  wake [on|off|default]                    whether sessions on this device that are not running may be started\n                                           by a message from your other signed-in devices; on unless turned off\n  bootstrap                                set up this device's service for your sign-in (every omo start runs it)\n  attach <session>                         open a session in the terminal UI; also takes <device>/<session>\n  open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]\n       [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]]\n                                           start a session on another device; prints <device>/<session>; it runs\n                                           in MODE (default: this device's own setting, else full-access), on the\n                                           model and thinking level given (a model it cannot run opens nothing),\n                                           in a new git worktree of P with --worktree, and is handed TEXT first\n  send <session> <text|-> [--steer|--follow-up] [--no-wait]\n                                           send a message and print the answer as it arrives (--steer: into the\n                                           running turn; --no-wait: return once the session took it).\n                                           Use the thread value from open --json, or <device>/<session>.\n  model <session> <provider/id>            switch the model; also takes <device>/<session>\n  interrupt <session>                      stop the running turn; also takes <device>/<session>\n  close <session> [--force]                end the session; --force also drops messages it has not read\n"
+  },
+  "native-remote-open-no-device": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo remote open: the device is required (the DEVICE column of omo remote devices)\nusage: omo remote <command> [--json]\n  status                                   the device service's connection state\n  devices                                  the devices on this account\n  sessions [--device D] [--project P] [--state running|idle|ended]\n                                           sessions across the account's devices\n  enable | disable                         turn remote sessions on or off for this device\n  control [on|off]                         whether your other signed-in devices can view and command this\n                                           device's sessions (on unless you turn it off)\n  wake [on|off|default]                    whether sessions on this device that are not running may be started\n                                           by a message from your other signed-in devices; on unless turned off\n  bootstrap                                set up this device's service for your sign-in (every omo start runs it)\n  attach <session>                         open a session in the terminal UI; also takes <device>/<session>\n  open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]\n       [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]]\n                                           start a session on another device; prints <device>/<session>; it runs\n                                           in MODE (default: this device's own setting, else full-access), on the\n                                           model and thinking level given (a model it cannot run opens nothing),\n                                           in a new git worktree of P with --worktree, and is handed TEXT first\n  send <session> <text|-> [--steer|--follow-up] [--no-wait]\n                                           send a message and print the answer as it arrives (--steer: into the\n                                           running turn; --no-wait: return once the session took it).\n                                           Use the thread value from open --json, or <device>/<session>.\n  model <session> <provider/id>            switch the model; also takes <device>/<session>\n  interrupt <session>                      stop the running turn; also takes <device>/<session>\n  close <session> [--force]                end the session; --force also drops messages it has not read\n"
+  },
+  "native-update-all-refused": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo update: unknown option --all\nRun omo update --help for usage.\n"
+  },
+  "native-update-unknown-flag": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo update: unknown option --bogus\nRun omo update --help for usage.\n"
+  },
+  "native-account-usage": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|sign-in [--stdin|--check]|retire-sync --account <id>|store status|enable|disable [--discard]\n"
+  },
+  "native-account-unknown": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|sign-in [--stdin|--check]|retire-sync --account <id>|store status|enable|disable [--discard]\n"
+  },
+  "native-account-devices-unknown": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo account devices: use devices or devices revoke <id>\n"
+  },
+  "native-sign-in-check": {
+    "exit": 0,
+    "stdout": "{\"event\":\"ready\"}\n",
+    "stderr": ""
+  },
+  "native-sync-help": {
+    "exit": 0,
+    "stdout": "Usage: omo sync [options] [command]\n\nEnd-to-end encrypted memory sync\n\nOptions:\n  -h, --help        display help for command\n\nCommands:\n  enable            Turn memory sync on for this device, joining your memory if\n                    needed\n  disable           Turn memory sync off for this device only; memory on this\n                    device stays\n  status [options]  Show this device's memory sync state, the account's devices\n                    and the running engine\n  approve [id]      Approve a device that is waiting to join, after comparing\n                    the code on both screens\n  recover           Recover memory after losing every device\n  help [command]    display help for command\n",
+    "stderr": ""
+  },
+  "native-app-server-retired": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo app-server has been removed. Use omo --mode rpc or omo host.\n"
+  },
+  "native-ulw-loop-retired": {
+    "exit": 2,
+    "stdout": "",
+    "stderr": "omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env(\"OMO_AGENT_TOOLKIT_SDK_ROOT\")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).\n"
+  },
+  "native-version": {
+    "exit": 0,
+    "stdout": "omo 5.1.83 (engine: senpi 2026.11.23)\n",
+    "stderr": ""
+  },
+  "opencode-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode [options] [command]\n\nThe ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more\n\nOptions:\n  -v, --version                         Show version number\n  -h, --help                            Display help for command\n\nCommands:\n  install|setup [options]               Install and configure oh-my-opencode\n                                        with interactive setup\n  cleanup|uninstall [options]           Clean managed Codex Light state and\n                                        repair project-local legacy Codex\n                                        artifacts\n  run [options] <message>               Run opencode with todo/background task\n                                        completion enforcement\n  get-local-version [options]           Show current installed version and check\n                                        for updates\n  doctor [options]                      Check oh-my-opencode installation health\n                                        and diagnose issues\n  config                                Manage unified OMO configuration\n  refresh-model-capabilities [options]  Refresh the cached models.dev-based\n                                        model capabilities snapshot\n  version                               Show version information\n  boulder [options]                     Show boulder progress, elapsed time, and\n                                        per-task statistics\n  worktree-sweep [options]              Report (and optionally remove) stale\n                                        linked git worktrees\n  ulw-loop [args...]                    Run the Codex LazyCodex ulw-loop CLI\n  mcp                                   MCP server management\n  account                               OmO account and device identity\n  help [command]                        display help for command\n",
+    "stderr": ""
+  },
+  "opencode-install-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode install|setup [options]\n\nInstall and configure oh-my-opencode with interactive setup\n\nOptions:\n  --no-tui                          Run in non-interactive mode (requires all\n                                    options)\n  --claude <value>                  Claude subscription: no, yes, max20\n  --openai <value>                  OpenAI/ChatGPT subscription: no, yes\n                                    (default: no)\n  --gemini <value>                  Gemini integration: no, yes\n  --copilot <value>                 GitHub Copilot subscription: no, yes\n  --platform <platform>             Install target platform: opencode, codex,\n                                    both, native (choices: \"opencode\", \"codex\",\n                                    \"both\", \"native\")\n  --opencode-zen <value>            OpenCode Zen access: no, yes (default: no)\n  --zai-coding-plan <value>         Z.ai Coding Plan subscription: no, yes\n                                    (default: no)\n  --kimi-for-coding <value>         Kimi For Coding subscription: no, yes\n                                    (default: no)\n  --opencode-go <value>             OpenCode Go subscription: no, yes (default:\n                                    no)\n  --bailian-coding-plan <value>     Bailian Coding Plan subscription: no, yes\n                                    (default: no)\n  --minimax-cn-coding-plan <value>  MiniMax Coding Plan (minimaxi.com)\n                                    subscription: no, yes (default: no)\n  --minimax-coding-plan <value>     MiniMax Coding Plan (minimax.io)\n                                    subscription: no, yes (default: no)\n  --vercel-ai-gateway <value>       Vercel AI Gateway: no, yes (default: no)\n  --codex-autonomous                Configure Codex with approval never, full\n                                    filesystem access, and network enabled\n  --no-codex-autonomous             Leave existing Codex permission settings\n                                    unchanged\n  --skip-auth                       Skip authentication setup hints\n  -h, --help                        Display help for command\n\nExamples:\n  $ bunx oh-my-opencode install\n  $ npx lazycodex-ai install --no-tui\n  $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no\n  $ omo-agent-toolkit install --platform=codex --codex-autonomous\n  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes\n\nModel Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel):\n  Claude        Native anthropic/ models (Opus, Sonnet, Haiku)\n  OpenAI        Native openai/ models (GPT-5.6 Sol for Oracle)\n  Gemini        Native google/ models (Gemini 3.1 Pro, Flash)\n  Copilot       github-copilot/ models (fallback)\n  OpenCode Zen  opencode/ models (opencode/claude-opus-5, etc.)\n  Z.ai          zai-coding-plan/glm-5.2 (visual-engineering fallback)\n  Kimi          kimi-for-coding/kimi-k3.1-pro (Sisyphus/Prometheus fallback)\n  Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)\n  MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)\n  MiniMax CN    minimax-cn-coding-plan/MiniMax-M3 (utility fallback)\n  Vercel        vercel/ models (universal proxy, always last fallback)\n\n",
+    "stderr": ""
+  },
+  "opencode-run-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode run [options] <message>\n\nRun opencode with todo/background task completion enforcement\n\nOptions:\n  -a, --agent <name>            Agent to use (default: from CLI/env/config,\n                                fallback: Sisyphus)\n  -m, --model <provider/model>  Model override (e.g., anthropic/claude-sonnet-4)\n  -d, --directory <path>        Working directory\n  -p, --port <port>             Server port (attaches if port already in use)\n  --attach <url>                Attach to existing opencode server URL\n  --on-complete <command>       Shell command to run after completion\n  --json                        Output structured JSON result to stdout\n  --no-timestamp                Disable timestamp prefix in run output\n  --verbose                     Show full event stream (default: messages/tools\n                                only)\n  --session-id <id>             Resume existing session instead of creating new\n                                one\n  -h, --help                    Display help for command\n\nExamples:\n  $ bunx oh-my-opencode run \"Fix the bug in index.ts\"\n  $ bunx oh-my-opencode run --agent Sisyphus \"Implement feature X\"\n  $ bunx oh-my-opencode run --port 4321 \"Fix the bug\"\n  $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 \"Fix the bug\"\n  $ bunx oh-my-opencode run --json \"Fix the bug\" | jq .sessionId\n  $ bunx oh-my-opencode run --on-complete \"notify-send Done\" \"Fix the bug\"\n  $ bunx oh-my-opencode run --session-id ses_abc123 \"Continue the work\"\n  $ bunx oh-my-opencode run --model anthropic/claude-sonnet-4 \"Fix the bug\"\n  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.6-sol \"Implement feature X\"\n\nAgent resolution order:\n  1) --agent flag\n  2) OPENCODE_DEFAULT_AGENT\n  3) .omo/omo.jsonc \"default_run_agent\"\n  4) Sisyphus (fallback)\n\nAvailable core agents:\n  Sisyphus, Hephaestus, Prometheus, Atlas\n\nUnlike 'opencode run', this command waits until:\n  - All todos are completed or cancelled\n  - All child sessions (background tasks) are idle\n\n",
+    "stderr": ""
+  },
+  "opencode-doctor-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode doctor [options]\n\nCheck oh-my-opencode installation health and diagnose issues\n\nOptions:\n  --status               Show compact system dashboard\n  --verbose              Show detailed diagnostic information\n  --json                 Output results in JSON format\n  --platform <platform>  Doctor target platform: opencode, codex (choices:\n                         \"opencode\", \"codex\")\n  -h, --help             Display help for command\n\nExamples:\n  $ bunx oh-my-opencode doctor            # Show problems only\n  $ bunx oh-my-opencode doctor --status   # Compact dashboard\n  $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics\n  $ bunx oh-my-opencode doctor --json     # JSON output\n  $ omo-agent-toolkit doctor --platform=codex   # Codex/LazyCodex diagnostics only\n\n",
+    "stderr": ""
+  },
+  "opencode-boulder-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode boulder [options]\n\nShow boulder progress, elapsed time, and per-task statistics\n\nOptions:\n  -d, --directory <path>  Working directory\n  -w, --work-id <id>      Filter to a specific work\n  --json                  Output as JSON\n  -h, --help              Display help for command\n",
+    "stderr": ""
+  },
+  "opencode-sweep-bad-age": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: option '--older-than <days>' argument 'x' is invalid. --older-than must be a non-negative integer number of days, got: x\n"
+  },
+  "opencode-mcp-oauth-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode mcp oauth [options] [command]\n\nOAuth token management for MCP servers\n\nOptions:\n  -h, --help                      display help for command\n\nCommands:\n  login [options] <server-name>   Authenticate with an MCP server using OAuth\n  logout [options] <server-name>  Remove stored OAuth tokens for an MCP server\n  status [server-name]            Show OAuth token status for MCP servers\n  help [command]                  display help for command\n",
+    "stderr": ""
+  },
+  "opencode-config-migrate-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode config migrate [options]\n\nMigrate legacy OMO configuration into ~/.omo/omo.jsonc\n\nOptions:\n  --dry-run   Print the transform, backup move plan, and conflicts without new\n              migration writes\n  --json      Print machine-readable migration output\n  -h, --help  Display help for command\n",
+    "stderr": ""
+  },
+  "opencode-version": {
+    "exit": 0,
+    "stdout": "oh-my-openagent v5.1.83\n",
+    "stderr": ""
+  },
+  "opencode-local-version-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode get-local-version [options]\n\nShow current installed version and check for updates\n\nOptions:\n  -d, --directory <path>  Working directory to check config from\n  --json                  Output in JSON format for scripting\n  -h, --help              Display help for command\n\nExamples:\n  $ bunx oh-my-opencode get-local-version\n  $ bunx oh-my-opencode get-local-version --json\n  $ bunx oh-my-opencode get-local-version --directory /path/to/project\n\nThis command shows:\n  - Current installed version\n  - Latest available version on npm\n  - Whether you're up to date\n  - Special modes (local dev, pinned version)\n\n",
+    "stderr": ""
+  },
+  "opencode-cleanup-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode cleanup|uninstall [options]\n\nClean managed Codex Light state and repair project-local legacy Codex artifacts\n\nOptions:\n  --platform <platform>  Cleanup target platform: codex (choices: \"codex\")\n  --codex-home <path>    Codex home to clean (defaults to CODEX_HOME or\n                         ~/.codex)\n  --project <path>       Project directory to inspect for project-local .codex\n                         artifacts\n  --json                 Output structured JSON result\n  -h, --help             Display help for command\n\nExamples:\n  $ npx lazycodex-ai uninstall\n  $ omo-agent-toolkit uninstall --platform=codex\n  $ npx lazycodex-ai cleanup\n  $ omo-agent-toolkit cleanup --platform=codex\n  $ omo-agent-toolkit uninstall --platform=codex --project /path/to/project\n\n",
+    "stderr": ""
+  },
+  "opencode-login-help": {
+    "exit": 0,
+    "stdout": "Sign in to OmO from this terminal with a device code.\n\nWhile OmO accounts are closed, omo login signs a computer in by device code: omo prints a\nverification URL with a user code and a matching code, a person approves on another device,\nand the credential is stored in the OS credential store.\n\n  omo login                 device-code sign-in (a computer without the OmO desktop app's sign-in)\n  omo login --device        force the device-code route\n  omo login --no-browser    the same, never opening a browser\n  omo login --replace       replace this computer's earlier device without asking\n  omo login --api <url>     OmO API origin (or OMO_SERVICE_API_URL)\n\nThe service's approval page decides who may sign in. A computer whose OmO desktop app or\nstored sign-in already has its device is refused instead of registering a second one.\nWhen the service says this computer already has a device, omo login offers to replace it\n(an interactive terminal asks, default No; a script passes --replace). The replacement is\napproved on the service's page, which then signs the earlier device out.\n",
+    "stderr": ""
+  },
+  "opencode-account-keys-help": {
+    "exit": 0,
+    "stdout": "Usage: oh-my-opencode account keys [options] [command]\n\nDevice sync keys kept in the OS keystore\n\nOptions:\n  -h, --help      Display help for command\n\nCommands:\n  init            Create this device's sync keys (keeps existing keys)\n  status          Show this device's public sync keys\n  help [command]  display help for command\n",
+    "stderr": ""
+  },
+  "loop-brief-skips-ignored-flags": {
+    "brief": "ship it"
+  },
+  "tool-list-empty": {
+    "result": {
+      "kind": "ok",
+      "threads": [],
+      "scope": "workspace"
+    }
+  },
+  "tool-read-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-receipt-missing": {
+    "result": {
+      "kind": "ok",
+      "thread": "missing-thread",
+      "delivery_id": "d1",
+      "outcome": {
+        "kind": "outcome_unavailable"
+      }
+    }
+  },
+  "tool-send-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-interrupt-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-close-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-rename-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-set-model-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-set-reasoning-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-archive-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "tool-handoff-missing": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  }
+}

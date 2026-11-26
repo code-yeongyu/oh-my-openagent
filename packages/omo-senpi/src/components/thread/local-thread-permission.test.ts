@@ -94,7 +94,7 @@ const LOCAL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ["thread_create", { name: "helper", prompt: "hi" }],
   ["thread_create", { fork_from: LOCAL_ID }],
   ["thread_create", { thread: LOCAL_ID }],
-  ["thread_read", { thread: REMOTE_ID }],
+  ["thread_read", {}],
   ["thread_send", { thread: LOCAL_ID, message: "hi" }],
   ["thread_handoff", { thread: LOCAL_ID, message: "hi" }],
   ["thread_interrupt", { thread: LOCAL_ID }],
@@ -103,10 +103,8 @@ const LOCAL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ["thread_rename", { name: "renamed" }],
   ["thread_set_model", { thread: LOCAL_ID, model: "a/b" }],
   ["thread_set_reasoning", { thread: LOCAL_ID, level: "high" }],
-  ["thread_report", { kind: "progress", text: "x" }],
-  ["thread_outbox", {}],
-  ["thread_outbox_ack", { binding_id: "b", cursor: 1 }],
-  ["thread_answer", { binding_id: "b", reply_token: "t", answer: "yes" }],
+  ["thread_archive", { thread: LOCAL_ID }],
+  ["thread_archive", { thread: "self", archived: false }],
 ]
 
 describe("i22: routine local thread tool calls ask for no approval", () => {
@@ -134,6 +132,11 @@ describe("i22: routine local thread tool calls ask for no approval", () => {
       requests(tools, "thread_send", { thread: "an-account-alias", message: "hi" }),
       requests(tools, "thread_handoff", { thread: "near name", match: "fuzzy", message: "hi" }),
       requests(tools, "thread_close", { thread: REMOTE_ID }),
+      requests(tools, "thread_archive", { thread: REMOTE_ID }),
+      requests(tools, "thread_archive", { thread: LOCAL_NAME }),
+      // omo#14807 H1: a read of a thread this device does not hold may reopen it on its device (omo#14799), so it asks.
+      requests(tools, "thread_read", { thread: REMOTE_ID }),
+      requests(tools, "thread_read", { thread: LOCAL_NAME }),
     ]
     for (const parsed of asks) expect(parsed.some((request) => request.autoApproveAsk === true)).toBe(false)
   })
