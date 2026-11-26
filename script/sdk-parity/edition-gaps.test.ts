@@ -114,18 +114,27 @@ describe("the 6.11 SDK-today cell of a row with an opencode gap", () => {
 describe("an edition gap is added only by the pull request that clears its row", () => {
   const added = { ...opencodeGap, row: "install.version" }
 
-  test("#given a new gap on a row the merge base held unresolved #then it passes", () => {
-    expect(editionGapAdditionProblems([added], [], new Set(["install.version"]))).toEqual([])
+  const none = new Set<string>()
+
+  test("#given a new gap on a row the merge base held unresolved and the head clears #then it passes", () => {
+    expect(editionGapAdditionProblems([added], [], new Set(["install.version"]), none)).toEqual([])
+  })
+
+  test("#given a new gap on a row the head still holds unresolved #then it fails, naming the rule", () => {
+    const open = new Set(["install.version"])
+    expect(editionGapAdditionProblems([added], [], open, open)).toEqual([
+      "edition gap install.version (opencode): install.version is still unresolved at the head; an edition gap is added only by the pull request that clears its row",
+    ])
   })
 
   test("#given a new gap on a row the merge base had built #then it fails, naming the rule", () => {
-    expect(editionGapAdditionProblems([added], [], new Set())).toEqual([
+    expect(editionGapAdditionProblems([added], [], none, none)).toEqual([
       "edition gap install.version (opencode): install.version was not unresolved at the merge base; an edition gap is added only by the pull request that clears its row",
     ])
   })
 
   test("#given a gap the merge base already had #then it passes on a built row", () => {
-    expect(editionGapAdditionProblems([added], [added], new Set())).toEqual([])
+    expect(editionGapAdditionProblems([added], [added], none, none)).toEqual([])
   })
 
   const baseWith =
@@ -142,12 +151,18 @@ describe("an edition gap is added only by the pull request that clears its row",
     const unresolved = (ids: readonly string[]) =>
       JSON.stringify({ version: 1, entries: ids.map((id) => ({ id, gap: "no SDK call", slice: "C1c", issue: "new" })) })
     expect(
-      editionGapBaseProblems(baseWith({ "script/sdk-parity/unresolved.json": unresolved([]) }), [added], "origin/dev"),
+      editionGapBaseProblems(
+        baseWith({ "script/sdk-parity/unresolved.json": unresolved([]) }),
+        [added],
+        new Set(),
+        "origin/dev",
+      ),
     ).toEqual({ problems: [expect.stringContaining("an edition gap is added only by the pull request")] })
     expect(
       editionGapBaseProblems(
         baseWith({ "script/sdk-parity/unresolved.json": unresolved(["install.version"]) }),
         [added],
+        new Set(),
         "origin/dev",
       ),
     ).toEqual({ problems: [] })

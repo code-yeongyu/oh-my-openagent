@@ -29,9 +29,9 @@ function readInstalledOrUndefined(readInstalled) {
  * be read any more, one reinstall of the previous version.
  * @param {{ result: ChildResult, before: Installed, install: (spec: UpdateTarget) => Promise<ChildResult>,
  *   resolveUpdate: (version?: string) => UpdateTarget, readInstalled: () => Installed, ports: UpdatePorts,
- *   progress: (event: UpdateProgress) => void }} input
+ *   progress: (event: UpdateProgress) => void, signal: AbortSignal }} input
  */
-export async function heldInstall({ result, before, install, resolveUpdate, readInstalled, ports, progress }) {
+export async function heldInstall({ result, before, install, resolveUpdate, readInstalled, ports, progress, signal }) {
   const file = heldTarget(result.stderr)
   const listProcesses = ports.listProcesses ?? listWindowsProcesses
   const installDir = ports.installDir ?? dirname(packageRoot)
@@ -50,12 +50,24 @@ export async function heldInstall({ result, before, install, resolveUpdate, read
   // fail moving an old dependency after the new omo-ai is in place, and reinstalling over it would undo a working
   // update and hit the same held file. Only an unreadable install is restored.
   const previous = resolveUpdate(before.omo)
+  // The reinstall is a write: the call's signal is read immediately before it, and a reinstall the signal ended is a
+  // stop, never a failed restore.
+  const stopped = (/** @type {"held_file" | "held_restore"} */ phase) => ({
+    ...named,
+    stopped_in: phase,
+    attempts: LOCK_RETRY_DELAYS_MS.length + 1,
+    before: before.omo,
+    holders,
+    previous_command: previous.command,
+  })
+  if (signal.aborted) return stopped("held_file")
   let restored
   try {
     restored = await install(previous)
   } catch {
     restored = { status: 1, signal: null }
   }
+  if (signal.aborted && (restored.signal || (restored.status ?? 1) !== 0)) return stopped("held_restore")
   const after = readInstalledOrUndefined(readInstalled)
   const back = (restored.status ?? 1) === 0 && !restored.signal && after?.omo === before.omo
   return {

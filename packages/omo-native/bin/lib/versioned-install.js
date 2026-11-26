@@ -104,7 +104,7 @@ async function installInto(input, finalDir, bun) {
  * the previous version dir stays for rollback. Answers what happened and the facts its report names
  * (`versionedUpdateLines` renders them); exitCode is 0 only when the omo on PATH reports the target.
  * @param {{ install: VersionedInstall, before: string, target: string, run: Function, env: NodeJS.ProcessEnv,
- *   platform: NodeJS.Platform, now?: () => number }} input
+ *   platform: NodeJS.Platform, now?: () => number, signal?: AbortSignal, onSwitched?: () => void }} input
  * @returns {Promise<VersionedOutcome>}
  */
 export async function versionedInstallUpdate(input) {
@@ -123,6 +123,7 @@ export async function versionedInstallUpdate(input) {
  *   | { kind: "install_failed", finalDir: string }
  *   | { kind: "wrong_version", finalDir: string, reported: string }
  *   | { kind: "not_on_path", updated: string, onPath: string | undefined, onPathReal: string | undefined, seen: string }
+ *   | { kind: "stopped", finalDir: string, phase: "install" | "before_switch" }
  * )} VersionedOutcome
  */
 
@@ -152,6 +153,11 @@ export function versionedUpdateLines(outcome, input) {
       }
     case "install_failed":
       return { log: [], error: [`omo: bun install of omo-ai@${target} into ${outcome.finalDir} failed; ${unchanged}`] }
+    case "stopped":
+      return {
+        log: [],
+        error: [`omo: the update to ${target} was stopped before ${current} was switched; ${unchanged}`],
+      }
     case "wrong_version":
       return {
         log: [],
@@ -189,6 +195,8 @@ async function updateInto(input) {
   if (!existsSync(finalDir) || !(await runsTarget())) {
     setAside(versionsDir, finalDir, target, now)
     const status = await installInto(input, finalDir, bun)
+    // A bun install the call's signal ended is a stop, not a failed install: current was never touched.
+    if (status !== 0 && input.signal?.aborted) return { kind: "stopped", finalDir, phase: "install", exitCode: 1 }
     if (status !== 0) return { kind: "install_failed", finalDir, exitCode: status }
     const fresh = await readLauncherVersion(join(finalDir, launcherIn(finalDir)), env)
     if (!reportsVersion(fresh, target)) {
@@ -196,6 +204,10 @@ async function updateInto(input) {
       return { kind: "wrong_version", finalDir, reported: fresh, exitCode: 1 }
     }
   }
+  // The publish boundary (design lane rule): the signal is read here, immediately before anything names the new dir
+  // finished or switches current. Stopped here, current still names the old version; the finished dir is adopted by
+  // the next update. Past this point the switch happens, and the call answers what happened, never stopped.
+  if (input.signal?.aborted) return { kind: "stopped", finalDir, phase: "before_switch", exitCode: 1 }
   if (!existsSync(join(finalDir, COMPLETE)))
     writeFileSync(join(finalDir, COMPLETE), `${new Date(now()).toISOString()}\n`)
 
@@ -203,6 +215,7 @@ async function updateInto(input) {
   rmSync(next, { force: true })
   symlinkSync(isAbsolute(readlinkSync(current)) ? finalDir : target, next)
   renameSync(next, current)
+  input.onSwitched?.()
 
   const updated = join(current, launcherIn(finalDir))
   const onPath = findOmoOnPath(env)

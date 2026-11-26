@@ -134,6 +134,8 @@ export type SetupApplyOptions = {
   readonly report?: (line: string) => void
   /** The file effects the stages make (setup-fs.js); the real file system when absent. */
   readonly fs?: typeof import("./setup-fs.js").REAL_SETUP_FS
+  /** The calling install.setup.apply's signal: the model-choice replan ends on it, before any write. */
+  readonly signal?: AbortSignal
 }
 
 /** Refused by `applySetupStages` when `staleGuard` finds a target that changed since planning. */

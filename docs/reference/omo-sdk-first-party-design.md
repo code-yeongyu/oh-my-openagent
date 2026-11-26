@@ -433,8 +433,8 @@ Both editions register `login`, `logout` and `whoami` over the same core (`C/cli
 | `diagnostics.run({ status?, verbose?, platform? })` answering findings as data; `.models()`; `.fixReflectionLock({ dry_run? })`; `.reapStaleEngines({ pids })` | `omo doctor`; `--models`; `--fix [--dry-run]`; `--reap`. OpenCode edition: `doctor [--status] [--verbose] [--json] [--platform]`, keeping its platform selection and its output-mode precedence | none | **no** | Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only | C1b; OC1a |
 | `install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent: "all" \| "each" })`: `--yes` and the command with neither flag are both `all`, the second with the adapter rendering one confirmation whose refusal makes no call (`N/bin/lib/setup-import.js:72-96`); `--ask-each` is `each` | `omo setup [--yes] [--ask-each] [--dry-run]` | none | **yes** | Tool omitted: plan, consent, write is a person's flow | C1c |
 | `install.update({ dry_run? })`. Flags it does not know are a usage refusal today (`--all`, `--force` alone), and stay one | `omo update [--dry-run \| --print] [--self]`, and the `self`, `senpi`, `omo` targets (`N/bin/lib/update-args.js:23-52`) | none | **yes** | Tool omitted: replaces the binary the session runs on | C1c |
-| `install.version()`, `install.sdkRoot()` | `omo --version`, `-v`; `omo sdk root` (new) | none | **yes** | Tool omitted: `OMO_SDK_ROOT` is already in a session's environment | C1c |
-| `install.version()`, `install.sdkRoot()` | `omo --version`, `-v`; `omo sdk root` (new) | none | **no** | Tool omitted: `OMO_SDK_ROOT` is already in a session's environment | C1c |
+| `install.version()` | `omo --version`, `-v` | none | **yes** | Tool omitted: `OMO_SDK_ROOT` is already in a session's environment | C1c |
+| `install.sdkRoot()` | `omo sdk root` (new) | none | **no** | Tool omitted: `OMO_SDK_ROOT` is already in a session's environment | C1c |
 
 ### 6.8 Engine commands forwarded by the launcher
 

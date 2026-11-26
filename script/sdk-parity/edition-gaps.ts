@@ -70,18 +70,23 @@ export function editionGapProblems(entries: readonly EditionGap[], rows: readonl
 
 /**
  * An edition gap is added only by the pull request that clears its row's unresolved entry (design lane ruling): a gap
- * the merge base did not have, on a row the merge base did not hold unresolved, could hide a regression in a built row.
+ * the merge base did not have fails on a row the merge base did not hold unresolved (it could hide a regression in a
+ * built row), and on a row the head still holds unresolved (this pull request does not clear it).
  */
 export function editionGapAdditionProblems(
   head: readonly EditionGap[],
   baseGaps: readonly EditionGap[],
   baseUnresolved: ReadonlySet<string>,
+  headUnresolved: ReadonlySet<string>,
 ): string[] {
   const had = new Set(baseGaps.map((gap) => `${gap.row} ${gap.edition}`))
+  const rule = "an edition gap is added only by the pull request that clears its row"
   return head
-    .filter((gap) => !had.has(`${gap.row} ${gap.edition}`) && !baseUnresolved.has(gap.row))
-    .map(
-      (gap) =>
-        `edition gap ${gap.row} (${gap.edition}): ${gap.row} was not unresolved at the merge base; an edition gap is added only by the pull request that clears its row`,
-    )
+    .filter((gap) => !had.has(`${gap.row} ${gap.edition}`))
+    .flatMap((gap) => {
+      const at = `edition gap ${gap.row} (${gap.edition})`
+      if (!baseUnresolved.has(gap.row)) return [`${at}: ${gap.row} was not unresolved at the merge base; ${rule}`]
+      if (headUnresolved.has(gap.row)) return [`${at}: ${gap.row} is still unresolved at the head; ${rule}`]
+      return []
+    })
 }

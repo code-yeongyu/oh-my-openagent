@@ -92,8 +92,13 @@ export function offenderBaseProblems(git: GitPort, head: OffenderRecord, ref: st
   return { problems: offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), head) }
 }
 
-/** A gap the merge base does not have, on a row it did not hold unresolved, fails (edition-gaps.ts). */
-export function editionGapBaseProblems(git: GitPort, head: readonly EditionGap[], ref: string = BASE_REF): BaseCheck {
+/** A gap the merge base does not have fails unless this head clears its row (edition-gaps.ts). */
+export function editionGapBaseProblems(
+  git: GitPort,
+  head: readonly EditionGap[],
+  headUnresolved: ReadonlySet<string>,
+  ref: string = BASE_REF,
+): BaseCheck {
   const probe = probeBase(git, ref)
   if (!probe.readable) return { skipped: probe.reason }
   const gaps = showAt(git, probe.base, EDITION_GAPS_PATH)
@@ -103,6 +108,7 @@ export function editionGapBaseProblems(git: GitPort, head: readonly EditionGap[]
       head,
       gaps === undefined ? [] : (JSON.parse(gaps) as { entries: EditionGap[] }).entries,
       new Set(unresolved === undefined ? [] : (JSON.parse(unresolved) as Baseline).entries.map((entry) => entry.id)),
+      headUnresolved,
     ),
   }
 }

@@ -167,6 +167,7 @@ try {
         show(mergeBase, EDITION_GAPS_PATH),
       ),
       new Set((base.unresolved ?? []).map((entry) => entry.id)),
+      new Set(unresolved.entries.map((entry) => entry.id)),
     ),
   ]
   const baselineFailures = baselineProblems({

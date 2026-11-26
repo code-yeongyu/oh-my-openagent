@@ -67,7 +67,8 @@ export function version(_input = {}, ports = {}) {
  * @typedef {{ kind: "unpinned", channel: string, spec: string }
  *   | { kind: "installing", manager: string, command: string }
  *   | { kind: "retrying", file: string | undefined, delay_ms: number, attempt: number, attempts: number }
- *   | { kind: "held", file: string | undefined, attempts: number, holders: Holder[] }} UpdateProgress
+ *   | { kind: "held", file: string | undefined, attempts: number, holders: Holder[] }
+ *   | { kind: "switched", current: string, target: string }} UpdateProgress
  * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").InstallUpdate} InstallUpdate
  * @typedef {{
  *   resolveUpdate?: (targetVersion?: string) => UpdateTarget,
@@ -125,7 +126,7 @@ export function exitOf(surface, failure) {
   return surface.refused
 }
 
-/** @type {{ readonly [Kind in Exclude<import("./versioned-install.js").VersionedOutcome["kind"], "updated">]: Extract<InstallFailedDetails, { reason: "versioned" }>["cause"] }} */
+/** @type {{ readonly [Kind in Exclude<import("./versioned-install.js").VersionedOutcome["kind"], "updated" | "stopped">]: Extract<InstallFailedDetails, { reason: "versioned" }>["cause"] }} */
 const VERSIONED_CAUSE = {
   no_bun: "no_bun",
   busy: "busy",
@@ -233,13 +234,20 @@ async function updateUntil(input, ports, signal) {
   stopIfAborted(signal)
   progress({ kind: "installing", manager: resolved.manager, command: resolved.command })
   if (versioned !== undefined && target !== undefined) {
-    const outcome = await versionedInstallUpdate({ install: versioned, before: before.omo, target, run, env, platform })
-    // Stopped while bun installed into the staging directory: current still names the old version, and the next
-    // update sets the unfinished directory aside.
-    const stoppedVersioned = signal.aborted
-      ? abortedAnswer(signal.reason, { stopped_in: "versioned_install", current: versioned.current })
-      : undefined
-    if (stoppedVersioned !== undefined) return stoppedVersioned
+    const onSwitched = () => progress({ kind: "switched", current: versioned.current, target })
+    const versionedInput = { install: versioned, before: before.omo, target, run, env, platform, signal, onSwitched }
+    const outcome = await versionedInstallUpdate(versionedInput)
+    // Stopped before current was switched (the updater reads the signal at that boundary): current still names the
+    // old version. A switch that happened is answered as what happened, whenever the signal fired.
+    if (outcome.kind === "stopped") {
+      const details = {
+        stopped_in: "versioned_install",
+        phase: outcome.phase,
+        current: versioned.current,
+        switched: false,
+      }
+      return /** @type {Failure} */ (abortedAnswer(signal.reason, details))
+    }
     if (outcome.kind === "updated") {
       return answer("updated", true, {
         after: { omo: target, engine: before.engine },
@@ -314,11 +322,22 @@ async function updateUntil(input, ports, signal) {
       attempt: attempt + 2,
       attempts: LOCK_RETRY_DELAYS_MS.length + 1,
     })
-    await untilAborted(sleep(delay), signal)
+    try {
+      await untilAborted(sleep(delay), signal)
+    } catch (error) {
+      const stopped = abortedAnswer(error, {
+        stopped_in: "install_retry",
+        command: resolved.command,
+        attempts: attempt + 1,
+      })
+      if (stopped === undefined) throw error
+      return stopped
+    }
   }
 
   if (failed(result) && heldOnWindows(result)) {
-    const held = await heldInstall({ result, before, install, resolveUpdate, readInstalled, ports, progress })
+    const held = await heldInstall({ result, before, install, resolveUpdate, readInstalled, ports, progress, signal })
+    if ("stopped_in" in held) return /** @type {Failure} */ (abortedAnswer(signal.reason, held))
     return installFailed(
       { reason: "file_held", attempts: LOCK_RETRY_DELAYS_MS.length + 1, before: before.omo, ...held },
       "Windows would not let the package manager replace a file",

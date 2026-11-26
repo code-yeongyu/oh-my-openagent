@@ -836,8 +836,8 @@
         "install.version"
       ],
       "cells": [
-        "`install.version()`, `install.sdkRoot()`",
-        "`omo --version`, `-v`; `omo sdk root` (new)",
+        "`install.version()`",
+        "`omo --version`, `-v`",
         "none",
         "**yes**",
         "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment",
@@ -851,8 +851,8 @@
         "install.sdkRoot"
       ],
       "cells": [
-        "`install.version()`, `install.sdkRoot()`",
-        "`omo --version`, `-v`; `omo sdk root` (new)",
+        "`install.sdkRoot()`",
+        "`omo sdk root` (new)",
         "none",
         "**no**",
         "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment",

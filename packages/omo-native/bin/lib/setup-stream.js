@@ -37,6 +37,7 @@ import {
   planModelChoices,
 } from "./setup-model-choices-import.js"
 import { setupStageItems } from "./setup-stream-items.js"
+import { untilAborted } from "./install-abort.js"
 
 export { canonicalAgentDir } from "./agent-dir.js"
 
@@ -319,7 +320,9 @@ export async function applySetupStages(plans, confirm, report = () => {}, option
         !applied.has("providers")
       ) {
         const shown = new Set(plans.modelChoices.notices)
-        plans.modelChoices = await plans.planChoices([])
+        // The replan is a wait inside the apply: with the call's signal (options.signal) it ends on it, before any write.
+        const replan = plans.planChoices([])
+        plans.modelChoices = await (options.signal === undefined ? replan : untilAborted(replan, options.signal))
         stage.plan = plans.modelChoices
         for (const notice of plans.modelChoices.notices) if (!shown.has(notice)) report(notice)
       }

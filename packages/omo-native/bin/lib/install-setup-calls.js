@@ -225,7 +225,7 @@ export function createSetup() {
           plans,
           consented,
           (text) => progress({ kind: "notice", text }),
-          ports.fs === undefined ? {} : { fs: ports.fs },
+          ports.fs === undefined ? { signal: wait.signal } : { fs: ports.fs, signal: wait.signal },
         )
       } catch (error) {
         const fault = setupApplyFault(error)
