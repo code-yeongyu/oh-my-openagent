@@ -3105,7 +3105,6 @@
           "ast-grep",
           "browser",
           "coding-agent-sessions",
-          "dag-library",
           "data-scientist",
           "debugging",
           "eval-integrity",
@@ -3943,5 +3942,5 @@
       }
     }
   },
-  "sha256": "76a4c900edf52cce28b1380352c7a180ceb1f4e4912709201c4e15c1c67d1870"
+  "sha256": "4db9624c48ceb27b119abccb5239058ea4c73a35027babca9e7dceb3e4b83b1d"
 }

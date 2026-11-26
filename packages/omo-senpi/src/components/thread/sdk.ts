@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import { deviceLabel } from "@oh-my-opencode/thread-address-core"
-
 import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
 import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
@@ -29,12 +27,8 @@ import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
-import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
-import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
-import type { GatewayRelay, RelayResult } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import { resolveProvenance, type ProvenanceWorkspaces } from "./gateway/provenance-resolver"
-import type { ReportOpResult } from "./gateway/store-relay-ops"
+import type { ProvenanceWorkspaces } from "./gateway/provenance-resolver"
 import type { StoreExtensionApi } from "./gateway/store-extensions"
 export type {
   StoreExtensionApi,
@@ -46,23 +40,16 @@ export type {
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
 import type { DeliveryOutcome, DeliveryTarget, RelayDeliverySuccess } from "./gateway/transport"
-import type {
-  ExternalAuthor,
-  GatewayDeliveryMode,
-  GatewayDeliveryResult,
-  GatewayDeliverySuccess,
-} from "./gateway/types"
+import type { GatewayDeliveryMode, GatewayDeliveryResult, GatewayDeliverySuccess } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { resolveThreadSocket } from "./live-surface-paths"
-import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
+import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
-import { sendView } from "./tools/send-view"
 import { listAcross } from "./remote/cross-device"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "./remote/ports"
-import { stampThisDevice } from "./remote/this-device"
 
 export type ThreadSdkOptions = {
   readonly agentDir: string
@@ -112,25 +99,6 @@ export function assertThreadSdkOptions(options: unknown): asserts options is Thr
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type Scoped = { readonly all_scope?: boolean }
 type Keyed = { readonly idempotency_key?: string }
-type Relayed<K extends keyof GatewayRelay> = Promise<Awaited<ReturnType<GatewayRelay[K]>> | Failure>
-/**
- * Whether an armed completion's wake reached the running session. When it did not, the durable arm is
- * picked up at the session's next start: `no_live_endpoint` (nothing lists the session live),
- * `not_routable` (its host lists no live session under the durable id), `unreachable` (the wake failed).
- */
-export type ArmWake =
-  | { readonly reached: true }
-  | {
-      readonly reached: false
-      readonly reason: "no_live_endpoint" | "not_routable" | "unreachable"
-      readonly detail?: string
-    }
-
-/** A report as the SDK answers it: the arm's sequence number stays inside the gateway; an armed completion says whether its wake reached the session. */
-type Reported = Promise<
-  RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean; readonly wake?: ArmWake }> | Failure
->
-
 /** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
 export type ThreadSdkSendResult =
   | (Omit<GatewayDeliverySuccess, "thread_id"> & { readonly thread: string })
@@ -149,79 +117,25 @@ export type LocatedThread = Pick<
 }
 
 export type ThreadSdk = StoreExtensionApi & {
-  /** `cli:<uid>`: the principal every receipt, budget and bindingless send of this SDK is keyed by. */
+  /** `cli:<uid>`: the principal every receipt, budget and send of this SDK is keyed by. */
   readonly principal: string
   /** `state`: the thread states to list; the default lists every state but archived. */
-  readonly list: (request: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
+  readonly list: (request?: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
   readonly read: (
     request: Scoped & { readonly thread: string; readonly max_bytes?: number; readonly cursor?: string },
   ) => Promise<ThreadToolResult>
-  /**
-   * Bindingless: the `cli` sender. With `binding_id`: the connector inbound path (`event:<key>` admitted once), with an
-   * optional `author` and a `mode` capped by the binding's `inbound_mode`; `author` without `binding_id` is `invalid_arguments`.
-   */
+  /** A send to a session by id, alias or name, as the `cli` sender, on the agent's `thread_send` road. */
   readonly send: (
     request: Scoped &
       Keyed & {
-        readonly thread?: string
+        readonly thread: string
         readonly text: string
         readonly mode?: GatewayDeliveryMode
         readonly expected_turn_id?: number
-        readonly binding_id?: string
-        readonly author?: ExternalAuthor
-        /** Bindingless only: replaces this sender's earlier undelivered send to the thread under the same key (#14428). */
+        /** Replaces this sender's earlier undelivered send to the thread under the same key (#14428). */
         readonly collapse_key?: string
       },
   ) => Promise<ThreadSdkSendResult>
-  readonly bind: (
-    request: Scoped & Keyed & { readonly session: string; readonly binding: Omit<BindInput, "session_durable_id"> },
-  ) => Relayed<"bind">
-  readonly unbind: (
-    request: Keyed & { readonly binding_id: string; readonly expected_revision: number },
-  ) => Relayed<"unbind">
-  readonly rebind: (
-    request: Scoped &
-      Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session: string },
-  ) => Relayed<"rebind">
-  readonly bindings: (
-    request: Scoped & {
-      readonly session?: string
-      readonly platform?: string
-      readonly account_id?: string
-      readonly chat_id?: string
-      readonly thread_id?: string
-      readonly status?: string
-      readonly cursor?: string
-      readonly limit?: number
-    },
-  ) => Relayed<"bindings">
-  readonly report: (
-    request: Scoped &
-      Keyed & {
-        readonly session: string
-        readonly kind: string
-        readonly text: string
-        readonly binding_id?: string
-        readonly request_id?: string
-        readonly request_kind?: string
-      },
-  ) => Reported
-  readonly outbox: (request: {
-    readonly binding_id: string
-    readonly after_cursor?: number
-    readonly limit?: number
-  }) => Relayed<"outbox">
-  readonly ack: (request: {
-    readonly binding_id: string
-    readonly cursor: number
-    readonly provider_message_id?: string
-  }) => Relayed<"ack">
-  readonly answer: (request: {
-    readonly binding_id: string
-    readonly reply_token: string
-    readonly answer: string
-    readonly author?: ExternalAuthor
-  }) => Relayed<"answer">
   readonly locate: (
     request: Scoped & { readonly thread: string },
   ) => Promise<{ readonly kind: "ok"; readonly thread: LocatedThread } | Failure>
@@ -288,6 +202,36 @@ function thrown(error: unknown): Failure {
   )
 }
 
+/**
+ * A script names only the keys an operation reads: a misspelt one (`allScope` for `all_scope`) is refused by name
+ * instead of silently ignored (#14316).
+ */
+function unknownKeys(request: unknown, known: readonly string[]): Failure | undefined {
+  if (typeof request !== "object" || request === null || Array.isArray(request))
+    return fail("invalid_arguments", "The options must be an object.", `Pass an object with ${known.join(", ")}.`)
+  const unknown = Object.keys(request).filter((key) => !known.includes(key))
+  if (unknown.length === 0) return undefined
+  return fail(
+    "invalid_arguments",
+    `Unknown option${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}.`,
+    `Pass only ${known.join(", ")}.`,
+    { unknown },
+  )
+}
+
+const LIST_KEYS = ["all_scope", "state"] as const
+const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
+const SEND_KEYS = [
+  "thread",
+  "text",
+  "mode",
+  "expected_turn_id",
+  "all_scope",
+  "idempotency_key",
+  "collapse_key",
+] as const
+const LOCATE_KEYS = ["thread", "all_scope"] as const
+
 // omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
 async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
   try {
@@ -299,7 +243,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
 
 /**
  * The script-callable thread surface: every operation the agent tools offer, over the same address
- * book, engine and relay, without an agent session. It never starts a host; it reads the endpoints
+ * book and engine, without an agent session. It never starts a host; it reads the endpoints
  * the engine enumerates and the gateway store under `agentDir`.
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
@@ -317,16 +261,6 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     options.store ??
     createGatewayStore({
       agentDir: options.agentDir,
-      senderProvenance: () =>
-        stampThisDevice(
-          resolveProvenance({
-            cwd: options.cwd,
-            env,
-            ...(options.provenanceWorkspaces === undefined ? {} : { workspaces: options.provenanceWorkspaces }),
-          }),
-          options.remote,
-        ),
-      resolveTarget: (address, request) => resolveForExtension(address, request),
       ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }),
     })
   const now = options.now ?? store.now
@@ -343,38 +277,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     now,
   }
   const view = () => hostView(surface)
-  const { relay, endpoints, locate, pipeline } = createGatewayServices(
+  const { pipeline } = createGatewayServices(
     { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
     () => hostView(surface, { offline: true }),
   )
-  // An extension call resolves its target while the store worker runs that call's transaction, so it
-  // takes the store-free live-and-disk resolver: the send path's `resolve` first asks this same store
-  // for the session's owner, a request the busy worker would only answer after the call's budget.
-  const resolveForExtension = createGatewayResolver(surface, () => hostView(surface, { offline: true }))
-
-  // A running session writes a completion only once it knows of the arm; the arm is durable, so a
-  // wake that does not get through leaves it to the session's next start, and the report says so.
-  async function wakeForArm(durableId: string): Promise<ArmWake> {
-    const unreachable = (error: unknown): ArmWake => ({
-      reached: false,
-      reason: "unreachable",
-      detail: error instanceof Error ? error.message : String(error),
-    })
-    let endpoint: Awaited<ReturnType<typeof locate>>
-    try {
-      endpoint = await locate(durableId)
-    } catch (error) {
-      return unreachable(error)
-    }
-    if (endpoint === null) return { reached: false, reason: "no_live_endpoint" }
-    try {
-      const reply = await endpoints.wake(endpoint, [])
-      return reply.unroutable === undefined ? { reached: true } : { reached: false, reason: "not_routable" }
-    } catch (error) {
-      return unreachable(error)
-    }
-  }
-
   const controls: ThreadToolSurfaceOptions = {
     ...surface,
     ...(options.remote === undefined ? {} : { remote: options.remote }),
@@ -405,138 +311,47 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     callerId: UNKNOWN_CALLER,
   })
 
-  /**
-   * A session a store-only operation names (bind, rebind, bindings --session, report, a bound send's target), through
-   * the one address module. These operations write THIS device's gateway store, so the address resolves on this device
-   * first, exactly as before the module (a name a local session shares with another device's thread is the local
-   * session); only a local not_found consults the account, so a thread that lives on another device is refused naming
-   * that device instead of a bare not_found.
-   */
-  async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
-    const offline = await sendView(surface, address, () => hostView(surface, { offline: true }))
-    const context = resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(address), allScope)))
-    const here = await resolveAddress({ ...context, remote: undefined }, address, { all_scope: allScope })
-    const resolved =
-      here.kind === "error" && here.code === "not_found" && options.remote !== undefined
-        ? await resolveAddress(context, address, { all_scope: allScope, probe: true })
-        : here
-    if (resolved.kind === "error") return { kind: "error", error: resolved }
-    if (resolved.where.kind === "device") {
-      const device = resolved.device
-      const id = resolved.where.row.device
-      return fail(
-        "unsupported",
-        `Session ${resolved.thread} is held on ${deviceLabel({ id, name: device?.name ?? id })}, not on this device; this device's gateway holds bindings and reports only for sessions it holds.`,
-        "Run the bind or report on that device, or name a session this device holds.",
-        {
-          thread: resolved.thread,
-          device: id,
-          ...(device === null ? {} : { device_name: device.name }),
-          address: resolved.address,
-          reason: "session_on_other_device",
-        },
-      )
-    }
-    return { id: resolved.thread }
-  }
-
   function named(sent: DeliveryOutcome): ThreadSdkSendResult {
     if (sent.kind !== "ok") return sent
     const { thread_id, ...facts } = sent
     return { ...facts, thread: thread_id }
   }
 
-  async function inbound(
-    request: Parameters<ThreadSdk["send"]>[0] & { readonly binding_id: string },
-  ): Promise<GatewayDeliveryResult> {
-    if (request.thread !== undefined) {
-      const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
-      // An explicit durable id that IS the binding's session needs no validating lookup: the inbound
-      // delivery resolves that same owner once, so a bound send pays one lookup budget like any
-      // other send. Any other address still resolves here to enforce the match.
-      if (binding === null || binding.session_durable_id !== request.thread) {
-        const target = await sessionId(request.thread, request.all_scope)
-        if ("kind" in target) return target
-        if (binding !== null && binding.session_durable_id !== target.id) {
-          return fail(
-            "invalid_arguments",
-            `Binding ${binding.binding_id} delivers to session ${binding.session_durable_id}, not ${target.id}.`,
-            "Drop the target (the binding names its session) or pass the binding of that session.",
-            { binding_id: binding.binding_id, session: binding.session_durable_id },
-          )
-        }
-      }
-    }
-    if (request.expected_turn_id !== undefined)
-      return fail(
-        "invalid_arguments",
-        "A binding message never steers, so it takes no expected_turn_id.",
-        "Drop expected_turn_id.",
-      )
-    if (request.mode === "steer")
-      return fail(
-        "invalid_arguments",
-        "A binding message is delivered as auto or follow_up, never steer.",
-        "Send with mode auto or follow_up, or omit it for the binding's inbound_mode.",
-      )
-    return await relay.inbound({
-      binding_id: request.binding_id,
-      event_id: request.idempotency_key ?? randomUUID(),
-      text: request.text,
-      ...(request.author === undefined ? {} : { author: request.author }),
-      ...(request.mode === undefined ? {} : { mode: request.mode }),
-    })
-  }
-
   return {
     registerStoreExtension: store.registerStoreExtension,
     extensionCall: store.extensionCall,
     principal,
-    list: (request) =>
-      guarded(async () =>
-        listAcross(
-          options.remote,
-          await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
-          request.all_scope === true,
-          request.state,
-        ),
+    list: (request = {}) =>
+      guarded(
+        async () =>
+          unknownKeys(request, LIST_KEYS) ??
+          listAcross(
+            options.remote,
+            await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
+            request.all_scope === true,
+            request.state,
+          ),
       ),
     read: (request) =>
-      guarded(async () =>
-        readThread(
-          { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
-          await view(),
-          {
-            thread: request.thread,
-            max_bytes: request.max_bytes,
-            cursor: request.cursor,
-            all_scope: request.all_scope,
-          },
-          UNKNOWN_CALLER,
-        ),
+      guarded(
+        async () =>
+          unknownKeys(request, READ_KEYS) ??
+          readThread(
+            { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
+            await view(),
+            {
+              thread: request.thread,
+              max_bytes: request.max_bytes,
+              cursor: request.cursor,
+              all_scope: request.all_scope,
+            },
+            UNKNOWN_CALLER,
+          ),
       ),
     send: (request) =>
       guarded(async () => {
-        if (request.binding_id !== undefined && request.collapse_key !== undefined)
-          return fail(
-            "invalid_arguments",
-            "A send through a binding is keyed by its event id; collapse_key applies to a send without a binding.",
-            "Drop collapse_key, or send without the binding.",
-          )
-        if (request.binding_id !== undefined)
-          return named(await inbound({ ...request, binding_id: request.binding_id }))
-        if (request.thread === undefined)
-          return fail(
-            "invalid_arguments",
-            "A send without a binding needs a target session.",
-            "Pass the target session, or --binding to deliver through a binding.",
-          )
-        if (request.author !== undefined)
-          return fail(
-            "invalid_arguments",
-            "An author names a human in a bound external thread; a send without a binding has none.",
-            "Pass binding_id with the author, or drop the author.",
-          )
+        const refused = unknownKeys(request, SEND_KEYS)
+        if (refused !== undefined) return refused
         // The same road as an agent's send: the address resolves through the address module (across the account when this SDK
         // has one, this device only otherwise), and the target's kind picks the transport. Like the agent's thread_send, an id
         // this device's gateway owns needs no lookup (no host listing, no account call); any other address resolves over the
@@ -586,94 +401,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         })
         return named(sent)
       }),
-    bind: (request) =>
-      guarded(async () => {
-        const session = await sessionId(request.session, request.all_scope)
-        if ("kind" in session) return session
-        return await relay.bind({
-          principal,
-          ...keyed(request),
-          binding: { ...request.binding, session_durable_id: session.id },
-        })
-      }),
-    unbind: (request) =>
-      guarded(() =>
-        relay.unbind({
-          principal,
-          ...keyed(request),
-          binding_id: request.binding_id,
-          expected_revision: request.expected_revision,
-        }),
-      ),
-    rebind: (request) =>
-      guarded(async () => {
-        const session = await sessionId(request.session, request.all_scope)
-        if ("kind" in session) return session
-        return await relay.rebind({
-          principal,
-          ...keyed(request),
-          binding_id: request.binding_id,
-          expected_revision: request.expected_revision,
-          session_durable_id: session.id,
-        })
-      }),
-    bindings: (request) =>
-      guarded(async () => {
-        const { session: address, all_scope: allScope, cursor, limit, ...filter } = request
-        const session = address === undefined ? undefined : await sessionId(address, allScope)
-        if (session !== undefined && "kind" in session) return session
-        return await relay.bindings({
-          filter: { ...filter, ...(session === undefined ? {} : { session_durable_id: session.id }) },
-          ...(cursor === undefined ? {} : { cursor }),
-          ...(limit === undefined ? {} : { limit }),
-        })
-      }),
-    report: (request) =>
-      guarded(async () => {
-        const event = OUTBOUND_EVENTS.find((candidate): candidate is OutboundEvent => candidate === request.kind)
-        if (event === undefined)
-          return fail(
-            "invalid_arguments",
-            `The report kind must be one of ${OUTBOUND_EVENTS.join(", ")}.`,
-            "Pass milestone, report, question or completion.",
-          )
-        const requestKind = request.request_kind
-        if (requestKind !== undefined && !isUiRequestKind(requestKind))
-          return fail(
-            "invalid_arguments",
-            `The request kind must be one of ${UI_REQUEST_KINDS.join(", ")}.`,
-            "Pass question, select, confirm, input or editor.",
-          )
-        const session = await sessionId(request.session, request.all_scope)
-        if ("kind" in session) return session
-        const reported = await relay.report({
-          principal,
-          ...keyed(request),
-          session_durable_id: session.id,
-          event,
-          text: request.text,
-          ...(request.binding_id === undefined ? {} : { binding_id: request.binding_id }),
-          ...(request.request_id === undefined ? {} : { request_id: request.request_id }),
-          ...(requestKind === undefined ? {} : { request_kind: requestKind }),
-        })
-        if (reported.kind !== "ok") return reported
-        // The arm's sequence number is the running session's settle watermark, read back on the wake; not part of the result.
-        const { arm_seq: _armSeq, ...result } = reported
-        return result.armed ? { ...result, wake: await wakeForArm(session.id) } : result
-      }),
-    outbox: (request) => guarded(() => relay.outbox(request)),
-    ack: (request) => guarded(() => relay.ack(request)),
-    answer: (request) =>
-      guarded(() =>
-        relay.answer({
-          binding_id: request.binding_id,
-          reply_token: request.reply_token,
-          answer: request.answer,
-          ...(request.author === undefined ? {} : { author: request.author }),
-        }),
-      ),
     locate: (request) =>
       guarded(async () => {
+        const refused = unknownKeys(request, LOCATE_KEYS)
+        if (refused !== undefined) return refused
         const current = await view()
         const resolved = await resolveAddress(
           resolveContext(toThreadAddressEntries(addressBook(surface, current))),
@@ -795,15 +526,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         ),
       ),
     dispose: async () => {
-      relay.dispose()
       await options.remote?.sessions.close?.().catch(() => undefined)
       return store.dispose()
     },
   }
-}
-
-function keyed(request: Keyed): Keyed {
-  return request.idempotency_key === undefined ? {} : { idempotency_key: request.idempotency_key }
 }
 
 const HERE_PREFIX = "here/"

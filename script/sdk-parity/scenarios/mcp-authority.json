@@ -1,0 +1,444 @@
+{
+  "domain": "mcp",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "mcp.oauth.login/authority-base",
+      "row": "mcp.oauth.login",
+      "kind": "effect",
+      "input": {
+        "server": "x-server"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login"
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/authority-server",
+      "row": "mcp.oauth.login",
+      "kind": "effect",
+      "input": {
+        "server": "x-server"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "args": {
+            "server": "x-server"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/authority-server-url",
+      "row": "mcp.oauth.login",
+      "kind": "effect",
+      "input": {
+        "server": "x-server",
+        "server_url": "x-server_url"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "args": {
+            "server_url": "x-server_url"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/authority-client-id",
+      "row": "mcp.oauth.login",
+      "kind": "effect",
+      "input": {
+        "server": "x-server",
+        "client_id": "x-client_id"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "args": {
+            "client_id": "x-client_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/authority-scopes",
+      "row": "mcp.oauth.login",
+      "kind": "effect",
+      "input": {
+        "server": "x-server",
+        "scopes": [
+          "x-scopes"
+        ]
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "args": {
+            "scopes": [
+              "x-scopes"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/authority-base",
+      "row": "mcp.oauth.logout",
+      "kind": "effect",
+      "input": {
+        "server": "x-server"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout"
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/authority-server",
+      "row": "mcp.oauth.logout",
+      "kind": "effect",
+      "input": {
+        "server": "x-server"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "args": {
+            "server": "x-server"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/authority-server-url",
+      "row": "mcp.oauth.logout",
+      "kind": "effect",
+      "input": {
+        "server": "x-server",
+        "server_url": "x-server_url"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "args": {
+            "server_url": "x-server_url"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.status/authority-base",
+      "row": "mcp.oauth.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.status"
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.status/authority-server",
+      "row": "mcp.oauth.status",
+      "kind": "effect",
+      "input": {
+        "server": "x-server"
+      },
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.status",
+          "args": {
+            "server": "x-server"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/credential-refuses-connector",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/credential-refuses-session",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/credential-refuses-service",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/credential-refuses-connector",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/credential-refuses-session",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/credential-refuses-service",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/opencode-credential-refuses-connector",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/opencode-credential-refuses-session",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/opencode-credential-refuses-service",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/opencode-credential-refuses-connector",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/opencode-credential-refuses-session",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/opencode-credential-refuses-service",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.status/opencode-read-refuses-connector",
+      "row": "mcp.oauth.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.status/opencode-read-refuses-service",
+      "row": "mcp.oauth.status",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.status",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

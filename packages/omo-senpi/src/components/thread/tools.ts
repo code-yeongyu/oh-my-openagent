@@ -33,7 +33,7 @@ import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
-import { hashArgs } from "./gateway/bindings"
+import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import type { DeliveryPipeline } from "./gateway/pipeline"
@@ -43,13 +43,12 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
-import { createRelayTools } from "./tools/relay-tools"
 import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./address/account"
-import { listAcross } from "./remote/lazy-ops"
+import { listAcross, readReceipt } from "./remote/lazy-ops"
 import { rowCreatedAt, rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
@@ -88,6 +87,7 @@ import {
   type AnyTool,
   type ToolOutput,
   uncertainFailure,
+  uncertainNote,
 } from "./tools/internals"
 import { currentResult, threadRow } from "./tools/thread-row"
 
@@ -119,7 +119,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
 } {
   // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
   const options = surface.remote === undefined ? surface : { ...surface, remote: withClosedRows(surface.remote) }
-  const { store, relay, pipeline } = createGatewayServices(options, () => view({ offline: true }))
+  const { store, pipeline } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> {
     await options.ensureHost?.()
@@ -186,6 +186,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
+    if (
+      name === "thread_read" &&
+      "delivery_id" in value &&
+      typeof value.delivery_id === "string" &&
+      "thread" in value &&
+      typeof value.thread === "string"
+    ) {
+      // This branch precedes view()/ensureHost and the read tool's own receipt admission.
+      return output(await readReceipt(store, options.remote, callerId, value.thread, value.delivery_id, now()))
+    }
     const explicitKey =
       "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key?.trim() : undefined
     const scope = {
@@ -217,7 +227,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
       admitting.set(key, (admitting.get(key) ?? 0) + 1)
       try {
-        admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
+        admission = await store.toolReceiptBegin({
+          ...scope,
+          now: at,
+          args_hash: hashArgs(value),
+          retry_uncertain: name === "thread_create",
+        })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (isLockWaitExceeded(error))
@@ -242,8 +257,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         // The slot passes to the key's recovery entry when the failure left one; otherwise it is free again.
         releaseAdmitting(key)
       }
+      // The store committed this key's reservation for a call whose reply was lost, so nothing ran under it: the call
+      // resumes as the reservation it found, a recovery keeping its first cause (#14623 review round 2 H1).
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
-        admission = { kind: "accepted" }
+        admission =
+          admission.recovery === undefined
+            ? { kind: "accepted" }
+            : { kind: "retry", error_note: admission.recovery.error_note }
       unanswered.delete(key)
       if (admission.kind === "replay") {
         const result = currentResult(admission.result as ThreadToolResult)
@@ -277,11 +297,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         )
       }
       // #14060: a thread_create that failed after the host made its thread may recover by re-running it; the create
-      // itself refuses unless it finds that thread (see thread_create).
-      if (admission.kind === "uncertain") {
-        if (name !== "thread_create") return output(uncertainFailure(admission.error_note))
-        retrying = { error_note: admission.error_note }
-      }
+      // itself refuses unless it finds that thread (see thread_create). The store reserved the receipt for this retry
+      // alone (#14623 H1), so its answer settles it like a new call's.
+      if (admission.kind === "uncertain") return output(uncertainFailure(admission.error_note))
+      if (admission.kind === "retry") retrying = { error_note: admission.error_note }
     }
     const unrecorded = (what: string) => (settleError: unknown) => {
       unsettled.set(
@@ -350,7 +369,26 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (refusal === undefined) return await failed(error)
       result = { kind: "error", error: refusal }
     }
-    if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the call ran"))
+    // A create that may have made its thread (its open's reply was lost) has no answer yet: its receipt stays uncertain,
+    // so a retry under the key runs the create again, which finds that thread or answers uncertain again (#14060). The
+    // note keeps the first uncertain answer's cause (#14569); a retry that fails in any way has not settled what the
+    // first run made, so its receipt stays uncertain under that same note and its error is never replayed as final.
+    const undecided =
+      name === "thread_create" &&
+      result.kind === "error" &&
+      (result.error.code === "idempotency_uncertain" || retrying !== undefined)
+        ? (retrying?.error_note ?? uncertainNote(result.error))
+        : undefined
+    if (receipted)
+      await store
+        .toolReceiptSettle({
+          ...scope,
+          now: now(),
+          ...(undecided === undefined ? { result } : { error_note: undecided }),
+        })
+        .then((settled) => {
+          if (!settled) unrecorded("the call ran")(new Error("this call no longer held its receipt"))
+        }, unrecorded("the call ran"))
     running.delete(receiptKey(scope))
     return output(result)
   }
@@ -502,27 +540,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         archiveThread(options, current, value, callerId),
       ),
   }
-  const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {
     pipeline.dispose()
     unanswered.clear()
-    relay.dispose()
   }
   return {
-    tools: [
-      create,
-      list,
-      read,
-      send,
-      interrupt,
-      close,
-      handoff,
-      rename,
-      setModel,
-      setReasoning,
-      archive,
-      ...relayTools,
-    ].map((tool) =>
+    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, archive].map((tool) =>
       withThreadRenderers({
         ...tool,
         permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
@@ -557,6 +580,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
+    const replyHere = replyTo !== undefined && replyTo.device === undefined
     const localFor = sendBookFor(options, current)
     const context = (local: readonly ThreadAddressEntry[], account = true) => ({
       remote: account ? options.remote : undefined,
@@ -590,7 +614,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         here,
       )
       if (mismatch !== undefined) return refuse(mismatch)
-      return { kind: "local", thread_id: address, all_scope: scope }
+      return { kind: "local", thread_id: address, all_scope: replyHere ? true : scope }
     }
     // Decision 0027: ONE resolver over this device's book and the account's other devices (resolveAddress, which takes
     // <device>/<thread> too); where it resolved says which transport carries the send.
@@ -607,6 +631,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
             id_prefix: { exclude: callerId },
           })
         : await resolveAddress(context(entries, false), address, { all_scope: scope, id_prefix: false })
+    // The reply grant: a consumed delivery's sender on this device is answered without all_scope even when it runs in
+    // another workspace. Only a scoped refusal is widened, and the widened hit must still be that sender
+    // (replyTargetMismatch below), so the grant reaches no other session and lasts as long as the reply allowance.
+    let widened = replyHere && resolved.kind === "error" && resolved.code === "scope_denied"
+    if (widened)
+      resolved = await resolveAddress(context(entries, false), address, { all_scope: true, id_prefix: false })
     // #14048: a delivery id without a device part (`rpc:local/<id>`, a bare row id) proves no device: another device's
     // delivery arrives that way when the connection that admitted it declared no remote origin. A sender this device does
     // not hold is then looked up account-wide (exact id or name only, never an id prefix), and the reply goes only to the
@@ -625,6 +655,19 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         return { kind: "remote", row: resolved.where.row }
       }
     }
+    // A stated name no session on this device or the account carries any more (the sender renamed itself, or its session
+    // file records no name) is answered through the sender's recorded id, so a reply by name reaches it as a reply by id
+    // does. A name another session carries, here or on another device, resolved above and is refused there.
+    if (replyHere && resolved.kind === "error" && resolved.code === "not_found" && address !== replyTo.session_id) {
+      const byId = await resolveAddress(context(localFor(replyTo.session_id), false), replyTo.session_id, {
+        all_scope: true,
+        id_prefix: false,
+      })
+      if (byId.kind === "ok") {
+        resolved = byId
+        widened = true
+      }
+    }
     if (resolved.kind === "error") return refuse(resolved)
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
     // the address resolves to that sender on that sender's device, else refuse by name without sending (decision 0027
@@ -632,7 +675,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
     if (mismatch !== undefined) return refuse(mismatch)
     if (resolved.where.kind === "device") return { kind: "remote", row: resolved.where.row }
-    return { kind: "local", thread_id: resolved.thread, all_scope: resolved.all_scope ?? scope }
+    return { kind: "local", thread_id: resolved.thread, all_scope: widened ? true : (resolved.all_scope ?? scope) }
   }
 
   async function deliver(
@@ -656,7 +699,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
  * reported the same way whatever carried it; a gateway row's `message_seq` exists only for a session
  * this device holds (an unreachable one is `queued_offline`, the row is durable), and `device` only names another one.
  * A chain may come back to a session it passed; only a session sending to itself is refused `loop_detected`. Answers
- * may also travel through thread_read, thread_report and thread_answer.
+ * may also travel through thread_read.
  */
 async function deliverThrough(
   options: ThreadToolSurfaceOptions,
@@ -702,6 +745,7 @@ async function deliverThrough(
   if ("device" in sent) {
     // The relay leg answers with the same delivery facts as the local one (#13014, #13036); it knows no endpoint on that device.
     const facts = {
+      ...(sent.outcome === undefined ? {} : { outcome: sent.outcome }),
       ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }),
       ...(sent.effective_mode === undefined ? {} : { effective_mode: sent.effective_mode }),
       device: sent.device,
@@ -741,6 +785,7 @@ async function deliverThrough(
   }
   const threadId = sent.thread_id
   const facts = {
+    ...(sent.outcome === undefined ? {} : { outcome: sent.outcome }),
     delivery_id: sent.delivery_id,
     effective_mode: sent.effective_mode,
     ...(sent.collapsed === true ? { collapsed: true as const } : {}),
@@ -779,9 +824,8 @@ async function deliverThrough(
 }
 
 /**
- * Registers the fourteen tools, a removed-tool hint for each chat-binding tool sessions no longer have, and with `pi.on`
- * the store extensions' session tools at each `session_start` (`tools/extension-tools.ts`); `dispose` (shutdown) cancels
- * the relay's background retries and drops the receipt-recovery keys.
+ * Registers the eleven tools, and with `pi.on` the store extensions' session tools at each `session_start`
+ * (`tools/extension-tools.ts`); `dispose` (shutdown) drops the receipt-recovery keys.
  */
 export function registerThreadTools(
   pi: ExtensionToolHost,

@@ -15,6 +15,7 @@ The thread and device address rules every omo surface shares (#14305): the addre
 | `parse.ts` | `parseAddress` (`self`, a bare address, or `<device>/<thread>` split on its single `/` unless the text is a path), `formatAddress`, the thread id / session id / id prefix shapes, `DEVICE_PREFIX_MIN`, `HERE` |
 | `name.ts` | `normalizeName`: NFKC, trim, lowercase, collapsed whitespace; `thread/addressing.ts` `normalizeThreadName` is this function |
 | `device.ts` | `resolveDevice`: exact id > `here` > name (online twins count) > unique 6+ id prefix; `DeviceRef` |
+| `ladder.ts` | `matchThread`: the one thread-part ladder (exact id > session id / listing key > alias > name in the caller's scope > unique 8+ hex id prefix, each thread id counted once); answers one or many at the first step that matches and leaves what many holders mean to the caller. `thread/addressing.ts` `resolveTarget` and the remote client's `sessions.resolve` both run it |
 | `listing.ts` | `deviceListing`: `listed / incomplete / offline` from one round and the roster |
 | `row.ts` | `rowKey`, `rowAddress`, `rowName` (only a real name is an address; a fallback is `unnamed`), `mergeRows` |
 | `refusals.ts` | refusal codes, the plain refusal union and its builders, the device candidate shape, `deviceLabel` (`name (id)`) |

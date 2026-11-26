@@ -2,7 +2,7 @@ import { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, UNCONFIGURED_POSTHOG_API
 import type { TelemetryEnv } from "./types"
 
 const TRUTHY_DISABLE_VALUES = ["1", "true", "yes"] as const
-const SEND_OPT_OUT_VALUES = ["0", "false", "no", "yes"] as const
+const SEND_OPT_OUT_VALUES = ["0", "false", "no"] as const
 
 export type ShouldDisableTelemetryInput = {
   readonly env?: TelemetryEnv
@@ -33,6 +33,12 @@ export function shouldDisableTelemetry(input: ShouldDisableTelemetryInput): bool
   const prefixes = Array.from(new Set([globalPrefix, input.productEnvPrefix]))
 
   if (isDisableFlag(env["DO_NOT_TRACK"]) || isDisableFlag(env[`${globalPrefix}_DISABLE_TELEMETRY`])) {
+    return true
+  }
+
+  // OTEL_SDK_DISABLED=true stops every sender, not only the OTLP branch (#14920): a machine that
+  // asked the OpenTelemetry SDK to go away must not keep receiving PostHog events.
+  if (env["OTEL_SDK_DISABLED"]?.trim().toLowerCase() === "true") {
     return true
   }
 

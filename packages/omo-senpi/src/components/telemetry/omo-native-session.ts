@@ -25,6 +25,7 @@ import {
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { readOmoNativeConsent } from "./omo-native-consent"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { userInfo } from "node:os"
 import { CONFIG_SELECTION_ENV_KEYS, withConfigSelection, type ConfigSelection } from "./session-summary-purge"
@@ -224,7 +225,7 @@ function readTimeZone(provider: (() => string) | undefined): string | undefined 
   }
 }
 
-/** The one enablement decision: the env opt-out matrix plus the omo config gate for the event's cwd. */
+/** The one enablement decision: the env opt-out matrix, the omo config gate, and the recorded first-run consent answer for the event's state directory. */
 export function isOmoNativeTelemetryEnabled(
   options: Pick<OmoNativeSessionOptions, "diagnostics" | "isConfigEnabled"> & { readonly automationDeps?: TempDirDeps },
   eventCtx: unknown,
@@ -233,7 +234,8 @@ export function isOmoNativeTelemetryEnabled(
   return (
     notAutomated(env, options.automationDeps) &&
     isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() }) &&
-    configEnabled(options, eventCtx, env)
+    configEnabled(options, eventCtx, env) &&
+    readOmoNativeConsent(getOmoNativeStateDir(env)) === "accepted"
   )
 }
 

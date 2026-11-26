@@ -30,7 +30,6 @@ import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from ".
 import type { SessionWatchHandlers, SessionWatchOutcome } from "./control/wait-settled"
 import type { JsonObject } from "./remote/ports"
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
-import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
 import { closeLadder, SESSION_GONE } from "./control/close-ladder"
 
@@ -969,16 +968,6 @@ export function createLiveThreadSurface(
       )
     },
     classifyLiveness: liveness,
-    respondUi: async (endpoint, answer) => {
-      kinds.set(resolve(endpoint.socket), endpoint.kind)
-      const sessionId = endpoint.kind === "rpc_host" ? await routingIdOf(endpoint) : endpoint.routing_id
-      if (sessionId === null && endpoint.kind === "rpc_host") return { delivered: false, error: "unknown_session" }
-      return await answerUiRequest(
-        (socket, type, data) => callFrame(socket, type, data, undefined, endpoint.durable_session_id),
-        { ...endpoint, routing_id: sessionId },
-        answer,
-      )
-    },
   }
 
   return {
@@ -1012,6 +1001,10 @@ export function createLiveThreadSurface(
       }
     },
     listSessions: async () => (await listView()).sessions,
+    capabilities: async () => {
+      const info = await callOn<Record<string, unknown>>(legacy, "get_protocol_info", { observe: true })
+      return Array.isArray(info.capabilities) ? info.capabilities.filter((name) => typeof name === "string") : []
+    },
     listView,
     endpoint: (socket) =>
       sessionMethods(socket, (type, data, durableId) => callOn(socket, type, data, undefined, durableId)),
@@ -1062,10 +1055,12 @@ export function createLiveThreadSurface(
 export { createServiceAliasRegistry } from "./remote/alias-registry"
 export { createCliRemoteSurface, remoteClient, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
+export { readReceipt } from "./remote/receipt"
 export { createRemoteMonitorSource, resolveMonitorTarget } from "./remote/monitor-source"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
+export { reopenParkedRow } from "./remote/reopen-parked"
 export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"

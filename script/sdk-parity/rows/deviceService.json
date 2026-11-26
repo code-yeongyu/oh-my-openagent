@@ -1,0 +1,466 @@
+{
+  "domain": "deviceService",
+  "rows": [
+    {
+      "id": "deviceService.bootstrap",
+      "kind": "capability",
+      "sdk": "deviceService.bootstrap",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {
+          "account": {
+            "type": "object"
+          },
+          "install": {
+            "type": "boolean"
+          },
+          "adopt": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "bootstrap"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it downloads and installs a service"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "deviceService.control",
+      "kind": "capability",
+      "sdk": "deviceService.control",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "control"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "deviceService.disable",
+      "kind": "capability",
+      "sdk": "deviceService.disable",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "disable"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "deviceService.enable",
+      "kind": "capability",
+      "sdk": "deviceService.enable",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "enable"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "deviceService.info",
+      "kind": "capability",
+      "sdk": "deviceService.info",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on",
+        "cli": "CLI omitted: omo remote status prints it beside the status (deviceService.status)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "deviceService.setControl",
+      "kind": "capability",
+      "sdk": "deviceService.setControl",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {
+          "on": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "control"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {
+            "state": "on"
+          },
+          "values": [
+            "on",
+            "off"
+          ]
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The positional state fills on: on is true, off is false."
+    },
+    {
+      "id": "deviceService.setWake",
+      "kind": "capability",
+      "sdk": "deviceService.setWake",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {
+          "on": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "on"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "wake"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {
+            "state": "on"
+          },
+          "values": [
+            "on",
+            "off",
+            "default"
+          ]
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The positional state fills on: on is true, off is false, default is null (the stored value is removed)."
+    },
+    {
+      "id": "deviceService.status",
+      "kind": "capability",
+      "sdk": "deviceService.status",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "status"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "deviceService.wake",
+      "kind": "capability",
+      "sdk": "deviceService.wake",
+      "today": "partial",
+      "slices": [
+        "A2a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "wake"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.5",
+      "position": 1,
+      "ids": [
+        "deviceService.status",
+        "deviceService.info"
+      ],
+      "cells": [
+        "`deviceService.status()` with the local service units; `deviceService.info()`",
+        "`omo remote status`",
+        "none",
+        "partial: the omo SDK's narrower status; remote module `service.status`, `service.info`",
+        "Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on",
+        "A2a"
+      ]
+    },
+    {
+      "table": "6.5",
+      "position": 2,
+      "ids": [
+        "deviceService.enable",
+        "deviceService.disable"
+      ],
+      "cells": [
+        "`deviceService.enable()`, `.disable()`, with the opt-out record and the cold-wake steps the CLI runs around them today, as one operation each",
+        "`omo remote enable`; `omo remote disable`",
+        "none",
+        "partial: remote module `service.setEnabled`, `admin.ts`",
+        "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's",
+        "A2a"
+      ]
+    },
+    {
+      "table": "6.5",
+      "position": 3,
+      "ids": [
+        "deviceService.control",
+        "deviceService.setControl"
+      ],
+      "cells": [
+        "`deviceService.control()`, `.setControl(on)`",
+        "`omo remote control [on\\|off]`",
+        "none",
+        "partial: remote module",
+        "Same reason",
+        "A2a"
+      ]
+    },
+    {
+      "table": "6.5",
+      "position": 4,
+      "ids": [
+        "deviceService.wake",
+        "deviceService.setWake"
+      ],
+      "cells": [
+        "`deviceService.wake()`, `.setWake(on \\| null)`, person only",
+        "`omo remote wake [on\\|off\\|default]`",
+        "none",
+        "partial: remote module",
+        "Same reason",
+        "A2a"
+      ]
+    },
+    {
+      "table": "6.5",
+      "position": 5,
+      "ids": [
+        "deviceService.bootstrap"
+      ],
+      "cells": [
+        "`deviceService.bootstrap({ account?, install?, adopt? })` (`R/types.ts:218-222`)",
+        "`omo remote bootstrap`",
+        "none",
+        "partial: remote module, `admin.ts`",
+        "Tool omitted: it downloads and installs a service",
+        "A2a"
+      ]
+    }
+  ]
+}

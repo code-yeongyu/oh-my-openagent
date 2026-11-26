@@ -86,6 +86,51 @@ describe("thread_create on a device whose route does not reach the session it op
     expect(kit.git(repo, "branch", "--list", "far-unrouted")).toBe("")
   })
 
+  // #14623 review M5: the worktree is removed only once b's engine confirms the session it holds there is unloaded. A
+  // refused, timed-out or unknown unload may leave that session alive in the folder, so the folder stays and is named.
+  test.each([
+    [
+      "refuses the unload",
+      {
+        kind: "ok" as const,
+        response: { type: "response", success: true, data: { outcome: "refused", reason: "attached" } },
+      },
+    ],
+    ["times out on the unload", { kind: "refused" as const, reason: "request_timeout" }],
+    ["loses the unload's reply (unknown)", { kind: "uncertain" as const, reason: "reply_lost" }],
+  ])(
+    "#given b's route never lists the new session and b's engine %s #when thread_create runs on b with a worktree #then the worktree stays on b and the refusal names it",
+    async (_label, unload) => {
+      const repo = kit.repository()
+      const a = account({ openUnrouted: true, unlistedReason: "route_unlisted", sessionFiles: UNROUTED_FILES })
+      const far = withFarWorktrees(a, kit.folder("thread-wt-far-"), "answers")
+      const remote: RemoteThreadSurface = {
+        ...far,
+        sessions: {
+          ...far.sessions,
+          endpointCommand: async (device, rpc, options) =>
+            rpc["type"] === "unload_session" ? unload : far.sessions.endpointCommand(device, rpc, options),
+        },
+      }
+      const result = await surface(remote).run("thread_create", {
+        device: "studio",
+        name: "remote-lane",
+        cwd: repo,
+        worktree: { branch: "far-kept" },
+      })
+
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "host_unavailable",
+          message: expect.stringContaining("worktree"),
+          details: { created: true, worktree: { branch: "far-kept" } },
+        },
+      })
+      expect(kit.git(repo, "branch", "--list", "far-kept")).not.toBe("")
+    },
+  )
+
   test("#given the same, and b does not remove the worktree #when thread_create runs on b with a worktree #then the refusal names the worktree left on b and the cleanup failure", async () => {
     const repo = kit.repository()
     const a = account({ openUnrouted: true, unlistedReason: "route_unlisted", sessionFiles: UNROUTED_FILES })

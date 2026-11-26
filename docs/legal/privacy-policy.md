@@ -17,7 +17,7 @@ Use the private form or email, never a public issue, for anything that contains 
 
 ## 2. What telemetry sends
 
-While OmO runs, it sends product telemetry to PostHog (section 5). OmO Native events (the CLI and Desktop) are a fixed set of fields, and each field is a boolean, a number, a size bucket, or a value from a published list. The once-a-day activity events described under "About your computer" also carry a few strings as your system reports them (CPU model, terminal application, locale) and the name of your login shell program, cut from its path. The complete, machine-checked list of events and fields is in the [telemetry reference](../reference/senpi-telemetry.md); the Codex adapter's single event is in the [Codex telemetry reference](../reference/codex-telemetry.md). If this notice and those lists ever differ, the lists are authoritative and this notice is wrong.
+While OmO runs, it sends product telemetry to PostHog (`https://us.i.posthog.com`), and OmO Native's events additionally to OmO's own collector at `https://t.omo.dev` (section 5). OmO Native events (the CLI and Desktop) are a fixed set of fields, and each field is a boolean, a number, a size bucket, or a value from a published list. The once-a-day activity events described under "About your computer" also carry a few strings as your system reports them (CPU model, terminal application, locale) and the name of your login shell program, cut from its path. The complete, machine-checked list of events and fields is in the [telemetry reference](../reference/senpi-telemetry.md); the Codex adapter's single event is in the [Codex telemetry reference](../reference/codex-telemetry.md). If this notice and those lists ever differ, the lists are authoritative and this notice is wrong.
 
 ### Identifiers
 
@@ -120,6 +120,7 @@ Any one of the environment variables below turns everything off in every product
   export OMO_DISABLE_TELEMETRY=1
   export OMO_DISABLE_POSTHOG=1
   export OMO_SEND_ANONYMOUS_TELEMETRY=0
+  export OTEL_SDK_DISABLED=true
   ```
 
 - **Codex adapter only:** `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
@@ -128,7 +129,7 @@ OmO Native turns telemetry off automatically in CI and test runs; the OpenCode p
 
 ## 5. Who receives the data: our processor, and the transfer abroad
 
-We use one processor, and telemetry has no other destination.
+We use one processor, and one first-party destination of our own.
 
 | | |
 |---|---|
@@ -140,6 +141,8 @@ We use one processor, and telemetry has no other destination.
 | Purpose at the recipient | Storing the events and serving our analytics queries. |
 | Retention at the recipient | See section 6. |
 | How to refuse | Turn telemetry off (section 4). This stops the transfer completely and has no effect on OmO. |
+
+OmO Native's events (the CLI and Desktop) are also sent, with the same fields over the same HTTPS transport, to OmO's own telemetry collector at `https://t.omo.dev` — an OTLP endpoint operated by the OmO project, not a third party. Before the first send it records the install hash once at `/v1/register`; events then go to `/v1/logs`. Turning telemetry off (section 4) stops both destinations together.
 
 **EU/EEA, UK, and Swiss users:** PostHog, Inc. is certified under the EU-U.S. Data Privacy Framework, its UK Extension, and the Swiss-U.S. DPF, so the transfer is covered by the European Commission's adequacy decision for DPF participants. PostHog's Data Processing Agreement also contains the EU Standard Contractual Clauses as a fallback. The DPA text is at https://posthog.com/dpa.
 
