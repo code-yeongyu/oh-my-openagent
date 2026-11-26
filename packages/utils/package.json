@@ -17,6 +17,10 @@
       "types": "./src/escape-for-display.ts",
       "import": "./src/escape-for-display.ts"
     },
+    "./testing/display-unsafe": {
+      "types": "./src/testing/display-unsafe.ts",
+      "import": "./src/testing/display-unsafe.ts"
+    },
     "./path-containment": {
       "types": "./src/path-containment.ts",
       "import": "./src/path-containment.ts"

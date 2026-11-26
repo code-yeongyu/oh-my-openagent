@@ -168,8 +168,9 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // contracts and the thread core load on first use and the file may not grow. Raising the ceiling or adding a static path
 // reopens that decision; the split into a second runtime file is the next SDK slice's. The ceiling sits at the current
 // size (owner's rule): 748,709 since the thread client loads from its shipped sidecar (P1b size ruling; 933,161 before);
-// 748,976 with the disposed-root gate (root/assemble.ts ROOT_DISPOSED, +267 B, LEAD ruling (a)).
-const OMO_SDK_RUNTIME_BYTES = 748_976
+// 748,976 with the disposed-root gate (root/assemble.ts ROOT_DISPOSED, +267 B, LEAD ruling (a)); 749,055 with the base
+// branch at 43ef159329 (utils/src/escape-for-display.ts +196, thread/addressing.ts -53 pre-minify; LEAD ruling).
+const OMO_SDK_RUNTIME_BYTES = 749_055
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,
