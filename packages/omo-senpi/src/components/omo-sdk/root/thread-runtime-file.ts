@@ -4,6 +4,7 @@ import type { OmoFailure } from "../contract"
 import { OMO_CODE_REGISTRY } from "../contract/codes"
 import { RUNTIME_STAMP } from "../runtime-stamp"
 import { reportUnexpected, type UnexpectedPort, withUnexpectedLog } from "../unexpected-port"
+import { ROOT_DISPOSED } from "./assemble"
 
 // The SDK root's thread runtime file at its boundary (slice P1c, #15031): what the root takes from the file, the checks
 // a loaded file passes before any member uses it, and the one path that loads it and builds the core.
@@ -16,7 +17,6 @@ export type ThreadsRuntime = Pick<
 
 export const RUNTIME_FILE_UNAVAILABLE = "runtime_file_unavailable"
 export const RUNTIME_FILE_MISMATCH = "runtime_file_mismatch"
-export const ROOT_DISPOSED = "root_disposed"
 
 // A file that is missing loads on a later call once it is back; one whose evaluation failed stays failed for this process,
 // because the platform's module loader keeps it (review 6075851574, MEDIUM 5), so the text names both recoveries.
@@ -28,15 +28,9 @@ const MISMATCH_MESSAGE =
 
 const CORE_MESSAGE = "The omo SDK thread core could not be started."
 
-const DISPOSED: OmoFailure = {
-  kind: "error",
-  error: {
-    code: "internal_error",
-    message: "This omo SDK root was disposed; create a new root to make thread calls.",
-    next_action: "Create a new omo SDK root and call it again.",
-    details: { reason: ROOT_DISPOSED },
-  },
-}
+// A disposed root's thread call, up front or for a creation that resumes after dispose: the root's one shared refusal
+// (design ruling; root/assemble.ts).
+const DISPOSED: OmoFailure = { kind: "error", error: ROOT_DISPOSED }
 
 // What the root takes from a loaded thread runtime file, checked once at the boundary (a file on disk is a system
 // boundary; design lane ruling on review 6077124491): this build's stamp, the factory, the create call's fields and the

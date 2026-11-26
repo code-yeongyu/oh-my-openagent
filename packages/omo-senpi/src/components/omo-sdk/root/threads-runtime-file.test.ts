@@ -2,13 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import { UNEXPECTED_LOG_UNWRITTEN, unexpectedLogNamed } from "../unexpected-port"
 import { RUNTIME_STAMP } from "../runtime-stamp"
-import {
-  CORE_CALLS,
-  ROOT_DISPOSED,
-  RUNTIME_FILE_MISMATCH,
-  RUNTIME_FILE_UNAVAILABLE,
-  type ThreadsRuntime,
-} from "./thread-runtime-file"
+import { CORE_CALLS, RUNTIME_FILE_MISMATCH, RUNTIME_FILE_UNAVAILABLE, type ThreadsRuntime } from "./thread-runtime-file"
+import { ROOT_DISPOSED } from "./assemble"
 import { threadsNamespace } from "./threads"
 
 // Slice P1c (#15031): the thread core is its own runtime file, loaded on the first thread call through one import the
@@ -219,10 +214,7 @@ describe("a dispose that races the first thread call", () => {
       expect({ created: counts.created, disposed: counts.disposed, answer }).toEqual({
         created: 0,
         disposed: 0,
-        answer: expect.objectContaining({
-          kind: "error",
-          error: expect.objectContaining({ code: "internal_error", details: { reason: ROOT_DISPOSED } }),
-        }),
+        answer: { kind: "error", error: ROOT_DISPOSED },
       })
     })
 

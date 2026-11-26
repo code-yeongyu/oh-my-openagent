@@ -229,7 +229,7 @@ var SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
     lazy: false,
-    ceiling: 609933,
+    ceiling: 612270,
     staticSet: "omo-sdk-static-modules.json",
     packages: ["jsonc-parser", "typebox", "zod"]
   },
@@ -239,7 +239,7 @@ var SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/threads.js",
     specifier: "#omo-sdk-threads-runtime",
     lazy: true,
-    ceiling: 532882,
+    ceiling: 246730,
     staticSet: "omo-sdk-threads-static-modules.json",
     packages: ["typebox"]
   }
