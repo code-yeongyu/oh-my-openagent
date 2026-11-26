@@ -1,12 +1,12 @@
 // #15150, the owner's guard: a workflow node that waits for its child's pending revival can never stay
-// `running` for good. Every pending state ends - the child is revived (the node follows it), the revival
-// is refused (the node fails with that reason), or the lifecycle's persisted recovery deadline passes
-// (the node fails as orphaned) - including across a restart while the revival is still pending.
+// `running` for good. Every pending state ends - the revival is refused (the node folds that reason), a
+// restart while pending reaches the revival, and a lifecycle that is disposed or stops for shutdown ends
+// the wait without journaling a failure. The deadline's ends live in recovery-pending-revival-deadline.
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { cleanupProjects as cleanupManagers } from "../manager/__fixtures__/manager-fakes"
 import { cleanupProjects } from "../lifecycle/__fixtures__/lifecycle-fakes"
-import { liveParentFixture } from "../lifecycle/__fixtures__/live-parent-fakes"
+import { bounded, liveParentFixture } from "../lifecycle/__fixtures__/live-parent-fakes"
 import { runId } from "./__fixtures__/reattached-run"
 import { subscribeDagJournal } from "./journal"
 import type { DagFileStore } from "./store"
@@ -16,7 +16,6 @@ import {
   finishRun,
   freeSlot,
   lifecycleRetryTick,
-  nodeError,
   nodeStates,
   PARENT,
   recoverRun,
@@ -35,8 +34,6 @@ afterEach(() => {
   cleanupProjects()
   cleanupManagers()
 })
-
-const SUSPENSION_BUDGET_MS = 300_000
 
 function nodeTransitions(store: DagFileStore, nodeId: string): readonly string[] {
   return store
@@ -79,21 +76,6 @@ describe("ends of a pending revival under a waiting workflow node (#15150)", () 
     await run.scheduler.suspend()
   })
 
-  test("#given no slot frees #when the lifecycle's recovery deadline passes #then the node fails as orphaned and its dependent is skipped", async () => {
-    // given
-    const f = overCapacity()
-    const { hang, store } = await reopenOverCapacity(f)
-    const run = await recoverRun(f, store)
-
-    // when
-    f.advance(SUSPENSION_BUDGET_MS)
-
-    // then
-    expect((await run.settled).record?.status).toBe("failed")
-    expect(nodeStates(store)).toEqual(["k-hang:failed:resume_task_orphaned", "k-after:skipped"])
-    expect(nodeError(store, "k-hang")).toContain(hang)
-  })
-
   test("#given the host restarts while the revival is pending #when the next session start revives the child #then the new run's recovery follows it to completion", async () => {
     // given - the first process waits on the pending revival, then dies with its scheduler
     const f = overCapacity()
@@ -114,21 +96,28 @@ describe("ends of a pending revival under a waiting workflow node (#15150)", () 
     expect(nodeStates(store)).toEqual(["k-hang:completed", "k-after:completed"])
   })
 
-  test("#given the host restarts after the recovery deadline passed #when the next session starts #then the stale pending state ends and the node fails", async () => {
-    // given - the deadline passes while no process runs, so no lifecycle tick saw it
-    const f = overCapacity()
-    const { hang, store } = await reopenOverCapacity(f)
-    await (await recoverRun(f, store)).scheduler.suspend()
-    f.advance(SUSPENSION_BUDGET_MS, false)
-    await f.restart().reconcileOnSessionStart(PARENT)
+  for (const [teardown, stop] of [
+    ["the lifecycle is disposed", (f: ReturnType<typeof overCapacity>) => f.lifecycle.dispose?.()],
+    [
+      "the session's retries stop for shutdown",
+      (f: ReturnType<typeof overCapacity>) =>
+        f.lifecycle.suspendOnSessionShutdown({ parentSessionId: PARENT, reason: "quit" }),
+    ],
+  ] as const) {
+    test(`#given a waiting node #when ${teardown} #then the waiter ends, the run parks and the node is not journaled failed`, async () => {
+      // given
+      const f = overCapacity()
+      const { store } = await reopenOverCapacity(f)
+      const run = await recoverRun(f, store)
+      expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
 
-    // when
-    const run = await recoverRun(f, store)
+      // when
+      await stop(f)
 
-    // then
-    expect((await run.settled).record?.status).toBe("failed")
-    expect(nodeStates(store)[1]).toBe("k-after:skipped")
-    expect(nodeStates(store)[0]).toStartWith("k-hang:failed")
-    expect(f.manager.getResidentHandle(hang)).toBeUndefined()
-  })
+      // then - the scheduler holds no child it can follow, so it parks the run for the next recovery
+      expect((await bounded(run.settled)).record?.status).toBe("paused")
+      expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
+      expect(nodeTransitions(store, "k-hang")).toEqual([])
+    })
+  }
 })
