@@ -44,7 +44,7 @@ function stepRun(job: string, name: string): string {
 }
 
 // REF_POST: "lost" creates the ref but answers with an error, "fails" creates nothing. REF_READ: "error" answers HTTP 502.
-// DISPATCH: "no-id" answers without a run id; the ref then has one unknown queued run, 78. RUN_LIST: "error" fails listing it. RUN_READ / CANCEL: "error" fails that call. RUN_STATUS: the run's status.
+// DISPATCH: "no-id" answers without a run id; the ref then has one unknown queued run, 78. RUN_LIST: "error" fails listing it, "never" never lists it; RUN_VISIBLE_AFTER: lists before it shows up. RUN_READ / CANCEL: "error" fails that call. RUN_STATUS: the run's status.
 const GH_STUB = [
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
@@ -57,7 +57,7 @@ const GH_STUB = [
   '    "api --method DELETE "*) touch "$STATE/deleted" ;;',
   '    *"/actions/workflows/ci.yml/dispatches "*) if [ "${DISPATCH:-}" = no-id ]; then echo "{}"; else echo \'{"workflow_run_id":77}\'; fi | jq -r "$filter" ;;',
   '    *"/actions/runs/77 "*) [ "${RUN_READ:-}" = error ] && return 1; printf \'{"status":"%s"}\' "$RUN_STATUS" | jq -r "$filter" ;;',
-  '    *"actions/workflows/ci.yml/runs"*) [ "${RUN_LIST:-}" = error ] && return 1; echo \'{"workflow_runs":[{"id":78,"status":"queued"}]}\' | jq -r "$filter" ;;',
+  '    *"actions/workflows/ci.yml/runs"*) [ "${RUN_LIST:-}" = error ] && return 1; local n=0; [ -f "$STATE/lists" ] && n=$(cat "$STATE/lists"); printf "%s" $((n + 1)) > "$STATE/lists"; if [ "${RUN_LIST:-}" = never ] || [ "$n" -lt "${RUN_VISIBLE_AFTER:-0}" ]; then echo \'{"workflow_runs":[]}\'; else echo \'{"workflow_runs":[{"id":78,"status":"queued"}]}\'; fi | jq -r "$filter" ;;',
   '    "run cancel 78"*) touch "$STATE/cancelled-stray" ;;',
   '    "run cancel 77"*) [ "${CANCEL:-}" = error ] && return 1; touch "$STATE/cancelled" ;;',
   "    *) return 1 ;;",
@@ -93,7 +93,8 @@ interface Cleanup {
   readonly runRead?: "error"
   readonly cancel?: "error"
   readonly refRead?: "error"
-  readonly runList?: "error"
+  readonly runList?: "error" | "never"
+  readonly runVisibleAfter?: number
 }
 
 interface Outcome {
@@ -180,6 +181,8 @@ function unpinCi(after: Outcome, input: Cleanup) {
     CANCEL: input.cancel ?? "",
     REF_READ: input.refRead ?? "",
     RUN_LIST: input.runList ?? "",
+    RUN_VISIBLE_AFTER: String(input.runVisibleAfter ?? 0),
+    DISPATCH_ATTEMPTED: after.outputs.dispatch_attempted ?? "",
   })
   const exists = (name: string) => spawnSync("test", ["-e", join(after.root, name)]).status === 0
   return {
@@ -207,7 +210,13 @@ describe("publish.yml pin-ci (#15094)", () => {
     const result = pinCi({ pin: fixture.sha.B })
     const ref = `release-ci/${fixture.sha.B}-900-1`
     expect(result.status, result.output).toBe(0)
-    expect(result.outputs).toEqual({ source_sha: fixture.sha.B, ci_ref: ref, ref_owned: "true", ci_run_id: "77" })
+    expect(result.outputs).toEqual({
+      source_sha: fixture.sha.B,
+      ci_ref: ref,
+      ref_owned: "true",
+      dispatch_attempted: "true",
+      ci_run_id: "77",
+    })
     expect(result.ghCalls).toContain(`repos/${REPO}/git/refs -f ref=refs/heads/${ref} -f sha=${fixture.sha.B}`)
     expect(result.ghCalls).toContain(`actions/workflows/ci.yml/dispatches -f ref=${ref} -F return_run_details=true`)
   })
@@ -280,6 +289,25 @@ describe("publish.yml pin-ci (#15094)", () => {
     expect(unlisted.status).not.toBe(0)
     expect(unlisted.deleted).toBe(true)
     expect(unlisted.output).toContain("list-runs")
+  })
+
+  test("#when the run of a lost dispatch is listed only after a while #then unpin-ci keeps looking and cancels it", () => {
+    const cleanup = unpinCi(pinCi({ pin: fixture.sha.B, dispatch: "no-id" }), {
+      runStatus: "completed",
+      runVisibleAfter: 3,
+    })
+    expect(cleanup.status, cleanup.output).toBe(0)
+    expect(cleanup.cancelledStray).toBe(true)
+  })
+
+  test("#when the run of a lost dispatch never shows up #then unpin-ci removes the ref but reports the dispatch indeterminate", () => {
+    const cleanup = unpinCi(pinCi({ pin: fixture.sha.B, dispatch: "no-id" }), {
+      runStatus: "completed",
+      runList: "never",
+    })
+    expect(cleanup.status).not.toBe(0)
+    expect(cleanup.deleted).toBe(true)
+    expect(cleanup.output).toContain("dispatch-indeterminate")
   })
 
   test("#when the gate is done while the release's own run still runs #then unpin-ci cancels it and removes the ref", () => {

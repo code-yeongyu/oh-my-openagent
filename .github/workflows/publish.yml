@@ -90,6 +90,7 @@ jobs:
       ref_owned: ${{ steps.pin.outputs.ref_owned }}
       ci_run_id: ${{ steps.pin.outputs.ci_run_id }}
       ci_ref: ${{ steps.pin.outputs.ci_ref }}
+      dispatch_attempted: ${{ steps.pin.outputs.dispatch_attempted }}
       source_sha: ${{ steps.pin.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v7
@@ -131,7 +132,9 @@ jobs:
               exit 1
             fi
           fi
-          # No retry: a repeated dispatch could start a second run nobody records. A lost answer fails the release.
+          # No retry: a repeated dispatch could start a second run nobody records. A lost answer fails the release, and
+          # unpin-ci then looks for the run it may have started.
+          echo "dispatch_attempted=true" >> "$GITHUB_OUTPUT"
           run_id="$(gh api --method POST "repos/${GH_REPO}/actions/workflows/ci.yml/dispatches" -f ref="$ref" -F return_run_details=true --jq '.workflow_run_id // empty')"
           if ! [[ "$run_id" =~ ^[0-9]+$ ]]; then
             echo "::error::Dispatching ci.yml on ${ref} returned no run id ('${run_id}')."
@@ -385,6 +388,13 @@ jobs:
               echo "::error::CI run ${owned} names release attempt ${parent_id}-${parent_attempt}, which is not a publish.yml release of this repository that started it."
               return 1
             fi
+            receipt="release-ci-receipt-${sha}-${PREPARED_RELEASE_SHA}-${owned}"
+            receipts="$(retry_gh "Read the parent release's CI receipt" gh api --method GET "repos/${REPOSITORY}/actions/runs/${parent_id}/artifacts" \
+              -f name="$receipt" --jq "[.artifacts[] | select(.workflow_run.id == ${parent_id})] | length")"
+            if [ "$receipts" = 0 ]; then
+              echo "::error::Release attempt ${parent_id} recorded no receipt binding CI run ${owned} to ${sha} and ${PREPARED_RELEASE_SHA} (${receipt})."
+              return 1
+            fi
           }
 
           # Unpinned releases can also use the release-state PR's CI at the prepared SHA.
@@ -567,6 +577,7 @@ jobs:
           SOURCE_SHA: ${{ needs.pin-ci.outputs.source_sha }}
           CI_RUN_ID: ${{ needs.pin-ci.outputs.ci_run_id }}
           CI_REF: ${{ needs.pin-ci.outputs.ci_ref }}
+          DISPATCH_ATTEMPTED: ${{ needs.pin-ci.outputs.dispatch_attempted }}
         run: |
           set -uo pipefail
           # Cancelling the run and removing the ref are independent; each retries, and anything unresolved fails this job.
@@ -581,15 +592,26 @@ jobs:
             done
             return 1
           }
-          if [ -z "$CI_RUN_ID" ]; then
-            # The dispatch's answer was lost or never came: any run on this attempt's own ref is the one it may have started.
-            if listed="$(with_retry gh api --method GET "repos/${GH_REPO}/actions/workflows/ci.yml/runs" -f branch="$CI_REF" -f event=workflow_dispatch --jq '[.workflow_runs[] | select(.status != "completed") | .id] | join(" ")')"; then
-              for stray in $listed; do
-                with_retry gh run cancel "$stray" > /dev/null || unresolved+=" cancel-run-${stray}"
+          if [ -z "$CI_RUN_ID" ] && [ "$DISPATCH_ATTEMPTED" = true ]; then
+            # The dispatch's answer was lost: a run on this attempt's own ref is the one it may have started. A new run can
+            # take a while to be listed, so an empty list is no answer until the window ends; then it stays indeterminate.
+            found=""
+            for visibility in $(seq 1 18); do
+              if ! listed="$(with_retry gh api --method GET "repos/${GH_REPO}/actions/workflows/ci.yml/runs" -f branch="$CI_REF" -f event=workflow_dispatch --jq '[.workflow_runs[] | "\(.id):\(.status)"] | join(" ")')"; then
+                found=error
+                unresolved+=" list-runs"
+                break
+              fi
+              for entry in $listed; do
+                found=yes
+                if [ "${entry#*:}" != completed ]; then
+                  with_retry gh run cancel "${entry%%:*}" > /dev/null || unresolved+=" cancel-run-${entry%%:*}"
+                fi
               done
-            else
-              unresolved+=" list-runs"
-            fi
+              [ -z "$found" ] || break
+              sleep 10
+            done
+            [ -n "$found" ] || unresolved+=" dispatch-indeterminate"
           fi
           if [ -n "$CI_RUN_ID" ]; then
             if run_status="$(with_retry gh api "repos/${GH_REPO}/actions/runs/${CI_RUN_ID}" --jq .status)"; then
@@ -1266,6 +1288,22 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+
+      # The parent's record that it accepted its own CI run for this source and handed it to the child of this prepared
+      # source. Only this run can attach an artifact to itself, so the child, which finds the parent from the run's ref,
+      # treats the artifact's name as the parent's binding of source, prepared SHA and CI run.
+      - name: Record the release's own CI receipt for the child
+        if: needs.pin-ci.outputs.ci_run_id != ''
+        run: printf 'Accepted by this release attempt for its tagged child.\n' > "$RUNNER_TEMP/release-ci-receipt.txt"
+
+      - name: Upload the release's own CI receipt
+        if: needs.pin-ci.outputs.ci_run_id != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-ci-receipt-${{ needs.pin-ci.outputs.source_sha }}-${{ needs.prepare-release-state.outputs.release_sha }}-${{ needs.pin-ci.outputs.ci_run_id }}
+          path: ${{ runner.temp }}/release-ci-receipt.txt
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Tag prepared source and dispatch provenance-safe publish
         env:

@@ -23,6 +23,27 @@ const WAIVED = "hosted CI wait waived by ci_basis_receipt"
 const UNKNOWN_SHA = "0123456789abcdef0123456789abcdef01234567"
 const TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
+/** The receipt artifact the parent's dispatch job uploads, rendered for one source, prepared SHA and CI run. */
+function parentReceipt(source: string, prepared: string, run: string): string {
+  const workflow = Bun.YAML.parse(
+    readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n"),
+  ) as { jobs: Record<string, { steps: Array<{ uses?: string; with?: { name?: string } }> }> }
+  const name = workflow.jobs["dispatch-provenance-safe-publish"]?.steps.find((step) =>
+    step.uses?.startsWith("actions/upload-artifact@"),
+  )?.with?.name
+  if (!name) throw new Error("dispatch-provenance-safe-publish uploads no receipt artifact")
+  const values: Record<string, string> = {
+    "needs.pin-ci.outputs.source_sha": source,
+    "needs.prepare-release-state.outputs.release_sha": prepared,
+    "needs.pin-ci.outputs.ci_run_id": run,
+  }
+  return name.replace(/\$\{\{\s*([\w.-]+)\s*\}\}/g, (_match, expression: string) => {
+    const value = values[expression]
+    if (value === undefined) throw new Error(`unexpected expression ${expression} in the receipt name`)
+    return value
+  })
+}
+
 function stepRun(): string {
   const workflow = Bun.YAML.parse(
     readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n"),
@@ -40,7 +61,8 @@ const GH_STUB = [
   // The run pin-ci dispatched for the pin (id 55 on release-ci/<pin>-1-1): OWNED_STATES lists its status:conclusion per
   // read, the last one repeating; OWNED_BRANCH / OWNED_ACTOR override its branch and triggering actor; OWNED_RED_JOB is a
   // job of it that already failed. ci.yml is workflow 11 and publish.yml workflow 12; run 1 is the parent release attempt
-  // the default ref names, of workflow PARENT_WORKFLOW.
+  // the default ref names, of workflow PARENT_WORKFLOW; PARENT_RECEIPT is the one receipt artifact it recorded (by default
+  // the one dispatch-provenance-safe-publish uploads for this source, this prepared SHA and run 55).
   "owned_state() {",
   '  local n=0 IFS=,; [ -f "$STATE_DIR/owned-reads" ] && n=$(cat "$STATE_DIR/owned-reads"); printf "%s" $((n + 1)) > "$STATE_DIR/owned-reads"',
   "  local states=($OWNED_STATES) state; state=${states[$n]:-${states[${#states[@]}-1]}}",
@@ -61,6 +83,7 @@ const GH_STUB = [
   '    *"/actions/runs/55 "*) owned_state | jq -r "$filter" ;;',
   '    *"/actions/workflows/ci.yml "*) echo \'{"id":11}\' | jq -r "$filter" ;;',
   '    *"/actions/workflows/publish.yml "*) echo \'{"id":12}\' | jq -r "$filter" ;;',
+  '    *"/actions/runs/1/artifacts "*) local wanted="$*"; wanted="${wanted##*name=}"; wanted="${wanted%% *}"; local n=0; [ "$wanted" = "$PARENT_RECEIPT" ] && n=1; printf \'{"artifacts":[%s]}\' "$([ "$n" = 1 ] && printf \'{"name":"%s","workflow_run":{"id":1}}\' "$wanted")" | jq -r "$filter" ;;',
   '    *"/actions/runs/1 "*) printf \'{"workflow_id":%s,"event":"workflow_dispatch","run_attempt":1,"created_at":"2026-01-01T00:00:00Z"}\' "${PARENT_WORKFLOW:-12}" | jq -r "$filter" ;;',
   '    *"/actions/runs/55/jobs?filter=latest"*) if [ -n "$OWNED_RED_JOB" ]; then printf \'{"jobs":[{"name":"%s","status":"completed","conclusion":"failure"}]}\' "$OWNED_RED_JOB"; else printf \'{"jobs":[{"name":"typecheck","status":"in_progress","conclusion":null}]}\'; fi | jq -r "$filter" ;;',
   '    *"/actions/runs/55/attempts/1/jobs?"*) cat "$OWNED_JOBS" ;;',
@@ -127,6 +150,7 @@ interface Dispatch {
   readonly ownedActor?: string
   readonly ownedWorkflow?: string
   readonly parentWorkflow?: string
+  readonly parentReceipt?: string
   readonly ownedRedJob?: string
   /** The tagged child carries the parent's run id without its ref name; the parent knows the exact ref. */
   readonly ownedInChild?: boolean
@@ -223,6 +247,7 @@ function dispatch(input: Dispatch): Outcome {
       OWNED_ACTOR: input.ownedActor ?? "",
       OWNED_WORKFLOW: input.ownedWorkflow ?? "",
       PARENT_WORKFLOW: input.parentWorkflow ?? "",
+      PARENT_RECEIPT: input.parentReceipt ?? parentReceipt((input.pin ?? "").toLowerCase(), prepared, "55"),
       OWNED_RED_JOB: input.ownedRedJob ?? "",
       SOURCE_SHA_LOWER: (input.pin ?? "").toLowerCase(),
       STATE_DIR: root,
@@ -346,6 +371,8 @@ describe("#given a pinned release", () => {
       ["refused when the ref names no publish.yml attempt", { parentWorkflow: "99" }],
       ["refused when a person dispatched the child", { triggeringActor: "maint" }],
       ["refused for another workflow's run", { ownedWorkflow: "99" }],
+      ["refused when the parent recorded no receipt", { parentReceipt: "" }],
+      ["refused when the parent's receipt names another CI run", { parentReceipt: "release-ci-receipt-x-y-56" }],
     ] as const)(
       "#when the tagged child is given the parent's own run and no push is green #then it is %s",
       (name, change) => {
