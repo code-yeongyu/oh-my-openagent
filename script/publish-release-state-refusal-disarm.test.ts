@@ -37,7 +37,7 @@ const GH_STUB = [
   '    "pr list "*) printf "77\\n" ;;',
   '    "pr merge 77 --merge --auto"*) touch "$STATE/armed"; [ -z "$ENABLE_FAILS" ] ;;',
   '    "pr merge 77 --disable-auto"*) [ -n "$DISABLE_FAILS" ] && return 1; rm -f "$STATE/armed"; [ -n "$MERGES_IN_RACE" ] && touch "$STATE/merged"; [ -n "$CLOSES_IN_RACE" ] && touch "$STATE/closed"; return 0 ;;',
-  '    "pr view 77 --json autoMergeRequest"*) if [ -e "$STATE/armed" ]; then echo true; else echo false; fi ;;',
+  '    "pr view 77 --json autoMergeRequest"*) [ -n "$ENABLE_FAILS" ] && return 1; if [ -e "$STATE/armed" ]; then echo true; else echo false; fi ;;',
   '    "pr view 77 --json state,autoMergeRequest"*) [ -n "$SNAPSHOT_FAILS" ] && return 1; local st=OPEN; [ -e "$STATE/merged" ] && st=MERGED; [ -e "$STATE/closed" ] && st=CLOSED; printf \'{"state":"%s","autoMergeRequest":%s}\' "$st" "$([ -e "$STATE/armed" ] && echo "{}" || echo null)" | jq -r "$filter" ;;',
   '    "pr view 77 --json state"*) [ -n "$STATE_READ_FAILS" ] && return 1; echo OPEN ;;',
   '    "pr view 77 --json statusCheckRollup"*) printf \'{"statusCheckRollup":[{"name":"sdk-parity","conclusion":"%s"}]}\' "$CHECK" | jq -r "$filter" ;;',
@@ -140,9 +140,12 @@ describe("publish.yml release-state refusal (#15126)", () => {
   })
 
   test("#when enabling auto-merge reports failure after reaching GitHub #then the step disarms it before failing", () => {
-    const result = run({ enableFails: true })
+    const result = run({ enableFails: true, check: "SUCCESS" })
     expect(result.status).not.toBe(0)
+    expect(result.output).toContain("Read release-state PR auto-merge failed after 5 retries")
+    expect(result.ghCalls).not.toContain("statusCheckRollup")
     expect(result.armed).toBe(false)
+    expect(result.output).toContain(KEPT_OPEN)
   })
 
   test("#when the PR was closed meanwhile #then the refusal says so, not that it stays open", () => {
