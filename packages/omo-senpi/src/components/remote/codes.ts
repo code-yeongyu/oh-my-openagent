@@ -12,7 +12,7 @@ export const REMOTE_CODES = [
   "session_ended",
   "sender_not_allowed",
   "local_only",
-  // #13414 W3, silent devices (relay-daemon#1137, omo#13406): the first two ran nothing; `undelivered` is safe to resend
+  // #13414 W3, silent devices (#13406): the first two ran nothing; `undelivered` is safe to resend
   // under a new op id; `transport_expired`, `unconfirmed` and `host_error` may have run (uncertain).
   "host_not_answering",
   "no_transport",
