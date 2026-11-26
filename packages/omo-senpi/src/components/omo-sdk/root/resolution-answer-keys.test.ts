@@ -8,7 +8,11 @@ import { scenarioSetup } from "../../../../../../script/sdk-parity/fakes/setup"
 // a later change adds to the core's answer must not reach a session by default, so each key set is pinned exactly.
 const SESSION = { kind: "session", session_id: "session-1" } as const
 
-async function answer(row: "threads.resolve" | "threads.locate", principal: unknown, input: object): Promise<unknown> {
+async function answer(
+  row: "threads.resolve" | "threads.locate" | "devices.resolve",
+  principal: unknown,
+  input: object,
+): Promise<unknown> {
   const scenario = {
     id: `keys/${row}`,
     row,
@@ -43,5 +47,13 @@ describe("a session's resolution answers carry no other field (security design 4
     // Control: the script's answer does carry what the session's must not, so the projection is what removed them.
     expect(full).toEqual(expect.arrayContaining(["endpoint", "session_path"]))
     expect(shown).toEqual(full.filter((key) => key !== "endpoint" && key !== "session_path"))
+  })
+
+  test("#given a session principal #when devices.resolve answers a device #then the value holds exactly its id, where a script's holds the row", async () => {
+    const resolved = await answer("devices.resolve", SESSION, { device: "studio" })
+    const scripted = await answer("devices.resolve", undefined, { device: "studio" })
+    expect(resolved).toEqual({ kind: "ok", value: { id: "b" } })
+    // Control: the script's value is the roster row, so the projection is what removed the rest.
+    expect(keysOf(Reflect.get(Object(scripted), "value"))).toEqual(expect.arrayContaining(["caps", "name", "online"]))
   })
 })

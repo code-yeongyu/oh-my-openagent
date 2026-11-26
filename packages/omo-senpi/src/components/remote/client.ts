@@ -1,6 +1,13 @@
 import { lendConnection } from "./connection-of"
 import { existsSync } from "node:fs"
-import { deviceListing, mergeRows, resolveDevice, rowKey, rowName } from "@oh-my-opencode/thread-address-core"
+import {
+  deviceListing,
+  mergeRows,
+  resolveDevice,
+  resolveDeviceRow,
+  rowKey,
+  rowName,
+} from "@oh-my-opencode/thread-address-core"
 import { hostname } from "node:os"
 import {
   connectDeviceService,
@@ -433,26 +440,13 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     },
     devices: {
       list: devicesList,
+      // The address core's one device resolver over the roster: exact id, `here`, name, then a unique id prefix of six
+      // or more; a shared name or prefix answers ambiguous_target with the candidates, nothing answers not_found.
       resolve: async (idOrName, opts) => {
         const listed = await devicesList(opts)
         if (listed.kind === "error") return listed
-        const byId = listed.value.find((row) => row.id === idOrName)
-        if (byId !== undefined) return ok(byId)
-        const wanted = idOrName.toLowerCase()
-        const byName = listed.value.filter((row) => row.name.toLowerCase() === wanted)
-        if (byName.length === 1 && byName[0] !== undefined) return ok(byName[0])
-        if (byName.length > 1)
-          return remoteFailure(
-            "ambiguous_target",
-            `${byName.length} devices are named ${idOrName}.`,
-            "Pass the device id.",
-            {
-              details: { candidates: byName.map((row) => ({ id: row.id, name: row.name })) },
-            },
-          )
-        return remoteFailure("not_found", `No device has the id or name ${idOrName}.`, nextActionFor("not_found"), {
-          details: { kind: "device" },
-        })
+        const resolved = resolveDeviceRow(listed.value, idOrName)
+        return resolved.kind === "ok" ? ok(resolved.row) : deviceRefusal(resolved.refusal)
       },
     },
     sessions: {

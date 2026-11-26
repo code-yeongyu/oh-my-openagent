@@ -256,30 +256,251 @@
       ]
     },
     {
-      "id": "devices.resolve/by-name",
+      "id": "devices.resolve/by-id",
       "row": "devices.resolve",
       "kind": "effect",
       "input": {
-        "device": "desktop"
+        "device": "b"
       },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
       "expect": [
         {
           "port": "remote",
           "op": "devices.resolve",
           "args": {
-            "device": "desktop"
+            "device": "b"
           }
         }
-      ]
+      ],
+      "answer": {
+        "value": {
+          "id": "b",
+          "name": "studio"
+        }
+      }
+    },
+    {
+      "id": "devices.resolve/by-name",
+      "row": "devices.resolve",
+      "kind": "effect",
+      "input": {
+        "device": "studio"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "studio"
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "id": "b",
+          "name": "studio"
+        }
+      }
+    },
+    {
+      "id": "devices.resolve/here",
+      "row": "devices.resolve",
+      "kind": "effect",
+      "input": {
+        "device": "here"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "here"
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "id": "here"
+        }
+      }
+    },
+    {
+      "id": "devices.resolve/name-case-folded",
+      "row": "devices.resolve",
+      "kind": "effect",
+      "input": {
+        "device": "STUDIO"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "STUDIO"
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "id": "b"
+        }
+      }
+    },
+    {
+      "id": "devices.resolve/unique-prefix",
+      "row": "devices.resolve",
+      "kind": "effect",
+      "input": {
+        "device": "c0ffee"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "c0ffee"
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "id": "c0ffee5a1d2b3c4d"
+        }
+      }
     },
     {
       "id": "devices.resolve/unknown-device",
       "row": "devices.resolve",
       "kind": "refusal",
-      "refusal": "not_found",
       "input": {
         "device": "nowhere"
       },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "refusal": "not_found",
       "expect": [
         {
           "port": "remote",
@@ -298,16 +519,80 @@
       "id": "devices.resolve/name-shared",
       "row": "devices.resolve",
       "kind": "refusal",
-      "refusal": "ambiguous_target",
       "input": {
         "device": "mac"
       },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "refusal": "ambiguous_target",
       "expect": [
         {
           "port": "remote",
           "op": "devices.resolve",
           "args": {
             "device": "mac"
+          },
+          "count": 1,
+          "result": {
+            "error": "ambiguous_target"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/prefix-shared",
+      "row": "devices.resolve",
+      "kind": "refusal",
+      "input": {
+        "device": "f00dcafe"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devices": [
+              {
+                "device": "c0ffee5a1d2b3c4d",
+                "label": "attic"
+              },
+              {
+                "device": "f00dcafe00000001",
+                "label": "mac"
+              },
+              {
+                "device": "f00dcafe00000002",
+                "label": "mac"
+              }
+            ]
+          }
+        }
+      ],
+      "refusal": "ambiguous_target",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "f00dcafe"
           },
           "count": 1,
           "result": {
@@ -324,6 +609,14 @@
       "input": {
         "device": "desktop"
       },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "devicesFail": true
+          }
+        }
+      ],
       "expect": [
         {
           "port": "remote",

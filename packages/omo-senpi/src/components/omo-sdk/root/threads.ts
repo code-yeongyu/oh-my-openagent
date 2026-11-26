@@ -1,5 +1,6 @@
 import type { GatewayStore } from "../../thread/gateway/store"
 import type { ProvenanceWorkspaces } from "../../thread/gateway/provenance-resolver"
+import type { DeviceRow } from "../../remote/types"
 import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import type { ThreadCore } from "../../thread/sdk-core"
 import type { ThreadHost } from "../../thread/tools/ports"
@@ -89,17 +90,50 @@ const NO_ACCOUNT: OmoFailure = {
 
 // A session's answer never carries an unexpected exception's text (the B8 echo of the thread core's thrown(), admitted
 // only for a script and a person until slice T1b removes it): internal_error is answered with fixed text.
+/** The fixed answer for an unexpected exception (security ruling B8): no exception text in any field. */
+const UNEXPECTED: OmoFailure = {
+  kind: "error",
+  error: {
+    code: "internal_error",
+    message: "The thread operation failed unexpectedly.",
+    next_action: "Call it again; if it fails again, report the call and the time it failed.",
+  },
+}
+
 const sessionFailure = (error: Parameters<typeof threadFailure>[0]): OmoFailure =>
-  error.code === "internal_error"
-    ? {
-        kind: "error",
-        error: {
-          code: "internal_error",
-          message: "The thread operation failed unexpectedly.",
-          next_action: "Call it again; if it fails again, report the call and the time it failed.",
-        },
-      }
-    : threadFailure(error)
+  error.code === "internal_error" ? UNEXPECTED : threadFailure(error)
+
+/**
+ * Whether a session's refusal candidates keep only their identifiers (T1a review LOW 1, the owner's ruling pending): off,
+ * a session's refusals carry the candidates the address core gives every principal, as the shipped tools do today.
+ */
+const SESSION_REFUSAL_IDENTIFIERS_ONLY = false
+const IDENTIFIER_KEYS = new Set(["thread", "id", "device"])
+
+const sessionRefusal = (failure: OmoFailure): OmoFailure => {
+  if (!SESSION_REFUSAL_IDENTIFIERS_ONLY) return failure
+  const candidates = failure.error.details?.["candidates"]
+  if (!Array.isArray(candidates)) return failure
+  const kept = candidates.map((candidate: unknown) =>
+    Object.fromEntries(Object.entries(Object(candidate)).filter(([key]) => IDENTIFIER_KEYS.has(key))),
+  )
+  return { ...failure, error: { ...failure.error, details: { ...failure.error.details, candidates: kept } } }
+}
+
+/** devices.resolve over the remote client's roster (the address core's resolver); the row as it lists it. */
+async function resolveDevice(
+  remote: RemoteThreadSurface | undefined,
+  device: string,
+): Promise<OmoFailure | { readonly kind: "ok"; readonly value: DeviceRow }> {
+  if (remote === undefined) return NO_ACCOUNT
+  try {
+    const resolved = await remote.client.devices.resolve(device)
+    if (resolved.kind === "error") return (await import("./remote-failures")).remoteFailure(resolved)
+    return { kind: "ok", value: resolved.value }
+  } catch {
+    return UNEXPECTED
+  }
+}
 
 const LIST = ["all_scope", "state"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope"]
@@ -160,14 +194,18 @@ export function threadsNamespace(options: {
       members: {
         "threads.resolve": async (input) => {
           const decided = await (await thread()).resolveThread(input, caller)
-          if (decided.kind === "error") return sessionFailure(decided.error)
+          if (decided.kind === "error") return sessionRefusal(sessionFailure(decided.error))
           return { kind: "ok", thread: decided.thread, id: decided.id, device: decided.device }
         },
         "threads.locate": async (input) => {
           const located = await (await thread()).locate(input, caller)
-          if (located.kind === "error") return sessionFailure(located.error)
+          if (located.kind === "error") return sessionRefusal(sessionFailure(located.error))
           const { endpoint: _endpoint, session_path: _path, ...shown } = located.thread
           return { kind: "ok", thread: shown.address ?? shown.thread_id, located: shown }
+        },
+        "devices.resolve": async (input) => {
+          const resolved = await resolveDevice(options.ports?.remote, input.device)
+          return resolved.kind === "error" ? sessionRefusal(resolved) : { kind: "ok", value: { id: resolved.value.id } }
         },
       },
       releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }),
@@ -199,6 +237,7 @@ export function threadsNamespace(options: {
       if (located.kind === "error") return threadFailure(located.error)
       return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
     },
+    "devices.resolve": async (input) => await resolveDevice(options.ports?.remote, input.device),
     "threads.resolve": async (input) => {
       const decided = await (await thread()).resolveThread(input)
       if (decided.kind === "error") return threadFailure(decided.error)

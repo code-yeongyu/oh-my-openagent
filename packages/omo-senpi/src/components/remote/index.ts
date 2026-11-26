@@ -17,3 +17,4 @@ export { resolveTypedDevice } from "../thread/address"
 // Seam 4 (the only resolver for a typed thread address, #14305): every `omo remote` verb resolves what a person typed here.
 export { resolveTypedAddress } from "./device-address"
 export type * from "./types"
+export { deviceRefusal } from "./resolve"

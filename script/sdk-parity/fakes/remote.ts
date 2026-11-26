@@ -63,8 +63,22 @@ export function remotePort(recorder: Recorder): {
     durable_id: thread,
     title: `lane ${thread}`,
   }))
+  // `devices: [{device, label, online?}]` adds devices to the roster; `devicesFail: true` makes the device reads fail as
+  // a device service that is not installed answers.
+  const devices = Array.isArray(given["devices"])
+    ? (given["devices"] as readonly { device: string; label: string; online?: boolean }[]).map((device) => ({
+        online: true,
+        ...device,
+      }))
+    : []
   const fixture = createRemoteThreadFixture()
-  const { remote } = fixture.account({ rows: [row, ...hereRows], online, live: [STUDIO_THREAD] })
+  const { remote } = fixture.account({
+    rows: [row, ...hereRows],
+    online,
+    live: [STUDIO_THREAD],
+    devices,
+    ...(given["devicesFail"] === true ? { devicesFail: true } : {}),
+  })
   const label = (device: unknown): string => (device === STUDIO.id ? STUDIO.label : String(device))
   const address = (device: unknown, session: unknown): string => `${label(device)}/${String(session)}`
   const refusalOf = (result: unknown): string | undefined => {

@@ -363,6 +363,7 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.setModel",
       "threads.rename",
       "threads.extensions.call",
+      "devices.resolve",
     ],
     person: [
       "threads.resolve",
@@ -375,9 +376,10 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.setModel",
       "threads.rename",
       "threads.extensions.call",
+      "devices.resolve",
     ],
-    // A session's two resolution calls name the address the session itself sent in their refusal (security design 4.6).
-    session: ["threads.resolve", "threads.locate"],
+    // A session's resolution calls name the address or device the session itself sent in their refusal (security design 4.6).
+    session: ["threads.resolve", "threads.locate", "devices.resolve"],
   },
   fault: {},
 }
