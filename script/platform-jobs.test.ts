@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process"
 const posixBashTest = test.skipIf(process.platform === "win32" || spawnSync("jq", ["--version"]).status !== 0)
 
 // The job classification both the tracker and the release-state probe read. The macOS required contexts are Linux status
-// jobs whose only always-on steps are checkout, setup-node and the summary; macos-combined runs the macOS tests.
+// jobs whose only always-on steps are checkout, setup-node and the summary; macos-combined-1 and -2 run the macOS tests.
 describe("#given platform-jobs.jq", () => {
   const filter = new URL("../.github/scripts/platform-jobs.jq", import.meta.url).pathname
   const step = (name: string, conclusion = "success") => ({ name, conclusion })
@@ -23,13 +23,17 @@ describe("#given platform-jobs.jq", () => {
       step("Write job summary"),
     ],
   })
-  const combined = (conclusion: string) => ({
-    name: "macos-combined",
+  const macosJob = (name: string, conclusion: string) => ({
+    name,
     conclusion,
     html_url: "u",
     labels: ["macos-latest"],
-    steps: conclusion === "success" ? [step("Run actions/setup-node@v7"), step("Run root test shard 1")] : [],
+    steps: conclusion === "success" ? [step("Run actions/setup-node@v7"), step("Run root test shard 1 rest")] : [],
   })
+  const combined = (first: string, second = first) => [
+    macosJob("macos-combined-1", first),
+    macosJob("macos-combined-2", second),
+  ]
   function classify(jobs: unknown[]): Record<string, string> {
     const run = spawnSync("jq", ["-r", "-f", filter], { encoding: "utf8", input: JSON.stringify({ jobs }) })
     expect(run.status).toBe(0)
@@ -42,33 +46,48 @@ describe("#given platform-jobs.jq", () => {
   }
 
   posixBashTest(
-    "#when macos-combined was skipped #then a macOS status job that ran only setup steps is no-tests",
+    "#when the macOS jobs were skipped #then a macOS status job that ran only setup steps is no-tests",
     () => {
-      const result = classify([statusJob("test (macos-latest, 1/2)"), combined("skipped")])
+      const result = classify([statusJob("test (macos-latest, 1/2)"), ...combined("skipped")])
       expect(result["test (macos-latest, 1/2)"]).toBe("no-tests")
-      expect(result["macos-combined"]).toBe("skipped")
+      expect(result["macos-combined-1"]).toBe("skipped")
     },
   )
 
   posixBashTest(
-    "#when macos-combined ran #then a passing status job is success, even if another macOS part failed",
+    "#when both macOS jobs ran #then a passing status job is success, even if another macOS part failed",
     () => {
-      expect(classify([statusJob("test (macos-latest, 2/2)"), combined("success")])["test (macos-latest, 2/2)"]).toBe(
-        "success",
-      )
-      expect(classify([statusJob("test (macos-latest, 2/2)"), combined("failure")])["test (macos-latest, 2/2)"]).toBe(
-        "success",
-      )
+      const name = "test (macos-latest, 2/2)"
+      expect(classify([statusJob(name), ...combined("success")])[name]).toBe("success")
+      expect(classify([statusJob(name), ...combined("failure")])[name]).toBe("success")
+      expect(classify([statusJob(name), ...combined("success", "failure")])[name]).toBe("success")
+    },
+  )
+
+  posixBashTest("#when only one macOS job ran #then a status job that ran only setup steps is no-tests", () => {
+    const name = "test (macos-latest, 2/2)"
+    expect(classify([statusJob(name), ...combined("success", "cancelled")])[name]).toBe("no-tests")
+    expect(classify([statusJob(name), ...combined("success", "skipped")])[name]).toBe("no-tests")
+    expect(classify([statusJob(name), macosJob("macos-combined-1", "success")])[name]).toBe("no-tests")
+  })
+
+  posixBashTest(
+    "#when the run predates the split #then its single macos-combined job is judged by the same rule",
+    () => {
+      const name = "test (macos-latest, 1/2)"
+      expect(classify([statusJob(name), macosJob("macos-combined", "success")])[name]).toBe("success")
+      expect(classify([statusJob(name), macosJob("macos-combined", "failure")])[name]).toBe("success")
+      expect(classify([statusJob(name), macosJob("macos-combined", "skipped")])[name]).toBe("no-tests")
     },
   )
 
   posixBashTest("#when a status job's own part failed #then it is failure", () => {
     const failed = { ...statusJob("codex-compatibility (macos-latest, platform)"), conclusion: "failure" }
-    expect(classify([failed, combined("failure")])["codex-compatibility (macos-latest, platform)"]).toBe("failure")
+    expect(classify([failed, ...combined("failure")])["codex-compatibility (macos-latest, platform)"]).toBe("failure")
   })
 
-  posixBashTest("#when a Windows leg ran only setup steps #then it is no-tests whatever macos-combined did", () => {
+  posixBashTest("#when a Windows leg ran only setup steps #then it is no-tests whatever the macOS jobs did", () => {
     const windows = { ...statusJob("test (windows-latest, 1/2)"), labels: ["windows-latest"] }
-    expect(classify([windows, combined("success")])["test (windows-latest, 1/2)"]).toBe("no-tests")
+    expect(classify([windows, ...combined("success")])["test (windows-latest, 1/2)"]).toBe("no-tests")
   })
 })

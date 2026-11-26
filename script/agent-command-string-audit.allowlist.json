@@ -133,7 +133,10 @@
     "packages/omo-native/knip.workspace.jsonc: omo doctor",
     "packages/memory-core/src/retention/cap.ts: omo doctor",
     "packages/memory-core/src/retention/pass.ts: omo doctor",
-    "packages/memory-core/src/retention/size.ts: omo doctor"
+    "packages/memory-core/src/retention/size.ts: omo doctor",
+    "docs/reference/omo-sdk-first-party-design.md: omo doctor x3",
+    "docs/reference/omo-sdk-first-party-design.md: omo install",
+    "docs/reference/omo-sdk-first-party-design.md: omo ulw-loop"
   ],
   "literal-label": [
     "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",

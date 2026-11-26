@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { lstatSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import ts from "@typescript/typescript6"
 
@@ -34,21 +35,30 @@ const SKIPPED_PATHS = [
   "packages/omo-codex/scripts/install-dist/",
 ]
 
+// Tracked files plus new files not yet added, never gitignored ones: the scan must not depend on which ignored build
+// copies (for example the shared skill scripts copied into packages/*/plugin/skills) a checkout happens to have
+// generated. Only regular files on disk count, as in a directory walk: a symlink or a tracked file deleted locally is
+// skipped.
 function listSourceFiles(repoRoot: string): string[] {
-  const files: string[] = []
-  const walk = (relativeDir: string): void => {
-    for (const entry of readdirSync(join(repoRoot, relativeDir), { withFileTypes: true })) {
-      const path = `${relativeDir}/${entry.name}`
-      if (SKIPPED_PATHS.some((skipped) => path.startsWith(skipped))) continue
-      if (entry.isDirectory()) {
-        if (!entry.name.startsWith(".") && !SKIPPED_DIRS.has(entry.name)) walk(path)
-      } else if (entry.isFile() && SOURCE_FILE.test(entry.name) && !entry.name.includes(".generated.")) {
-        files.push(path)
-      }
-    }
-  }
-  walk("packages")
-  return files.toSorted()
+  const listed = execFileSync(
+    "git",
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "packages"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    },
+  )
+  return [...new Set(listed.split("\0"))]
+    .filter((path) => {
+      if (path === "" || SKIPPED_PATHS.some((skipped) => path.startsWith(skipped))) return false
+      const segments = path.split("/")
+      const name = segments.at(-1) ?? ""
+      if (segments.slice(0, -1).some((dir) => dir.startsWith(".") || SKIPPED_DIRS.has(dir))) return false
+      if (!SOURCE_FILE.test(name) || name.includes(".generated.")) return false
+      return lstatSync(join(repoRoot, path), { throwIfNoEntry: false })?.isFile() === true
+    })
+    .toSorted()
 }
 
 const literalText = (node: ts.Node | undefined): string | undefined =>

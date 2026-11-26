@@ -1677,7 +1677,7 @@
     "omo-testing/no-module-mock": 1
   },
   "packages/omo-senpi/src/components/thread/component.test.ts": {
-    "omo-testing/no-flake-masking": 3
+    "omo-testing/no-flake-masking": 1
   },
   "packages/omo-senpi/src/components/thread/gateway/cross-process.test.ts": {
     "omo-testing/no-flake-masking": 1
@@ -1700,9 +1700,6 @@
   "packages/omo-senpi/src/components/thread/gateway/store-extension-session-paths.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/omo-senpi/src/components/thread/gateway/store-extension-wake-marker.test.ts": {
-    "omo-testing/no-flake-masking": 3
-  },
   "packages/omo-senpi/src/components/thread/gateway/store-extensions-concurrency.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
@@ -1710,18 +1707,12 @@
     "typescript/no-non-null-assertion": 3
   },
   "packages/omo-senpi/src/components/thread/published-endpoint.test.ts": {
-    "omo-testing/no-flake-masking": 21
-  },
-  "packages/omo-senpi/src/components/thread/question-closed-locally.test.ts": {
-    "omo-testing/no-flake-masking": 8
+    "omo-testing/no-flake-masking": 19
   },
   "packages/omo-senpi/src/components/thread/remote/relay-transport.test.ts": {
     "omo-testing/no-fixed-sleep": 2
   },
   "packages/omo-senpi/src/components/thread/remote/remote-anchor-e2e.test.ts": {
-    "omo-testing/no-flake-masking": 1
-  },
-  "packages/omo-senpi/src/components/thread/sdk.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/omo-senpi/src/components/thread/tools.test.ts": {

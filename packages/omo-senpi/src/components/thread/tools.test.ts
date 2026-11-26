@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parseThreadParams, threadToolParamSchemas, type ThreadToolName, type ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
-import { type BindInput, hashArgs, normalizeBindInput } from "./gateway/bindings"
+import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -134,7 +134,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the fifteen contract tools with eval exposure", () => {
+  test("registers exactly the eleven contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -153,10 +153,6 @@ describe("thread tool registration", () => {
       "thread_set_model",
       "thread_set_reasoning",
       "thread_archive",
-      "thread_report",
-      "thread_outbox",
-      "thread_outbox_ack",
-      "thread_answer",
     ])
     for (const tool of tools) {
       expect(tool.exposure, String(tool.name)).toBe("eval")
@@ -935,15 +931,7 @@ function gatewayFixture(store?: GatewayStore) {
     } as never)
     return result.details.result as ThreadToolResult
   }
-  /** Binds a chat thread to `session` straight through the store, as the gateway does; no session tool binds. */
-  const bind = async (session: string, chat: Omit<BindInput, "session_durable_id">): Promise<string> => {
-    const binding = normalizeBindInput({ ...chat, session_durable_id: session })
-    if ("kind" in binding) throw new Error(JSON.stringify(binding))
-    const bound = await f.store.bind({ now: Date.now(), receipt: null, binding })
-    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-    return bound.binding.binding_id
-  }
-  return { f, wakes, run, bind }
+  return { f, wakes, run }
 }
 
 describe("thread_send through the session gateway", () => {
@@ -1002,49 +990,6 @@ describe("thread_send through the session gateway", () => {
       error: { code: "loop_detected" },
     })
     expect(await g.f.store.list({ target_durable_id: "dur-tui" })).toEqual([])
-  })
-})
-
-describe("relay tools over the gateway store", () => {
-  test("#given the gateway bound a chat thread to session B #when B reports a milestone #then a connector reads it with the binding revision and a cursor and acks it", async () => {
-    const g = gatewayFixture()
-    const bindingId = await g.bind("dur-tui", { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1" })
-    const reported = await g.run(
-      "thread_report",
-      { binding_id: bindingId, kind: "milestone", text: "done step 1" },
-      "dur-tui",
-      "call-2",
-    )
-    expect(reported).toMatchObject({ kind: "ok", binding_id: bindingId, revision: 1, event: "milestone" })
-    const read = await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-3")
-    expect(read).toMatchObject({
-      kind: "ok",
-      rows: [{ event: "milestone", text: "done step 1", revision: 1, cursor: (reported as { cursor: number }).cursor }],
-    })
-    expect(
-      await g.run(
-        "thread_outbox_ack",
-        { binding_id: bindingId, cursor: (reported as { cursor: number }).cursor },
-        "connector",
-        "call-4",
-      ),
-    ).toMatchObject({ kind: "ok", changed: true })
-    expect(await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-5")).toMatchObject({
-      kind: "ok",
-      rows: [],
-    })
-  })
-
-  test("#given a binding of session B #when another session reports through it #then it is scope_denied and the outbox stays empty", async () => {
-    const g = gatewayFixture()
-    const bindingId = await g.bind("dur-tui", { platform: "discord", account_id: "bot", chat_id: "c9" })
-    expect(
-      await g.run("thread_report", { binding_id: bindingId, kind: "report", text: "not mine" }, "dur-host", "call-2"),
-    ).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
-    expect(await g.run("thread_outbox", { binding_id: bindingId }, "connector", "call-3")).toMatchObject({
-      kind: "ok",
-      rows: [],
-    })
   })
 })
 
@@ -1385,25 +1330,6 @@ describe("thread tools over a gateway store a newer omo build migrated", () => {
       } finally {
         db.close()
       }
-    },
-  )
-
-  test.each([
-    ["thread_outbox_ack", { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" }],
-    ["thread_report", { kind: "milestone", text: "done step 1" }],
-    ["thread_outbox", { binding_id: "bnd-1", after_cursor: 0 }],
-  ] as const)(
-    "#given the agent dir's store is one schema version past this binary's #when the relay tool %s runs #then it answers gateway_schema_too_new naming both schemas and omo update",
-    async (name, args) => {
-      const n = newerStore(1)
-      const g = gatewayFixture(n.store)
-      expect(await g.run(name, args, "dur-host", "call-relay")).toMatchObject({
-        kind: "error",
-        error: {
-          code: "gateway_schema_too_new",
-          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
-        },
-      })
     },
   )
 })

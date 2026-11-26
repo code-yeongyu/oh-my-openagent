@@ -6,6 +6,7 @@ import type {
   GatewayDeliveryMode,
   GatewayDeliveryResult,
   GatewaySender,
+  ReceiptOutcome,
 } from "./types"
 
 /**
@@ -46,6 +47,7 @@ export type OutboundDelivery = {
 
 /** A delivery to another device has no gateway row on this device, so it names the device it reached instead of a row sequence. */
 export type RelayDeliverySuccess = {
+  readonly outcome?: ReceiptOutcome
   readonly kind: "ok"
   readonly thread_id: string
   readonly delivery: GatewayDeliveryDelivery
