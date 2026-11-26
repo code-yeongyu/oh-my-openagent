@@ -83,8 +83,8 @@ const GH_STUB = [
   '    *"/actions/runs/55 "*) owned_state | jq -r "$filter" ;;',
   '    *"/actions/workflows/ci.yml "*) echo \'{"id":11}\' | jq -r "$filter" ;;',
   '    *"/actions/workflows/publish.yml "*) echo \'{"id":12}\' | jq -r "$filter" ;;',
-  '    *"/actions/runs/1/artifacts "*) local wanted="$*"; wanted="${wanted##*name=}"; wanted="${wanted%% *}"; local n=0; [ "$wanted" = "$PARENT_RECEIPT" ] && n=1; printf \'{"artifacts":[%s]}\' "$([ "$n" = 1 ] && printf \'{"name":"%s","workflow_run":{"id":1}}\' "$wanted")" | jq -r "$filter" ;;',
-  '    *"/actions/runs/1 "*) printf \'{"workflow_id":%s,"event":"workflow_dispatch","run_attempt":1,"created_at":"2026-01-01T00:00:00Z"}\' "${PARENT_WORKFLOW:-12}" | jq -r "$filter" ;;',
+  '    *"/actions/runs/1/artifacts "*) [ -n "$RECEIPT_API_DOWN" ] && return 1; local wanted="$*"; wanted="${wanted##*name=}"; wanted="${wanted%% *}"; local n=0; [ "$wanted" = "$PARENT_RECEIPT" ] && n=1; printf \'{"artifacts":[%s]}\' "$([ "$n" = 1 ] && printf \'{"name":"%s","workflow_run":{"id":1}}\' "$wanted")" | jq -r "$filter" ;;',
+  '    *"/actions/runs/1 "*) [ -n "$PARENT_API_DOWN" ] && return 1; printf \'{"workflow_id":%s,"event":"workflow_dispatch","run_attempt":1,"created_at":"2026-01-01T00:00:00Z"}\' "${PARENT_WORKFLOW:-12}" | jq -r "$filter" ;;',
   '    *"/actions/runs/55/jobs?filter=latest"*) if [ -n "$OWNED_RED_JOB" ]; then printf \'{"jobs":[{"name":"%s","status":"completed","conclusion":"failure"}]}\' "$OWNED_RED_JOB"; else printf \'{"jobs":[{"name":"typecheck","status":"in_progress","conclusion":null}]}\'; fi | jq -r "$filter" ;;',
   '    *"/actions/runs/55/attempts/1/jobs?"*) cat "$OWNED_JOBS" ;;',
   '    *"actions/workflows/ci.yml/runs?branch=dev"*)',
@@ -151,6 +151,8 @@ interface Dispatch {
   readonly ownedWorkflow?: string
   readonly parentWorkflow?: string
   readonly parentReceipt?: string
+  readonly receiptApiDown?: boolean
+  readonly parentApiDown?: boolean
   readonly ownedRedJob?: string
   /** The tagged child carries the parent's run id without its ref name; the parent knows the exact ref. */
   readonly ownedInChild?: boolean
@@ -247,6 +249,8 @@ function dispatch(input: Dispatch): Outcome {
       OWNED_ACTOR: input.ownedActor ?? "",
       OWNED_WORKFLOW: input.ownedWorkflow ?? "",
       PARENT_WORKFLOW: input.parentWorkflow ?? "",
+      RECEIPT_API_DOWN: input.receiptApiDown ? "1" : "",
+      PARENT_API_DOWN: input.parentApiDown ? "1" : "",
       PARENT_RECEIPT: input.parentReceipt ?? parentReceipt((input.pin ?? "").toLowerCase(), prepared, "55"),
       OWNED_RED_JOB: input.ownedRedJob ?? "",
       SOURCE_SHA_LOWER: (input.pin ?? "").toLowerCase(),
@@ -373,6 +377,8 @@ describe("#given a pinned release", () => {
       ["refused for another workflow's run", { ownedWorkflow: "99" }],
       ["refused when the parent recorded no receipt", { parentReceipt: "" }],
       ["refused when the parent's receipt names another CI run", { parentReceipt: "release-ci-receipt-x-y-56" }],
+      ["refused when the receipt cannot be read", { receiptApiDown: true }],
+      ["refused when the parent run cannot be read", { parentApiDown: true }],
     ] as const)(
       "#when the tagged child is given the parent's own run and no push is green #then it is %s",
       (name, change) => {
@@ -390,7 +396,7 @@ describe("#given a pinned release", () => {
           expect(result.output).toContain(`CI workflow run 55 ran and passed required validation for ${fixture.sha.B}.`)
         } else {
           expect(result.status).not.toBe(0)
-          expect(result.output).toContain("CI run 55")
+          expect(result.output).not.toContain("ran and passed required validation")
         }
       },
     )

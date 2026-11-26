@@ -352,17 +352,18 @@ jobs:
           # release-ci ref for the source. The parent knows the exact ref (and got the id from its own dispatch). The tagged
           # child gets the id as an input, so it also requires that it was itself dispatched by the workflow token and that
           # the ref names a real publish.yml attempt of this repository, created before that run.
+          # Called in an || list, so errexit is off inside: every lookup refuses explicitly when it fails.
           verify_owned_run() {
-            local sha="$1" ci_workflow run parent_id parent_attempt parent
+            local sha="$1" ci_workflow publish_workflow run parent_id parent_attempt parent receipt receipts
             if ! [[ "$owned" =~ ^[0-9]+$ ]]; then
               echo "::error::The release's CI run id '${owned}' is not a run id."
               return 1
             fi
-            ci_workflow="$(retry_gh "Read the ci.yml workflow" gh api "repos/${REPOSITORY}/actions/workflows/ci.yml" --jq .id)"
+            ci_workflow="$(retry_gh "Read the ci.yml workflow" gh api "repos/${REPOSITORY}/actions/workflows/ci.yml" --jq .id)" || return 1
             run="$(retry_gh "Read the release's own CI run" gh api "repos/${REPOSITORY}/actions/runs/${owned}" \
-              --jq '[.id, .workflow_id, .head_sha, .event, .head_branch, .triggering_actor.login, .created_at] | @tsv')"
+              --jq '[.id, .workflow_id, .head_sha, .event, .head_branch, .triggering_actor.login, .created_at] | @tsv')" || return 1
             IFS=$'\t' read -r run_id run_workflow run_sha run_event run_branch run_actor run_created <<< "$run"
-            if [ "$run_id" != "$owned" ] || [ "$run_workflow" != "$ci_workflow" ] || [ "$run_sha" != "$sha" ] ||
+            if ! [[ "$ci_workflow" =~ ^[0-9]+$ ]] || [ "$run_id" != "$owned" ] || [ "$run_workflow" != "$ci_workflow" ] || [ "$run_sha" != "$sha" ] ||
               [ "$run_event" != workflow_dispatch ] || [ "$run_actor" != "github-actions[bot]" ]; then
               echo "::error::CI run ${owned} is not a run this release dispatched for ${sha} (workflow ${run_workflow:-?}, event ${run_event:-?}, branch ${run_branch:-?}, by ${run_actor:-?})."
               return 1
@@ -381,17 +382,18 @@ jobs:
             parent_id="${BASH_REMATCH[1]}"
             parent_attempt="${BASH_REMATCH[2]}"
             parent="$(retry_gh "Read the parent release run" gh api "repos/${REPOSITORY}/actions/runs/${parent_id}" \
-              --jq '[.workflow_id, .event, .run_attempt, .created_at] | @tsv')"
+              --jq '[.workflow_id, .event, .run_attempt, .created_at] | @tsv')" || return 1
+            publish_workflow="$(retry_gh "Read the publish.yml workflow" gh api "repos/${REPOSITORY}/actions/workflows/publish.yml" --jq .id)" || return 1
             IFS=$'\t' read -r parent_workflow parent_event parent_run_attempt parent_created <<< "$parent"
-            if [ "$parent_workflow" != "$(retry_gh "Read the publish.yml workflow" gh api "repos/${REPOSITORY}/actions/workflows/publish.yml" --jq .id)" ] ||
-              [ "$parent_event" != workflow_dispatch ] || [ "$parent_run_attempt" -lt "$parent_attempt" ] || [[ "$parent_created" > "$run_created" ]]; then
+            if ! [[ "$publish_workflow" =~ ^[0-9]+$ ]] || [ "$parent_workflow" != "$publish_workflow" ] ||
+              [ "$parent_event" != workflow_dispatch ] || ! [[ "$parent_run_attempt" =~ ^[0-9]+$ ]] || [ "$parent_run_attempt" -lt "$parent_attempt" ] || [[ "$parent_created" > "$run_created" ]]; then
               echo "::error::CI run ${owned} names release attempt ${parent_id}-${parent_attempt}, which is not a publish.yml release of this repository that started it."
               return 1
             fi
             receipt="release-ci-receipt-${sha}-${PREPARED_RELEASE_SHA}-${owned}"
             receipts="$(retry_gh "Read the parent release's CI receipt" gh api --method GET "repos/${REPOSITORY}/actions/runs/${parent_id}/artifacts" \
-              -f name="$receipt" --jq "[.artifacts[] | select(.workflow_run.id == ${parent_id})] | length")"
-            if [ "$receipts" = 0 ]; then
+              -f name="$receipt" --jq "[.artifacts[] | select(.workflow_run.id == ${parent_id})] | length")" || return 1
+            if ! [[ "$receipts" =~ ^[1-9][0-9]*$ ]]; then
               echo "::error::Release attempt ${parent_id} recorded no receipt binding CI run ${owned} to ${sha} and ${PREPARED_RELEASE_SHA} (${receipt})."
               return 1
             fi
