@@ -8,7 +8,7 @@ Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex 
 
 ## SKILLS (19 under `skills/<name>/`)
 
-`programming`, `debugging`, `eval-integrity`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git-master`, `refactor`, `review-work`, `ulw-execute`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`, `browser`.
+`programming`, `debugging`, `eval-integrity`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `data-scientist`, `git`, `refactor`, `review-work`, `ulw-execute`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`, `browser`.
 
 `browser` carries a staged runtime: `stage-omowright-runtime.mjs` bundles the root `omowright` devDependency (one ESM file plus its `page-bundle.js` and a digest manifest) into `skills/browser/runtime/omowright/` at build/prepack time (`materialize-shared-upstreams.mjs` calls it). The directory is gitignored and packed through the skill's `.npmignore`; `--check` is the freshness gate. Every shipped browser instruction (visual-qa, debugging, frontend, review-work, ulw-*, ultimate-browsing Tier 2, the ultrawork directives) routes to that runtime through the skill's `scripts/omowright.mjs` loader.
 

@@ -88,6 +88,20 @@ describe("skill-commands input rewrite", () => {
     }
   })
 
+  test("#given the git skill is loaded #when the user submits the retired git-master name bare or as /skill: #then both become /skill:git with the args intact", async () => {
+    const fixture = skillsFixture(["git"])
+    try {
+      const pi = hostWith([{ name: "skill:git", source: "skill" }])
+      await registerSkillCommands(pi, fixture.dir)
+
+      expect((await submit(pi, "/git-master commit the fix")).text).toBe("/skill:git commit the fix")
+      expect((await submit(pi, "/skill:git-master commit the fix")).text).toBe("/skill:git commit the fix")
+      expect((await submit(pi, "/git")).text).toBe("/skill:git")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
   test("#given an attached image #when a bare skill command is rewritten #then the image rides along", async () => {
     const fixture = skillsFixture(["ulw-plan"])
     try {

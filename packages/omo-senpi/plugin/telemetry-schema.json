@@ -3117,7 +3117,7 @@
           "debugging",
           "eval-integrity",
           "frontend",
-          "git-master",
+          "git",
           "give-me-tips",
           "hyperplan",
           "init-deep",
@@ -3950,5 +3950,5 @@
       }
     }
   },
-  "sha256": "0ba9c2f8c0f052b8749b8a6ebdfb00960ca42c47ba8122d3850aa09ade7bca8c"
+  "sha256": "56bfa69a62a0e988d97cc3a169661b2d7fe2a21e26f50d68715f75e88482ffd7"
 }

@@ -53,7 +53,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("skills", "coding-agent-sessions", "SKILL.md"),
   join("skills", "debugging", "SKILL.md"),
   join("skills", "frontend", "SKILL.md"),
-  join("skills", "git-master", "SKILL.md"),
+  join("skills", "git", "SKILL.md"),
   join("skills", "init-deep", "SKILL.md"),
   join("skills", "lsp-setup", "SKILL.md"),
   join("skills", "programming", "SKILL.md"),

@@ -68,7 +68,7 @@ async function makePackagedPlugin(): Promise<string> {
     "coding-agent-sessions",
     "debugging",
     "frontend",
-    "git-master",
+    "git",
     "init-deep",
     "browser",
     "lsp-setup",

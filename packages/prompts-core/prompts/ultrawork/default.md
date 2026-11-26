@@ -160,7 +160,7 @@ task(category="visual-engineering", load_skills=["frontend"], run_in_background=
 task(category="ultrabrain", load_skills=[...], run_in_background=true)
 
 // Quick fixes
-task(category="quick", load_skills=["git-master"], run_in_background=true)
+task(category="quick", load_skills=["git"], run_in_background=true)
 ```
 
 **YOU SHOULD ONLY DO IT YOURSELF WHEN:**

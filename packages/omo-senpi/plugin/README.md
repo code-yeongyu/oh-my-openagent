@@ -14,7 +14,7 @@ The plugin ships 28 skills by default:
 - `debugging` — hypothesis-driven runtime debugging across languages
 - `eval-integrity` — check whether an eval, benchmark, or metric claim is trustworthy
 - `frontend` — UI/UX/visual design, styling, layout, and frontend implementation
-- `git-master` — advanced Git operations, history surgery, and workflow automation
+- `git` — local git from eval cells: commits, worktrees, base sync, push, history search (`git-master` still resolves as an alias)
 - `give-me-tips` — explain any senpi tip, including the Tip: lines in the TUI
 - `hyperplan` — adversarial 5-member cross-critique planning
 - `init-deep` — deep project initialization and scaffold setup

@@ -41,7 +41,7 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "debugging",
   "eval-integrity",
   "frontend",
-  "git-master",
+  "git",
   "give-me-tips",
   "hyperplan",
   "init-deep",

@@ -18,7 +18,7 @@ const expectedSkillNames = [
   "debugging",
   "eval-integrity",
   "frontend",
-  "git-master",
+  "git",
   "give-me-tips",
   "hyperplan",
   "init-deep",

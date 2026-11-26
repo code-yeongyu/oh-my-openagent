@@ -28,14 +28,8 @@ function withShell<T>(platform: NodeJS.Platform, shell: string | undefined, call
   }
 }
 
-function expectCommandsPrefixed(result: string, prefix: string): void {
-  for (const command of TEMPLATE_COMMANDS) {
-    expect(result).toContain(`${prefix} ${command}`)
-  }
-}
-
 describe("injectGitMasterConfig", () => {
-  it("propagates the configured Unix env prefix to template commands", () => {
+  it("propagates the configured Unix env prefix to the line form and the Bun.$ env form", () => {
     const gitEnvPrefix = "SENTINEL_GIT_ENV=enabled"
     const result = withShell("linux", "/bin/bash", () =>
       injectGitMasterConfig(SAMPLE_TEMPLATE, {
@@ -45,7 +39,8 @@ describe("injectGitMasterConfig", () => {
       }),
     )
 
-    expectCommandsPrefixed(result, buildShellAwareGitPrefix(gitEnvPrefix, "unix"))
+    expect(result).toContain(`${buildShellAwareGitPrefix(gitEnvPrefix, "unix")} git`)
+    expect(result).toContain('SENTINEL_GIT_ENV: "enabled"')
   })
 
   it("leaves template commands unchanged when the prefix is disabled", () => {
