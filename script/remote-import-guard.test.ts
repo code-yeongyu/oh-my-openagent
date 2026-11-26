@@ -63,15 +63,47 @@ describe("remote import guard G1 over packages/**", () => {
 // omo#13413: the omo SDK's devices.list is the remote module's devices.list, so a script has one device-service listing.
 // The account service's own listing is the SDK's account view (account.devices, the fields only the account holds) and
 // nothing else: devices.list reaching it, or a remote client built past the barrel, fails here.
-describe("the omo SDK's one device listing", () => {
-  const root = join(import.meta.dir, "..")
-  const resolve = createResolver(root)
-  const sdkFiles = scanRepository(root).filter(
+const sdkFactsOf = (root: string) =>
+  scanRepository(root).filter(
     (fact) =>
       (fact.file.startsWith("packages/omo-senpi/src/components/omo-sdk/") ||
         fact.file === "packages/omo-senpi/src/extension/omo-sdk.ts") &&
       !REMOTE_IMPORT_RULES.testFile(fact.file),
   )
+
+// Value reaches only: a type-only import of the remote module is erased at build (no runtime path; the fused bundle
+// carries no remote/types.ts module), so only values count. Every value reach is pinned by exact file and target.
+const sdkRemoteValueReaches = (root: string) => {
+  const resolve = createResolver(root)
+  return sdkFactsOf(root)
+    .flatMap((fact) =>
+      fact.edges
+        .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
+        .map((edge) => ({
+          file: fact.file,
+          target: resolve(fact.file, edge.specifier),
+          values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
+        })),
+    )
+    .filter((reach) => reach.values.length > 0)
+}
+
+const SDK_REMOTE_VALUE_REACHES = [
+  // The contract's code table, data only: no device or session client.
+  {
+    file: "packages/omo-senpi/src/components/omo-sdk/contract/code-sources.ts",
+    target: "packages/omo-senpi/src/components/remote/codes.ts",
+    values: ["REMOTE_CODES"],
+  },
+  {
+    file: "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
+    target: "packages/omo-senpi/src/components/remote/index.ts",
+    values: ["remoteClientForSession"],
+  },
+]
+
+describe("the omo SDK's one device listing", () => {
+  const sdkFiles = sdkFactsOf(join(import.meta.dir, ".."))
 
   test("#given the omo SDK's sources #then only the account view imports the account service's device listing", () => {
     const listings = sdkFiles.flatMap((fact) =>
@@ -89,31 +121,43 @@ describe("the omo SDK's one device listing", () => {
   })
 
   test("#given the omo SDK's sources #then devices.list reaches the remote module only through its barrel's session factory", () => {
-    // Value reaches only: the SDK contract's type-only imports of remote/types.ts carry no runtime path.
-    const reaches = sdkFiles
-      .flatMap((fact) =>
-        fact.edges
-          .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
-          .map((edge) => ({
-            file: fact.file,
-            target: resolve(fact.file, edge.specifier),
-            values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
-          })),
-      )
-      .filter((reach) => reach.values.length > 0)
-    expect(reaches).toEqual([
-      // The contract's code table, data only: no device or session client.
-      {
-        file: "packages/omo-senpi/src/components/omo-sdk/contract/code-sources.ts",
-        target: "packages/omo-senpi/src/components/remote/codes.ts",
-        values: ["REMOTE_CODES"],
-      },
-      {
-        file: "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
-        target: "packages/omo-senpi/src/components/remote/index.ts",
-        values: ["remoteClientForSession"],
-      },
-    ])
+    expect(sdkRemoteValueReaches(join(import.meta.dir, ".."))).toEqual(SDK_REMOTE_VALUE_REACHES)
+  })
+
+  test("#given a value import past the barrel, or the code table from a second file #then each is a reach the pinned list refuses; a type-only import is not one", () => {
+    const root = mkdtempSync(join(tmpdir(), "sdk-remote-reach-"))
+    try {
+      const sdk = "packages/omo-senpi/src/components/omo-sdk"
+      const remote = "packages/omo-senpi/src/components/remote"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${remote}/index.ts`, "export const remoteClientForSession = () => 1\n")
+      put(`${remote}/codes.ts`, "export const REMOTE_CODES = []\n")
+      put(`${remote}/types.ts`, "export type RemoteRow = { id: string }\n")
+      put(`${remote}/sessions.ts`, "export const openSessions = () => 1\n")
+      put(`${sdk}/devices/index.ts`, 'import { remoteClientForSession } from "../../remote/index.ts"\n')
+      put(`${sdk}/contract/code-sources.ts`, 'import { REMOTE_CODES } from "../../remote/codes.ts"\n')
+      put(`${sdk}/contract/results/rows.ts`, 'import type { RemoteRow } from "../../../remote/types.ts"\n')
+      const scan = (): ReturnType<typeof sdkRemoteValueReaches> => {
+        execFileSync("git", ["add", "packages"], { cwd: root })
+        return sdkRemoteValueReaches(root)
+      }
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      // The allowed shape, type-only reach included, is exactly the pinned list.
+      expect(scan()).toEqual(SDK_REMOTE_VALUE_REACHES)
+
+      put(`${sdk}/devices/index.ts`, 'import { remoteClientForSession } from "../../remote/index.ts"\nimport { openSessions } from "../../remote/sessions.ts"\n')
+      put(`${sdk}/contract/other-codes.ts`, 'import { REMOTE_CODES } from "../../remote/codes.ts"\n')
+      const grown = scan()
+      expect(grown).not.toEqual(SDK_REMOTE_VALUE_REACHES)
+      expect(grown).toContainEqual({ file: `${sdk}/devices/index.ts`, target: `${remote}/sessions.ts`, values: ["openSessions"] })
+      expect(grown).toContainEqual({ file: `${sdk}/contract/other-codes.ts`, target: `${remote}/codes.ts`, values: ["REMOTE_CODES"] })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
