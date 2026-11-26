@@ -1,4 +1,6 @@
+import { THREAD_READ_DEFAULT_BYTES } from "../thread/contracts/fields"
 import { interruptOver } from "../thread/control/interrupt"
+import { takeWithinBudget } from "../thread/read-budget"
 import type { ThreadSocketConnect } from "../thread/live-surface"
 import type { ThreadCloseOptions, ThreadHost, ThreadSessionPort } from "../thread/tools/ports"
 import { ok, type Outcome } from "./client"
@@ -149,7 +151,13 @@ export function localSessionMembers(hostOn: HostOn) {
         }))
         const end = page?.before === undefined ? all.length : all.findIndex((item) => item.entry_id === page.before)
         const upTo = all.slice(0, end < 0 ? all.length : end)
-        const entries = page?.tail === undefined ? upTo : upTo.slice(-page.tail)
+        // Bounded as thread_read is (design lane ruling 5 i): the newest entries within a read's default budget, by the
+        // one rule every thread read cuts with; an older entry left out is reported through next_before.
+        const { selected: entries } = takeWithinBudget(
+          page?.tail === undefined ? upTo : upTo.slice(-page.tail),
+          THREAD_READ_DEFAULT_BYTES,
+          "end",
+        )
         const first = entries[0]
         return ok({ entries, next_before: first !== undefined && upTo.length > entries.length ? first.entry_id : null })
       }),
