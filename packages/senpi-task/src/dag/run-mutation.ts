@@ -1,6 +1,6 @@
 import { applyRunPause } from "./run-pause"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
-import { liveLeaseHolder, pausedAmendmentUnsafe } from "./amend-safety"
+import { pausedAmendmentUnsafe } from "./amend-safety"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagBottleneck, DagDiagnostic, DagEdge, DagNode, DagNodeId, DagRunEvent, DagWave } from "./types"
 type DagPersistedDefinition = DagRunRecordV1["definition"]
@@ -58,7 +58,6 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
   })
   if (unsafeIds.length > 0) return record
   if (record.status === "running") return record
-  if (record.status === "paused" && record.pause?.reason !== "user_stop" && liveLeaseHolder(record)) return record
   return {
     ...record,
     name: mutation.definition.name,

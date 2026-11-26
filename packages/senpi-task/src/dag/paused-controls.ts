@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto"
 import { addGuidance, changeGuidance, type Guidance } from "../pause/guidance"
 import type { DagRunRecordV1 } from "./manager"
+import { defaultSignaller } from "../lifecycle/context"
+import type { DagJournal } from "./journal"
 import { controlJournal, DagNodeControlError, ownedRecord } from "./node-control-context"
+import { dagRunEligibility, decideDagRun } from "./run-acquisition"
 import type { DagSchedulerOptions } from "./scheduler"
-import type { DagNodeId, DagRunId } from "./types"
+import type { DagNodeId, DagRunEventPayload, DagRunId } from "./types"
 
 export { pausedAmendmentUnsafe } from "./amend-safety"
 
@@ -31,7 +34,7 @@ export function applyPausedDagGuidance(
       })
       const guidance = changed.find((entry) => entry.id === command.id)
       if (guidance === undefined) throw new Error("guidance change did not retain its record")
-      controlJournal(options, record).append({
+      appendWhileStopped(options, record, {
         type: command.kind === "remove" ? "dag.guidance.removed" : "dag.guidance.edited",
         guidance,
       })
@@ -40,6 +43,47 @@ export function applyPausedDagGuidance(
     default:
       throw new Error(`Unexpected guidance command: ${command satisfies never}`)
   }
+}
+
+/**
+ * The one write path for a user-stopped run (guidance, node cancel, retry staging, guidance delivery).
+ * Decided at the write, under the journal's run lock, on the fresh record by both facts (#15125):
+ * still stopped by the same Stop (`stoppedWrite`) and not held by another live process (the one
+ * holder rule): a successor claiming the run for a Resume writes its lease under the same Stop.
+ * Otherwise nothing is written and the write is refused (`run_not_owned` naming the holder, or
+ * `run_not_user_paused`). The journal's own duplicate-transition skip stays silent.
+ */
+export function appendWhileStopped(
+  options: DagSchedulerOptions,
+  record: DagRunRecordV1,
+  payload: DagRunEventPayload,
+): DagJournal<DagRunRecordV1> {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  const eligible = dagRunEligibility.stoppedWrite(record.pause?.pauseSeq)
+  let refusal: DagNodeControlError | undefined
+  const journal = controlJournal(options, record, undefined, (fresh) => {
+    const decision = decideDagRun(fresh, { probe, eligible })
+    if (decision.kind === "held")
+      refusal = new DagNodeControlError({
+        code: "run_not_owned",
+        message: `dag run "${record.runId}" is held by live process ${decision.holderPid}`,
+        runId: record.runId,
+      })
+    else if (decision.kind === "not_eligible")
+      refusal = new DagNodeControlError({
+        code: "run_not_user_paused",
+        message: "the run is no longer stopped by the user",
+        runId: record.runId,
+      })
+    return refusal !== undefined
+  })
+  journal.append(payload)
+  if (refusal !== undefined) throw refusal
+  return journal
 }
 
 export function requireUserPaused(record: DagRunRecordV1): void {
@@ -76,7 +120,7 @@ export function guidePausedDag(
   }
   const guidance = addGuidance(record.guidance ?? [], input).find((entry) => entry.id === input.id)
   if (guidance === undefined) throw new Error("guidance was not created")
-  controlJournal(options, record).append({ type: "dag.guidance.added", guidance })
+  appendWhileStopped(options, record, { type: "dag.guidance.added", guidance })
   return guidance
 }
 
@@ -97,8 +141,7 @@ export async function cancelPausedDagNode(
       nodeIds: [nodeId],
     })
   if (node.state === "completed" || node.state === "cancelled") return
-  const journal = controlJournal(options, record)
-  journal.append({ type: "dag.node.cancel_requested", nodeId })
+  appendWhileStopped(options, record, { type: "dag.node.cancel_requested", nodeId })
   if (node.taskId !== undefined) {
     const task = options.taskManager.get(node.taskId)
     const result = await options.taskManager.cancelTask(
@@ -131,7 +174,7 @@ export async function cancelPausedDagNode(
       runId,
     })
   }
-  controlJournal(options, fresh).append({
+  appendWhileStopped(options, fresh, {
     type: "dag.node.transitioned",
     nodeId,
     from: current.state,

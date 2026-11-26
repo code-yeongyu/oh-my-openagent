@@ -3,6 +3,8 @@
 import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
+import { acquireDagRun, dagRunEligibility, type DagRunAcquisition } from "./run-acquisition"
+import { liveForeignHolder, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
@@ -19,6 +21,7 @@ export const DAG_NODE_CONTROL_ERROR_CODES = [
   "node_unresponsive",
   "run_paused_by_user",
   "run_not_user_paused",
+  "run_busy",
 ] as const
 
 export type DagNodeControlErrorCode = (typeof DAG_NODE_CONTROL_ERROR_CODES)[number]
@@ -62,17 +65,130 @@ export function ownedRecord(options: DagSchedulerOptions, runId: DagRunId): DagR
   if (record === null) {
     throw new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
   }
-  const hostPid = options.hostPid ?? process.pid
-  const isAlive = options.isProcessAlive ?? defaultSignaller.isAlive
-  const leaseHolderPid = (record as DagRunRecordV1 & { readonly leaseHolderPid?: number }).leaseHolderPid
-  if (leaseHolderPid !== undefined && leaseHolderPid !== hostPid && isAlive(leaseHolderPid)) {
+  // The one holder rule (#15125): the lease, a still-draining previous holder, or for a record naming
+  // neither the live foreign owner of an active child.
+  const holder = liveForeignHolder(
+    {
+      taskManager: options.taskManager,
+      hostPid: options.hostPid ?? process.pid,
+      isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+    },
+    record,
+  )
+  if (holder !== undefined) {
     throw new DagNodeControlError({
       code: "run_not_owned",
-      message: `dag run "${runId}" is leased by live process ${leaseHolderPid}`,
+      message: `dag run "${runId}" is leased by live process ${holder}`,
       runId,
     })
   }
   return record
+}
+
+/**
+ * A run paused for any reason but the user's Stop that still records active nodes has children no
+ * scheduler holds (a parked run, #15125). Only recovery may reattach them; a control verb that built
+ * another scheduler over them would hold none of them either.
+ */
+export function refuseUnheldActiveNodes(record: DagRunRecordV1): void {
+  if (record.status !== "paused" || record.pause?.reason === "user_stop") return
+  const active = record.nodes.filter((node) => node.state === "scheduled" || node.state === "running")
+  if (active.length === 0) return
+  throw new DagNodeControlError({
+    code: "run_still_active",
+    message: `dag run "${record.runId}" has active nodes whose children no scheduler holds; recovery must reattach them first`,
+    runId: record.runId,
+    nodeIds: active.map((node) => node.id),
+  })
+}
+
+/**
+ * Acquires the run for a re-entry (retry, amend) before its first write (#15125): on the fresh record
+ * the run must still be this session's and settled, or paused (not by the user) with no active node;
+ * no other live process may hold it; and no other operation of this process may be installing or
+ * mutating it (the caller passes the reservation it holds in `options.reservation`). Returns the
+ * acquired record, which the re-entry must decide and write from, and the release for a re-entry
+ * that fails before its scheduler takes over.
+ */
+export function acquireReentryLease(
+  options: DagSchedulerOptions,
+  runId: DagRunId,
+): { readonly record: DagRunRecordV1; readonly abandon: () => void } {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  const parentSessionId = options.initialRecord.parentSessionId
+  const acquired = acquireDagRun(options.store, runId, {
+    operation: "re-entry",
+    probe,
+    ...(options.reservation === undefined ? {} : { reservation: options.reservation }),
+    eligible: dagRunEligibility.reentry(parentSessionId),
+  })
+  if (acquired.kind !== "acquired") throw reentryRefusal(runId, acquired, parentSessionId)
+  // The re-entry decides and writes from this record: the one acquired, never an earlier read.
+  return {
+    record: acquired.record,
+    // Only a lease this acquisition wrote (decided under its lock) is given back.
+    abandon: acquired.leaseTaken ? () => releaseDagRunLease(options.store, runId, probe.hostPid) : () => undefined,
+  }
+}
+
+function reentryRefusal(
+  runId: DagRunId,
+  outcome: Exclude<DagRunAcquisition<DagRunRecordV1>, { readonly kind: "acquired" }>,
+  parentSessionId: string,
+): DagNodeControlError {
+  switch (outcome.kind) {
+    case "missing":
+      return new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
+    case "held":
+      return new DagNodeControlError({
+        code: "run_not_owned",
+        message: `dag run "${runId}" is held by live process ${outcome.holderPid}`,
+        runId,
+      })
+    case "busy":
+      return runBusy(runId, outcome.operation)
+    case "not_eligible":
+      if (outcome.record.parentSessionId !== parentSessionId)
+        return new DagNodeControlError({
+          code: "run_not_owned",
+          message: `dag run "${runId}" belongs to another session`,
+          runId,
+        })
+      if (outcome.record.pause?.reason === "user_stop")
+        return new DagNodeControlError({
+          code: "run_paused_by_user",
+          message: "only the user's Resume may restart this run",
+          runId,
+        })
+      return new DagNodeControlError({
+        code: "run_still_active",
+        message: `dag run "${runId}" is ${outcome.record.status} with work in flight; it cannot be re-entered now`,
+        runId,
+      })
+  }
+}
+
+/** The retryable refusal while another operation of this process installs or mutates the run. */
+export function runBusy(runId: DagRunId, operation: string): DagNodeControlError {
+  return new DagNodeControlError({
+    code: "run_busy",
+    message: `dag run "${runId}" is busy with ${operation} in this session; try again once it finishes`,
+    runId,
+  })
+}
+
+/** The one holder rule (`liveForeignHolder`) with this verb's probe, for a write decided elsewhere. */
+export function foreignHolderOf(options: DagSchedulerOptions): (fresh: DagRunRecordV1) => number | undefined {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  return (fresh) => liveForeignHolder(probe, fresh)
 }
 
 export function readRecord(store: DagFileStore, runId: DagRunId): DagRunRecordV1 | null {
@@ -92,6 +208,8 @@ export function controlJournal(
   options: DagSchedulerOptions,
   record: DagRunRecordV1,
   pendingErrors: ReadonlyMap<DagNodeId, DagNodeError> = new Map(),
+  // Decided on the recovered checkpoint under the journal's run lock: true drops the append.
+  skip?: (recovered: DagRunRecordV1) => boolean,
 ): DagJournal<DagRunRecordV1> {
   const now = options.now ?? Date.now
   return createDagJournal<DagRunRecordV1>({
@@ -106,7 +224,8 @@ export function controlJournal(
       }),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
-    skipDuplicate: skipDuplicateTerminalTransition,
+    skipDuplicate: (recovered, payload) =>
+      skipDuplicateTerminalTransition(recovered, payload) || (skip?.(recovered) ?? false),
   })
 }
 

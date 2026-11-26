@@ -25,6 +25,7 @@ import {
 } from "../scheduler"
 import type { createDagSkillMaterializer } from "../skills"
 import { createDagFileStore, type DagFileStore } from "../store"
+import { noLiveHolder } from "./reattached-run"
 import type { DagNodeId, DagRunEvent, DagRunId } from "../types"
 
 export const parentSessionId = "session-e2e-failure-parent"
@@ -253,7 +254,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       return reentry
     },
     async amend(input, runId) {
-      await manager.amend({ runId, definition: input, parentSessionId })
+      await manager.amend({ holder: noLiveHolder, runId, definition: input, parentSessionId })
       const reentry = reenterDagRun({
         store,
         taskManager,

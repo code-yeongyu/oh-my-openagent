@@ -12,6 +12,7 @@ import {
   parentSessionId,
 } from "./__fixtures__/controlled-dag-e2e"
 import { ControlledRunner, completed } from "./__fixtures__/controlled-runner"
+import { noLiveHolder } from "./__fixtures__/reattached-run"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
@@ -52,12 +53,12 @@ test("#11381 #given a settled run that owes a stop for a reachable child #when m
 
   // when
   const answers = [
-    await codeOf(fixture.manager.amend({ runId, key, definition: valid, parentSessionId })),
+    await codeOf(fixture.manager.amend({ holder: noLiveHolder, runId, key, definition: valid, parentSessionId })),
     await codeOf(
-      fixture.manager.amend({ runId, definition: definition(key, [categoryNode("A", ["ghost"])]), parentSessionId }),
+      fixture.manager.amend({ holder: noLiveHolder, runId, definition: definition(key, [categoryNode("A", ["ghost"])]), parentSessionId }),
     ),
     await codeOf(
-      fixture.manager.amend({ runId, definition: definition("another-key", [categoryNode("A")]), parentSessionId }),
+      fixture.manager.amend({ holder: noLiveHolder, runId, definition: definition("another-key", [categoryNode("A")]), parentSessionId }),
     ),
   ]
 

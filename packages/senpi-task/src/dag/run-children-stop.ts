@@ -72,7 +72,7 @@ export async function stopRunChildren(
 }
 
 export async function stopSettledRunChildren(
-  taskManager: TaskManager,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "cancelTask" | "selfResumeStopPending">,
   record: DagRunRecordV1,
   reason?: string,
 ): Promise<void> {

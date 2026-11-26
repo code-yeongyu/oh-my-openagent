@@ -2,12 +2,11 @@ import { cancelPausedDagNode } from "../../../../senpi-task/src/dag/paused-contr
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/node-control-context"
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagNodeId, DagRunId } from "../../../../senpi-task/src/dag/types"
-import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 import { isTerminalRecord } from "../../../../senpi-task/src/manager/manager-helpers"
 import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 
 export type PausedNodeHoldPort = {
-  closeHold(taskId: string, cause: "node_cancelled" | "run_cancelled"): Promise<void>
+  closeHold(taskId: string, cause: "node_cancelled"): Promise<void>
 }
 
 type ChildLookup = Pick<TaskManager, "get" | "getResidentHandle">
@@ -25,21 +24,6 @@ export function endedChildClosure(manager: ChildLookup): PausedNodeHoldPort {
         throw new Error(`task ${taskId} has not ended, so its run hold is still in place`)
       }
     },
-  }
-}
-
-/** Every paused node child of a user-stopped run is ended before the run is journaled cancelled. */
-export async function endPausedRunChildren(
-  manager: ChildLookup & Pick<TaskManager, "cancelTask">,
-  record: DagRunRecordV1,
-  closure: PausedNodeHoldPort,
-): Promise<void> {
-  for (const node of record.nodes) {
-    if (node.taskId === undefined) continue
-    const task = manager.get(node.taskId)
-    if (task === undefined || isTerminalRecord(task)) continue
-    await manager.cancelTask(node.taskId, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
-    await closure.closeHold(node.taskId, "run_cancelled")
   }
 }
 

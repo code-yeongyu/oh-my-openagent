@@ -12,23 +12,19 @@ import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 import { defaultSignaller } from "../lifecycle/context"
 import type { TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
-import {
-  dagNodeReusedEvent,
-  dagNodeRetriedEvent,
-  dagNodeTaskAttachedEvent,
-  dagNodeTransitionedEvent,
-  dagRunPausedEvent,
-  dagRunResumedEvent,
-} from "./events"
+import { dagNodeReusedEvent, dagNodeRetriedEvent, dagNodeTaskAttachedEvent, dagNodeTransitionedEvent } from "./events"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
 import type { OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
-import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
+import { leaseAfterEvent, releaseDagRunLease } from "./run-lease"
+import { pauseRunsForShutdown } from "./recovery-shutdown"
+import { claimOrphanedRun, claimPausedRun } from "./recovery-claim"
+import { createDagRunReservations, type DagRunHeldReservations, type DagRunReservations } from "./run-acquisition"
+import { applyDagSchedulerEvent, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
 
-const LIVE_RUN_STATUSES = new Set(["pending", "running"])
 // Bound repeated owner deaths before launch using the durable execution counter, not display
 // attempt. Retries/amendments also consume this budget; recovery never advances it past three.
 const MAX_RECOVERY_READMISSIONS = 3
@@ -59,9 +55,11 @@ export type DagRecoveryOptions = {
   // Liveness probe for a paused run's previous lease holder. Defaults to the lifecycle port's
   // signaller so the signal-0 existence check has exactly one implementation in the package.
   readonly isProcessAlive?: (pid: number) => boolean
-  // Whether THIS process still runs a scheduler for the run. Consulted only when the recorded holder
-  // pid is our own: a signal-0 probe on ourselves is always true, so without this a same-process
+  // Whether THIS process still runs a scheduler for the run. Consulted when the recorded holder pid
+  // is our own: a signal-0 probe on ourselves is always true, so without this a same-process
   // session reopen (multi-session host) would wait for its own host to exit. (#8006)
+  // It also gates the claim of a run left `running`: only a caller that can tell its own live
+  // scheduler from a dead host's may take such a run over.
   readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
   readonly now?: () => number
   readonly subscriberRing?: number
@@ -71,6 +69,8 @@ export type DagRecoveryOptions = {
   // The recovering session's own task depth: resumed nodes spawn one level below it, exactly like
   // a fresh run's nodes (scheduler `ancestry`), so a child session's workflow cannot reset depth.
   readonly ancestry?: { readonly depth: number }
+  // The caller's per-run reservations, shared with every other entry that mutates a run here.
+  readonly reservations?: DagRunReservations
 }
 
 export type DagRecovery = {
@@ -80,7 +80,7 @@ export type DagRecovery = {
     pauseSeq: number,
     credential?: ResumeCredential,
   ) => Promise<InstalledDagRun | DagRecoveryOutcome>
-  readonly pauseRunsForShutdown: (parentSessionId: string) => readonly DagRunId[]
+  readonly pauseRunsForShutdown: (parentSessionId: string, held?: DagRunHeldReservations) => readonly DagRunId[]
   readonly resumePausedRuns: (
     parentSessionId: string,
     forkSourceSessionId?: string,
@@ -97,6 +97,8 @@ export type DagRecovery = {
 export type InstalledDagRun = {
   readonly kind: "installed"
   readonly runId: DagRunId
+  // Ends the claim's reservation; the adopter calls it once it holds the scheduler (#15125).
+  readonly release: () => void
   readonly scheduler: DagScheduler
   readonly settled: Promise<DagRecoveryOutcome>
 }
@@ -107,6 +109,9 @@ export type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskM
   readonly hostPid: number
   readonly isProcessAlive: (pid: number) => boolean
   readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
+  // A claim writes our pid as the lease before the scheduler exists, so until the caller holds that
+  // scheduler every other entry of this process must see the run as taken.
+  readonly reservations: DagRunReservations
   readonly now: () => number
   readonly subscriberRing?: number
   readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
@@ -119,11 +124,6 @@ export type RecoveryPendingTerminalResult = {
   readonly record: TaskRecord
 }
 
-type ClaimedRun =
-  | { readonly kind: "claimed"; readonly record: RecoverableRecord }
-  | { readonly kind: "skipped"; readonly reason: "foreign_session" | "not_paused" }
-  | { readonly kind: "skipped"; readonly reason: "live_lease"; readonly holderPid: number }
-
 export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
   const context: RecoveryContext = {
     store: options.store,
@@ -131,6 +131,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     hostPid: options.hostPid ?? process.pid,
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
     ...(options.isRunHeldInProcess === undefined ? {} : { isRunHeldInProcess: options.isRunHeldInProcess }),
+    reservations: options.reservations ?? createDagRunReservations(),
     now: options.now ?? Date.now,
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     ...(options.pausedChildren === undefined ? {} : { pausedChildren: options.pausedChildren }),
@@ -144,39 +145,22 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     installResumedRun: async (runId, parentSessionId, pauseSeq, credential) => {
       const record = context.store.readCheckpoint<RecoverableRecord>(runId)
       if (record?.pause?.pauseSeq !== pauseSeq) return { kind: "skipped", runId, reason: "not_paused" }
-      const claim = claimPausedRun(context, runId, parentSessionId)
+      const claim = claimPausedRun(context, runId, parentSessionId, { kind: "resume", pauseSeq })
       if (claim.kind === "skipped") return { ...claim, runId }
-      return installResumedRun(
-        { ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) },
-        claim.record,
-      )
+      try {
+        const context_ = { ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) }
+        return { ...(await installResumedRun(context_, claim.record)), release: claim.release }
+      } catch (error) {
+        claim.release()
+        throw error
+      }
     },
-    pauseRunsForShutdown: (parentSessionId) => pauseRunsForShutdown(context, parentSessionId),
+    pauseRunsForShutdown: (parentSessionId, held) => pauseRunsForShutdown(context, parentSessionId, held),
     resumePausedRuns: (parentSessionId, forkSourceSessionId) =>
       resumePausedRuns(context, parentSessionId, forkSourceSessionId),
     installPausedRuns: (parentSessionId, adopt, forkSourceSessionId) =>
       installPausedRuns(context, parentSessionId, adopt, forkSourceSessionId),
   }
-}
-
-function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: string): readonly DagRunId[] {
-  const paused: DagRunId[] = []
-  for (const observed of listRunRecords(context.store)) {
-    if (observed.pause?.reason === "user_stop") continue
-    if (observed.parentSessionId !== parentSessionId || !LIVE_RUN_STATUSES.has(observed.status)) continue
-    context.stopAdmission?.(observed.runId)
-    const journal = recoveryJournal(context, observed)
-    journal.append(dagRunPausedEvent({ reason: "session_shutdown" }))
-    context.store.withRunLock(observed.runId, () => {
-      const fresh = context.store.readCheckpoint<RecoverableRecord>(observed.runId)
-      if (fresh === null || fresh.status !== "paused") return
-      const previousLeaseHolderPid = fresh.leaseHolderPid ?? context.hostPid
-      const { leaseHolderPid: _leaseHolderPid, ...released } = fresh
-      context.store.writeCheckpoint(observed.runId, { ...released, previousLeaseHolderPid })
-    })
-    paused.push(observed.runId)
-  }
-  return paused
 }
 
 async function resumePausedRuns(
@@ -198,8 +182,8 @@ async function installPausedRuns(
   adopt: (installed: InstalledDagRun) => void,
   forkSourceSessionId?: string,
 ): Promise<readonly DagRecoveryOutcome[]> {
-  return visitPausedRuns(context, parentSessionId, forkSourceSessionId, async (claimed, foreign) => {
-    adopt(await installResumedRun(context, claimed))
+  return visitPausedRuns(context, parentSessionId, forkSourceSessionId, async (claimed, foreign, release) => {
+    adopt({ ...(await installResumedRun(context, claimed)), release })
     return { runId: claimed.runId, kind: foreign ? "adopted" : "resumed" }
   })
 }
@@ -208,7 +192,7 @@ async function visitPausedRuns(
   context: RecoveryContext,
   parentSessionId: string,
   forkSourceSessionId: string | undefined,
-  recover: (claimed: RecoverableRecord, foreign: boolean) => Promise<DagRecoveryOutcome>,
+  recover: (claimed: RecoverableRecord, foreign: boolean, release: () => void) => Promise<DagRecoveryOutcome>,
 ): Promise<readonly DagRecoveryOutcome[]> {
   const outcomes: DagRecoveryOutcome[] = []
   const forkSource = normalizeSessionId(forkSourceSessionId)
@@ -217,15 +201,19 @@ async function visitPausedRuns(
     const foreign = observed.parentSessionId !== parentSessionId
     if (foreign && (forkSource === undefined || normalizeSessionId(observed.parentSessionId) !== forkSource)) continue
     const claim = foreign
-      ? claimOrphanedRun(context, observed, parentSessionId)
-      : claimPausedRun(context, observed.runId, parentSessionId)
+      ? claimOrphanedRun(context, observed.runId, observed.parentSessionId, parentSessionId)
+      : claimPausedRun(context, observed.runId, parentSessionId, { kind: "automatic" })
     if (claim.kind === "skipped") {
       if (!foreign && claim.reason === "live_lease") {
         outcomes.push({ runId: observed.runId, kind: "skipped", reason: claim.reason, holderPid: claim.holderPid })
       }
       continue
     }
-    outcomes.push(await recover(claim.record, foreign))
+    try {
+      outcomes.push(await recover(claim.record, foreign, claim.release))
+    } finally {
+      claim.release()
+    }
   }
   return outcomes
 }
@@ -235,66 +223,19 @@ function normalizeSessionId(sessionId: string | undefined): string | undefined {
   return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed
 }
 
-// Only an immediate fork source can be adopted, and its recorded holder must still prove
-// abandonment. Missing holders and live foreign processes remain protected.
-function claimOrphanedRun(context: RecoveryContext, observed: RecoverableRecord, parentSessionId: string): ClaimedRun {
-  const runId = observed.runId
-  return context.store.withRunLock(runId, () => {
-    const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
-    if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
-    if (fresh.parentSessionId !== observed.parentSessionId) return { kind: "skipped", reason: "foreign_session" }
-    const holder = fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid
-    if (holder === undefined) return { kind: "skipped", reason: "foreign_session" }
-    if (holder !== context.hostPid && context.isProcessAlive(holder)) {
-      return { kind: "skipped", reason: "live_lease", holderPid: holder }
-    }
-    // Re-home fully: parent AND root move to the adopter so children spawned after the resume
-    // carry live ancestry, matching what a fresh start records (the dag tool wires root = session).
-    const claimed: RecoverableRecord = {
-      ...fresh,
-      parentSessionId,
-      rootSessionId: parentSessionId,
-      leaseHolderPid: context.hostPid,
-    }
-    context.store.writeCheckpoint(runId, claimed)
-    return { kind: "claimed", record: claimed }
-  })
-}
-
-function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSessionId: string): ClaimedRun {
-  return context.store.withRunLock(runId, () => {
-    const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
-    if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
-    if (fresh.parentSessionId !== parentSessionId) return { kind: "skipped", reason: "foreign_session" }
-    const priorHolder = fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid
-    if (priorHolder !== undefined && holderStillLive(context, runId, priorHolder)) {
-      return { kind: "skipped", reason: "live_lease", holderPid: priorHolder }
-    }
-    const claimed: RecoverableRecord = { ...fresh, leaseHolderPid: context.hostPid }
-    context.store.writeCheckpoint(runId, claimed)
-    return { kind: "claimed", record: claimed }
-  })
-}
-
-// Our own pid is always alive to a signal-0 probe, so for it the only holder that can still matter
-// is a scheduler registered in this process (same-runtime pause + re-attach). A fresh runtime that
-// reopens the session in the same process holds nothing and claims. Every other pid keeps the
-// cross-host liveness fence: two live host processes must never both schedule a run.
-function holderStillLive(context: RecoveryContext, runId: DagRunId, holderPid: number): boolean {
-  if (holderPid === context.hostPid) return context.isRunHeldInProcess?.(runId) ?? false
-  return context.isProcessAlive(holderPid)
-}
-
 async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRecord): Promise<DagRecoveryOutcome> {
   return (await installResumedRun(context, claimed)).settled
 }
 
-async function installResumedRun(context: RecoveryContext, claimed: RecoverableRecord): Promise<InstalledDagRun> {
+async function installResumedRun(
+  context: RecoveryContext,
+  claimed: RecoverableRecord,
+): Promise<Omit<InstalledDagRun, "release">> {
   return installRecoveredDag(context, claimed, {
     journal: (record, errors, results) => recoveryJournal(context, record, errors, results),
     reconcile: (journal, outputs, errors, results, tasks) =>
       reconcileNodes(context, journal, outputs, errors, results, tasks),
-    release: () => releaseLease(context, claimed.runId),
+    release: () => releaseDagRunLease(context.store, claimed.runId, context.hostPid),
   })
 }
 
@@ -526,7 +467,7 @@ function foldTaskOutcome(
   failNode(journal, nodeId, failure.code, failure.message, context.now, pendingErrors)
 }
 
-function recoveryJournal(
+export function recoveryJournal(
   context: RecoveryContext,
   record: DagRunRecordV1,
   pendingErrors: ReadonlyMap<DagNodeId, DagNodeError> = new Map(),
@@ -558,7 +499,8 @@ function applyRecoveryEvent(
     readonly now: () => number
   },
 ): DagRunRecordV1 {
-  if (event.type === "dag.run.paused") return { ...record, status: "paused", updatedAt: event.at }
+  if (event.type === "dag.run.paused")
+    return leaseAfterEvent({ ...record, status: "paused", updatedAt: event.at }, event)
   // dag.run.resumed is owned by the scheduler reducer now (it also clears the stale completedAt),
   // so recovery no longer forks that transition.
   return applyDagSchedulerEvent(record, event, pendingErrors, terminalResults)
@@ -606,16 +548,7 @@ function failNode(
   pendingErrors.delete(nodeId)
 }
 
-function releaseLease(context: RecoveryContext, runId: DagRunId): void {
-  context.store.withRunLock(runId, () => {
-    const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
-    if (fresh === null || fresh.leaseHolderPid !== context.hostPid) return
-    const { leaseHolderPid: _leaseHolderPid, previousLeaseHolderPid: _previousLeaseHolderPid, ...released } = fresh
-    context.store.writeCheckpoint(runId, released)
-  })
-}
-
-function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {
+export function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {
   return readDagDirectory(store.paths.runs)
     .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
     .map((entry) => store.readCheckpoint<RecoverableRecord>(entry.name.slice(0, -5) as DagRunId))

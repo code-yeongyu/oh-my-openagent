@@ -54,6 +54,7 @@ export { dagDefinitionFingerprint, dagFingerprint, nodeFingerprintInput } from "
 export type { DagDefinitionFingerprintInputV1, DagNodeFingerprintInputV1 } from "./fingerprint"
 
 export {
+  DAG_UNATTACHED_NODES_PAUSE_REASON,
   dagDefinitionAmendedEvent,
   dagDiagnosticAddedEvent,
   dagEventLane,

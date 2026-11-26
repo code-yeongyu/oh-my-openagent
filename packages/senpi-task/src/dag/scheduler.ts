@@ -1,9 +1,11 @@
 import type { TaskManager } from "../manager/types"
 import type { ResumeCredential } from "../pause/admission-barrier"
+import type { DagRunReservation, DagRunReservations } from "./run-reservations"
 import type { DagExecutionModeSources } from "./execution-mode"
 import { createDagJournal, subscribeDagJournal, type DagJournalListener } from "./journal"
 import { skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
-import { retryDagNodes, type DagRetryOptions, type DagRunReentry } from "./node-retry"
+import { retryDagNodes, type DagRetryOptions } from "./node-retry"
+import type { DagRunReentry } from "./run-reentry"
 import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
@@ -22,8 +24,9 @@ import { createInfrastructureRetries, type RetrySchedule } from "./infrastructur
 export { applyDagSchedulerEvent } from "./scheduler-projection"
 export { DAG_NODE_CONTROL_ERROR_CODES, DagNodeControlError } from "./node-control-context"
 export type { DagNodeControlErrorCode } from "./node-control-context"
-export { reenterDagRun } from "./node-retry"
-export type { DagRetryOptions, DagRunReentry } from "./node-retry"
+export { reenterDagRun } from "./run-reentry"
+export type { DagRetryOptions } from "./node-retry"
+export type { DagRunReentry } from "./run-reentry"
 export type { DagNodeSendResult } from "./node-send"
 
 export type DagSchedulerOptions = {
@@ -50,6 +53,10 @@ export type DagSchedulerOptions = {
   readonly isProcessAlive?: (pid: number) => boolean
   readonly now?: () => number
   readonly scheduleRetry?: RetrySchedule
+  // The in-process reservation a control verb already holds for this run (`run-acquisition.ts`).
+  readonly reservation?: DagRunReservation
+  // This process's reservations: a revive watcher's fold waits on them (`node-send-revive.ts`).
+  readonly reservations?: DagRunReservations
 }
 
 // Harness-injected gate for agent-routed nodes, evaluated once per admission before startOwned:
@@ -173,7 +180,13 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => (running ??= runFrontier(context)),
+    // A frontier that returns the run paused (parked or held) has exited for good, so it stops
+    // listening for commits like a terminal one; later commits belong to whoever resumes the run.
+    run: () =>
+      (running ??= runFrontier(context).then((record) => {
+        if (record.status === "paused") unsubscribeCommits()
+        return record
+      })),
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     suspend: async () => {
       context.suspended = true

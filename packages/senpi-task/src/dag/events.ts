@@ -71,6 +71,9 @@ export function dagRunStartedEvent(input: { generation: number }): DagRunEventPa
   return { type: "dag.run.started", generation: input.generation }
 }
 
+/** The pause a scheduler writes when the run's active nodes belong to children it does not hold. */
+export const DAG_UNATTACHED_NODES_PAUSE_REASON = "unattached_nodes"
+
 export function dagRunPausedEvent(input: { reason?: string } = {}): DagRunEventPayload {
   return input.reason === undefined ? { type: "dag.run.paused" } : { type: "dag.run.paused", reason: input.reason }
 }

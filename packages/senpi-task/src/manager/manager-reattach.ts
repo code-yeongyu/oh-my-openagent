@@ -36,6 +36,8 @@ export async function reattachManagedTask(input: {
   // The respawn that minted this handle re-joined a session whose last turn ended aborted (or never
   // answered) and idle: the new run is stamped "resumed, waiting for input" (senpi#3266).
   readonly awaitingInput?: { readonly reason: AwaitingInputReason }
+  // The respawn delivered a continuation to this handle: the reattach ends when its run is decided.
+  readonly followContinuation?: () => Promise<void>
 }): Promise<ReattachResult> {
   let fresh = input.store.load(input.record.task_id)
   if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident" || fresh.killed === true) {
@@ -80,6 +82,9 @@ export async function reattachManagedTask(input: {
       if (hasChildIdentity(identity) || childSession.child_session_id !== undefined) {
         input.store.mutate(fresh.task_id, (current) => ({ ...current, ...identity, ...childSession }))
       }
+      // The host's notice marked the turn interrupted while the continuation it was sent is about to
+      // reopen the record: the revival is not done until that run reopened it or ended (#15125).
+      if (fresh.status === "interrupted" && input.followContinuation !== undefined) await input.followContinuation()
       return { ok: true }
     }
     const {
