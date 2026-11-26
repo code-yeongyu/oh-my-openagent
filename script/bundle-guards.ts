@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const BUNDLE_INPUTS = "packages/omo-senpi/bundle-inputs.json"
@@ -44,6 +45,16 @@ function bundlePathsTouched(root: string, base: string, head: string): string[] 
   if (!diff.ok) throw new Error(`git diff ${base}...${head}: ${diff.err}`)
   const inputs = new Set([...bundleInputsAt(root, base), ...bundleInputsAt(root, head)])
   return lines(diff.out).filter((path) => inputs.has(path) || SHIPPED_PATH.test(path))
+}
+
+function sandboxedEnv(home: string): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env, HOME: home, USERPROFILE: home }
+  for (const name of ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"]) {
+    env[name] = join(home, name.toLowerCase())
+    mkdirSync(join(home, name.toLowerCase()), { recursive: true, mode: 0o700 })
+  }
+  delete env.DBUS_SESSION_BUS_ADDRESS
+  return env
 }
 
 function trackedChanges(root: string): string[] {
@@ -92,11 +103,14 @@ function runBundleGuards(root: string, base: string, head: string): Verdict {
   const guards = deriveBundleGuards(root)
   const header = `BUNDLE_GUARDS head=${headSha} touched=${touched.length} guards=${guards.length}`
   if (guards.length === 0) return { exitCode: 0, lines: [header, "BUNDLE_GUARDS_OK no guard reads a shipped path"] }
+  const home = mkdtempSync(join(tmpdir(), "bundle-guards-home-"))
   const run = Bun.spawnSync([process.execPath, "test", ...guards.map((guard) => `./${guard}`)], {
     cwd: root,
+    env: sandboxedEnv(home),
     stdout: "pipe",
     stderr: "pipe",
   })
+  rmSync(home, { recursive: true, force: true })
   const output = `${run.stdout.toString()}${run.stderr.toString()}`
   if (run.exitCode === 0) return { exitCode: 0, lines: [header, `BUNDLE_GUARDS_OK ${guards.join(" ")}`] }
   const failures = failingTests(output)

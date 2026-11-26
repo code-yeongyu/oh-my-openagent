@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -64,9 +64,14 @@ function fixtureRepo(extra: Record<string, string> = {}): { root: string; base: 
   return { root, base }
 }
 
-function runGate(root: string, base: string, ...args: string[]): { exitCode: number; output: string } {
-  const result = Bun.spawnSync([process.execPath, cli, "--base", base, ...args], {
+function runGate(
+  root: string,
+  base: string,
+  env: Record<string, string | undefined> = process.env,
+): { exitCode: number; output: string } {
+  const result = Bun.spawnSync([process.execPath, cli, "--base", base], {
     cwd: root,
+    env,
     stdout: "pipe",
     stderr: "pipe",
   })
@@ -144,6 +149,22 @@ describe("bundle guard push gate (#15072)", () => {
     expect(exitCode).toBe(1)
     expect(output).toContain("BUNDLE_GUARDS_DIRTY_TREE")
     expect(output).toContain(bundlePath)
+  })
+
+  test("#given a guard that writes under HOME #when the gate runs it #then the caller's HOME is untouched", () => {
+    // given
+    const callerHome = mkdtempSync(join(tmpdir(), "bundle-guards-caller-home-"))
+    fixtures.push(callerHome)
+    const homeWriter = `import { test } from "bun:test"\nimport { writeFileSync } from "node:fs"\nimport { join } from "node:path"\n\ntest("writes a marker under HOME and XDG_CONFIG_HOME", () => {\n  writeFileSync(join(process.env.HOME ?? "", "touched"), "x")\n  writeFileSync(join(process.env.XDG_CONFIG_HOME ?? "", "touched"), "x")\n})\n// reads ${bundlePath}\n`
+    const { root, base } = fixtureRepo({ "script/home-writer.test.ts": homeWriter })
+    commit(root, { [sourcePath]: "marker-2\n", [bundlePath]: "const marker = 'marker-2'\n" }, "change and regenerate")
+
+    // when
+    const { exitCode } = runGate(root, base, { ...process.env, HOME: callerHome, XDG_CONFIG_HOME: callerHome })
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(existsSync(join(callerHome, "touched"))).toBe(false)
   })
 
   test("#given a new script test that reads a bundle path #when the set is derived #then it joins without a list edit, and a test that reads none stays out", () => {
