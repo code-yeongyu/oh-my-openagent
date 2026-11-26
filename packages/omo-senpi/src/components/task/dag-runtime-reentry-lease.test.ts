@@ -177,4 +177,26 @@ describe("DAG runtime re-entry takes the run's lease first", () => {
       runtime.dispose()
     })
   }
+
+  test("#given a run paused for shutdown by a foreign host that is still draining #when a node is sent a message #then the send is refused under the same holder rule and nothing is written", async () => {
+    // given
+    const { runId, runtime, runner, pausedBy, bytes } = await cancelledRun("draining-send")
+    pausedBy(FOREIGN_HOST_PID)
+    const before = bytes()
+
+    // when
+    const refusal = await within(
+      runtime.send(runId, "one", "continue").then(
+        () => undefined,
+        (error: unknown) => error,
+      ),
+      "runtime.send",
+    )
+
+    // then
+    expect(refusal).toEqual(expect.objectContaining({ code: "run_not_owned" }))
+    expect(bytes()).toBe(before)
+    expect(runner.handles).toHaveLength(1)
+    runtime.dispose()
+  })
 })

@@ -4,7 +4,7 @@ import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
 import { acquireDagRun, type DagRunAcquisition } from "./run-acquisition"
-import { releaseDagRunLease } from "./run-lease"
+import { liveForeignHolder, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
 import { TERMINAL_DAG_RUN_STATUSES, type DagNodeError, type DagNodeId, type DagRunId } from "./types"
@@ -65,13 +65,20 @@ export function ownedRecord(options: DagSchedulerOptions, runId: DagRunId): DagR
   if (record === null) {
     throw new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
   }
-  const hostPid = options.hostPid ?? process.pid
-  const isAlive = options.isProcessAlive ?? defaultSignaller.isAlive
-  const leaseHolderPid = (record as DagRunRecordV1 & { readonly leaseHolderPid?: number }).leaseHolderPid
-  if (leaseHolderPid !== undefined && leaseHolderPid !== hostPid && isAlive(leaseHolderPid)) {
+  // The one holder rule (#15125): the lease, a still-draining previous holder, or for a record naming
+  // neither the live foreign owner of an active child.
+  const holder = liveForeignHolder(
+    {
+      taskManager: options.taskManager,
+      hostPid: options.hostPid ?? process.pid,
+      isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+    },
+    record,
+  )
+  if (holder !== undefined) {
     throw new DagNodeControlError({
       code: "run_not_owned",
-      message: `dag run "${runId}" is leased by live process ${leaseHolderPid}`,
+      message: `dag run "${runId}" is leased by live process ${holder}`,
       runId,
     })
   }

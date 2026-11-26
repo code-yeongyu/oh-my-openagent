@@ -81,4 +81,42 @@ describe("DAG recovery lease across a shutdown retirement", () => {
     expect(handedOver?.leaseHolderPid).toBeUndefined()
     expect(handedOver?.previousLeaseHolderPid).toBe(THIS_HOST_PID)
   })
+
+  test("#given a run this host would pause for shutdown #when another host claims it the moment before the pause #then this host's shutdown leaves it to that host", () => {
+    // given - another live host's claim lands when this host next takes the run lock
+    const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-shutdown-race-"))
+    cleanupRoots.push(directory)
+    const base = createDagFileStore(ownedTaskState(directory))
+    const definition: DagDefinition = { key: "shutdown-race", name: "shutdown race", nodes: [node("slow")] }
+    const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(definition, { slow: { state: "pending" } })
+    base.writeCheckpoint(runId, { ...paused, status: "running", leaseHolderPid: THIS_HOST_PID })
+    let raced = false
+    const store = {
+      ...base,
+      withRunLock: <T>(lockedRunId: typeof runId, operation: () => T): T => {
+        if (!raced && lockedRunId === runId) {
+          raced = true
+          const record = base.readCheckpoint<Leased>(runId)
+          if (record !== null) base.writeCheckpoint(runId, { ...record, leaseHolderPid: OTHER_HOST_PID })
+        }
+        return base.withRunLock(lockedRunId, operation)
+      },
+    }
+    const eventsBefore = base.readEvents(runId, 0, { limit: 500 }).events.length
+
+    // when
+    createDagRecovery({
+      store,
+      taskManager: new LongRunningTaskManager(),
+      hostPid: THIS_HOST_PID,
+      isProcessAlive: (pid) => pid === OTHER_HOST_PID,
+    }).pauseRunsForShutdown(parentSessionId)
+
+    // then
+    expect(raced).toBe(true)
+    expect(base.readEvents(runId, 0, { limit: 500 }).events.length).toBe(eventsBefore)
+    expect(base.readCheckpoint<Leased>(runId)).toEqual(
+      expect.objectContaining({ status: "running", leaseHolderPid: OTHER_HOST_PID }),
+    )
+  })
 })
