@@ -4,7 +4,12 @@ import type { MacSession } from "./session.ts"
 // Mission Control's own "add desktop" button (System Events, the accessibility route the QA session grants) before the
 // typist starts. The Spaces bar shows that button only while the pointer is at the top edge, and only a real pointer
 // event (not a warp) opens it, so Mission Control is opened first and the planter then moves the pointer there. The
-// result is reported, never assumed: the Space plant itself checks the count again.
+// result is reported, never assumed: the Space plant itself checks the count again. Mission Control takes a
+// machine-dependent time to show (a loaded guest took about 3 s), so the setup waits for the Dock to report its
+// group, under a deadline, instead of a fixed pause.
+
+const MISSION_CONTROL_DEADLINE_MS = 10_000
+const MISSION_CONTROL_SHOWN = `tell application "System Events" to tell process "Dock" to exists group "Mission Control"`
 
 const ADD_DESKTOP = `
 tell application "System Events"
@@ -76,11 +81,23 @@ async function enableSpaceHotkeys(): Promise<string> {
   return reread.code === 0 ? "hotkeys=on" : `hotkeys_reread_failed:${reread.text}`
 }
 
+// No notification announces that Mission Control is on screen, so its accessibility group is read until it exists.
+async function missionControlShown(deadlineMs: number): Promise<boolean> {
+  const until = Date.now() + deadlineMs
+  while (Date.now() < until) {
+    const shown = await output(["/usr/bin/osascript", "-e", MISSION_CONTROL_SHOWN])
+    if (shown.code === 0 && shown.text === "true") return true
+    await Bun.sleep(250)
+  }
+  return false
+}
+
 export async function ensureSecondSpace(session: MacSession): Promise<string> {
   const hotkeys = await enableSpaceHotkeys()
   const opened = await output(["/usr/bin/open", "-a", "Mission Control"])
   if (opened.code !== 0) return `mission_control_failed:${opened.text}`
-  await Bun.sleep(1_500)
+  if (!(await missionControlShown(MISSION_CONTROL_DEADLINE_MS)))
+    return `mission_control_not_shown_within_${MISSION_CONTROL_DEADLINE_MS}ms ${hotkeys}`
   const planter = session.planter
   if (planter !== undefined) {
     const hovered = planter.next((line) => line.ctl === "hovered", 3_000, "pointer at the top edge")
