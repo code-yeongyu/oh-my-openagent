@@ -142,7 +142,17 @@ fn refused_call(refused: &Refused) -> Failure {
             data["warning"] = json!(warning);
         }
     }
+    busy_data(refused, &mut failure);
     failure
+}
+
+/// `InputBusy{target_busy}`: the busy wait's `indicator`, `waitedMs` and `retryAfterMs`.
+fn busy_data(refused: &Refused, failure: &mut Failure) {
+    if let (Some(busy), Some(data)) = (&refused.busy, failure.data.as_mut()) {
+        data["indicator"] = json!(busy.indicator);
+        data["waitedMs"] = json!(busy.waited_ms);
+        data["retryAfterMs"] = json!(busy.retry_after_ms);
+    }
 }
 
 /// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
@@ -233,6 +243,7 @@ mod tests {
             call_id: Some("k-1".to_owned()),
             receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            busy: None,
             warning: Some("write_failed".to_owned()),
         };
         let Failure { data, .. } = refused_call(&interrupted);

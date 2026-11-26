@@ -1,5 +1,6 @@
 //! The mutate funnel, pre-input marker, audit, refs registry, settle, frames, consent and verbs.
 
+pub mod attribution;
 pub mod audit;
 pub mod batch;
 pub mod budget;
@@ -13,9 +14,11 @@ pub mod mutate;
 pub mod observe;
 pub mod refs;
 mod session;
+pub mod settle;
 #[cfg(test)]
 mod test_process;
 pub mod trace;
+mod wait_for;
 
 pub use epoch::EpochChanged;
 pub use frames::CapturedFrame;

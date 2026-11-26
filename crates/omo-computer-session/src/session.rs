@@ -46,6 +46,7 @@ pub struct Session {
     pub(crate) refs: crate::refs::RefRegistry,
     pub(crate) frames: crate::frames::FrameStore,
     pub(crate) trace: crate::trace::Trace,
+    pub(crate) settle: crate::settle::SettleState,
 }
 
 impl Session {
@@ -74,6 +75,7 @@ impl Session {
             refs: crate::refs::RefRegistry::default(),
             frames: crate::frames::FrameStore::default(),
             trace: crate::trace::Trace::default(),
+            settle: crate::settle::SettleState::default(),
         }
     }
 
