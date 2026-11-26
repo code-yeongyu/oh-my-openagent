@@ -7,16 +7,6 @@
       "owner": "C1b",
       "pull_request": 14984,
       "reason": "no core serves diagnostics.run on this base, so there is no finding list to add it to; the account calls already carry audit_unavailable and the CLI prints the note"
-    },
-    {
-      "finding": "security design 8.2: recovery closes a started record whose pid the OS has given to another process, and decides liveness only for records written in its own process namespace (review 6066498814 Y4; 6067671766 L1)",
-      "waits_for_design_fields": [
-        "pid_started_at",
-        "pid_namespace"
-      ],
-      "owner": "A1b follow-up pull request on #15036",
-      "issue": 15036,
-      "reason": "8.2 fixes the field set of a started record; recovery needs the starter's start identity and its namespace in that record, and 8.2 must name them before a record may carry them"
     }
   ]
 }
