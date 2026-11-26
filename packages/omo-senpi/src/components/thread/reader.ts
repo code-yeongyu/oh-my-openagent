@@ -56,7 +56,7 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 export type ThreadTranscriptEntry = { readonly [key: string]: JsonValue }
 
 /** The message a public file read can render, or undefined for session bookkeeping. */
-export function sessionMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry | undefined {
+function sessionMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry | undefined {
   const message = entry.message
   if (entry.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message))
     return undefined
