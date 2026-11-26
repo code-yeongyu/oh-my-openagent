@@ -141,7 +141,7 @@ export function observeModelRefusals(input: {
 
 type TerminalFields = {
   readonly error_message: string
-  readonly failure_kind?: "child-unresponsive" | typeof MODEL_CHAIN_EXHAUSTED
+  readonly failure_kind?: "child-unresponsive" | "async_work_pending" | typeof MODEL_CHAIN_EXHAUSTED
 }
 
 /**
@@ -161,7 +161,12 @@ export function terminalFailureFields(
     final.reason === "error" ||
     runtimeFallbackCandidates(record, failure.message).remaining.length > 0
   ) {
-    return { error_message: message, ...(failure.kind === "child-unresponsive" ? { failure_kind: failure.kind } : {}) }
+    return {
+      error_message: message,
+      ...(failure.kind === "child-unresponsive" || failure.kind === "async_work_pending"
+        ? { failure_kind: failure.kind }
+        : {}),
+    }
   }
   return {
     error_message: `${message}\n${describeExhaustedChain(record, [...(record.model_refusals ?? []), final])}`,
