@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createTwoDevices, T } from "./address/testing/two-devices"
+import { B, createTwoDevices, NAMES, T } from "./address/testing/two-devices"
 import { createGatewayStore } from "./gateway/store"
 import { createThreadSdk } from "./sdk"
 import type { ThreadHost } from "./tools"
@@ -11,7 +11,7 @@ import type { ThreadHost } from "./tools"
 // ThreadSdk.send's refusal is the shape dev answers (its error carries code, message, next_action and details, never a
 // nested kind), whichever way the shared send operation refuses: the address resolver's refusal object is mapped, not
 // passed through. The design lane's differential found the nested kind on this PR's head (cells "sdk send | missing" and
-// "sdk send | name two threads share"; a device no one signed in takes the same refusal path with no local thread).
+// "sdk send | name two threads share"; with no local thread here, a device name two devices share is the ambiguous case).
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
@@ -58,12 +58,13 @@ function sdkOver(td: ReturnType<typeof createTwoDevices>) {
 
 describe("a refused ThreadSdk.send answers dev's refusal shape", () => {
   test.each([
-    ["a thread no device holds", T.nowhere, "not_found"],
-    ["a device no one signed in", "nowhere/lane", "not_found"],
+    ["a thread no device holds", T.nowhere, "not_found", { twin: false }],
+    ["a device no one signed in", "nowhere/lane", "not_found", { twin: false }],
+    ["a device name two devices share", `${B.name}/${NAMES.bLive}`, "ambiguous_target", { twin: true }],
   ] as const)(
     "#given %s #when ThreadSdk.send addresses it #then its error has no nested kind",
-    async (_case, thread, code) => {
-      const td = createTwoDevices()
+    async (_case, thread, code, setup) => {
+      const td = createTwoDevices(setup)
       cleanups.push(td.cleanup)
       const answer = (await sdkOver(td).send({ thread, text: "x" })) as {
         readonly kind: string
