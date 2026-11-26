@@ -21,6 +21,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
+import { liveChildOwner, liveForeignHolder, ownerKey } from "./run-lease"
 import { applyDagSchedulerEvent, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
@@ -172,6 +173,8 @@ function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: string)
   for (const observed of listRunRecords(context.store)) {
     if (observed.pause?.reason === "user_stop") continue
     if (observed.parentSessionId !== parentSessionId || !LIVE_RUN_STATUSES.has(observed.status)) continue
+    // A run a live process elsewhere holds is not this host's to pause (#15125).
+    if (liveForeignHolder(context, observed) !== undefined) continue
     context.stopAdmission?.(observed.runId)
     const journal = recoveryJournal(context, observed)
     journal.append(dagRunPausedEvent({ reason: "session_shutdown" }))
@@ -296,18 +299,6 @@ function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSession
     context.installing.add(runId)
     return { kind: "claimed", record: claimed }
   })
-}
-
-// A first-generation run records no lease, so the process that still owns its attached children
-// stands in for the holder. Lifecycle reconcile runs first and takes over the children of a dead
-// owner, so a record still under a live foreign pid means that process is running them.
-function liveChildOwner(context: RecoveryContext, record: RecoverableRecord): number | undefined {
-  for (const node of record.nodes) {
-    if (node.taskId === undefined || (node.state !== "scheduled" && node.state !== "running")) continue
-    const owner = context.taskManager.get(node.taskId)?.host_pid
-    if (owner !== undefined && owner !== context.hostPid && context.isProcessAlive(owner)) return owner
-  }
-  return undefined
 }
 
 // Our own pid is always alive to a signal-0 probe, so for it the only holder that can still matter
@@ -686,10 +677,6 @@ function taskOwner(record: DagRunRecordV1, nodeId: DagNodeId): DagTaskOwner {
       }),
     ),
   }
-}
-
-function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
-  return { kind: "dag" as const, runId: record.runId, nodeId }
 }
 
 function nodeById(record: DagRunRecordV1, nodeId: DagNodeId) {

@@ -171,4 +171,20 @@ describe("DAG runtime recovery of a run its host left running", () => {
     expect(errors).toEqual([])
     runtime.dispose()
   })
+
+  test("#given a run a live host holds #when the successor shuts down #then it does not pause the run it never held", async () => {
+    // given
+    const fixture = await killedHostFixture("live-holder-shutdown", { alive: true }, "between-nodes")
+    const { runtime, eventTypes, status } = fixture
+    await within(runtime.attach(), "attach")
+    const before = eventTypes()
+
+    // when
+    await within(runtime.pauseForShutdown(), "pauseForShutdown")
+
+    // then
+    expect(status()).toBe("running")
+    expect(eventTypes()).toEqual(before)
+    runtime.dispose()
+  })
 })
