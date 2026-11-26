@@ -163,6 +163,24 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
 
 ---
 
+## Resource release — `using`
+
+A `using` / `await using` binding is disposed when its block exits, on a throw too, in reverse order. Collect resources without a dispose method on a stack; `try/finally` stays for one-off values.
+
+```typescript
+await using stack = new AsyncDisposableStack()
+const dir = stack.use(await fs.promises.mkdtempDisposable(join(tmpdir(), "job-")))
+const server = Bun.serve({ port: 0, fetch: handle })
+stack.defer(() => server.stop(true))
+const child = stack.use(Bun.spawn(["worker", dir.path]))
+await run(server.port, child)
+// child, server, dir are closed here, in that order
+
+const kept = stack.move() // hand the open resources to a longer-lived owner instead
+```
+
+---
+
 ## Sources
 
 - MDN: [Error cause](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause)
