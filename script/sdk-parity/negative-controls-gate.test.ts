@@ -241,4 +241,39 @@ describe("a built call's nested schema change (design 7.4 amendments 5 and 7, re
       "SDK-Parity-Changed names threads.teleport, which is not a registry row",
     )
   })
+
+  // T1b-m's finding: a scenario only the head has is a deliberate change, never a closure-only candidate.
+  test("#given a scenario only the head has #then under an unresolved gap it fails and is no candidate, and on a cleared row it needs the Changed line", () => {
+    const added = { id: "s2", capability: "threads.send", surface: "native", argv: ["thread", "send", "y"] } as const
+    const open = gateReport(
+      input({
+        scenarios: [...input().scenarios, added],
+        head: { ...input().head, outcomes: { s1: { exit: 2 }, s2: { exit: 0 } } },
+        changedFiles: ["packages/omo-native/bin/lib/thread.js"],
+      }),
+    )
+    expect(open.failures).toContain(
+      "threads.send: scenario s2 is new in this pull request under an unresolved gap; add the SDK call threads.send and clear the row, or keep the scenario out",
+    )
+    expect(open.candidates).not.toContain("threads.send")
+    const cleared = unresolved.entries.filter((entry) => entry.id !== "threads.locate")
+    const onCleared = {
+      id: "s3",
+      capability: "threads.locate",
+      surface: "native",
+      argv: ["thread", "locate", "x"],
+    } as const
+    const clearedInput = (body: string) =>
+      input({
+        body,
+        scenarios: [...input().scenarios, onCleared],
+        head: { ...input().head, unresolved: cleared, outcomes: { s1: { exit: 2 }, s3: { exit: 0 } } },
+      })
+    expect(gateReport(clearedInput("")).failures).toContain(
+      'threads.locate: this pull request adds scenarios to it; declare the change with an "SDK-Parity-Changed: threads.locate" line',
+    )
+    const declared = gateReport(clearedInput("SDK-Parity-Changed: threads.locate"))
+    expect(declared.failures.filter((failure) => failure.startsWith("threads.locate"))).toEqual([])
+    expect(declared.changed).toEqual(["threads.locate"])
+  })
 })
