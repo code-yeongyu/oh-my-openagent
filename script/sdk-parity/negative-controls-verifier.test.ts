@@ -27,6 +27,30 @@ describe("negative controls: the candidate verifier (7.4, 7.6, review 6061267823
     expect(verifyReview(output, body, clear(`SDK-Parity-Reviewed: ${digest}\n`)).decision).toBe("accepted")
   })
 
+  test("#given only rows declared changed #then the verifier needs no Unchanged line, and still needs one beside a candidate", () => {
+    const cleared = input().head.unresolved.filter((entry) => entry.id !== "threads.locate")
+    const declaredBody = "SDK-Parity-Changed: threads.locate\n"
+    const declaredOnly = renderReport(
+      gateReport(input({ body: declaredBody, head: { ...input().head, unresolved: cleared } })),
+    )
+    const declaredDigest = candidateDigest(HEAD, ["threads.locate#changed"])
+    expect(verifyReview(declaredOnly, declaredBody, clear(`SDK-Parity-Reviewed: ${declaredDigest}\n`)).decision).toBe(
+      "accepted",
+    )
+    const withCandidate = renderReport(
+      gateReport(
+        input({
+          body: declaredBody,
+          head: { ...input().head, unresolved: cleared },
+          changedFiles: ["packages/omo-native/bin/lib/thread.js"],
+        }),
+      ),
+    )
+    expect(verifyReview(withCandidate, declaredBody, clear("")).reason).toBe(
+      "the pull request body lacks the author's SDK-Parity-Unchanged: yes",
+    )
+  })
+
   test("#given a digest the check did not print #then the verifier withholds", () => {
     const other = candidateDigest(HEAD, ["threads.close"])
     expect(verifyReview(output, body, clear(`SDK-Parity-Reviewed: ${other}\n`))).toEqual({

@@ -21,10 +21,14 @@ const withheld = (reason: string): ReviewDecision => ({ decision: "withheld", re
 export function verifyReview(checkOutput: string, body: string, verdict: string): ReviewDecision {
   const printed = CANDIDATES_LINE.exec(checkOutput)
   if (printed === null) return withheld("the check output carries no SDK-Parity-Candidates line")
-  const [, head = "", digest = "", count = "0"] = printed
+  const [, head = "", digest = "", count = "0", ids = ""] = printed
   if (Number(count) === 0)
     return { decision: "accepted", reason: `no candidate at ${head.slice(0, 10)}; nothing to review` }
-  if (!UNCHANGED_LINE.test(body)) return withheld("the pull request body lacks the author's SDK-Parity-Unchanged: yes")
+  // The author's Unchanged line speaks for the candidates and live-schema rows; rows declared changed on purpose
+  // (`<id>#changed`) carry the SDK-Parity-Changed line instead, which the check itself holds.
+  const claimsUnchanged = ids.split(",").some((id) => id !== "" && !id.endsWith("#changed"))
+  if (claimsUnchanged && !UNCHANGED_LINE.test(body))
+    return withheld("the pull request body lacks the author's SDK-Parity-Unchanged: yes")
   if (!CLEAR_VERDICT.test(verdict)) return withheld("the verdict is not a CLEAR")
   const reviewed = [...verdict.matchAll(REVIEWED_LINE)].map((match) => match[1])
   if (reviewed.length === 0)
