@@ -1,7 +1,7 @@
 import { Type } from "typebox"
 
 export const THREAD_MESSAGE_MAX_BYTES = 32768
-export const THREAD_SUMMARY_MAX_LENGTH = 200
+const THREAD_SUMMARY_MAX_LENGTH = 200
 export const THREAD_READ_DEFAULT_BYTES = 131072
 export const THREAD_READ_MAX_BYTES = 1048576
 
