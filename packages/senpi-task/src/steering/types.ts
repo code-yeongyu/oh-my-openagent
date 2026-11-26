@@ -189,6 +189,8 @@ export type RedispatchOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
+  // The one resolution of a task address (id first, then name) every steering verb uses.
+  resolve(idOrName: string): TaskRecord | undefined
   hasPendingSends(taskId: string): boolean
   hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.

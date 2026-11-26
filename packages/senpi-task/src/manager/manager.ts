@@ -100,6 +100,8 @@ import { restorePausedChild } from "./paused-restore"
 import { defaultSignaller } from "../lifecycle/context"
 import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
 import { cancelBehindRefusedStop, RefusedStops, sendBehindRefusedStop } from "./refused-stops"
+import { ownerSendRefusal } from "./explicit-send"
+import { REDISPATCH_HOLDER_WAIT_MS, redispatchLockPath, redispatchRefusal } from "./redispatch-guard"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
 import { AdmissionBarrier, type ResumeCredential } from "../pause/admission-barrier"
@@ -183,30 +185,6 @@ type ReattachingTaskManager = TaskManager &
 export const START_REPORT_WINDOW_MS = 250
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
-// A re-dispatch holds its lock across a child launch, which can take far longer than a record write.
-const REDISPATCH_HOLDER_WAIT_MS = 120_000
-
-function redispatchLockPath(stateDir: string, taskId: string): string {
-  return join(stateDir, "redispatch-locks", taskId)
-}
-
-function redispatchRefusal(record: TaskRecord): RedispatchOutcome | undefined {
-  if (isTerminalRecord(record)) {
-    return {
-      kind: "invalid_state",
-      task_id: record.task_id,
-      reason: `Task ${record.task_id} is ${record.status}; only a task waiting for input can be re-dispatched.`,
-    }
-  }
-  if (record.awaiting_input === undefined) {
-    return {
-      kind: "invalid_state",
-      task_id: record.task_id,
-      reason: `Task ${record.task_id} is not waiting for input; only a flagged "resumed, waiting for input" task can be re-dispatched.`,
-    }
-  }
-  return undefined
-}
 function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
   const ownerKey = `${owner.kind}\0${owner.runId}\0${owner.nodeId}`
   const digest = createHash("sha256").update(ownerKey).digest("hex")
@@ -788,10 +766,15 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
-    const waiting = sendBehindRefusedStop(this.#refusedStops, input.idOrName)
+    // One resolution of the address (steering's own), synchronous: every later step uses its task id.
+    const record = this.#steering.resolve(input.idOrName)
+    const taskId = record?.task_id ?? input.idOrName
+    const refused = ownerSendRefusal(this.#options.ownerResumeFence, record)
+    if (refused !== undefined) return refused
+    const waiting = sendBehindRefusedStop(this.#refusedStops, taskId)
     const behind = waiting === undefined ? undefined : await waiting
     if (behind !== undefined) return behind
-    const outcome = await this.#steering.sendToTask(input)
+    const outcome = await this.#steering.sendToTask({ ...input, idOrName: taskId })
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
     return outcome
   }
@@ -806,9 +789,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const refused = cancelBehindRefusedStop(this.#refusedStops, idOrName, () => this.#tryLoad(idOrName)?.status)
+    const taskId = this.#steering.resolve(idOrName)?.task_id ?? idOrName
+    const refused = cancelBehindRefusedStop(this.#refusedStops, taskId, () => this.#tryLoad(taskId)?.status)
     if (refused !== undefined) return refused
-    const outcome = await this.#steering.cancelTask(idOrName, reason, options)
+    const outcome = await this.#steering.cancelTask(taskId, reason, options)
     if (outcome.kind === "cancelled") {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)

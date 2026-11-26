@@ -9,6 +9,8 @@ export type OwnerResumeVerdict =
       readonly kind: "refuse"
       readonly reason: string
       readonly disposition: "retire" | "hold"
+      // What a caller should do instead, for an explicit send the owner refuses (a retired claim).
+      readonly remedy?: string
       // The owner's durable record of the refusal, run by the manager right after the record mutation
       // that refused (never inside it: the owner's write takes its own locks).
       readonly record?: () => void

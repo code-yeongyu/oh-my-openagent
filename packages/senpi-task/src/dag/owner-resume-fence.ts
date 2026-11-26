@@ -40,13 +40,14 @@ export function createDagOwnerResumeFence(ports: {
       const reason = removed
         ? `its DAG node "${owner.nodeId}" was removed`
         : `it is a ${age} claim of DAG node "${owner.nodeId}"`
-      return refuse(reason, "retire")
+      return refuse(reason, "retire", RETRY_NODE)
     }
-    if (run.status === "cancelled") return refuse(`its DAG run "${run.runId}" was cancelled`, "retire")
+    if (run.status === "cancelled") return refuse(`its DAG run "${run.runId}" was cancelled`, "retire", RUN_CANCELLED)
     // A current claim of a failed or completed run keeps the explicit send/revive contract: only the
     // unsolicited turn stops, and the child stays as resident and revivable as it was.
     if (TERMINAL_DAG_RUN_STATUSES.has(run.status)) return refuse(`its DAG run "${run.runId}" is ${run.status}`, "hold")
-    if (ports.cancelling?.(run.runId) === true) return refuse(`its DAG run "${run.runId}" is being cancelled`, "retire")
+    if (ports.cancelling?.(run.runId) === true)
+      return refuse(`its DAG run "${run.runId}" is being cancelled`, "retire", RUN_CANCELLED)
     if (run.status !== "paused" || run.pause?.reason !== "user_stop") return ALLOW
     const held = refuse(`its DAG run "${run.runId}" is stopped by the user`, "hold")
     const write = ports.heldTriggers
@@ -56,6 +57,10 @@ export function createDagOwnerResumeFence(ports: {
   }
 }
 
-function refuse(reason: string, disposition: "retire" | "hold"): OwnerResumeVerdict {
-  return { kind: "refuse", reason, disposition }
+// What an explicit send to a retired claim should do instead (the manager answers it as `not_continuable`).
+const RETRY_NODE = "Retry the DAG node to run its current attempt."
+const RUN_CANCELLED = "Its DAG run was cancelled; retry the node to run it again."
+
+function refuse(reason: string, disposition: "retire" | "hold", remedy?: string): OwnerResumeVerdict {
+  return { kind: "refuse", reason, disposition, ...(remedy === undefined ? {} : { remedy }) }
 }

@@ -294,6 +294,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   return {
+    resolve,
     sendToTask,
     ...createSteeringControls(port, resolve, (taskId) => {
       clearPersistedQueue(taskId, undefined, "cancelled")
