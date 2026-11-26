@@ -23,7 +23,8 @@ export const CURSOR_TABLES: readonly CursorTable[] = [
     copy: join(packageDir, "cursor-motion.json"),
     module: join(packageDir, "src/cursor-motion.generated.ts"),
     constName: "CURSOR_MOTION",
-    summary: "The agent cursor's glide: clamp(minMs, maxMs, baseMs + perDoublingMs * log2(1 + d / distanceUnitPoints)) ms.",
+    summary:
+      "The agent cursor's glide: clamp(minMs, maxMs, baseMs + perDoublingMs * log2(1 + d / distanceUnitPoints)) ms.",
   },
   {
     source: join(presenceDir, "cursor-look.json"),
