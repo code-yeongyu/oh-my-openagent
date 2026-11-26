@@ -1,7 +1,10 @@
 /**
  * What the carrier reads from `get_state` and the open reply (#13037 A3.2.1-A3.2.8, close probe K1-K10). Finished means
- * nothing runs and nothing waits but a stalled turn; a person's wait is a pending dialog or a human wait that is not
- * stalled; held is a hold or a paused session. Background work and children are work: the carrier never releases then.
+ * nothing runs and no person is asked; a person's wait is a prompt still open on the session (a question in
+ * `pendingQuestions`, a dialog in `pendingDialogs`), the same reading as the live send's `parkedOnApproval`. The
+ * lifecycle's own human waits (a turn that ended asking its owner, a blocked goal, a stall) open no prompt: the engine
+ * starts a turn for a peer's message there, so they are not a person's wait (#15171). Held is a hold or a paused
+ * session. Background work and children are work: the carrier never releases then.
  */
 export type EngineView = {
   readonly held: boolean
@@ -25,8 +28,7 @@ export function readEngineState(state: unknown): EngineView {
   const lifecycle = record(data.lifecycle)
   const waitingOn = record(lifecycle.waitingOn)
   const holds = list(data.holds).map((hold) => String(record(hold).kind ?? "unknown"))
-  const human = list(waitingOn.human).map((wait) => String(record(wait).kind ?? "unknown"))
-  const personWait = human.some((kind) => kind !== "stalled") || list(data.pendingDialogs).length > 0
+  const personWait = list(data.pendingQuestions).length > 0 || list(data.pendingDialogs).length > 0
   const held = holds.length > 0 || data.paused === true
   const working =
     data.isStreaming === true ||

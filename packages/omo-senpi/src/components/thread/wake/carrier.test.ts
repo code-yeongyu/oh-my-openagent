@@ -9,9 +9,11 @@ import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/ha
 import { createCarrier, type Carrier, type CarrierEvent } from "./carrier"
 import { connectCarrierHost } from "./carrier-connection"
 import {
+  ASKED_AT_TURN_END,
   BACKGROUND,
   FINISHED,
   HOST_STAMPED,
+  OPEN_QUESTION,
   PARKED_APPROVAL,
   STALLED,
   STOPPED,
@@ -404,6 +406,32 @@ describe("waiting for a person (A3.2.6)", () => {
     expect(sent(fake, "close_session")).toEqual([])
     expect(await store.sessionWait.read({ durable_id: "s1" })).toMatchObject({ wait: "waiting" })
     expect(await store.woken.list()).toEqual([])
+  })
+
+  test("#given a question tool still open #when a row from another device wakes the session #then it waits for the person and no wake is sent", async () => {
+    const { fake, store, carrier, file, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+    })
+    fake.setSnapshot(file("t"), OPEN_QUESTION)
+    await intakeRow("t", "d-remote")
+    expect(await carrier.wake("t")).toEqual({ kind: "waiting" })
+    expect(sent(fake, "wake")).toEqual([])
+    expect(await store.sessionWait.read({ durable_id: "t" })).toMatchObject({ wait: "waiting" })
+  })
+
+  // #15171: a turn that ended asking its owner a question opens no prompt; the engine starts a turn for a peer's
+  // message there, so the carrier must send the wake that runs the drain, or the row waits for a turn nothing starts.
+  test("#given a session whose last turn ended asking its owner a question #when a row from another device wakes it #then the engine's wake is sent and no person's wait is stored", async () => {
+    const { fake, store, carrier, file, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+    })
+    fake.setSnapshot(file("t"), ASKED_AT_TURN_END)
+    await intakeRow("t", "d-remote")
+    expect(await carrier.wake("t")).toMatchObject({ kind: "open" })
+    expect(sent(fake, "wake")).toHaveLength(1)
+    expect(await store.sessionWait.read({ durable_id: "t" })).toBeNull()
   })
 })
 

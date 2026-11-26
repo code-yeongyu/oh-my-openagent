@@ -25,6 +25,7 @@ export type EngineSnapshot = {
   readonly paused: boolean
   readonly isStreaming: boolean
   readonly pendingDialogs: readonly unknown[]
+  readonly pendingQuestions?: readonly unknown[]
 }
 
 export const FINISHED: EngineSnapshot = {
@@ -54,6 +55,17 @@ export const PARKED_APPROVAL: EngineSnapshot = {
   },
   isStreaming: true,
   pendingDialogs: [{ method: "select", title: "Permission required: eval" }],
+}
+/** A turn that ended asking its owner a question (the engine's own question wait): no prompt is open, nothing runs. */
+export const ASKED_AT_TURN_END: EngineSnapshot = {
+  ...FINISHED,
+  lifecycle: { state: "waiting_human", waitingOn: { children: 0, background: [], human: [{ kind: "question" }] } },
+}
+/** A question tool that is still open: the turn waits on the person's answer. */
+export const OPEN_QUESTION: EngineSnapshot = {
+  ...ASKED_AT_TURN_END,
+  isStreaming: true,
+  pendingQuestions: [{ method: "question", requestId: "q-1" }],
 }
 export const STALLED: EngineSnapshot = {
   ...FINISHED,
@@ -195,7 +207,10 @@ export async function startFakeEngineHost(options: FakeEngineOptions = {}): Prom
         if (entry.others > 0) return refuse("attached", { attachments: entry.others })
         const interrupt = frame.interrupt === true
         const { snapshot } = entry
-        const asking = snapshot.pendingDialogs.length > 0 || snapshot.lifecycle.state === "running"
+        const asking =
+          snapshot.pendingDialogs.length > 0 ||
+          (snapshot.pendingQuestions?.length ?? 0) > 0 ||
+          snapshot.lifecycle.state === "running"
         if (asking) return refuse("turn_active", { attachments: 1, busy: ["turn", "session_work"] })
         if (entry.heldDeliveries.length > 0 && !interrupt)
           return refuse("turn_active", { attachments: 1, busy: ["delivery"] })
