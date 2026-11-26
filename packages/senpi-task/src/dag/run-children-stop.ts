@@ -29,9 +29,9 @@ export function liveRunChildren(taskManager: TaskManager, record: DagRunRecordV1
  * A child this controller is attached to keeps its deferred in-process teardown (`abort: "skip"`,
  * disposed at the outcome boundary the scheduler awaits); any other owned child - a finished node's
  * child that resumed on its own - is cancelled outright, since no outcome may ever come for it. Stop
- * completion is re-read from each record: a `cancel_pending` answer, or a noop on a record that is
- * still live, is a child still running, never success. The obligation stays derivable from the
- * store, so a later cancel of the run finds the same live children again.
+ * completion is re-read from the run's whole live set: a `cancel_pending` answer, a noop on a record
+ * that is still live, or a child that went live after its stop is a child still running, never
+ * success. The obligation stays derivable from the store, so a later cancel finds the same children.
  */
 export async function stopRunChildren(
   taskManager: TaskManager,
@@ -39,19 +39,29 @@ export async function stopRunChildren(
   attached: ReadonlySet<string>,
   reason?: string,
 ): Promise<unknown> {
-  const taskIds = [...new Set([...attached, ...liveRunChildren(taskManager, record).map((task) => task.task_id)])]
-  const results = await Promise.allSettled(
-    taskIds.map((taskId) =>
-      taskManager.cancelTask(taskId, reason, attached.has(taskId) ? { abort: "skip" } : undefined),
-    ),
-  )
-  const rejected = results.find((result) => result.status === "rejected")
+  const outcomes = new Map<string, PromiseSettledResult<CancelOutcome>>()
+  // Drained to a fixed point: each pass re-reads the run's whole live set, so a child that went live
+  // while an earlier stop was pending is attempted too; every id is attempted once.
+  for (;;) {
+    const live = liveRunChildren(taskManager, record).map((task) => task.task_id)
+    const pass = [...new Set([...attached, ...live])].filter((taskId) => !outcomes.has(taskId))
+    if (pass.length === 0) break
+    const results = await Promise.allSettled(
+      pass.map((taskId) =>
+        taskManager.cancelTask(taskId, reason, attached.has(taskId) ? { abort: "skip" } : undefined),
+      ),
+    )
+    pass.forEach((taskId, index) => {
+      const result = results[index]
+      if (result !== undefined) outcomes.set(taskId, result)
+    })
+  }
+  const rejected = [...outcomes.values()].find((result) => result.status === "rejected")
   if (rejected?.status === "rejected") return rejected.reason
-  const survivors = taskIds.flatMap((taskId, index) => {
-    const task = taskManager.get(taskId)
-    const result = results[index]
-    if (!isLiveTask(task) || result?.status !== "fulfilled") return []
-    return [{ taskId, detail: `${task?.status}, ${describe(result.value)}` }]
+  const survivors = liveRunChildren(taskManager, record).map((task) => {
+    const result = outcomes.get(task.task_id)
+    const answer = result?.status === "fulfilled" ? describe(result.value) : "not stopped"
+    return { taskId: task.task_id, detail: `${task.status}, ${answer}` }
   })
   return survivors.length === 0 ? undefined : new DagRunChildrenLiveError(record.runId, survivors)
 }
