@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 import { UNEXPECTED_LOG_UNWRITTEN, unexpectedLogNamed } from "../unexpected-port"
 import { RUNTIME_STAMP } from "../runtime-stamp"
-import { RUNTIME_FILE_MISMATCH, RUNTIME_FILE_UNAVAILABLE, type ThreadsRuntime, threadsNamespace } from "./threads"
+import {
+  CORE_CALLS,
+  ROOT_DISPOSED,
+  RUNTIME_FILE_MISMATCH,
+  RUNTIME_FILE_UNAVAILABLE,
+  type ThreadsRuntime,
+} from "./thread-runtime-file"
+import { threadsNamespace } from "./threads"
 
 // Slice P1c (#15031): the thread core is its own runtime file, loaded on the first thread call through one import the
 // root is given. These cases drive that import directly (an injected function, never a module mock or a timer).
@@ -31,13 +38,40 @@ function failingLoad() {
   return { calls, load }
 }
 
+// A core with every member the root calls, each answering an empty success; a case overrides the members it drives.
+function fullCore(overrides: Readonly<Record<string, unknown>> = {}): Record<string, unknown> {
+  const answer = async () => ({ kind: "ok", threads: [] })
+  return {
+    ...Object.fromEntries(
+      [
+        "list",
+        "read",
+        "send",
+        "locate",
+        "create",
+        "interrupt",
+        "close",
+        "rename",
+        "setModel",
+        "release",
+        "releaseRow",
+        "warm",
+        "dispose",
+      ].map((name) => [name, answer]),
+    ),
+    extensions: { register: answer, call: answer },
+    ...overrides,
+  }
+}
+
 function runtimeWith(list: () => unknown): ThreadsRuntime {
   return {
     RUNTIME_STAMP,
-    createThreadCore: (() => ({ list })) as unknown as ThreadsRuntime["createThreadCore"],
-    fail: (() => {
-      throw new Error("fail is not reached in these cases")
-    }) as ThreadsRuntime["fail"],
+    createThreadCore: (() => fullCore({ list })) as unknown as ThreadsRuntime["createThreadCore"],
+    fail: ((code: string, message: string, next_action: string) => ({
+      kind: "error",
+      error: { code, message, next_action },
+    })) as unknown as ThreadsRuntime["fail"],
     threadToolParamSchemas: {
       thread_create: { properties: {} },
     } as unknown as ThreadsRuntime["threadToolParamSchemas"],
@@ -160,27 +194,43 @@ describe("a dispose that races the first thread call", () => {
       ...runtimeWith(() => ({ kind: "ok", threads: [] })),
       createThreadCore: (() => {
         counts.created += 1
-        return {
-          list: async () => ({ kind: "ok", threads: [] }),
+        return fullCore({
           dispose: async () => {
             counts.disposed += 1
           },
-        }
+        })
       }) as unknown as ThreadsRuntime["createThreadCore"],
     }
     return { counts, runtime }
   }
 
-  test("#given a first load held open #when dispose runs and the load then succeeds #then the core it built is disposed", async () => {
-    const gate = held()
-    const { counts, runtime } = countingRuntime()
-    const served = namespace(gate.load)
-    const call = list(served)
-    await gate.loading
-    const disposed = served.dispose?.()
-    gate.release(runtime)
-    await Promise.all([call, disposed])
-    expect(counts).toEqual({ created: 1, disposed: 1 })
+  // Review 6076881626 HIGH: every member, whatever it awaits before the core (threads.create reads the file's schemas
+  // first), leaves no core a dispose did not reach.
+  for (const member of Object.keys(namespace(() => Promise.resolve(runtimeWith(() => undefined))).members))
+    test(`#given a first load held open #when ${member} runs, dispose runs and the load then succeeds #then every core built is disposed`, async () => {
+      const gate = held()
+      const { counts, runtime } = countingRuntime()
+      const served = namespace(gate.load)
+      const call = callMember(served, member)(MEMBER_INPUTS[member] ?? {}).catch((error: unknown) => error)
+      await gate.loading
+      const disposed = served.dispose?.()
+      gate.release(runtime)
+      const [answer] = await Promise.all([call, disposed])
+      expect({ created: counts.created, disposed: counts.disposed, answer }).toEqual({
+        created: 0,
+        disposed: 0,
+        answer: expect.objectContaining({
+          kind: "error",
+          error: expect.objectContaining({ code: "internal_error", details: { reason: ROOT_DISPOSED } }),
+        }),
+      })
+    })
+
+  // Architecture contract (the design lane's ruling on review 6076881626): the runtime file is loaded on ONE path, the
+  // one that registers the pending creation and observes disposal, so no call site can reach it around a dispose.
+  test("#given the thread runtime file's boundary source #then the runtime file's loader has exactly one caller", async () => {
+    const source = await Bun.file(new URL("./thread-runtime-file.ts", import.meta.url)).text()
+    expect(source.match(/\bloadRuntime\(\)/g)?.length).toBe(1)
   })
 
   test("#given a first load held open #when dispose runs and the load then fails #then no core is built and the caller's store is released", async () => {
@@ -272,7 +322,7 @@ describe("a thread core that cannot be built from a loaded file", () => {
         createThreadCore: (() => {
           builds += 1
           if (builds === 1) throw new Error(CONSTRUCTION_TEXT)
-          return { list: async () => ({ kind: "ok", threads: [] }) }
+          return fullCore()
         }) as unknown as ThreadsRuntime["createThreadCore"],
       }),
     )
@@ -293,6 +343,23 @@ const MISMATCHES: Readonly<Record<string, Readonly<Record<string, unknown>>>> = 
   "no threadToolParamSchemas": { threadToolParamSchemas: undefined },
   "a createThreadCore that is not a function": { createThreadCore: {} },
   "threadToolParamSchemas that are not an object": { threadToolParamSchemas: "schemas" },
+  "threadToolParamSchemas that are null": { threadToolParamSchemas: null },
+  "threadToolParamSchemas that are an array": { threadToolParamSchemas: [] },
+  "no thread_create schema": { threadToolParamSchemas: {} },
+  "a thread_create schema without properties": { threadToolParamSchemas: { thread_create: {} } },
+  "a fail that answers nothing": { fail: () => undefined },
+  "a fail that throws": {
+    fail: () => {
+      throw new Error("the fail of another build")
+    },
+  },
+  "a core without the calls the root makes": { createThreadCore: () => ({}) },
+  "an export whose getter throws": Object.defineProperty({}, "createThreadCore", {
+    enumerable: true,
+    get() {
+      throw new Error("the getter of another build")
+    },
+  }),
 }
 
 describe("a thread runtime file that loads but does not match the root", () => {
@@ -302,7 +369,11 @@ describe("a thread runtime file that loads but does not match the root", () => {
     for (const member of members)
       test(`#given ${mismatch} #when ${member} runs #then it answers runtime_file_mismatch and the port gets a fixed diagnostic`, async () => {
         const seen: unknown[] = []
-        const loaded = { ...runtimeWith(() => ({ kind: "ok", threads: [] })), ...change } as unknown as ThreadsRuntime
+        // Copied by descriptor, so a getter in a case runs only when the root reads it.
+        const loaded = Object.defineProperties(
+          { ...runtimeWith(() => ({ kind: "ok", threads: [] })) },
+          Object.getOwnPropertyDescriptors(change),
+        ) as unknown as ThreadsRuntime
         const served = namespace(
           () => Promise.resolve(loaded),
           (error) => {
@@ -342,23 +413,55 @@ describe("a thread runtime file that loads but does not match the root", () => {
   })
 })
 
+// Security review 6077124491 Q1: the port's fixed diagnostic names the check that failed, so a null schemas export is
+// caught by its own clause, not by an exception a later dereference would throw.
+test("#given threadToolParamSchemas that are null #when a thread call runs #then the port is told that export is missing", async () => {
+  const seen: unknown[] = []
+  const loaded = { ...runtimeWith(() => undefined), threadToolParamSchemas: null } as unknown as ThreadsRuntime
+  await list(
+    namespace(
+      () => Promise.resolve(loaded),
+      (error) => {
+        seen.push(error)
+        return false
+      },
+    ),
+  )
+  expect(seen.map(String)).toEqual([
+    "Error: The thread runtime file does not match this root: it has no threadToolParamSchemas object.",
+  ])
+})
+
+// Architecture contract (the design lane's ruling on review 6077124491): the core is checked against one table of the
+// members the root calls, and every core member this file calls is in that table, so a new call cannot skip the check.
+test("#given the threads namespace source #then every core member it calls is in the table the core is checked against", async () => {
+  const source = await Bun.file(new URL("./threads.ts", import.meta.url)).text()
+  const called = new Set(
+    [...source.matchAll(/\b(?:core|ready|made\.core|ready\.core)\.(\w+)\(/g)].map((match) => match[1] as string),
+  )
+  // The extension calls are the store port's (a caller's port, not the file), answered by settledExtension's boundary.
+  expect([...called].filter((name) => !(CORE_CALLS as readonly string[]).includes(name))).toEqual([])
+  expect(called.size).toBeGreaterThan(5)
+})
+
 describe("an operation of a built core that throws keeps P1b's boundaries", () => {
   const operationText = "the store's file at /home/probe/.omo/agent/store.db is locked"
   const failingCore: ThreadsRuntime = {
     ...runtimeWith(() => ({ kind: "ok", threads: [] })),
-    createThreadCore: (() => ({
-      extensions: {
-        register: async () => {
-          throw new Error(operationText)
+    createThreadCore: (() =>
+      fullCore({
+        extensions: {
+          register: async () => {
+            throw new Error(operationText)
+          },
+          call: async () => {
+            throw new Error(operationText)
+          },
         },
-        call: async () => {
-          throw new Error(operationText)
+        warm: async () => {
+          throw new Error("the daemon socket refused the warm")
         },
-      },
-      warm: async () => {
-        throw new Error("the daemon socket refused the warm")
-      },
-    })) as unknown as ThreadsRuntime["createThreadCore"],
+      })) as unknown as ThreadsRuntime["createThreadCore"],
   }
   const served = () => namespace(() => Promise.resolve(failingCore))
 

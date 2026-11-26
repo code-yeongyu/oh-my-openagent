@@ -17,7 +17,8 @@ import { remotePort } from "../../../../../../script/sdk-parity/fakes/remote"
 import type { ThreadHost } from "../../thread/tools"
 import { createThreadSdk } from "../../thread/sdk"
 import { invalidInput } from "./assemble"
-import { RUNTIME_FILE_MISMATCH, RUNTIME_FILE_UNAVAILABLE, type ThreadsRuntime, threadsNamespace } from "./threads"
+import { RUNTIME_FILE_MISMATCH, RUNTIME_FILE_UNAVAILABLE, type ThreadsRuntime } from "./thread-runtime-file"
+import { threadsNamespace } from "./threads"
 import { boundaryRefusals } from "./authority"
 
 // Security design 6, for the whole root (P1b's share): fake ports hold one canary per asset of 2.1; every call of the

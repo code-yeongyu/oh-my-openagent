@@ -5,7 +5,8 @@ import type { OmoPrincipal, OmoSdkRoot } from "./contract"
 import type { OmoSdkOptions } from "./options"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
-import { type ThreadsRuntime, threadsNamespace } from "./root/threads"
+import type { ThreadsRuntime } from "./root/thread-runtime-file"
+import { threadsNamespace } from "./root/threads"
 
 // The thread half of the root, on its own: what the standalone thread SDK runtime (plugin/runtime/thread-sdk) reaches.
 // It imports no other namespace's core, so that bundle inlines what it did before the root existed.

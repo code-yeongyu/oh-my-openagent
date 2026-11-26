@@ -6,7 +6,7 @@ import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
 import { type CoreLoaders, LAUNCHER_NAMESPACES } from "./root/members"
 import { shippedNamespaces } from "./root/shipped"
-import type { ThreadsRuntime } from "./root/threads"
+import type { ThreadsRuntime } from "./root/thread-runtime-file"
 import { threadsServing } from "./thread-assembly"
 
 /** What only the entry that ships the launcher library sets; never part of the public options (design 4.1). */
