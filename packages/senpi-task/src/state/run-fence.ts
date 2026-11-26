@@ -27,6 +27,14 @@ export function nextRunEpoch(record: TaskRecord): number {
   return Math.max(record.notification.run_epoch, record.burnt_epoch ?? 0) + 1
 }
 
+/**
+ * A stop accepted for the running run (durable `cancel_requested`, written before its terminal) owns how that run ends.
+ * A revival whose prompt was refused never takes such a run back: the pending stop settles it as cancelled.
+ */
+export function acceptedStopOwnsRun(record: TaskRecord): boolean {
+  return record.status === "running" && record.cancel_requested !== undefined
+}
+
 // A record written before run_start_epoch existed names no run start, and its run_epoch moves inside a
 // run (model fallback, reattach), so it cannot key a run. Every such run gets this one fixed key until
 // its first revive, which always writes a real run_start_epoch.

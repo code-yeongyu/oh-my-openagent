@@ -1,5 +1,5 @@
 import { accessSync, constants, statSync } from "node:fs"
-import { isSpawnSpecV1, nextRunEpoch, type TaskRecord } from "../state"
+import { acceptedStopOwnsRun, isSpawnSpecV1, nextRunEpoch, type TaskRecord } from "../state"
 import { acquireSessionAdmissionLease } from "./admission-lease"
 import { checkReviveGeneration, isColdRevivalCandidate } from "./revive-policy"
 import { nowIso, type LifecycleContext } from "./context"
@@ -18,6 +18,7 @@ export function rollbackDetachedRevival(context: LifecycleContext, prior: TaskRe
       fresh.host_pid !== context.hostPid ||
       fresh.residency_state !== "resident" ||
       fresh.killed === true ||
+      acceptedStopOwnsRun(fresh) ||
       (!claimed && !running)
     )
       return fresh

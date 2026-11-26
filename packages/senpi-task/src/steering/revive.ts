@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { getLifecycleDetachedRevival } from "../lifecycle/port"
-import type { TaskRecord } from "../state"
+import { acceptedStopOwnsRun, type TaskRecord } from "../state"
 import {
   buildRevived,
   deliveryUncertain,
@@ -265,16 +265,24 @@ async function deliverRevivedTerminal(
 
 // A resident child refused the revival prompt, so the new epoch never started and nothing tracks it.
 // Leaving it running strands the record forever: a later send steers the child as if it were live and
-// its outcome is never settled. Put the finished run back, fenced on the epoch this revival wrote.
+// its outcome is never settled. Put the finished run back, fenced on the epoch this revival wrote and on
+// the same rollback rule the cold path keeps: a stop accepted meanwhile owns the run's ending. Messages
+// queued while the prompt was in flight are still owed to the child, so the current queue is kept.
 function restoreRefusedWarmRevival(port: SteeringPort, terminal: TaskRecord, revived: TaskRecord): void {
   try {
-    port.store.mutate(terminal.task_id, (fresh) =>
-      fresh.status === "running" &&
-      fresh.notification.run_epoch === revived.notification.run_epoch &&
-      fresh.host_pid === revived.host_pid
-        ? terminal
-        : fresh,
-    )
+    port.store.mutate(terminal.task_id, (fresh) => {
+      if (
+        fresh.status !== "running" ||
+        fresh.notification.run_epoch !== revived.notification.run_epoch ||
+        fresh.host_pid !== revived.host_pid ||
+        fresh.residency_state !== "resident" ||
+        fresh.killed === true ||
+        acceptedStopOwnsRun(fresh)
+      )
+        return fresh
+      const { pending_steering: _queueAtRevival, ...finished } = terminal
+      return fresh.pending_steering === undefined ? finished : { ...finished, pending_steering: fresh.pending_steering }
+    })
   } catch (error) {
     log("senpi-task warm revival restore failed", {
       taskId: terminal.task_id,
