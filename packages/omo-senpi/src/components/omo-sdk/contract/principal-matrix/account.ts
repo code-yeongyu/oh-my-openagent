@@ -6,10 +6,10 @@ const CREDENTIAL_CHECK = "once its output is shown to hold no credential"
 export const ACCOUNT_LINES: readonly MatrixLine[] = [
   {
     section: "4.2",
-    capability: "`devices.list`, `account.whoami`, `account.show`, `account.signInCheck`, `sync.status` (reads)",
+    capability: "`devices.list`, `account.whoami`, `sync.status` (reads)",
     docRow: "`devices.list`, `account.whoami`, `deviceService.status`, `control()`, `wake()`, `sync.status` (reads)",
     slug: "account-read",
-    rows: ["devices.list", "account.whoami", "account.show", "account.signInCheck", "sync.status"],
+    rows: ["devices.list", "account.whoami", "sync.status"],
     cells: columns({
       people: allow(),
       session: allow(`through the SDK in an eval cell; sync.status ${CREDENTIAL_CHECK}`),

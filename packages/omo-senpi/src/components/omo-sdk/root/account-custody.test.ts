@@ -124,7 +124,7 @@ describe("custody records at the root", () => {
     expect(calls).toEqual(["refused account.signIn unsupported"])
   })
 
-  test("#given forget with an empty device #then one boundary record and nothing is touched", async () => {
+  test("#given forget with an empty device #then the input boundary refuses it with one record and nothing is touched", async () => {
     const touched: string[] = []
     const touch = (port: string) => async (): Promise<never> => {
       touched.push(port)
@@ -146,12 +146,9 @@ describe("custody records at the root", () => {
     )
     expect(await sdk.account.forget({ device: "" })).toMatchObject({
       kind: "error",
-      error: { details: { reason: "empty_device" } },
+      error: { code: "invalid_arguments" },
     })
-    expect({ calls, touched }).toEqual({
-      calls: ["refused account.forget empty_device"],
-      touched: [],
-    })
+    expect({ calls, touched }).toEqual({ calls: ["refused account.forget invalid_arguments"], touched: [] })
   })
 
   test("#given a custody log that cannot be written #when a person signs out #then the answer carries audit_unavailable", async () => {

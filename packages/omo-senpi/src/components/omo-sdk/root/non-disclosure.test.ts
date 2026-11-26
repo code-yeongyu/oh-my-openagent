@@ -150,6 +150,9 @@ const PORT_NAMES = {
   now: true,
   deviceServiceStatus: true,
   signInProcess: true,
+  accountSession: true,
+  accountStore: true,
+  custody: true,
 } as const satisfies Record<keyof OmoSdkPorts, true>
 
 function notFake(ports: OmoSdkPorts): string[] {
@@ -197,6 +200,30 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     },
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
+    // Slice A1b's ports: sign-out and forget act on this session and store; the store switch never reaches a helper.
+    accountSession: {
+      session: {
+        logout: fault ? failing(CANARIES.oauthToken) : async () => true,
+        forget: async () => undefined,
+        update: failing(CANARIES.refreshToken),
+        discard: async () => undefined,
+      },
+      store: { clear: fault ? failing(CANARIES.refreshToken) : async () => undefined },
+    },
+    accountStore: {
+      platform: "darwin",
+      available: async () => !fault,
+      status: () => ({ store: "login", state: "absent", path: join(home, "credential-keychain") }),
+      enable: fault
+        ? failing(CANARIES.privateKey)
+        : async () =>
+            ({ kind: "refused", code: "switch_failed", message: "a fake store switch", store: "login" }) as never,
+      disable: fault
+        ? failing(CANARIES.privateKey)
+        : async () =>
+            ({ kind: "refused", code: "switch_failed", message: "a fake store switch", store: "login" }) as never,
+    },
+    custody: { begin: async () => ({ recorded: true, end: async () => true }), refused: async () => true },
     host: canaryHost(fault),
     // With ports faulting the gateway store faults too; healthy, it is a store the scan builds in its own scratch agent
     // dir, so its file is read column by column.

@@ -232,7 +232,7 @@ export function accountNamespace(options: {
     },
     recordRefusal: (key, code) => {
       const capability = CUSTODY_CALLS[key]
-      return capability === undefined ? undefined : custody.refused(capability, code)
+      return capability === undefined ? undefined : custody.refused(capability, code).then(() => undefined)
     },
   }
 }
