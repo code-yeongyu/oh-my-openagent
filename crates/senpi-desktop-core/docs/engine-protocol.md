@@ -13,6 +13,7 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `engine.hello` | read | no | no | `EmptyParams` | `HelloResult` | `ErrorCode` |
 | `session.open` | exec | yes | no | `DesktopSessionOptions` | `SessionOpenResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `session.close` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `session.viewerStatus` | read | yes | no | `EmptyParams` | `SessionStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `control.grant` | exec | yes | no | `ControlGrantParams` | `ControlStateResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `control.revoke` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `control.state` | read | no | no | `EmptyParams` | `ControlStateResult` | `ErrorCode` |
@@ -50,7 +51,6 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `ax.typeText` | exec | no | no | `AxTypeTextParams` | `AxInputResult` | `ErrorCode` |
 | `stopPath.start` | exec | yes | no | `StopPathStartParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.status` | read | no | no | `EmptyParams` | `StopPathStatus` | `ErrorCode` |
-| `session.viewerStatus` | read | yes | no | `EmptyParams` | `SessionStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.heartbeat` | read | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.stop` | read | no | no | `StopPathStopParams` | `StopPathStatus` | `ErrorCode` |
 | `stopPath.resume` | exec | yes | no | `StopPathResumeParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |

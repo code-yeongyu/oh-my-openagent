@@ -37,6 +37,17 @@
         "type": "null"
       }
     },
+    "session.viewerStatus": {
+      "effect": "read",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/SessionStatus"
+      }
+    },
     "control.grant": {
       "effect": "exec",
       "hostOnly": true,
@@ -598,17 +609,6 @@
         "$ref": "#/definitions/StopPathStatus"
       }
     },
-    "session.viewerStatus": {
-      "effect": "read",
-      "hostOnly": true,
-      "testOnly": false,
-      "params": {
-        "$ref": "#/definitions/EmptyParams"
-      },
-      "result": {
-        "$ref": "#/definitions/SessionStatus"
-      }
-    },
     "stopPath.heartbeat": {
       "effect": "read",
       "hostOnly": true,
@@ -1139,6 +1139,66 @@
       ],
       "description": "Window-addressed input availability; `reason` is an open token set\n(`no_eis`, `portal_missing`, `kwin_dbus_missing`,\n`gnome_extension_missing`).",
       "additionalProperties": false
+    },
+    "SessionStatus": {
+      "type": "object",
+      "properties": {
+        "suspended": {
+          "type": "boolean"
+        },
+        "globalLive": {
+          "type": "boolean"
+        },
+        "hostRelayLive": {
+          "type": "boolean"
+        },
+        "heartbeatFresh": {
+          "type": "boolean"
+        },
+        "stopPath": {
+          "$ref": "#/definitions/StopPathKind"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why input is not allowed, when it is not (e.g. `no-global-listener`,\n`heartbeat-stale`)."
+        },
+        "pictureState": {
+          "$ref": "#/definitions/PictureState"
+        }
+      },
+      "required": [
+        "suspended",
+        "globalLive",
+        "hostRelayLive",
+        "heartbeatFresh",
+        "stopPath",
+        "pictureState"
+      ],
+      "description": "The status read, as distinct from a stop-path notification or a request to change the stop.",
+      "additionalProperties": false
+    },
+    "StopPathKind": {
+      "type": "string",
+      "enum": [
+        "global",
+        "host-relay",
+        "none"
+      ],
+      "description": "Which stop path currently guards input."
+    },
+    "PictureState": {
+      "type": "string",
+      "enum": [
+        "available",
+        "secure_input",
+        "locked",
+        "permission_missing",
+        "unknown"
+      ],
+      "description": "Whether the backend permits displaying a result picture at the instant of the status read."
     },
     "ControlGrantParams": {
       "type": "object",
@@ -2252,6 +2312,7 @@
         "engine.hello",
         "session.open",
         "session.close",
+        "session.viewerStatus",
         "control.grant",
         "control.revoke",
         "control.state",
@@ -2289,7 +2350,6 @@
         "ax.typeText",
         "stopPath.start",
         "stopPath.status",
-        "session.viewerStatus",
         "stopPath.heartbeat",
         "stopPath.stop",
         "stopPath.resume",
@@ -3234,66 +3294,6 @@
       ],
       "description": "`stopPath.*` reply and the `stopPath.changed` notification payload.",
       "additionalProperties": false
-    },
-    "StopPathKind": {
-      "type": "string",
-      "enum": [
-        "global",
-        "host-relay",
-        "none"
-      ],
-      "description": "Which stop path currently guards input."
-    },
-    "SessionStatus": {
-      "type": "object",
-      "properties": {
-        "suspended": {
-          "type": "boolean"
-        },
-        "globalLive": {
-          "type": "boolean"
-        },
-        "hostRelayLive": {
-          "type": "boolean"
-        },
-        "heartbeatFresh": {
-          "type": "boolean"
-        },
-        "stopPath": {
-          "$ref": "#/definitions/StopPathKind"
-        },
-        "reason": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "Why input is not allowed, when it is not (e.g. `no-global-listener`,\n`heartbeat-stale`)."
-        },
-        "pictureState": {
-          "$ref": "#/definitions/PictureState"
-        }
-      },
-      "required": [
-        "suspended",
-        "globalLive",
-        "hostRelayLive",
-        "heartbeatFresh",
-        "stopPath",
-        "pictureState"
-      ],
-      "description": "The status read, as distinct from a stop-path notification or a request to change the stop.",
-      "additionalProperties": false
-    },
-    "PictureState": {
-      "type": "string",
-      "enum": [
-        "available",
-        "secure_input",
-        "locked",
-        "permission_missing",
-        "unknown"
-      ],
-      "description": "Whether the backend permits displaying a result picture at the instant of the status read."
     },
     "StopPathStopParams": {
       "type": "object",

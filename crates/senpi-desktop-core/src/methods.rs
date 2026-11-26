@@ -90,6 +90,7 @@ method_table! {
     EngineHello = "engine.hello", Read, Public, EmptyParams => HelloResult;
     SessionOpen = "session.open", Exec, HostOnly, DesktopSessionOptions => SessionOpenResult;
     SessionClose = "session.close", Exec, HostOnly, EmptyParams => ();
+    SessionViewerStatus = "session.viewerStatus", Read, HostOnly, EmptyParams => SessionStatus;
     ControlGrant = "control.grant", Exec, HostOnly, ControlGrantParams => ControlStateResult;
     ControlRevoke = "control.revoke", Exec, HostOnly, EmptyParams => ();
     ControlState = "control.state", Read, Public, EmptyParams => ControlStateResult;
@@ -127,7 +128,6 @@ method_table! {
     AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
-    SessionViewerStatus = "session.viewerStatus", Read, HostOnly, EmptyParams => SessionStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();
     StopPathStop = "stopPath.stop", Read, Public, StopPathStopParams => StopPathStatus;
     StopPathResume = "stopPath.resume", Exec, HostOnly, StopPathResumeParams => StopPathStatus;
