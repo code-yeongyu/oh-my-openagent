@@ -1,5 +1,6 @@
 import { LocalApiError, type RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
 import type { HeldAttach } from "./attach-pool"
+import { LookupFenceRefused } from "./ports"
 import type {
   JsonObject,
   RemoteCommandOutcome,
@@ -231,10 +232,20 @@ class SessionWatch {
     this.#leftReason = reason
     const durable = this.#durable
     if (durable === undefined) return this.#finish(reason)
-    try {
-      this.#key = await this.link.locate(this.device, durable)
-    } catch {
-      return this.#finish(reason)
+    // omo#14748 review round 7: a locate the port's lookup fence refused was never sent, so it says nothing about the
+    // session; it is retried with the attach backoff. Any answer the device gave ends the watch as before.
+    let wait = RETRY_FIRST_MS
+    for (;;) {
+      try {
+        this.#key = await this.link.locate(this.device, durable)
+        break
+      } catch (error) {
+        if (!(error instanceof LookupFenceRefused)) return this.#finish(reason)
+        this.#reportLost("lookup_fence_timeout")
+        await this.link.delay(wait)
+        wait = Math.min(wait * 2, RETRY_MAX_MS)
+        if (this.#done) return
+      }
     }
     await this.#reattach(undefined, true)
   }

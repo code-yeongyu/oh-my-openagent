@@ -148,6 +148,10 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     // A loaded port without the omo#13037 lookup or wake answers as the port contract reads an absent member.
     lookup: async (device, durableId) => (await (await load()).lookup?.(device, durableId)) ?? { kind: "unavailable" },
     canLookup: async () => (await (await load()).canLookup?.()) === true,
+    lookupAlone: async (device, durableId, waitMs) => {
+      const port = await load()
+      return port.lookupAlone === undefined ? undefined : await port.lookupAlone(device, durableId, waitMs)
+    },
     wake: async (device, durableId, rpc) =>
       (await (await load()).wake?.(device, durableId, rpc)) ?? { kind: "unavailable" },
     canWake: async () => (await (await load()).canWake?.()) === true,

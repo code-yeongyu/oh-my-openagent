@@ -48,6 +48,7 @@ import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { listAcross } from "./remote/cross-device"
+import { lazySameDeviceWake } from "./wake/lazy-same-device-wake"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "./remote/ports"
 
@@ -275,6 +276,14 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     callerSessionId: () => UNKNOWN_CALLER,
     callerWorkspaceRoot: () => options.cwd,
     now,
+    sameDeviceWake: lazySameDeviceWake({
+      options: {},
+      store,
+      agentDir: () => options.agentDir,
+      sessionsDirectory: () => join(options.agentDir, "sessions"),
+      cwd: () => options.cwd,
+      warn: (line) => process.stderr.write(`${line}\n`),
+    }),
   }
   const view = () => hostView(surface)
   const { pipeline } = createGatewayServices(
