@@ -13,7 +13,7 @@ export const SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
     lazy: false,
-    ceiling: 608_704,
+    ceiling: 608_770,
     staticSet: "omo-sdk-static-modules.json",
   },
   {

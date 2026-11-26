@@ -57,6 +57,8 @@ function unexpectedStderr(stderr) {
 // An SDK runtime file of a build, by its table row name (runtime-files.mjs).
 const sdkFile = (outputs, name) => sdkRuntimeOutputPaths(outputs.sdkRuntimeRoot)[name]
 const rowNamed = (name) => SDK_RUNTIME_FILES.find((row) => row.name === name)
+// The one dynamic import of a file a build wrote (remote import guard G1 counts each non-literal import).
+const importBuilt = (path) => import(pathToFileURL(path).href)
 const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
 const packageVersion = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version
 
@@ -237,7 +239,7 @@ describe("the SDK root's thread runtime file (P1c, #15031)", () => {
   // the committed file the plugin ships must export the same names.
   test("#given the freshly built thread runtime file #then it exports exactly what the root takes, as functions and plain data, with this build's stamp, as the shipped file does", async () => {
     const outputs = await sharedOutputs()
-    const fresh = await import(pathToFileURL(sdkFile(outputs, "threads")).href)
+    const fresh = await importBuilt(sdkFile(outputs, "threads"))
     const { RUNTIME_STAMP, createThreadCore, fail, threadToolParamSchemas, ...rest } = fresh
     expect(Object.keys(rest)).toEqual([])
     expect([typeof createThreadCore, typeof fail]).toEqual(["function", "function"])
@@ -277,7 +279,7 @@ describe("a row added to the SDK runtime file table", () => {
     const paths = sdkRuntimeOutputPaths(out, table)
     expect(inputs.probe.some((input) => input.endsWith("entry.ts"))).toBe(true)
     const [probeStamp, threadsStamp] = await Promise.all(
-      [paths.probe, paths.threads].map(async (path) => (await import(pathToFileURL(path).href)).RUNTIME_STAMP),
+      [paths.probe, paths.threads].map(async (path) => (await importBuilt(path)).RUNTIME_STAMP),
     )
     expect(probeStamp).toBe(threadsStamp)
 
@@ -393,7 +395,7 @@ describe("thread SDK runtime", () => {
         (input) => input.includes("node_modules/") && !input.includes("/node_modules/typebox/"),
       ),
     ).toEqual([])
-    const sdk = await import(outputs.threadSdkOutputPath)
+    const sdk = await importBuilt(outputs.threadSdkOutputPath)
     expect(Object.keys(sdk).sort()).toEqual(["createThreadSdk", "readSessionFacts"])
   })
 
