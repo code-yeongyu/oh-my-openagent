@@ -23,31 +23,39 @@ describe("a session command refused route_unlisted by the device holding the thr
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session"])
   })
 
+  // A send re-asks b whether it still runs the thread (find_session, #14240); b refusing that too answers nothing, so the
+  // send cannot say the thread stopped (#15004): a host to retry.
   test.each([
-    ["thread_read", { thread: "dur-on-b" }],
-    ["thread_rename", { thread: "dur-on-b", name: "renamed" }],
-    ["thread_interrupt", { thread: "dur-on-b" }],
-    ["thread_send", { thread: "dur-on-b", message: "hello" }],
+    ["thread_read", { thread: "dur-on-b" }, "not_resumable"],
+    ["thread_rename", { thread: "dur-on-b", name: "renamed" }, "not_resumable"],
+    ["thread_interrupt", { thread: "dur-on-b" }, "not_resumable"],
+    ["thread_send", { thread: "dur-on-b", message: "hello" }, "host_unavailable"],
   ] as const)(
-    "#given b's host no longer lists the thread's session #when %s names it #then it is not_resumable naming b and route_unlisted, never an update-omo answer",
-    async (tool, input) => {
+    "#given b's host no longer lists the thread's session #when %s names it #then it is %s naming b and route_unlisted, never an update-omo answer",
+    async (tool, input, code) => {
       const a = account({ refuse: "route_unlisted" })
       const { run } = surface(a.remote)
       const result = await run(tool, input)
       expect(result).toMatchObject({
         kind: "error",
-        error: { code: "not_resumable", details: { device: "b", reason: "route_unlisted" } },
+        error: { code, details: { device: "b", reason: "route_unlisted" } },
       })
       expect(JSON.stringify(result)).not.toContain("Update omo")
     },
   )
 
-  // #14240 re-asks b with find_session after a live-listed thread's send is refused route_unlisted. When b cannot answer
-  // that either (an older engine without it, its own route_unlisted, no answer), nothing new was learnt: the send answers
-  // the route_unlisted refusal it already had, even where this device could wake the thread.
-  test.each(["route_unlisted", "unsupported", "method_unclassified", "request_timeout"])(
-    "#given b's host no longer lists the thread's session and b's find_session is refused %s #when thread_send names it #then it is not_resumable naming b and route_unlisted, and nothing is woken (#14240)",
-    async (findSessionRefuse) => {
+  // #14240 re-asks b with find_session after a live-listed thread's send is refused route_unlisted. When b's engine
+  // predates find_session, nothing new was learnt: the send answers the route_unlisted refusal it already had, even where
+  // this device could wake the thread. #15004: when b does not answer it at all (no answer in time, or no route to the
+  // engine it named), nothing proves the thread stopped: b is too busy to route it, a host to retry, never "not running".
+  test.each([
+    ["unsupported", "not_resumable"],
+    ["method_unclassified", "not_resumable"],
+    ["route_unlisted", "host_unavailable"],
+    ["request_timeout", "host_unavailable"],
+  ] as const)(
+    "#given b's host no longer lists the thread's session and b's find_session is refused %s #when thread_send names it #then it is %s naming b and route_unlisted, and nothing is woken (#14240, #15004)",
+    async (findSessionRefuse, code) => {
       const a = account({
         live: [],
         unlistedReason: "route_unlisted",
@@ -59,11 +67,53 @@ describe("a session command refused route_unlisted by the device holding the thr
       const result = await run("thread_send", { thread: "dur-on-b", message: "hello" })
       expect(result).toMatchObject({
         kind: "error",
-        error: { code: "not_resumable", details: { device: "b", reason: "route_unlisted" } },
+        error: { code, details: { device: "b", reason: "route_unlisted" } },
       })
       expect(JSON.stringify(result)).not.toContain("Update omo")
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
       expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+    },
+  )
+
+  // #15004: a starved host refuses route_unlisted for a session its engine still runs: find_session says an engine holds
+  // it open, yet no key routes to it now. Nothing proves it stopped and nothing was dispatched: a busy host to retry.
+  test("#given b's engine holds the thread open but b's host routes neither the send nor the locate #when thread_send names it #then it is host_unavailable naming b and route_unlisted, not not_resumable (#15004)", async () => {
+    const a = account({ refuseSessionCommands: "route_unlisted", locateRefuse: "route_unlisted" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "hello" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "route_unlisted" } },
+    })
+  })
+
+  // #15004: a send b refused before any engine took it (its host did not route it, or did not answer in its bound) holds
+  // no key: the retry it advises is a fresh send under that key, with or without its optional fields, and delivers once.
+  test.each([
+    ["its host did not answer in time", { admitRefuse: "host_not_answering" }],
+    [
+      "its host routed no key to the running thread",
+      { refuseSessionCommands: "route_unlisted", locateRefuse: "route_unlisted" },
+    ],
+  ] as const)(
+    "#given b refused a send because %s #when b answers again and the send is retried under the same key without its summary #then the retry delivers it once",
+    async (_label, refusal) => {
+      const options: { admitRefuse?: string; refuseSessionCommands?: string; locateRefuse?: string } = { ...refusal }
+      const a = account(options)
+      const { run } = surface(a.remote)
+      const args = { thread: "dur-on-b", message: "hello", idempotency_key: "busy-retry" }
+
+      expect(await run("thread_send", { ...args, summary: "greeting" })).toMatchObject({
+        kind: "error",
+        error: { code: "host_unavailable" },
+      })
+      delete options.admitRefuse
+      delete options.refuseSessionCommands
+      delete options.locateRefuse
+
+      expect(await run("thread_send", args)).toMatchObject({ kind: "ok", deduplicated: false })
+      expect(
+        a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message" && entry.via === "session"),
+      ).toHaveLength("admitRefuse" in refusal ? 2 : 1)
     },
   )
 

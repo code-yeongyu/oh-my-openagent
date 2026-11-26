@@ -69,6 +69,27 @@ const ADMIT_UNSUPPORTED: ReadonlySet<string> = new Set([
   "method_unknown",
 ])
 
+const ROUTE_UNLISTED = "route_unlisted"
+
+// #15004: the device service's own refusals of a send before any engine there took it: its host routed no key to the
+// session, or did not answer within its bound (local-api.md: `host_not_answering` may be sent again). Neither changed
+// anything on that device.
+const UNDISPATCHED: ReadonlySet<string> = new Set([ROUTE_UNLISTED, "host_not_answering"])
+
+const undispatched = (result: SendOutcome): boolean =>
+  result.kind === "error" &&
+  (result.error.code === "host_unavailable" || result.error.code === "not_resumable") &&
+  UNDISPATCHED.has(String(result.error.details?.["reason"]))
+
+/** #15004: a thread b's engine may still run, which b's host did not route just now (a host too busy to route it). */
+const busyHost = (device: string, thread: string): Failure =>
+  fail(
+    "host_unavailable",
+    `Device ${device} did not route ${thread} just now (route_unlisted), and nothing shows it stopped there; nothing was sent.`,
+    "Retry in a few seconds under the same idempotency_key: the device may be too busy to route its threads now.",
+    { device, thread, reason: ROUTE_UNLISTED },
+  )
+
 // About half an hour of background re-sends while the receiver's user keeps a draft open (the engine admits nothing then);
 // the same delivery id each time, so the engine answers already_admitted once it took one.
 const HELD_RETRY_DELAYS_MS: readonly number[] = [
@@ -403,7 +424,9 @@ export function createRelayTransport(
       await (sent ? settle() : release(settle))
       throw error
     }
-    if (!sent) {
+    // #15004: a send b refused before any engine there took it holds no key, so the retry its answer advises is a fresh
+    // send under the same key (its optional fields may differ), never a replay of the refusal or an idempotency_conflict.
+    if (!sent || undispatched(result)) {
       await release(() => store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran")))
       return result
     }
@@ -460,6 +483,9 @@ export function createRelayTransport(
         details,
       )
     if (parked !== undefined && view === "unknown") return parked
+    // #15004: b's host did not route the live-listed thread, and b did not answer whether it runs it: nothing proves it
+    // stopped (a host starved past its routing deadline answers neither), and nothing was dispatched.
+    if (parked !== undefined && view === "silent") return busyHost(listed.device, thread)
     if (view !== "running") {
       // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
       const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
@@ -476,6 +502,9 @@ export function createRelayTransport(
       )
     }
     const located = await remote.sessions.locate(listed.device, listed.durable_id ?? "")
+    // #15004: b says an engine runs it, yet its host routes no key to it now (an engine that missed its routing deadline
+    // on a starved host): a busy host to retry, never "not running".
+    if (located.kind !== "ok" && located.reason === ROUTE_UNLISTED) return busyHost(listed.device, thread)
     if (located.kind !== "ok")
       return fail(
         "not_resumable",
