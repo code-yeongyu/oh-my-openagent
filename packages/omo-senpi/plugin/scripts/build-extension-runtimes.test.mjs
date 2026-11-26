@@ -231,6 +231,13 @@ describe("the SDK root's thread runtime file (P1c, #15031)", () => {
     expect(threads.some((path) => path.endsWith("src/extension/omo-sdk.ts"))).toBe(false)
   })
 
+  test("#given the shipped thread runtime file #then it exports exactly what the root takes, as functions and plain data", async () => {
+    const { createThreadCore, fail, threadToolParamSchemas, ...rest } = await import("../runtime/omo-sdk/threads.js")
+    expect(Object.keys(rest)).toEqual([])
+    expect([typeof createThreadCore, typeof fail]).toEqual(["function", "function"])
+    expect(Object.getPrototypeOf(threadToolParamSchemas)).toBe(Object.prototype)
+  })
+
   test("#given the thread runtime entry #then the modules it ships (kept bytes, static edges) are exactly its committed list", async () => {
     const { set } = await staticModuleSet(undefined, { row: threadsRow })
     expect(definition).toBe(staticSetDefinition(threadsRow))

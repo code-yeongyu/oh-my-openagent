@@ -609,7 +609,7 @@ export async function buildExtension(options = {}) {
  * before it is removed: plugin/scripts/omo-sdk-static-set.mjs reads what this build keeps (#14950); `entry` lets its
  * control build one extra import on top of the same entry with the same settings.
  */
-export function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
+function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
   return buildRuntimeFile(SDK_RUNTIME_FILES[0], output, buildDefines, { keepMetafile, entry })
 }
 

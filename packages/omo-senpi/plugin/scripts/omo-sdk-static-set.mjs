@@ -1,7 +1,7 @@
 // What ships and runs at import in the SDK root runtime (design lane ruling of record, P1b #14950): the inputs of the
 // built runtime file that keep bytes in its output, reached from the entry by static edges only, plus the node builtins
 // a kept module imports. A module the bundler drops costs nothing at import and is not in the set. The metafile is the
-// one of the repository's own build of that file (build-extension-core.mjs buildOmoSdkRuntime), never a separate build.
+// one of the repository's own build of that file (build-extension-core.mjs buildRuntimeFile), never a separate build.
 // The list is the same in every install layout: a module is named by its real file, a workspace package's file as
 // `packages/<dir>/...` whether the build reached it through `node_modules/<name>` or `packages/<dir>`, a third-party
 // file as `node_modules/<package>/...` with bun's store directory (`.bun/<name>@<version>/`) dropped so a lockfile bump

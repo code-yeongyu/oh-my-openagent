@@ -66,6 +66,8 @@
         "scripts/install.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/native-skill-sources.d.mts",
+        // the declarations TypeScript reads for runtime-files.mjs; nothing imports a .d.mts by name (#15031)
+        "scripts/runtime-files.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/stage-lsp-daemon-runtime.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
