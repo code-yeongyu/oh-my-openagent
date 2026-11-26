@@ -9,7 +9,8 @@ import type {
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { ComponentLogger } from "../../extension/types"
-import { releaseDagRunLease, takeDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
+import { acquireDagRun, type DagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
+import { releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
 
 export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
@@ -28,6 +29,7 @@ export function createDagSchedulerRegistry(ports: {
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
   readonly logger: ComponentLogger
   readonly isProcessAlive: (pid: number) => boolean
+  readonly reservations: DagRunReservations
 }) {
   const { schedulers, store, coreManager, schedulerOptions, logger } = ports
   const lease = {
@@ -42,6 +44,11 @@ export function createDagSchedulerRegistry(ports: {
   const schedulerFor = (runId: DagRunId, parentSessionId: string): OwnedScheduler => ({
     scheduler: createDagScheduler({ ...schedulerOptions, initialRecord: coreManager.record(runId, parentSessionId) }),
   })
+  const register = (runId: DagRunId, initialRecord: DagRunRecordV1): void => {
+    const owned: OwnedScheduler = { scheduler: createDagScheduler({ ...schedulerOptions, initialRecord }) }
+    schedulers.set(runId, owned)
+    track(runId, owned, owned.scheduler.run())
+  }
 
   // A verb on a run this host does not hold gets a throwaway carrier that never enters `schedulers`,
   // so a refused or non-adopting verb can never make the run read as held here.
@@ -72,13 +79,20 @@ export function createDagSchedulerRegistry(ports: {
   /** Returns false for a `running` run this runtime does not hold: it is recovery's to claim or leave. */
   const ensureScheduled = (runId: DagRunId, parentSessionId: string): boolean => {
     if (holdsRun(runId)) return true
-    const record = coreManager.record(runId, parentSessionId)
-    if (record.status === "running") return false
-    if (record.status !== "pending") return true
-    if (takeDagRunLease(store, runId, lease).kind !== "taken") return true
-    const owned = schedulerFor(runId, parentSessionId)
-    schedulers.set(runId, owned)
-    track(runId, owned, owned.scheduler.run())
+    // A fresh start expects the run still `pending` and still this session's on the record it acquires;
+    // anything else (finished, cancelled, parked by another host meanwhile) launches nothing.
+    const acquired = acquireDagRun<DagRunRecordV1>(store, runId, {
+      operation: "start",
+      probe: lease,
+      reservations: ports.reservations,
+      eligible: (fresh) => fresh.status === "pending" && fresh.parentSessionId === parentSessionId,
+    })
+    if (acquired.kind !== "acquired") return !(acquired.kind === "not_eligible" && acquired.record.status === "running")
+    try {
+      register(runId, acquired.record)
+    } finally {
+      acquired.reservation?.release()
+    }
     return true
   }
 

@@ -3,10 +3,11 @@
 import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
-import { releaseDagRunLease, takeDagRunLease } from "./run-lease"
+import { acquireDagRun, type DagRunAcquisition } from "./run-acquisition"
+import { releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
-import type { DagNodeError, DagNodeId, DagRunId } from "./types"
+import { TERMINAL_DAG_RUN_STATUSES, type DagNodeError, type DagNodeId, type DagRunId } from "./types"
 
 export const DAG_NODE_CONTROL_ERROR_CODES = [
   "run_not_found",
@@ -20,6 +21,7 @@ export const DAG_NODE_CONTROL_ERROR_CODES = [
   "node_unresponsive",
   "run_paused_by_user",
   "run_not_user_paused",
+  "run_busy",
 ] as const
 
 export type DagNodeControlErrorCode = (typeof DAG_NODE_CONTROL_ERROR_CODES)[number]
@@ -94,9 +96,10 @@ export function refuseUnheldActiveNodes(record: DagRunRecordV1): void {
 }
 
 /**
- * Takes the run's lease for a re-entry (retry, amend) before its first write, so no other process can
- * claim the run this host is about to revive and no child starts under another live process's lease
- * (#15125). Refuses with `run_not_owned` while another live process holds the lease. Returns the
+ * Acquires the run for a re-entry (retry, amend) before its first write (#15125): on the fresh record
+ * the run must still be this session's and settled, or paused (not by the user) with no active node;
+ * no other live process may hold it; and no other operation of this process may be installing or
+ * mutating it (the caller passes the reservation it holds in `options.reservation`). Returns the
  * release for a re-entry that fails before its scheduler takes over.
  */
 export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunId): () => void {
@@ -106,18 +109,70 @@ export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunI
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
   }
   const heldBefore = readRecord(options.store, runId)?.leaseHolderPid === probe.hostPid
-  const take = takeDagRunLease(options.store, runId, probe)
-  if (take.kind === "missing") {
-    throw new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
-  }
-  if (take.kind === "held") {
-    throw new DagNodeControlError({
-      code: "run_not_owned",
-      message: `dag run "${runId}" is held by live process ${take.holderPid}`,
-      runId,
-    })
-  }
+  const parentSessionId = options.initialRecord.parentSessionId
+  const acquired = acquireDagRun(options.store, runId, {
+    operation: "re-entry",
+    probe,
+    ...(options.reservation === undefined ? {} : { reservation: options.reservation }),
+    eligible: (fresh) => fresh.parentSessionId === parentSessionId && reenterable(fresh),
+  })
+  if (acquired.kind !== "acquired") throw reentryRefusal(runId, acquired, parentSessionId)
   return heldBefore ? () => undefined : () => releaseDagRunLease(options.store, runId, probe.hostPid)
+}
+
+function reenterable(record: DagRunRecordV1): boolean {
+  if (TERMINAL_DAG_RUN_STATUSES.has(record.status)) return true
+  return record.status === "paused" && record.pause?.reason !== "user_stop" && !record.nodes.some(isActiveNode)
+}
+
+function isActiveNode(node: DagRunRecordV1["nodes"][number]): boolean {
+  return node.state === "scheduled" || node.state === "running"
+}
+
+function reentryRefusal(
+  runId: DagRunId,
+  outcome: Exclude<DagRunAcquisition<DagRunRecordV1>, { readonly kind: "acquired" }>,
+  parentSessionId: string,
+): DagNodeControlError {
+  switch (outcome.kind) {
+    case "missing":
+      return new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
+    case "held":
+      return new DagNodeControlError({
+        code: "run_not_owned",
+        message: `dag run "${runId}" is held by live process ${outcome.holderPid}`,
+        runId,
+      })
+    case "busy":
+      return runBusy(runId, outcome.operation)
+    case "not_eligible":
+      if (outcome.record.parentSessionId !== parentSessionId)
+        return new DagNodeControlError({
+          code: "run_not_owned",
+          message: `dag run "${runId}" belongs to another session`,
+          runId,
+        })
+      if (outcome.record.pause?.reason === "user_stop")
+        return new DagNodeControlError({
+          code: "run_paused_by_user",
+          message: "only the user's Resume may restart this run",
+          runId,
+        })
+      return new DagNodeControlError({
+        code: "run_still_active",
+        message: `dag run "${runId}" is ${outcome.record.status} with work in flight; it cannot be re-entered now`,
+        runId,
+      })
+  }
+}
+
+/** The retryable refusal while another operation of this process installs or mutates the run. */
+export function runBusy(runId: DagRunId, operation: string): DagNodeControlError {
+  return new DagNodeControlError({
+    code: "run_busy",
+    message: `dag run "${runId}" is busy with ${operation} in this session; try again once it finishes`,
+    runId,
+  })
 }
 
 export function readRecord(store: DagFileStore, runId: DagRunId): DagRunRecordV1 | null {

@@ -22,7 +22,8 @@ afterEach(() => {
 
 describe("DAG re-entry under the one holder rule", () => {
   test("#given a legacy record whose active child a live foreign process owns #when the amend re-entry runs #then it is refused naming that process and nothing is written", () => {
-    // given - no lease and no previous holder, only the child's live foreign owner
+    // given - a settled (re-enterable) record with no lease and no previous holder, whose node still
+    // names a child the live foreign process runs: only the holder rule can refuse it
     const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-reentry-holder-"))
     cleanupRoots.push(directory)
     const store = createDagFileStore(ownedTaskState(directory))
@@ -31,7 +32,8 @@ describe("DAG re-entry under the one holder rule", () => {
     const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(definition, {
       slow: { state: "running", taskId: "task-slow", attempt: 1 },
     })
-    store.writeCheckpoint(runId, paused)
+    const settled = { ...paused, status: "failed" as const }
+    store.writeCheckpoint(runId, settled)
     manager.add({ ...taskRecord(owner("slow"), "running", "task-slow"), host_pid: LIVE_FOREIGN_PID })
     const bytes = (): string => fs.readFileSync(store.paths.run(runId), "utf8")
     const before = bytes()
@@ -42,7 +44,7 @@ describe("DAG re-entry under the one holder rule", () => {
       reenterDagRun({
         store,
         taskManager: manager,
-        initialRecord: paused,
+        initialRecord: settled,
         hostPid: THIS_HOST_PID,
         isProcessAlive: (pid) => pid === LIVE_FOREIGN_PID,
       })

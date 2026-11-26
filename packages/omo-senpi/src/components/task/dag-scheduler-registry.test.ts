@@ -16,6 +16,7 @@ import {
 
 import { LongRunningTaskManager, taskRecord } from "../../../../senpi-task/src/dag/__fixtures__/reattached-run"
 import { subscribeDagJournal } from "../../../../senpi-task/src/dag/journal"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { DagNodeId } from "../../../../senpi-task/src/dag/types"
 import { dagNode, FOREIGN_HOST_PID, within } from "./dag-runtime-recovery.test-support"
 import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler-registry"
@@ -57,6 +58,7 @@ describe("DAG scheduler registry lease across a shutdown retirement", () => {
       schedulerOptions: { store, taskManager, isProcessAlive },
       logger: quietLogger,
       isProcessAlive,
+      reservations: createDagRunReservations(),
     })
     let unsubscribe = (): void => undefined
     const attached = new Promise<void>((resolve) => {

@@ -45,6 +45,7 @@ import {
 import { createDagRuntimeControls } from "./dag-runtime-controls"
 import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler-registry"
 import { createDagRecoverySweeps } from "./dag-recovery-sweeps"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { PausedChildRecoveryPort } from "../../../../senpi-task/src/dag/paused-child-recovery"
 import { createDagRunPauseSource, type DagGuidanceDelivery } from "./dag-run-pause-source"
 import { ownedSubtree } from "./engine-run-pause"
@@ -114,6 +115,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const deliveredSeq = new Map<DagRunId, number>()
   const schedulers = new Map<DagRunId, OwnedScheduler>()
   const stoppedAdmissions = new Set<DagRunId>()
+  const reservations = createDagRunReservations()
   const recoveryTaskSubscriptions = new Map<string, () => void>()
   const activityTaskSubscriptions = new Map<string, () => void>()
   const isProcessAlive = deps.leaseWatch?.isProcessAlive ?? defaultSignaller.isAlive
@@ -210,6 +212,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     schedulerOptions,
     logger: deps.logger,
     isProcessAlive,
+    reservations,
   })
   const holders = { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive }
 

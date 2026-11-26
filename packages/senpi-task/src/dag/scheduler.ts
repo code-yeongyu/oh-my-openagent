@@ -1,5 +1,6 @@
 import type { TaskManager } from "../manager/types"
 import type { ResumeCredential } from "../pause/admission-barrier"
+import type { DagRunReservation } from "./run-acquisition"
 import type { DagExecutionModeSources } from "./execution-mode"
 import { createDagJournal, subscribeDagJournal, type DagJournalListener } from "./journal"
 import { skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
@@ -50,6 +51,8 @@ export type DagSchedulerOptions = {
   readonly isProcessAlive?: (pid: number) => boolean
   readonly now?: () => number
   readonly scheduleRetry?: RetrySchedule
+  // The in-process reservation a control verb already holds for this run (`run-acquisition.ts`).
+  readonly reservation?: DagRunReservation
 }
 
 // Harness-injected gate for agent-routed nodes, evaluated once per admission before startOwned:
