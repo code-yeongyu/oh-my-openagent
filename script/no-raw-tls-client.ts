@@ -222,6 +222,10 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
           if (value && ts.isIdentifier(spec.name)) {
             if (name === "default" && CLIENTS[value.module]) bind(spec.name, value)
             else if (CLIENTS[value.module]?.includes(name)) bind(spec.name, { ...value, member: name })
+            else if (value.module === "globalThis") {
+              const global = bindings.globalProperty(name)
+              if (global) bind(spec.name, global)
+            }
           }
         }
     }

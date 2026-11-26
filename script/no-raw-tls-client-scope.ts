@@ -9,8 +9,8 @@ import ts from "@typescript/typescript6"
 // - a file with a with statement or a direct eval has no resolvable scope: every reference there resolves by name
 //   alone, as before #15071.
 // A parameter default is read like a variable initializer by the caller (no-raw-tls-client.ts); flow through a plain
-// assignment or an immediately invoked function's argument is tracked through flowTargets and declare/assign. Other
-// data flow is out of scope for this guard.
+// assignment, an immediately invoked function's argument or a for-of over an array literal is tracked through
+// flowTargets and declare/assign. Other data flow is out of scope for this guard.
 
 type Declaration = { readonly name: ts.Identifier; readonly scope: ts.Node; readonly shadows: boolean }
 
@@ -110,6 +110,17 @@ export function flowTargets(node: ts.Node): Flow[] {
     let left: ts.Expression = node.left
     while (ts.isParenthesizedExpression(left)) left = left.expression
     return ts.isIdentifier(left) ? [[left, node.right, "assign"]] : []
+  }
+  if (ts.isForOfStatement(node) && ts.isArrayLiteralExpression(node.expression)) {
+    const list = node.initializer
+    const name = ts.isVariableDeclarationList(list) ? list.declarations[0]?.name : list
+    return name && ts.isIdentifier(name)
+      ? node.expression.elements.map((element): Flow => [
+          name,
+          element,
+          ts.isVariableDeclarationList(list) ? "declare" : "assign",
+        ])
+      : []
   }
   if (ts.isCallExpression(node)) {
     let callee: ts.Expression = node.expression

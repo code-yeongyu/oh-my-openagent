@@ -31,6 +31,8 @@ const ALIASES = [
   "var t = globalThis.Bun;",
   "var u = globalThis.Bun; var t = u;",
   "var v = globalThis.Bun; var u = v; var t = u;",
+  "var { Bun: t } = globalThis;",
+  "var b = globalThis.Bun; for (var t of [b]) {}",
 ]
 
 function program(form: Form, position: Position, reference: Reference, alias: string): string {
