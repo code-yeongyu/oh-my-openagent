@@ -605,7 +605,14 @@ function timingVerdict(p95: number, bound: Bound | undefined, measured: string):
 
 // The wheel rows count only when the settled-foreground control delivered every wheel: without that, a 0 could
 // be an oracle that cannot see a wheel.
-type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string; readonly notFg?: number }
+type Tally = {
+  readonly delivered: number
+  readonly runs: number
+  readonly acquire?: string
+  readonly notFg?: number
+  // settled control only: wheels sent before the box itself saw the cursor's move (not proven under the cursor)
+  readonly notHover?: number
+}
 function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
   const c = controlText(control.delivered, control.runs)
   const proven = control.runs > 0 && control.delivered === control.runs
@@ -614,7 +621,7 @@ function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string
     "n-wheel-control-settled": propertyVerdict(
       "wheelSettled",
       proven,
-      `${c} foreground by ${control.acquire ?? "-"} not foreground at the wheel ${control.notFg ?? "-"}/${control.runs}`,
+      `${c} foreground by ${control.acquire ?? "-"} not foreground at the wheel ${control.notFg ?? "-"}/${control.runs} not under the cursor at the wheel ${control.notHover ?? "-"}/${control.runs}`,
     ),
     "n-wheel-after-raise-dwmflush": proven
       ? {
@@ -958,6 +965,7 @@ const wheel: Group = {
       runs: num(j.runs),
       acquire: str(j.acquire),
       notFg: num(j.notForegroundAtWheel),
+      notHover: num(j.notUnderCursorAtWheel),
     })
     // where each wheel was routed, printed so a lost wheel names the window that received it
     const routed = (j: Json): Json => {
@@ -2497,6 +2505,35 @@ const LOGIC_CHECKS: readonly Check[] = [
         )
       )
         bad.push("the measure pass does not record the native assembly in the elevated rows' notes")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    // Hosted run 43172236218: the settled control read 0/6 with the target foreground at every wheel. The wheel goes
+    // to the window under the cursor (MouseWheelRouting 2 on the runner, run 45856172603), as last hit-tested; a
+    // cursor parked on the same pixel is never re-hit-tested, and SPN-COVER shares the target's rect.
+    finding: "WHEEL hover-proven control (run 43172236218)",
+    async run() {
+      const bad: string[] = []
+      const legs = psCode(source("sp-n-legs-delivery.ps1")).join("\n")
+      const wheelLeg = legs.slice(legs.indexOf("function Leg-wheel("))
+      const settled = wheelLeg.slice(wheelLeg.indexOf("if ($a.mode -eq 'settled') {"), wheelLeg.indexOf("} else {"))
+      const move = settled.search(/SetCursorPos\(\$px \+ \d+, \$py \+ \d+\); \[void\]\[SpN\]::SetCursorPos\(\$px, \$py\)/)
+      const m0 = settled.indexOf("$m0 = MoveCount $a.state")
+      const wait = settled.search(/if \(\(MoveCount \$a\.state\) -gt \$m0\) \{ \$hover = \$true; break \}/)
+      const before = settled.indexOf("$before = WheelCount $a.state")
+      if (m0 < 0 || move < m0 || wait < move || before < wait)
+        bad.push("the settled control does not move off and back and wait for the box's move before the wheel")
+      if (!/if \(-not \$hover\) \{ \$notHover\+\+ \}/.test(settled)) bad.push("a wheel without the hover proof is not counted")
+      if (!/notUnderCursorAtWheel = \$notHover/.test(wheelLeg)) bad.push("Leg-wheel does not emit notUnderCursorAtWheel")
+      const target = psCode(source("sp-n-target.ps1")).join("\n")
+      if (!/\$box\.Add_MouseMove\(\{ \$script:moves\+\+; Write-State/.test(target)) bad.push("the edit target counts no mouse moves")
+      if (!/moves = \$script:moves/.test(target)) bad.push("the edit target's state has no move counter")
+      if (!/notHover: num\(j\.notUnderCursorAtWheel\)/.test(source("probe-sp-n.ts"))) bad.push("the wheel tally drops the hover count")
+      const t = (d: number, notHover?: number): Tally => ({ delivered: d, runs: 6, acquire: "plain", notFg: 0, ...(notHover === undefined ? {} : { notHover }) })
+      const ctl = wheelResults(t(4, 2), t(9), t(3))["n-wheel-control-settled"] as Result
+      if (!ctl.measured.includes("not under the cursor at the wheel 2/6")) bad.push(`control text: ${ctl.measured}`)
+      if (JSON.stringify(parseControl(ctl.measured)) !== "[[4,6]]") bad.push(`control text no longer parses: ${ctl.measured}`)
       return bad.length ? bad.join("; ") : undefined
     },
   },

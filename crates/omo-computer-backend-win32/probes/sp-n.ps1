@@ -157,6 +157,12 @@ function WheelCount([string]$path) {
   if ($null -eq $r.state.wheel) { throw "state has no wheel counter: $path" }
   return [int]$r.state.wheel
 }
+function MoveCount([string]$path) {
+  $r = ReadState $path
+  if (-not $r.ok) { throw "state read failed: $($r.error)" }
+  if ($null -eq $r.state.moves) { throw "state has no move counter: $path" }
+  return [int]$r.state.moves
+}
 function CountChar([string]$s, [char]$c) { return @($s.ToCharArray() | Where-Object { $_ -eq $c }).Count }
 function WaitCount($t, [char]$c, [int]$want, [int]$ms) {
   $sw = [Diagnostics.Stopwatch]::StartNew()

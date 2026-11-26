@@ -131,7 +131,7 @@ function Leg-uipi($a) {
 # oracle is proven able to see a wheel; 'dwmflush' and 'delay' wheel right after raising the target over a cover.
 function Leg-wheel($a) {
   $top = [IntPtr][int64]$a.top; $cover = [IntPtr][int64]$a.cover
-  $delivered = 0; $runs = [int]$a.n; $acq = @(); $notFg = 0; $route = @()
+  $delivered = 0; $runs = [int]$a.n; $acq = @(); $notFg = 0; $notHover = 0; $route = @()
   $box = [IntPtr][int64](ReadState $a.state).state.editHwnd
   $wr = New-Object SpN+RECT; [void][SpN]::GetWindowRect($top, [ref]$wr)
   $px = [int](($wr.Left + $wr.Right) / 2); $py = [int](($wr.Top + $wr.Bottom) / 2)
@@ -139,7 +139,15 @@ function Leg-wheel($a) {
     if ($a.mode -eq 'settled') {
       $acq += [SpN]::Foreground($top)
       [SpN]::Pump(300); [void][SpN]::DwmFlush(); [void][SpN]::DwmFlush()
-      [void][SpN]::SetCursorPos($px, $py)
+      # The wheel goes to the window the system last hit-tested under the cursor, which a cursor parked on the
+      # same pixel never refreshes, and SPN-COVER shares the target's rect (hosted run 43172236218: 0/6 with the
+      # target foreground). Move off and back, then wait until the box itself saw the move: only then is the box
+      # the window under the cursor for the wheel. A wheel sent without that proof is counted, never hidden.
+      $m0 = MoveCount $a.state
+      [void][SpN]::SetCursorPos($px + 8, $py + 8); [void][SpN]::SetCursorPos($px, $py)
+      $sw = [Diagnostics.Stopwatch]::StartNew(); $hover = $false
+      while ($sw.ElapsedMilliseconds -lt 1000) { if ((MoveCount $a.state) -gt $m0) { $hover = $true; break }; [SpN]::Pump(20) }
+      if (-not $hover) { $notHover++ }
       $before = WheelCount $a.state
     } else {
       $acq += [SpN]::Foreground($cover)
@@ -161,5 +169,5 @@ function Leg-wheel($a) {
     $at['delivered'] = $got; $route += $at
   }
   $routing = [Microsoft.Win32.Registry]::GetValue('HKEY_CURRENT_USER\Control Panel\Desktop', 'MouseWheelRouting', $null)
-  Emit @{ mode = $a.mode; delivered = $delivered; runs = $runs; acquire = ($acq | Select-Object -Unique); notForegroundAtWheel = $notFg; route = $route; mouseWheelRouting = $routing; mousePresent = [SpN]::GetSystemMetrics(19); wheelPresent = [SpN]::GetSystemMetrics(75) }
+  Emit @{ mode = $a.mode; delivered = $delivered; runs = $runs; acquire = ($acq | Select-Object -Unique); notForegroundAtWheel = $notFg; notUnderCursorAtWheel = $notHover; route = $route; mouseWheelRouting = $routing; mousePresent = [SpN]::GetSystemMetrics(19); wheelPresent = [SpN]::GetSystemMetrics(75) }
 }

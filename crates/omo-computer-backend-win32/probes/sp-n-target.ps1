@@ -40,10 +40,14 @@ if ($Kind -eq 'edit') {
   $box.ScrollBars = 'Vertical'
   $box.Dock = 'Fill'
   $form.Controls.Add($box)
-  $script:wheel = 0
-  $box.Add_TextChanged({ Write-State @{ ready = $true; text = $box.Text; wheel = $script:wheel; editHwnd = [int64]$box.Handle } })
-  $box.Add_MouseWheel({ $script:wheel++; Write-State @{ ready = $true; text = $box.Text; wheel = $script:wheel; editHwnd = [int64]$box.Handle } })
-  $form.Add_Shown({ $box.Focus() | Out-Null; Write-State @{ ready = $true; text = $box.Text; wheel = 0; editHwnd = [int64]$box.Handle } })
+  # wheel: wheels the box received; moves: mouse moves it received, so a probe can prove the system routes
+  # pointer input under the cursor to this box (the wheel goes to the window under the cursor, not the focus)
+  $script:wheel = 0; $script:moves = 0
+  $editState = { @{ ready = $true; text = $box.Text; wheel = $script:wheel; moves = $script:moves; editHwnd = [int64]$box.Handle } }
+  $box.Add_TextChanged({ Write-State (& $editState) })
+  $box.Add_MouseWheel({ $script:wheel++; Write-State (& $editState) })
+  $box.Add_MouseMove({ $script:moves++; Write-State (& $editState) })
+  $form.Add_Shown({ $box.Focus() | Out-Null; Write-State (& $editState) })
   [System.Windows.Forms.Application]::Run($form)
   exit 0
 }
