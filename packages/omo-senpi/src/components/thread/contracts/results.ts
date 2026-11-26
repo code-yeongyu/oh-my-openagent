@@ -275,6 +275,8 @@ export type ThreadListResult =
        */
       readonly listing?: "incomplete"
       readonly unanswered_endpoints?: number
+      /** With `limit`: the matching threads this answer left out. */
+      readonly rows_omitted?: number
     }
   | ThreadDataError
 
@@ -301,6 +303,8 @@ export type ThreadReadResult =
       readonly device?: string
       /** Set when the read asked to wait (`wait_ms`): how the wait ended, read before the transcript. */
       readonly wait?: ThreadWaitOutcome
+      /** Set when a request was larger than the read serves: what was asked and what was read instead. */
+      readonly reduced?: { readonly limit?: { readonly requested: number; readonly used: number } }
     }
   | ThreadDataError
 
@@ -308,10 +312,11 @@ export type ThreadReadResult =
  * A `thread_read` wait (#13417). `settled`: a turn end was observed (`turn_id`), or the thread showed no run for the
  * quiet window and is idle (no `turn_id`); a snapshot's idle alone never settles it.
  * `timeout`: `wait_ms` passed with the thread still running. `cancelled`: the call was aborted. `ended`: the watch
- * could not continue (the session closed for good or the access ended; `status` names why).
+ * could not continue (the session closed for good or the access ended; `status` names why). `not_waited`: `wait_ms` was
+ * 0, so the read ran at once (#15073).
  */
 export type ThreadWaitOutcome = {
-  readonly outcome: "settled" | "timeout" | "cancelled" | "ended"
+  readonly outcome: "settled" | "timeout" | "cancelled" | "ended" | "not_waited"
   readonly status: string
   readonly waited_ms: number
   /** The turn whose observed end settled the wait; absent when the session showed no run and settled on its idle. */

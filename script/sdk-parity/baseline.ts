@@ -15,6 +15,17 @@ export type BaselineEntry = {
   // A gap only one slice may clear (a security-gated input or call): the pull request that removes the entry names that
   // slice in an `SDK-Parity-Slice:` body line, and the gate refuses the removal otherwise.
   readonly clearedOnlyBy?: string
+  // A tool ahead of its SDK call under this gap (LEAD ruling on #15076, tool-ahead.ts): the pull request that adds it may
+  // add the optional tool fields in `fields`, widen the fields in `widened`, and declare aliases; nothing else.
+  readonly toolAhead?: ToolAhead
+}
+
+export type ToolAhead = {
+  readonly pr: string
+  readonly until: string
+  readonly fields?: readonly string[]
+  readonly widened?: readonly string[]
+  readonly aliases?: boolean
 }
 
 export type Baseline = { readonly version: 1; readonly entries: readonly BaselineEntry[] }

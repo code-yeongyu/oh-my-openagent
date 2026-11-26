@@ -346,6 +346,8 @@
         "scripts/qa/telemetry-optout-purge-e2e.mjs",
         // run by path from scripts/qa/thread-tools/run-all.mjs (#14079: local thread calls in an approved eval cell ask nothing)
         "scripts/qa/thread-tools/local-approvals.mjs",
+        // run by path from scripts/qa/thread-tools/run-all.mjs (#15073: the argument names agents predict, on a real host)
+        "scripts/qa/thread-tools/familiar-args.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/adopt.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

@@ -40,7 +40,10 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
-import { listThreads, readThread, withBacklog } from "./tools/read-ops"
+import { modelWithReasoning } from "./tools/model-match"
+import { narrowListing } from "./tools/list-narrowing"
+import { readThreadWithLimits, receiptLimitRefusal } from "./tools/read-limits"
+import { listThreads, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { threadToolPermission } from "./tools/local-permission"
@@ -194,6 +197,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       typeof value.thread === "string"
     ) {
       // This branch precedes view()/ensureHost and the read tool's own receipt admission.
+      const refused = receiptLimitRefusal({ ...value, thread: value.thread, delivery_id: value.delivery_id })
+      if (refused !== undefined) return output(refused)
       return output(await readReceipt(store, options.remote, callerId, value.thread, value.delivery_id, now()))
     }
     const explicitKey =
@@ -429,18 +434,17 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     ...metadata("thread_list"),
     parameters: threadToolParamSchemas.thread_list,
     execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) =>
-      execute(
-        "thread_list",
-        id,
-        args,
-        ectx,
-        async (current, value) =>
+      execute("thread_list", id, args, ectx, async (current, value) =>
+        narrowListing(
           await listAcross(
             options.remote,
             await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
             value.all_scope === true,
             value.state,
           ),
+          value.query,
+          value.limit,
+        ),
       ),
   }
   const read: AnyTool = {
@@ -448,7 +452,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_read,
     execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
       execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
-        readThread(options, current, value, callerId, signal),
+        readThreadWithLimits(options, current, value, callerId, signal),
       ),
   }
   const send: AnyTool = {
@@ -518,7 +522,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
         if (located.kind === "error") return located.result
         if (located.kind === "not_live") return NOT_LIVE
-        return await setModelOn(located.control, value.model, value.provider)
+        const model = modelWithReasoning(value.model, value.reasoning)
+        if (typeof model !== "string") return model
+        return await setModelOn(located.control, model, value.provider)
       }),
   }
   const setReasoning: AnyTool = {

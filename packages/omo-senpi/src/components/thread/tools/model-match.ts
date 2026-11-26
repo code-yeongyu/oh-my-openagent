@@ -12,6 +12,19 @@ export function modelPatternFailure(model: string): ThreadToolResult | undefined
     : undefined
 }
 
+/** `model` with `reasoning` as its `:<level>` suffix, the one form the matcher reads; a different level already on it is refused. */
+export function modelWithReasoning(model: string, reasoning: string | undefined): string | ThreadToolResult {
+  if (reasoning === undefined) return model
+  const named = splitModelDecorators(model, { thinkingOnly: true }).thinkingLevel
+  if (named === undefined) return `${model}:${reasoning}`
+  if (named === reasoning) return model
+  return failure(
+    "invalid_arguments",
+    `model ends in the level "${named}" and reasoning asks for "${reasoning}". Nothing was done.`,
+    "Name the level once, either as reasoning or as the model's :<level> suffix.",
+  )
+}
+
 /**
  * The one model a catalog's exact `provider/id` names (matchModel's first rung, within `provider` when given): a match
  * no later catalog change can make ambiguous, so a held catalog may decide it; the engine's set_model still confirms it.

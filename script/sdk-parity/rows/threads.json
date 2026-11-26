@@ -664,6 +664,10 @@
           "launch_spec": {
             "type": "string",
             "minLength": 1
+          },
+          "all_scope": {
+            "type": "boolean",
+            "const": true
           }
         },
         "required": []
@@ -735,8 +739,16 @@
             "permission_preset",
             "prompt",
             "delivery",
-            "idempotency_key"
-          ]
+            "idempotency_key",
+            "all_scope"
+          ],
+          "aliases": {
+            "message": "prompt",
+            "title": "name",
+            "mode": "delivery",
+            "thinking": "reasoning",
+            "thinking_level": "reasoning"
+          }
         }
       ],
       "planned": {},
@@ -1266,7 +1278,10 @@
             "summary",
             "idempotency_key",
             "all_scope"
-          ]
+          ],
+          "aliases": {
+            "mode": "delivery"
+          }
         }
       ],
       "planned": {
@@ -1425,6 +1440,14 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "required": []
@@ -1485,8 +1508,13 @@
           "reads": [
             "all_scope",
             "state",
-            "idempotency_key"
-          ]
+            "idempotency_key",
+            "query",
+            "limit"
+          ],
+          "aliases": {
+            "search": "query"
+          }
         }
       ],
       "planned": {},
@@ -1654,8 +1682,17 @@
             "cursor",
             "max_bytes",
             "all_scope",
-            "idempotency_key"
-          ]
+            "idempotency_key",
+            "limit"
+          ],
+          "aliases": {
+            "tail": "limit",
+            "lines": "limit",
+            "count": "limit",
+            "last": "limit",
+            "limit_bytes": "max_bytes",
+            "bytes": "max_bytes"
+          }
         }
       ],
       "planned": {},
@@ -1665,7 +1702,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The thread SDK's read (thread/sdk.ts READ_KEYS) does not take limit or wait_ms yet and answers 'Unknown option'; the tool is ahead of it until T1b (#15076)."
     },
     {
       "id": "threads.readAfterWait",
@@ -1682,7 +1720,7 @@
           },
           "wait_ms": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
             "maximum": 600000
           },
           "cursor": {
@@ -1698,6 +1736,10 @@
           },
           "idempotency_key": {
             "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "required": [
@@ -1724,8 +1766,17 @@
             "cursor",
             "max_bytes",
             "all_scope",
-            "idempotency_key"
-          ]
+            "idempotency_key",
+            "limit"
+          ],
+          "aliases": {
+            "tail": "limit",
+            "lines": "limit",
+            "count": "limit",
+            "last": "limit",
+            "limit_bytes": "max_bytes",
+            "bytes": "max_bytes"
+          }
         }
       ],
       "planned": {
@@ -1737,7 +1788,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The thread SDK's read (thread/sdk.ts READ_KEYS) does not take limit or wait_ms yet and answers 'Unknown option'; the tool is ahead of it until T1b (#15076)."
     },
     {
       "id": "threads.receipt",
@@ -1913,7 +1965,10 @@
             "alias",
             "all_scope",
             "idempotency_key"
-          ]
+          ],
+          "aliases": {
+            "title": "name"
+          }
         }
       ],
       "planned": {
@@ -2303,7 +2358,10 @@
             "idempotency_key",
             "collapse_key",
             "all_scope"
-          ]
+          ],
+          "aliases": {
+            "mode": "delivery"
+          }
         }
       ],
       "planned": {},
@@ -2501,6 +2559,38 @@
           },
           "idempotency_key": {
             "type": "string"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "off"
+              },
+              {
+                "type": "string",
+                "const": "minimal"
+              },
+              {
+                "type": "string",
+                "const": "low"
+              },
+              {
+                "type": "string",
+                "const": "medium"
+              },
+              {
+                "type": "string",
+                "const": "high"
+              },
+              {
+                "type": "string",
+                "const": "xhigh"
+              },
+              {
+                "type": "string",
+                "const": "max"
+              }
+            ]
           }
         },
         "required": [
@@ -2554,7 +2644,8 @@
             "model",
             "provider",
             "all_scope",
-            "idempotency_key"
+            "idempotency_key",
+            "reasoning"
           ]
         }
       ],
@@ -2835,9 +2926,9 @@
         "threads.list"
       ],
       "cells": [
-        "`threads.list({ all_scope?, workspace?, state?, device?, project?, name?, archived?, idempotency_key? })`",
+        "`threads.list({ all_scope?, workspace?, state?, device?, project?, name?, archived?, query?, limit?, idempotency_key? })`",
         "`omo thread list [--all-scope] [--state ...]` (repeatable or comma-separated); `omo remote sessions [--device] [--project] [--state running\\|idle\\|ended]`; `omo host session list`",
-        "`thread_list { all_scope?, state?, idempotency_key? }`",
+        "`thread_list { all_scope?, state?, query?, limit?, idempotency_key? }`",
         "partial: no `workspace`, `device`, `project`, `name`, `archived` in the thread SDK (remote module has them, `R/types.ts:68, 233-239`)",
         "Tool omits the five filters: rows carry `device`, `cwd`, `name` and status, and the listing is one bounded payload the model filters",
         "T1b"
@@ -2880,7 +2971,7 @@
         "threads.readAfterWait"
       ],
       "cells": [
-        "`threads.readAfterWait({ thread, wait_ms, cursor?, max_bytes?, all_scope?, idempotency_key? })`: wait for the turn to end, then read, with the `wait` block",
+        "`threads.readAfterWait({ thread, wait_ms, cursor?, max_bytes?, all_scope?, idempotency_key?, limit? })`: wait for the turn to end, then read, with the `wait` block",
         "none",
         "`thread_read { wait_ms }` (wait branch)",
         "**no**",
@@ -3044,7 +3135,7 @@
         "threads.create"
       ],
       "cells": [
-        "`threads.create({ thread?, device?, alias?, name?, cwd?, worktree?: { branch?, base? }, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key?, launch_spec? })`. `prompt` is a string, or `{ message, delivery?, expected_turn_id?, summary?, attachments?, author? }` (the remote module's `first`). `thread` (open an existing thread on whichever device holds it, optionally with `prompt`) never with `device`; `fork_from` on a host open is refused `unsupported` (`fork_unsupported`) until the engine forks on open (a terminal process forks through `engine.launch`, 6.9); a wider `permission_preset` is `scope_denied`",
+        "`threads.create({ thread?, device?, alias?, name?, cwd?, worktree?: { branch?, base? }, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key?, launch_spec?, all_scope? })`. `prompt` is a string, or `{ message, delivery?, expected_turn_id?, summary?, attachments?, author? }` (the remote module's `first`). `thread` (open an existing thread on whichever device holds it, optionally with `prompt`) never with `device`; `fork_from` on a host open is refused `unsupported` (`fork_unsupported`) until the engine forks on open (a terminal process forks through `engine.launch`, 6.9); a wider `permission_preset` is `scope_denied`",
         "`omo remote open <device> [--project] [--model] [--thinking] [--permission-preset] [--worktree [--branch] [--base]] [--prompt [--steer\\|--follow-up]]`; `omo host session open --cwd [--model] [--name] [--prompt] [--launch-spec]`",
         "`thread_create` (all fields but `launch_spec` and the object form of `prompt`)",
         "partial: the thread SDK creates; `omo remote open` skips the create orchestration (#13016 OMO-CTL-26); no `launch_spec`, no prompt metadata",
@@ -3134,7 +3225,7 @@
         "threads.setModel"
       ],
       "cells": [
-        "`threads.setModel({ thread, model, provider?, idempotency_key?, all_scope? })`",
+        "`threads.setModel({ thread, model, provider?, reasoning?, idempotency_key?, all_scope? })`",
         "`omo remote model <s> <provider/id>`; `omo host session model <ref> <provider/id>`",
         "`thread_set_model`",
         "partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`)",

@@ -1,3 +1,7 @@
+import { threadToolParamSchemas } from "../../packages/omo-senpi/src/components/thread/contracts"
+import { allRows, loadDomainFiles } from "./registry"
+import type { Row } from "./schema"
+
 // The scenarios the changed-capability gate drives on the merge base and on the head (design 7.4): each names the
 // capability whose outcome it shows and the surface it goes through. They stop at parsing, usage refusals and the tools'
 // own refusals, so no scenario reaches the network, an account, a model or a real engine host.
@@ -18,6 +22,17 @@ export type ToolScenario = {
   readonly surface: "tool"
   readonly tool: string
   readonly args: Readonly<Record<string, unknown>>
+  // Generated from a row's declared aliases (#15073): `twin` names the scenario with the field itself, which this one
+  // must answer exactly like; `conflict` marks the alias given with its field and a different value, which is refused.
+  readonly alias?: {
+    readonly row: string
+    readonly field?: string
+    readonly name?: string
+    readonly twin?: string
+    readonly conflict?: boolean
+  }
+  // Generated once per thread tool (LEAD ruling on #15076): a field no thread tool takes, so its refusal stays in view.
+  readonly unknownField?: boolean
 }
 
 // The loop's brief parser, driven directly: the flags it accepts and ignores must keep their value out of the brief
@@ -51,6 +66,82 @@ const tool = (id: string, capability: string, name: string, args: Record<string,
   tool: name,
   args,
 })
+
+const ALIAS_BASE_ARGS: Readonly<Record<string, Record<string, unknown>>> = {
+  thread_read: { thread: "missing-thread" },
+  thread_list: {},
+  thread_create: { thread: "missing-thread" },
+  thread_send: { thread: "missing-thread", message: "hi" },
+  thread_handoff: { thread: "missing-thread", message: "hi" },
+  thread_rename: { thread: "missing-thread" },
+}
+const ALIAS_VALUES: Readonly<Record<string, readonly [unknown, unknown]>> = {
+  limit: [3, 4],
+  max_bytes: [4096, 8192],
+  query: ["qa", "zz"],
+  prompt: ["hi", "yo"],
+  name: ["n1", "n2"],
+  delivery: ["follow_up", "steer"],
+  reasoning: ["high", "low"],
+}
+
+const REQUIRED_SAMPLES: Readonly<Record<string, unknown>> = {
+  thread: "missing-thread",
+  message: "hi",
+  model: "m",
+  level: "high",
+}
+
+// One scenario per thread tool the rows bind: its required fields and one field it does not take.
+function unknownFieldScenarios(rows: readonly Row[]): ToolScenario[] {
+  const schemas = threadToolParamSchemas as Readonly<Record<string, { readonly required?: readonly string[] }>>
+  const out = new Map<string, ToolScenario>()
+  for (const row of rows)
+    for (const entry of row.tool) {
+      if (!entry.name.startsWith("thread_") || out.has(entry.name)) continue
+      const required = schemas[entry.name]?.required ?? []
+      const args: Record<string, unknown> = { unknown_field: 1 }
+      for (const field of required) {
+        if (!(field in REQUIRED_SAMPLES))
+          throw new Error(`scenarios.ts: ${entry.name} requires ${field}, which REQUIRED_SAMPLES has no sample for`)
+        args[field] = REQUIRED_SAMPLES[field]
+      }
+      out.set(entry.name, { ...tool(`unknown-field-${entry.name}`, row.id, entry.name, args), unknownField: true })
+    }
+  return [...out.values()]
+}
+
+// Three scenarios per declared alias, once per tool: the alias alone, its field alone (the twin), and both disagreeing.
+function aliasScenarios(rows: readonly Row[]): ToolScenario[] {
+  const seen = new Set<string>()
+  const out: ToolScenario[] = []
+  for (const row of rows)
+    for (const entry of row.tool)
+      for (const [alias, field] of Object.entries(entry.aliases ?? {})) {
+        const id = `alias-${entry.name}-${alias}`
+        const values = ALIAS_VALUES[field]
+        if (values === undefined)
+          throw new Error(
+            `scenarios.ts: alias ${alias} of ${entry.name} maps to ${field}, which ALIAS_VALUES has no sample for`,
+          )
+        if (seen.has(id)) continue
+        seen.add(id)
+        const args = ALIAS_BASE_ARGS[entry.name] ?? {}
+        const [value, other] = values
+        out.push(
+          { ...tool(`${id}-field`, row.id, entry.name, { ...args, [field]: value }), alias: { row: row.id, field } },
+          {
+            ...tool(id, row.id, entry.name, { ...args, [alias]: value }),
+            alias: { row: row.id, field, name: alias, twin: `${id}-field` },
+          },
+          {
+            ...tool(`${id}-conflict`, row.id, entry.name, { ...args, [alias]: value, [field]: other }),
+            alias: { row: row.id, field, name: alias, conflict: true },
+          },
+        )
+      }
+  return out
+}
 
 export const SCENARIOS: readonly Scenario[] = [
   native("native-thread-usage", "threads.list", ["thread"]),
@@ -118,4 +209,7 @@ export const SCENARIOS: readonly Scenario[] = [
   }),
   tool("tool-archive-missing", "threads.archive", "thread_archive", { thread: "missing-thread" }),
   tool("tool-handoff-missing", "threads.handoff", "thread_handoff", { thread: "missing-thread", message: "hi" }),
+  tool("tool-read-wait-below-bound", "threads.readAfterWait", "thread_read", { thread: "missing-thread", wait_ms: -1 }),
+  ...aliasScenarios(allRows(loadDomainFiles())),
+  ...unknownFieldScenarios(allRows(loadDomainFiles())),
 ]

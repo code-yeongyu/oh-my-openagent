@@ -4,6 +4,9 @@ export const THREAD_MESSAGE_MAX_BYTES = 32768
 export const THREAD_SUMMARY_MAX_LENGTH = 200
 export const THREAD_READ_DEFAULT_BYTES = 131072
 export const THREAD_READ_MAX_BYTES = 1048576
+/** The newest messages a `thread_read` returns when it names no `limit`, and the most it may name. */
+export const THREAD_READ_DEFAULT_LIMIT = 60
+export const THREAD_READ_MAX_LIMIT = 200
 
 export const ThreadAddress = Type.String({
   description:
@@ -80,7 +83,7 @@ export const DEFAULT_THREAD_DELIVERY = "auto" as const
 export const ThreadDeliveryMode = Type.Union([Type.Literal("auto"), Type.Literal("steer"), Type.Literal("follow_up")], {
   default: DEFAULT_THREAD_DELIVERY,
   description:
-    "Omitted: auto. auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn (pass it only when the message must wait for that turn to end).",
+    "Omitted: auto. auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn (pass it only when the message must wait for that turn to end). Also accepted as mode.",
 })
 
 /**

@@ -46,7 +46,8 @@ import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
-import { listThreads, readThread, withBacklog } from "./tools/read-ops"
+import { readThreadWithLimits } from "./tools/read-limits"
+import { listThreads, withBacklog } from "./tools/read-ops"
 import { listAcross } from "./remote/cross-device"
 import { lazySameDeviceWake } from "./wake/lazy-same-device-wake"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
@@ -345,7 +346,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       guarded(
         async () =>
           unknownKeys(request, READ_KEYS) ??
-          readThread(
+          readThreadWithLimits(
             { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
             await view(),
             {

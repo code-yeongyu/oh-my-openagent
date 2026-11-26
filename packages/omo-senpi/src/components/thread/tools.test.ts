@@ -327,6 +327,121 @@ describe("thread links", () => {
   })
 })
 
+// #15073: the names the fleet census found agents predicting do what they say on the real tools, not only in the parser.
+describe("thread tools under the argument names agents predict", () => {
+  const tenMessages = () => Array.from({ length: 10 }, (_, index) => ({ role: "user", content: `m${index + 1}` }))
+
+  test.each(["limit", "tail", "lines"] as const)(
+    "#given a ten-message thread #when thread_read names %s 3 #then it returns the newest three, ending at the latest",
+    async (field) => {
+      // given
+      const f = fixture()
+      const withTen = { ...f, host: { ...f.host, getMessages: async () => tenMessages() } }
+
+      // when
+      const read = (await runner(withTen)("thread_read", { thread: "peer", [field]: 3 })) as unknown as {
+        kind: string
+        items: unknown[]
+      }
+
+      // then
+      expect(read.kind).toBe("ok")
+      expect(read.items).toHaveLength(3)
+      expect(JSON.stringify(read.items.at(-1))).toContain("m10")
+      expect(JSON.stringify(read.items[0])).toContain("m8")
+    },
+  )
+
+  test("#given a first read's limit and a cursor together #when thread_read runs #then it is refused by name and nothing is read", async () => {
+    const f = fixture()
+    const read = await runner(f)("thread_read", { thread: "peer", limit: 3, cursor: "t1.x" })
+    expect(read).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  test("#given two threads #when thread_list names query and then limit #then the rows narrow and the cut is counted", async () => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "other" })
+    const run = runner(f)
+
+    // when
+    const matched = (await run("thread_list", { query: "OTH" }, undefined, "call-q")) as unknown as {
+      threads: Array<{ thread: string }>
+    }
+    const cut = (await run("thread_list", { limit: 1 }, undefined, "call-l")) as unknown as {
+      threads: unknown[]
+      rows_omitted?: number
+    }
+
+    // then
+    expect(matched.threads.map((row) => row.thread)).toEqual(["dur-other"])
+    expect(cut.threads).toHaveLength(1)
+    expect(cut.rows_omitted).toBe(1)
+  })
+
+  test("#given thread_set_model with reasoning #when it switches #then the engine gets the model and the level", async () => {
+    const f = fixture()
+    expect(
+      await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x", reasoning: "high" }),
+    ).toMatchObject({ kind: "ok", thread: "dur-peer", model: { provider: "openai", id: "gpt-x" } })
+    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
+    expect(f.setThinkingLevel.mock.calls.map((call) => call[1])).toEqual(["high"])
+  })
+
+  test("#given a model whose suffix names another level than reasoning #when set #then it is refused and nothing switches", async () => {
+    const f = fixture()
+    expect(
+      await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:off", reasoning: "high" }),
+    ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(f.setModel).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    [500, 200, { limit: { requested: 500, used: 200 } }],
+    [200, 200, undefined],
+  ] as const)(
+    "#given a 600-message thread #when thread_read asks limit %i #then it reads the newest %i and reduced is %o",
+    async (asked, read, reduced) => {
+      // given
+      const f = fixture()
+      const many = Array.from({ length: 600 }, (_, index) => ({ role: "user", content: `m${index + 1}` }))
+      const run = runner({ ...f, host: { ...f.host, getMessages: async () => many } })
+
+      // when
+      const result = (await run("thread_read", { thread: "peer", limit: asked, max_bytes: 1048576 })) as unknown as {
+        kind: string
+        items: unknown[]
+        reduced?: unknown
+      }
+
+      // then
+      expect(result.kind).toBe("ok")
+      expect(result.items).toHaveLength(read)
+      expect(JSON.stringify(result.items.at(-1))).toContain("m600")
+      expect(result.reduced).toEqual(reduced)
+    },
+  )
+
+  test("#given a host that cannot report a turn end #when thread_read waits 0 then 1 ms #then 0 reads at once with wait not_waited and 1 tries to wait", async () => {
+    // given
+    const run = runner(fixture())
+
+    // when
+    const now = await run("thread_read", { thread: "peer", wait_ms: 0 })
+    const waited = await run("thread_read", { thread: "peer", wait_ms: 1 }, undefined, "call-2")
+
+    // then
+    expect(now).toMatchObject({ kind: "ok", wait: { outcome: "not_waited", waited_ms: 0 } })
+    expect(waited).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+  })
+
+  test("#given a receipt read #when it also names limit #then it is refused by name, never answered with limit dropped", async () => {
+    const result = await runner(fixture())("thread_read", { thread: "peer", delivery_id: "d-1", limit: 3 })
+    expect(result).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(JSON.stringify(result)).toContain("delivery_id")
+  })
+})
+
 describe("thread session controls", () => {
   test("rename trims the name and routes by the live id while returning the durable id", async () => {
     const f = fixture()

@@ -1,3 +1,4 @@
+import { CHANGED_REFUSALS_PATH, loadChangedRefusals, unknownFieldCoverageProblems } from "./changed-refusals"
 import { execFileSync } from "node:child_process"
 import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -126,6 +127,7 @@ try {
   const goldens = JSON.parse(readFileSync(join(REPO_ROOT, GOLDENS_PATH), "utf8")) as Record<string, Outcome>
   const baseGoldensText = show(mergeBase, GOLDENS_PATH)
   const baseRowsText = show(mergeBase, "script/sdk-parity/presentation.json")
+  const baseRefusalsText = show(mergeBase, CHANGED_REFUSALS_PATH)
   const report = gateReport({
     base,
     head: { rows, tools: headSide.tools, outcomes: headSide.outcomes, unresolved: unresolved.entries },
@@ -143,12 +145,17 @@ try {
       base: baseGoldensText === undefined ? undefined : (JSON.parse(baseGoldensText) as Record<string, Outcome>),
       head: goldens,
     },
+    changedRefusals: {
+      base: baseRefusalsText === undefined ? undefined : loadChangedRefusals(baseRefusalsText),
+      head: loadChangedRefusals(),
+    },
   })
   // The checks that read the merge base's tree run here, in the dedicated job that fetches it, and nowhere else: the
   // ordinary test shards have a shallow checkout without the base ref (design 7.4; train review of 6871a012b9).
   const evidence = await runEffectScenarios(rows)
   const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
   const baseFailures = [
+    ...unknownFieldCoverageProblems(rows, SCENARIOS),
     ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
     ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
   ]

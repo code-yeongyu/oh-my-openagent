@@ -29,7 +29,7 @@ export const ThreadCreateParams = Type.Object({
   name: Type.Optional(
     Type.String({
       description:
-        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while the thread value stays the address.",
+        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while the thread value stays the address. Also accepted as title.",
     }),
   ),
   cwd: Type.Optional(
@@ -86,7 +86,7 @@ export const ThreadCreateParams = Type.Object({
   ),
   reasoning: Type.Optional(
     thinkingLevel(
-      "Thinking level the new thread starts with. Default: that device's own default. Only for a new thread.",
+      "Thinking level the new thread starts with. Default: that device's own default. Only for a new thread. Also accepted as thinking or thinking_level.",
     ),
   ),
   permission_preset: Type.Optional(
@@ -102,9 +102,15 @@ export const ThreadCreateParams = Type.Object({
     Type.String({
       minLength: 1,
       maxLength: THREAD_MESSAGE_MAX_BYTES,
-      description: `First message for the new thread, delivered as thread_send (tool.thread_send() in an eval cell) delivers it once the thread exists (delivery picks its mode); the result's prompt field names that delivery, or its failure while the thread stays created. Covered by the same idempotency_key as the create. Also sent when thread opens an existing thread: it goes to that thread (#14335). Longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
+      description: `First message for the new thread, delivered as thread_send (tool.thread_send() in an eval cell) delivers it once the thread exists (delivery picks its mode); the result's prompt field names that delivery, or its failure while the thread stays created. Covered by the same idempotency_key as the create. Also sent when thread opens an existing thread: it goes to that thread (#14335). Longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large. Also accepted as message.`,
     }),
   ),
   delivery: Type.Optional(ThreadDeliveryMode),
+  all_scope: Type.Optional(
+    Type.Literal(true, {
+      description:
+        "Accepted as on the other thread tools: this tool already finds an existing thread in every workspace and on every device, so true changes nothing.",
+    }),
+  ),
   idempotency_key: IdempotencyKey,
 })

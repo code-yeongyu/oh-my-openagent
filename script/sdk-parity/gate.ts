@@ -4,7 +4,16 @@ import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
-import { schemaDifferences, type DiscoveredTool } from "./tool-check"
+import {
+  CHANGED_REFUSALS_PATH,
+  type ChangedRefusal,
+  changedRefusalEntryProblems,
+  changedRefusalProblem,
+  freshRefusals,
+} from "./changed-refusals"
+import { judgeUnresolvedRow } from "./row-judgement"
+import { aliasNewOnHead, aliasScenarioProblems, freshAheadEntries } from "./tool-ahead"
+import type { DiscoveredTool } from "./tool-check"
 
 // The changed-capability gate of design 7.4 (amendments 2 and 3). A demonstrated change fails it: a descriptor or tool-schema
 // change, or a base-versus-head outcome difference, under an unresolved entry, and a security-gated entry cleared without
@@ -35,6 +44,11 @@ export type GateInput = {
   readonly goldens: Goldens
   // Each tree's declared omo and engine versions (version-mask.ts); the merge base's is undefined when it has no manifest.
   readonly versions: { readonly base: DeclaredVersions | undefined; readonly head: DeclaredVersions }
+  // changed-refusals.json at the merge base (undefined when it has none) and at the head.
+  readonly changedRefusals: {
+    readonly base: readonly ChangedRefusal[] | undefined
+    readonly head: readonly ChangedRefusal[]
+  }
 }
 
 export type GateReport = {
@@ -44,6 +58,8 @@ export type GateReport = {
   readonly presentation: readonly string[]
   readonly presentationRows: readonly string[]
   readonly versionMasked: readonly string[]
+  readonly toolAhead: readonly string[]
+  readonly changedRefusals: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -52,32 +68,6 @@ export type GateReport = {
 
 const UNCHANGED_LINE = /^SDK-Parity-Unchanged:\s*yes\s*$/im
 const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
-
-// Design 7.4 (amendment 5): a row has two parts. Its DESCRIPTOR is what a surface accepts or calls: the sdk member, each
-// cli entry, each tool binding, which input fields exist and which are required, plus its kind, today
-// value, surfaces, projection and modules. Any change there under an unresolved entry fails. Everything else (a named
-// field's type, enum, nested schema, scenario ids, notes) is CONTRACT ANNOTATION: its change alone makes a candidate.
-function descriptorOf(row: Row): string {
-  const shape = [
-    ...Object.keys(row.input.properties).map((name) => `field ${name}`),
-    ...row.input.required.map((name) => `required ${name}`),
-  ]
-  const { id, kind, sdk, today, slices, cli, tool, planned, omitted, projection, modules } = row
-  return JSON.stringify({
-    id,
-    kind,
-    sdk,
-    today,
-    slices,
-    cli,
-    tool,
-    planned,
-    omitted,
-    projection,
-    modules,
-    shape: [...new Set(shape)].toSorted(),
-  })
-}
 
 // Design 7.4 (amendment 3): the candidates' digest binds the head and the sorted ids, so a verdict from another head or
 // over another list cannot carry it. The reviewer copies it into `SDK-Parity-Reviewed: <digest>`; nobody types the ids.
@@ -99,27 +89,17 @@ export function gateReport(input: GateInput): GateReport {
   const presentation: string[] = []
   const presentationRows: string[] = []
   const versionMasked: string[] = []
+  const aheadOf = freshAheadEntries(input.head.unresolved, input.base.unresolved)
+  const toolAhead: string[] = []
+  const refusals = freshRefusals(input.changedRefusals.head, input.changedRefusals.base)
+  const changedRefusals: string[] = []
+  const tools = { base: input.base.tools, head: input.head.tools }
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
-    const before = baseRows.get(row.id)
-    if (!initialization && (before === undefined || descriptorOf(before) !== descriptorOf(row))) {
-      failures.push(
-        `${row.id}: its descriptor changed under an unresolved gap; add the SDK call ${row.sdk} and its scenarios in this pull request`,
-      )
-      flagged.add(row.id)
-    }
-    for (const entry of row.tool) {
-      const [a, b] = [input.base.tools, input.head.tools].map(
-        (tools) => tools.find((tool) => tool.name === entry.name)?.parameters,
-      )
-      const moved = a !== undefined && b !== undefined ? schemaDifferences(a, b, entry.name) : []
-      if (moved.length > 0) {
-        failures.push(
-          `${row.id}: tool ${entry.name} changed its input schema under an unresolved gap (${moved[0]}); add the SDK call ${row.sdk}`,
-        )
-        flagged.add(row.id)
-      }
-    }
+    const judged = judgeUnresolvedRow(row, baseRows.get(row.id), aheadOf.get(row.id), tools, initialization)
+    failures.push(...judged.failures)
+    if (judged.failures.length > 0) flagged.add(row.id)
+    if (judged.ahead) toolAhead.push(row.id)
   }
   for (const scenario of input.scenarios) {
     const [before, after] = [input.base.outcomes[scenario.id], input.head.outcomes[scenario.id]]
@@ -139,6 +119,23 @@ export function gateReport(input: GateInput): GateReport {
       versionMasked.push(`${scenario.id}#version-mask`)
       continue
     }
+    const declared = refusals.get(scenario.id)
+    if (declared !== undefined) {
+      const tools = { base: input.base.tools, head: input.head.tools }
+      const why = changedRefusalProblem(declared, scenario, before, after, {
+        ahead: aheadOf.get(scenario.capability),
+        tools,
+      })
+      if (why === undefined) changedRefusals.push(`${scenario.id}#changed-refusal`)
+      else {
+        failures.push(
+          `${scenario.capability}: scenario ${scenario.id} is declared in ${CHANGED_REFUSALS_PATH}, but ${why}`,
+        )
+        flagged.add(scenario.capability)
+      }
+      continue
+    }
+    if (aliasNewOnHead(scenario, baseRows) && aheadOf.get(scenario.capability)?.aliases === true) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
       const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
@@ -157,6 +154,10 @@ export function gateReport(input: GateInput): GateReport {
       flagged.add(scenario.capability)
     }
   }
+  failures.push(...aliasScenarioProblems(input.scenarios, input.head.outcomes))
+  failures.push(
+    ...changedRefusalEntryProblems(refusals, input.scenarios, { base: input.base.outcomes, head: input.head.outcomes }),
+  )
   const slices = new Set([...input.body.matchAll(SLICE_LINE)].map((match) => match[1]))
   const atHead = unresolved
   for (const entry of input.base.unresolved ?? [])
@@ -166,7 +167,7 @@ export function gateReport(input: GateInput): GateReport {
       )
   const changed = new Set(input.changedFiles)
   const annotated = input.head.rows
-    .filter((row) => unresolved.has(row.id) && !flagged.has(row.id) && !initialization)
+    .filter((row) => unresolved.has(row.id) && !flagged.has(row.id) && !initialization && !toolAhead.includes(row.id))
     .filter((row) => JSON.stringify(baseRows.get(row.id)) !== JSON.stringify(row))
     .map((row) => row.id)
   const closureMoved = [...input.closures]
@@ -191,6 +192,8 @@ export function gateReport(input: GateInput): GateReport {
     presentation: presentation.toSorted(),
     presentationRows: presentationRows.toSorted(),
     versionMasked: versionMasked.toSorted(),
+    toolAhead: toolAhead.toSorted(),
+    changedRefusals: changedRefusals.toSorted(),
     head: input.headSha,
     // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
     // added later appends after these, so a merge that keeps both tiers keeps one order.
@@ -199,6 +202,8 @@ export function gateReport(input: GateInput): GateReport {
       ...liveSchema.map((id) => `${id}#live-schema`),
       ...presentationRows,
       ...versionMasked,
+      ...toolAhead.toSorted().map((id) => `${id}#tool-ahead`),
+      ...changedRefusals.toSorted(),
     ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
@@ -228,6 +233,8 @@ const reviewed = (report: GateReport): string[] => [
   ...report.liveSchema.map((id) => `${id}#live-schema`),
   ...report.presentationRows,
   ...report.versionMasked,
+  ...report.toolAhead.map((id) => `${id}#tool-ahead`),
+  ...report.changedRefusals,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -255,6 +262,16 @@ export function renderReport(report: GateReport): string {
   if (report.versionMasked.length > 0)
     lines.push(
       `VERSION MASK: ${report.versionMasked.map((entry) => entry.replace("#version-mask", "")).join(", ")}: equal only once each tree's own declared omo package version and engine pin (packages/omo-native/package.json) are replaced by placeholders; the reviewer confirms the version is the only difference before CLEAR.`,
+      "",
+    )
+  if (report.changedRefusals.length > 0)
+    lines.push(
+      `CHANGED REFUSAL: ${report.changedRefusals.map((entry) => entry.replace("#changed-refusal", "")).join(", ")}: refusals whose next_action or details changed with the same code and message (or, for a bound entry, only the widened bound in the message), as ${CHANGED_REFUSALS_PATH} declares in this pull request; the reviewer confirms each new advice before CLEAR.`,
+      "",
+    )
+  if (report.toolAhead.length > 0)
+    lines.push(
+      `TOOL AHEAD: ${report.toolAhead.join(", ")}: the tool gained optional fields, widened fields or aliases under an unresolved gap, as its unresolved.json entry's toolAhead (added in this pull request) admits; the reviewer confirms each change is additive before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

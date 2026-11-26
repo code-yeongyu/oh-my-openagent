@@ -33,5 +33,6 @@ export const input = (overrides: Partial<GateInput> = {}): GateInput => ({
   presentation: { base: [], head: [] },
   goldens: { base: {}, head: {} },
   versions: { base: undefined, head: { omo: "0.0.0", engine: "0.0.0" } },
+  changedRefusals: { base: [], head: [] },
   ...overrides,
 })

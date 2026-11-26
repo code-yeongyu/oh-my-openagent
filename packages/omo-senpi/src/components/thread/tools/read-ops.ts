@@ -128,8 +128,18 @@ export async function withBacklog(
  * pages from it (a first read's cursor names the older part of that window). Tail mode ignores the cursor, so following
  * next_cursor in tail mode returned the same slice again.
  */
-function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?: number; cursor?: string } {
-  return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }
+function readWindow(value: ThreadReadInput): {
+  mode: "tail" | "page"
+  tail_items?: number
+  max_bytes?: number
+  cursor?: string
+} {
+  return {
+    mode: value.cursor === undefined ? "tail" : "page",
+    tail_items: value.limit,
+    max_bytes: value.max_bytes,
+    cursor: value.cursor,
+  }
 }
 
 /** `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint here is dead. */
@@ -159,7 +169,7 @@ async function readLive(
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
   let wait: ThreadWaitOutcome | undefined
-  if (value.wait_ms !== undefined) {
+  if (value.wait_ms !== undefined && value.wait_ms > 0) {
     try {
       wait = await control.waitSettled(value.wait_ms, signal)
     } catch (error) {
@@ -182,6 +192,8 @@ async function readLive(
  * no longer pages is stale.
  */
 async function pagedReadResult(control: SessionControl, value: ThreadReadInput): Promise<ThreadToolResult | undefined> {
+  // The holder pages by bytes only; a read that names how many messages takes the whole transcript's window instead.
+  if (value.limit !== undefined) return undefined
   const entryCursor = value.cursor !== undefined && isEntryCursor(value.cursor)
   if (value.cursor !== undefined && !entryCursor) return undefined
   const page = await control.readEntryPage?.({

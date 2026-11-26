@@ -71,6 +71,8 @@ export type ToolEntry = {
   readonly branch: string
   readonly when: { readonly present: readonly string[]; readonly absent: readonly string[] }
   readonly reads: readonly string[]
+  /** Names the tool accepts in place of a field this branch reads (#15073): `{ alias: field }`. Part of the descriptor. */
+  readonly aliases?: Readonly<Record<string, string>>
 }
 
 export type Surfaces = { readonly cli?: string; readonly tool?: string }
@@ -256,6 +258,15 @@ export function rowProblems(row: Row): string[] {
   for (const tool of row.tool)
     for (const field of tool.reads)
       if (!inputs.has(field)) problems.push(`${at}: tool ${tool.name} reads "${field}", which ${row.sdk} does not take`)
+  for (const tool of row.tool)
+    for (const [alias, field] of Object.entries(tool.aliases ?? {})) {
+      if (!tool.reads.includes(field))
+        problems.push(
+          `${at}: tool ${tool.name} alias "${alias}" maps to "${field}", which branch ${tool.branch} does not read`,
+        )
+      if (inputs.has(alias) || tool.reads.includes(alias))
+        problems.push(`${at}: tool ${tool.name} alias "${alias}" is a real field and would shadow it`)
+    }
   return problems
 }
 
