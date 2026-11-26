@@ -38,6 +38,16 @@ Recovery resolves the newest owned task of the node's CURRENT `execAttempt` (`re
 
 `TaskRecord.started_at` is durable before normal start or lifecycle respawn invokes a runner. Respawn preserves an existing stamp without changing status or epoch; non-terminal reattachment stamps any absent value when writing `running`. A DAG node may remain `scheduled` after its child starts, so only a scheduled, lost task without this stamp is eligible for automatic readmission. Recovery uses `dag.node.retried` with `execAttempt + 1`, capped at three. Stamped lost work folds `task_lost`; legacy unstamped scheduled records remain eligible. A crash after stamping but before invocation conservatively folds `task_lost`. Reconciliation loss reduces the current stored record under its record lock, including when respawn fails after invoking the runner; it must preserve the launch stamp and other facts persisted during respawn.
 
+## Owned children: one cancellation rule (#11381)
+
+- **Resume fence.** A settled child runs again only through the manager's self-resume reopen. For a DAG-owned record the manager asks `owner-resume-fence.ts` inside the same record mutation. The answer rests on the run's durable checkpoint, which every journal append rewrites synchronously: the claim must be current by `owned-attempt.ts` and the run must not be settled. A loaded scheduler may only add a refusal, for a cancellation that has not journaled yet. A refused run is torn down and recorded as `task_self_resume_refused`.
+- **Sweeps deal only with children already live.**
+  - Run cancel (`run-children-stop.ts`) drains the run's whole live set to a fixed point. Attached children keep the deferred outcome boundary; any child still live fails the cancel with `DagRunChildrenLiveError`.
+  - No node is admitted in a pass after which a superseded or removed-node child is still live (`fenceStaleChildren`). The ready nodes fail with the retryable `stale_attempt_alive`, and node retry recovers.
+  - The owned start refuses start and reuse while any other live claim exists.
+  - Recovery stops stale siblings before it returns, attaches or folds a current claim.
+- **Outstanding stop.** A terminal run that still owns a live child owes a stop. `outstanding-stop.ts` derives it from durable state; nothing is stored. Snapshot and wait carry `outstandingStop`, and amend, retry and every re-entry refuse with `run_still_active` until a repeated cancel drains the run.
+
 ## Conventions
 
 - Policy is fixed inside the definition fingerprint: `dependency-frontier` wave admission (was `strict-barrier` before 2026-08-25), `continue-independent` failure handling, filesystem-only dependency data.
