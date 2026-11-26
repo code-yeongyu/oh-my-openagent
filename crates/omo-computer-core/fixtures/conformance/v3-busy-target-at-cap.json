@@ -221,6 +221,19 @@
               "evidence": [],
               "observation": {
                 "untrustedText": true
+              },
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
               }
             }
           },
@@ -324,7 +337,20 @@
                 "reason": "target_busy",
                 "indicator": "spinner",
                 "waitedMs": 1000,
-                "retryAfterMs": 1000
+                "retryAfterMs": 1000,
+                "session": {
+                  "screenLocked": "unknown",
+                  "displayAsleep": "unknown",
+                  "userActive": {
+                    "active": "unknown",
+                    "lastInputAgeMs": null
+                  },
+                  "secureInputActive": "unknown",
+                  "sessionActive": "unknown",
+                  "screensaverActive": "unknown",
+                  "pauseReasons": [],
+                  "sampledAt": 0
+                }
               }
             }
           },

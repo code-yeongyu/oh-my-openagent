@@ -1,9 +1,10 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { accountHome, lockDirectoryIn } from "../account-home"
+import { CredentialStoreError, DedicatedStoreError } from "../keystore"
 import { type HelperAccess, resolveHelperAccess } from "./access"
 import { type ApprovalCache, processApprovalCache } from "./approval-cache"
-import { HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
+import { ACL_DENIAL_MESSAGE, HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
 import { lockedDarwinStore, type LockedDarwinStore } from "./darwin-store"
 import type { HelperLease } from "./client"
 import { bundleCandidates, machineCandidates } from "./location"
@@ -69,6 +70,8 @@ export function asKeystoreError(error: unknown, pending: (message: string) => Er
   if (!(error instanceof HelperReadError)) return error
   if (error.failure === "pending") return pending(error.message)
   if (error.failure === "locked") return Object.assign(new Error(error.message), { code: "-25308" })
+  if (error.failure === "acl") return new CredentialStoreError(ACL_DENIAL_MESSAGE)
+  if (error.failure === "dedicated") return new DedicatedStoreError(error.message)
   return error
 }
 
@@ -83,6 +86,8 @@ export type KeychainHelperOptions = {
   readonly cache?: ApprovalCache
   readonly handOff?: () => Promise<boolean>
   readonly noDialog?: boolean
+  /** Whether OmO's own keychain is active (#13116); defaults to the marker under this user's home. */
+  readonly dedicatedStore?: () => boolean
 }
 
 export type DarwinBackend = {
@@ -106,7 +111,10 @@ export function createDarwinBackend(options: {
   readonly cache?: ApprovalCache
   readonly handOff?: () => Promise<boolean>
   readonly noDialog?: boolean
+  /** OmO's own keychain (#13116 r2 finding 1): every call names it, and nothing here reaches the login keychain. */
+  readonly dedicated?: boolean
 }): DarwinBackend {
+  if (options.dedicated === true) return createDarwinBackend({ ...dedicatedOptions(options), dedicated: false })
   const silently = options.silently ?? silentSecrets
   const key = { service: options.service, name: options.account }
   const deps = {
@@ -137,6 +145,40 @@ export function createDarwinBackend(options: {
     },
     underLock: (lease) => lockedDarwinStore(deps, lease),
     migrationPending: () => unowned,
+  }
+}
+
+const NO_LOGIN_KEYCHAIN = "OmO's own keychain is active; omo does not touch the login keychain."
+
+/** r2 finding 1: with OmO's own keychain active there is no helper-less path, so a missing helper is a hard error. */
+export const dedicatedHelperMissing = (): DedicatedStoreError =>
+  new DedicatedStoreError(
+    "OmO's own keychain is active on this Mac, but OmO's keychain helper is missing or failed its signature check. Reinstall omo, then try again. omo never falls back to the login keychain.",
+  )
+
+// No foreign-identity item can exist in an OmO-created keychain, so the own-identity steps (Bun.secrets on the login
+// keychain) are not wired, the creator hand-off is off and no dialog is ever shown.
+function dedicatedOptions<O extends Parameters<typeof createDarwinBackend>[0]>(options: O): O {
+  const access = options.access
+  return {
+    ...options,
+    access: { ...access, call: (call, lease) => access.call({ ...call, store: "omo" }, lease) },
+    secrets: {
+      // Never a value and never the login keychain: an item the helper cannot read takes row 8b (reads as signed out,
+      // a fresh sign-in moves it aside), as it does in the login keychain.
+      get: async () => {
+        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
+      },
+      set: async () => {
+        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
+      },
+      delete: async () => {
+        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
+      },
+    },
+    silently: (run) => run(),
+    handOff: async () => false,
+    noDialog: true,
   }
 }
 

@@ -9,7 +9,13 @@ import type {
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
-import { MirroredDialogs } from "./remote-attach-dialogs"
+import { MirroredDialogs, pendingIds } from "./remote-attach-dialogs"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+
+// A person drives these records (a slash command an extension runs, a compaction, a bash call), and the engine replies
+// only when the command finishes, so the attach terminal waits far longer than a tool call would; it still never waits
+// forever on a final state the relay lost.
+const FORWARD_WAIT_MS = 60 * 60_000
 
 // One authenticated attach TUI connection to the `omo remote attach` endpoint (remote-attach.ts): the attach's session
 // presented as the one row LOCAL_SESSION_ID, its plumbing answered here, every other record forwarded to the host.
@@ -78,9 +84,10 @@ export class Presentation {
   event(event: RemoteAttachEvent): void {
     switch (event.kind) {
       case "snapshot":
-        // The first snapshot replays when the stream starts; the TUI reads its dialogs through get_state. A later one is
-        // a re-attach after a relay gap, whose dialogs the TUI never reads, so they are presented here (omo#13474).
-        if (this.snapshot !== undefined && this.snapshot !== event.snapshot) this.presentPending(event.snapshot)
+        // Every snapshot (the first and each re-attach after a relay gap) presents its pending dialogs and questions as
+        // the TUI's request frames (#13482, omo#13474); the TUI shows a request id once, so get_state's copy of the same
+        // dialogs does not show it twice.
+        this.presentPending(event.snapshot)
         this.snapshot = event.snapshot
         return
       case "records":
@@ -114,7 +121,9 @@ export class Presentation {
   private presentPending(snapshot: SnapshotBody): void {
     const { pendingDialogs, pendingQuestions } = this.pendingOf(snapshot)
     const pending = [...pendingDialogs, ...pendingQuestions]
-    for (const resolved of this.dialogs.settledAway(pending, LOCAL_SESSION_ID)) this.send(resolved)
+    const state = isRecord(snapshot.state) ? snapshot.state : {}
+    const still = pendingIds(state.pendingDialogs, state.pendingQuestions)
+    for (const resolved of this.dialogs.settledAway(still, LOCAL_SESSION_ID)) this.send(resolved)
     for (const dialog of pending) this.send(dialog)
   }
 
@@ -123,7 +132,7 @@ export class Presentation {
       type: "extension_ui_request",
       id: randomUUID(),
       method: "notify",
-      message,
+      message: escapeForDisplay(message, { keepLineFeeds: true }),
       notifyType,
       sessionId: LOCAL_SESSION_ID,
     })
@@ -187,7 +196,7 @@ export class Presentation {
   private async forward(request: JsonObject, type: string): Promise<void> {
     const named = this.dialogs.answer(request)
     const rpc = named.sessionId === LOCAL_SESSION_ID ? { ...named, sessionId: this.attach.sessionId } : named
-    const { outcome, response } = await this.attach.command(rpc)
+    const { outcome, response } = await this.attach.command(rpc, { waitMs: FORWARD_WAIT_MS })
     if (response !== undefined) {
       this.send({ ...response, id: request.id })
       return

@@ -1,6 +1,6 @@
 import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./constants"
 import type { DeliverySender } from "./adapter"
-import type { DeliveryRow, Provenance } from "./types"
+import type { DeliveryRow, Provenance, StoredDeliveryEnvelope } from "./types"
 
 function headerValue(value: string): string {
   const cleaned = value.replace(/[\s\[\]=]+/g, "_")
@@ -24,19 +24,9 @@ export function deliveryProvenanceLine(provenance: Provenance | undefined): stri
 /** The fields a delivery's text is rendered from: a stored row, or the delivery a send to another device makes (remote-ops.ts). */
 export type RenderedDelivery = Pick<
   DeliveryRow,
-  "delivery_id" | "envelope" | "body" | "mode_requested" | "mode_effective" | "binding_id" | "binding_revision"
+  "delivery_id" | "envelope" | "body" | "mode_requested" | "mode_effective"
 > &
   Partial<DeliveryRow>
-
-function authorFields(row: RenderedDelivery): string[] {
-  const author = "external" in row.envelope.origin ? row.envelope.origin.external.author : undefined
-  if (author === undefined) return []
-  return [
-    `author=${quotedHeaderValue(author.display)}`,
-    `author_id=${quotedHeaderValue(author.platform_user_id)}`,
-    ...(author.user_id === undefined ? [] : [`author_user_id=${quotedHeaderValue(author.user_id)}`]),
-  ]
-}
 
 /** Who sent the delivery, as a human surface labels it: the header in the text stays the model's provenance. */
 export function deliverySender(row: DeliveryRow): DeliverySender {
@@ -46,12 +36,33 @@ export function deliverySender(row: DeliveryRow): DeliverySender {
     return { kind: "agent", session_id: origin.session, ...(name === undefined ? {} : { name }) }
   }
   if (origin.external.platform === "cli") return { kind: "command_line", user: origin.external.account_id }
-  const author = origin.external.author?.display
-  return { kind: "external", platform: origin.external.platform, ...(author === undefined ? {} : { author }) }
+  return { kind: "external", platform: origin.external.platform }
+}
+
+/**
+ * thread_create's first prompt is the created thread's own brief from the session that owns it (#14045): it arrives as
+ * that session's first user message, as if typed there, with no relay header or untrusted-content sentence. One line
+ * after it names the creator, so the thread can still answer the session that made it.
+ */
+function renderCreatorPrompt(row: RenderedDelivery): string {
+  const origin = row.envelope.origin
+  if (!("session" in origin)) return row.body
+  return `${row.body}\n\n(This thread was created by session ${origin.session}; report to it with tool.thread_send({ thread: "${origin.session}", message }) inside an eval cell.)`
+}
+
+/** The text a person sees for a delivery: the creator's prompt as written, any other delivery under its provenance line. */
+export function renderDeliveryDisplayText(row: {
+  readonly envelope: Pick<StoredDeliveryEnvelope, "provenance" | "authority">
+  readonly body: string
+}): string {
+  return row.envelope.authority === "creator"
+    ? row.body
+    : `${deliveryProvenanceLine(row.envelope.provenance)}\n${row.body}`
 }
 
 export function renderDeliveryText(row: RenderedDelivery): string {
   const envelope = row.envelope
+  if (envelope.authority === "creator") return renderCreatorPrompt(row)
   const source = "session" in envelope.origin ? "peer_agent" : "external"
   const senderSession = "session" in envelope.origin ? envelope.origin.session : "-"
   const effective = row.mode_effective ?? row.mode_requested
@@ -72,14 +83,12 @@ export function renderDeliveryText(row: RenderedDelivery): string {
             : [`device=${quotedHeaderValue(envelope.provenance.device)}`]),
         ]),
     `actor=${headerValue(envelope.actor)}`,
-    ...authorFields(row),
     `sender_session=${headerValue(senderSession)}`,
     `delivery=${headerValue(row.delivery_id)}`,
     `requested=${row.mode_requested}`,
     `effective=${effective}`,
     `root=${headerValue(envelope.root_id)}`,
     `hop=${envelope.hop}`,
-    ...(row.binding_id === null ? [] : [`binding=${headerValue(row.binding_id)}@${row.binding_revision ?? 0}`]),
   ].join(" ")
   // One header line, workspace and project first: readers split the text as header, sentence, body. Every label is
   // quoted with its brackets escaped, so the line still ends at the header's own `]`.

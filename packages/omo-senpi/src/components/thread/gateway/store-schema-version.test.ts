@@ -20,7 +20,9 @@ test("#given a newer core schema #when an older supported version opens it #then
   const path = gatewayDatabasePath(h.agentDir)
   const db = new Database(path)
   const futureVersion = GATEWAY_MIGRATIONS.length + 1
-  db.exec(`PRAGMA user_version = ${futureVersion}; INSERT INTO gateway_meta VALUES ('future-fixture', 'keep')`)
+  db.exec(
+    `PRAGMA user_version = ${futureVersion}; INSERT INTO gateway_meta VALUES ('future-fixture', 'keep'); INSERT OR REPLACE INTO gateway_meta VALUES ('reader_floor', '${futureVersion}')`,
+  )
   db.close()
   const exits: Promise<unknown>[] = []
   const store = h.store({

@@ -110,6 +110,24 @@ async function repoWithRemote(): Promise<{
   const paths = buildIdentityPaths(join(root, "memory"), "agent")
   const project = join(root, "project")
   for (const dir of [paths.repo, project]) execFileSync("git", ["init", "-q", dir], { windowsHide: true })
+  // Sync binds a memory repository only after its first commit (#13486).
+  execFileSync(
+    "git",
+    [
+      "-C",
+      paths.repo,
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "first",
+    ],
+    { windowsHide: true },
+  )
   execFileSync("git", ["-C", project, "remote", "add", "origin", "git@github.com:acme/widgets.git"], {
     windowsHide: true,
   })

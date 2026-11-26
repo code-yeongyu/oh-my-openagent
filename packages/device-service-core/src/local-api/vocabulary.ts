@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/vocabulary.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/vocabulary.ts
 // The value lists of the local API v1 vocabulary. Every name and value here is generic: none contains a
 // transport-internal word (docs/local-api.md "Wording"); LA18 scans this file, protocol.ts and the docs.
 export const LOCAL_API_VERSION = 1;
@@ -24,17 +24,16 @@ export type StatusState = (typeof STATUS_STATES)[number];
 // #829 P2: the update record's phase a candidate reports in status.get update (trial until the installer commits it).
 export const STATUS_UPDATE_PHASES = ["trial", "committed"] as const;
 export type StatusUpdatePhase = (typeof STATUS_UPDATE_PHASES)[number];
-export const POLICY_STATES = ["off", "pending", "active"] as const;
-export type PolicyState = (typeof POLICY_STATES)[number];
-export const THIS_DEVICE_STATES = [
-  "unclassified",
-  "desktop_unregistered",
-  "indeterminate",
-  "desktop",
-  "cli_only",
-  "acked",
-] as const;
-export type ThisDeviceState = (typeof THIS_DEVICE_STATES)[number];
+export {
+  POLICY_STATES,
+  POLICY_WAIT_REASONS,
+  POLICY_WAITING_STATES,
+  THIS_DEVICE_STATES,
+  type PolicyState,
+  type PolicyWaitReason,
+  type PolicyWaitingState,
+  type ThisDeviceState,
+} from "./policy.ts";
 
 // "sdk": a program built on the machine SDK (design 8.4); like "omo", it carries no data_home.
 export const CLIENT_NAMES = ["desktop", "omo", "installer", "sdk"] as const;
@@ -176,6 +175,8 @@ export const COMMAND_REFUSAL_REASONS = [
   "route_unlisted",
   // R3 C1 (spec#297): an empty hand_link poll over its sender's rate; only a hosted brain's hand_link meets it.
   "rate_limited",
+  // Decision 0029 (spec#303): a hand_link outside its sender's signed hosted binding; only a hosted brain meets it.
+  "unbound",
   // #1120, local only: a host reason this list lacks; the host's own reason travels as receipt.raw_reason. Gated by
   // client version (event-gate.ts): an older client gets engine_capability_missing.
   "unknown_reason",

@@ -27,7 +27,7 @@ const TABLE: Readonly<Record<FolderFailureReason, { readonly code: ThreadErrorCo
   not_a_directory: { code: "invalid_arguments", next: "Pass a folder, not a file, as cwd; nothing was created." },
   relative_path: {
     code: "invalid_arguments",
-    next: "Pass an absolute folder; on another device use a path of that device (thread_list with all_scope shows its folders).",
+    next: "Pass an absolute folder; on another device use a path of that device (thread_list with all_scope, tool.thread_list({ all_scope: true }) in an eval cell, shows its folders).",
   },
   not_a_git_repo: {
     code: "invalid_arguments",

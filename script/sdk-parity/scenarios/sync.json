@@ -1,0 +1,404 @@
+{
+  "domain": "sync",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "sync.status/reads-device-devices-pending",
+      "row": "sync.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "sync.status"
+        },
+        {
+          "port": "session",
+          "op": "devices.list"
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<memory-root>/sync-pin/trust-anchor"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.status/signed-out",
+      "row": "sync.status",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.disable/switches-off-on-service-then-locally",
+      "row": "sync.disable",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.disable"
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<memory-root>/sync-pin/device-switch"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sync.disable/service-refused",
+      "row": "sync.disable",
+      "kind": "refusal",
+      "refusal": "service_refused",
+      "input": {},
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.disable",
+          "count": 1,
+          "result": {
+            "kind": "refused"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.disable/signed-out",
+      "row": "sync.disable",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "sync.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/approves-the-one-waiting-device",
+      "row": "sync.approve",
+      "kind": "effect",
+      "input": {
+        "confirmCode": "123456"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": [
+              {
+                "id": "p-1",
+                "answer": null
+              }
+            ]
+          }
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "args": {
+            "id": "p-1",
+            "confirmCode": "123456"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/approves-the-named-device",
+      "row": "sync.approve",
+      "kind": "effect",
+      "input": {
+        "id": "p-2",
+        "confirmCode": "123456"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": [
+              {
+                "id": "p-1",
+                "answer": null
+              },
+              {
+                "id": "p-2",
+                "answer": null
+              }
+            ]
+          }
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "args": {
+            "id": "p-2",
+            "confirmCode": "123456"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/none-waiting",
+      "row": "sync.approve",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "confirmCode": "123456"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": []
+          }
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/several-waiting-no-id",
+      "row": "sync.approve",
+      "kind": "refusal",
+      "refusal": "ambiguous_target",
+      "input": {
+        "confirmCode": "123456"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": [
+              {
+                "id": "p-1",
+                "answer": null
+              },
+              {
+                "id": "p-2",
+                "answer": null
+              }
+            ]
+          }
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/code-differs",
+      "row": "sync.approve",
+      "kind": "refusal",
+      "refusal": "approval_denied",
+      "input": {
+        "id": "p-1",
+        "confirmCode": "000000"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": [
+              {
+                "id": "p-1",
+                "answer": null
+              }
+            ]
+          }
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/request-expired",
+      "row": "sync.approve",
+      "kind": "refusal",
+      "refusal": "approval_expired",
+      "input": {
+        "id": "p-1",
+        "confirmCode": "123456"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": [
+              {
+                "id": "p-1",
+                "answer": null
+              }
+            ]
+          }
+        },
+        {
+          "port": "clock",
+          "op": "now"
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/not-a-member",
+      "row": "sync.approve",
+      "kind": "refusal",
+      "refusal": "service_refused",
+      "input": {
+        "id": "p-1",
+        "confirmCode": "123456"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 1,
+          "result": {
+            "pending": [
+              {
+                "id": "p-1",
+                "answer": null
+              }
+            ]
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<memory-root>/sync-pin/trust-anchor"
+          },
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/missing-confirm-code",
+      "row": "sync.approve",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "id": "p-1"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.retirePin/retires-the-accounts-pin",
+      "row": "sync.retirePin",
+      "kind": "effect",
+      "input": {
+        "account": "acct-1"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "args": {
+            "path": "<memory-root>/sync-pin/trust-anchor/<sha256(acct-1)>"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sync.retirePin/empty-account",
+      "row": "sync.retirePin",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "account": ""
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

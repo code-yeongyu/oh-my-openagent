@@ -18,7 +18,8 @@ const bundleHash = createHash("sha256")
   .digest("hex")
 assert.equal(bundleHash, "a44111084c0d4782206c04b4276292f7fec6d1f7a33525512fbeef3242079dfb")
 const workflow = Bun.YAML.parse(await readFile(new URL("../workflows/cla.yml", import.meta.url), "utf8"))
-const signatureStep = workflow.jobs.cla.steps.find((step) => step.id === "cla_state")
+const automation = Bun.YAML.parse(await readFile(new URL("../workflows/pr-automation.yml", import.meta.url), "utf8"))
+const signatureStep = automation.jobs.automation.steps.find((step) => step.id === "cla_state")
 const actionStep = workflow.jobs.cla.steps.find((step) => step.uses?.startsWith("contributor-assistant/"))
 const user = { login: "first-time-fork-contributor", id: 567, type: "User" }
 const pr = { number: 42, state: "open", head: { sha: "fork-head", ref: "contribution" } }

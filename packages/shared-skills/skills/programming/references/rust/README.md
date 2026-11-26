@@ -221,6 +221,10 @@ Full decision tree with rationale and code snippets → [libraries.md](libraries
 | HTTP server | `axum` + `tower` | Type-safe extractors, tower middleware. Stack → [axum-stack.md](axum-stack.md) |
 | CLI | `clap` derive + `color-eyre` | Typed args, beautiful errors. Stack → [clap-stack.md](clap-stack.md) |
 | Serialization | `serde` + `serde_json` | Non-negotiable for any boundary type |
+| HTTP client | `reqwest` with rustls | Tuned timeouts and pool, never a bare default client |
+| Logging | `tracing` + `tracing-subscriber` | Structured spans and fields |
+| Config from env | `figment` or `config` | Parsed once into a typed struct |
+| Data / analytics | `polars` or `arrow` | Columnar, no row-at-a-time loops |
 | Error (library) | `thiserror` | Derive `Error` with zero boilerplate |
 | Error (binary) | `anyhow` / `color-eyre` | Context-rich ad-hoc errors |
 | Database | `sqlx` (compile-time checked) | No runtime SQL surprises |
@@ -236,7 +240,7 @@ Full decision tree with rationale and code snippets → [libraries.md](libraries
 
 ## Cargo Strict Configuration
 
-Every new project gets the strict lint config from [cargo-strict.md](cargo-strict.md). The non-negotiable CI gate:
+Scaffold a new project with `bun run ../../scripts/rust/new-project.ts <name>`. Every new project gets the strict lint config from [cargo-strict.md](cargo-strict.md). The non-negotiable CI gate:
 
 ```bash
 cargo fmt --all -- --check && \

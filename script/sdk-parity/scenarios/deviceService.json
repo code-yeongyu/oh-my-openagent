@@ -1,0 +1,546 @@
+{
+  "domain": "deviceService",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "deviceService.status/reads-service-state",
+      "row": "deviceService.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.status"
+        }
+      ]
+    },
+    {
+      "id": "deviceService.status/service-unproven",
+      "row": "deviceService.status",
+      "kind": "refusal",
+      "refusal": "device_service_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.status",
+          "count": 1,
+          "result": {
+            "error": "server_proof_invalid"
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.info/reads-version-and-capabilities",
+      "row": "deviceService.info",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.info"
+        }
+      ]
+    },
+    {
+      "id": "deviceService.info/service-not-installed",
+      "row": "deviceService.info",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.info",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.enable/bootstraps-switches-on-clears-opt-out",
+      "row": "deviceService.enable",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap"
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "args": {
+            "on": true
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "args": {
+            "path": "~/.omo/remote-sessions.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.enable/bootstrap-stopped",
+      "row": "deviceService.enable",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "count": 1,
+          "result": {
+            "kind": "stopped",
+            "state": "service_degraded"
+          }
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.disable/records-opt-out-and-switches-off",
+      "row": "deviceService.disable",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/remote-sessions.json"
+          }
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "args": {
+            "on": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.disable/signed-out",
+      "row": "deviceService.disable",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.disable/service-not-running",
+      "row": "deviceService.disable",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/remote-sessions.json"
+          }
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.control/reads-attach-control",
+      "row": "deviceService.control",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.control"
+        }
+      ]
+    },
+    {
+      "id": "deviceService.control/service-without-control",
+      "row": "deviceService.control",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.info",
+          "count": 1,
+          "result": {
+            "capabilities": []
+          }
+        },
+        {
+          "port": "deviceService",
+          "op": "service.control",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.control/signed-out",
+      "row": "deviceService.control",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "deviceService",
+          "op": "service.control",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/turns-control-on",
+      "row": "deviceService.setControl",
+      "kind": "effect",
+      "input": {
+        "on": true
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "args": {
+            "on": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/turns-control-off",
+      "row": "deviceService.setControl",
+      "kind": "effect",
+      "input": {
+        "on": false
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "args": {
+            "on": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/service-without-control",
+      "row": "deviceService.setControl",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "on": true
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.info",
+          "count": 1,
+          "result": {
+            "capabilities": []
+          }
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/signed-out",
+      "row": "deviceService.setControl",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {
+        "on": true
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/on-not-boolean",
+      "row": "deviceService.setControl",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "on": "yes"
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.wake/reads-wake-switch",
+      "row": "deviceService.wake",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.wake"
+        }
+      ]
+    },
+    {
+      "id": "deviceService.wake/service-too-old",
+      "row": "deviceService.wake",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.wake",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/turns-wake-on",
+      "row": "deviceService.setWake",
+      "kind": "effect",
+      "input": {
+        "on": true
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "args": {
+            "on": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/turns-wake-off",
+      "row": "deviceService.setWake",
+      "kind": "effect",
+      "input": {
+        "on": false
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "args": {
+            "on": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/null-restores-default",
+      "row": "deviceService.setWake",
+      "kind": "effect",
+      "input": {
+        "on": null
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "args": {
+            "on": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/service-too-old",
+      "row": "deviceService.setWake",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "on": true
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/on-missing",
+      "row": "deviceService.setWake",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {},
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/reads-account-itself",
+      "row": "deviceService.bootstrap",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        },
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/given-account-skips-store-read",
+      "row": "deviceService.bootstrap",
+      "kind": "effect",
+      "input": {
+        "account": {
+          "exitCode": 4,
+          "stdout": "{\"signedIn\":false}"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "args": {
+            "account": {
+              "exitCode": 4,
+              "stdout": "{\"signedIn\":false}"
+            }
+          },
+          "count": 1,
+          "result": {
+            "kind": "stopped",
+            "state": "signed_out"
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/install-pinned-service",
+      "row": "deviceService.bootstrap",
+      "kind": "effect",
+      "input": {
+        "install": true
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        },
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "args": {
+            "install": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/adopt-hands-over-sign-in",
+      "row": "deviceService.bootstrap",
+      "kind": "effect",
+      "input": {
+        "adopt": true
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        },
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "args": {
+            "adopt": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/install-not-boolean",
+      "row": "deviceService.bootstrap",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "install": "yes"
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}
