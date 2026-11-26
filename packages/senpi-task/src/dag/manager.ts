@@ -13,7 +13,16 @@ import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } f
 import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprintInputV1 } from "./fingerprint"
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
-import { readDagNodeActivityAt } from "./node-activity"
+import { projectSnapshot } from "./run-snapshot"
+import {
+  batchedOwnedTaskReader,
+  drainOutstandingStop,
+  outstandingRunStop,
+  outstandingStopRefusal,
+  withOutstandingStop,
+  type DagOwnedTaskReader,
+  type DagRunStopper,
+} from "./outstanding-stop"
 import { readDagDirectory, type DagEventPage, type DagFileStore } from "./store"
 import { DAG_SETTINGS_DEFAULTS } from "./types"
 import type {
@@ -166,6 +175,8 @@ export type DagRunSummary = {
   readonly createdAt: string
   readonly updatedAt: string
   readonly counts: DagNodeCounts
+  /** A settled run that still owns a live child owes a stop (#11381); the same derivation as the snapshot. */
+  readonly outstandingStop?: DagRunSnapshot["outstandingStop"]
 }
 
 export type DagStartResult = {
@@ -198,6 +209,8 @@ export type DagManagerOptions = {
   readonly now?: () => number
   readonly materializeSkills?: DagMaterializeSkills
   readonly settings?: Partial<DagSettings>
+  /** Task records of the run's children: snapshot and amend read a settled run's outstanding stop from them. */
+  readonly ownedTasks?: DagRunStopper
 }
 
 export type DagHistoryParams = {
@@ -238,6 +251,16 @@ export function createDagManager(options: DagManagerOptions): DagManager {
   const now = options.now ?? Date.now
   const newRunId = options.newRunId ?? (() => `dag_${randomUUID()}` as DagRunId)
   const settings: DagSettings = { ...DAG_SETTINGS_DEFAULTS, ...options.settings }
+  const owedStopTarget = (error: unknown, params: DagAmendParams): DagRunRecordV1 | undefined => {
+    if (!(error instanceof DagManagerError) || error.code !== "run_still_active" || error.runId === undefined)
+      return undefined
+    const target = store.readCheckpoint<DagRunRecordV1>(error.runId)
+    if (target?.parentSessionId !== params.parentSessionId) return undefined
+    return outstandingRunStop(options.ownedTasks, target) === undefined ? undefined : target
+  }
+  const ownedReader = options.ownedTasks === undefined ? undefined : batchedOwnedTaskReader(options.ownedTasks)
+  const snapshotOf = (record: DagRunRecordV1): DagRunSnapshot =>
+    withOutstandingStop(projectSnapshot(record, store.stateDir), ownedReader, record)
   // list() sits on the DAG widget's 1Hz repaint path AND on the runtime mutation listener that
   // fires for every checkpoint write, so parsing each checkpoint in the runs directory made one
   // frame re-read the whole of DAG history: 710 checkpoints / 68MB / 473ms per call on a real
@@ -307,21 +330,35 @@ export function createDagManager(options: DagManagerOptions): DagManager {
         settings,
         ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
       }),
-    amend: async (params) =>
-      amendRun(params, {
+    amend: async (params) => {
+      const context = {
         store,
         now,
         settings,
+        ...(options.ownedTasks === undefined ? {} : { ownedTasks: options.ownedTasks }),
         ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-      }),
+      }
+      // Validation first and synchronous: an amendment that is malformed or invalid is rejected before
+      // anything is drained. Only an owed-stop refusal of a run that really owes one drains, and the
+      // amendment then runs again, re-validating the durable run after the await (#11381).
+      try {
+        return amendRun(params, context)
+      } catch (error) {
+        const target = owedStopTarget(error, params)
+        if (target === undefined) throw error
+        await drainOutstandingStop(options.ownedTasks, target)
+      }
+      return amendRun(params, context)
+    },
+
     attach(runId, parentSessionId) {
       ownedRecord(runId, parentSessionId)
       return {
         runId,
-        snapshot: () => projectSnapshot(ownedRecord(runId, parentSessionId), store.stateDir),
+        snapshot: () => snapshotOf(ownedRecord(runId, parentSessionId)),
       }
     },
-    snapshot: (runId, parentSessionId) => projectSnapshot(ownedRecord(runId, parentSessionId), store.stateDir),
+    snapshot: (runId, parentSessionId) => snapshotOf(ownedRecord(runId, parentSessionId)),
     record: ownedRecord,
     list(parentSessionId, listOptions) {
       const limit = resolveLimit(listOptions?.limit, LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT)
@@ -341,7 +378,10 @@ export function createDagManager(options: DagManagerOptions): DagManager {
         if (byUpdated !== 0) return byUpdated
         return a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0
       })
-      return summaries.slice(0, limit)
+      return summaries.slice(0, limit).map((summary) => {
+        const outstandingStop = outstandingRunStop(ownedReader, summary)
+        return outstandingStop === undefined ? summary : { ...summary, outstandingStop }
+      })
     },
     history(params) {
       ownedRecord(params.runId, params.parentSessionId)
@@ -371,7 +411,7 @@ type StartContext = {
   readonly materializeSkills?: DagMaterializeSkills
 }
 
-type AmendContext = Omit<StartContext, "newRunId">
+type AmendContext = Omit<StartContext, "newRunId"> & { readonly ownedTasks?: DagOwnedTaskReader }
 
 function startRun(params: DagStartParams, context: StartContext): DagStartResult {
   const at = new Date(context.now()).toISOString()
@@ -539,6 +579,8 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
       nodeIds: unsafeIds,
     })
   }
+  const owed = outstandingStopRefusal(context.ownedTasks, oldRecord)
+  if (owed !== undefined) throw new DagManagerError({ code: "run_still_active", message: owed, runId: selectedRunId })
   if (oldRecord.status === "running") {
     throw new DagManagerError({
       code: "run_still_active",
@@ -733,46 +775,6 @@ function materializeAmendedDefinition(
       })),
     },
     diagnostics: [...oldRecord.diagnostics, ...(materialized.diagnostics ?? [])],
-  }
-}
-
-// States whose node still owns a child that could be doing work right now. The activity clock is
-// projected for exactly these, so a settled node never reports a stale "last seen" time.
-const LIVE_CHILD_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["scheduled", "running", "paused"])
-
-function withNodeActivity(nodes: readonly DagNode[], stateDir: string): readonly DagNode[] {
-  return nodes.map((node) => {
-    if (node.taskId === undefined || !LIVE_CHILD_NODE_STATES.has(node.state)) return node
-    const lastActivityAt = readDagNodeActivityAt(stateDir, node.taskId)
-    return lastActivityAt === undefined ? node : { ...node, lastActivityAt }
-  })
-}
-
-function projectSnapshot(record: DagRunRecordV1, stateDir: string): DagRunSnapshot {
-  return {
-    ...(record.pause === undefined ? {} : { pause: record.pause }),
-    schemaVersion: 1,
-    runId: record.runId,
-    runKey: record.runKey,
-    name: record.name,
-    parentSessionId: record.parentSessionId,
-    rootSessionId: record.rootSessionId,
-    status: record.status,
-    generation: record.generation,
-    createdAt: record.createdAt,
-    ...(record.startedAt === undefined ? {} : { startedAt: record.startedAt }),
-    ...(record.completedAt === undefined ? {} : { completedAt: record.completedAt }),
-    definitionFingerprint: record.definitionFingerprint,
-    lastSeq: record.checkpointSeq,
-    nodes: withNodeActivity(record.nodes, stateDir),
-    edges: record.edges,
-    waves: record.waves,
-    criticalPath: record.criticalPath,
-    bottlenecks: record.bottlenecks,
-    diagnostics: record.diagnostics,
-    counts: countNodes(record.nodes),
-    ...(record.amendHistory === undefined ? {} : { amendHistory: record.amendHistory }),
-    ...(record.leaseHolderPid === undefined ? {} : { leaseHolderPid: record.leaseHolderPid }),
   }
 }
 

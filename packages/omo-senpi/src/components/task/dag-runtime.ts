@@ -9,10 +9,12 @@ import {
 } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
+  createDagOwnerResumeFence,
   createDagLeaseWatch,
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
+  stopSettledRunChildren,
   type DagDefinition,
   type DagFileStore,
   type DagLeaseWatchOptions,
@@ -150,6 +152,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const coreManager = createDagManager({
     store,
     materializeSkills,
+    ownedTasks: deps.engine.manager,
     ...(dagSettings === undefined ? {} : { settings: dagSettings }),
   })
   const taskManager = admissionTaskManager(deps.engine.manager, (runId) => stoppedAdmissions.has(runId))
@@ -214,6 +217,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const stopObservingSchedulers = observeDagSchedulers(taskManager, (scheduler) => {
     scheduler.subscribe(publishSchedulerEvent)
   })
+  const stopFencingResumes = deps.engine.registerOwnerResumeFence(
+    createDagOwnerResumeFence({ store, cancelling: (runId) => schedulers.get(runId)?.scheduler.cancelling() ?? false }),
+  )
 
   const controller = (
     runId: DagRunId,
@@ -253,7 +259,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
     const sessionId = deps.engine.runtime.sessionId() ?? ""
     const record = coreManager.record(runId, sessionId)
-    if (TERMINAL_RUN_STATUSES.has(record.status)) return
+    // A settled run has no scheduler to ask, but a child it owns can still be live (#11381).
+    if (TERMINAL_RUN_STATUSES.has(record.status)) return stopSettledRunChildren(taskManager, record, reason)
     // A user-stopped run has no live scheduler holding its children: end each paused child first,
     // journal the run cancelled, and only then let the parent's fence for the run go.
     const userStopped = record.status === "paused" && record.pause?.reason === "user_stop"
@@ -326,7 +333,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     sessionId: () => deps.engine.runtime.sessionId() ?? "",
   })
 
-  const waitSurface = createDagWaitSurface({ store, subscribe, cancel })
+  const waitSurface = createDagWaitSurface({ store, subscribe, cancel, ownedTasks: taskManager })
   const wait = async (runId: DagRunId, parentSessionId: string) => {
     const result = await waitSurface.wait(runId, parentSessionId)
     const owned = schedulers.get(runId)
@@ -716,6 +723,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     dispose() {
       unregisterPauseSource?.()
       stopObservingSchedulers()
+      stopFencingResumes()
       cancelLeaseWatches()
       bridge.dispose()
       activeSessionId = undefined
