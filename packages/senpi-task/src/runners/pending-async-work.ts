@@ -90,6 +90,28 @@ function describePendingAsyncWork(work: PendingAsyncWork): string {
   return parts.join("; ")
 }
 
+/**
+ * What is known about the child's own async work when a turn's last answer is classified for good
+ * (omo#10487): the pending work the engine reported, `"none-pending"` when it reported none, or
+ * `"unrecorded"` when it reported nothing at all - an older engine without a lifecycle, the one
+ * documented case read as not held.
+ */
+export type PendingWorkEvidence = PendingAsyncWork | "none-pending" | "unrecorded"
+
+export function pendingWorkOf(evidence: PendingWorkEvidence): PendingAsyncWork | undefined {
+  return typeof evidence === "string" ? undefined : evidence
+}
+
+/**
+ * The one classifier for an answer whose turn has ended for good - an exit, a park, a teardown, a
+ * restore or reopen by a fresh parent: no later turn on this handle can answer the work it waited on,
+ * so an answer given while that work was pending is the abandoned work, never the result.
+ */
+export function finishedTurnOutcome(finalResponse: string, evidence: PendingWorkEvidence): RunnerOutcome {
+  const work = pendingWorkOf(evidence)
+  return work === undefined ? { status: "completed", finalResponse } : abandonedAsyncWorkOutcome(work)
+}
+
 // What a held turn amounts to once the session that owned its work is gone (teardown, a reopened
 // session): the same typed outcome everywhere, never the interim note.
 export function abandonedAsyncWorkOutcome(work: PendingAsyncWork): RunnerOutcome {

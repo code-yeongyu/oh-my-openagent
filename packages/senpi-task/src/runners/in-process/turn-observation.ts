@@ -1,3 +1,4 @@
+import { finishedTurnOutcome, type PendingWorkEvidence } from "../pending-async-work"
 import type { ChildCompletionPolicy, ChildSession, ChildSessionEvent, RunnerOutcome } from "./child-handle"
 
 // Per-turn facts observed from the session's event stream. senpi surfaces provider/stream failures
@@ -83,10 +84,17 @@ export function turnOutcome(
 // The outcome a restored handle owes waitForIdle() before any follow-up starts a turn: the
 // transcript's last assistant text is the honest drain for a child whose completion never reached
 // its record (crash between turn end and transition). No text means nothing durable was produced.
-export function settledSessionOutcome(session: ChildSession, completion: ChildCompletionPolicy): RunnerOutcome {
+// `evidence` is what the session file records about the child's own async work after that text: a
+// text given while that work was pending is a held note whose work died with the old session
+// (omo#10487).
+export function settledSessionOutcome(
+  session: ChildSession,
+  completion: ChildCompletionPolicy,
+  evidence: PendingWorkEvidence,
+): RunnerOutcome {
   const final = session.getLastAssistantText()
-  if (final !== undefined && final.length > 0) return { status: "completed", finalResponse: final }
-  if (completion === "turn") return { status: "completed", finalResponse: "" }
+  if (final !== undefined && final.length > 0) return finishedTurnOutcome(final, evidence)
+  if (completion === "turn") return finishedTurnOutcome("", evidence)
   return {
     status: "error",
     failure: { kind: "child-turn-failed", message: "restored session has no assistant output" },

@@ -3,7 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import { sessionTailReconciliation } from "../../manager/interrupted-turn"
 import type { TaskRecord } from "../../state"
 import type { RunnerOutcome } from "../in-process/child-handle"
-import { abandonedAsyncWorkOutcome, type PendingAsyncWork } from "../pending-async-work"
+import { abandonedAsyncWorkOutcome, pendingWorkOf, type PendingAsyncWork } from "../pending-async-work"
 import { reattachContinuationPrompt } from "./reattach"
 import type { HostSessionLiveness } from "./handle-port"
 
@@ -133,7 +133,7 @@ export async function reconcileHostTurn(
     // omo#10487: an answer the child gave while its own async work was still pending is an interim
     // note. A session reopened from its file runs nothing the old one started, so that work is lost;
     // a live one holds the note on its work until the turn that work wakes answers.
-    const held = tail?.heldWork
+    const held = tail === undefined ? undefined : pendingWorkOf(tail.workEvidence)
     if (held !== undefined && port.reopened === true) {
       port.settle(abandonedAsyncWorkOutcome(held))
       return "failed"

@@ -1,6 +1,10 @@
 import { open } from "node:fs/promises"
 
-import { readLifecyclePendingWork, type PendingAsyncWork } from "../runners/pending-async-work"
+import {
+  readLifecyclePendingWork,
+  type PendingAsyncWork,
+  type PendingWorkEvidence,
+} from "../runners/pending-async-work"
 
 const INITIAL_TAIL_BYTES = 64 * 1024
 
@@ -78,10 +82,10 @@ export type ConversationTail = {
   readonly turnUser?: SessionMessageEntry["message"]
   readonly entryId?: string
   readonly endEvent?: Record<string, unknown>
-  // omo#10487: the child's own async work the engine recorded as still pending AFTER the last message
-  // (its durable `session-lifecycle` records): that message was a turn held on the work, an interim
-  // note, never the child's answer.
-  readonly heldWork?: PendingAsyncWork
+  // omo#10487: what the engine's durable `session-lifecycle` records written AFTER the last message say
+  // about the child's own async work. Work any of them names as pending makes that message a turn held
+  // on the work, an interim note, never the child's answer.
+  readonly workEvidence: PendingWorkEvidence
 }
 
 export async function sessionTailReconciliation(
@@ -134,8 +138,8 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
     let lastMessage: SessionMessageEntry["message"] | undefined
     let entryId: string | undefined
     let endEvent: Record<string, unknown> | undefined
-    let heldWork: PendingAsyncWork | undefined
-    const held = (): { readonly heldWork?: PendingAsyncWork } => (heldWork === undefined ? {} : { heldWork })
+    let workEvidence: PendingWorkEvidence = "unrecorded"
+    const held = (): { readonly workEvidence: PendingWorkEvidence } => ({ workEvidence })
     for (;;) {
       const start = size - bytes
       const buffer = Buffer.allocUnsafe(bytes)
@@ -150,7 +154,8 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
         if (line.length === 0) continue
         const verdict = classifyRecord(line)
         if (verdict.kind === "end" && endEvent === undefined) endEvent = verdict.event
-        if (verdict.kind === "lifecycle" && lastMessage === undefined) heldWork ??= verdict.work
+        if (verdict.kind === "lifecycle" && lastMessage === undefined && typeof workEvidence === "string")
+          workEvidence = verdict.work ?? "none-pending"
         if (verdict.kind === "message") {
           if (lastMessage === undefined) {
             lastMessage = verdict.message

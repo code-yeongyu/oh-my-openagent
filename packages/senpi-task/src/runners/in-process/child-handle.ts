@@ -8,6 +8,7 @@ import { createInProcessRunPause, type EngineTurnWatch, type RunHoldSession } fr
 import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
 import { createInProcessAsyncWork, type AsyncWorkSession, type InProcessAsyncWorkOptions } from "./async-work-turn"
 import { observeTurnEvent, settledSessionOutcome, turnOutcome, type TurnObservation } from "./turn-observation"
+import type { PendingWorkEvidence } from "../pending-async-work"
 
 /** How the engine settled a steer/follow-up: delivered to the running turn, or queued behind it. */
 export type QueuedInputDisposition = Awaited<ReturnType<AgentSession["steer"]>>
@@ -134,6 +135,8 @@ export type CreateChildHandleInput = {
 export type CreateRestoredChildHandleInput = {
   readonly taskId: string
   readonly session: ChildSession
+  // What the session file records about the child's own async work after its last answer (omo#10487).
+  readonly workEvidence: PendingWorkEvidence
   readonly completion?: ChildCompletionPolicy
   readonly asyncWork?: InProcessAsyncWorkOptions
 }
@@ -179,12 +182,14 @@ function createTrackedChildHandle(
   session: ChildSession,
   completion: ChildCompletionPolicy = "final-text",
   asyncWorkOptions?: InProcessAsyncWorkOptions,
+  // A fresh session has run no turn yet, so it owns no work; a restored one says so in its file.
+  workEvidence: PendingWorkEvidence = "none-pending",
 ): TrackedChildHandle {
   let aborted = false
   let disposed = false
   let turnActive = false
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
-  let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
+  let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion, workEvidence))
   const observation: TurnObservation = {
     text: undefined,
     stopReason: undefined,
@@ -317,7 +322,8 @@ export function createStagedChildHandle(input: CreateChildHandleInput): {
 // replayed. The handle restores IDLE - its first followUp() starts a fresh tracked turn exactly
 // like a resident revival (any continuation nudge is manager-owned, todo 12, never the runner's).
 export function createRestoredChildHandle(input: CreateRestoredChildHandleInput): ChildHandle {
-  return createTrackedChildHandle(input.taskId, input.session, input.completion, input.asyncWork).handle
+  return createTrackedChildHandle(input.taskId, input.session, input.completion, input.asyncWork, input.workEvidence)
+    .handle
 }
 
 // The pre-admission counterpart of rpc/start-cleanup.ts: when handle construction itself throws,
