@@ -23,11 +23,6 @@
     },
     {
       "section": "4.6",
-      "row": "threads.resolve",
-      "slice": "T1a; T1c for the alias"
-    },
-    {
-      "section": "4.6",
       "row": "threads.readAfterWait",
       "slice": "T1b"
     },
