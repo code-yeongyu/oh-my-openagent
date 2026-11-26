@@ -2669,7 +2669,7 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!plain.includes("exited within 3 s with 0x00000001;")) bad.push(`a plain exit code reads: ${plain}`)
       const self = source("probe-sp-n.ts")
       const fn = self.slice(self.indexOf("async function medium("), self.indexOf("const MEDIUM_LABEL"))
-      if (!/throw new Error\(mediumFailure\(e\.message, started, /.test(fn))
+      if (!/throw new Error\(\s*mediumFailure\(e\.message, started, /.test(fn))
         bad.push("medium() does not report through mediumFailure")
       if (!/h\["exitText"\] = /.test(source("sp-n-native-medium.ps1")))
         bad.push("StartMedium does not read the exit status's text")
