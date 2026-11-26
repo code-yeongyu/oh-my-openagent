@@ -1085,6 +1085,48 @@
       "target": "this_device"
     },
     {
+      "id": "threads.messages/budget",
+      "row": "threads.messages",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "max_bytes": 4096
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "args": {
+            "thread": "t-1",
+            "all": true,
+            "max_bytes": 4096
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.messages/budget-over-cap-clamped",
+      "row": "threads.messages",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "max_bytes": 2097152
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "args": {
+            "thread": "t-1",
+            "all": true,
+            "max_bytes": 1048576
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.messages/missing",
       "row": "threads.messages",
       "kind": "refusal",

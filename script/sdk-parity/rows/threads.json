@@ -1550,6 +1550,10 @@
         "properties": {
           "thread": {
             "type": "string"
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "required": [

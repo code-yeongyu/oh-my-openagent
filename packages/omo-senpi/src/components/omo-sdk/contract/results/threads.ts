@@ -67,6 +67,8 @@ export type ThreadMessagesResult = Ok<{
   readonly truncated: boolean
   readonly total_items: number
   readonly max_bytes: number
+  /** The asked max_bytes passed the 1 MiB cap: `max_bytes` is the cap the read took (never a refusal). */
+  readonly clamped?: true
 }>
 
 export type ThreadGetResult = Ok<{ readonly session: SessionDetail }>

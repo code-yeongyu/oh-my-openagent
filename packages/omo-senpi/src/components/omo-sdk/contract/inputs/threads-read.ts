@@ -46,7 +46,9 @@ export const ThreadsEntries = Type.Object({
   max_bytes: Type.Optional(PositiveInteger),
 })
 
-export const ThreadsMessages = Type.Object({ thread: Thread })
+// The read's own byte budget (design lane ruling 4): absent, 128 KiB; above the 1 MiB cap, the cap, and the answer says
+// it was clamped. Never refused for its size, so the schema has no maximum.
+export const ThreadsMessages = Type.Object({ thread: Thread, max_bytes: Type.Optional(PositiveInteger) })
 
 export const ThreadsGet = Type.Object({ thread: Thread })
 

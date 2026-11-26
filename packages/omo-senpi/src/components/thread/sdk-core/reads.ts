@@ -1,6 +1,6 @@
 import { resolveAddress } from "../address"
 import { toThreadAddressEntries, type AddressEntry } from "../address-book"
-import type { ThreadResultSummary, ThreadState, ThreadToolResult } from "../contracts"
+import { THREAD_READ_MAX_BYTES, type ThreadResultSummary, type ThreadState, type ThreadToolResult } from "../contracts"
 import { listAcross } from "../remote/cross-device"
 import { addressBook } from "../tools/internals"
 import { UNKNOWN_CALLER } from "../tools/ports"
@@ -104,6 +104,8 @@ export type CoreMessagesResult =
       readonly truncated: boolean
       readonly total_items: number
       readonly max_bytes: number
+      /** The asked budget passed the cap, so the read took the cap (design lane ruling 4: clamped, never refused). */
+      readonly clamped?: true
     }
   | Failure
 
@@ -248,7 +250,9 @@ export function createReads(context: ThreadCoreContext) {
     context.guard(async () => {
       const refused = unknownKeys(request, MESSAGES_KEYS)
       if (refused !== undefined) return refused
-      const budget = readBudget(request.max_bytes)
+      const asked = request.max_bytes
+      const clamped = asked !== undefined && Number.isSafeInteger(asked) && asked > THREAD_READ_MAX_BYTES
+      const budget = readBudget(clamped ? THREAD_READ_MAX_BYTES : asked)
       if (budget.kind === "error") return budget
       const located = await locateControl(controls, await view(), request.thread, request.all_scope, UNKNOWN_CALLER)
       if (located.kind === "error") return located.result as Failure
@@ -263,6 +267,7 @@ export function createReads(context: ThreadCoreContext) {
           truncated: selected.length < all.length,
           total_items: all.length,
           max_bytes: budget.maxBytes,
+          ...(clamped ? { clamped: true as const } : {}),
         }
       } catch (error) {
         // A control's typed refusal (another device's answer included) is the call's answer, as in every control.

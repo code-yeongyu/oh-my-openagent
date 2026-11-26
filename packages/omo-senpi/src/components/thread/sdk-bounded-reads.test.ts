@@ -41,6 +41,7 @@ type Messages = {
   readonly truncated: boolean
   readonly total_items: number
   readonly max_bytes: number
+  readonly clamped?: true
 }
 type Page = {
   readonly kind: string
@@ -72,18 +73,32 @@ describe("threads.messages", () => {
     },
   )
 
-  test("#given a budget of its own #when the core reads the messages #then at most that budget, newest kept", async () => {
-    const { core } = holders()
-    const answer = (await core.messages({ thread: "dur-local", max_bytes: 4096 } as never)) as unknown as Messages
-    expect(bytes(answer.messages)).toBeLessThanOrEqual(4096)
-    expect(answer.messages.at(-1)).toEqual(BIG.at(-1))
-    expect(answer).toMatchObject({ truncated: true, total_items: BIG.length, max_bytes: 4096 })
+  test.each(["dur-local", "dur-on-b"])(
+    "#given %s and a smaller budget of the caller's #when the root asks for its messages #then at most that budget, newest kept, not clamped",
+    async (thread) => {
+      const { root } = holders()
+      const answer = (await root.threads.messages({ thread, max_bytes: 4096 })) as unknown as Messages
+      expect(bytes(answer.messages)).toBeLessThanOrEqual(4096)
+      expect(answer.messages.at(-1)).toEqual(BIG.at(-1))
+      expect(answer).toMatchObject({ kind: "ok", truncated: true, total_items: BIG.length, max_bytes: 4096 })
+      expect("clamped" in answer).toBe(false)
+    },
+  )
+
+  test("#given a budget over the cap #when the root asks for the messages #then the read takes the cap and says it was clamped, never refused", async () => {
+    const { root, s } = holders()
+    const asked = spyOn(s.host, "getMessages")
+    const answer = (await root.threads.messages({ thread: "dur-local", max_bytes: OVER_CAP })) as unknown as Messages
+    expect(answer).toMatchObject({ kind: "ok", max_bytes: THREAD_READ_MAX_BYTES, clamped: true })
+    expect(bytes(answer.messages)).toBeLessThanOrEqual(THREAD_READ_MAX_BYTES)
+    expect(asked).toHaveBeenCalled()
   })
 
-  test("#given a budget over the cap #when the core reads the messages #then read.max_bytes_over_cap, before the holder is asked", async () => {
+  test("#given a budget that is not a positive whole number #when the core reads the messages #then read.max_bytes_invalid, before the holder is asked", async () => {
     const { core, s } = holders()
     const asked = spyOn(s.host, "getMessages")
-    overCap(await core.messages({ thread: "dur-local", max_bytes: OVER_CAP } as never))
+    const answer = (await core.messages({ thread: "dur-local", max_bytes: 0 } as never)) as Refused
+    expect(provenanceOf(answer.error)?.id).toBe("read.max_bytes_invalid")
     expect(asked).not.toHaveBeenCalled()
   })
 })
