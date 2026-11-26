@@ -463,8 +463,9 @@ export function createRelayTransport(
    * holding it on disk: an ended row takes the wake path when there is one, anything else is `not_resumable`.
    * `parked` (#14240): the row reads live but its host refused a command to it `route_unlisted` (it parked the session),
    * so the listing is stale: `parked` is the answer that refusal maps to. The holder is asked as for a not-live row, and a
-   * session it holds on disk takes the wake path whatever the row's state. A holder that cannot say (find_session refused,
-   * unsupported or unanswered) taught nothing new, so the answer stays `parked`.
+   * session it holds on disk takes the wake path whatever the row's state. A holder that did not answer find_session
+   * (refused `route_unlisted` or timed out: `silent`, #15004) is a busy host, answered `host_unavailable` with a retry; a
+   * device whose engine predates find_session (unsupported) taught nothing new, so the answer stays `parked`.
    */
   async function addressOf(
     listed: RemoteSessionRow,
