@@ -147,7 +147,12 @@ describe("omo remote close and send stdin (#13905)", () => {
   test("#given a session key its device does not hold #when close names it #then it fails typed not_found with a non-zero exit and nothing is sent", async () => {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: personWorld() })
     owners.push(owner)
-    const result = await run(["close", `${PEER}/bm8tc3VjaC1zZXNzaW9uLWtleQ`, "--json"], owner.stateDir, SIGNED_IN, testBootstrap())
+    const result = await run(
+      ["close", `${PEER}/bm8tc3VjaC1zZXNzaW9uLWtleQ`, "--json"],
+      owner.stateDir,
+      SIGNED_IN,
+      testBootstrap(),
+    )
     expect(parsed(result.out)).toMatchObject({ kind: "error", code: "not_found" })
     expect(result.code).toBe(REMOTE_EXIT.failed)
     expect(commandTargets(owner.state.bindings)).toEqual([])
