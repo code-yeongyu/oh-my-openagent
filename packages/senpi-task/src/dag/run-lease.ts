@@ -63,24 +63,27 @@ export function liveForeignHolder(probe: DagRunHolderProbe, record: LeasedRecord
   return holder !== undefined && holder !== probe.hostPid && probe.isProcessAlive(holder) ? holder : undefined
 }
 
+export type DagRunLeaseTake =
+  | { readonly kind: "taken"; readonly record: LeasedRecord }
+  | { readonly kind: "held"; readonly holderPid: number }
+  | { readonly kind: "missing" }
+
 /**
- * Records this process as the run's holder before a scheduler admits anything, so no other process
- * can read the run as abandoned while it waits for its first child (#15125). Refuses (undefined) a
- * run whose recorded holder is another live process.
+ * Records this process as the run's holder before a scheduler admits anything or a re-entry writes,
+ * so no other process can read the run as abandoned meanwhile (#15125). Under the run lock it refuses
+ * whenever `liveForeignHolder` names a process: the same holder rule the claim, the unheld cancel and
+ * the shutdown pause ask. A lease already ours is the fast path.
  */
-export function takeDagRunLease(
-  store: LeaseStore,
-  runId: DagRunId,
-  probe: Pick<DagRunHolderProbe, "hostPid" | "isProcessAlive">,
-): LeasedRecord | undefined {
+export function takeDagRunLease(store: LeaseStore, runId: DagRunId, probe: DagRunHolderProbe): DagRunLeaseTake {
   return store.withRunLock(runId, () => {
     const fresh = store.readCheckpoint<LeasedRecord>(runId)
-    if (fresh === null) return undefined
-    if (fresh.leaseHolderPid === probe.hostPid) return fresh
-    if (fresh.leaseHolderPid !== undefined && probe.isProcessAlive(fresh.leaseHolderPid)) return undefined
+    if (fresh === null) return { kind: "missing" }
+    if (fresh.leaseHolderPid === probe.hostPid) return { kind: "taken", record: fresh }
+    const holderPid = liveForeignHolder(probe, fresh)
+    if (holderPid !== undefined) return { kind: "held", holderPid }
     const taken = { ...fresh, leaseHolderPid: probe.hostPid }
     store.writeCheckpoint(runId, taken)
-    return taken
+    return { kind: "taken", record: taken }
   })
 }
 

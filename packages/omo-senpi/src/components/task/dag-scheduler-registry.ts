@@ -30,7 +30,11 @@ export function createDagSchedulerRegistry(ports: {
   readonly isProcessAlive: (pid: number) => boolean
 }) {
   const { schedulers, store, coreManager, schedulerOptions, logger } = ports
-  const lease = { hostPid: process.pid, isProcessAlive: ports.isProcessAlive }
+  const lease = {
+    taskManager: schedulerOptions.taskManager,
+    hostPid: process.pid,
+    isProcessAlive: ports.isProcessAlive,
+  }
 
   /** "This host holds the run": a scheduler of this runtime is running it (started or installed here). */
   const holdsRun = (runId: DagRunId): boolean => schedulers.get(runId)?.running !== undefined
@@ -71,7 +75,7 @@ export function createDagSchedulerRegistry(ports: {
     const record = coreManager.record(runId, parentSessionId)
     if (record.status === "running") return false
     if (record.status !== "pending") return true
-    if (takeDagRunLease(store, runId, lease) === undefined) return true
+    if (takeDagRunLease(store, runId, lease).kind !== "taken") return true
     const owned = schedulerFor(runId, parentSessionId)
     schedulers.set(runId, owned)
     track(runId, owned, owned.scheduler.run())

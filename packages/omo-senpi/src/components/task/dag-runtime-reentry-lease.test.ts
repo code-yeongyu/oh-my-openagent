@@ -37,7 +37,7 @@ const definition = (prompt = "one") => ({
 })
 
 /** A run this runtime started and then cancelled, so its node can be retried or amended. */
-async function cancelledRun(name: string) {
+async function cancelledRun(name: string, holder: { alive: boolean } = { alive: true }) {
   const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-reentry-${name}-`))
   cleanupRoots.push(cwd)
   const sessionId = `session-reentry-${name}`
@@ -49,7 +49,11 @@ async function cancelledRun(name: string) {
     pi,
     engine,
     logger: quietLogger,
-    leaseWatch: { isProcessAlive: (pid) => pid === FOREIGN_HOST_PID, timers: new ManualTimers(), intervalMs: 250 },
+    leaseWatch: {
+      isProcessAlive: (pid) => pid === FOREIGN_HOST_PID && holder.alive,
+      timers: new ManualTimers(),
+      intervalMs: 250,
+    },
   })
   await within(runtime.attach(), "attach")
   const started = await within(
@@ -71,7 +75,18 @@ async function cancelledRun(name: string) {
     },
   })
   const eventCount = (): number => store.readEvents(runId, 0, { limit: 500 }).events.length
-  return { runId, sessionId, store, runtime, runner, leaseAtStart, eventCount }
+  // The run as a shutdown pause between nodes leaves it: paused, its node failed, the pausing host
+  // recorded as the previous holder.
+  const pausedBy = (previousLeaseHolderPid: number): void => {
+    const record = store.readCheckpoint<Leased>(runId)
+    if (record === null) throw new Error("expected a checkpoint")
+    const { leaseHolderPid: _lease, ...unleased } = record
+    const nodes = unleased.nodes.map((entry) => ({ ...entry, state: "failed" as const }))
+    store.writeCheckpoint(runId, { ...unleased, nodes, status: "paused", previousLeaseHolderPid })
+  }
+  const bytes = (): string =>
+    fs.readFileSync(store.paths.run(runId), "utf8") + fs.readFileSync(store.paths.event(runId), "utf8")
+  return { runId, sessionId, store, runtime, runner, leaseAtStart, eventCount, pausedBy, bytes }
 }
 
 describe("DAG runtime re-entry takes the run's lease first", () => {
@@ -111,6 +126,54 @@ describe("DAG runtime re-entry takes the run's lease first", () => {
 
       // then
       expect(leaseAtStart[0]).toBe(process.pid)
+      runtime.dispose()
+    })
+  }
+
+  for (const verb of ["retry", "amend"] as const) {
+    const reenter = (
+      runtime: Awaited<ReturnType<typeof cancelledRun>>["runtime"],
+      runId: Parameters<typeof runtime.retry>[0],
+    ) => (verb === "retry" ? runtime.retry(runId) : runtime.amend(runId, definition("one again")))
+
+    test(`#given a run paused for shutdown by a foreign host that is still draining #when ${verb} re-enters it #then it is refused with nothing written, and goes through once that host is gone`, async () => {
+      // given
+      const holder = { alive: true }
+      const { runId, runtime, runner, pausedBy, bytes } = await cancelledRun(`draining-${verb}`, holder)
+      pausedBy(FOREIGN_HOST_PID)
+      const before = bytes()
+
+      // when
+      const refusal = await within(
+        reenter(runtime, runId).then(
+          () => undefined,
+          (error: unknown) => error,
+        ),
+        verb,
+      )
+
+      // then
+      expect(refusal).toEqual(expect.objectContaining({ code: "run_not_owned" }))
+      expect(bytes()).toBe(before)
+      expect(runner.handles).toHaveLength(1)
+
+      // and when that host has exited
+      holder.alive = false
+      await within(reenter(runtime, runId), `${verb} after the holder exited`)
+      await within(runner.whenStarted(2), "the re-entered child starting")
+      runtime.dispose()
+    })
+
+    test(`#given a run this host paused for shutdown #when ${verb} re-enters it #then it goes through`, async () => {
+      // given
+      const { runId, runtime, runner, pausedBy } = await cancelledRun(`own-${verb}`)
+      pausedBy(process.pid)
+
+      // when
+      await within(reenter(runtime, runId), verb)
+
+      // then
+      await within(runner.whenStarted(2), "the re-entered child starting")
       runtime.dispose()
     })
   }

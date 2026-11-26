@@ -101,14 +101,19 @@ export function refuseUnheldActiveNodes(record: DagRunRecordV1): void {
  */
 export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunId): () => void {
   const probe = {
+    taskManager: options.taskManager,
     hostPid: options.hostPid ?? process.pid,
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
   }
   const heldBefore = readRecord(options.store, runId)?.leaseHolderPid === probe.hostPid
-  if (takeDagRunLease(options.store, runId, probe) === undefined) {
+  const take = takeDagRunLease(options.store, runId, probe)
+  if (take.kind === "missing") {
+    throw new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
+  }
+  if (take.kind === "held") {
     throw new DagNodeControlError({
       code: "run_not_owned",
-      message: `dag run "${runId}" is leased by live process ${readRecord(options.store, runId)?.leaseHolderPid}`,
+      message: `dag run "${runId}" is held by live process ${take.holderPid}`,
       runId,
     })
   }

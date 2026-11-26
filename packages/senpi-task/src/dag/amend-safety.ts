@@ -11,7 +11,8 @@ export function pausedAmendmentUnsafe(record: DagRunRecordV1, nodeId: DagNodeId)
   )
 }
 
+// "Another" live lease: this process is never one (the run's own holder or the host that paused it).
 export function liveLeaseHolder(record: DagRunRecordV1): boolean {
   const pid = record.leaseHolderPid ?? record.previousLeaseHolderPid
-  return pid !== undefined && defaultSignaller.isAlive(pid)
+  return pid !== undefined && pid !== process.pid && defaultSignaller.isAlive(pid)
 }
