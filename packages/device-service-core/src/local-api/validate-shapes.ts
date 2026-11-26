@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-shapes.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/validate-shapes.ts
 import { SESSION_DEVICE_MAX_CHARS, SESSION_ID_MAX_CHARS } from "./spec-proto.ts";
 import type {
   DeviceRef,
@@ -6,6 +6,7 @@ import type {
   ErrorBody,
   PathRefusal,
   Policy,
+  PolicyBlocker,
   ReadEntry,
   SnapshotBody,
   Status,
@@ -34,6 +35,8 @@ import {
   ERROR_CODES,
   PATH_REFUSAL_PROBLEMS,
   POLICY_STATES,
+  POLICY_WAIT_REASONS,
+  POLICY_WAITING_STATES,
   STATUS_STATES,
   THIS_DEVICE_STATES,
 } from "./vocabulary.ts";
@@ -66,15 +69,27 @@ export const deviceRef = (v: unknown, what = "device", fields: FieldCheck = exac
   };
 };
 
+const blockerOf = (v: unknown): PolicyBlocker => {
+  const m = known(v, ["device", "label", "reason", "action"], [], "policy.blocker");
+  return {
+    device: deviceId(m["device"]),
+    label: text(m["label"], LABEL_MAX_CHARS, "policy.blocker.label", 0),
+    reason: oneOf(POLICY_WAIT_REASONS, m["reason"], "policy.blocker.reason"),
+    // The action names the device by its label (up to LABEL_MAX_CHARS), so it takes the reason bound.
+    action: nullable(m["action"], (a) => text(a, REASON_MAX_CHARS, "policy.blocker.action")),
+  };
+};
+
 const policyOf = (v: unknown): Policy => {
   const m = known(
     v,
     ["state", "generation", "this_device", "homes_pending", "unacked"],
-    [],
+    ["waiting", "blocker"],
     "policy",
   );
   const unacked = m["unacked"];
   if (!Array.isArray(unacked)) return fail("policy.unacked");
+  const { waiting, blocker } = m;
   return {
     state: oneOf(POLICY_STATES, m["state"], "policy.state"),
     generation: millis(m["generation"], "policy.generation"),
@@ -87,6 +102,10 @@ const policyOf = (v: unknown): Policy => {
         label: text(entry["label"], LABEL_MAX_CHARS, "label", 0),
       };
     }),
+    ...(waiting === undefined
+      ? {}
+      : { waiting: oneOf(POLICY_WAITING_STATES, waiting, "policy.waiting") }),
+    ...(blocker === undefined ? {} : { blocker: blockerOf(blocker) }),
   };
 };
 

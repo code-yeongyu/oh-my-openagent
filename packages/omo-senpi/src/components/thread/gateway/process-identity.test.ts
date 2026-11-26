@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
+import * as childProcess from "node:child_process"
 import { randomUUID } from "node:crypto"
 
 import { isClaimantDead, parseLstart, processStartTime } from "./process-identity"
@@ -17,6 +18,40 @@ async function inProcess(env: Readonly<Record<string, string>>, expression: stri
   if (code !== 0) throw new Error(`the identity probe exited ${code}`)
   return JSON.parse(stdout)
 }
+
+describe("#12314: the OS refuses to start ps", () => {
+  // Bun, like Node, throws EPERM from posix_spawn synchronously (EACCES and ENOENT reach the callback instead); this is
+  // the error a process limit or a sandbox refusal raises on macOS.
+  const refuseSpawn = () =>
+    spyOn(childProcess, "execFile").mockImplementation((() => {
+      throw Object.assign(new Error("EPERM: operation not permitted, posix_spawn 'ps'"), { code: "EPERM" })
+    }) as unknown as typeof childProcess.execFile)
+
+  test("#given ps cannot be started #when a start time is read #then it is unreadable, not a thrown error", async () => {
+    const spawn = refuseSpawn()
+    try {
+      expect(await processStartTime(process.pid)).toBeNull()
+    } finally {
+      spawn.mockRestore()
+    }
+  })
+
+  test("#given ps cannot be started #when a live claimant is judged #then it counts as live, as any unreadable start time does", async () => {
+    const spawn = refuseSpawn()
+    try {
+      expect(
+        await isClaimantDead({
+          pid: process.pid,
+          process_start_time: "epoch:1",
+          instance_id: randomUUID(),
+          runtime_instance: null,
+        }),
+      ).toBe(false)
+    } finally {
+      spawn.mockRestore()
+    }
+  })
+})
 
 describe.skipIf(process.platform === "win32")("claimant liveness across locales and time zones", () => {
   test("#given a live process whose start time was recorded under one locale and time zone #when another locale and time zone checks it #then it is alive", async () => {

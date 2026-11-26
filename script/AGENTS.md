@@ -71,4 +71,4 @@ Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycode
 
 ## NOTE
 
-CI uses plain `bun test`; there is no sharding or split isolation runner.
+CI runs each root test group as one serial `bun test` process with no isolation runner. On Linux the remainder and `packages/omo-senpi` are split across jobs with `bun test --shard` balanced by `.github/ci-test-timings.json`; omo-opencode is never file-sharded (global zauc mocks).

@@ -27,5 +27,7 @@ export { ConnectedMachineHub, connectMachineHub } from "./machine-hub.ts";
 export { ArtifactDigestMismatchError, ArtifactFetchError, ArtifactSizeMismatchError } from "./read-handle.ts";
 export { ReadLimitError } from "./read-ops.ts";
 export type { BridgeInvokeResult } from "./result-shape.ts";
+export type { ShipCapability, ShipEntry, ShipEntryKind, ShipRequest, ShipValidator } from "./ship-request.ts";
+export { ShipRefusedError, ShipValidatorError } from "./ship-request.ts";
 export { isBridgeEnvelope, isShellResult, isTerminalFrame } from "./result-shape.ts";
 export type { AccountCredentials, BunshinClient, BunshinOperatorConfig, CapabilityTokenMintInput, CapabilityTokenMintResult, ConnectMachineHubOptions, DevicePolicy, DurableArtifactResolver, DurableResultStatus, MachineCallOptions, MachineDirectoryFields, MachineHubTransport, MachineOperationMetadata, MachineRouting, MachineTaskOptions, MachineToolMethod, MachineTransportKind, ProcessInfo, ReadHandle, ReplayJournalEntry, RouteRefusalExplainer, ShellInput, ShellOptions, ShellRequestPayload, StandaloneMachine, StandaloneMachineHub, StandaloneMachineRecord, StepClock, StepContext, StepFn, TaskScopedMachine, TransportCredentialRefresh, } from "./types.ts";

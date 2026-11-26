@@ -89,7 +89,7 @@ interface ExtensionAPI {
 const CHILD_IDENTITY = "running as an omo senpi-task child"
 const FINAL_TEXT = "omo e2e openai lane child final text"
 const PARENT_PROVIDER = "omo-openai-lane-mock"
-const LANE_MODEL_ID = "gpt-6-astra"
+const LANE_MODEL_ID = "gpt-6.2-astra"
 const QUOTA_ERROR = `403: {"message":"You've reached your usage limit for this billing cycle.","type":"access_terminated_error"}`
 // Scenarios: "both-lanes" (API lane and subscription lane both serve the model - the subscription
 // lane must win), "api-key-only" (only `openai` serves it), "subscription-only" (only

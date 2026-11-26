@@ -13,6 +13,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const primary = "vendor-a/primary"
 const next = "vendor-b/next"
@@ -163,7 +164,7 @@ describe("TaskManager capacity paths", () => {
   })
 
   test("#given persistence fails after acquire #when spawning #then the lease is released and no child starts", async () => {
-    const inner = createTaskRecordStore({ project_dir: tempProject() })
+    const inner = createTaskRecordStore(ownedTaskState(tempProject()))
     let failReplace = true
     const store: TaskRecordStore = {
       ...inner,

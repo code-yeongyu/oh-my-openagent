@@ -83,6 +83,13 @@ for await (const line of console) {
 }
 `
 
+// Windows stores only the readonly bit, so stat reports 666 for any writable mode and 444 for a
+// mode with no owner write. POSIX reports the bits chmod wrote.
+const persistedMode = (requested: string): string => {
+  if (process.platform !== "win32") return requested
+  return (Number.parseInt(requested, 8) & 0o200) === 0 ? "444" : "666"
+}
+
 type Run = { code: number; stdout: string; stderr: string }
 
 let dir = ""
@@ -450,7 +457,11 @@ describe("replay driver", () => {
     counter += 1
     const cases = join(dir, `plant-${counter}`)
     await mkdir(cases)
-    const seen = { same: true, seed: { mode: "600", content: "hello" }, locked: { mode: "500", content: null } }
+    const seen = {
+      same: true,
+      seed: { mode: persistedMode("600"), content: "hello" },
+      locked: { mode: persistedMode("500"), content: null },
+    }
     const planted = {
       transport: "stdio",
       env: { PROBE_RUNTIME: "$" + "{RUNTIME_DIR}" },
@@ -479,7 +490,7 @@ describe("replay driver", () => {
     counter += 1
     const cases = join(dir, `leftover-${counter}`)
     await mkdir(cases)
-    const seen = { same: true, seed: { mode: "600", content: "hello" }, locked: null }
+    const seen = { same: true, seed: { mode: persistedMode("600"), content: "hello" }, locked: null }
     const steps = [{ send: request(1), expect: [expectation(reply(1, seen))] }]
     const env = { PROBE_RUNTIME: "$" + "{RUNTIME_DIR}" }
     const plant = [{ path: "seed/state.json", content: "hello", mode: "0600" }]

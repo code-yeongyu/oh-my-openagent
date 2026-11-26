@@ -4,7 +4,9 @@
 // history it first reads the snapshot from `GET /v1/sync/state`. Each batch row names its batch id
 // (#463 contract 1.17.0; null on keyring rows); the engine checks it against the sealed header. Refusals arrive as
 // `{ error: { code } }`; `stale_base` is answered with the head read back from the state route.
+// Every request, the event stream included, carries syncRequestHeaders (#13691).
 
+import { syncRequestHeaders } from "../../contract-version"
 import type {
   AppendRequest,
   AppendResult,
@@ -80,7 +82,7 @@ async function bearer(options: HttpTransportOptions): Promise<string> {
 export function createHttpTransport(options: HttpTransportOptions): Transport {
   const doFetch = options.fetch ?? fetch
   const request = async (method: string, path: string, body?: string | Uint8Array, json = true): Promise<Response> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await bearer(options)}` }
+    const headers = syncRequestHeaders(await bearer(options))
     if (body !== undefined && json) headers["content-type"] = "application/json"
     const response = await doFetch(`${options.baseUrl}${path}`, {
       method,
@@ -170,7 +172,7 @@ async function streamLoop(
     let up = false
     try {
       const response = await doFetch(`${options.baseUrl}/v1/me/events`, {
-        headers: { authorization: `Bearer ${await bearer(options)}`, accept: "text/event-stream" },
+        headers: { ...syncRequestHeaders(await bearer(options)), accept: "text/event-stream" },
         signal,
       })
       if (!response.ok || response.body === null) throw new SyncHttpError("stream", response.status, true)

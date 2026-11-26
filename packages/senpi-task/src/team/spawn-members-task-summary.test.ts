@@ -8,6 +8,7 @@ import { createTaskRecordStore } from "../store"
 import { normalizeSenpiTeamSpec } from "./normalize"
 import type { TeamRuntimeManagerPort } from "./runtime-types"
 import { spawnTeamMembers } from "./spawn-members"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -84,6 +85,6 @@ describe("spawnTeamMembers task_summary", () => {
     }
     const persisted = JSON.parse(readFileSync(join(store.stateDir, "tasks", `${taskId}.json`), "utf8"))
     expect(persisted).toMatchObject(expected)
-    expect(createTaskRecordStore({ project_dir: project }).load(taskId!)).toMatchObject(expected)
+    expect(createTaskRecordStore(ownedTaskState(project)).load(taskId!)).toMatchObject(expected)
   })
 })

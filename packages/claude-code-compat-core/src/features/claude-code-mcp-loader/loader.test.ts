@@ -16,18 +16,18 @@ function loaderOptions(cwd = TEST_DIR) {
   return { cwd, homeDir: TEST_HOME, claudeConfigDir: join(TEST_HOME, ".claude") }
 }
 
+beforeEach(() => {
+  TEST_DIR = mkdtempSync(join(tmpdir(), "mcp-loader-test-"))
+  TEST_HOME = join(TEST_DIR, "home")
+  mkdirSync(TEST_HOME, { recursive: true })
+})
+
+afterEach(() => {
+  mock.restore()
+  rmSync(TEST_DIR, { recursive: true, force: true })
+})
+
 describe("getSystemMcpServerNames", () => {
-  beforeEach(() => {
-    TEST_DIR = mkdtempSync(join(tmpdir(), "mcp-loader-test-"))
-    TEST_HOME = join(TEST_DIR, "home")
-    mkdirSync(TEST_HOME, { recursive: true })
-  })
-
-  afterEach(() => {
-    mock.restore()
-    rmSync(TEST_DIR, { recursive: true, force: true })
-  })
-
   it("returns empty set when no .mcp.json files exist", async () => {
     // given
 
@@ -332,16 +332,9 @@ describe("getSystemMcpServerNames", () => {
 
 describe("loadMcpConfigs", () => {
   beforeEach(() => {
-    mkdirSync(TEST_DIR, { recursive: true })
-    mkdirSync(TEST_HOME, { recursive: true })
     mock.module("../../shared/logger", () => ({
       log: () => {},
     }))
-  })
-
-  afterEach(() => {
-    mock.restore()
-    rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
   it("should skip MCPs in disabledMcps list", async () => {

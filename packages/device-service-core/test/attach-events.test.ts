@@ -198,3 +198,18 @@ describe("attach events", () => {
     expect(attach.failure()).toBe(boom)
   })
 })
+
+// omo#11999 item 1: the replay buffer a late listener reads is bounded; the newest events always replay.
+test("a listener added later replays at most the newest bound many events", async () => {
+  const script = scriptedClient()
+  const attach = await attachOver(script)
+  script.emit(script.snapshotEvent(1))
+  const total = 600
+  for (let i = 0; i < total; i++) script.emit(script.records(1, `m${i}`))
+  const seen: string[] = []
+  attach.onEvent((event) => {
+    if (event.kind === "records") seen.push(String((event.records as { text?: string }[])[0]?.text))
+  })
+  expect(seen.length).toBeLessThanOrEqual(512)
+  expect(seen[seen.length - 1]).toBe(`m${total - 1}`)
+})

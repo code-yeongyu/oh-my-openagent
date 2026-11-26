@@ -1,0 +1,15 @@
+{
+  "rows": [
+    {
+      "verb": "remote send",
+      "scenarios": ["native-remote-help", "native-remote-unknown", "native-remote-open-no-device"],
+      "changes": [
+        {
+          "before": "  send <session> <text> [--steer|--follow-up] [--no-wait]",
+          "after": "  send <session> <text|-> [--steer|--follow-up] [--no-wait]"
+        }
+      ],
+      "reason": "The existing text argument also takes - to read the message from stdin; the command and exit codes are unchanged."
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import type {
   CeremonyClock,
   ApproveOutcome,
   JoinOutcome,
+  DisableOutcome,
   EnableMethod,
   EnableOutcome,
   PhraseGate,
@@ -88,6 +89,12 @@ export interface SyncRpcRuntime {
       readonly credentialId?: string
     },
   ): Promise<{ readonly ok: true }>
+  /** Turns sync off on this device only (#14093): the service's switch for it, then the local one. */
+  disableSync(
+    input: Pick<SyncRpcCeremonyInput, "account" | "pairing" | "pinDir" | "authority" | "signal"> & {
+      readonly serviceDeviceId: string
+    },
+  ): Promise<DisableOutcome>
   joinAccount(
     input: SyncRpcCeremonyInput & {
       readonly clock: CeremonyClock
@@ -126,6 +133,10 @@ export interface SyncRpcOptions {
   readonly pinDir: string
   readonly signal: AbortSignal
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
+  /** Closes the sync engines this process runs for a device that was just turned off; absent on a host with none. */
+  readonly stopSync?: () => Promise<void>
+  /** Starts the engines this process parked once sync is on for the device again; absent on a host with none. */
+  readonly resumeSync?: () => Promise<void>
   readonly clock?: CeremonyClock
   /** Releases recovery-phrase key creation (amendment A1); absent means off. */
   readonly phraseGate?: PhraseGate

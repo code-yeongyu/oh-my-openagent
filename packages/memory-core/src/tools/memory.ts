@@ -14,7 +14,7 @@ import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
 import type { ClaimReceipt } from "../provenance"
 import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatter"
-import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
+import { commitMemoryWrite, type MemoryWriteLock, type MemoryWriteStage } from "./commit-write"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
 
@@ -63,6 +63,7 @@ export interface RunMemoryToolOptions {
   repo: GitMemoryRepo
   lock: MemoryToolLock
   params: MemoryToolParams
+  onStage?: (stage: MemoryWriteStage) => void
 }
 
 type AppliedCommand = { affectedPaths: string[]; strippedPaths?: string[] }
@@ -80,6 +81,7 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
       ...(params.provenance === undefined ? {} : { provenance: params.provenance }),
       successLabel: `Memory ${params.command}`,
       noChangesMessage: `${params.command} made no changes`,
+      ...(options.onStage === undefined ? {} : { onStage: options.onStage }),
       apply: async () => applyCommand(repo.dir, params),
     })
     return {

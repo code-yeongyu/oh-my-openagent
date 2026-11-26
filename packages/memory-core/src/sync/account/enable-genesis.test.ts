@@ -1,12 +1,14 @@
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, mock, spyOn, test } from "bun:test"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { failAnchorListingAfterPin } from "../crypto/testing/retired-pin-listing.test-support.ts"
 import { loadTrustAnchor } from "../crypto/trust-pin.ts"
 import { enableSync } from "./enable.ts"
 import { ACCOUNT, fixture, operationScope } from "./testing/genesis-enable.test-support.ts"
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
+  mock.restore()
   for (const close of cleanups.splice(0).reverse()) await close()
 })
 const setup = async () => {
@@ -102,6 +104,25 @@ test("cancellation after PUT leaves the exact intent for a successor, without st
   expect((await loadTrustAnchor(f.input.pinDir, ACCOUNT)).ok).toBe(false)
   expect(await enableSync(f.input)).toEqual({ kind: "joined", created: true })
   expect(f.ceremonies()).toBe(1)
+})
+
+// #12382: the root-change notice runs after the pin is written, so a failure to list the retired pins must not turn a
+// pinned enable into an error. The skipped check is part of the outcome, for the caller to show; the library itself
+// writes nothing to the host's stderr (in-process it would draw over the TUI).
+test("an enable that pinned still joins, and reports the root-change check as skipped, when the retired pins cannot be listed", async () => {
+  const f = await setup()
+  const fault = failAnchorListingAfterPin(f.input.pinDir)
+  const stderr = spyOn(process.stderr, "write")
+
+  const outcome = await enableSync(f.input)
+  const written = stderr.mock.calls.length
+  mock.restore()
+
+  expect(fault.pinned()).toBe(true)
+  expect(outcome).toEqual({ kind: "joined", created: true, rootCheck: { kind: "skipped", reason: "EACCES" } })
+  expect(written).toBe(0)
+  const pinned = await loadTrustAnchor(f.input.pinDir, ACCOUNT)
+  expect(pinned.ok && pinned.anchor.genesisDigest).toBe(f.built.digest)
 })
 
 test("no bridge answers passkey_unavailable for the passkey method without changing switches", async () => {

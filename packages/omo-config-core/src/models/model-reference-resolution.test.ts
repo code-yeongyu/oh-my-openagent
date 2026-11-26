@@ -127,7 +127,7 @@ describe("resolveModelReferences", () => {
       model_profiles: {
         capable: {
           display_name: "Capable",
-          models: ["fable", { model: "fable", variant: "high" }, "openai/gpt-6-astra"],
+          models: ["fable", { model: "fable", variant: "high" }, "openai/gpt-6.2-astra"],
         },
       },
     })
@@ -143,7 +143,7 @@ describe("resolveModelReferences", () => {
       models: [
         { model: "anthropic/claude-fable-5-1", reasoning: "max" },
         { model: "anthropic/claude-fable-5-1", reasoning: "high" },
-        "openai/gpt-6-astra",
+        "openai/gpt-6.2-astra",
       ],
     })
     expect(view).toEqual(originalView)
@@ -205,7 +205,7 @@ describe("resolveModelReferences", () => {
         capable: { models: ["anthropic/claude-fable-5-1"] },
       },
       categories: {
-        deep: { models: ["capable", "openai/gpt-6-astra"] },
+        deep: { models: ["capable", "openai/gpt-6.2-astra"] },
       },
       agents: {
         reviewer: { models: [{ model: "capable" }, "capable"] },
@@ -228,7 +228,7 @@ describe("resolveModelReferences", () => {
         path: "agents.reviewer.models.1",
       },
     ])
-    expect(result.view.categories?.deep?.models).toEqual(["capable", "openai/gpt-6-astra"])
+    expect(result.view.categories?.deep?.models).toEqual(["capable", "openai/gpt-6.2-astra"])
   })
 
   test("#given profiles that shadow nothing and chains that name no profile #when resolved #then no profile diagnostic is emitted", () => {
@@ -241,10 +241,10 @@ describe("resolveModelReferences", () => {
         capable: { models: ["fable"] },
       },
       categories: {
-        deep: { models: ["fable", "openai/gpt-6-astra"] },
+        deep: { models: ["fable", "openai/gpt-6.2-astra"] },
       },
       agents: {
-        reviewer: { models: ["openai/gpt-6-astra"] },
+        reviewer: { models: ["openai/gpt-6.2-astra"] },
       },
     })
 

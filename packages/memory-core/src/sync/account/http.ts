@@ -6,7 +6,7 @@
 
 import type { KeyringEntry } from "../crypto/entry.ts"
 import { admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
-import { syncHeaders } from "../contract-version.ts"
+import { syncRequestHeaders } from "../contract-version.ts"
 import type {
   AppendResult,
   ChainRow,
@@ -70,7 +70,7 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
     body: unknown,
     operation: SyncOperationOptions = options,
   ): Promise<Response> => {
-    const headers: Record<string, string> = { ...syncHeaders(), authorization: `Bearer ${await options.token()}` }
+    const headers = syncRequestHeaders(await options.token())
     if (body !== undefined) headers["content-type"] = "application/json"
     const signal = syncOperationSignal(operation)
     return admitSyncOperation(operation, () =>
