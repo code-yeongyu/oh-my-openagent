@@ -295,6 +295,7 @@ function createTrackedChildHandle(
       if (disposed) return
       disposed = true
       asyncWork.abandon()
+      asyncWork.dispose()
       unsubscribeObserver()
       await shutDownChildSession(session)
     },

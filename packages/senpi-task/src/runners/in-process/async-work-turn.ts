@@ -1,5 +1,5 @@
 import { createAsyncWorkHold, type AsyncWorkScheduler } from "../async-work-hold"
-import { readLifecyclePendingWork } from "../pending-async-work"
+import { readLifecyclePendingWork, type PendingAsyncWork } from "../pending-async-work"
 import type { ChildSessionEvent, ChildSessionListener, RunnerOutcome } from "./child-handle"
 
 export type InProcessAsyncWorkOptions = {
@@ -19,6 +19,7 @@ export type InProcessAsyncWork = {
   readonly supersede: (next: Promise<RunnerOutcome>) => void
   readonly abandon: () => void
   readonly abort: () => void
+  readonly dispose: () => void
 }
 
 type Release = (value: RunnerOutcome | Promise<RunnerOutcome> | "abandoned") => void
@@ -51,11 +52,27 @@ export function createInProcessAsyncWork(input: {
 }): InProcessAsyncWork {
   const { session } = input
   let release: Release | undefined
+  // The answer's evidence window, as in the RPC tracker (rpc/turn-async-work.ts): from the turn's end
+  // until a new agent_start, work seen pending stays evidence even if it drains before prompt()
+  // resolves. Subscribed first, so every later listener reads the window this event opened or closed.
+  let answerWindow = false
+  let latched: PendingAsyncWork | undefined
+  const current = (): PendingAsyncWork | undefined => readLifecyclePendingWork(session.lifecycle) ?? undefined
+  const unsubscribeWindow = session.subscribe((event) => {
+    if (event.type === "agent_start") {
+      answerWindow = false
+      latched = undefined
+    } else if (endsTurn(event)) {
+      answerWindow = true
+      latched = current()
+    }
+  })
+  const answerWork = (): PendingAsyncWork | undefined => (answerWindow ? (current() ?? latched) : current())
 
   const settle = (outcome: RunnerOutcome): Promise<RunnerOutcome> => {
     if (outcome.status !== "completed") return Promise.resolve(outcome)
-    const work = readLifecyclePendingWork(session.lifecycle)
-    if (work === null || work === undefined) return Promise.resolve(outcome)
+    const work = answerWork()
+    if (work === undefined) return Promise.resolve(outcome)
     return new Promise<RunnerOutcome>((resolve) => {
       let engineTurn = false
       const hold = createAsyncWorkHold({
@@ -100,5 +117,6 @@ export function createInProcessAsyncWork(input: {
     supersede: (next) => release?.(next),
     abandon: () => release?.("abandoned"),
     abort: () => release?.({ status: "cancelled" }),
+    dispose: unsubscribeWindow,
   }
 }
