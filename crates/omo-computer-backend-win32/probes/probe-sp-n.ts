@@ -1524,6 +1524,10 @@ const CITE_RULES: ReadonlyArray<readonly [RegExp, Cite]> = [
   [/^n-wheel-control-/, { noClaim: "no design line states that a settled foreground target receives the wheel" }],
   [/^n-wheel-after-raise-/, D(128, "DwmFlush before pointer: doc numbers 6/6 lost -> 18/18, re-measured")],
   [/^n-affinity-/, D(393, "cover-window oracle reads > 0 -> hide_ack")],
+  [
+    /^n-uipi-postmessage$/,
+    D(151, "windows above the engine's integrity RID: UIPI drops input; the posted route is refused, ERROR_ACCESS_DENIED"),
+  ],
   [/^n-uipi-/, D(151, "windows above the engine's integrity RID: UIPI drops input silently")],
   [
     /^n-elevated-/,
@@ -3856,6 +3860,9 @@ const LOGIC_CHECKS: readonly Check[] = [
           if (rowVerdict(id, { kind: "MEASURED", data: { outcome, text: "m" } }).verdict !== "NEW-EDGE")
             bad.push(`${id} judges a ${outcome} OS read against the engine's refusal policy`)
       }
+      // the posted route is refused with an error, not dropped silently
+      if (!/ERROR_ACCESS_DENIED/.test(cite("n-uipi-postmessage")) || /silently/.test(cite("n-uipi-postmessage")))
+        bad.push("n-uipi-postmessage does not cite the ERROR_ACCESS_DENIED refusal")
       for (const id of [
         "n-capture-wgc-monitor-display-off",
         "n-capture-printwindow-disconnected",
