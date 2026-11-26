@@ -99,37 +99,21 @@ export const invalidInput = (key: RootCallKey): OmoFailure["error"] => ({
 const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
 
 /** The input as its schema sees it: for a call in the list, only the keys the schema names. */
-async function checkedInput(key: RootCallKey, input: unknown): Promise<unknown> {
-  if (!UNKNOWN_KEYS_DROPPED.includes(key) || typeof input !== "object" || input === null) return input
+async function checkedInput(key: RootCallKey, input: Record<string, unknown>): Promise<unknown> {
+  if (!UNKNOWN_KEYS_DROPPED.includes(key)) return input
   const { ROOT_CALLS } = await import("../contract/calls")
   const named = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
   return Object.fromEntries(Object.entries(input).filter(([field]) => named.includes(field)))
 }
 
-// The call table's schemas load on the first checked call, not when the root is built (design lane ruling on the
-// runtime's cold import); contract/eager-tables.test.ts builds them all so a bad schema still fails in CI.
-export async function accepts(key: RootCallKey, input: unknown): Promise<boolean> {
-  if (!isPlainInput(input)) return false
-  const { inputAccepts } = await import("../contract/validate")
-  try {
-    return inputAccepts(key, await checkedInput(key, input))
-  } catch {
-    // The schema check reads the caller's object; a getter or proxy trap that throws there is a malformed input.
-    return false
-  }
-}
-
-// An omitted input is the empty input; any other value, null included, is checked as given.
-const inputOf = (args: readonly unknown[]): unknown => (args[0] === undefined ? {} : args[0])
-
 /**
  * A call's input is a plain object: its prototype is Object.prototype or null. A Date, a Map, a boxed string or a class
- * instance would satisfy a schema with no required field as if it were the empty input, so the boundary refuses it.
+ * instance would satisfy a schema with no required field as if it were the empty input, so the boundary refuses it, and
+ * so is an object built in another realm (a vm context), whose prototype is that realm's own.
  */
-export const isPlainInput = (input: unknown): input is Record<string, unknown> => {
+const isPlainInput = (input: unknown): input is Record<string, unknown> => {
   if (typeof input !== "object" || input === null) return false
   try {
-    // Both run the caller's code for a proxy; a trap that throws makes the input not a plain object.
     if (Array.isArray(input)) return false
     const prototype: unknown = Object.getPrototypeOf(input)
     return prototype === Object.prototype || prototype === null
@@ -138,14 +122,52 @@ export const isPlainInput = (input: unknown): input is Record<string, unknown> =
   }
 }
 
+/**
+ * The boundary's one read of the caller's object: its own enumerable fields, copied, so no member reads the caller's
+ * object again. Every read here may run the caller's code (a proxy trap, a getter); a throw makes the input malformed,
+ * answered with the fixed refusal and never the thrown text (review 6075306724).
+ */
+export const ownCopy = (input: unknown): Record<string, unknown> | undefined => {
+  if (!isPlainInput(input)) return undefined
+  try {
+    return Object.fromEntries(Object.entries(input))
+  } catch {
+    return undefined
+  }
+}
+
+// The call table's schemas load on the first checked call, not when the root is built (design lane ruling on the
+// runtime's cold import); contract/eager-tables.test.ts builds them all so a bad schema still fails in CI.
+/** The copy a member receives, or undefined when the input is refused. */
+export async function admitted(key: RootCallKey, input: unknown): Promise<Record<string, unknown> | undefined> {
+  const own = ownCopy(input)
+  if (own === undefined) return undefined
+  const { inputAccepts } = await import("../contract/validate")
+  try {
+    // The schema also reads nested values the caller owns; a throw there is the same malformed input.
+    return inputAccepts(key, await checkedInput(key, own)) ? own : undefined
+  } catch {
+    return undefined
+  }
+}
+
+// An omitted input is the empty input and stays omitted for the member; any other value, null included, is checked as
+// given and replaced by its copy.
+async function admittedArgs(key: RootCallKey, args: readonly unknown[]): Promise<readonly unknown[] | undefined> {
+  const own = await admitted(key, args[0] === undefined ? {} : args[0])
+  if (own === undefined) return undefined
+  return args[0] === undefined ? args : [own, ...args.slice(1)]
+}
+
 function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[]): Call {
   const refuse = refusing(key, invalidInput(key), servings)
+  const run = async (args: readonly unknown[]) => {
+    const given = await admittedArgs(key, args)
+    return given === undefined ? refuse() : member(...given)
+  }
   if (ROOT_CALL_ANSWERS[key] === "stream")
-    return (...args) =>
-      lazyStream(
-        async () => ((await accepts(key, inputOf(args))) ? member(...args) : refuse()) as OmoStream<unknown, unknown>,
-      )
-  return async (...args) => ((await accepts(key, inputOf(args))) ? member(...args) : refuse())
+    return (...args) => lazyStream(async () => (await run(args)) as OmoStream<unknown, unknown>)
+  return async (...args) => run(args)
 }
 
 function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | undefined {
