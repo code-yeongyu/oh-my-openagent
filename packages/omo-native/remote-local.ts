@@ -22,6 +22,7 @@ import {
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import {
   candidateLines,
@@ -79,15 +80,17 @@ export interface RemoteCommandDependencies {
 /** This device's real account read, local API and stdio: every dependency the local verbs need. */
 export function localRemoteDependencies(packageRoot?: string): RemoteCommandDependencies {
   const stateDir = deviceServiceStateDir()
-  const error = (line: string) => process.stderr.write(`${line}\n`)
+  const error = (line: string) => process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`)
   return {
     accountShow: () => readAccountInProcess(error),
     stateDir,
     ...(packageRoot === undefined ? {} : { packageRoot }),
     connect: () => connectLocalService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
+    // Machine-readable output (--json) passes through unchanged; human lines are escaped where they are built.
     output: (line) => process.stdout.write(`${line}\n`),
-    write: (text) => process.stdout.write(text),
+    // The streamed reply text of a human run (never --json) takes the display escaping.
+    write: (text) => process.stdout.write(escapeForDisplay(text, { keepLineFeeds: true })),
     error,
   }
 }
@@ -281,7 +284,9 @@ async function runRead(client: RemoteClient, parsed: Parsed, dependencies: Remot
       // An ambiguous one is a typed failure like any other: renderFailure prints its candidates (#14305).
       if (listed.kind === "error" && listed.code === "not_found" && listed.details?.["kind"] === "device") {
         dependencies.error(
-          `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
+          escapeForDisplay(
+            `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
+          ),
         )
         return REMOTE_EXIT.usage
       }
@@ -351,8 +356,8 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
     )
     return REMOTE_EXIT.unavailable
   }
-  dependencies.error(`omo remote: ${failure.message}`)
-  dependencies.error(withVerbs(failure.next_action))
+  dependencies.error(escapeForDisplay(`omo remote: ${failure.message}`))
+  dependencies.error(escapeForDisplay(withVerbs(failure.next_action)))
   for (const line of candidateLines(failure)) dependencies.error(line)
   return exitCodeOf(failure)
 }
@@ -411,10 +416,12 @@ export async function accountNotice(dependencies: RemoteCommandDependencies): Pr
 
 export function reportFailure(dependencies: RemoteCommandDependencies, error: unknown): number {
   if (error instanceof LocalApiError) {
-    dependencies.error(`omo remote: ${error.reason}`)
-    if (error.action) dependencies.error(error.action)
+    dependencies.error(escapeForDisplay(`omo remote: ${error.reason}`))
+    if (error.action) dependencies.error(escapeForDisplay(error.action))
     return REMOTE_EXIT.failed
   }
-  dependencies.error(error instanceof Error ? `omo remote: ${error.message}` : "omo remote: the operation failed")
+  dependencies.error(
+    error instanceof Error ? escapeForDisplay(`omo remote: ${error.message}`) : "omo remote: the operation failed",
+  )
   return REMOTE_EXIT.failed
 }

@@ -1,7 +1,9 @@
 import { type RemoteClient, resolveTypedDevice } from "../omo-senpi/src/components/remote/index"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { isPermissionPreset, localPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
+import { openedLines, undeliveredPromptLines } from "./remote-render"
 import type { SessionArgs } from "./remote-session-args"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { Answer } from "./remote-session-answer"
 
 const isOpened = (value: unknown): value is { readonly thread: string } =>
@@ -26,7 +28,7 @@ export async function openOn(
       throw new UsageError(`omo remote open: --permission-preset is one of ${PERMISSION_PRESETS.join(", ")}`)
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
-    dependencies.error(error.message)
+    dependencies.error(escapeForDisplay(error.message))
     return REMOTE_EXIT.usage
   }
   const device = await resolveTypedDevice(client, args.device)
@@ -43,17 +45,14 @@ export async function openOn(
   })
   // --json keeps naming the model the session opened on (#13748 review).
   const named = args.model === undefined ? {} : { model: { provider: args.model.provider, id: args.model.modelId } }
-  if (opened.kind === "ok") return answer.ok({ ...opened.value, ...named }, [opened.value.thread])
+  if (opened.kind === "ok") return answer.ok({ ...opened.value, ...named }, openedLines(opened.value.thread))
   const { partial, ...failure } = opened
   if (!isOpened(partial)) return answer.refuse(failure, "")
   // The session exists: the first prompt that failed names it, so a retry sends to it instead of opening another.
   if (answer.json) dependencies.output(JSON.stringify({ ...partial, ...named, prompt: { error: failure } }))
   else {
-    dependencies.output(partial.thread)
-    dependencies.error(
-      `omo remote: opened ${partial.thread}, but its first prompt was not delivered: ${failure.message}`,
-    )
-    dependencies.error(`${failure.next_action} Send it again with omo remote send ${partial.thread} <text>.`)
+    for (const line of openedLines(partial.thread)) dependencies.output(line)
+    for (const line of undeliveredPromptLines(partial.thread, failure)) dependencies.error(line)
   }
   return REMOTE_EXIT.failed
 }

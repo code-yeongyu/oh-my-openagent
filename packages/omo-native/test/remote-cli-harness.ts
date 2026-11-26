@@ -115,6 +115,10 @@ export async function run(
     readonly optOut?: RemoteOptOut
     readonly localPermissionPreset?: () => string
     readonly readStdin?: () => Promise<string>
+    /** The real stdio writers (localRemoteDependencies), for a test of what reaches the terminal. */
+    readonly output?: (line: string) => void
+    readonly write?: (text: string) => void
+    readonly error?: (line: string) => void
   } = {},
 ) {
   let dir = stateDir

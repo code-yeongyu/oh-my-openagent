@@ -1,7 +1,8 @@
 import type { personSurface, RemoteClient } from "../omo-senpi/src/components/remote/index"
 import { REMOTE_EXIT } from "./remote-exit"
 import type { RemoteCommandDependencies } from "./remote-local"
-import { candidateLines, personNextAction } from "./remote-render"
+import { personNextAction, refusalLines } from "./remote-render"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 // How an `omo remote` session verb answers (#13414 4c-2): --json prints the person client's value as is, and a refusal as
 // the client's flat failure; a person reads the value's lines, or the refusal's message, next step and candidates.
@@ -36,16 +37,14 @@ export function sessionAnswer(json: boolean, dependencies: RemoteCommandDependen
     dependencies,
     refuse: (refusal, label) => {
       // A next action naming the agents' eval-only thread_list reads the CLI verb in --json too: scripts run the CLI.
-      const next = personNextAction(refusal.next_action)
-      if (json) dependencies.output(JSON.stringify({ kind: "error", ...refusal, next_action: next }))
+      if (json)
+        dependencies.output(
+          JSON.stringify({ kind: "error", ...refusal, next_action: personNextAction(refusal.next_action) }),
+        )
       else if (label !== "" && NO_SUCH_SESSION.has(String(refusal.details?.["reason"]))) {
-        dependencies.error(`omo remote: no session ${label} on this account.`)
+        dependencies.error(escapeForDisplay(`omo remote: no session ${label} on this account.`))
         dependencies.error("Run omo remote sessions to see them.")
-      } else {
-        dependencies.error(`omo remote: ${refusal.message}`)
-        dependencies.error(next)
-        for (const line of candidateLines(refusal)) dependencies.error(line)
-      }
+      } else for (const line of refusalLines(refusal)) dependencies.error(line)
       return REMOTE_EXIT.failed
     },
     ok: (value, lines) => {

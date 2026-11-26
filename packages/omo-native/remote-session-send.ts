@@ -1,6 +1,7 @@
 import type { RemoteClient, SendReceipt, ThreadHandle } from "../omo-senpi/src/components/remote/index"
 import { REMOTE_EXIT } from "./remote-exit"
-import { sendLines, sendWaitNotice } from "./remote-render"
+import { sendLines, sendWaitNotice, sessionEndedLine } from "./remote-render"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { SessionArgs } from "./remote-session-args"
 import type { Answer, Refusal } from "./remote-session-answer"
 
@@ -24,7 +25,7 @@ export async function sendTo(
   const { json, dependencies } = answer
   const refuse = (refusal: Refusal): number => {
     if (refusal.code !== "not_steerable" || json) return answer.refuse(refusal, label)
-    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+    dependencies.error(escapeForDisplay(`omo remote: nothing is running on ${label} to steer.`))
     dependencies.error("Send without --steer to start a turn.")
     return REMOTE_EXIT.failed
   }
@@ -47,7 +48,7 @@ export async function sendTo(
     // A send that waits behind a running turn says so at once (#13268); under --json the notice rides the final JSON
     // value instead of stderr, so one JSON value always carries it (#13425).
     const notice = sendWaitNotice(label, sent.value)
-    if (notice !== null && !json) dependencies.error(notice)
+    if (notice !== null && !json) dependencies.error(escapeForDisplay(notice))
     const typed = { ...sent.value, ...(notice === null ? {} : { queued_notice: notice }) }
     let reply = ""
     for await (const event of stream) {
@@ -62,17 +63,14 @@ export async function sendTo(
       const { reason } = event.outcome
       if (reason === "settled") return answer.ok({ ...typed, reply }, [])
       if (reason === "interrupted") {
-        dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
+        dependencies.error(escapeForDisplay(`omo remote: the turn on ${label} was interrupted before it finished.`))
         return REMOTE_EXIT.failed
       }
       if (json) dependencies.output(JSON.stringify({ ...typed, kind: "session_ended", end: reason }))
-      else
-        dependencies.error(
-          `omo remote: the session on ${sent.value.device.id} ended before its turn settled (${reason}).`,
-        )
+      else dependencies.error(sessionEndedLine(sent.value.device.id, String(reason)))
       return REMOTE_EXIT.failed
     }
-    dependencies.error(`omo remote: the follow of ${label} stopped before its turn settled.`)
+    dependencies.error(escapeForDisplay(`omo remote: the follow of ${label} stopped before its turn settled.`))
     return REMOTE_EXIT.failed
   } finally {
     stream.stop()
@@ -93,7 +91,9 @@ function timedOut(failure: Refusal, typed: object, label: string, waitMs: number
     )
   else
     answer.dependencies.error(
-      `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+      escapeForDisplay(
+        `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+      ),
     )
   return REMOTE_EXIT.failed
 }

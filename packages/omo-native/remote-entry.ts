@@ -9,6 +9,7 @@ import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from 
 import { coldWakeSetup, refreshColdWakeAtLaunch } from "./remote-cold-wake"
 import { remoteOptOut } from "./remote-opt-out"
 import { localRemoteDependencies } from "./remote-local"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
 
@@ -30,7 +31,7 @@ export function remoteDependencies(packageRoot?: string): RemoteVerbDependencies
       await cliDeviceServiceHandoff({
         api,
         stateDir,
-        log: (line) => process.stderr.write(`${line}\n`),
+        log: (line) => process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`),
       }).adopt(credentials)
       return "linked"
     },
@@ -42,7 +43,9 @@ export function remoteDependencies(packageRoot?: string): RemoteVerbDependencies
  * the running executable itself, never `OMO_BIN` or the caller's agent dir (#14194 review H1).
  */
 export const refreshSessionHostUnit = (isOlder: (installedRuntimeVersion: string) => boolean): Promise<void> =>
-  refreshColdWakeAtLaunch({ runtime: process.execPath, isOlder }, (line) => process.stderr.write(`${line}\n`))
+  refreshColdWakeAtLaunch({ runtime: process.execPath, isOlder }, (line) =>
+    process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`),
+  )
 
 /** The launchers' entry for `omo remote attach`: the engine argv to run in place of this command, or undefined (exit code set). */
 export async function runRemoteAttachCommand(args: readonly string[]): Promise<readonly string[] | undefined> {
@@ -74,7 +77,11 @@ export async function setUpRemoteAfterLogin(): Promise<void> {
  */
 export async function setUpRemoteAfterSignIn(): Promise<"on" | "kept_off" | "not_on" | "background"> {
   if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return "not_on"
-  const dependencies = { ...remoteDependencies(), output: (line: string) => process.stderr.write(`${line}\n`) }
+  const dependencies = {
+    ...remoteDependencies(),
+    // The sign-in setup's output can be JSON (remote-bootstrap --json): it passes through unchanged.
+    output: (line: string) => process.stderr.write(`${line}\n`),
+  }
   return runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }
 

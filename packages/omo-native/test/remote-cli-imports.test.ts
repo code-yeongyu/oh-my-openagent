@@ -33,8 +33,12 @@ const OFFENDERS: readonly string[] = [
   "remote-cold-wake.ts -> ../device-service-core/src/index.ts",
 ]
 
+// The display escaping helper and its omo-native mirror are dependency-free leaf modules, allowed like node:*.
+const DISPLAY_ESCAPE: ReadonlySet<string> = new Set(["./display-escape.js", "@oh-my-opencode/utils/escape-for-display"])
+
 const allowed = (specifier: string): boolean =>
   specifier.startsWith("node:") ||
+  DISPLAY_ESCAPE.has(specifier) ||
   /^\.\/(remote-[\w-]+|thread-[\w-]+\.js)$/.test(specifier) ||
   /^\.\.\/omo-senpi\/src\/components\/remote\/(index|types|admin)$/.test(specifier)
 

@@ -1,7 +1,7 @@
 import { handleOf, relayUnavailable, resolveTypedAddress } from "../omo-senpi/src/components/remote/index"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT } from "./remote-exit"
-import { closeLines, interruptLines } from "./remote-render"
+import { closeLines, interruptLines, modelLines } from "./remote-render"
 import { STDIN_TEXT, type SessionArgs } from "./remote-session-args"
 import { type PersonRemote, type Refusal, sessionAnswer } from "./remote-session-answer"
 import { openOn } from "./remote-session-open"
@@ -56,7 +56,7 @@ export async function runSession(
       const set = await sessions.setModel(thread, args.model)
       return set.kind === "error"
         ? answer.refuse(set, label)
-        : answer.ok({ thread, ...set.value }, [`${label} now uses ${set.value.model}.`])
+        : answer.ok({ thread, ...set.value }, modelLines(label, set.value.model))
     }
     case "interrupt": {
       const interrupted = await sessions.interrupt(thread)

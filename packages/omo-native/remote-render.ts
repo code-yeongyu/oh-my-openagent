@@ -8,6 +8,7 @@ import type {
   SessionsList,
 } from "../omo-senpi/src/components/remote/index"
 import type { LocalStatus } from "./remote-cold-wake"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 type StatusState = ServiceStatus["state"]
 type UnitState = LocalStatus["device_service"]["state"]
@@ -31,7 +32,8 @@ const STATE_LABELS: Readonly<Record<StatusState, string>> = {
   fail_closed: "Needs repair",
 }
 
-function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {
+function renderTable(header: readonly string[], shownRows: readonly (readonly string[])[]): string[] {
+  const rows = shownRows.map((row) => row.map((cell) => escapeForDisplay(cell)))
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => (row[column] ?? "").length)))
   const line = (cells: readonly string[]) =>
     cells
@@ -61,13 +63,41 @@ export function candidateLines(refusal: {
   return listed.filter(isEntry).flatMap((candidate) => {
     const id = textOf(candidate["address"]) ?? textOf(candidate["device"]) ?? textOf(candidate["thread"])
     const name = textOf(candidate["device_name"]) ?? textOf(candidate["name"])
-    return id === undefined ? [] : [`  ${id}${name === undefined ? "" : `  ${name}`}`]
+    return id === undefined ? [] : [escapeForDisplay(`  ${id}${name === undefined ? "" : `  ${name}`}`)]
   })
 }
 
 // A refusal's next action may name the agents' eval-only thread_list tool; a person at a terminal runs the CLI verb.
 export const personNextAction = (text: string): string =>
   /\bthread_list\b/.test(text) ? "Run omo remote sessions to see the account's sessions." : text
+
+/** A typed refusal as the lines a person reads on stderr: the message, the next action, then any candidates. */
+export function refusalLines(refusal: {
+  readonly code: string
+  readonly message: string
+  readonly next_action: string
+  readonly details?: Readonly<Record<string, unknown>> | undefined
+}): string[] {
+  return [
+    escapeForDisplay(`omo remote: ${refusal.message}`),
+    escapeForDisplay(personNextAction(refusal.next_action)),
+    ...candidateLines(refusal),
+  ]
+}
+
+/** `omo remote open --prompt` whose session opened but whose first prompt was not delivered. */
+export function undeliveredPromptLines(
+  label: string,
+  error: { readonly message: string; readonly next_action: string },
+): string[] {
+  return [
+    escapeForDisplay(`omo remote: opened ${label}, but its first prompt was not delivered: ${error.message}`),
+    escapeForDisplay(`${error.next_action} Send it again with omo remote send ${label} <text>.`),
+  ]
+}
+
+export const sessionEndedLine = (device: string, end: string): string =>
+  escapeForDisplay(`omo remote: the session on ${device} ended before its turn settled (${end}).`)
 
 export function ago(ms: number | null, now: number): string {
   if (ms === null) return "never"
@@ -94,7 +124,7 @@ export function statusLines(
   if (status.detail?.action) rows.push(["Action", status.detail.action])
   rows.push(...local)
   const width = Math.max(...rows.map(([label]) => label.length))
-  return rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`)
+  return rows.map(([label, value]) => escapeForDisplay(`${label.padEnd(width)}  ${value}`))
 }
 
 const UNIT_STATE_LABELS: Readonly<Record<UnitState, string>> = {
@@ -159,7 +189,9 @@ export function sessionLines(listing: SessionsList, now: number): string[] {
   if (listing.unanswered.length > 0)
     lines.push(
       "",
-      `Not answered, rows may be missing or cached: ${listing.unanswered.map((device) => device.name).join(", ")}`,
+      escapeForDisplay(
+        `Not answered, rows may be missing or cached: ${listing.unanswered.map((device) => device.name).join(", ")}`,
+      ),
     )
   return lines
 }
@@ -177,13 +209,17 @@ const queuedLine = (label: string, receipt: Extract<SendReceipt, { readonly queu
 
 /** The human answer of a send that did not wait; `label` is the session as its address names it. */
 export function sendLines(label: string, receipt: SendReceipt): string[] {
-  if (receipt.lane === "queued" || receipt.lane === "queued_offline") return [queuedLine(label, receipt)]
-  if (receipt.lane === "steered") return [`Steered turn ${receipt.turn_id ?? "?"} on ${label}.`]
-  return [`Sent to ${label}: turn ${receipt.turn_id ?? "?"} started.`]
+  if (receipt.lane === "queued" || receipt.lane === "queued_offline")
+    return [escapeForDisplay(queuedLine(label, receipt))]
+  if (receipt.lane === "steered") return [escapeForDisplay(`Steered turn ${receipt.turn_id ?? "?"} on ${label}.`)]
+  return [escapeForDisplay(`Sent to ${label}: turn ${receipt.turn_id ?? "?"} started.`)]
 }
 
 /** The human answer of an interrupt: what ran, and the background jobs of its turn it stopped or left (#13444). */
-export function interruptLines(label: string, result: InterruptResult): string[] {
+export const interruptLines = (label: string, result: InterruptResult): string[] =>
+  interruptVerbLines(label, result).map((line) => escapeForDisplay(line))
+
+function interruptVerbLines(label: string, result: InterruptResult): string[] {
   if (!result.interrupted) return [`Nothing was running on ${label}.`]
   const { background } = result
   if (background.status === "not_supported")
@@ -211,8 +247,14 @@ export function closeLines(
   return [
     closed.closed ? `Closed ${label}.` : `${label} was not open.`,
     ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
-  ]
+  ].map((line) => escapeForDisplay(line))
 }
+
+/** The human answer of a model change: the model the session now uses. */
+export const modelLines = (label: string, model: string): string[] => [escapeForDisplay(`${label} now uses ${model}.`)]
+
+/** The human answer of an open: the new session's address. */
+export const openedLines = (address: string): string[] => [escapeForDisplay(address)]
 
 /**
  * The wait-mode status line for a send that waits behind a running turn (#13268): stdout stays the streamed answer
