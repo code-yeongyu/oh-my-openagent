@@ -17,6 +17,7 @@ import { remotePort } from "../../../../../../script/sdk-parity/fakes/remote"
 import type { ThreadHost } from "../../thread/tools"
 import { createThreadSdk } from "../../thread/sdk"
 import { invalidInput } from "./assemble"
+import { RUNTIME_FILE_MISMATCH, RUNTIME_FILE_UNAVAILABLE, type ThreadsRuntime, threadsNamespace } from "./threads"
 import { boundaryRefusals } from "./authority"
 
 // Security design 6, for the whole root (P1b's share): fake ports hold one canary per asset of 2.1; every call of the
@@ -545,5 +546,109 @@ describe("the non-disclosure scan over the whole root", () => {
         expect([...new Set(echoed.map((entry): string => entry.key))]).toEqual([
           ...(EXPECTED_B8_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? []),
         ])
+      })
+
+  // Security review 6075906719 and the design lane's ask: the guarantee for the thread runtime file is the scan's, not one
+  // test's. A load that throws (its text holding canaries and a path) and a file that loads from another build (a stamp
+  // and an export carrying canaries) are driven through every call, for every principal; nothing of either reaches an
+  // answer, the console or a file. Script and person reach the loader and every thread call answers the typed reason;
+  // the other principals never reach it.
+  const LOADER_FAULTS: Readonly<
+    Record<string, { readonly reason: string; readonly load: () => Promise<ThreadsRuntime> }>
+  > = {
+    "a load that throws": {
+      reason: RUNTIME_FILE_UNAVAILABLE,
+      load: () =>
+        Promise.reject(new Error(`cannot open /home/${CANARIES.privateKey}/threads.js: ${CANARIES.accessToken}`)),
+    },
+    "a file from another build": {
+      reason: RUNTIME_FILE_MISMATCH,
+      load: async () =>
+        ({
+          RUNTIME_STAMP: CANARIES.socketSecret,
+          createThreadCore: () => {
+            throw new Error(CANARIES.refreshToken)
+          },
+          fail: () => CANARIES.oauthToken,
+          threadToolParamSchemas: { [CANARIES.providerKey]: {} },
+        }) as unknown as ThreadsRuntime,
+    },
+  }
+  const THREAD_CALLS = (Object.keys(ROOT_CALLS) as RootCallKey[]).filter(
+    (key) => key.startsWith("threads.") || key === "daemon.warm",
+  )
+  const SERVED_THREAD_CALLS = THREAD_CALLS.filter((key) =>
+    Object.hasOwn(
+      threadsNamespace({
+        agentDir: "/",
+        cwd: "/",
+        uid: 0,
+        user: "scan",
+        env: {},
+        principal: { kind: "script", uid: 0 },
+      }).members,
+      key,
+    ),
+  )
+
+  for (const [fault, { reason, load }] of Object.entries(LOADER_FAULTS))
+    for (const principal of PRINCIPALS)
+      test(`#given ${principal?.kind ?? "the default script"} root and ${fault} #when every call of the root runs #then no canary of the loader or the file reaches an answer, the console or a file, and a thread call answers ${reason}`, async () => {
+        const home = mkdtempSync(join(tmpdir(), "non-disclosure-runtime-file-"))
+        directories.push(home)
+        const logged: unknown[] = []
+        const restore = (["log", "info", "warn", "error", "debug"] as const).map((level) => {
+          const original = console[level]
+          console[level] = (...args: unknown[]) => void logged.push(args)
+          return () => void (console[level] = original)
+        })
+        const captured: Captured[] = []
+        let loads = 0
+        const options = {
+          env: { OMO_SERVICE_API_URL: "https://accounts.example.test", HOME: home, OMO_CODING_AGENT_DIR: home },
+          cwd: home,
+          home,
+          agentDir: home,
+          ...(principal === undefined ? {} : { principal }),
+          ports: scanPorts(false, home),
+        }
+        try {
+          const root = assembleOmoSdk(options, {
+            loadThreadsRuntime: () => {
+              loads += 1
+              return load()
+            },
+          })
+          for (const key of Object.keys(ROOT_CALLS) as RootCallKey[])
+            await drive(
+              key,
+              key.split(".").reduce<unknown>((node, part) => Reflect.get(Object(node), part), root),
+              captured,
+            )
+          await root.dispose()
+        } finally {
+          for (const undo of restore) undo()
+        }
+        const written = filesUnder(home)
+          .filter((path) => !isStoreFile(path))
+          .map((path) => ({ path, text: readFileSync(path, "latin1") }))
+        expect({
+          answers: canariesIn(captured),
+          console: canariesIn(logged),
+          files: canariesIn(written),
+        }).toEqual({ answers: [], console: [], files: [] })
+        const reaches = principal === undefined || principal.kind === "person"
+        const answered = THREAD_CALLS.filter((key) =>
+          captured.some(
+            (entry) =>
+              entry.key === key &&
+              Bun.deepEquals((entry.answer as { readonly error?: { readonly details?: unknown } }).error?.details, {
+                reason,
+                file: "threads",
+              }),
+          ),
+        )
+        // The calls the threads namespace serves load the file; every other thread call answers before any loader.
+        expect({ reaches: loads > 0, answered }).toEqual({ reaches, answered: reaches ? SERVED_THREAD_CALLS : [] })
       })
 })

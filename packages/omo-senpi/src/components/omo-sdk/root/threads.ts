@@ -7,6 +7,7 @@ import type { ThreadHost } from "../../thread/tools/ports"
 import type { Endpoint, OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
 import type * as result from "../contract/results/threads"
 import { OMO_CODE_REGISTRY } from "../contract/codes"
+import { RUNTIME_STAMP } from "../runtime-stamp"
 import { reportUnexpected, type UnexpectedPort, withUnexpectedLog } from "../unexpected-port"
 import { extensionFailure } from "./extension-codes"
 import type { Members, NamespaceServing } from "./members"
@@ -35,12 +36,35 @@ export type ThreadPorts = {
 }
 
 /** What the root takes from its thread runtime file (slice P1c, #15031): functions and plain data only. */
-export type ThreadsRuntime = Pick<typeof ThreadsRuntimeEntry, "createThreadCore" | "fail" | "threadToolParamSchemas">
+export type ThreadsRuntime = Pick<
+  typeof ThreadsRuntimeEntry,
+  "RUNTIME_STAMP" | "createThreadCore" | "fail" | "threadToolParamSchemas"
+>
 
 export const RUNTIME_FILE_UNAVAILABLE = "runtime_file_unavailable"
+export const RUNTIME_FILE_MISMATCH = "runtime_file_mismatch"
 
+// A file that is missing loads on a later call once it is back; one whose evaluation failed stays failed for this process,
+// because the platform's module loader keeps it (review 6075851574, MEDIUM 5), so the text names both recoveries.
 const RUNTIME_FILE_MESSAGE =
-  "A part of the omo SDK runtime could not be loaded. Reinstall or update the omo package, then retry."
+  "A part of the omo SDK runtime could not be loaded. Reinstall or update the omo package, then retry; if it still fails, restart this process."
+
+const MISMATCH_MESSAGE =
+  "The omo SDK runtime installed on this device changed while this process was running. Restart the process to use it."
+
+const CORE_MESSAGE = "The omo SDK thread core could not be started."
+
+// What the root checks of a file it loaded before using it (a file on disk is a system boundary): this build's stamp and
+// the three exports by kind. The answer names the check that failed, never a value read from the file.
+function runtimeMismatch(loaded: unknown): string | undefined {
+  const file = (typeof loaded === "object" && loaded !== null ? loaded : {}) as Readonly<Record<string, unknown>>
+  if (file.RUNTIME_STAMP !== RUNTIME_STAMP) return "its build stamp is not this root's"
+  if (typeof file.createThreadCore !== "function") return "it has no createThreadCore function"
+  if (typeof file.fail !== "function") return "it has no fail function"
+  if (typeof file.threadToolParamSchemas !== "object" || file.threadToolParamSchemas === null)
+    return "it has no threadToolParamSchemas object"
+  return undefined
+}
 
 const importThreadsRuntime = (): Promise<ThreadsRuntime> => import("#omo-sdk-threads-runtime")
 
@@ -132,39 +156,72 @@ export function threadsNamespace(options: {
     return { members: {}, releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }) }
   // The thread runtime file loads on the first thread call (slice P1c, #15031). A load that fails is not kept: the call
   // answers the typed refusal, its exception goes to the logger port alone, and the next call loads again.
+  // A loaded file from another build, or without the exports the root takes, answers runtime_file_mismatch the same way.
   let runtime: Promise<ThreadsRuntime> | undefined
-  const loadRuntime = async (): Promise<ThreadsRuntime | OmoFailure> => {
-    try {
-      return await (runtime ??= (options.loadThreadsRuntime ?? importThreadsRuntime)())
-    } catch (error) {
-      runtime = undefined
-      const written = reportUnexpected(options.ports?.onUnexpected, error)
-      return {
-        kind: "error",
-        error: {
-          code: "internal_error",
-          message: withUnexpectedLog(RUNTIME_FILE_MESSAGE, written),
-          next_action: OMO_CODE_REGISTRY.internal_error.next_action,
-          details: { reason: RUNTIME_FILE_UNAVAILABLE, file: "threads" },
-        },
-      }
+  const refuse = (error: unknown, message: string, reason: string): OmoFailure => {
+    runtime = undefined
+    const written = reportUnexpected(options.ports?.onUnexpected, error)
+    return {
+      kind: "error",
+      error: {
+        code: "internal_error",
+        message: withUnexpectedLog(message, written),
+        next_action: OMO_CODE_REGISTRY.internal_error.next_action,
+        details: { reason, file: "threads" },
+      },
     }
   }
-  let core: Promise<ThreadCore> | undefined
-  const thread = async (): Promise<ThreadCore | OmoFailure> => {
-    const loaded = await loadRuntime()
-    if (isFailure(loaded)) return loaded
-    return (core ??= Promise.resolve(
-      loaded.createThreadCore({
-        agentDir: options.agentDir,
-        cwd: options.cwd,
-        uid: options.uid,
-        user: options.user,
-        env: env(options),
-        ...options.threads,
-        ...options.ports,
-      }),
-    ))
+  const loadRuntime = async (): Promise<ThreadsRuntime | OmoFailure> => {
+    let loaded: ThreadsRuntime
+    try {
+      loaded = await (runtime ??= (options.loadThreadsRuntime ?? importThreadsRuntime)())
+    } catch (error) {
+      return refuse(error, RUNTIME_FILE_MESSAGE, RUNTIME_FILE_UNAVAILABLE)
+    }
+    const mismatch = runtimeMismatch(loaded)
+    if (mismatch === undefined) return loaded
+    return refuse(
+      new Error(`The thread runtime file does not match this root: ${mismatch}.`),
+      MISMATCH_MESSAGE,
+      RUNTIME_FILE_MISMATCH,
+    )
+  }
+  // The core's creation is the namespace's from the first call on: it is assigned before any await, so a dispose that
+  // races the first call waits for it and disposes what it built. A core that cannot be built from a loaded file answers
+  // internal_error with fixed text, its exception at the logger port alone; like a failed load, it is not kept.
+  let core: Promise<ThreadCore | OmoFailure> | undefined
+  const thread = (): Promise<ThreadCore | OmoFailure> => {
+    if (core !== undefined) return core
+    const creating: Promise<ThreadCore | OmoFailure> = (async (): Promise<ThreadCore | OmoFailure> => {
+      const loaded = await loadRuntime()
+      if (isFailure(loaded)) return loaded
+      try {
+        return await loaded.createThreadCore({
+          agentDir: options.agentDir,
+          cwd: options.cwd,
+          uid: options.uid,
+          user: options.user,
+          env: env(options),
+          ...options.threads,
+          ...options.ports,
+        })
+      } catch (error) {
+        const written = reportUnexpected(options.ports?.onUnexpected, error)
+        return {
+          kind: "error",
+          error: {
+            code: "internal_error",
+            message: withUnexpectedLog(CORE_MESSAGE, written),
+            next_action: OMO_CODE_REGISTRY.internal_error.next_action,
+          },
+        }
+      }
+    })().then((made) => {
+      if (isFailure(made) && core === creating) core = undefined
+      return made
+    })
+    core = creating
+    return creating
   }
   const withCore = async <R>(run: (core: ThreadCore) => Promise<R>): Promise<R | OmoFailure> => {
     const ready = await thread()
@@ -290,6 +347,9 @@ export function threadsNamespace(options: {
         ? ({ success: false, error: "internal_error" } as Awaited<ReturnType<ThreadCore["releaseRow"]>>)
         : ready.releaseRow(located, request)
     },
-    dispose: async () => (core === undefined ? disposePorts() : (await core).dispose()),
+    dispose: async () => {
+      const made = core === undefined ? undefined : await core
+      return made === undefined || isFailure(made) ? disposePorts() : made.dispose()
+    },
   }
 }
