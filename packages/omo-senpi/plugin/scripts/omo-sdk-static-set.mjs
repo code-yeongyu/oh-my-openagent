@@ -164,8 +164,6 @@ export async function staticModuleSet(entry, options = {}) {
 export const staticSetDefinition = (row) =>
   `modules of ${row.output} that keep bytes in its output and are reached from the entry by static edges only, plus the node builtins a kept module imports; named by real path, layout-independent`
 
-export const STATIC_SET_DEFINITION = staticSetDefinition(SDK_RUNTIME_FILES[0])
-
 export const difference = (actual, pinned) => ({
   added: actual.filter((path) => !pinned.includes(path)),
   removed: pinned.filter((path) => !actual.includes(path)),

@@ -233,16 +233,18 @@ describe("the SDK root's thread runtime file (P1c, #15031)", () => {
     expect(threads.some((path) => path.endsWith("src/extension/omo-sdk.ts"))).toBe(false)
   })
 
-  // Review 6075851574 LOW 7: the file this build wrote, so a change to the entry cannot pass against a committed bundle.
-  test("#given the freshly built thread runtime file #then it exports exactly what the root takes, as functions and plain data, with this build's stamp", async () => {
+  // Review 6075851574 LOW 7: the file this build wrote, so a change to the entry cannot pass against a committed bundle;
+  // the committed file the plugin ships must export the same names.
+  test("#given the freshly built thread runtime file #then it exports exactly what the root takes, as functions and plain data, with this build's stamp, as the shipped file does", async () => {
     const outputs = await sharedOutputs()
-    const { RUNTIME_STAMP, createThreadCore, fail, threadToolParamSchemas, ...rest } = await import(
-      pathToFileURL(sdkFile(outputs, "threads")).href
-    )
+    const fresh = await import(pathToFileURL(sdkFile(outputs, "threads")).href)
+    const { RUNTIME_STAMP, createThreadCore, fail, threadToolParamSchemas, ...rest } = fresh
     expect(Object.keys(rest)).toEqual([])
     expect([typeof createThreadCore, typeof fail]).toEqual(["function", "function"])
     expect(Object.getPrototypeOf(threadToolParamSchemas)).toBe(Object.prototype)
     expect(RUNTIME_STAMP).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    const shipped = await import("../runtime/omo-sdk/threads.js")
+    expect(Object.keys(shipped).sort()).toEqual(Object.keys(fresh).sort())
   })
 })
 
