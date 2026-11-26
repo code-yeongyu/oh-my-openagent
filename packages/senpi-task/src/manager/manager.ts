@@ -1761,7 +1761,8 @@ class TaskManagerImpl implements TaskManager {
       },
       onLivenessNotice: (record, status) => this.#options.onChildLiveness?.(record, status),
       // The engine hopped past a spent designated rung in-session: remember it like a failed turn (#11383).
-      onUsageLimitHop: (provider, modelId, message) => this.#limits.settle(taskId, provider, modelId, message),
+      onUsageLimitHop: (provider, modelId, message) =>
+        this.#limits.settle(taskId, provider, modelId, message, false, this.#tryLoad(taskId)?.notification.run_epoch),
       onExtensionEvent: (event) => {
         const record = this.#tryLoad(taskId)
         if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)
@@ -1783,7 +1784,7 @@ class TaskManagerImpl implements TaskManager {
     const probeTimedOut =
       input.outcome.status === "error" &&
       input.outcome.failure.kind === "child-unresponsive" &&
-      this.#limits.probeOf(input.taskId) !== undefined &&
+      this.#limits.probeOf(input.taskId, input.epoch) !== undefined &&
       (input.runStats?.tool_calls ?? 0) === 0
     if (input.outcome.status !== "error" || !(isChainWalkable(input.outcome, input.runStats) || probeTimedOut)) {
       return false
@@ -1792,7 +1793,14 @@ class TaskManagerImpl implements TaskManager {
     const record = this.#tryLoad(input.taskId)
     const route = record?.resolved_model
     if (route !== undefined)
-      this.#limits.settle(input.taskId, route.provider, route.model_id, input.outcome.failure.message, probeTimedOut)
+      this.#limits.settle(
+        input.taskId,
+        route.provider,
+        route.model_id,
+        input.outcome.failure.message,
+        probeTimedOut,
+        input.epoch,
+      )
     const candidates =
       record == null ? undefined : runtimeFallbackCandidates(record, input.outcome.failure.message, this.#limits)
     const nextModel = candidates?.remaining[0]
@@ -1932,7 +1940,7 @@ class TaskManagerImpl implements TaskManager {
     })
     const launch = (): void => {
       if (candidates.limit === "ambiguous" && nextModel.provider === route?.provider) {
-        this.#limits.beginProbe(input.taskId, nextModel.provider, failureMessage)
+        this.#limits.beginProbe(input.taskId, nextModel.provider, failureMessage, nextEpoch)
       }
       void this.#launchRuntimeFallback({
         record: nextRecord,
@@ -2077,8 +2085,9 @@ class TaskManagerImpl implements TaskManager {
     })
     // Checked before anything starts: a cancel, an interrupt or another owner that moved the task while
     // this launch waited (for the old rung's close, or for capacity) must not get a child started.
+    const epoch = context.record.notification.run_epoch
     if (!this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))) {
-      this.#limits.endProbe(context.record.task_id)
+      this.#limits.endProbe(context.record.task_id, epoch)
       this.#releaseSlot(context.record.task_id, context.model, context.record.notification.run_epoch)
       failOwnedRun(this.#options.store, launchRunOf(context.record), nowIso(this.#now), {
         errorMessage: "Runtime fallback launch aborted before the child could start.",
@@ -2088,7 +2097,7 @@ class TaskManagerImpl implements TaskManager {
     }
 
     const request = createProbeRequestSignal(this.#now)
-    const probing = this.#limits.probeOf(context.record.task_id) !== undefined
+    const probing = this.#limits.probeOf(context.record.task_id, epoch) !== undefined
     let handle: ManagedChildHandle
     try {
       handle = await context.runner.start(
@@ -2098,13 +2107,14 @@ class TaskManagerImpl implements TaskManager {
       )
     } catch (error) {
       const route = context.record.resolved_model
-      if (route !== undefined && this.#limits.probeOf(context.record.task_id) !== undefined) {
+      if (route !== undefined && this.#limits.probeOf(context.record.task_id, epoch) !== undefined) {
         this.#limits.settle(
           context.record.task_id,
           route.provider,
           route.model_id,
           describeStartFailure(error).errorMessage,
           true,
+          epoch,
         )
       }
       const advanced = this.#advanceStartFallback(context, error)
@@ -2125,6 +2135,7 @@ class TaskManagerImpl implements TaskManager {
     // The start awaited: a cancel, interrupt or another owner may have moved the task meanwhile. A
     // late child of a run that is no longer this one's is discarded, never attached.
     if (!this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))) {
+      this.#limits.endProbe(context.record.task_id, epoch)
       await this.#discardStaleLaunch(context, handle)
       return
     }
@@ -2141,16 +2152,16 @@ class TaskManagerImpl implements TaskManager {
     this.#recordSpawnFacts(context.record.task_id, handle)
     void this.#isolation.stamp(context.record.task_id, handle)
     const taskId = context.record.task_id
-    const probe = this.#limits.probeOf(taskId)
+    const probe = this.#limits.probeOf(taskId, epoch)
     this.#outcome.trackOutcome(
       taskId,
       handle,
       context.model,
-      context.record.notification.run_epoch,
+      epoch,
       probe === undefined
         ? undefined
         : {
-            turnId: `usage-limit-probe-${context.record.notification.run_epoch}`,
+            turnId: `usage-limit-probe-${epoch}`,
             outcome: boundedProbeOutcome({
               handle,
               probe,
@@ -2158,7 +2169,7 @@ class TaskManagerImpl implements TaskManager {
               subscribeRequest: request.subscribe,
               now: this.#now,
               timeoutMs: this.#options.limitProbeTimeoutMs ?? LIMIT_PROBE_TIMEOUT_MS,
-              onAnswered: () => this.#limits.endProbe(taskId),
+              onAnswered: () => this.#limits.endProbe(taskId, epoch),
             }),
           },
     )

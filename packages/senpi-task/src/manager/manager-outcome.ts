@@ -299,9 +299,14 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     const outcomePromise = turn?.outcome ?? handle.waitForOutcome()
     outcomePromise
       .then(async (outcome) => {
+        // A run that ended without a failure, or was stopped, answers no usage-limit probe; only its own probe ends.
+        if (outcome.status !== "error") ports.usageLimits?.endProbe(taskId, epoch)
         if (turns.get(taskId) !== tracking) return
         const stopped = ports.stopSettlement?.(taskId)
-        if (stopped !== undefined) return await settleStopped(taskId, handle, model, epoch, stopped)
+        if (stopped !== undefined) {
+          ports.usageLimits?.endProbe(taskId, epoch)
+          return await settleStopped(taskId, handle, model, epoch, stopped)
+        }
         const paused = ports.pauseSettlement?.(taskId, epoch)
         if (paused !== undefined) {
           if (await settlePaused(ports, taskId, handle, epoch, paused)) return

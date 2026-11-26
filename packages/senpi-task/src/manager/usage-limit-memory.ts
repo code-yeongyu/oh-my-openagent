@@ -16,23 +16,38 @@ function modelFamily(modelId: string): string {
   return FAMILY.exec(modelId)?.[0].toLowerCase() ?? modelId
 }
 
-export type UsageLimitProbe = { readonly provider: string; readonly message: string; readonly until: number }
+export type UsageLimitProbe = {
+  readonly provider: string
+  readonly message: string
+  readonly until: number
+  readonly epoch?: number
+}
 
 /**
  * Usage-limit verdicts the task manager has already paid for, shared by every child it runs (#11383): a provider
  * whose account is spent and a model family whose own limit is spent, each until its stated reset (`Resets at
  * <ISO>`) or LIMIT_MEMORY_DEFAULT_MS. A later child skips them instead of re-probing the family or re-discovering
  * the account limit. `probe` marks a task whose ambiguous limit hopped onto a same-provider rung: ANY failure of
- * that rung (a limit, an error or the probe timeout) confirms the provider's account limit.
+ * that rung (a limit, an error or the probe timeout) confirms the provider's account limit. A probe belongs to the run
+ * it was begun for: when both the probe and the caller name a run epoch, every read, settle and end addresses only
+ * that run's probe, so a late callback of an ended run never touches a newer one; a side that names no epoch addresses
+ * the task's probe whatever its run. A probe is forgotten LIMIT_MEMORY_DEFAULT_MS after it began.
  */
 export type UsageLimitMemory = {
   readonly accountSpent: (provider: string) => boolean
   readonly familySpent: (provider: string, modelId: string) => boolean
   readonly spentReason: (provider: string, modelId: string) => string | undefined
-  readonly settle: (taskId: string, provider: string, modelId: string, message: string, probeTimedOut?: boolean) => void
-  readonly beginProbe: (taskId: string, provider: string, message: string) => void
-  readonly probeOf: (taskId: string) => UsageLimitProbe | undefined
-  readonly endProbe: (taskId: string) => void
+  readonly settle: (
+    taskId: string,
+    provider: string,
+    modelId: string,
+    message: string,
+    probeTimedOut?: boolean,
+    epoch?: number,
+  ) => void
+  readonly beginProbe: (taskId: string, provider: string, message: string, epoch?: number) => void
+  readonly probeOf: (taskId: string, epoch?: number) => UsageLimitProbe | undefined
+  readonly endProbe: (taskId: string, epoch?: number) => void
 }
 
 export function createUsageLimitMemory(now: () => number): UsageLimitMemory {
@@ -48,13 +63,25 @@ export function createUsageLimitMemory(now: () => number): UsageLimitMemory {
   }
   const spentReason = (provider: string, modelId: string): string | undefined =>
     live(provider) ?? live(`${provider}/${modelFamily(modelId)}`)
+  const probeOf = (taskId: string, epoch?: number): UsageLimitProbe | undefined => {
+    const probe = probes.get(taskId)
+    if (probe === undefined) return undefined
+    if (probe.until <= now()) {
+      probes.delete(taskId)
+      return undefined
+    }
+    return epoch === undefined || probe.epoch === undefined || probe.epoch === epoch ? probe : undefined
+  }
+  const endProbe = (taskId: string, epoch?: number): void => {
+    if (probeOf(taskId, epoch) !== undefined) probes.delete(taskId)
+  }
   return {
     accountSpent: (provider) => live(provider) !== undefined,
     familySpent: (provider, modelId) => spentReason(provider, modelId) !== undefined,
     spentReason,
-    settle: (taskId, provider, modelId, message, probeTimedOut = false) => {
-      const probe = probes.get(taskId)
-      probes.delete(taskId)
+    settle: (taskId, provider, modelId, message, probeTimedOut = false, epoch) => {
+      const probe = probeOf(taskId, epoch)
+      endProbe(taskId, epoch)
       const scope = usageLimitScope(message)
       if (probe?.provider === provider) {
         spent.set(provider, {
@@ -67,13 +94,16 @@ export function createUsageLimitMemory(now: () => number): UsageLimitMemory {
         spent.set(`${provider}/${modelFamily(modelId)}`, { until: until(message), message })
       }
     },
-    beginProbe: (taskId, provider, message) => {
-      probes.set(taskId, { provider, message, until: until(message) })
+    beginProbe: (taskId, provider, message, epoch) => {
+      probes.set(taskId, {
+        provider,
+        message,
+        until: now() + LIMIT_MEMORY_DEFAULT_MS,
+        ...(epoch === undefined ? {} : { epoch }),
+      })
     },
-    probeOf: (taskId) => probes.get(taskId),
-    endProbe: (taskId) => {
-      probes.delete(taskId)
-    },
+    probeOf,
+    endProbe,
   }
 }
 

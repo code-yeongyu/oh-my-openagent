@@ -120,7 +120,7 @@ function previousRungOnProvider(record: TaskRecord, provider: string, limits?: U
   const attempts = record.fallback_attempts ?? []
   const previous = attempts[attempts.length - 2]
   return (
-    limits?.probeOf(record.task_id)?.provider === provider ||
+    limits?.probeOf(record.task_id, record.notification.run_epoch)?.provider === provider ||
     (previous?.provider === provider && limits?.familySpent(provider, previous.model_id) === true)
   )
 }
