@@ -24,7 +24,8 @@ export function resolveRecoveredNodeTask(
   node: DagNode,
   staleLive?: string,
 ): RecoveredNodeTask | Promise<RecoveredNodeTask> {
-  const owned = taskManager.findOwnedTasks({ kind: "dag", runId: record.runId, nodeId: node.id })
+  const key = { kind: "dag", runId: record.runId, nodeId: node.id } as const
+  const owned = taskManager.findOwnedTasks(key)
   const retained = node.taskId === undefined ? undefined : taskManager.get(node.taskId)
   const claims =
     retained === undefined || owned.some((task) => task.task_id === retained.task_id) ? owned : [...owned, retained]
@@ -36,9 +37,15 @@ export function resolveRecoveredNodeTask(
   // hands live children to the scheduler without yielding, so a racing settle is never folded twice.
   if (live.length === 0) return afterStops(taskManager, node, stale, current, staleLive)
   const reason = `superseded by attempt ${node.execAttempt ?? 0} of DAG node "${node.id}"`
-  return Promise.allSettled(live.map((task) => taskManager.cancelTask(task.task_id, reason))).then(() =>
-    afterStops(taskManager, node, stale, current, staleLive),
-  )
+  // The stop awaited: the current claim may have settled meanwhile, so it is read again, never returned
+  // from the snapshot taken before the await (a settled child must be folded, not re-attached).
+  return Promise.allSettled(live.map((task) => taskManager.cancelTask(task.task_id, reason))).then(() => {
+    const fresh =
+      current === undefined
+        ? undefined
+        : taskManager.findOwnedTasks(key).find((task) => task.task_id === current.task_id)
+    return afterStops(taskManager, node, stale, fresh ?? current, staleLive)
+  })
 }
 
 function afterStops(
