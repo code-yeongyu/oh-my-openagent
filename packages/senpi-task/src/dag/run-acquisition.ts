@@ -8,64 +8,14 @@ import { liveForeignHolder, type DagRunHolderProbe } from "./run-lease"
 import type { DagFileStore } from "./store"
 import { TERMINAL_DAG_RUN_STATUSES, type DagRunId } from "./types"
 
-/** This process's claim on one run while an operation installs, re-enters or mutates it. */
-export type DagRunReservation = {
-  readonly runId: DagRunId
-  readonly operation: string
-  readonly release: () => void
-}
-
-/** Reservations a caller already holds for runs it hands to another step, which never releases them. */
-export type DagRunHeldReservations = ReadonlyMap<DagRunId, DagRunReservation>
-
-export type DagRunReservations = {
-  /** Undefined when another operation of this process already holds the run. */
-  readonly reserve: (runId: DagRunId, operation: string) => DagRunReservation | undefined
-  readonly inFlight: (runId: DagRunId) => string | undefined
-  readonly whenFree: (runId: DagRunId) => Promise<void>
-  readonly whenAllFree: () => Promise<void>
-}
-
-export function createDagRunReservations(): DagRunReservations {
-  const held = new Map<DagRunId, { readonly operation: string; readonly released: Promise<void> }>()
-  return {
-    reserve(runId, operation) {
-      if (held.has(runId)) return undefined
-      let markReleased = (): void => undefined
-      const entry = { operation, released: new Promise<void>((resolve) => (markReleased = resolve)) }
-      held.set(runId, entry)
-      let open = true
-      return {
-        runId,
-        operation,
-        release: () => {
-          if (!open) return
-          open = false
-          if (held.get(runId) === entry) held.delete(runId)
-          markReleased()
-        },
-      }
-    },
-    inFlight: (runId) => held.get(runId)?.operation,
-    whenFree: (runId) => held.get(runId)?.released ?? Promise.resolve(),
-    whenAllFree: async () => {
-      while (held.size > 0) await Promise.all([...held.values()].map((entry) => entry.released))
-    },
-  }
-}
-
-/** Waits until no other operation of this process holds the run, then reserves it for `operation`. */
-export async function reserveWhenFree(
-  reservations: DagRunReservations,
-  runId: DagRunId,
-  operation: string,
-): Promise<DagRunReservation> {
-  for (;;) {
-    const reservation = reservations.reserve(runId, operation)
-    if (reservation !== undefined) return reservation
-    await reservations.whenFree(runId)
-  }
-}
+export {
+  createDagRunReservations,
+  reserveWhenFree,
+  type DagRunHeldReservations,
+  type DagRunReservation,
+  type DagRunReservations,
+} from "./run-reservations"
+import type { DagRunReservation, DagRunReservations } from "./run-reservations"
 
 type LeasedRecord = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
 type Eligibility = (fresh: LeasedRecord) => boolean
@@ -131,24 +81,13 @@ export const dagRunEligibility = {
     (parentSessionId: string): Eligibility =>
     (fresh) =>
       fresh.parentSessionId === parentSessionId && LIVE_STATUSES.has(fresh.status) && !stoppedByUser(fresh),
-  /**
-   * A send that revives a child of a settled run this host does not hold: of this session, `failed`
-   * (completed and cancelled stay refused), the node exists and has a child. It takes the run over.
-   */
-  sendRevive:
+  /** A send that reaches the child: steer into a live run, or revive (and take) a failed one. */
+  send:
     (parentSessionId: string, nodeId: string): Eligibility =>
-    (fresh) =>
-      fresh.parentSessionId === parentSessionId &&
-      fresh.status === "failed" &&
-      fresh.nodes.some((node) => node.id === nodeId && node.taskId !== undefined),
-  /** A send that steers or queues into a live child: decided without taking anything. */
-  sendSteer:
-    (parentSessionId: string, nodeId: string): Eligibility =>
-    (fresh) =>
-      fresh.parentSessionId === parentSessionId &&
-      STOPPABLE_STATUSES.has(fresh.status) &&
-      !stoppedByUser(fresh) &&
-      fresh.nodes.some((node) => node.id === nodeId && node.taskId !== undefined),
+    (fresh) => {
+      const decision = classifySend(fresh, parentSessionId, nodeId)
+      return decision === "steer" || decision === "revive"
+    },
   /** The user's Stop: live or paused, not already under this Stop or a newer one. */
   userStop:
     (pauseSeq: number): Eligibility =>
@@ -179,6 +118,8 @@ export type DagRunAcquisitionRequest<T extends LeasedRecord> = {
   readonly reservation?: DagRunReservation
   /** A stricter holder rule than `liveForeignHolder` (the fork-source adoption). */
   readonly holder?: (fresh: T) => number | undefined
+  /** Whether this acquisition writes the lease (default: always); a send that only steers takes none. */
+  readonly leaseWhen?: (fresh: T) => boolean
   /** Fields written together with the lease (the fork-source adoption re-homes the run). */
   readonly claim?: (fresh: T) => T
 }
@@ -189,6 +130,24 @@ export type DagRunAcquisitionRequest<T extends LeasedRecord> = {
  * run lock on the record they will write (`acquireDagRun`, or a journal's locked `skipDuplicate` for an
  * entry such as Stop that writes without taking the lease).
  */
+/**
+ * The closed classification of a send on one fresh record (#15125): `guidance` (the user stopped the
+ * run), `steer` (a live run, no lease), `revive` (a failed run, taken with a lease), or the reason it
+ * is refused. Only steer and revive may reach the child; the holder rule is the acquisition's.
+ */
+export type DagSendClass =
+  "guidance" | "steer" | "revive" | "other_session" | "completed" | "cancelled" | "node_not_found" | "node_has_no_task"
+
+export function classifySend(fresh: LeasedRecord, parentSessionId: string, nodeId: string): DagSendClass {
+  if (fresh.parentSessionId !== parentSessionId) return "other_session"
+  const node = fresh.nodes.find((entry) => entry.id === nodeId)
+  if (node === undefined) return "node_not_found"
+  if (fresh.status === "paused" && stoppedByUser(fresh)) return "guidance"
+  if (fresh.status === "completed" || fresh.status === "cancelled") return fresh.status
+  if (node.taskId === undefined) return "node_has_no_task"
+  return fresh.status === "failed" ? "revive" : "steer"
+}
+
 export function decideDagRun<T extends LeasedRecord>(
   fresh: T,
   request: Pick<DagRunAcquisitionRequest<T>, "eligible" | "probe" | "holder">,
@@ -236,6 +195,7 @@ function writeLease<T extends LeasedRecord>(
   reservation: DagRunReservation | undefined,
 ): DagRunAcquisition<T> {
   const claimed = request.claim?.(fresh) ?? fresh
+  if (request.leaseWhen?.(fresh) === false) return { kind: "acquired", record: fresh, reservation, leaseTaken: false }
   if (claimed === fresh && fresh.leaseHolderPid === request.probe.hostPid)
     return { kind: "acquired", record: fresh, reservation, leaseTaken: false }
   const record = { ...claimed, leaseHolderPid: request.probe.hostPid }

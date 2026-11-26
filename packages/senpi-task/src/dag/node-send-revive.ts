@@ -13,53 +13,90 @@ import {
   runBusy,
 } from "./node-control-context"
 import { persistDagNodeResult } from "./results"
-import { acquireDagRun, dagRunEligibility, decideDagRun } from "./run-acquisition"
+import { acquireDagRun, classifySend, dagRunEligibility, type DagSendClass } from "./run-acquisition"
 import type { DagSchedulerOptions } from "./scheduler"
 import { type DagNodeError, type DagNodeErrorCode, type DagNodeId, type DagRunId } from "./types"
 
+export type DagSendDecision =
+  | { readonly kind: "guidance"; readonly record: DagRunRecordV1 }
+  | { readonly kind: "steer"; readonly record: DagRunRecordV1 }
+  | { readonly kind: "revive"; readonly record: DagRunRecordV1; readonly leaseTaken: boolean }
+
 /**
- * Decides a send on the fresh record under the run lock. A live run is steered without taking it
- * (refused while another live process holds it); a `failed` run is acquired first (holder rule,
- * the verb's reservation, this host's lease), because its child can only be revived, which takes
- * the run over. Returns the record the send must work from, and whether this send wrote the lease
- * (a lease this host already held for another revive stays until that revive's fold).
+ * Decides a send ONCE, on one fresh record under one run lock (#15125): the acquisition checks the
+ * send's classification (`classifySend`), the holder rule and the verb's reservation, and writes this
+ * host's lease only for a revive (`leaseWhen`). Only `steer` and `revive` may reach the child;
+ * `guidance` routes to the stopped-run write; everything else throws its typed refusal.
  */
-export function decideSend(
-  options: DagSchedulerOptions,
-  runId: DagRunId,
-  nodeId: DagNodeId,
-): { readonly record: DagRunRecordV1; readonly leaseTaken: boolean } {
-  const probe = {
-    taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-  }
+export function decideSend(options: DagSchedulerOptions, runId: DagRunId, nodeId: DagNodeId): DagSendDecision {
   const parentSessionId = options.initialRecord.parentSessionId
-  const steer = options.store.withRunLock(runId, () => {
-    const fresh = options.store.readCheckpoint<DagRunRecordV1>(runId)
-    if (fresh === null || fresh.status === "failed") return { kind: "revive" as const }
-    return { ...decideDagRun(fresh, { probe, eligible: dagRunEligibility.sendSteer(parentSessionId, nodeId) }), fresh }
-  })
-  if (steer.kind === "free") return { record: steer.fresh, leaseTaken: false }
-  if (steer.kind === "held") throw notOwned(runId, steer.holderPid)
-  if (steer.kind === "not_eligible") return { record: steer.fresh, leaseTaken: false }
   const acquired = acquireDagRun<DagRunRecordV1>(options.store, runId, {
     operation: "send",
-    probe,
+    probe: {
+      taskManager: options.taskManager,
+      hostPid: options.hostPid ?? process.pid,
+      isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+    },
     ...(options.reservation === undefined ? {} : { reservation: options.reservation }),
-    eligible: dagRunEligibility.sendRevive(parentSessionId, nodeId),
+    eligible: dagRunEligibility.send(parentSessionId, nodeId),
+    leaseWhen: (fresh) => fresh.status === "failed",
   })
   switch (acquired.kind) {
     case "acquired":
-      return { record: acquired.record, leaseTaken: acquired.leaseTaken }
+      return acquired.record.status === "failed"
+        ? { kind: "revive", record: acquired.record, leaseTaken: acquired.leaseTaken }
+        : { kind: "steer", record: acquired.record }
     case "held":
       throw notOwned(runId, acquired.holderPid)
     case "busy":
       throw runBusy(runId, acquired.operation)
     case "missing":
       throw new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
-    case "not_eligible":
-      return { record: acquired.record, leaseTaken: false }
+    case "not_eligible": {
+      const decision = classifySend(acquired.record, parentSessionId, nodeId)
+      if (decision === "guidance") return { kind: "guidance", record: acquired.record }
+      throw sendRefusal(runId, nodeId, decision)
+    }
+  }
+}
+
+function sendRefusal(runId: DagRunId, nodeId: DagNodeId, decision: DagSendClass): DagNodeControlError {
+  const nodeIds = [nodeId]
+  switch (decision) {
+    case "other_session":
+      return new DagNodeControlError({
+        code: "run_not_owned",
+        message: `dag run "${runId}" belongs to another session`,
+        runId,
+      })
+    case "completed":
+      return new DagNodeControlError({
+        code: "node_not_continuable",
+        message: `dag run "${runId}" already completed; node "${nodeId}" cannot be steered or revived. Amend the definition or start a new run.`,
+        runId,
+        nodeIds,
+      })
+    case "cancelled":
+      return new DagNodeControlError({
+        code: "node_not_continuable",
+        message: `dag run "${runId}" was cancelled; node "${nodeId}" cannot be steered or revived. Retry the node to run it again.`,
+        runId,
+        nodeIds,
+      })
+    case "node_not_found":
+      return new DagNodeControlError({
+        code: "node_not_found",
+        message: `unknown dag node "${nodeId}"`,
+        runId,
+        nodeIds,
+      })
+    default:
+      return new DagNodeControlError({
+        code: "node_has_no_task",
+        message: `dag node "${nodeId}" never started a child; retry the run to dispatch it`,
+        runId,
+        nodeIds,
+      })
   }
 }
 

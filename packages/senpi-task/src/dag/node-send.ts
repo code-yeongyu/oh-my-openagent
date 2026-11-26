@@ -33,35 +33,29 @@ export async function sendToDagNode(
   message: string,
   watchRevived?: (nodeId: DagNodeId, taskId: string) => Promise<void> | undefined,
 ): Promise<DagNodeSendResult> {
-  const observed = ownedRecord(options, runId)
-  const node = observed.nodes.find((entry) => entry.id === nodeId)
-  if (node === undefined) {
-    throw new DagNodeControlError({
-      code: "node_not_found",
-      message: `unknown dag node "${nodeId}"`,
-      runId,
-      nodeIds: [nodeId],
-    })
-  }
-  if (observed.status === "paused" && observed.pause?.reason === "user_stop") {
+  // Fast path only: refuses a run another live process holds before the lock; it never allows.
+  ownedRecord(options, runId)
+  const decision = decideSend(options, runId, nodeId)
+  const node = decision.record.nodes.find((entry) => entry.id === nodeId)
+  if (decision.kind === "guidance") {
     const guidance = guidePausedDag(options, runId, message, nodeId)
     return {
       nodeId,
       delivery: "guidance",
       guidanceId: guidance.id,
-      ...(node.taskId === undefined ? {} : { taskId: node.taskId }),
+      ...(node?.taskId === undefined ? {} : { taskId: node.taskId }),
     }
   }
-  // The read above only routes the user-stopped case and refuses early; every rule below is decided
-  // again on the record the send decided from under the run lock (#15125).
-  sendableTask(observed, runId, nodeId)
-  const { record, leaseTaken } = decideSend(options, runId, nodeId)
-  // A send that took the lease and then did not revive (it steered, or was refused) gives it back.
+  const { record } = decision
+  // A revive that wrote the lease and then did not revive (it steered, or was refused) gives it back.
   const giveBack = (): void => {
-    if (leaseTaken) releaseDagRunLease(options.store, runId, options.hostPid ?? process.pid)
+    if (decision.kind === "revive" && decision.leaseTaken)
+      releaseDagRunLease(options.store, runId, options.hostPid ?? process.pid)
   }
   try {
-    const { node: current, taskId } = sendableTask(record, runId, nodeId)
+    // `classifySend` admitted steer and revive only for a node with a child.
+    const taskId = node?.taskId
+    if (node === undefined || taskId === undefined) throw new Error("send decision admitted a node without a child")
     if (options.taskManager.get(taskId) === undefined) {
       throw new DagNodeControlError({
         code: "node_not_found",
@@ -76,52 +70,13 @@ export async function sendToDagNode(
       callerSessionId: record.parentSessionId,
       allScope: true,
     })
-    const result = foldSendOutcome(options, record, current, taskId, outcome, watchRevived)
+    const result = foldSendOutcome(options, record, node, taskId, outcome, watchRevived)
     if (result.delivery !== "revive") giveBack()
     return result
   } catch (error) {
     giveBack()
     throw error
   }
-}
-
-// #7412 defect 2: a completed or cancelled run is settled evidence. Reviving a child here would
-// journal running nodes under a terminal run - a checkpoint no recovery path can ever claim again
-// (resume claims only "paused" runs). Failed runs stay sendable: revive is the documented remedy for
-// a failed node whose child is still resident.
-function sendableTask(
-  record: DagRunRecordV1,
-  runId: DagRunId,
-  nodeId: DagNodeId,
-): { readonly node: DagNode; readonly taskId: string } {
-  if (record.status === "completed" || record.status === "cancelled") {
-    throw new DagNodeControlError({
-      code: "node_not_continuable",
-      message:
-        record.status === "completed"
-          ? `dag run "${runId}" already completed; node "${nodeId}" cannot be steered or revived. Amend the definition or start a new run.`
-          : `dag run "${runId}" was cancelled; node "${nodeId}" cannot be steered or revived. Retry the node to run it again.`,
-      runId,
-      nodeIds: [nodeId],
-    })
-  }
-  const node = record.nodes.find((entry) => entry.id === nodeId)
-  if (node === undefined)
-    throw new DagNodeControlError({
-      code: "node_not_found",
-      message: `unknown dag node "${nodeId}"`,
-      runId,
-      nodeIds: [nodeId],
-    })
-  if (node.taskId === undefined) {
-    throw new DagNodeControlError({
-      code: "node_has_no_task",
-      message: `dag node "${nodeId}" never started a child; retry the run to dispatch it`,
-      runId,
-      nodeIds: [nodeId],
-    })
-  }
-  return { node, taskId: node.taskId }
 }
 
 function foldSendOutcome(
