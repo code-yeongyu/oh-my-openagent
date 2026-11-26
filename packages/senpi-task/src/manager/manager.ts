@@ -555,19 +555,19 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #ownedResult(owner: DagTaskOwner): OwnedStartResult | undefined {
-    const record = this.findOwnedTask(owner)
+    const records = this.findOwnedTasks(owner)
+    const record = records.at(-1)
     if (record === undefined) return undefined
     if (record.owner?.fingerprint !== owner.fingerprint) {
-      // A settled record cannot be re-run in place, so a differing fingerprint on it is a retry:
-      // ownership moves to the fresh task. Only a LIVE task with a different fingerprint is a
-      // genuine conflict between two callers over one running child.
-      if (isTerminalRecord(record)) return undefined
-      // A live task of an EARLIER execAttempt (an amend or retry replaced it) is never the new
-      // attempt's task (#11381); only a same-attempt duplicate is adoptable (#7412).
+      // A settled newest claim is a retry and ownership moves to a fresh task, unless ANY claim is
+      // still live: an older attempt's child can resume on its own behind a newer one (#11381).
+      const live = records.findLast((claim) => !isTerminalRecord(claim))
+      if (live === undefined) return undefined
+      // Only a same-attempt duplicate is adoptable (#7412); an earlier attempt's task is not (#11381).
       return {
-        kind: (record.owner?.execAttempt ?? 0) === (owner.execAttempt ?? 0) ? "owner_conflict" : "owner_superseded",
-        task_id: record.task_id,
-        existing_fingerprint: record.owner?.fingerprint ?? "",
+        kind: (live.owner?.execAttempt ?? 0) === (owner.execAttempt ?? 0) ? "owner_conflict" : "owner_superseded",
+        task_id: live.task_id,
+        existing_fingerprint: live.owner?.fingerprint ?? "",
         requested_fingerprint: owner.fingerprint,
       }
     }

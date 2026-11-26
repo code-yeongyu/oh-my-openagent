@@ -368,6 +368,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
         store,
         taskManager,
         initialRecord: manager.record(runId, parentSessionId),
+        ...(options.scheduleRetry === undefined ? {} : { scheduleRetry: options.scheduleRetry }),
       })
       register(runId, reentry)
       return reentry
