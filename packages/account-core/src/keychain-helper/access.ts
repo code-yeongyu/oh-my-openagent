@@ -10,7 +10,7 @@ import {
 import { locateHelper } from "./location"
 import { type PinResult, pinVerifiedCopy } from "./pin"
 import { processSignatureChecker, type SignatureVerdict } from "./signature"
-import { KeychainHelperUnderTestPreload, underTestPreload } from "./test-preload"
+import { KeychainHelperUnderTestPreload, underTestRun } from "./test-preload"
 
 export type HelperAccess =
   | {
@@ -39,7 +39,7 @@ export async function resolveHelperAccess(
     readonly pin?: (source: string, verify: (path: string) => Promise<SignatureVerdict>) => Promise<PinResult>
   },
 ): Promise<HelperAccess> {
-  if (underTestPreload() && (options.spawn === undefined || options.spawn === spawnDetachedHelper))
+  if (underTestRun() && (options.spawn === undefined || options.spawn === spawnDetachedHelper))
     throw new KeychainHelperUnderTestPreload(options.port)
   const verify = options.verify ?? processSignatureChecker()
   let source: string

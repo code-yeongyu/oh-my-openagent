@@ -5,7 +5,7 @@ import { resolveHelperAccess } from "./access"
 import { spawnDetachedHelper } from "./client"
 import { helperAccess } from "./darwin-backend"
 import { keychainProcessState } from "./process-state"
-import { KeychainHelperUnderTestPreload, underTestPreload } from "./test-preload"
+import { KeychainHelperUnderTestPreload, underTestPreload, underTestRun } from "./test-preload"
 
 // The repository's one guard on the signed keychain helper (security owner's order on the 2026-11-26 incident): under the
 // test preload, any port that would reach the real helper is refused by name before anything is located, pinned,
@@ -30,6 +30,16 @@ function reached() {
 describe("the keychain helper under the test preload", () => {
   test("#given this test process #then it runs under the preload (the guard's precondition)", () => {
     expect(underTestPreload()).toBe(true)
+  })
+
+  test("#given a bun test run without the preload's mark #then it is still a test run; a program is not", () => {
+    const unmarked = { get: async () => null }
+    expect({
+      testFile: underTestRun("/repo/packages/account-core/src/calls/store.test.ts", unmarked),
+      specFile: underTestRun("/repo/x.spec.mjs", unmarked),
+      launcher: underTestRun("/usr/local/lib/node_modules/omo-ai/bin/omo.js", unmarked),
+      compiled: underTestRun("/usr/local/bin/omo", unmarked),
+    }).toEqual({ testFile: true, specFile: true, launcher: false, compiled: false })
   })
 
   test("#given a new port wired to the real helper spawner #then it is refused by name and nothing is touched", async () => {
