@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 
 import { attachBuildMarker, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
 import { stageRuntimePersonas } from "./persona-artifacts.mjs"
+import { SDK_RUNTIME_FILES } from "./runtime-files.mjs"
 
 export function resolveBunExecutable(platform = process.platform) {
   return platform === "win32" ? "bun.exe" : "bun"
@@ -381,6 +382,9 @@ export function resolveOutputs(options) {
     ),
     bunshinTsOutput: sibling(options.bunshinTsOutputPath, bunshinTsOutputPath, join("runtime", "bunshin-ts", "sdk.js")),
     omoSdkOutput: sibling(options.omoSdkOutputPath, omoSdkOutputPath, OMO_SDK_RELATIVE_PATH),
+    sdkRuntimeOutputs: lazySdkRuntimeOutputs(
+      sibling(options.omoSdkOutputPath, omoSdkOutputPath, OMO_SDK_RELATIVE_PATH),
+    ),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(
       options.rollbackRuntimeOutputPath,
@@ -425,7 +429,24 @@ export const omoSenpiBuildDefines = (version) => ({ OMO_SENPI_PACKAGE_VERSION: v
 
 // The root SDK runtime's externals: node builtins, and the wake sidecar the root's thread core carries like the thread
 // SDK below (#14972). plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
-const OMO_SDK_EXTERNALS = [...sdkExternalSpecifiers, "#omo-wake-runtime"]
+// Every SDK runtime file leaves node builtins, the wake sidecar the thread core carries (#14972) and every OTHER lazily
+// loaded SDK runtime file external, so no file inlines another (slice P1c, #15031).
+export const runtimeFileExternals = (row, table = SDK_RUNTIME_FILES) => [
+  ...sdkExternalSpecifiers,
+  "#omo-wake-runtime",
+  ...table.filter((other) => other !== row && other.lazy).map((other) => other.specifier),
+]
+
+// The lazily loaded SDK runtime files sit at their table output under the same plugin root as the root runtime file.
+function lazySdkRuntimeOutputs(omoSdkOutput) {
+  const pluginRootOfSdk = omoSdkOutput.slice(0, omoSdkOutput.length - OMO_SDK_RELATIVE_PATH.length)
+  return Object.fromEntries(
+    SDK_RUNTIME_FILES.filter((row) => row.lazy).map((row) => [
+      row.name,
+      join(pluginRootOfSdk, ...row.output.split("/")),
+    ]),
+  )
+}
 
 export async function buildExtension(options = {}) {
   const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"))
@@ -444,6 +465,7 @@ export async function buildExtension(options = {}) {
     toolkitSdkOutput,
     bunshinTsOutput,
     omoSdkOutput,
+    sdkRuntimeOutputs,
     threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
@@ -470,6 +492,9 @@ export async function buildExtension(options = {}) {
   const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
   // The root's thread core carries the same parked-session wake as the thread SDK below (#14972), loaded the same way.
   const omoSdkInputs = await buildOmoSdkRuntime(omoSdkOutput, buildDefines)
+  const sdkRuntimeInputs = {}
+  for (const row of SDK_RUNTIME_FILES.filter((candidate) => candidate.lazy))
+    sdkRuntimeInputs[row.name] = await buildRuntimeFile(row, sdkRuntimeOutputs[row.name], buildDefines)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
@@ -551,6 +576,7 @@ export async function buildExtension(options = {}) {
     toolkitSdkInputs,
     bunshinTsInputs,
     omoSdkInputs,
+    sdkRuntimeInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     computerRunWorkerInputs,
@@ -584,7 +610,17 @@ export async function buildExtension(options = {}) {
  * control build one extra import on top of the same entry with the same settings.
  */
 export function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
-  return buildEntry(entry, output, buildDefines, OMO_SDK_EXTERNALS, { keepMetafile })
+  return buildRuntimeFile(SDK_RUNTIME_FILES[0], output, buildDefines, { keepMetafile, entry })
+}
+
+/** One SDK runtime file of the table, with that row's externals; `entry` overrides the row's entry for a control build. */
+export function buildRuntimeFile(
+  row,
+  output,
+  buildDefines,
+  { keepMetafile, entry = join(packageRoot, row.entry) } = {},
+) {
+  return buildEntry(entry, output, buildDefines, runtimeFileExternals(row), { keepMetafile })
 }
 
 async function buildEntry(

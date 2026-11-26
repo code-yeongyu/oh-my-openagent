@@ -3,6 +3,8 @@ import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
+import { runtimeArtifactPaths } from "../../plugin/scripts/runtime-files.mjs"
+
 const REQUIRED_SKILL_NAMES = [
   "ast-grep",
   "browser",
@@ -58,7 +60,7 @@ export async function createPluginFixture(
   await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "omo-sdk", "sdk.js"), "export {}\n")
+  for (const artifact of runtimeArtifactPaths()) await writeFixtureFile(join(pluginPath, artifact), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")

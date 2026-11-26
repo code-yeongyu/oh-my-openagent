@@ -11,12 +11,15 @@ import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { buildOmoSdkRuntime, omoSenpiBuildDefines } from "./build-extension-core.mjs"
+import { buildRuntimeFile, omoSenpiBuildDefines } from "./build-extension-core.mjs"
+import { SDK_RUNTIME_FILES } from "./runtime-files.mjs"
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolvePath(scriptsDir, "../../../..")
 export const STATIC_SET_PATH = join(scriptsDir, "omo-sdk-static-modules.json")
-const omoSdkEntryPath = join(REPO_ROOT, "packages", "omo-senpi", "src", "extension", "omo-sdk.ts")
+// Each SDK runtime file of the table has its own committed list (slice P1c, #15031): the root's keeps its name.
+export const staticSetPath = (row) =>
+  join(scriptsDir, row.lazy ? `omo-sdk-${row.name}-static-modules.json` : "omo-sdk-static-modules.json")
 
 function workspacePackages(repoRoot = REPO_ROOT) {
   const names = new Map()
@@ -67,13 +70,18 @@ export function normalizeModulePath(
 
 const SCHEMA_LIBRARIES = ["zod", "typebox", "@sinclair/typebox"]
 
-export async function staticModuleSet(entry = omoSdkEntryPath, options = {}) {
+export async function staticModuleSet(entry, options = {}) {
+  const row = options.row ?? SDK_RUNTIME_FILES[0]
+  entry ??= join(REPO_ROOT, "packages", "omo-senpi", row.entry)
   const { version } = JSON.parse(readFileSync(join(REPO_ROOT, "packages", "omo-senpi", "package.json"), "utf8"))
   const dir = mkdtempSync(join(tmpdir(), "omo-sdk-static-set-"))
   let metafile
   try {
     const metafilePath = join(dir, "meta.json")
-    await buildOmoSdkRuntime(join(dir, "sdk.js"), omoSenpiBuildDefines(version), { entry, keepMetafile: metafilePath })
+    await buildRuntimeFile(row, join(dir, "out.js"), omoSenpiBuildDefines(version), {
+      entry,
+      keepMetafile: metafilePath,
+    })
     metafile = JSON.parse(readFileSync(metafilePath, "utf8"))
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -153,16 +161,20 @@ export async function staticModuleSet(entry = omoSdkEntryPath, options = {}) {
   return { set, reached: [...reached].map(name), schemaUsers, dropped: reached.size - shipped.length }
 }
 
-export const STATIC_SET_DEFINITION =
-  "modules of runtime/omo-sdk/sdk.js that keep bytes in its output and are reached from the entry by static edges only, plus the node builtins a kept module imports; named by real path, layout-independent"
+export const staticSetDefinition = (row) =>
+  `modules of ${row.output} that keep bytes in its output and are reached from the entry by static edges only, plus the node builtins a kept module imports; named by real path, layout-independent`
+
+export const STATIC_SET_DEFINITION = staticSetDefinition(SDK_RUNTIME_FILES[0])
 
 export const difference = (actual, pinned) => ({
   added: actual.filter((path) => !pinned.includes(path)),
   removed: pinned.filter((path) => !actual.includes(path)),
 })
 
-if (import.meta.main && process.argv.includes("--write")) {
-  const { set } = await staticModuleSet()
-  writeFileSync(STATIC_SET_PATH, `${JSON.stringify({ definition: STATIC_SET_DEFINITION, modules: set }, null, 2)}\n`)
-  console.log(`${set.length} modules -> ${relative(REPO_ROOT, STATIC_SET_PATH)}`)
-}
+if (import.meta.main && process.argv.includes("--write"))
+  for (const row of SDK_RUNTIME_FILES) {
+    const { set } = await staticModuleSet(undefined, { row })
+    const path = staticSetPath(row)
+    writeFileSync(path, `${JSON.stringify({ definition: staticSetDefinition(row), modules: set }, null, 2)}\n`)
+    console.log(`${set.length} modules -> ${relative(REPO_ROOT, path)}`)
+  }

@@ -148,6 +148,7 @@ const PORT_NAMES = {
   store: true,
   remote: true,
   now: true,
+  onUnexpected: true,
   deviceServiceStatus: true,
   signInProcess: true,
 } as const satisfies Record<keyof OmoSdkPorts, true>
@@ -203,6 +204,8 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     store: fault ? faultingStore() : createGatewayStore({ agentDir: home }),
     remote: fault ? (fakeRemote(true) as RemoteThreadSurface) : listingRemote(),
     now: () => 1_764_000_000_000,
+    // The owner's own local sink (security ruling B8): what reaches it is not an answer, so the scan only needs it quiet.
+    onUnexpected: () => undefined,
   })
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { runtimeArtifactPaths } from "../packages/omo-senpi/plugin/scripts/runtime-files.mjs"
 import { findRawTlsClients } from "./no-raw-tls-client"
 
 // Security owner's ruling on #14950 (TLS guard): the shipped SDK runtimes carry no raw TLS client hit of any rule, with
@@ -10,7 +11,7 @@ import { findRawTlsClients } from "./no-raw-tls-client"
 // written later as a member read fails here, in the slice that adds it.
 const REPO_ROOT = join(import.meta.dir, "..")
 const RUNTIMES = [
-  "packages/omo-senpi/plugin/runtime/omo-sdk/sdk.js",
+  ...runtimeArtifactPaths().map((artifact) => join("packages", "omo-senpi", "plugin", artifact)),
   "packages/omo-senpi/plugin/runtime/thread-sdk/sdk.js",
 ]
 

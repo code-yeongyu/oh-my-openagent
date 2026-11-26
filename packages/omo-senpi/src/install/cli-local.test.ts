@@ -5,6 +5,7 @@ import { createHash } from "node:crypto"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
+import { runtimeArtifactPaths } from "../../plugin/scripts/runtime-files.mjs"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
 const cliPath = join(repoRoot, "packages", "omo-senpi", "src", "install", "cli-local.ts")
@@ -48,7 +49,7 @@ async function makePackagedPlugin(): Promise<string> {
   await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
-  await writeFixtureFile(join(pluginPath, "runtime", "omo-sdk", "sdk.js"), "export {}\n")
+  for (const artifact of runtimeArtifactPaths()) await writeFixtureFile(join(pluginPath, artifact), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")

@@ -13,6 +13,7 @@
     "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
     "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
     "#omo-wake-runtime": "./extensions/omo-wake.js",
+    "#omo-sdk-threads-runtime": "./runtime/omo-sdk/threads.js",
     "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
     "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
     "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",

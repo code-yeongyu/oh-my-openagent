@@ -59,6 +59,7 @@ export async function checkExtensionCurrent(options = {}) {
     claimReceiptOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
+    sdkRuntimeOutputs,
   } = resolveOutputs(options)
   const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
@@ -148,6 +149,11 @@ export async function checkExtensionCurrent(options = {}) {
     return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
   const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
   if (currentThreadSdk === undefined) return { ok: false, reason: "missing-output", output: threadSdkOutput }
+  const currentSdkRuntimes = {}
+  for (const [name, path] of Object.entries(sdkRuntimeOutputs)) {
+    currentSdkRuntimes[name] = await readBuiltEntry(path)
+    if (currentSdkRuntimes[name] === undefined) return { ok: false, reason: "missing-output", output: path }
+  }
 
   const ownsReproduction = options.expectedRoot === undefined
   const tempRoot = ownsReproduction ? await mkdtemp(join(tmpdir(), "omo-senpi-build-check-")) : options.expectedRoot
@@ -191,6 +197,11 @@ export async function checkExtensionCurrent(options = {}) {
       [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
       [currentBunshinTs, expected.bunshinTsOutputPath, bunshinTsOutput],
       [currentOmoSdk, expected.omoSdkOutputPath, omoSdkOutput],
+      ...Object.entries(sdkRuntimeOutputs).map(([name, path]) => [
+        currentSdkRuntimes[name],
+        resolveOutputs(expected).sdkRuntimeOutputs[name],
+        path,
+      ]),
       [currentMain, expected.outputPath, output],
       [currentTask, expected.taskOutputPath, taskOutput],
       [currentMember, expected.memberOutputPath, memberOutput],

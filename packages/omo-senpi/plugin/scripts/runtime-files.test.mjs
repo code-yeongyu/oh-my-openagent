@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { REQUIRED_PLUGIN_ARTIFACTS } from "../../src/install/plugin-artifacts.ts"
-import { buildRuntimeFile, omoSenpiBuildDefines, runtimeFileExternals } from "./build-extension-core.mjs"
+import { runtimeFileExternals } from "./build-extension-core.mjs"
 import { runtimeArtifactPaths, SDK_RUNTIME_FILES } from "./runtime-files.mjs"
 
 // Slice P1c (#15031): the SDK root's runtime files are one declaration table. Every list that names a runtime file is
@@ -16,18 +15,6 @@ const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"))
 const pluginManifest = readJson(join(packageRoot, "plugin", "package.json"))
 const sourceManifest = readJson(join(packageRoot, "package.json"))
-const version = sourceManifest.version
-
-async function buildInputs(row) {
-  const dir = mkdtempSync(join(tmpdir(), "omo-sdk-runtime-file-"))
-  try {
-    const metafile = join(dir, "meta.json")
-    await buildRuntimeFile(row, join(dir, "out.js"), omoSenpiBuildDefines(version), { keepMetafile: metafile })
-    return Object.keys(readJson(metafile).inputs)
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
-  }
-}
 
 const row = (name) => SDK_RUNTIME_FILES.find((entry) => entry.name === name)
 
@@ -61,25 +48,6 @@ describe("the SDK runtime file table", () => {
     for (const entry of table.filter((candidate) => candidate !== added))
       expect(runtimeFileExternals(entry, table)).toContain(added.specifier)
     expect(runtimeFileExternals(added, table)).not.toContain(added.specifier)
-  })
-})
-
-describe("each runtime file holds only its own modules", () => {
-  test("#given the root's build #then no module of the thread core is among its inputs", async () => {
-    const inputs = await buildInputs(row("root"))
-    expect(inputs.filter((path) => path.includes("components/thread/sdk-core/"))).toEqual([])
-  })
-
-  test("#given the thread file's build #then the thread core is among its inputs and the root's entry is not", async () => {
-    const inputs = await buildInputs(row("threads"))
-    expect(inputs.some((path) => path.includes("components/thread/sdk-core/"))).toBe(true)
-    expect(inputs.some((path) => path.endsWith("src/extension/omo-sdk.ts"))).toBe(false)
-  })
-
-  test("#given the root's build #then its logger-port helper is an input and no thread text module is", async () => {
-    const inputs = await buildInputs(row("root"))
-    expect(inputs.some((path) => path.endsWith("components/omo-sdk/unexpected-port.ts"))).toBe(true)
-    expect(inputs.filter((path) => /components\/thread\/.*text[^/]*\.ts$/.test(path))).toEqual([])
   })
 })
 

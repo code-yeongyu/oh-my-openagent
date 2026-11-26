@@ -2,9 +2,12 @@ import type { GatewayStore } from "../../thread/gateway/store"
 import type { ProvenanceWorkspaces } from "../../thread/gateway/provenance-resolver"
 import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import type { ThreadCore } from "../../thread/sdk-core"
+import type * as ThreadsRuntimeEntry from "../../thread/sdk-core/runtime-entry"
 import type { ThreadHost } from "../../thread/tools/ports"
 import type { Endpoint, OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
 import type * as result from "../contract/results/threads"
+import { OMO_CODE_REGISTRY } from "../contract/codes"
+import { reportUnexpected, type UnexpectedPort, withUnexpectedLog } from "../unexpected-port"
 import { extensionFailure } from "./extension-codes"
 import type { Members, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
@@ -23,7 +26,25 @@ export type ThreadPorts = {
   readonly store?: GatewayStore
   readonly remote?: RemoteThreadSurface
   readonly now?: () => number
+  /**
+   * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
+   * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   * A port that wrote the details to a local file answers that file's path, and the fixed message names it.
+   */
+  readonly onUnexpected?: UnexpectedPort
 }
+
+/** What the root takes from its thread runtime file (slice P1c, #15031): functions and plain data only. */
+export type ThreadsRuntime = Pick<typeof ThreadsRuntimeEntry, "createThreadCore" | "fail" | "threadToolParamSchemas">
+
+export const RUNTIME_FILE_UNAVAILABLE = "runtime_file_unavailable"
+
+const RUNTIME_FILE_MESSAGE =
+  "A part of the omo SDK runtime could not be loaded. Reinstall or update the omo package, then retry."
+
+const importThreadsRuntime = (): Promise<ThreadsRuntime> => import("#omo-sdk-threads-runtime")
+
+const isFailure = (value: object): value is OmoFailure => (value as { readonly kind?: unknown }).kind === "error"
 
 type Input = Readonly<Record<string, unknown>>
 
@@ -79,10 +100,6 @@ async function settledExtension<T>(run: () => Promise<T>): Promise<T | undefined
 const LIST = ["all_scope", "state"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope"]
 const SEND = ["thread", "message", "delivery", "expected_turn_id", "all_scope", "idempotency_key", "collapse_key"]
-// The thread core and its contracts are imported on the first thread call, not when the entry loads (design lane ruling on
-// the runtime's cold import): a script that only signs in never evaluates them.
-const createFields = async (): Promise<readonly string[]> =>
-  Object.keys((await import("../../thread/contracts")).threadToolParamSchemas.thread_create.properties)
 
 const env = (options: {
   readonly env: Readonly<Record<string, string | undefined>>
@@ -106,15 +123,39 @@ export function threadsNamespace(options: {
   readonly ports?: ThreadPorts
   /** The public root refuses a module URL that is not an absolute file URL before any effect; the shipped facade does not. */
   readonly checkModuleUrl?: boolean
+  /** Loads the thread runtime file; absent, its import-map specifier (test seam: no module mock, no timer). */
+  readonly loadThreadsRuntime?: () => Promise<ThreadsRuntime>
 }): NamespaceServing & { readonly releaseLocated: ThreadCore["releaseRow"] } {
   // Only a script or a person reaches the thread core through the root; every allowed cell of another principal is
   // slice T2's or X1b's (design lane ruling), and the refused cells are answered before this at the root's boundary.
   if (options.principal.kind !== "script" && options.principal.kind !== "person")
     return { members: {}, releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }) }
+  // The thread runtime file loads on the first thread call (slice P1c, #15031). A load that fails is not kept: the call
+  // answers the typed refusal, its exception goes to the logger port alone, and the next call loads again.
+  let runtime: Promise<ThreadsRuntime> | undefined
+  const loadRuntime = async (): Promise<ThreadsRuntime | OmoFailure> => {
+    try {
+      return await (runtime ??= (options.loadThreadsRuntime ?? importThreadsRuntime)())
+    } catch (error) {
+      runtime = undefined
+      const written = reportUnexpected(options.ports?.onUnexpected, error)
+      return {
+        kind: "error",
+        error: {
+          code: "internal_error",
+          message: withUnexpectedLog(RUNTIME_FILE_MESSAGE, written),
+          next_action: OMO_CODE_REGISTRY.internal_error.next_action,
+          details: { reason: RUNTIME_FILE_UNAVAILABLE, file: "threads" },
+        },
+      }
+    }
+  }
   let core: Promise<ThreadCore> | undefined
-  const thread = (): Promise<ThreadCore> =>
-    (core ??= import("../../thread/sdk-core").then(({ createThreadCore }) =>
-      createThreadCore({
+  const thread = async (): Promise<ThreadCore | OmoFailure> => {
+    const loaded = await loadRuntime()
+    if (isFailure(loaded)) return loaded
+    return (core ??= Promise.resolve(
+      loaded.createThreadCore({
         agentDir: options.agentDir,
         cwd: options.cwd,
         uid: options.uid,
@@ -124,48 +165,64 @@ export function threadsNamespace(options: {
         ...options.ports,
       }),
     ))
+  }
+  const withCore = async <R>(run: (core: ThreadCore) => Promise<R>): Promise<R | OmoFailure> => {
+    const ready = await thread()
+    return isFailure(ready) ? ready : run(ready)
+  }
   const members: Members = {
     "threads.list": async (input = {}) =>
       (await unbuilt("threads.list", input, LIST)) ??
-      onRoot((await (await thread()).list(input)) as result.ThreadListResult),
+      withCore(async (core) => onRoot((await core.list(input)) as result.ThreadListResult)),
     "threads.read": async (input) =>
       (await unbuilt("threads.read", input, READ)) ??
-      onRoot((await (await thread()).read(input)) as result.ThreadReadResult),
+      withCore(async (core) => onRoot((await core.read(input)) as result.ThreadReadResult)),
     "threads.send": async (input) => {
-      if (input?.author !== undefined)
+      if (input?.author !== undefined) {
+        const loaded = await loadRuntime()
+        if (isFailure(loaded)) return loaded
         return threadFailure(
-          (await import("../../thread/sdk-core/failures")).fail(
-            "invalid_arguments",
-            "author is a connector's field.",
-            "Send without author.",
-          ).error,
+          loaded.fail("invalid_arguments", "author is a connector's field.", "Send without author.").error,
         )
-      return (await unbuilt("threads.send", input, SEND)) ?? onRoot(await (await thread()).send(input))
+      }
+      return (await unbuilt("threads.send", input, SEND)) ?? withCore(async (core) => onRoot(await core.send(input)))
     },
-    "threads.locate": async (input) => {
-      const located = await (await thread()).locate(input)
-      if (located.kind === "error") return threadFailure(located.error)
-      return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
-    },
+    "threads.locate": async (input) =>
+      withCore(async (core) => {
+        const located = await core.locate(input)
+        if (located.kind === "error") return threadFailure(located.error)
+        return {
+          kind: "ok" as const,
+          thread: located.thread.address ?? located.thread.thread_id,
+          located: located.thread,
+        }
+      }),
     "threads.create": async (input) => {
       if (typeof input?.prompt === "object") return notImplemented("threads.create")() as Promise<OmoFailure>
+      const loaded = await loadRuntime()
+      if (isFailure(loaded)) return loaded
+      const fields = Object.keys(loaded.threadToolParamSchemas.thread_create.properties)
       return (
-        (await unbuilt("threads.create", input, await createFields())) ??
-        onRoot(
-          (await (await thread()).create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult,
+        (await unbuilt("threads.create", input, fields)) ??
+        withCore(async (core) =>
+          onRoot((await core.create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult),
         )
       )
     },
     "threads.interrupt": async (input) =>
-      onRoot((await (await thread()).interrupt(input)) as result.ThreadInterruptResult),
-    "threads.close": async (input = {}) => onRoot((await (await thread()).close(input)) as result.ThreadCloseResult),
-    "threads.rename": async (input = {}) => onRoot((await (await thread()).rename(input)) as result.ThreadRenameResult),
+      withCore(async (core) => onRoot((await core.interrupt(input)) as result.ThreadInterruptResult)),
+    "threads.close": async (input = {}) =>
+      withCore(async (core) => onRoot((await core.close(input)) as result.ThreadCloseResult)),
+    "threads.rename": async (input = {}) =>
+      withCore(async (core) => onRoot((await core.rename(input)) as result.ThreadRenameResult)),
     "threads.setModel": async (input) =>
-      onRoot((await (await thread()).setModel(input)) as result.ThreadSetModelResult),
+      withCore(async (core) => onRoot((await core.setModel(input)) as result.ThreadSetModelResult)),
     "threads.release": async (input) => {
       const refused = await unbuilt("threads.release", input, ["thread", "interrupt", "force"])
       if (refused !== undefined) return refused
-      const released = onRoot(await (await thread()).release(input))
+      const ready = await thread()
+      if (isFailure(ready)) return ready
+      const released = onRoot(await ready.release(input))
       // Design lane ruling: the root's failures are refusals; the engine's release_unsupported reply (a row with no
       // local endpoint) is answered as one. The thread facade keeps the engine's shape through its own path.
       if (released.kind === "ok" && !released.value.success && released.value.error === "release_unsupported")
@@ -191,22 +248,26 @@ export function threadsNamespace(options: {
             details: { field: "moduleUrl" },
           },
         }
-      const registered = await settledExtension(async () => (await thread()).extensions.register(input))
+      const ready = await thread()
+      if (isFailure(ready)) return ready
+      const registered = await settledExtension(async () => ready.extensions.register(input))
       if (registered === undefined) return EXTENSION_UNEXPECTED
       return registered.kind === "ok" ? registered : extensionFailure(registered)
     },
     "threads.extensions.call": async (input) => {
-      const answered = await settledExtension(async () =>
-        (await thread()).extensions.call(input.name, input.op, input.args),
-      )
+      const ready = await thread()
+      if (isFailure(ready)) return ready
+      const answered = await settledExtension(async () => ready.extensions.call(input.name, input.op, input.args))
       if (answered === undefined) return EXTENSION_UNEXPECTED
       return answered.kind === "ok" ? answered : extensionFailure(answered)
     },
     "daemon.warm": async (input = {}) => {
       const refused = await unbuilt("daemon.warm", input, [])
       if (refused !== undefined) return refused
+      const ready = await thread()
+      if (isFailure(ready)) return ready
       try {
-        return { kind: "ok", value: await (await thread()).warm() }
+        return { kind: "ok", value: await ready.warm() }
       } catch (error) {
         // The warm's own transport error, as `omo daemon run` prints it today; slice C1a words it as the daemon core's.
         const message = error instanceof Error ? error.message : String(error)
@@ -223,7 +284,12 @@ export function threadsNamespace(options: {
     members,
     // The thread facade's release (design lane ruling on threads.release): the row its caller located, released where
     // that row is served, with no second lookup. Reachable only through the internal assembly, never the public root.
-    releaseLocated: async (located, request) => (await thread()).releaseRow(located, request),
+    releaseLocated: async (located, request) => {
+      const ready = await thread()
+      return isFailure(ready)
+        ? ({ success: false, error: "internal_error" } as Awaited<ReturnType<ThreadCore["releaseRow"]>>)
+        : ready.releaseRow(located, request)
+    },
     dispose: async () => (core === undefined ? disposePorts() : (await core).dispose()),
   }
 }
