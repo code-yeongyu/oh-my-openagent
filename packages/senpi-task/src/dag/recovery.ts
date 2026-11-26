@@ -322,7 +322,13 @@ async function reconcileNodes(
   const staleLive = fencing instanceof Promise ? await fencing : fencing
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
-      reconcileCompletedNode({ ...context, journal, reusedOutputs, reattachedTasks }, observed)
+      const failCompleted = (nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void =>
+        failNode(journal, nodeId, code, message, context.now, pendingErrors)
+      const reopening = reconcileCompletedNode(
+        { ...context, journal, reusedOutputs, reattachedTasks, staleLive, failNode: failCompleted },
+        observed,
+      )
+      if (reopening instanceof Promise) await reopening
       continue
     }
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue

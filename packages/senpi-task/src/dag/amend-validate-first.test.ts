@@ -27,7 +27,12 @@ test("#11381 #given a settled run that owes a stop for a reachable child #when m
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-amend-validate-"))
   roots.push(root)
   const runner = new ControlledRunner()
-  const fixture = createE2eFixture({ project: root, runner, materializeSkills: identityMaterializer })
+  const fixture = createE2eFixture({
+    project: root,
+    resumeFence: false,
+    runner,
+    materializeSkills: identityMaterializer,
+  })
   const key = "amend-validate"
   const started = await fixture.start(definition(key, [categoryNode("A"), categoryNode("B")]))
   const runId = started.snapshot.runId
@@ -37,9 +42,11 @@ test("#11381 #given a settled run that owes a stop for a reachable child #when m
     runId,
     (event) => event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
   )
-  await runner.selfResume("A")
   runner.settle("B", completed("B"))
   await fixture.wait(runId)
+  // Stacked on #15133 a turn the fence allows while the run runs is followed by its node, so a live
+  // child of a settled run is one no fence re-checked: a host-session child outliving its process.
+  await runner.selfResume("A")
   const taskA = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
   if (taskA === undefined) throw new Error("node A owns no task")
   expect(fixture.manager.snapshot(runId, parentSessionId).outstandingStop).toEqual({ liveTaskIds: [taskA] })

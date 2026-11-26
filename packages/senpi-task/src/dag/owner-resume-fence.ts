@@ -1,4 +1,5 @@
 import type { OwnerResumeFence, OwnerResumeVerdict } from "../manager/types"
+import type { TaskRecord } from "../state"
 import type { DagRunRecordV1 } from "./manager"
 import { ownedClaimAge } from "./owned-attempt"
 import type { DagFileStore } from "./store"
@@ -28,21 +29,31 @@ export function createDagOwnerResumeFence(ports: {
     if (owner === undefined) return ALLOW
     const run = ports.store.readCheckpoint<DagRunRecordV1>(owner.runId)
     if (run === null) return ALLOW
-    const age = ownedClaimAge(task, run)
-    if (age !== "current") {
-      const removed = !run.nodes.some((node) => node.id === owner.nodeId)
-      const reason = removed
-        ? `its DAG node "${owner.nodeId}" was removed`
-        : `it is a ${age} claim of DAG node "${owner.nodeId}"`
-      return refuse(reason, "retire")
-    }
-    if (run.status === "cancelled") return refuse(`its DAG run "${run.runId}" was cancelled`, "retire")
-    // A current claim of a failed or completed run keeps the explicit send/revive contract: only the
-    // unsolicited turn stops, and the child stays as resident and revivable as it was.
-    if (TERMINAL_DAG_RUN_STATUSES.has(run.status)) return refuse(`its DAG run "${run.runId}" is ${run.status}`, "hold")
-    if (ports.cancelling?.(run.runId) === true) return refuse(`its DAG run "${run.runId}" is being cancelled`, "retire")
-    return ALLOW
+    return selfResumeVerdict(task, run, ports.cancelling?.(run.runId) === true)
   }
+}
+
+/**
+ * The one decision about a turn a settled child of `run` started on its own (#11381, #12134): the
+ * manager's fence asks it before the turn may run, and the scheduler holding the run asks it before a
+ * node re-opens to follow that turn, so no turn runs that no node may follow and no node follows a turn
+ * that was refused. Allowed only for the node's current claim of a run that is neither settled nor
+ * being cancelled; a paused run allows it, and the scheduler that next holds the run follows it.
+ */
+export function selfResumeVerdict(task: TaskRecord, run: DagRunRecordV1, cancelling: boolean): OwnerResumeVerdict {
+  const age = ownedClaimAge(task, run)
+  if (age !== "current") {
+    const nodeId = task.owner?.nodeId
+    const removed = !run.nodes.some((node) => node.id === nodeId)
+    const reason = removed ? `its DAG node "${nodeId}" was removed` : `it is a ${age} claim of DAG node "${nodeId}"`
+    return refuse(reason, "retire")
+  }
+  if (run.status === "cancelled") return refuse(`its DAG run "${run.runId}" was cancelled`, "retire")
+  // A current claim of a failed or completed run keeps the explicit send/revive contract: only the
+  // unsolicited turn stops, and the child stays as resident and revivable as it was.
+  if (TERMINAL_DAG_RUN_STATUSES.has(run.status)) return refuse(`its DAG run "${run.runId}" is ${run.status}`, "hold")
+  if (cancelling) return refuse(`its DAG run "${run.runId}" is being cancelled`, "retire")
+  return ALLOW
 }
 
 function refuse(reason: string, disposition: "retire" | "hold"): OwnerResumeVerdict {

@@ -11,7 +11,14 @@ import {
 } from "./scheduler-self-resume.test-harness"
 
 // #12134: a completed node's child that resumes on its own while the run is being cancelled is
-// cancelled with the run, whichever cancellation step the wake lands in.
+// cancelled with the run, whichever cancellation step the wake lands in. Stacked on #15135, the
+// run-wide stop is the one cancellation rule: after the cancel no child the run owns is live.
+function liveOwned(manager: SelfResumingTaskManager): readonly string[] {
+  return manager
+    .findOwnedTasks({ kind: "dag", runId })
+    .filter((task) => task.status === "pending" || task.status === "running" || task.status === "paused")
+    .map((task) => task.task_id)
+}
 describe("DAG cancellation while a completed node's child resumes on its own (#12134)", () => {
   test("#given cancellation waits on an in-flight admission #when a completed node's child resumes #then the resumed child is cancelled with the run", async () => {
     const admissionEntered = deferred()
@@ -43,7 +50,9 @@ describe("DAG cancellation while a completed node's child resumes on its own (#1
       expect(result.status).toBe("cancelled")
       expect(manager.cancellations).toContain("A")
       expect(manager.taskOf("A").status).toBe("cancelled")
-      expect(result.nodes.find((entry) => entry.id === "A")?.state).toBe("cancelled")
+      expect(liveOwned(manager)).toEqual([])
+      // One decision with the fence: a turn started during the cancel is refused, never followed.
+      expect(result.nodes.find((entry) => entry.id === "A")?.state).toBe("completed")
       expect(manager.selfResumedListenerCount()).toBe(0)
     } finally {
       fixture.cleanup()
@@ -70,7 +79,7 @@ describe("DAG cancellation while a completed node's child resumes on its own (#1
       await within(cancelled)
       const result = await within(running)
 
-      expect(manager.cancellations).toEqual(["A", "D", "A"])
+      expect(liveOwned(manager)).toEqual([])
       expect(manager.taskOf("A").status).toBe("cancelled")
       expect(manager.taskOf("A").notification.run_epoch).toBe(2)
       expect(result.status).toBe("cancelled")
@@ -99,9 +108,10 @@ describe("DAG cancellation while a completed node's child resumes on its own (#1
       const result = await within(running)
 
       expect(result.status).toBe("cancelled")
-      expect(manager.cancellations).toEqual(["D", "A"])
+      expect(liveOwned(manager)).toEqual([])
       expect(manager.taskOf("A").status).toBe("cancelled")
-      expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["A:cancelled", "D:cancelled"])
+      // One decision with the fence: a turn started during the cancel is refused, never followed.
+      expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["A:completed", "D:cancelled"])
       expect(manager.selfResumedListenerCount()).toBe(0)
     } finally {
       fixture.cleanup()

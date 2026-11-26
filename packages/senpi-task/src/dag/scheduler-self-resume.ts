@@ -1,23 +1,25 @@
+import { selfResumeVerdict } from "./owner-resume-fence"
 import { nodeById, transition, type SchedulerContext } from "./scheduler-context"
 import { attachTaskSettlement } from "./scheduler-task-attachment"
 import type { DagNodeId } from "./types"
 
-// The node task a self-resume watch was armed for: the task id plus the execution attempt the node
-// held it under. A retried node claims a new execAttempt, so an old task can never reopen it.
-type NodeTaskBinding = { readonly nodeId: DagNodeId; readonly taskId: string; readonly execAttempt: number }
+// The node task a self-resume watch was armed for.
+type NodeTaskBinding = { readonly nodeId: DagNodeId; readonly taskId: string }
 
-// omo#10487 / #12134: the one rule for who may re-open a node after its child resumed on its own.
-// Only the scheduler that holds the run, while the run is still running (cancellation included,
-// until the run is journaled cancelled), and only for the node's current task under the same
-// execution attempt, owned by this run and node.
-function holdsNodeTask(context: SchedulerContext, binding: NodeTaskBinding): boolean {
-  if (context.suspended) return false
+// omo#10487 / #12134: whether this scheduler re-opens a node to follow a turn its child started on
+// its own. Whether that turn may run at all is the one decision the manager's fence also asks
+// (`selfResumeVerdict`: the node's current claim, a run neither settled nor being cancelled); the
+// rest only says that THIS scheduler holds the run now and the task is the node's own. A turn allowed
+// while no scheduler holds the run (a paused run) is followed by the scheduler that next holds it.
+function followsNodeTask(context: SchedulerContext, binding: NodeTaskBinding): boolean {
   const record = context.journal.snapshot()
-  if (record.status !== "running") return false
-  const node = nodeById(record, binding.nodeId)
-  if (node.taskId !== binding.taskId || (node.execAttempt ?? 0) !== binding.execAttempt) return false
-  const owner = context.taskManager.get(binding.taskId)?.owner
-  return owner?.kind === "dag" && owner.runId === record.runId && owner.nodeId === binding.nodeId
+  if (context.suspended || record.status !== "running") return false
+  const task = context.taskManager.get(binding.taskId)
+  const owner = task?.owner
+  if (task === undefined || owner?.kind !== "dag" || owner.runId !== record.runId) return false
+  if (owner.nodeId !== binding.nodeId) return false
+  if (selfResumeVerdict(task, record, context.cancellationStarted).kind !== "allow") return false
+  return nodeById(record, binding.nodeId).taskId === binding.taskId
 }
 
 // A child whose turn completed can reopen itself (its background job or monitor wakes it). The node
@@ -25,12 +27,11 @@ function holdsNodeTask(context: SchedulerContext, binding: NodeTaskBinding): boo
 // normal settle loop, so a resumed run that fails turns the node failed and the run summary counts
 // it. Dependents admitted on the earlier completion keep their own outcome; dependents not yet
 // admitted wait for the node again (or are skipped if it fails). Only a completed node is re-opened
-// (an attached node instead discards its superseded settlement). A reopen during cancellation
-// attaches the task, and cancellation drains attached tasks until none is left uncancelled.
+// (an attached node instead discards its superseded settlement). A turn started while the run is
+// being cancelled is refused, never followed: the run-wide stop (#15135) stops it with the rest.
 export function watchSelfResume(context: SchedulerContext, nodeId: DagNodeId, taskId: string): NodeTaskBinding {
   disposeSelfResumeWatch(context, nodeId)
-  const execAttempt = nodeById(context.journal.snapshot(), nodeId).execAttempt ?? 0
-  const binding: NodeTaskBinding = { nodeId, taskId, execAttempt }
+  const binding: NodeTaskBinding = { nodeId, taskId }
   const unsubscribe = context.taskManager.subscribeSelfResumed?.(taskId, () => followSelfResume(context, binding))
   if (unsubscribe !== undefined) context.selfResumeWatches.set(nodeId, unsubscribe)
   return binding
@@ -50,7 +51,7 @@ export function followCompletedNodeTasks(context: SchedulerContext): void {
 }
 
 function followSelfResume(context: SchedulerContext, binding: NodeTaskBinding): void {
-  if (!holdsNodeTask(context, binding)) return
+  if (!followsNodeTask(context, binding)) return
   const attached = context.attachedTasks.get(binding.nodeId)
   if (attached !== undefined) {
     attached.selfResumed = true

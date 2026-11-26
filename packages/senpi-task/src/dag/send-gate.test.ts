@@ -42,7 +42,12 @@ async function sendAnswer(send: Promise<unknown>): Promise<string> {
 test("#11381 #given a run failed by the stale-child fence that still owes a stop #when a finished sibling is sent a message #then the send is refused and nothing starts", async () => {
   // given
   const runner = new ControlledRunner(undefined, { connectable: true })
-  const fixture = createE2eFixture({ project: project(), runner, materializeSkills: identityMaterializer })
+  const fixture = createE2eFixture({
+    project: project(),
+    resumeFence: false,
+    runner,
+    materializeSkills: identityMaterializer,
+  })
   const started = await fixture.start(definition("send-owed", [categoryNode("A"), categoryNode("B")]))
   const runId = started.snapshot.runId
   await runner.whenStarted(2)
@@ -51,9 +56,11 @@ test("#11381 #given a run failed by the stale-child fence that still owes a stop
     runId,
     (event) => event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
   )
-  await runner.selfResume("A")
   runner.settle("B", completed("B"))
   await fixture.wait(runId)
+  // Stacked on #15133 a turn the fence allows while the run runs is followed by its node, so a live
+  // child of a settled run is one no fence re-checked: a host-session child outliving its process.
+  await runner.selfResume("A")
   runner.child("A").connection.lose()
   const record = fixture.manager.record(runId, parentSessionId)
   const helper = await fixture.manager.start({

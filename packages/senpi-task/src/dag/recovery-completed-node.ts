@@ -10,7 +10,8 @@ import {
   type DagNodeResultContents,
 } from "./results"
 import type { DagFileStore } from "./store"
-import type { DagNode, DagNodeId, DagRunId } from "./types"
+import { resolveRecoveredNodeTask, type RecoveredNodeTask } from "./recovery-attempt"
+import type { DagNode, DagNodeErrorCode, DagNodeId, DagRunId } from "./types"
 
 export type CompletedNodeRecovery = {
   readonly store: DagFileStore
@@ -18,23 +19,50 @@ export type CompletedNodeRecovery = {
   readonly journal: DagJournal<DagRunRecordV1>
   readonly reusedOutputs: Map<DagNodeId, string>
   readonly reattachedTasks: Map<DagNodeId, string>
+  // What recovery's run-wide stale-child fence left live, if anything (#11381).
+  readonly staleLive: string | undefined
+  readonly failNode: (nodeId: DagNodeId, code: DagNodeErrorCode, message: string) => void
 }
 
 // A completed node is reused from its durable output, unless its child resumed on its own while no
 // scheduler held this active run and that resumed run ended without the node folding it (#12134).
 // Then the node re-opens and its task is handed to the scheduler, whose settle loop folds the ended
-// run like any other: a failure fails the node and skips its pending dependents.
-export function reconcileCompletedNode(recovery: CompletedNodeRecovery, node: DagNode): void {
-  const runId = recovery.journal.snapshot().runId
-  const stored = readDagNodeResultContents({ store: recovery.store, runId, nodeId: node.id })
+// run like any other: a failure fails the node and skips its pending dependents. The re-open is a
+// fold of that task, so it passes the attach/fold gate every recovered node passes
+// (`resolveRecoveredNodeTask`): only the node's current claim, never beside a live stale claim of the
+// node, which is stopped first; when it cannot be stopped the node fails closed (#11381).
+export function reconcileCompletedNode(recovery: CompletedNodeRecovery, node: DagNode): void | Promise<void> {
+  const record = recovery.journal.snapshot()
+  const stored = readDagNodeResultContents({ store: recovery.store, runId: record.runId, nodeId: node.id })
   const task = node.taskId === undefined ? undefined : recovery.taskManager.get(node.taskId)
-  if (task !== undefined && endedUnfoldedResumedRun(task, runId, node.id, stored)) {
-    recovery.journal.append(
-      dagNodeTransitionedEvent({ nodeId: node.id, from: "completed", to: "running", reason: { kind: "resumed" } }),
-    )
-    recovery.reattachedTasks.set(node.id, task.task_id)
-    return
+  if (task === undefined || !endedUnfoldedResumedRun(task, record.runId, node.id, stored)) {
+    return reuseCompletedNode(recovery, node)
   }
+  const resolving = resolveRecoveredNodeTask(recovery.taskManager, record, node, recovery.staleLive)
+  if (resolving instanceof Promise)
+    return resolving.then((resolved) => reopenThroughGate(recovery, node, task, resolved))
+  return reopenThroughGate(recovery, node, task, resolving)
+}
+
+function reopenThroughGate(
+  recovery: CompletedNodeRecovery,
+  node: DagNode,
+  task: TaskRecord,
+  resolved: RecoveredNodeTask,
+): void {
+  if (resolved.kind === "fail" && resolved.code === "stale_attempt_alive") {
+    return recovery.failNode(node.id, resolved.code, resolved.message)
+  }
+  // Not the node's current claim: its resumed outcome is not the node's, which keeps its own result.
+  if (resolved.kind !== "task" || resolved.task.task_id !== task.task_id) return reuseCompletedNode(recovery, node)
+  recovery.journal.append(
+    dagNodeTransitionedEvent({ nodeId: node.id, from: "completed", to: "running", reason: { kind: "resumed" } }),
+  )
+  recovery.reattachedTasks.set(node.id, task.task_id)
+}
+
+function reuseCompletedNode(recovery: CompletedNodeRecovery, node: DagNode): void {
+  const runId = recovery.journal.snapshot().runId
   const result = readDagNodeResult({ store: recovery.store, runId, nodeId: node.id })
   if (result === null) return
   recovery.reusedOutputs.set(node.id, result.output)
