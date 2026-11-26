@@ -65,9 +65,9 @@
         "script/qa/omo-native-parity-smoke.mjs",
         "script/qa/python-kernel-warmup.mjs",
         "script/qa/sdk-proof/drivers/sdk.ts",
+        "script/qa/sdk-proof/run.ts",
         // loaded by path into every X1a world process (NODE_OPTIONS --import, BUN_OPTIONS --preload)
         "script/qa/sdk-proof/world/loopback-guard.mjs",
-        "script/qa/sdk-proof/run.ts",
         "script/release-announce.ts",
         "script/release-desktop-engine-target.ts",
         "script/release-latest-flag.ts",

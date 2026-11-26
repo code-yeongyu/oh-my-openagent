@@ -20,7 +20,7 @@ The table states what this world (real engine hosts, fake model, account and rel
 | send-long-3 (send) | pass | pass | pass |
 | steer-unnamed (send) | pass | pass | pass |
 | send-long-2 (send) | pass | pass | pass |
-| interrupt (interrupt) | pass | pass [note: varies between runs: the engine defect of #15013 (senpi#7478) names the turn before the started one, so this interrupt hits the held turn only when the turn ids line up; the cell is not stable until the pinned engine carries that fix] | pass |
+| interrupt (interrupt) | pass | fail: B's held turn was not aborted (the engine (senpi#7478: a started delivery answers the turn before the one it starts), #15013) [note: varies between runs: the engine defect of #15013 (senpi#7478) names the turn before the started one, so this interrupt hits the held turn only when the turn ids line up; the cell is not stable until the pinned engine carries that fix] | pass |
 | set-model (setModel) | pass | pass | pass |
 | set-model-parked (setModel) | fail: the surface answered error partial_commit (T1b-m (#14939, folded into T1b), #14939) | fail: the surface answered error partial_commit (T1b-m (#14939, folded into T1b), #14939) | fail: the surface answered error partial_commit (T1b-m (#14939, folded into T1b), #14939) |
 | after-compaction (send) | fail: B's transcript lacks the message or its answer QA-ACK QA-TOKEN-x1a-after-compaction-sdk (T1b-m (#14939, folded into T1b), #15026, senpi#7482) | fail: B's transcript lacks the message or its answer QA-ACK QA-TOKEN-x1a-after-compaction-tools (T1b-m (#14939, folded into T1b), #15026, senpi#7482) | fail: B's transcript lacks the message or its answer QA-ACK QA-TOKEN-x1a-after-compaction-cli (T1b-m (#14939, folded into T1b), #15026, senpi#7482) |

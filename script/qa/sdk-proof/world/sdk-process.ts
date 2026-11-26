@@ -4,6 +4,7 @@ import { spawn } from "node:child_process"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 
+import { withTelemetryOptOut } from "../../../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { type Answer, type Call, type Driver, isRecord, succeeded, threadOf } from "../drivers/driver.ts"
 import { MAPPING } from "../drivers/sdk.ts"
 
@@ -17,7 +18,7 @@ export function startSdkDriver(options: {
 }): Driver {
   const child = spawn(process.execPath, [SCRIPT, options.entry], {
     cwd: options.cwd,
-    env: options.env,
+    env: withTelemetryOptOut(options.env),
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   })
