@@ -1,3 +1,49 @@
+## 2026-11-26 - What requesting `ulw` changes (#14870)
+
+In both Senpi variants, requesting `ulw` asks the agent to read even indirectly related skills and consult every source that may bear on the task before planning. The agent registers each edit and check as a separate todo. For work that changes the repository, `ulw` explicitly requests a local commit per verified increment unless the user says not to commit. LIGHT and HEAVY size the proof, not the initial investigation.
+
+## 2026-11-26 - dag-library folded into mass-ulw (#15049)
+
+`mass-ulw` now carries the saved-graph library as `references/library.md`, reached through a mode router in its body; its description absorbs the save / run-saved / re-run / schedule triggers. The `dag-library` skill, its registry entry and its telemetry skill name are removed.
+
+## 2026-11-23 - Release held remote attaches when the client closes (#14812)
+
+A remote client's sessions ports borrowed its connection and only cleared their held attaches when that connection reported closed. Closing the client now closes each port, which clears every held attach and its ten-minute idle timer at once.
+
+## 2026-11-24 - One reader for a delivery ledger key's sender device (#14872)
+
+`thread/delivery-ledger.ts` `ledgerDevice` reads `device:<device>/<id>` (URI-decoded, kept as written when not valid encoding); `component.ts` and `wake/carrier.ts` both call it, and their two copies, which disagreed on decoding, are deleted. Refs #14305.
+
+## 2026-11-24 - sessions.resolve on the shared thread-part rules (#14869)
+
+`thread-address-core` gains `matchThread` (exact id > listing key > alias > name > unique 8+ hex id prefix); `thread/addressing.ts` `resolveTarget` and `components/remote/resolve.ts` `sessions.resolve` both run it, and the remote client's own matcher is deleted. A table test runs one address table through thread_send, monitor targets, sessions.resolve, omo remote and the thread SDK. Refs #14305.
+
+## 2026-11-23 - Reopen a parked thread on its device before a read or a send (#14807)
+
+A read of a thread whose row reads ended now asks the holding device, reopens the session from its file there and reads it live. A send with no wake path does the same. A holder with no file still answers `not_found`.
+
+## 2026-11-22 - Thread train 11 (#14623)
+
+listing rows 6 and 7 from the device service (#14511):
+
+`device-service-core` re-vendors the local-API client at omo-relay-daemon 88e58154bb (relay-daemon#1480): `sessions.list` accepts `rows: 6 | 7`, and `ListingRow` gains `waiting` (`{kind, attempt, maxAttempts, delayMs, until}`) and `engine_version` (1-128 characters), both validated by the vendored decoder. `newestRowsListing` starts at rows 7 and remembers the version the service accepted (#14510). Upstream #1452 took #14101's DACL apply and PowerShell error reading into the vendored `dacl.ts` / `powershell.ts`, so `release/windows-dacl.ts` keeps only its alias-aware verify. `SecureFile` takes an `origin`, which `release/acquire.ts` passes from `makeDir`.
+
+Remote thread rows carry their real creation time (#14479):
+
+`rowCreatedAt` in `src/components/thread/remote/ports.ts` reads the creation time from a UUIDv7 durable id; a row without one keeps `updated_ms`. `relayAddressEntry`, the relay session host's listed thread and the resolved-remote `thread_send` row use it instead of copying `updated_ms` into `created_at` (#14474).
+
+Page durable thread reads over visible messages (#14423):
+
+- `reader.ts`, `tools/read-ops.ts`: select the durable tool page after message projection, while binding the cursor to the revision of the whole session file. Raw transcript reads keep their original entry windows and cursors.
+
+Thread bindings removed (#14319):
+
+`components/thread`: `gateway/bindings.ts`, `relay.ts`, `completion.ts`, `author.ts`, `answer-shape.ts`, `ui-answer.ts` and `tools/relay-tools.ts` are deleted; `store-relay-ops.ts` keeps only tool receipts as `store-tool-receipts.ts`; the store-extension transaction is SQL plus a read-only `bindingFor` for importing old routes; the binding tables stay in the gateway schema, empty and unread, so an omo still running gateway schema 14 keeps working through the upgrade (#14382); dropping them is deferred to #14859. `sdk.ts` keeps `list`, `read`, `send`, `locate` and the session controls, and refuses unknown argument keys (#14316).
+
+Queued delivery outcomes (#14449):
+
+Queued deliveries preserve their historical admission while exposing a separate outcome. The receiver can settle an unclaimed queue row at its 24-hour deadline without waking it; application evidence and unresolved claims take precedence over expiry. Receipt-only reads remain query-only after the 30-day replay window.
+
 ## 2026-11-22 - TypeScript 7 projects get post-edit diagnostics from their own tsc (#14656)
 
 `findServerForExtension` in `@oh-my-opencode/lsp-core` swaps the builtin `typescript` server for `node_modules/.bin/tsc --lsp --stdio` when the `typescript` package beside it has no `lib/tsserver.js` (TypeScript 7 dropped it, so typescript-language-server cannot start there). The lookup takes an optional target path: the LSP tools pass the file being served, so the compiler is taken from the edited file's project (walking up from the file to the `.git` boundary) rather than the session cwd. The target and the session cwd are compared by real path, so a target whose real location is outside the real session cwd (for example through a symlinked directory) keeps the cwd, as does `lsp_status`, while a symlinked session root still works. The walk probes only the `node_modules/.bin` of a directory with a Node project marker (never `bin` or a virtualenv, which the generic local-bin walk also probes) and accepts a `tsc` only from a real `node_modules/.bin` directory: npm, yarn, bun and pnpm link entries inside `node_modules` but never `node_modules` or `.bin` themselves, so a linked one is passed over and the walk continues up. A `tsc` also needs its `typescript` package beside it: a stale shim without one is passed over too, while an installed TypeScript 5 still ends the walk and keeps typescript-language-server. Directory diagnostics resolve each scanned file with the same lookup, cache it per directory for the scan, group files by resident client key and run each group on its own client. A group acquires its client right before its files are checked and releases it after its last file, so at most four groups (the per-request file worker limit, below the manager's six resident clients) hold a client at once; a group still starting holds no file worker, so it does not delay the others, and one that does not start within the manager's init timeout (`INIT_TIMEOUT_MS`) reports that for its own files. That deadline only detaches the scan's wait, so the scan moves on at once: `LspManager` owns every startup and shutdown, a waiter that aborts or times out leaves without awaiting a shutdown, a startup is stopped only once no waiter is left (as a tracked stop that the next acquisition and `stopAll()` await), and a startup another caller still waits for keeps running. An aborted directory scan releases its clients and throws the abort instead of returning partial output. A group with no server reports that for its own files, and the file cap and concurrency stay per request. `LspManager` keys resident clients by workspace root, server id and resolved command, so packages of one repository that resolve to different TypeScript servers never share a client, and the same command under one root still shares one. Only a repo-local `tsc` counts; `PATH` is never searched for it. The config merge records whether the `typescript` command is the inherited builtin default; a configured command, even one equal to the default, is never replaced, and project overrides and disabled settings keep their precedence. The tsserver-specific builtin initialization is not sent to `tsc`; initialization a config file supplied is. `lsp_status` reports `typescript` installed in such a project. `omo.js` is regenerated. Fixes #14642.

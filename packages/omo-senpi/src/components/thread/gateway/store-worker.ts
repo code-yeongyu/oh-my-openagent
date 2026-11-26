@@ -4,11 +4,12 @@
  * the session loop that owns the store facade. Requests run strictly one at a time.
  */
 import { createHash, randomUUID } from "node:crypto"
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, realpathSync, renameSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { chmodSync, existsSync, mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
 
+import { CONNECTION_LOST_CODE, connectionLost, isSqliteIoError, watchWalFiles } from "./connection-lost"
 import { OPEN_STATES, WAKE_LEASE_MS } from "./constants"
 import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory, gatewayWakeMarkerPath } from "./paths"
@@ -17,13 +18,12 @@ import { GatewaySchemaVersionError } from "./schema"
 import { isBusyError, Sql, type SqliteConnection, type SqlRow } from "./sql"
 import { readTargetBacklogs } from "./backlog"
 import * as ops from "./store-ops"
-import * as relay from "./store-relay-ops"
+import * as receipts from "./store-tool-receipts"
 import * as ownership from "./store-ownership"
 import { StoreExtensions } from "./store-extension-ops"
 import * as sessions from "./store-extension-session-ops"
 import { listSessionOps } from "./extension-registrations"
 import { ExtensionTransactionEndedError } from "./extension-transaction"
-import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
 import type {
   DeliveryRow,
@@ -32,7 +32,6 @@ import type {
   IntakeOutcome,
   IntakeRequest,
   ProcessIdentity,
-  Provenance,
   StoreRefusal,
 } from "./types"
 import type {
@@ -59,12 +58,6 @@ import type {
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
 type WorkerControl = { readonly type: "resume"; readonly hook: string }
-type ResolutionReply = { readonly type: "resolution"; readonly id: number } & (
-  { readonly ok: true; readonly value: GatewayResolution } | { readonly ok: false; readonly error: string }
-)
-type ProvenanceReply = { readonly type: "provenance_resolved"; readonly id: number } & (
-  { readonly ok: true; readonly value: Provenance } | { readonly ok: false; readonly error: string }
-)
 
 const port = parentPort
 if (port === null) throw new Error("the gateway store worker must run as a worker thread")
@@ -249,31 +242,11 @@ const barriers = new Map<string, () => void>()
 let running = false
 let context: ops.StoreContext | undefined
 let connection: SqliteConnection | undefined
+/** Names a `-wal`/`-shm` file of the open connection that was removed or replaced since it opened. */
+let walFilesLost: (() => string | undefined) | undefined
 let extensions: StoreExtensions | undefined
 /** The extension whose registration or call ran most recently; a late error is attributed to it. */
 let lastExtensionActivity: string | undefined
-let nextResolution = 1
-const resolutions = new Map<
-  number,
-  { readonly resolve: (value: GatewayResolution) => void; readonly reject: (error: Error) => void }
->()
-const resolveTarget: GatewayResolve = (address, request) =>
-  new Promise((resolve, reject) => {
-    const id = nextResolution++
-    resolutions.set(id, { resolve, reject })
-    port.postMessage({ type: "resolve", id, address, request })
-  })
-const provenanceRequests = new Map<
-  number,
-  { readonly resolve: (value: Provenance) => void; readonly reject: (error: Error) => void }
->()
-const senderProvenance = (): Promise<Provenance> =>
-  new Promise((resolve, reject) => {
-    const id = nextResolution++
-    provenanceRequests.set(id, { resolve, reject })
-    port.postMessage({ type: "provenance", id })
-  })
-
 function lateTransactionError(error: unknown): void {
   if (error instanceof ExtensionTransactionEndedError) {
     emit({ kind: "extension_error", extension: error.extension, phase: "stale_transaction", error: error.message })
@@ -293,21 +266,7 @@ function lateTransactionError(error: unknown): void {
 process.on("uncaughtException", lateTransactionError)
 process.on("unhandledRejection", lateTransactionError)
 
-port.on("message", (message: WorkerRequest | WorkerControl | ResolutionReply | ProvenanceReply) => {
-  if (message.type === "provenance_resolved") {
-    const pending = provenanceRequests.get(message.id)
-    provenanceRequests.delete(message.id)
-    if (message.ok) pending?.resolve(message.value)
-    else pending?.reject(new Error(message.error))
-    return
-  }
-  if (message.type === "resolution") {
-    const pending = resolutions.get(message.id)
-    resolutions.delete(message.id)
-    if (message.ok) pending?.resolve(message.value)
-    else pending?.reject(new Error(message.error))
-    return
-  }
+port.on("message", (message: WorkerRequest | WorkerControl) => {
   if (message.type === "resume") {
     barriers.get(message.hook)?.()
     barriers.delete(message.hook)
@@ -333,8 +292,9 @@ async function pump(): Promise<void> {
           error: {
             message: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined,
-            code:
-              typeof (error as { code?: unknown } | null)?.code === "string"
+            code: isSqliteIoError(error)
+              ? CONNECTION_LOST_CODE
+              : typeof (error as { code?: unknown } | null)?.code === "string"
                 ? (error as { code: string }).code
                 : undefined,
             details: error instanceof GatewaySchemaVersionError ? error.details : undefined,
@@ -916,8 +876,11 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     connection = undefined
     context = undefined
     extensions = undefined
+    walFilesLost = undefined
     return null
   }
+  const lost = walFilesLost?.()
+  if (lost !== undefined) throw connectionLost(lost)
   const ctx = requireContext()
   // Another process may have migrated the store since this worker opened it (#14622 review M5, M7): every op re-reads
   // the schema and reads its data in one snapshot, and every write re-reads it under its write lock.
@@ -946,18 +909,10 @@ async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Pro
         readonly now: number
       }
       lastExtensionActivity = request.name
-      try {
-        if (extensions === undefined) return undefined
-        return op === "extension_call"
-          ? await extensions.call(request.name, request.op, request.args, request.now)
-          : await sessions.sessionCall(ctx, extensions, args as sessions.SessionCallRequest)
-      } finally {
-        for (const pending of resolutions.values()) pending.reject(new ExtensionTransactionEndedError(request.name))
-        resolutions.clear()
-        for (const pending of provenanceRequests.values())
-          pending.reject(new ExtensionTransactionEndedError(request.name))
-        provenanceRequests.clear()
-      }
+      if (extensions === undefined) return undefined
+      return op === "extension_call"
+        ? await extensions.call(request.name, request.op, request.args, request.now)
+        : await sessions.sessionCall(ctx, extensions, args as sessions.SessionCallRequest)
     }
     case "session_callable_ops":
       return listSessionOps(ctx)
@@ -983,10 +938,16 @@ async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Pro
       return await ops.abandonReceipt(ctx, args as Parameters<typeof ops.abandonReceipt>[1])
     case "delivery_view":
       return ops.deliveryView(ctx, args as string)
-    case "delivery_receipt":
-      return ops.deliveryReceipt(ctx, args as Parameters<typeof ops.deliveryReceipt>[1])
-    case "recover_delivery":
-      return await ops.recoverDelivery(ctx, args as Parameters<typeof ops.recoverDelivery>[1])
+    case "receipt_outcome":
+      return await ops.receiptOutcome(ctx, args as ops.ReceiptOutcomeRequest)
+    case "refusal_notices":
+      return ops.refusalNotices(ctx, args as number)
+    case "claim_refusal_notice":
+      return await ops.claimRefusalNotice(ctx, args as Parameters<typeof ops.claimRefusalNotice>[1])
+    case "remote_receipt":
+      return receipts.remoteReceipt(ctx, args as Parameters<typeof receipts.remoteReceipt>[1])
+    case "reconcile_remote_receipt":
+      return await receipts.reconcileRemoteReceipt(ctx, args as receipts.ReconcileRemoteReceiptRequest)
     case "list":
       return ops.listDeliveries(ctx, args as Parameters<typeof ops.listDeliveries>[1])
     case "is_referenced":
@@ -998,51 +959,19 @@ async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Pro
     case "stats":
       return ops.stats(ctx)
     case "tool_receipt_begin":
-      return await relay.toolReceiptBegin(ctx, args as Parameters<typeof relay.toolReceiptBegin>[1])
+      return await receipts.toolReceiptBegin(ctx, args as Parameters<typeof receipts.toolReceiptBegin>[1])
     case "tool_receipt_settle":
-      return await relay.toolReceiptSettle(ctx, args as Parameters<typeof relay.toolReceiptSettle>[1])
+      return await receipts.toolReceiptSettle(ctx, args as Parameters<typeof receipts.toolReceiptSettle>[1])
     case "tool_receipt_revise":
-      return await relay.toolReceiptRevise(ctx, args as Parameters<typeof relay.toolReceiptRevise>[1])
+      return await receipts.toolReceiptRevise(ctx, args as Parameters<typeof receipts.toolReceiptRevise>[1])
     case "tool_receipt_release":
-      return await relay.toolReceiptRelease(ctx, args as Parameters<typeof relay.toolReceiptRelease>[1])
-    case "bind":
-      return await relay.bindThread(ctx, args as Parameters<typeof relay.bindThread>[1])
-    case "unbind":
-      return await relay.unbindThread(ctx, args as Parameters<typeof relay.unbindThread>[1])
-    case "rebind":
-      return await relay.rebindThread(ctx, args as Parameters<typeof relay.rebindThread>[1])
-    case "list_bindings":
-      return await relay.listBindings(ctx, args as Parameters<typeof relay.listBindings>[1])
-    case "binding_view":
-      return await relay.bindingView(ctx, args as Parameters<typeof relay.bindingView>[1])
+      return await receipts.toolReceiptRelease(ctx, args as Parameters<typeof receipts.toolReceiptRelease>[1])
     case "register_incarnation":
       return await ownership.registerIncarnation(ctx, args as Parameters<typeof ownership.registerIncarnation>[1])
     case "clear_endpoint":
       return await ownership.clearEndpoint(ctx, args as Parameters<typeof ownership.clearEndpoint>[1])
     case "session_owner":
       return ownership.sessionOwner(ctx, args as string)
-    case "report":
-      return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
-    case "emit_completions":
-      return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
-    case "pending_completion_arms":
-      return relay.pendingCompletionArms(ctx, args as string)
-    case "latest_completion_arm":
-      return relay.latestCompletionArm(ctx, args as string)
-    case "read_outbox":
-      return await relay.readOutbox(ctx, args as Parameters<typeof relay.readOutbox>[1])
-    case "ack_outbox":
-      return await relay.ackOutbox(ctx, args as Parameters<typeof relay.ackOutbox>[1])
-    case "claim_answer":
-      return await relay.claimAnswer(ctx, args as Parameters<typeof relay.claimAnswer>[1])
-    case "release_answer":
-      return await relay.releaseAnswer(ctx, args as Parameters<typeof relay.releaseAnswer>[1])
-    case "confirm_answer":
-      return await relay.confirmAnswer(ctx, args as Parameters<typeof relay.confirmAnswer>[1])
-    case "mark_prior_delivered":
-      return await relay.markPriorDelivered(ctx, args as Parameters<typeof relay.markPriorDelivered>[1])
-    case "close_question":
-      return await relay.closeQuestion(ctx, args as Parameters<typeof relay.closeQuestion>[1])
     default:
       throw new Error(`unknown gateway store op: ${op}`)
   }
@@ -1054,13 +983,18 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   mkdirSync(join(root, "inbox"), { recursive: true, mode: 0o700 })
   chmodSync(root, 0o700)
   const path = gatewayDatabasePath(config.agent_dir)
-  closeSync(openSync(path, "a", 0o600))
-  chmodSync(path, 0o600)
-  // The file actually opened, links resolved: the source-build guard checks this path, so a link moved after it was
-  // resolved cannot point the guard at another store than the one migrated (#14622 review M9).
-  const databasePath = realpathSync(path)
+  // Never open and close the database file outside SQLite: POSIX record locks belong to the process, so
+  // closing ANY descriptor of the file drops every lock this process holds on it, the SHARED lock of each
+  // other store already open here included. A foreign client then takes itself for the last connection
+  // and deletes -wal and -shm on close under every live store. SQLite creates the file; the gateway
+  // directory is already 0700 when it does, and the mode is narrowed right after.
+  // The file actually opened, links resolved without opening it (a new store's directory, before SQLite creates the
+  // file): the source-build guard checks this path, so a link moved after it was resolved cannot point the guard at
+  // another store than the one migrated (#14622 review M9).
+  const databasePath = existsSync(path) ? realpathSync(path) : join(realpathSync(dirname(path)), basename(path))
   const sqlite = await import("node:sqlite")
   connection = new sqlite.DatabaseSync(databasePath, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
+  chmodSync(databasePath, 0o600)
   const sql = new Sql(connection)
   sql.exec(`PRAGMA busy_timeout = ${Math.trunc(config.busy_timeout_ms)}`)
   // Two processes opening a brand-new store race for the WAL switch, which does not wait on
@@ -1083,6 +1017,8 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   }
   sql.exec("PRAGMA synchronous = FULL")
   for (const suffix of ["-wal", "-shm"]) if (existsSync(`${path}${suffix}`)) chmodSync(`${path}${suffix}`, 0o600)
+  walFilesLost = watchWalFiles(path)
+  walFilesLost()
   const self = {
     pid: process.pid,
     process_start_time: await processStartTime(process.pid),
@@ -1101,7 +1037,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   }
   try {
     await ops.migrate(context)
-    extensions = new StoreExtensions(context, resolveTarget, senderProvenance)
+    extensions = new StoreExtensions(context)
     const legacy = await ops.migrateLegacyMailboxes(context, request.now)
     context.stats.writes = 0
     context.stats.transactions = 0

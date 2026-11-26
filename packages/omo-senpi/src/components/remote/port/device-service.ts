@@ -1,4 +1,4 @@
-import { outcomeOf } from "../../thread/remote/outcome"
+import { attachRequired, outcomeOf } from "../../thread/remote/outcome"
 import {
   connectDeviceService,
   LocalApiError,
@@ -17,11 +17,13 @@ import type {
   JsonObject,
   RemoteCommandOutcome,
   RemoteListing,
+  RemoteLookupOutcome,
   RemoteSessionsPort,
 } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
 import { commandWaitMs, withinCallBudget } from "../../call-budget/call-deadline"
 import { createListingRound } from "./listing-round"
+import { createLookupGate, type LookupStart } from "./lookup-gate"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -135,11 +137,13 @@ export async function attachAddressed(
   connected: DeviceService,
   device: string,
   sessionId: string,
+  locateOn: (device: string, sessionId: string) => Promise<{ readonly key: string }> = (onDevice, id) =>
+    connected.locate(onDevice, id),
 ): Promise<{ readonly attached: RemoteAttach; readonly key: string }> {
   const on = async (key: string) => ({ attached: await connected.attach(device, key), key })
   const locate = () =>
     Promise.resolve()
-      .then(() => connected.locate(device, sessionId))
+      .then(() => locateOn(device, sessionId))
       .catch((error: unknown) => {
         // A locate that answered "none" is the answer: the address names no session there (not the attach's refusal).
         if (error instanceof LocalApiError && error.code === "session_not_found") throw error
@@ -148,7 +152,7 @@ export async function attachAddressed(
   if (DURABLE_ID.test(sessionId)) {
     // Only a locate that answered "none" means the session is gone; any other failure (b not answering, a lost connection)
     // is the refusal as it came, so a close never reports a running session not_live (review M1 of 6ce7397).
-    return await on((await connected.locate(device, sessionId)).key)
+    return await on((await locateOn(device, sessionId)).key)
   }
   try {
     return await on(sessionId)
@@ -185,9 +189,23 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         throw error
       },
     )).then((dialed) => dialed.conn)
-  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs, options.now)
+  // omo#14748 review round 5: an attach's locate goes through the lookup gate like every other locate of this port.
+  const pool = createAttachPool(
+    svc,
+    (connected, device, sessionId) =>
+      attachAddressed(connected, device, sessionId, (onDevice, id) =>
+        lookups.admit(() => connected.locate(onDevice, id)),
+      ),
+    options.attachIdleMs,
+    options.now,
+  )
   const endpoints = new Map<string, string>()
-  const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
+  // #14358: a command the other device refused attach_required ran nothing there: this device's attach is dropped and
+  // made again, and the record is sent once more (`reattached`); a second refusal is the answer.
+  const sendOnce = async (
+    reattached: boolean,
+    ...[device, sessionId, rpc, commandOptions]: Parameters<RemoteSessionsPort["sessionCommand"]>
+  ): Promise<RemoteCommandOutcome> => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
     // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
     let held: HeldAttach
@@ -201,7 +219,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // No connection means nothing was sent, as when the attach path cannot attach. A refusal before sending (the core
     // marks it NotSentError; a service older than #393 part B answers the `{session}` target `unsupported`) ran nothing,
     // so the record goes the attach way instead. Anything else may have run on the other device and is never resent.
-    if (commandOptions?.direct === true) {
+    // #14358 review M2: the retry goes the attach way only; a direct probe is never sent twice.
+    if (!reattached && commandOptions?.direct === true) {
       let connected: DeviceService
       try {
         connected = await svc()
@@ -212,7 +231,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const waitMs = commandWaitMs(SEND_WAIT_MS)
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
+        const direct = outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
+        if (!attachRequired(direct)) return direct
       } catch (error) {
         if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
       }
@@ -255,6 +275,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
         const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
+        if (!reattached && attachRequired(outcome)) {
+          pool.evict(device, sessionId)
+          held.release()
+          return await sendOnce(true, device, sessionId, rpc, commandOptions)
+        }
         if (isHeld && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
@@ -274,6 +299,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       held.release()
     }
   }
+  const sessionCommand: RemoteSessionsPort["sessionCommand"] = (...args) => sendOnce(false, ...args)
   const listing = async (filter?: { readonly device?: string }): Promise<RemoteListing> => {
     const listed = await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })
     return {
@@ -310,6 +336,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   }
   // Only the unfiltered account listing waits on every device, so only it is shared; a one-device listing goes out as asked.
   const round = createListingRound(() => listing(), options.now ?? Date.now)
+  // omo#14748 review M1/M3: one single-probe locate, sent at once; its answer is capped, the locate itself is not.
+  const startLookup = (device: string, durableId: string): LookupStart => {
+    const connected = svc()
+    const sent = connected.then((service) =>
+      service.takesSingleLocate ? service.locate(device, durableId, { single: true }) : undefined,
+    )
+    return { answer: cappedLookup(connected, sent, options.lookupCapMs ?? LOOKUP_CAP_MS), settled: sent }
+  }
+  const lookups = createLookupGate(startLookup, options.lookupCapMs ?? LOOKUP_CAP_MS)
   // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
   let info: ReturnType<DeviceService["thisDevice"]> | undefined
   const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
@@ -439,7 +474,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
           hold: pool.hold,
           getState: (onDevice, onSession) =>
             sessionCommand(onDevice, onSession, { type: "get_state", sessionId: onSession }),
-          locate: async (onDevice, durableSessionId) => (await (await svc()).locate(onDevice, durableSessionId)).key,
+          locate: async (onDevice, durableSessionId) => {
+            const service = await svc()
+            return (await lookups.admit(() => service.locate(onDevice, durableSessionId))).key
+          },
           delay: retryDelay,
         },
         device,
@@ -447,31 +485,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         handlers,
         watchOptions,
       ),
-    lookup: async (device, durableId) => {
-      let connected: DeviceService
-      try {
-        connected = await svc()
-      } catch (error) {
-        return { kind: "silent", reason: notSentReason(error) }
-      }
-      if (!connected.takesSingleLocate) return { kind: "unavailable" }
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const capped = new Promise<"timeout">((resolve) => {
-        timer = setTimeout(() => resolve("timeout"), options.lookupCapMs ?? LOOKUP_CAP_MS)
-        timer.unref?.()
-      })
-      try {
-        const answer = await Promise.race([connected.locate(device, durableId, { single: true }), capped])
-        if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
-        return { kind: "found", key: answer.key }
-      } catch (error) {
-        const code = error instanceof LocalApiError ? error.code : "locate_failed"
-        return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
-      } finally {
-        clearTimeout(timer)
-      }
-    },
+    lookup: lookups.lookup,
+    lookupAlone: lookups.lookupAlone,
     canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    // wakeCommand names a durable routing key. The new record is negotiated as delivery-outcome:v1
+    // by the sender service and intercepted before any engine/cold-wake path at its receiver.
+    receipt: async (
+      device: string,
+      durableId: string,
+      deliveryId: string,
+    ): Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }> =>
+      await port.wake(device, durableId, { type: "get_delivery_outcome", deliveryId }),
     canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
     wake: async (device, durableId, rpc) => {
       let record: WireRpc
@@ -525,7 +549,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       let key: string
       try {
         // omo#14130 review round 3 (L1): an older service's post-create locate shares the call's budget.
-        const located = await withinCallBudget(connected.locate(device, engineId))
+        // A post-create locate that outlives the call's budget still runs on that device: a solo lookup waits for it.
+        const located = await withinCallBudget(lookups.admit(() => connected.locate(device, engineId)))
         if (located === undefined) return { kind: "refused", reason: "request_timeout" }
         key = located.key
       } catch (error) {
@@ -567,5 +592,35 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       READ_ONLY_RECORDS.has(String(rpc["type"]))
         ? sessionCommand(device, sessionId, rpc, commandOptions)
         : round.fenced(sessionCommand)(device, sessionId, rpc, commandOptions),
+  }
+}
+
+/** A single-probe locate's answer within `capMs`: a device past the cap counts as silent (its locate runs on). */
+async function cappedLookup(
+  connected: Promise<DeviceService>,
+  sent: Promise<{ readonly key: string } | undefined>,
+  capMs: number,
+): Promise<RemoteLookupOutcome> {
+  let service: DeviceService
+  try {
+    service = await connected
+  } catch (error) {
+    return { kind: "silent", reason: notSentReason(error) }
+  }
+  if (!service.takesSingleLocate) return { kind: "unavailable" }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const capped = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), capMs)
+    timer.unref?.()
+  })
+  try {
+    const answer = await Promise.race([sent, capped])
+    if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
+    return answer === undefined ? { kind: "unavailable" } : { kind: "found", key: answer.key }
+  } catch (error) {
+    const code = error instanceof LocalApiError ? error.code : "locate_failed"
+    return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
+  } finally {
+    clearTimeout(timer)
   }
 }

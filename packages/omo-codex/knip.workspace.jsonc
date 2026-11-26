@@ -75,7 +75,7 @@
     "packages/omo-codex/src/telemetry/posthog-activity-state.ts": ["getPostHogActivityStateFilePath"],
     // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCliPostHog, createPluginPostHog, __createPostHogForTesting
     // #11572 (origin dev 4c87d16a73) removed the six __set/__reset provider, activity-state and transport-factory testing exports; their rows are gone with them.
-    "packages/omo-codex/src/telemetry/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "createCliPostHog", "createPluginPostHog", "__createPostHogForTesting"],
+    "packages/omo-codex/src/telemetry/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "createCliPostHog", "createPluginPostHog"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PRODUCT_NAME, PACKAGE_NAME, EVENT_NAME, LEGACY_PARENT_PACKAGE, PRODUCT_ENV_PREFIX
     "packages/omo-codex/src/telemetry/product-identity.ts": ["PRODUCT_NAME", "PACKAGE_NAME", "EVENT_NAME", "LEGACY_PARENT_PACKAGE", "PRODUCT_ENV_PREFIX"]
   }

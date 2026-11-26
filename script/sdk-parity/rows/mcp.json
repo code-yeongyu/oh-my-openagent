@@ -1,0 +1,188 @@
+{
+  "domain": "mcp",
+  "rows": [
+    {
+      "id": "mcp.oauth.login",
+      "kind": "capability",
+      "sdk": "mcp.oauth.login",
+      "today": "no",
+      "slices": [
+        "OC1c"
+      ],
+      "input": {
+        "properties": {
+          "server": {
+            "type": "string",
+            "minLength": 1
+          },
+          "server_url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "server"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "mcp",
+            "oauth",
+            "login"
+          ],
+          "flags": {
+            "--server-url": "server_url",
+            "--client-id": "client_id",
+            "--scopes": "scopes"
+          },
+          "positionals": {
+            "server-name": "server"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1c)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "mcp.oauth.logout",
+      "kind": "capability",
+      "sdk": "mcp.oauth.logout",
+      "today": "no",
+      "slices": [
+        "OC1c"
+      ],
+      "input": {
+        "properties": {
+          "server": {
+            "type": "string",
+            "minLength": 1
+          },
+          "server_url": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "server"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "mcp",
+            "oauth",
+            "logout"
+          ],
+          "flags": {
+            "--server-url": "server_url"
+          },
+          "positionals": {
+            "server-name": "server"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1c)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "mcp.oauth.status",
+      "kind": "capability",
+      "sdk": "mcp.oauth.status",
+      "today": "no",
+      "slices": [
+        "OC1c"
+      ],
+      "input": {
+        "properties": {
+          "server": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "mcp",
+            "oauth",
+            "status"
+          ],
+          "flags": {},
+          "positionals": {
+            "server-name": "server"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1c)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "position": 8,
+      "ids": [
+        "mcp.oauth.login",
+        "mcp.oauth.logout",
+        "mcp.oauth.status"
+      ],
+      "cells": [
+        "`mcp.oauth.login({ server, server_url?, client_id?, scopes? })`, `.logout({ server, server_url? })`, `.status({ server? })`, over `packages/mcp-client-core`",
+        "`mcp oauth login <server-name> [--server-url] [--client-id] [--scopes ...]`; `mcp oauth logout <server-name> [--server-url]`; `mcp oauth status [server-name]`",
+        "**no**; custody (S0)",
+        "Planned (OC1c)",
+        "OC1c"
+      ]
+    }
+  ]
+}

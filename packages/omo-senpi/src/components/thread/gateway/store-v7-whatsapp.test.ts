@@ -14,6 +14,10 @@ afterEach(async () => {
   harness = undefined
 })
 
+// #14623 review L2: the v7 bindings rebuild still runs for every store upgraded from v6 or older, so its upgrade
+// guarantees (rows, indexes and the AUTOINCREMENT high-water survive; referencing extension rows are never cascade-
+// deleted; a pre-existing violation on bindings rolls back to v6) stay pinned here after the binding verbs' removal.
+// The rows are written with plain SQL, as an older build's would be.
 const BINDING_ROW = (id: string, platform: string, seq?: number) =>
   `INSERT INTO bindings (${seq === undefined ? "" : "seq, "}binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at)
    VALUES (${seq === undefined ? "" : `${seq}, `}'${id}', 1, 'active', '${platform}', 'acct', 'c1', 't1', 'realm', 'S-${id}', 1, 1, 'auto', '[]', 'default', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`

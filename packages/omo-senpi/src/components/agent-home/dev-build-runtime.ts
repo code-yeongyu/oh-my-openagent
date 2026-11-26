@@ -27,6 +27,17 @@ export function isDevBuildRuntime(env: NodeJS.ProcessEnv = process.env): boolean
   return isRecord(stamp) && typeof stamp["command"] === "string" && stamp["command"].length > 0
 }
 
+/**
+ * True for an unreleased build no omo launcher started: the caller's module is running unbundled from TypeScript source
+ * (`bun test`, `bun <script>`) and no launcher pointed OMO_PACKAGE_DIR at a payload. Shipped code runs from generated
+ * `.js`/`.mjs` bundles, so it never matches; a release payload named by OMO_PACKAGE_DIR keeps its own answer.
+ */
+export function isUnlaunchedSourceRun(moduleUrl: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  const packageDir = env.OMO_PACKAGE_DIR
+  if (packageDir !== undefined && packageDir.trim().length > 0) return false
+  return /\.[cm]?tsx?$/.test(new URL(moduleUrl).pathname)
+}
+
 /** The canonical spelling of a path, symlinks resolved even where their target does not exist yet. */
 function canonical(path: string, depth = 0): string {
   try {

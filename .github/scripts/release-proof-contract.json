@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "425899999d7b98fe9f360539d9db6c86742d1d8a04a1caf670b7080a226725c8",
+  "workflowSha256": "6c903680c978cfcdcbab93c82c89cbe5345624c8f37bc6bcc9f39a0be087eb20",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
@@ -146,7 +146,7 @@
       "Verify root shard coverage",
       "Write job summary"
     ],
-    "macos-combined": [
+    "macos-combined-1": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
       "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
@@ -155,9 +155,18 @@
       "Run vendored lsp-daemon tests",
       "Run root test shard 1 memory-core sync",
       "Run root test shard 1 rest",
-      "Run root test shard 2 heavy",
       "Run root test shard 2 light",
       "Run Codex platform smoke",
+      "Upload macOS JUnit reports",
+      "Write job summary"
+    ],
+    "macos-combined-2": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Run root test shard 2 heavy",
       "Run Senpi compatibility tests",
       "Upload macOS JUnit reports",
       "Write job summary"

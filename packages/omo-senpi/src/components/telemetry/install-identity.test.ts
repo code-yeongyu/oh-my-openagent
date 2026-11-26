@@ -15,7 +15,8 @@ import { tmpdir, userInfo } from "node:os"
 import { basename, join } from "node:path"
 
 import { automatedRunReason, isOmoNativeTelemetryEnabled } from "./omo-native-session"
-import { getOmoNativeAttribution } from "./product-identity"
+import { recordOmoNativeConsent } from "./omo-native-consent"
+import { getOmoNativeAttribution, getOmoNativeStateDir } from "./product-identity"
 
 const roots: string[] = []
 afterEach(() => {
@@ -239,6 +240,7 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
   })
 
   it("#given an automated run #then the enablement gate is off, unless OMO_TELEMETRY_ALLOW_AUTOMATION opts back in", () => {
+    recordOmoNativeConsent(getOmoNativeStateDir(realHome), "accepted")
     const enabled = (env: Record<string, string>, automationDeps?: typeof realDeps) =>
       isOmoNativeTelemetryEnabled(
         { isConfigEnabled: () => true, ...(automationDeps === undefined ? {} : { automationDeps }) },
