@@ -86,12 +86,7 @@ async function reclaimResidentExclusive(
     }
   }
   if (TERMINAL_STATUSES.has(claimed.status)) return detachTerminalResident(context, claimed)
-  // A child its own run paused waits for that run's Resume, which restores it from its transcript
-  // under whichever host then owns the run. Park it with its run owner instead of disposing the work.
-  if (claimed.status === "paused" && sessionPath !== undefined) {
-    const parked = await detachTerminalResident(context, claimed)
-    return parked.kind === "resumed" ? { task_id: claimed.task_id, kind: "deferred", reason: "run_paused" } : parked
-  }
+  if (claimed.status === "paused") return settlePausedOrphan(context, claimed, sessionPath)
   if (!REVIVABLE_STATUSES.has(claimed.status)) {
     await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
     return { task_id: claimed.task_id, kind: "resumed", reason: "non-revivable orphan disposed" }
@@ -107,6 +102,24 @@ async function reclaimResidentExclusive(
     return { task_id: claimed.task_id, kind: "lost", reason: "reattach disabled for crashed resident" }
   }
   return reviveClaimed(context, claimed, rollbackResidency, sessionPath)
+}
+
+/**
+ * The one disposition of a paused orphan this host just claimed, for the scoped and the legacy sweep alike. A child its
+ * own run paused waits for that run's Resume, which restores it from its transcript under whichever host then owns the
+ * run, so it is parked with its run owner. Without a transcript nothing can restore it, and it is disposed.
+ */
+export async function settlePausedOrphan(
+  context: LifecycleContext,
+  claimed: TaskRecord,
+  sessionPath: string | undefined,
+): Promise<ReconcileOutcome> {
+  if (sessionPath === undefined) {
+    await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
+    return { task_id: claimed.task_id, kind: "resumed", reason: "non-revivable orphan disposed" }
+  }
+  const parked = await detachTerminalResident(context, claimed)
+  return parked.kind === "resumed" ? { task_id: claimed.task_id, kind: "deferred", reason: "run_paused" } : parked
 }
 
 export type ReviveClaimedOptions = {

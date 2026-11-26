@@ -2,9 +2,12 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { ManagedChildHandle } from "../manager/child-handle"
+import { restorePausedChild } from "../manager/paused-restore"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { createTaskLifecycle } from "./create"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { NO_START_EVIDENCE } from "./owner-process"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
 
 afterEach(cleanupProjects)
@@ -78,4 +81,44 @@ describe("a paused child whose owner process is gone", () => {
     // then
     expect(h.store.load(h.taskId)?.residency_state).toBe("disposed")
   })
+
+  // The startup sweep also visits other sessions' children (and the unscoped sweep visits all of them). Marking such a
+  // paused orphan lost made its run's recovered DAG treat it as failed instead of restoring it on Resume.
+  for (const sweep of [{ name: "another session's start", session: "s2" }, { name: "the unscoped sweep" }]) {
+    test(`#given a transcript #when ${sweep.name} reconciles #then it is parked for its run, and the run's Resume restores it`, async () => {
+      // given
+      const h = pausedOrphan(true)
+
+      // when
+      const result = await h.lifecycle.reconcileOnSessionStart(sweep.session)
+
+      // then
+      expect(result.outcomes.find((entry) => entry.task_id === h.taskId)).toMatchObject({
+        kind: "deferred",
+        reason: "run_paused",
+      })
+      const parked = h.store.load(h.taskId)
+      expect(parked).toMatchObject({ status: "paused", residency_state: "persisted_only", run_pause: RUN_OWNER })
+      if (parked === null) throw new Error("record vanished")
+
+      // when
+      const handle = { task_id: h.taskId } as ManagedChildHandle
+      const restored = await restorePausedChild(
+        {
+          store: h.store,
+          hostPid: 3333,
+          isProcessAlive: () => false,
+          ownerProcesses: NO_START_EVIDENCE,
+          respawn: async () => ({ ok: true, handle }),
+          reattach: async () => ({ ok: true }),
+          liveHandle: () => handle,
+        },
+        parked,
+      )
+
+      // then
+      expect(restored).toBe(handle)
+      expect(h.store.load(h.taskId)).toMatchObject({ status: "paused", residency_state: "resident", host_pid: 3333 })
+    })
+  }
 })
