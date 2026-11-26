@@ -5,7 +5,7 @@ import { dirname, join } from "node:path"
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
-import { runtimeArtifactPaths } from "../../plugin/scripts/runtime-files.mjs"
+import { RUNTIME_IMPORT_MAP, runtimeArtifactPaths } from "../../plugin/scripts/runtime-files.mjs"
 import { isRecord } from "./senpi-settings"
 
 export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
@@ -72,6 +72,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("runtime", "agent-toolkit-sdk", "sdk.js"),
   join("runtime", "bunshin-ts", "sdk.js"),
   ...runtimeArtifactPaths(),
+  RUNTIME_IMPORT_MAP,
   join("runtime", "thread-sdk", "sdk.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
