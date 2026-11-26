@@ -47,7 +47,8 @@ export function remotePort(recorder: Recorder): {
     device: STUDIO.id,
     session_id: STUDIO_THREAD,
     durable_id: STUDIO_THREAD,
-    title: `lane ${STUDIO_THREAD}`,
+    // `title` renames b's thread, e.g. to share a name with a thread on this device.
+    title: typeof given["title"] === "string" ? given["title"] : `lane ${STUDIO_THREAD}`,
     project: "/work/studio",
     path: "/work/studio",
     state: "idle",

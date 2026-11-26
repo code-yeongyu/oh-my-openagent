@@ -1,6 +1,7 @@
 import type { GatewayStore } from "../../thread/gateway/store"
 import type { ProvenanceWorkspaces } from "../../thread/gateway/provenance-resolver"
 import type { DeviceRow } from "../../remote/types"
+import { projectedCandidates } from "./refusal-candidates"
 import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import type { ThreadCore } from "../../thread/sdk-core"
 import type { ThreadHost } from "../../thread/tools/ports"
@@ -103,23 +104,6 @@ const UNEXPECTED: OmoFailure = {
 const sessionFailure = (error: Parameters<typeof threadFailure>[0]): OmoFailure =>
   error.code === "internal_error" ? UNEXPECTED : threadFailure(error)
 
-/**
- * Whether a session's refusal candidates keep only their identifiers (T1a review LOW 1, the owner's ruling pending): off,
- * a session's refusals carry the candidates the address core gives every principal, as the shipped tools do today.
- */
-const SESSION_REFUSAL_IDENTIFIERS_ONLY = false
-const IDENTIFIER_KEYS = new Set(["thread", "id", "device"])
-
-const sessionRefusal = (failure: OmoFailure): OmoFailure => {
-  if (!SESSION_REFUSAL_IDENTIFIERS_ONLY) return failure
-  const candidates = failure.error.details?.["candidates"]
-  if (!Array.isArray(candidates)) return failure
-  const kept = candidates.map((candidate: unknown) =>
-    Object.fromEntries(Object.entries(Object(candidate)).filter(([key]) => IDENTIFIER_KEYS.has(key))),
-  )
-  return { ...failure, error: { ...failure.error, details: { ...failure.error.details, candidates: kept } } }
-}
-
 /** devices.resolve over the remote client's roster (the address core's resolver); the row as it lists it. */
 async function resolveDevice(
   remote: RemoteThreadSurface | undefined,
@@ -188,24 +172,34 @@ export function threadsNamespace(options: {
   // identifiers for resolve, the located thread without its endpoint and session file path for locate. Every other
   // allowed cell of a session or another principal is slice T2's or X1b's (design lane ruling), and the refused cells are
   // answered before this at the root's boundary.
+  // Ruling B (the owner's, T1a review LOW 1): a resolution call's refusal candidates are the caller's own list rows for
+  // the same threads under the call's scope, plus the preview of a row it may read.
+  const candidateRefusal = (failure: OmoFailure, allScope?: boolean) =>
+    projectedCandidates(failure, async () => {
+      const listed = await (await thread()).list(allScope === true ? { all_scope: true } : {})
+      const rows = Reflect.get(Object(listed), "threads")
+      return Array.isArray(rows) ? rows : []
+    })
   if (options.principal.kind === "session") {
     const caller = { kind: "session", id: options.principal.session_id } as const
     return {
       members: {
         "threads.resolve": async (input) => {
           const decided = await (await thread()).resolveThread(input, caller)
-          if (decided.kind === "error") return sessionRefusal(sessionFailure(decided.error))
+          if (decided.kind === "error") return await candidateRefusal(sessionFailure(decided.error), input.all_scope)
           return { kind: "ok", thread: decided.thread, id: decided.id, device: decided.device }
         },
         "threads.locate": async (input) => {
           const located = await (await thread()).locate(input, caller)
-          if (located.kind === "error") return sessionRefusal(sessionFailure(located.error))
+          if (located.kind === "error") return await candidateRefusal(sessionFailure(located.error), input.all_scope)
           const { endpoint: _endpoint, session_path: _path, ...shown } = located.thread
           return { kind: "ok", thread: shown.address ?? shown.thread_id, located: shown }
         },
         "devices.resolve": async (input) => {
           const resolved = await resolveDevice(options.ports?.remote, input.device)
-          return resolved.kind === "error" ? sessionRefusal(resolved) : { kind: "ok", value: { id: resolved.value.id } }
+          return resolved.kind === "error"
+            ? await candidateRefusal(resolved)
+            : { kind: "ok", value: { id: resolved.value.id } }
         },
       },
       releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }),
@@ -234,13 +228,16 @@ export function threadsNamespace(options: {
     },
     "threads.locate": async (input) => {
       const located = await (await thread()).locate(input)
-      if (located.kind === "error") return threadFailure(located.error)
+      if (located.kind === "error") return await candidateRefusal(threadFailure(located.error), input.all_scope)
       return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
     },
-    "devices.resolve": async (input) => await resolveDevice(options.ports?.remote, input.device),
+    "devices.resolve": async (input) => {
+      const resolved = await resolveDevice(options.ports?.remote, input.device)
+      return resolved.kind === "error" ? await candidateRefusal(resolved) : resolved
+    },
     "threads.resolve": async (input) => {
       const decided = await (await thread()).resolveThread(input)
-      if (decided.kind === "error") return threadFailure(decided.error)
+      if (decided.kind === "error") return await candidateRefusal(threadFailure(decided.error), input.all_scope)
       const remote = options.ports?.remote
       if (remote === undefined) return NO_ACCOUNT
       // Design lane ruling A: the row is the account listing's row for the id the one resolver decided, read by that id.
