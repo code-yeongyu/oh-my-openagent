@@ -151,6 +151,8 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     wake: async (device, durableId, rpc) =>
       (await (await load()).wake?.(device, durableId, rpc)) ?? { kind: "unavailable" },
     canWake: async () => (await (await load()).canWake?.()) === true,
+    receipt: async (device, durableId, deliveryId) =>
+      (await (await load()).receipt?.(device, durableId, deliveryId)) ?? { kind: "unavailable" },
     close: async () => {
       client.close()
       const loaded = port

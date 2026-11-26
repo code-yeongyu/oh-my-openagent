@@ -1,0 +1,304 @@
+{
+  "domain": "config",
+  "rows": [
+    {
+      "id": "config.check",
+      "kind": "reserved",
+      "sdk": "config.check",
+      "today": "no",
+      "slices": [
+        "reserved"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.edit",
+      "kind": "reserved",
+      "sdk": "config.edit",
+      "today": "no",
+      "slices": [
+        "reserved"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.explain",
+      "kind": "reserved",
+      "sdk": "config.explain",
+      "today": "no",
+      "slices": [
+        "reserved"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.migrate",
+      "kind": "capability",
+      "sdk": "config.migrate",
+      "today": "no",
+      "slices": [
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "config",
+            "migrate"
+          ],
+          "flags": {
+            "--dry-run": "dry_run=true",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1a)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.modelCapabilities.refresh",
+      "kind": "capability",
+      "sdk": "config.modelCapabilities.refresh",
+      "today": "no",
+      "slices": [
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "refresh-model-capabilities"
+          ],
+          "flags": {
+            "-d": "directory",
+            "--directory": "directory",
+            "--source-url": "source_url",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1a)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.modelSwaps",
+      "kind": "reserved",
+      "sdk": "config.modelSwaps",
+      "today": "no",
+      "slices": [
+        "reserved"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.revert",
+      "kind": "reserved",
+      "sdk": "config.revert",
+      "today": "no",
+      "slices": [
+        "reserved"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "config.status",
+      "kind": "capability",
+      "sdk": "config.status",
+      "today": "yes",
+      "slices": [
+        "shipped"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "CLI planned only if #14366 asks for a verb",
+        "cli": "CLI omitted: omo doctor prints it in its WARN config: lines, through diagnostics.run"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "position": 6,
+      "ids": [
+        "config.migrate"
+      ],
+      "cells": [
+        "`config.migrate({ dry_run? })`: with `dry_run`, the transform, the backup move plan and the conflicts; without, what was applied",
+        "`config migrate [--dry-run] [--json]`",
+        "**no**",
+        "Planned (OC1a)",
+        "OC1a"
+      ]
+    },
+    {
+      "table": "6.11",
+      "position": 7,
+      "ids": [
+        "config.modelCapabilities.refresh"
+      ],
+      "cells": [
+        "`config.modelCapabilities.refresh({ directory?, source_url? })`, over `packages/model-core`",
+        "`refresh-model-capabilities [-d\\|--directory] [--source-url] [--json]`",
+        "**no**",
+        "Planned (OC1a)",
+        "OC1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 1,
+      "ids": [
+        "config.status"
+      ],
+      "cells": [
+        "`config.status()`",
+        "`omo doctor` (its `WARN config:` lines)",
+        "none",
+        "yes",
+        "CLI planned only if #14366 asks for a verb",
+        "shipped"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 2,
+      "ids": [
+        "config.explain",
+        "config.check",
+        "config.edit",
+        "config.revert",
+        "config.modelSwaps"
+      ],
+      "cells": [
+        "`config.explain`, `.check`, `.edit`, `.revert`, `.modelSwaps`: **reserved names, not a parity row**. No CLI verb and no tool has them today, so nothing here is a gap and the zero-gap gate does not count them. The registry lists them as `reserved`; when #14366 adds a surface for any of them, rule 5 applies to that pull request",
+        "none",
+        "none",
+        "no",
+        "Not applicable",
+        "reserved (#14366, outside this program)"
+      ]
+    }
+  ]
+}

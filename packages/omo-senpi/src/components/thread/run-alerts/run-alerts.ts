@@ -1,10 +1,15 @@
 import type { ResolvedErrorStreakSettings } from "@oh-my-opencode/omo-config-core"
 
-import type { AgentEndFacts } from "../gateway/completion"
 import { PAIR_BUCKET_REFILL_MS } from "../gateway/constants"
 import type { ThreadToolResult } from "../contracts"
 import type { ThreadSendAs } from "../tools"
-import { createErrorStreakDetector, runEndOf, type ErrorStreakEvent, type RunEnd } from "./error-streak"
+import {
+  createErrorStreakDetector,
+  runEndOf,
+  type AgentEndFacts,
+  type ErrorStreakEvent,
+  type RunEnd,
+} from "./error-streak"
 
 const ALERT_REQUEST_TIMEOUT_MS = 10_000
 const ALERT_WEBHOOK_RETRY_DELAY_MS = 2_000
@@ -43,8 +48,8 @@ const defaultDelay = (ms: number) =>
   })
 
 /**
- * Error-streak alerts (#14430): each settled run's outcome (the last `agent_end` before `agent_settled`, as completions
- * read it) feeds the detector; an alert goes to every configured thread through thread_send, as the failing session, and
+ * Error-streak alerts (#14430): each settled run's outcome (the last `agent_end` before `agent_settled`) feeds the
+ * detector; an alert goes to every configured thread through thread_send, as the failing session, and
  * to the configured webhook. An alert carries metadata only: names, ids, counts, error classes, times, provider and model,
  * never prompt text, tool output or message content.
  */

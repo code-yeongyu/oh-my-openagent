@@ -1,0 +1,759 @@
+{
+  "domain": "install",
+  "rows": [
+    {
+      "id": "install.cleanup",
+      "kind": "capability",
+      "sdk": "install.cleanup",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "platform": {
+            "enum": [
+              "opencode",
+              "codex",
+              "both",
+              "native",
+              "native-dev"
+            ]
+          },
+          "codex_home": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "cleanup"
+          ],
+          "flags": {
+            "--platform": "platform",
+            "--codex-home": "codex_home",
+            "--project": "project",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "uninstall"
+          ],
+          "flags": {
+            "--platform": "platform",
+            "--codex-home": "codex_home",
+            "--project": "project",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC2)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.localVersion",
+      "kind": "capability",
+      "sdk": "install.localVersion",
+      "today": "no",
+      "slices": [
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "get-local-version"
+          ],
+          "flags": {
+            "-d": "directory",
+            "--directory": "directory",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC1a)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.plugin",
+      "kind": "capability",
+      "sdk": "install.plugin",
+      "today": "no",
+      "slices": [
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "interactive": {
+            "type": "boolean"
+          },
+          "platform": {
+            "enum": [
+              "opencode",
+              "codex",
+              "both",
+              "native",
+              "native-dev"
+            ]
+          },
+          "claude": {
+            "enum": [
+              "no",
+              "yes",
+              "max20"
+            ]
+          },
+          "openai": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "gemini": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "copilot": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "opencodeZen": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "zaiCodingPlan": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "kimiForCoding": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "opencodeGo": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "bailianCodingPlan": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "minimaxCnCodingPlan": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "minimaxCodingPlan": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "vercelAiGateway": {
+            "enum": [
+              "no",
+              "yes"
+            ]
+          },
+          "codex_autonomous": {
+            "type": "boolean"
+          },
+          "skip_auth": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "interactive",
+          "skip_auth"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "install"
+          ],
+          "flags": {
+            "--no-tui": "interactive=false",
+            "--platform": "platform",
+            "--codex-autonomous": "codex_autonomous=true",
+            "--no-codex-autonomous": "codex_autonomous=false",
+            "--skip-auth": "skip_auth=true",
+            "--claude": "claude",
+            "--openai": "openai",
+            "--gemini": "gemini",
+            "--copilot": "copilot",
+            "--opencode-zen": "opencodeZen",
+            "--zai-coding-plan": "zaiCodingPlan",
+            "--kimi-for-coding": "kimiForCoding",
+            "--opencode-go": "opencodeGo",
+            "--bailian-coding-plan": "bailianCodingPlan",
+            "--minimax-cn-coding-plan": "minimaxCnCodingPlan",
+            "--minimax-coding-plan": "minimaxCodingPlan",
+            "--vercel-ai-gateway": "vercelAiGateway"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "setup"
+          ],
+          "flags": {
+            "--no-tui": "interactive=false",
+            "--platform": "platform",
+            "--codex-autonomous": "codex_autonomous=true",
+            "--no-codex-autonomous": "codex_autonomous=false",
+            "--skip-auth": "skip_auth=true",
+            "--claude": "claude",
+            "--openai": "openai",
+            "--gemini": "gemini",
+            "--copilot": "copilot",
+            "--opencode-zen": "opencodeZen",
+            "--zai-coding-plan": "zaiCodingPlan",
+            "--kimi-for-coding": "kimiForCoding",
+            "--opencode-go": "opencodeGo",
+            "--bailian-coding-plan": "bailianCodingPlan",
+            "--minimax-cn-coding-plan": "minimaxCnCodingPlan",
+            "--minimax-coding-plan": "minimaxCodingPlan",
+            "--vercel-ai-gateway": "vercelAiGateway"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [],
+          "flags": {
+            "--platform": "platform"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installs the plugin into an editor on this machine, a person's flow"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.sdkRoot",
+      "kind": "capability",
+      "sdk": "install.sdkRoot",
+      "today": "no",
+      "slices": [
+        "C1c"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {
+        "cli": "C1c"
+      },
+      "omitted": {
+        "tool": "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.setup.apply",
+      "kind": "capability",
+      "sdk": "install.setup.apply",
+      "today": "no",
+      "slices": [
+        "C1c"
+      ],
+      "input": {
+        "properties": {
+          "plan": {
+            "type": "object",
+            "required": [
+              "inventory",
+              "stages"
+            ],
+            "properties": {
+              "inventory": {
+                "type": "object",
+                "required": [
+                  "harnesses"
+                ],
+                "properties": {
+                  "harnesses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installed",
+                        "providers",
+                        "credentialTypes",
+                        "modelHint",
+                        "notices",
+                        "importableCount"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        },
+                        "providers": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "credentialTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "modelHint": {
+                          "type": "string"
+                        },
+                        "notices": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "importableCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "description"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "consent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "all"
+              },
+              {
+                "type": "string",
+                "const": "each"
+              }
+            ]
+          }
+        },
+        "required": [
+          "consent",
+          "plan"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "setup"
+          ],
+          "flags": {
+            "--yes": "consent=all",
+            "--ask-each": "consent=each"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: plan, consent, write is a person's flow"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "With neither flag the command asks once and, when accepted, applies every stage: that is consent all, the prompt being the adapter's rendering; --yes is the same call with the prompt answered. A declined prompt makes no call."
+    },
+    {
+      "id": "install.setup.detect",
+      "kind": "capability",
+      "sdk": "install.setup.detect",
+      "today": "no",
+      "slices": [
+        "C1c"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: plan, consent, write is a person's flow",
+        "cli": "CLI omitted: omo setup detects before it plans and applies, through install.setup.apply"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.setup.plan",
+      "kind": "capability",
+      "sdk": "install.setup.plan",
+      "today": "no",
+      "slices": [
+        "C1c"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "setup"
+          ],
+          "flags": {
+            "--dry-run": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: plan, consent, write is a person's flow"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.update",
+      "kind": "capability",
+      "sdk": "install.update",
+      "today": "no",
+      "slices": [
+        "C1c"
+      ],
+      "input": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "update"
+          ],
+          "flags": {
+            "--dry-run": "dry_run=true",
+            "--print": "dry_run=true",
+            "--self": "when",
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {
+            "target": "when"
+          },
+          "values": [
+            "self",
+            "senpi",
+            "omo"
+          ]
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: replaces the binary the session runs on"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "install.version",
+      "kind": "capability",
+      "sdk": "install.version",
+      "today": "no",
+      "slices": [
+        "C1c",
+        "OC1a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [],
+          "flags": {
+            "--version": "when",
+            "-v": "when"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "version"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [],
+          "flags": {
+            "-v": "when",
+            "--version": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "position": 1,
+      "ids": [
+        "install.plugin"
+      ],
+      "cells": [
+        "`install.plugin({ interactive, platform?, claude?, openai?, copilot?, opencodeZen?, zaiCodingPlan?, kimiForCoding?, opencodeGo?, bailianCodingPlan?, vercelAiGateway?, and the three further provider inputs of `InstallArgs`, codex_autonomous?, skip_auth })`. `claude` is `no`, `yes` or `max20`; every other provider input is `no` or `yes`; each is its own typed field. The registry holds no placeholder for them: it enumerates the twelve provider keys of `InstallArgs` (`C/types.ts:3-21`) mechanically, checks each against its Commander option (`C/cli-program.ts:57-76`) and its mapping (`C/install-command-options.ts:38-55`), freezes all twelve as rows in P0's baseline, and requires a scenario per key and value. This document's prose abbreviates three of the twelve names; the registry does not. `platform` is `opencode`, `codex`, `both`, `native` or `native-dev`; it defaults to `codex` when the binary is invoked as that edition, and `native-dev` is refused unless the release enables it (`C/install-command-options.ts:23-36`). `codex_autonomous` has three input cases, kept as they are today: `true` configures that platform's autonomous permissions; `false` leaves the existing permission settings unchanged (`C/cli-program.ts:74-76`); absent takes the mode's default, which in a non-interactive install for that platform is to configure them (`C/install-validators.ts:244`) and in an interactive one is the prompt's answer. Each case is a scenario, and the contract is one the security design reviews. The call answers what it installed and wrote per platform",
+        "`install` (alias `setup`) `[--no-tui] [one flag per provider input] [--codex-autonomous \\| --no-codex-autonomous] [--skip-auth]`, with the root option `--platform`",
+        "**no**",
+        "Planned (OC1a). The interactive prompts are a renderer over the same call",
+        "OC1a"
+      ]
+    },
+    {
+      "table": "6.11",
+      "position": 4,
+      "ids": [
+        "install.version"
+      ],
+      "cells": [
+        "`install.version()`",
+        "`version`; the root option `--version`, `-v`",
+        "**no**",
+        "Planned (OC1a), with the edition's own version projection",
+        "OC1a"
+      ]
+    },
+    {
+      "table": "6.11",
+      "position": 5,
+      "ids": [
+        "install.localVersion"
+      ],
+      "cells": [
+        "`install.localVersion({ directory? })` answering the installed version, the latest published one, whether it is up to date, and the local-development or pinned mode",
+        "`get-local-version [-d\\|--directory] [--json]`",
+        "**no**",
+        "Planned (OC1a)",
+        "OC1a"
+      ]
+    },
+    {
+      "table": "6.11",
+      "position": 13,
+      "ids": [
+        "install.cleanup"
+      ],
+      "cells": [
+        "`install.cleanup({ platform?, codex_home?, project? })`, answering what it removed; `platform` is `codex`, the sub-command's value before the root option's",
+        "`cleanup` (alias `uninstall`) `[--platform] [--codex-home] [--project] [--json]`",
+        "**no**",
+        "Planned (OC2)",
+        "OC2"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 14,
+      "ids": [
+        "install.setup.detect",
+        "install.setup.plan",
+        "install.setup.apply"
+      ],
+      "cells": [
+        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent: \"all\" \\| \"each\" })`: `--yes` and the command with neither flag are both `all`, the second with the adapter rendering one confirmation whose refusal makes no call (`N/bin/lib/setup-import.js:72-96`); `--ask-each` is `each`",
+        "`omo setup [--yes] [--ask-each] [--dry-run]`",
+        "none",
+        "**no**",
+        "Tool omitted: plan, consent, write is a person's flow",
+        "C1c"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 15,
+      "ids": [
+        "install.update"
+      ],
+      "cells": [
+        "`install.update({ dry_run? })`. Flags it does not know are a usage refusal today (`--all`, `--force` alone), and stay one",
+        "`omo update [--dry-run \\| --print] [--self]`, and the `self`, `senpi`, `omo` targets (`N/bin/lib/update-args.js:23-52`)",
+        "none",
+        "**no**",
+        "Tool omitted: replaces the binary the session runs on",
+        "C1c"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 16,
+      "ids": [
+        "install.version",
+        "install.sdkRoot"
+      ],
+      "cells": [
+        "`install.version()`, `install.sdkRoot()`",
+        "`omo --version`, `-v`; `omo sdk root` (new)",
+        "none",
+        "**no**",
+        "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment",
+        "C1c"
+      ]
+    }
+  ]
+}

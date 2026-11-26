@@ -30,13 +30,19 @@ import {
 } from "./constants"
 import { pairLoopGuardMessage } from "../errors"
 import { backlogRefusal } from "./backlog"
+import { findDiskSessions } from "../address-book"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { isDevBuildRuntime, isSharedAgentDir, isSharedStoreFile } from "../../agent-home/dev-build-runtime"
+import {
+  isDevBuildRuntime,
+  isSharedAgentDir,
+  isSharedStoreFile,
+  isUnlaunchedSourceRun,
+} from "../../agent-home/dev-build-runtime"
 import {
   GATEWAY_MIGRATIONS,
   GATEWAY_READER_FLOOR_KEY,
@@ -62,6 +68,8 @@ import type {
   ReconcileOutcome,
   ReconcileRequest,
   RecordOutcomeRequest,
+  ReceiptOutcome,
+  RefusalNotice,
   RefusalReason,
   StoreRefusal,
 } from "./types"
@@ -107,9 +115,6 @@ const DELIVERY_COLUMNS = [
   "created_at",
   "updated_at",
   "expires_at",
-  "binding_id",
-  "binding_revision",
-  "actor_user_id",
   "ledger_id",
   "verbatim_text",
   "verbatim_display_text",
@@ -154,9 +159,6 @@ function rowFrom(record: SqlRow): DeliveryRow {
     created_at: Number(record.created_at),
     updated_at: Number(record.updated_at),
     expires_at: Number(record.expires_at),
-    binding_id: record.binding_id === null ? null : String(record.binding_id),
-    binding_revision: nullableNumber(record.binding_revision),
-    actor_user_id: record.actor_user_id === null ? null : String(record.actor_user_id),
     ledger_id: nullableString(record.ledger_id),
     verbatim_text: nullableString(record.verbatim_text),
     verbatim_display_text: nullableString(record.verbatim_display_text),
@@ -391,9 +393,6 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.created_at,
       row.updated_at,
       row.expires_at,
-      row.binding_id,
-      row.binding_revision,
-      row.actor_user_id,
       row.ledger_id ?? null,
       row.verbatim_text ?? null,
       row.verbatim_display_text ?? null,
@@ -458,11 +457,12 @@ async function recordReaderFloor(ctx: StoreContext): Promise<void> {
 }
 
 /**
- * An omob source build never moves the shared agent dir's store forward (#14382): every released session on the device
- * reads that store, and a schema only an unreleased build knows would lock them out.
+ * An omob source build, or a run from TypeScript source no launcher started (a bare `bun test`), never moves the shared
+ * agent dir's store forward (#14382): every released session on the device reads that store, and a schema only an
+ * unreleased build knows would lock them out.
  */
 function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
-  if (!isDevBuildRuntime()) return undefined
+  if (!isDevBuildRuntime() && !isUnlaunchedSourceRun(import.meta.url)) return undefined
   const stores = [gatewayRootDirectory, gatewayDatabasePath]
   // The configured agent dir or its gateway dir or database linked into a shared one; or the file the worker actually
   // opened, compared by identity with each shared database wherever that database lives (#14622 review M9).
@@ -566,7 +566,7 @@ type ReceiptRetry = Pick<EnqueueRequest, "now" | "sender_principal" | "endpoint_
   readonly receipt: Pick<EnqueueRequest["receipt"], "idempotency_key" | "args_hash">
 }
 
-/** How a retry under an existing delivery receipt is answered: a send's retry and a closed binding's replayed event both come here. */
+/** How a retry under an existing delivery receipt is answered. */
 function classifyReceipt(ctx: StoreContext, request: ReceiptRetry, receipt: ReceiptRecord): EnqueueOutcome {
   if (receipt.args_hash !== request.receipt.args_hash) {
     return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
@@ -679,7 +679,10 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   return placement
 }
 
-function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
+function takePairToken(
+  ctx: StoreContext,
+  request: Pick<EnqueueRequest, "rate_principal" | "sender_principal" | "target_durable_id" | "now">,
+): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
   const bucket = ctx.sql.one(
     ["tokens", "updated_at"],
@@ -714,33 +717,6 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
     [sender, request.target_durable_id, tokens - 1, request.now],
   )
   return undefined
-}
-
-function checkBinding(
-  ctx: StoreContext,
-  request: EnqueueRequest,
-): { readonly expires_at: number | null } | StoreRefusal {
-  if (request.binding === null) return { expires_at: null }
-  const binding = ctx.sql.one(
-    ["revision", "status", "session_durable_id", "direction_inbound", "expires_at"],
-    "SELECT revision, status, session_durable_id, direction_inbound, expires_at FROM bindings WHERE binding_id = ?",
-    [request.binding.binding_id],
-  )
-  const expiresAt =
-    binding?.expires_at === null || binding?.expires_at === undefined ? null : Date.parse(String(binding.expires_at))
-  if (
-    binding === undefined ||
-    binding.status !== "active" ||
-    Number(binding.revision) !== request.binding.revision ||
-    String(binding.session_durable_id) !== request.target_durable_id ||
-    Number(binding.direction_inbound) !== 1 ||
-    (expiresAt !== null && expiresAt <= request.now)
-  ) {
-    return refused("invalid_arguments", "The binding is not active for this session at this revision.", {
-      binding: request.binding.binding_id,
-    })
-  }
-  return { expires_at: expiresAt }
 }
 
 /** What only the intake adds to an enqueue: the row's ledger fields, and the answer its receipt completes with in the same commit. */
@@ -791,11 +767,6 @@ export async function enqueue(
       ctx.sql.exec(commitSql)
       committed = true
       return outcome
-    }
-    const binding = checkBinding(ctx, request)
-    if ("kind" in binding) {
-      rollbackQuietly(ctx)
-      return binding
     }
     // Expired queued rows of this target are refused first, so neither a collapse nor the cap counts them (#14466).
     const expired = refuseExpiredQueued(ctx, request.now, RETENTION_SWEEP_BATCH, request.target_durable_id)
@@ -877,10 +848,7 @@ export async function enqueue(
       hop: placement.hop,
       created_at: request.now,
       updated_at: request.now,
-      expires_at: Math.min(request.now + QUEUED_TTL_MS, binding.expires_at ?? Number.POSITIVE_INFINITY),
-      binding_id: request.binding?.binding_id ?? null,
-      binding_revision: request.binding?.revision ?? null,
-      actor_user_id: "external" in request.origin ? (request.origin.external.author?.user_id ?? null) : null,
+      expires_at: request.now + QUEUED_TTL_MS,
       ledger_id: intakeFields?.ledger_id ?? null,
       verbatim_text: intakeFields?.verbatim_text ?? null,
       verbatim_display_text: intakeFields?.verbatim_display_text ?? null,
@@ -1132,6 +1100,197 @@ function transition(
   }
 }
 
+/** The caller holds the write lock; unresolved claims never expire by time alone. */
+function currentReceiptOutcome(ctx: StoreContext, row: DeliveryRow | undefined, now: number): ReceiptOutcome {
+  if (row === undefined) return { kind: "outcome_unavailable" }
+  switch (row.state) {
+    case "applied":
+    case "admitted":
+      return { kind: row.state }
+    case "admitting":
+    case "uncertain":
+      return { kind: "outcome_unavailable" }
+    case "refused":
+      switch (row.reason) {
+        case "expired":
+        case "target_closed":
+        case "turn_conflict":
+        case "not_steerable":
+          return { kind: "refused", reason: row.reason }
+        default:
+          return { kind: "outcome_unavailable" }
+      }
+    case "queued":
+      if (row.expires_at > now) return { kind: "pending" }
+      // A local message cannot reach an engine without a claim. If a previous claim existed,
+      // only reconciliation with its application evidence can establish non-delivery.
+      if (row.attempt !== 0 || row.admitted_by !== null) return { kind: "outcome_unavailable" }
+      transition(ctx, row, "refused", now, { reason: "expired" })
+      unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+      return { kind: "refused", reason: "expired" }
+  }
+}
+
+export type ReceiptOutcomeRequest = {
+  readonly now: number
+  /** Authenticated principal, never the session claimed in a relayed message body. */
+  readonly principal: string
+  readonly delivery_id: string
+  readonly target_durable_id: string
+  /** Receiver-owned path resolved by the local consumer; never a wire field. */
+  readonly session_path?: string
+}
+
+/** Bounded refusal-only candidates. A claim below, after authorization, owns each notice once. */
+export function refusalNotices(ctx: StoreContext, now: number): readonly RefusalNotice[] {
+  const rows = ctx.sql
+    .all(
+      DELIVERY_COLUMNS,
+      `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE state = 'refused' AND reason IN ('expired', 'not_steerable', 'turn_conflict', 'target_closed') AND ledger_id IS NOT NULL AND updated_at > ? AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.operation = 'outcome_notice' AND r.delivery_id = deliveries.delivery_id) ORDER BY updated_at LIMIT 32`,
+      [now - GATEWAY_RECEIPT_RETENTION_MS],
+    )
+    .map(rowFrom)
+  return rows.flatMap((row) => {
+    const outcome = currentReceiptOutcome(ctx, row, now)
+    if (outcome.kind !== "refused" || !row.sender.startsWith("device:") || !("session" in row.envelope.origin))
+      return []
+    const prefix = `${row.sender}/`
+    if (!row.ledger_id?.startsWith(prefix)) return []
+    return [
+      {
+        row_id: row.delivery_id,
+        delivery_id: row.ledger_id.slice(prefix.length),
+        device: row.sender.slice("device:".length),
+        session: row.envelope.origin.session,
+        target_durable_id: row.target_durable_id,
+        reason: outcome.reason,
+      },
+    ]
+  })
+}
+
+/** Uses the existing durable pair bucket and receipt retention; a lost notice is repaired by query. */
+export async function claimRefusalNotice(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly notice: RefusalNotice; readonly suppress?: boolean },
+): Promise<boolean> {
+  return await transaction(ctx, "claim_outcome_notice", () => {
+    const n = request.notice
+    const row = selectRow(ctx, n.row_id)
+    if (
+      row === undefined ||
+      row.state !== "refused" ||
+      row.reason !== n.reason ||
+      row.sender !== `device:${n.device}` ||
+      row.ledger_id !== `device:${n.device}/${n.delivery_id}` ||
+      row.target_durable_id !== n.target_durable_id ||
+      !("session" in row.envelope.origin) ||
+      row.envelope.origin.session !== n.session
+    )
+      return false
+    const key = `outcome-notice:${n.device}`
+    if (
+      ctx.sql.one(
+        ["delivery_id"],
+        "SELECT delivery_id FROM receipts WHERE principal = ? AND operation = 'outcome_notice' AND idempotency_key = ?",
+        [key, n.row_id],
+      ) !== undefined
+    )
+      return false
+    if (
+      !request.suppress &&
+      takePairToken(ctx, { now: request.now, sender_principal: "outcome-notice", target_durable_id: n.device }) !==
+        undefined
+    )
+      return false
+    write(
+      ctx,
+      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, 'outcome_notice', ?, ?, 'completed', ?, ?, ?, ?, ?)",
+      [
+        key,
+        n.row_id,
+        n.reason,
+        n.row_id,
+        ctx.config.instance_id,
+        request.now,
+        request.now,
+        request.now + GATEWAY_RECEIPT_RETENTION_MS,
+      ],
+    )
+    return true
+  })
+}
+
+/** Query-only. It writes no receipt, admission, marker, or wake, even after retention. */
+export async function receiptOutcome(ctx: StoreContext, request: ReceiptOutcomeRequest): Promise<ReceiptOutcome> {
+  const key = request.principal.startsWith("device:")
+    ? `${request.principal}/${request.delivery_id}`
+    : request.delivery_id
+  const find = () =>
+    selectRows(ctx, "sender = ? AND target_durable_id = ? AND (delivery_id = ? OR ledger_id = ?)", [
+      request.principal,
+      request.target_durable_id,
+      key,
+      key,
+    ])[0]
+  const before = find()
+  if (before === undefined) {
+    // A live RPC admission bypasses intake. Its engine-stamped, device-scoped transcript ID is
+    // still authoritative application evidence; absence proves neither expiry nor admission.
+    if (request.principal.startsWith("device:") && request.session_path !== undefined) {
+      try {
+        if (sessionHasToken(request.session_path, key, new Map())) return { kind: "applied" }
+      } catch {
+        return { kind: "outcome_unavailable" }
+      }
+    }
+    return { kind: "outcome_unavailable" }
+  }
+  const remember = (row: DeliveryRow, outcome: ReceiptOutcome): ReceiptOutcome => {
+    if (!request.principal.startsWith("session:")) return outcome
+    write(
+      ctx,
+      "UPDATE receipts SET result = json_set(result, '$.outcome', json(?)), updated_at = ? WHERE principal = ? AND operation = 'deliver' AND delivery_id = ? AND status = 'completed' AND expires_at > ? AND json_extract(result, '$.kind') = 'ok' AND COALESCE(json_extract(result, '$.outcome'), '') != ?",
+      [JSON.stringify(outcome), request.now, request.principal, row.delivery_id, request.now, JSON.stringify(outcome)],
+    )
+    return outcome
+  }
+  // A terminal fact needs no filesystem observation and is immutable.
+  if (before.state === "applied" || before.state === "refused")
+    return await transaction(ctx, "receipt_outcome", () => {
+      const row = find()
+      return row === undefined
+        ? { kind: "outcome_unavailable" }
+        : remember(row, currentReceiptOutcome(ctx, row, request.now))
+    })
+  const paths =
+    request.session_path === undefined
+      ? findDiskSessions(join(ctx.config.agent_dir, "sessions"), before.target_durable_id, { id_only: true })
+      : [{ session_path: request.session_path }]
+  let written = false
+  if (paths.length === 1) {
+    try {
+      written = sessionHasToken(paths[0]?.session_path ?? null, engineKey(before), new Map())
+    } catch {
+      return { kind: "outcome_unavailable" }
+    }
+  }
+  return await transaction(ctx, "receipt_outcome", () => {
+    const row = find()
+    if (row === undefined) return { kind: "outcome_unavailable" }
+    if (row.state === "applied" || row.state === "refused")
+      return remember(row, currentReceiptOutcome(ctx, row, request.now))
+    if (row.state !== before.state || claimFingerprint(row) !== claimFingerprint(before))
+      return { kind: "outcome_unavailable" }
+    if (written) {
+      transition(ctx, row, "applied", request.now)
+      unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+      return remember(row, { kind: "applied" })
+    }
+    return remember(row, currentReceiptOutcome(ctx, row, request.now))
+  })
+}
+
 /**
  * Receiver barrier pass. Claimant liveness and the transcript are read BEFORE the lock (both can
  * be slow), then applied under `BEGIN IMMEDIATE` only to rows whose claim is still the one that
@@ -1338,69 +1497,6 @@ export async function abandonReceipt(
   )
 }
 
-/** `result` is the stored result of a completed receipt, null for one that has not recorded it. */
-export type DeliveryReceipt = {
-  readonly args_hash: string
-  readonly completed: boolean
-  readonly result: unknown
-  readonly target_durable_id: string
-  readonly binding_revision: number | null
-}
-
-/**
- * An unexpired delivery receipt with the facts of its row the receipt's arguments hash was taken
- * over; null otherwise. A plain read (no write lock): it lets a binding that has since closed still
- * answer a retry of an event it delivered. A receipt that has not recorded its result goes through
- * `recoverDelivery`.
- */
-export function deliveryReceipt(
-  ctx: StoreContext,
-  request: { readonly now: number; readonly principal: string; readonly idempotency_key: string },
-): DeliveryReceipt | null {
-  const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
-  if (receipt === undefined || receipt.expires_at <= request.now || receipt.delivery_id === null) return null
-  const row = selectRow(ctx, receipt.delivery_id)
-  if (row === undefined) return null
-  const completed = receipt.status === "completed" && receipt.result !== null
-  return {
-    args_hash: receipt.args_hash,
-    completed,
-    result: completed ? JSON.parse(receipt.result as string) : null,
-    target_durable_id: row.target_durable_id,
-    binding_revision: row.binding_revision,
-  }
-}
-
-/**
- * A retry under an existing delivery receipt, answered exactly as a retried send is
- * (`classifyReceipt`): a decided row replays its outcome and completes the receipt, an undecided one
- * stays in progress or uncertain. Admits nothing; null when no unexpired receipt exists.
- */
-export async function recoverDelivery(
-  ctx: StoreContext,
-  request: {
-    readonly now: number
-    readonly principal: string
-    readonly idempotency_key: string
-    readonly args_hash: string
-  },
-): Promise<EnqueueOutcome | null> {
-  return await transaction(ctx, "recover_delivery", () => {
-    const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
-    if (receipt === undefined || receipt.expires_at <= request.now) return null
-    return classifyReceipt(
-      ctx,
-      {
-        now: request.now,
-        sender_principal: request.principal,
-        endpoint_kind: null,
-        receipt: { idempotency_key: request.idempotency_key, args_hash: request.args_hash },
-      },
-      receipt,
-    )
-  })
-}
-
 export function deliveryView(
   ctx: StoreContext,
   deliveryId: string,
@@ -1426,12 +1522,7 @@ export function isReferenced(ctx: StoreContext, durableId: string): boolean {
     ])?.n ?? 0,
   )
   if (open > 0) return true
-  const bindings = Number(
-    ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM bindings WHERE session_durable_id = ? AND status = 'active'", [
-      durableId,
-    ])?.n ?? 0,
-  )
-  return bindings > 0 || markerNames(ctx, durableId).length > 0
+  return markerNames(ctx, durableId).length > 0
 }
 
 export function journalMode(ctx: StoreContext): string {
@@ -1522,9 +1613,6 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           created_at: Number.isFinite(accepted) ? accepted : now,
           updated_at: now,
           expires_at: now + QUEUED_TTL_MS,
-          binding_id: null,
-          binding_revision: null,
-          actor_user_id: null,
         })
         createMarker(ctx, item.target, deliveryId, true)
         count++

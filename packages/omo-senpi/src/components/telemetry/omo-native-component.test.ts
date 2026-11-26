@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, rmSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, spyOn, test } from "bun:test"
 
@@ -592,6 +592,8 @@ describe("OmO Native telemetry component integration", () => {
 
         // given: the opted-out process runs a full turn cycle and dies without session_shutdown
         const optedOut = register(env)
+        // The enabled-env helper seeds a recorded accept; an opted-out machine asserts it wrote nothing.
+        rmSync(join(stateDir, "consent-answer"), { force: true })
         const session = context("opted-out")
         await optedOut.dispatch("session_start", { type: "session_start", reason: "startup" }, session)
         await optedOut.dispatch(

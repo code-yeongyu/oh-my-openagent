@@ -50,10 +50,6 @@ const gateway = [
   ["lost-ack", "lost-ack.mjs"],
   ["adopt", "adopt.mjs"],
   ["draft-preservation", "draft-preservation.mjs"],
-  ["binding-author", "binding-author.mjs"],
-  ["report-origin", "report-origin.mjs"],
-  ["report-origin-steer", "report-origin-steer.mjs"],
-  ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
   ["default-delivery", "default-delivery.mjs"],
   ["busy-backlog", "busy-backlog.mjs"],
 ]
