@@ -50,6 +50,7 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("ax.typeText", "exec", "public"),
     ("stopPath.start", "exec", "hostOnly"),
     ("stopPath.status", "read", "public"),
+    ("session.viewerStatus", "read", "hostOnly"),
     ("stopPath.heartbeat", "read", "hostOnly"),
     ("stopPath.stop", "read", "public"),
     ("stopPath.resume", "exec", "hostOnly"),

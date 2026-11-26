@@ -49,6 +49,7 @@ export const ENGINE_METHODS = [
 	"ax.typeText",
 	"stopPath.start",
 	"stopPath.status",
+	"session.viewerStatus",
 	"stopPath.heartbeat",
 	"stopPath.stop",
 	"stopPath.resume",

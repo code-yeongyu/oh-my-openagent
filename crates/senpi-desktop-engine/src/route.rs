@@ -122,6 +122,10 @@ impl Engine {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Immediate(to_result(self.stop_paths().status())))
             }
+            Method::SessionViewerStatus => {
+                parse::<EmptyParams>(params)?;
+                Ok(Route::Immediate(to_result(self.session_status())))
+            }
             Method::StopPathStart => {
                 let chord = parse::<StopPathStartParams>(params)?.chord;
                 let chord = Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;

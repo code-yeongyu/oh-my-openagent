@@ -18,7 +18,7 @@ use crate::protocol_params::{
 };
 use crate::protocol_results::{
     AuditEvent, AxInputResult, ControlStateResult, EngineLog, EpochChanged, HelloResult, SessionOpenResult,
-    StopPathStatus,
+    SessionStatus, StopPathStatus,
 };
 use crate::report::ActionReport;
 use crate::types::{
@@ -127,6 +127,7 @@ method_table! {
     AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
+    SessionViewerStatus = "session.viewerStatus", Read, HostOnly, EmptyParams => SessionStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();
     StopPathStop = "stopPath.stop", Read, Public, StopPathStopParams => StopPathStatus;
     StopPathResume = "stopPath.resume", Exec, HostOnly, StopPathResumeParams => StopPathStatus;

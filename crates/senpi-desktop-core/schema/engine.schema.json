@@ -598,6 +598,17 @@
         "$ref": "#/definitions/StopPathStatus"
       }
     },
+    "session.viewerStatus": {
+      "effect": "read",
+      "hostOnly": true,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/EmptyParams"
+      },
+      "result": {
+        "$ref": "#/definitions/SessionStatus"
+      }
+    },
     "stopPath.heartbeat": {
       "effect": "read",
       "hostOnly": true,
@@ -2278,6 +2289,7 @@
         "ax.typeText",
         "stopPath.start",
         "stopPath.status",
+        "session.viewerStatus",
         "stopPath.heartbeat",
         "stopPath.stop",
         "stopPath.resume",
@@ -3231,6 +3243,57 @@
         "none"
       ],
       "description": "Which stop path currently guards input."
+    },
+    "SessionStatus": {
+      "type": "object",
+      "properties": {
+        "suspended": {
+          "type": "boolean"
+        },
+        "globalLive": {
+          "type": "boolean"
+        },
+        "hostRelayLive": {
+          "type": "boolean"
+        },
+        "heartbeatFresh": {
+          "type": "boolean"
+        },
+        "stopPath": {
+          "$ref": "#/definitions/StopPathKind"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why input is not allowed, when it is not (e.g. `no-global-listener`,\n`heartbeat-stale`)."
+        },
+        "pictureState": {
+          "$ref": "#/definitions/PictureState"
+        }
+      },
+      "required": [
+        "suspended",
+        "globalLive",
+        "hostRelayLive",
+        "heartbeatFresh",
+        "stopPath",
+        "pictureState"
+      ],
+      "description": "The status read, as distinct from a stop-path notification or a request to change the stop.",
+      "additionalProperties": false
+    },
+    "PictureState": {
+      "type": "string",
+      "enum": [
+        "available",
+        "secure_input",
+        "locked",
+        "permission_missing",
+        "unknown"
+      ],
+      "description": "Whether the backend permits displaying a result picture at the instant of the status read."
     },
     "StopPathStopParams": {
       "type": "object",

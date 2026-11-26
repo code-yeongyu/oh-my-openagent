@@ -40,12 +40,14 @@ pub(crate) fn warp(source: &CGEventSource, point: DesktopPoint) -> CoreResult<()
 /// Whether the interactive session sits behind the lock screen; an unreadable
 /// session dictionary counts as unlocked.
 pub(crate) fn screen_locked() -> CoreResult<bool> {
+    Ok(probe_screen_locked().unwrap_or(false))
+}
+
+pub(crate) fn probe_screen_locked() -> Option<bool> {
     // The generated no-argument session query is itself unsafe and returns a
     // +1 dictionary or null.
     let session = CGSessionCopyCurrentDictionary();
-    let Some(session) = session else {
-        return Ok(false);
-    };
+    let session = session?;
     // SAFETY: The session dictionary is a CFDictionary<CFType, CFType>.
     let session = unsafe {
         objc2_core_foundation::CFRetained::cast_unchecked::<
@@ -53,10 +55,10 @@ pub(crate) fn screen_locked() -> CoreResult<bool> {
         >(session)
     };
     let key = objc2_core_foundation::CFString::from_str("CGSSessionScreenIsLocked");
-    Ok(session
-        .get(&key)
-        .and_then(|value| value.downcast::<CFBoolean>().ok())
-        .is_some_and(|locked| locked.as_bool()))
+    match session.get(&key) {
+        None => Some(false),
+        Some(value) => value.downcast::<CFBoolean>().ok().map(|locked| locked.as_bool()),
+    }
 }
 
 fn finite(value: f64, name: &str) -> CoreResult<i32> {

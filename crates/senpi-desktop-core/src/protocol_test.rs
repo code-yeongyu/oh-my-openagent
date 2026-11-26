@@ -87,6 +87,7 @@ fn only_session_and_stop_path_controls_are_host_only() {
         string_set([
             "session.open",
             "session.close",
+            "session.viewerStatus",
             "control.grant",
             "control.revoke",
             "stopPath.start",
