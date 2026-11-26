@@ -1525,7 +1525,13 @@ const CITE_RULES: ReadonlyArray<readonly [RegExp, Cite]> = [
   [/^n-wheel-after-raise-/, D(128, "DwmFlush before pointer: doc numbers 6/6 lost -> 18/18, re-measured")],
   [/^n-affinity-/, D(393, "cover-window oracle reads > 0 -> hide_ack")],
   [/^n-uipi-/, D(151, "windows above the engine's integrity RID: UIPI drops input silently")],
-  [/^n-elevated-/, D(151, "windows above the engine's integrity RID: PermissionDenied{band}")],
+  [
+    /^n-elevated-/,
+    {
+      noClaim:
+        "the engine refuses windows above its integrity RID by policy (PermissionDenied{band}, elevated_target before any walk); the row records what the OS allows a Medium process",
+    },
+  ],
   [
     /^n-capture-.*-(display-off|disconnected|locked)$/,
     D(
@@ -3842,11 +3848,14 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (/\/i\.test\(reason\)|error\|timeout/.test(to))
         bad.push("toObs still guesses the kind from the reason's words")
       const cite = (id: string) => JSON.stringify(ROW_CITES[id])
-      if (
-        !/PermissionDenied/.test(cite("n-elevated-uia-read")) ||
-        /UIPI drops input/.test(cite("n-elevated-printwindow"))
-      )
-        bad.push("the elevated rows cite input dropping")
+      // the engine refuses elevated reads by policy, before any walk: what the OS allows a Medium process neither
+      // confirms nor contradicts that, so an allowed and a refused read both read NEW-EDGE
+      for (const id of ["n-elevated-printwindow", "n-elevated-wgc-window", "n-elevated-uia-read"]) {
+        if (/UIPI drops input/.test(cite(id))) bad.push(`${id} cites input dropping`)
+        for (const outcome of ["held", "broken"] as const)
+          if (rowVerdict(id, { kind: "MEASURED", data: { outcome, text: "m" } }).verdict !== "NEW-EDGE")
+            bad.push(`${id} judges a ${outcome} OS read against the engine's refusal policy`)
+      }
       for (const id of [
         "n-capture-wgc-monitor-display-off",
         "n-capture-printwindow-disconnected",
