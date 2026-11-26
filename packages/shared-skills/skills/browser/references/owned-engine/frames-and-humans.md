@@ -36,6 +36,7 @@ and the `dialog.url` getter). A listener can answer it itself, which replaces th
 dialog; a listener that only observes leaves it to the policy:
 
 ```js
+// given: page, omowright
 page.on("dialog", (dialog) => dialog.type() === "prompt" ? dialog.accept("42") : dialog.dismiss())
 ```
 
@@ -56,6 +57,7 @@ When every rung fails on a login, a one-time code, or a challenge you cannot cle
 the fallback, not the failure:
 
 ```js
+const flag = `${(await import("node:os")).tmpdir()}/signed-in-${Date.now()}.flag`
 await tool.monitor({ description: "sign-in finished", path: flag, event: "create" })   // subscribe first
 globalThis.handoff = omowright.requestHuman(page, {
   prompt: "Please finish the sign-in in this window.",

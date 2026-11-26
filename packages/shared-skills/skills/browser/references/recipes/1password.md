@@ -17,6 +17,7 @@ Therefore: borrow the existing tab, read, return it. Do not open, do not navigat
 "refresh to fix" anything.
 
 ```js
+// given: session (the attached session from SKILL.md)
 const { tabs } = await session.tabList({ scope: "user" })          // find the already-signed-in tab by URL
 const vault = tabs.find((t) => /my\.1password\.com\/(?:vaults|app)/.test(t.url))
 await session.tabBorrow(vault.tab_id)                               // the user confirms
@@ -47,6 +48,7 @@ Other automation may be driving the same window.
 ## If it is locked
 
 ```js
+const flag = `${(await import("node:os")).tmpdir()}/unlocked-${Date.now()}.flag`
 await tool.monitor({ description: "1Password unlocked", path: flag, event: "create" })   // subscribe first
 globalThis.help = session.requestHelp({ prompt: "Please unlock 1Password in this tab, then continue." })
   .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))
