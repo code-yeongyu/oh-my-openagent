@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process"
 import { offenderGrowth } from "../remote-import-guard-adapter"
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
-import { P0_CONTEXT } from "./conformance-run"
+import { PORT_CONTEXT } from "./conformance-run"
 import { REPO_ROOT } from "./registry"
 import type { Row } from "./schema"
 
@@ -76,8 +76,8 @@ export function registryBaseProblems(git: GitPort, head: HeadRecord, ref: string
   const open = new Set(head.unresolved.entries.map((entry) => entry.id))
   return {
     problems: [
-      ...baselineProblems({ ...head, context: P0_CONTEXT, atBase }),
-      ...conformanceProblems(head.rows, open, head.evidence, P0_CONTEXT),
+      ...baselineProblems({ ...head, context: PORT_CONTEXT, atBase }),
+      ...conformanceProblems(head.rows, open, head.evidence, PORT_CONTEXT),
     ],
   }
 }

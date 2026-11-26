@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
+import { normalizer } from "./normalize"
 import { REPO_ROOT } from "./registry"
 import { type CliScenario, type LoopParseScenario, type Scenario, SCENARIOS, type ToolScenario } from "./scenarios"
 import { discoverOmoTools, openToolSession } from "./tool-registry"
@@ -16,11 +17,6 @@ const ENTRY: Readonly<Record<CliScenario["surface"], string>> = {
   opencode: "packages/omo-opencode/src/cli/index.ts",
 }
 const CLI_BUDGET_MS = 30_000
-
-const normalizer =
-  (pairs: readonly (readonly [string, string])[]) =>
-  (text: string): string =>
-    pairs.reduce((acc, [from, to]) => acc.split(from).join(to), text).replace(/\u001b\[[0-9;]*m/g, "")
 
 async function runCli(tree: string, scenario: CliScenario): Promise<Outcome> {
   const sandbox = mkdtempSync(join(tmpdir(), "sdk-parity-cli-"))
