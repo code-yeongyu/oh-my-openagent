@@ -184,7 +184,14 @@ export type RunPorts = ProcessPorts & {
   readonly categoryCoverage?: () => Promise<Findings>
 }
 
+/** The engine's model catalog as the model view resolves from it: provider and id of every available model. */
+export type EngineModelsPort = {
+  readonly modelsList: () => Promise<readonly { readonly provider: string; readonly id: string }[]>
+}
+
 export type ModelsPorts = {
+  /** Construction-time only, like the process and host ports: a conformance run's fake; absent, the installed engine. */
+  readonly engine?: EngineModelsPort
   readonly agentDir?: string
   readonly cwd?: string
   readonly env?: Env

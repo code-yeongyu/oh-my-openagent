@@ -99,11 +99,14 @@ export async function models(_input = {}, ports = {}) {
     const runtime = await (ports.loadRuntime ?? loadRuntime)()
     const cwd = ports.cwd ?? process.cwd()
     const env = ports.env ?? process.env
-    const available = await engineAvailableModels({
-      agentDir: ports.agentDir ?? canonicalAgentDir(env),
-      cwd,
-      loadEngine: ports.loadEngine,
-    })
+    const available =
+      ports.engine === undefined
+        ? await engineAvailableModels({
+            agentDir: ports.agentDir ?? canonicalAgentDir(env),
+            cwd,
+            loadEngine: ports.loadEngine,
+          })
+        : await ports.engine.modelsList()
     return { kind: "ok", value: runtime.modelChains({ models: available, cwd, env }) }
   } catch (error) {
     return {
