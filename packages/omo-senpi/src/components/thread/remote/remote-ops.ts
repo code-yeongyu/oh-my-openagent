@@ -110,7 +110,7 @@ const isRecord = (value: unknown): value is JsonObject =>
 const READ_TAIL = 256
 
 /** The joined text of a transcript message entry, or undefined for anything that is not one. */
-const entryTextOf = (entry: JsonObject): string | undefined => {
+export const entryTextOf = (entry: JsonObject): string | undefined => {
   const message = isRecord(entry["message"]) ? entry["message"] : entry["role"] !== undefined ? entry : undefined
   if (message === undefined) return undefined
   const content = message["content"]
@@ -129,7 +129,7 @@ export const isUserEntry = (entry: JsonObject): boolean => {
 }
 
 /** The client message id senpi stamped on a stored user entry (`clientMessageId` on the message), if any. */
-const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
+export const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
   const message = isRecord(entry["message"]) ? entry["message"] : entry
   const id = message["clientMessageId"]
   return typeof id === "string" && id !== "" ? id : undefined

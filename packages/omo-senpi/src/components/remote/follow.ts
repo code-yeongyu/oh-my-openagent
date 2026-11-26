@@ -4,6 +4,14 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
+import {
+  answerEvents,
+  expectSend,
+  preSendOf,
+  SEND_TAIL,
+  type TranscriptFallback,
+  transcriptFallback,
+} from "./send-transcript"
 import type {
   AttachEvent,
   AttachHandle,
@@ -661,6 +669,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
 
   const follow = (thread: ThreadHandle, opts?: FollowOpts) => {
     let watch: SessionWatch | undefined
+    // An engine that stamps no id: the transcript at a run's settle decides the send's turn (send-transcript.ts).
+    let fallback: TranscriptFallback | undefined
     let finished = false
     const deadlineMs = opts?.deadlineMs ?? DEADLINES.followTotal
     const output = eventStream<FollowEvent>({ onStop: () => finish() })
@@ -671,6 +681,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
       output.end()
       cancelTimer()
       resyncEnd?.()
+      fallback?.stop()
       opts?.signal?.removeEventListener("abort", onAbort)
       watch?.stop()
     }
@@ -724,8 +735,10 @@ export function streamMembers(core: ClientCore): StreamMembers {
     // Its receipt may still be pending (F1): the attach opens at once and holds every record until the receipt is known.
     let from: SendReceipt | undefined
     let send: SendTurn | undefined
+    const awaitedSend = opts?.from === undefined ? undefined : expectSend(core, thread)
     const receipt = settledReceipt(opts?.from)
     void receipt.then((settled) => {
+      awaitedSend?.()
       if (settled.kind === "error") fail(settled)
     })
     // A re-attach's get_state that says the run is over ends the turn only if no record of the send follows it within
@@ -737,7 +750,11 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const seen = send.started
       if (seen && sessionClosed(event.record)) return finish({ kind: "end", outcome: { reason: "session_closed" } })
       const verdict = send.classify(event.record)
-      if (verdict === "other") return
+      if (verdict === "other") {
+        if (!seen && event.record["type"] === "agent_settled") fallback?.settled()
+        return
+      }
+      fallback?.stop()
       resyncEnd?.()
       resyncEnd = undefined
       // Another turn's records are never applied: its agent_end must not mark this turn interrupted.
@@ -781,6 +798,19 @@ export function streamMembers(core: ClientCore): StreamMembers {
       from = known.value
       send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
       turn = new SessionTurn()
+      const view = from === undefined ? undefined : preSendOf(from)
+      const attached = watch
+      const answered = from
+      if (send !== undefined && view !== undefined && answered !== undefined)
+        fallback = transcriptFallback(
+          view,
+          () => attached.handle.read({ tail: SEND_TAIL }),
+          (answer) => {
+            const { text, end } = answerEvents(answer, answered)
+            for (const event of text) output.push(event)
+            finish({ kind: "end", outcome: end })
+          },
+        )
       if (send !== undefined) {
         if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
         if (from?.lane === "queued" || from?.lane === "queued_offline")
