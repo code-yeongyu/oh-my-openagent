@@ -13,7 +13,9 @@ export type CanonicalizeLegacyHarnessBlocksResult = {
 }
 
 export function canonicalHarnessName(name: string): string {
-  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] : name
+  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name)
+    ? (OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] ?? name)
+    : name
 }
 
 export function harnessBlockKey(harness: string): string {

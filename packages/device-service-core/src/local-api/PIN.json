@@ -1,6 +1,6 @@
 {
   "upstream": "sisyphuslabs/omo-relay-daemon",
-  "upstreamCommit": "edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6",
+  "upstreamCommit": "88e58154bb592d781446a62a3d8d912769675079",
   "importRewrites": [
     {
       "from": "@sisyphuslabs/relay-spec/proto",
@@ -17,8 +17,8 @@
   "files": [
     {
       "upstreamPath": "packages/local-api/src/access.ts",
-      "sha256": "c7164f485ca8688f66192f452120484fd55b4174307e7c08ca5f9081226df05c",
-      "gitBlobSha1": "65dc77a54f148b1aee989abb8b4e87ca52dca7b3",
+      "sha256": "6205b8ba8f021bad5e400e3cf0adbd5db12aa1fd955bed5be5864247d1489015",
+      "gitBlobSha1": "d5a32b8abc47f6251a2add766fb892bb9d128f83",
       "importRewrite": false
     },
     {
@@ -53,8 +53,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/client-open.ts",
-      "sha256": "8d4411754d8ef5218820c82c5fa8adf5054127c5b8b6068d2c8b3d1739e01211",
-      "gitBlobSha1": "dcdfacaab9c3a86134a7e7e41170a4e997d3185c",
+      "sha256": "2ce3338b3938bcc87cc1f4398758bd8e0da07ce1ff10f68d6b6c45c6a4ae5011",
+      "gitBlobSha1": "5c9aa1976bcebc9967704e44375901add95a6d93",
       "importRewrite": false
     },
     {
@@ -71,14 +71,14 @@
     },
     {
       "upstreamPath": "packages/local-api/src/dacl.ts",
-      "sha256": "b1ca42c5d67389fe01d74c2de1d2b2f528c3701d81b09867ee7e243a66fd2b0e",
-      "gitBlobSha1": "3451ae02763fa05e01f88c1f7c9f52ff2e53f8dc",
+      "sha256": "23e1fe39e46421c9226e176fa21b38c377ad83488fd575841b4e30237ab1b0f2",
+      "gitBlobSha1": "9c83a40799bda1c2b34467743d13976a2cc7dc88",
       "importRewrite": false
     },
     {
       "upstreamPath": "packages/local-api/src/errors.ts",
-      "sha256": "3b3635a207b86728461e78b9b960495063104fa45237d366a2d637c427274b08",
-      "gitBlobSha1": "e578f6690fbee4ce4ae872d9130dc01f004d81c7",
+      "sha256": "478f1c8fd4bc37996b7a02cf7de7b93632c12117fdc009c8c21e458384e4b565",
+      "gitBlobSha1": "f0a3d90bb3cc2ecec6495bbccc85ca4058b54b64",
       "importRewrite": false
     },
     {
@@ -97,6 +97,18 @@
       "upstreamPath": "packages/local-api/src/listing.ts",
       "sha256": "a863e9d953b19af2f836448560c9ffae61732dfb8b4cd2fec8c25d30c6e3a0d9",
       "gitBlobSha1": "69fc6e14e246b05f8c8a4438632497a02f5cd3ad",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/policy.ts",
+      "sha256": "e19272fa6ec459e74b3d1dfdb8997d59d279e968a5b9782b613ec05898795cd8",
+      "gitBlobSha1": "46abf9ccbe02475a1fef7032c0f3c991abc23e35",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/powershell.ts",
+      "sha256": "d80aec14a3cd08907e8784392d4a4e805aeb39d1eb618adbcbc7667e83df7322",
+      "gitBlobSha1": "f30b4aeb07f5fb7786bff48d038e3e95d5b2c3fa",
       "importRewrite": false
     },
     {
@@ -131,8 +143,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/protocol-events.ts",
-      "sha256": "685c8f23cb3e2a9870bffc751bd7fc6b15bba2f789ee7a32804b1c2da100f471",
-      "gitBlobSha1": "dff9b94415f36aefc8ef32b963e4390bf9801d42",
+      "sha256": "e62dc0208a0951e1b45b0350a25cf28fa7898a9858e4fc5fbf188f3049e77b93",
+      "gitBlobSha1": "0fba1de33448bd4cf680371cf8f1d95b8e5d38ef",
       "importRewrite": false
     },
     {
@@ -155,8 +167,14 @@
     },
     {
       "upstreamPath": "packages/local-api/src/protocol.ts",
-      "sha256": "17f877eaffcf30b087a2bc4626fcf34f7cfa9a225f66ac0a60992d36e8a66a4a",
-      "gitBlobSha1": "94e742b899aafe40db5977d9cc8e0aa147afd367",
+      "sha256": "d77357c824507126a346afceb3942ab0097b6c792712ddbb57fc50b1cdd436cb",
+      "gitBlobSha1": "d9cf40c40e7e0bcf21622147debb0e6f8bf477dc",
+      "importRewrite": false
+    },
+    {
+      "upstreamPath": "packages/local-api/src/secure-windows.ts",
+      "sha256": "7ee6a90171ec5bfffca54c65d595ec63bb427f7837cccea3979bd04a92336e09",
+      "gitBlobSha1": "aa046e79cf059886fb24f1652d8e4a4c3ad1fe7b",
       "importRewrite": false
     },
     {
@@ -167,8 +185,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/transport.ts",
-      "sha256": "f3f9be0e16c69eae7b0475822fd2c04aab92d89162a4535336029a566e028d6a",
-      "gitBlobSha1": "4fe9d9769154d42013e439b15e07dcff7a262d05",
+      "sha256": "c40f8d00a2a50c14c1e0a7bc069e400b9e4abcd4116711ad80ecd5a4d100b89f",
+      "gitBlobSha1": "877cfb04392181182879c3c84924983a3b412c3b",
       "importRewrite": false
     },
     {
@@ -209,8 +227,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-listing-row.ts",
-      "sha256": "db65760a241e2ad4a71030c4eeddd8e89c06981aa2b25c19a102bb272ddccc06",
-      "gitBlobSha1": "8edbb88c61ca76542214526a31fc485c587d9088",
+      "sha256": "fbe85f3c60bafc72e66b2e27f3b4431226aa8002452df1f525b8ca2047bd1f47",
+      "gitBlobSha1": "87b154becbf09a3229438d9b1d9293edfd9bd48a",
       "importRewrite": true
     },
     {
@@ -233,8 +251,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-requests.ts",
-      "sha256": "6b702a924f6cda7bf319384fcaa9ec8b45629b5b3786ef7df2102a88f617a82b",
-      "gitBlobSha1": "6c0d57c20fea00b9790abaa28248115153da6233",
+      "sha256": "e038ad4001f9d324172a29a16488bfbd76ac7c88d23bd2f338e643f42dbc2fbc",
+      "gitBlobSha1": "6f8fc11239457e3e3d59b863afc437939cceb401",
       "importRewrite": true
     },
     {
@@ -251,8 +269,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/validate-shapes.ts",
-      "sha256": "e699047cad97ecc03ae0a1c758aaccc6a1244060bb3f4abfbcabad03d64bc9c0",
-      "gitBlobSha1": "1b3a6b1e6b082eec820dec84e1028e3e6ca4fd65",
+      "sha256": "e8cfe53aafc7de6df1e86092a08dbcc31f6ffc90e9d74449850a890bdb277b91",
+      "gitBlobSha1": "b1ce8ed0f337c8ec0d775d9eb88d1f7ce8620f5b",
       "importRewrite": true
     },
     {
@@ -281,8 +299,8 @@
     },
     {
       "upstreamPath": "packages/local-api/src/vocabulary.ts",
-      "sha256": "7b8d0828d59cf24b47cb777d2b6a95b30ac08541ab714dc1657820f820b44374",
-      "gitBlobSha1": "040f36dffb054b533610f97d52eaf0b44978e9a6",
+      "sha256": "49fb731bfd71b58519a4211b6599871db45a28c24b9f45aeb09e8f8fcf864f4d",
+      "gitBlobSha1": "03b5979ded9a95c133469eeaa4fd14f22700a5de",
       "importRewrite": false
     }
   ]

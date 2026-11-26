@@ -63,21 +63,41 @@ function busyHostCause(error: unknown, reopening: boolean): BusyHostCause | unde
   return undefined
 }
 
+/** What a connect to a host socket found: a listener, nobody listening, or a failure that says neither. */
+export type SocketProbe =
+  { readonly kind: "accepts" } | { readonly kind: "refused" } | { readonly kind: "unknown"; readonly reason: string }
+
+const NOBODY_LISTENS = new Set(["ECONNREFUSED", "ENOENT"])
+
 /**
- * Whether something still ACCEPTS a connection on the host socket. The kernel completes a Unix
- * socket connect from the listen backlog without the host's event loop, so a live host with a
- * blocked loop answers yes while a dead one (refused, or no socket entry) answers no.
+ * Connects to a host socket and closes without sending anything. The kernel completes a Unix socket connect from the
+ * listen backlog without the host's event loop, so a live host with a blocked loop still answers `accepts`, while a
+ * dead one is `refused` (refused, or no socket entry). A permission error or no answer in time is `unknown`.
  */
-export function socketAcceptsConnection(socketPath: string, timeoutMs = 2_000): Promise<boolean> {
+export function probeSocket(socketPath: string, timeoutMs = 2_000): Promise<SocketProbe> {
   return new Promise((resolve) => {
     const socket = createConnection(socketPath)
-    const finish = (accepted: boolean): void => {
+    const finish = (probe: SocketProbe): void => {
       clearTimeout(timer)
       socket.destroy()
-      resolve(accepted)
+      resolve(probe)
     }
-    const timer = setTimeout(() => finish(false), timeoutMs)
-    socket.once("connect", () => finish(true))
-    socket.once("error", () => finish(false))
+    const timer = setTimeout(
+      () => finish({ kind: "unknown", reason: `no answer within ${timeoutMs / 1000}s` }),
+      timeoutMs,
+    )
+    socket.once("connect", () => finish({ kind: "accepts" }))
+    socket.once("error", (error: NodeJS.ErrnoException) =>
+      finish(
+        error.code !== undefined && NOBODY_LISTENS.has(error.code)
+          ? { kind: "refused" }
+          : { kind: "unknown", reason: error.message },
+      ),
+    )
   })
+}
+
+/** Whether something still ACCEPTS a connection on the host socket (see `probeSocket`). */
+export async function socketAcceptsConnection(socketPath: string, timeoutMs = 2_000): Promise<boolean> {
+  return (await probeSocket(socketPath, timeoutMs)).kind === "accepts"
 }

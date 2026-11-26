@@ -8,6 +8,7 @@ import { fakeClock } from "../rpc/__fixtures__/clock"
 import { createHostSessionHandle } from "./handle"
 import { fakeSessionPort, FAKE_SESSION } from "./handle.test-support"
 import type { HostSessionLiveness } from "./handle-port"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 let clock: ReturnType<typeof fakeClock>
 afterEach(() => {
@@ -180,7 +181,7 @@ test("the parent observes unresponsive then running without a terminal completio
   const notices: string[] = []
   const runner = { start: async (spec: { taskId: string }) => ({ ...adaptRpcHandle(h.handle), task_id: spec.taskId }) }
   const options = {
-    store: createTaskRecordStore({ project_dir: project }),
+    store: createTaskRecordStore(ownedTaskState(project)),
     runners: { "in-process": runner, process: runner },
     planner: categoryPlanner(),
     config: settings(),

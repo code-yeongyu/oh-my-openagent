@@ -11,6 +11,7 @@ import type { ReviveDriftPolicy, ReviveGenerationWarning } from "../revive-polic
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { createConfigGenerationStampingStore } from "../../../../omo-senpi/src/components/task/config-generation-store"
 import { NO_HOST_ENDPOINT } from "../host-session"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export function coldReviveHarness(
   options: {
@@ -25,7 +26,7 @@ export function coldReviveHarness(
   } = {},
 ) {
   const project = tempProject()
-  const backing = createTaskRecordStore({ project_dir: project })
+  const backing = createTaskRecordStore(ownedTaskState(project))
   const record: TaskRecord = {
     ...createTaskRecord({
       parent_session_id: "parent",

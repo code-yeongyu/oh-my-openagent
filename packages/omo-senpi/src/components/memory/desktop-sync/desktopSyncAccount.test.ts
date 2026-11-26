@@ -189,3 +189,40 @@ describe("the desktop account ports for phrase keys (A3 part 2a)", () => {
     })
   })
 })
+
+describe("turning this device's sync off over the desktop channel (omo #14093)", () => {
+  const serviceOps = (sent: readonly DesktopSyncRequest[]) =>
+    sent
+      .filter((request) => request.op === "service")
+      .map((request) => ("data" in request ? (request.data as Record<string, unknown>)["op"] : undefined))
+
+  test("#given this device #when its sync is turned off #then main gets one disableDeviceSync request and the answer is ok", async () => {
+    const main = fakeMain("unsupported", { service: () => ({ kind: "json", status: 204, body: null }) })
+    const operation = await (await openDesktopSyncAccount(main.wire, "/unused")).forOperation(owner())
+    expect(await operation.pairing.disableDeviceSync("device-1")).toEqual({ ok: true })
+    expect(serviceOps(main.sent)).toEqual(["disableDeviceSync"])
+  })
+
+  test("#given the service refuses #when this device's sync is turned off #then the engine gets a typed refusal with the closed code", async () => {
+    const main = fakeMain("unsupported", {
+      service: () => ({ kind: "json", status: 404, body: { error: { code: "not_found" } } }),
+    })
+    const operation = await (await openDesktopSyncAccount(main.wire, "/unused")).forOperation(owner())
+    expect(await operation.pairing.disableDeviceSync("device-1")).toEqual({ ok: false, code: "not_found" })
+  })
+
+  test("#given a failing service #when this device's sync is turned off #then the call throws instead of reporting a refusal", async () => {
+    const main = fakeMain("unsupported", {
+      service: () => ({ kind: "json", status: 503, body: { error: { code: "internal" } } }),
+    })
+    const operation = await (await openDesktopSyncAccount(main.wire, "/unused")).forOperation(owner())
+    await expect(operation.pairing.disableDeviceSync("device-1")).rejects.toMatchObject({ status: 503 })
+  })
+
+  test("#given another device's id #when its sync is turned off #then nothing reaches the channel", async () => {
+    const main = fakeMain("unsupported")
+    const operation = await (await openDesktopSyncAccount(main.wire, "/unused")).forOperation(owner())
+    await expect(operation.pairing.disableDeviceSync("device-2")).rejects.toThrow()
+    expect(serviceOps(main.sent)).toEqual([])
+  })
+})

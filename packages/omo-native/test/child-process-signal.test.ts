@@ -334,3 +334,13 @@ await maybeReexecUnderBun({
     }, 30_000)
   })
 })
+
+describePosix("launcher child spawn failure", () => {
+  test("#given a spawn that throws #when runChild starts the engine #then it rejects and leaves no signal listener behind", async () => {
+    const { runChild } = await import(CHILD_PROCESS_MODULE)
+    const signals = ["SIGTERM", "SIGHUP", "SIGINT", "SIGUSR1", "SIGUSR2"] as const
+    const before = signals.map((signal) => process.listenerCount(signal))
+    await expect(runChild(process.execPath, [], { stdio: ["bogus"] })).rejects.toThrow(/stdio/)
+    expect(signals.map((signal) => process.listenerCount(signal))).toEqual(before)
+  })
+})

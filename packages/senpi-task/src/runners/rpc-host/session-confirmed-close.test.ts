@@ -15,6 +15,7 @@ import { HostSessionClient } from "./session-client"
 import type { HostRpcClient } from "./session-transport"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 import { FAKE_HOST_CAPABILITIES } from "./__fixtures__/fake-host-probe"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const harness = sessionClientHarness()
 const clients: HostSessionClient[] = []
@@ -98,7 +99,7 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
   const project = tempProject()
   const runner = { start: async (spec: { taskId: string }) => ({ ...adaptRpcHandle(handle), task_id: spec.taskId }) }
   const manager = createTaskManager({
-    store: createTaskRecordStore({ project_dir: project }),
+    store: createTaskRecordStore(ownedTaskState(project)),
     runners: { "in-process": runner, process: runner },
     planner: categoryPlanner(),
     config: settings(),

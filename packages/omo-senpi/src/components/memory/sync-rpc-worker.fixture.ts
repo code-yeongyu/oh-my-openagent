@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createDeviceKeyring } from "../../../../memory-core/src/sync/keyring-port"
 import { createAccountHttp } from "../../../../memory-core/src/sync/account/http"
 import { createPairingHttp } from "../../../../memory-core/src/sync/account/pairing-http"
+import { disableSync } from "../../../../memory-core/src/sync/account/device-switch"
 import { enableSync } from "../../../../memory-core/src/sync/account/enable"
 import { joinAccount } from "../../../../memory-core/src/sync/account/join"
 import { approveDevice } from "../../../../memory-core/src/sync/account/approve"
@@ -67,6 +68,7 @@ const coordinator = registerSyncRpc(
     clock: { now: Date.now, sleep: () => new Promise<void>(() => {}) },
     runtime: {
       enableSync,
+      disableSync,
       approveDevice,
       joinAccount: (input) =>
         joinAccount({

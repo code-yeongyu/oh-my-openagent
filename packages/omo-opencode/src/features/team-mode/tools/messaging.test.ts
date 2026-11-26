@@ -143,6 +143,44 @@ function createImmediateTeamSendMessageTool(
   return createTeamSendMessageTool(config, client, { loadRuntimeState, dispatchTiming: IMMEDIATE_DISPATCH_TIMING })
 }
 
+type HeldRecipient = {
+  release(): boolean
+}
+
+const heldClocks: Array<{ mockRestore(): void }> = []
+
+// The blocker's post-dispatch hold lapses on the wall clock after
+// DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS. A loaded shard can spend longer than that
+// between the blocker and its release, and the queued wake then prunes the lapsed hold and
+// dispatches early. Freezing Date.now until release() makes the explicit release the only
+// way the hold ends.
+async function holdRecipientBehindBlocker(
+  fixture: { readonly memberTwoSessionId: string; readonly config: ReturnType<typeof createConfig> },
+  client: Parameters<typeof createProductionTeamSendMessageTool>[1],
+): Promise<HeldRecipient> {
+  const clock = spyOn(Date, "now").mockReturnValue(Date.now())
+  heldClocks.push(clock)
+  await dispatchInternalPrompt({
+    mode: "async",
+    client,
+    sessionID: fixture.memberTwoSessionId,
+    source: "test-blocker",
+    input: {
+      path: { id: fixture.memberTwoSessionId },
+      body: { parts: [{ type: "text", text: "blocker" }] },
+      query: { directory: resolveBaseDir(fixture.config) },
+    },
+  })
+  return {
+    release: () => {
+      const released = releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")
+      heldClocks.splice(heldClocks.indexOf(clock), 1)
+      clock.mockRestore()
+      return released
+    },
+  }
+}
+
 function createDeferred<T>(): Deferred<T> {
   let resolvePromise: Deferred<T>["resolve"] | undefined
   const promise = new Promise<T>((resolve) => {
@@ -173,6 +211,7 @@ async function waitForEvent<T>(
 
 afterEach(async () => {
   jest.useRealTimers()
+  for (const clock of heldClocks.splice(0)) clock.mockRestore()
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
@@ -620,17 +659,7 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
-      },
-    })
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
     await liveTool.execute(
       {
         teamRunId: fixture.teamRunId,
@@ -645,7 +674,7 @@ describe("createTeamSendMessageTool", () => {
     expect(unread.map((message) => message.body)).toEqual(["fallback ping"])
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(fallbackWakeDispatched.promise, "queued fallback mailbox wake")
     const injection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
@@ -736,17 +765,7 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
-      },
-    })
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
     await liveTool.execute(
       {
         teamRunId: fixture.teamRunId,
@@ -781,7 +800,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after cancelled fallback wake")
 
     // then
@@ -804,17 +823,7 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
-      },
-    })
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
     await liveTool.execute(
       {
         teamRunId: fixture.teamRunId,
@@ -847,7 +856,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after pending acknowledgement")
 
     // then
@@ -870,17 +879,7 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
-      },
-    })
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
     await liveTool.execute(
       {
         teamRunId: fixture.teamRunId,
@@ -911,7 +910,7 @@ describe("createTeamSendMessageTool", () => {
     expect(unreadBeforeWake.map((message) => message.body)).toEqual(["second fallback"])
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(secondWakeDispatched.promise, "second message fallback wake")
     const secondInjection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
@@ -943,17 +942,7 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
-      },
-    })
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
     await liveTool.execute(
       {
         teamRunId: fixture.teamRunId,
@@ -985,7 +974,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after recipient shutdown")
 
     // then
@@ -1010,17 +999,7 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
-      },
-    })
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
     await liveTool.execute(
       {
         teamRunId: fixture.teamRunId,
@@ -1049,7 +1028,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after team deletion")
 
     // then

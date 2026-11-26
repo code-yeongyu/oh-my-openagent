@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs"
 declare const require: (name: string) => any
-const { describe, expect, mock, test, beforeEach } = require("bun:test")
+const { afterAll, describe, expect, mock, test, beforeEach } = require("bun:test")
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { Member } from "../types"
+import { preserveModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
 const resolveCategoryExecutionMock = mock()
 const resolveSubagentExecutionMock = mock()
@@ -13,6 +14,11 @@ mock.module("./resolve-member-dependencies", () => ({
   resolveSubagentExecution: resolveSubagentExecutionMock,
   buildSystemContent: buildSystemContentMock,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member?resolve-member-test")
 
@@ -26,7 +32,6 @@ function createExecutorContext(): ExecutorContext {
 
 describe("resolveMember", () => {
   beforeEach(() => {
-    mock.restore()
     resolveCategoryExecutionMock.mockReset()
     resolveSubagentExecutionMock.mockReset()
     buildSystemContentMock.mockReset()

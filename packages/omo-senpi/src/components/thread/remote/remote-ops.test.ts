@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { anchorMatches, followRemote } from "./remote-ops"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { createRemoteClient } from "../../remote/client"
+import { anchorMatches, followRemote, remoteReady } from "./remote-ops"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import { fakeRemoteClient } from "../thread-remote-fixture"
 
 // The adapter drops anything delivered before `live = true`, so records reach the listener only after watch()
 // returns; over the relay the previous turn's replay arrives exactly then, after the send's reply (#13267).
@@ -13,8 +18,12 @@ function followSurface(transcript: JsonObject[], before: JsonObject[] = []) {
     if (listener !== undefined) for (const record of records) listener(record)
   }
   const remote = {
+    client: fakeRemoteClient({
+      state: () => "connected",
+      here: null,
+      devices: () => [{ device: "b", label: "b", online: true }],
+    }),
     sessions: {
-      devices: async () => [{ device: "b", label: "b", online: true }],
       watch: async (_device: string, _session: string, handlers: { readonly record: RecordListener }) => {
         listener = handlers.record
         return {
@@ -715,5 +724,39 @@ describe("#13481 review: a started send prints its own turn, never an earlier id
     expect(await withTimeout(follow.settled, 2000, "the follow never settled")).toBe("settled")
     expect(printed).toEqual(["own answer"])
     follow.stop()
+  })
+})
+
+describe("remoteReady: no device service is not set up, a failing one is an outage (#13758 review L1)", () => {
+  test("#given a real client on a device with no device service #when the relay state is read #then the failure carries no state, so a local miss stays silent", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "omo-no-device-service-"))
+    const client = createRemoteClient({ kind: "session", id: "caller" }, { version: "0.0.0-test", stateDir })
+    try {
+      const ready = await remoteReady({
+        sessions: {} as RemoteThreadSurface["sessions"],
+        client,
+        chain: { stamp: (record) => record },
+      })
+      expect("kind" in ready && ready.error.code).toBe("host_unavailable")
+      expect("kind" in ready ? ready.error.details?.["state"] : "ready").toBeUndefined()
+    } finally {
+      client.close()
+      rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a device service that answers its status read with a failure #when the relay state is read #then the failure is an outage (state unreachable)", async () => {
+    const client = fakeRemoteClient({
+      state: () => "connected",
+      here: "a",
+      devices: () => [],
+      fail: { kind: "error", code: "host_unavailable", message: "closed", next_action: "Retry." },
+    })
+    const ready = await remoteReady({
+      sessions: {} as RemoteThreadSurface["sessions"],
+      client,
+      chain: { stamp: (record) => record },
+    })
+    expect("kind" in ready ? ready.error.details?.["state"] : "ready").toBe("unreachable")
   })
 })

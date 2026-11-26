@@ -255,7 +255,7 @@ export async function withLspClient<T>(
   }
 
   const ext = effectiveExtension(absPath)
-  const result = findServerForExtension(ext)
+  const result = findServerForExtension(ext, absPath)
   if (result.status !== "found") {
     throw new LspServerLookupError(formatServerLookupError(result), result)
   }
@@ -271,18 +271,18 @@ export async function withLspClient<T>(
       return await fn(client, root, absPath)
     } catch (err) {
       if (allowRetry && READ_ONLY_TOOLS.has(toolName) && isLspDeadConnectionError(err)) {
-        manager.invalidateClient(root, server.id, client)
+        manager.invalidateClient(root, server, client)
         return acquireAndCall(false)
       }
 
       if (err instanceof LspRequestTimeoutError) {
-        if (manager.isServerInitializing(root, server.id)) {
+        if (manager.isServerInitializing(root, server)) {
           throw new LspServerInitializingError(err)
         }
       }
       throw err
     } finally {
-      manager.releaseClient(root, server.id)
+      manager.releaseClient(root, server, client)
     }
   }
 

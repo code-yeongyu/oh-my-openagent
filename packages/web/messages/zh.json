@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "本文档仅提供英文版。",
     "mobileHeader": "OmO 文档",
     "searchPlaceholder": "搜索文档...",
     "searchLabel": "筛选文档章节",
@@ -545,7 +546,6 @@
       "accent": "But it's an agent.",
       "sub": "把你的 token 变成真正有价值的成果：上万个来源的研究、一看就懂的演示、后端、前端和代码。",
       "start": "开始使用",
-      "beta": "下载桌面应用测试版",
       "download": "下载桌面应用",
       "makers": "来自 <team>Sisyphus Labs</team>，<dori>Dori</dori> 和 <term>doriterm</term> 的开发团队。"
     },

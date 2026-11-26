@@ -12,7 +12,7 @@ const acknowledgeRequest = z
     credentialId: z.string().min(1).optional(),
   })
   .strict()
-const FEATURES = ["enable-method", "phrase-genesis", "acknowledge"] as const
+const FEATURES = ["enable-method", "phrase-genesis", "acknowledge", "disable"] as const
 const approval = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin"), pendingId: z.string().min(1) }).strict(),
   z
@@ -36,7 +36,16 @@ const device = z.object({
 
 export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOptions) {
   const coordinator = createSyncRpcCoordinator(options)
-  for (const verb of ["enable", "pending", "approve", "status", "devices", "features", "acknowledge"] as const) {
+  for (const verb of [
+    "enable",
+    "pending",
+    "approve",
+    "status",
+    "devices",
+    "features",
+    "acknowledge",
+    "disable",
+  ] as const) {
     rpc.handle(`omo.memory.sync.${verb}`, async (data, context) => {
       if (!coordinator.check(context)) return { kind: "unavailable", reason: "A live trusted connection is required." }
       try {
@@ -67,6 +76,8 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
             }
           case "status":
             return await coordinator.status(context)
+          case "disable":
+            return await coordinator.disable(context)
           case "pending":
             return await coordinator.read(context, async (ports) => ({
               pending: (await ports.pairing.listPending()).map((row) => ({

@@ -63,7 +63,7 @@ describe("directory diagnostics", () => {
     }
   })
 
-  it("#given directory diagnostics are aborted after one file #when the worker loops #then no later file is scheduled", async () => {
+  it("#given directory diagnostics are aborted after one file #when the worker loops #then no later file is scheduled and the scan throws the abort", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "lsp-directory-diag-cancel-"))
     const controller = new AbortController()
     const visited: string[] = []
@@ -90,16 +90,16 @@ describe("directory diagnostics", () => {
     }
 
     try {
-      const result = await aggregateDiagnosticsForDirectory(workspace, ".ts", "all", 3, {
+      const outcome = await aggregateDiagnosticsForDirectory(workspace, ".ts", "all", 3, {
         manager: manager as never,
         listFiles: () => files,
         workspaceRoot: workspace,
         server,
         maxConcurrency: 1,
         signal: controller.signal,
-      })
+      }).catch((error: unknown) => error)
 
-      expect(result.totalDiagnostics).toBe(0)
+      expect(outcome).toBe(controller.signal.reason)
       expect(visited).toEqual([firstFile])
     } finally {
       rmSync(workspace, { recursive: true, force: true })
