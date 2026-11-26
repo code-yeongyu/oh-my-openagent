@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
@@ -391,6 +391,62 @@ describe("omo SDK runtime", () => {
     // then: the store answered the unknown extension itself, losslessly, as it does from source
     expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
     expect(JSON.parse(stdout.trim())).toEqual({ code: "not_found", refusal: "extension_unknown_name" })
+  })
+
+  // Slice P1c (#15031): the thread core ships in its own file beside the root, resolved through the plugin manifest's
+  // import map, so a source-layout test proves nothing about it; this one runs the two shipped files.
+  for (const runtime of ["node", "bun"])
+    test(`#given the two built SDK files in a plugin layout #when ${runtime} runs a script #then an account call needs no thread file and a thread call loads it or refuses`, async () => {
+      const outputs = await sharedOutputs()
+      const threadsOutputPath = join(dirname(outputs.omoSdkOutputPath), "threads.js")
+      const plugin = await mkdtemp(join(tmpdir(), "omo-sdk-split-layout-"))
+      perTestRoots.push(plugin)
+      await mkdir(join(plugin, "runtime", "omo-sdk"), { recursive: true })
+      await cp(outputs.omoSdkOutputPath, join(plugin, "runtime", "omo-sdk", "sdk.js"))
+      await cp(threadsOutputPath, join(plugin, "runtime", "omo-sdk", "threads.js"))
+      await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
+      const run = async (withThreadsFile) => {
+        if (!withThreadsFile) await rm(join(plugin, "runtime", "omo-sdk", "threads.js"), { force: true })
+        const probe = [
+          `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
+          `const root = createOmoSdk({ env: { HOME: ${JSON.stringify(plugin)} }, cwd: ${JSON.stringify(plugin)}, home: ${JSON.stringify(plugin)}, agentDir: ${JSON.stringify(join(plugin, "agent"))}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
+          "const config = await root.config.status()",
+          "const sent = await root.threads.send({ thread: 'probe', message: 'hi', author: 'someone' })",
+          "await root.dispose()",
+          "console.log(JSON.stringify({ config: config.kind, thread: sent.kind === 'error' ? { code: sent.error.code, reason: sent.error.details?.reason ?? null } : sent.kind }))",
+        ].join("\n")
+        const child = spawn(runtime, runtime === "node" ? ["--input-type=module", "-e", probe] : ["-e", probe], {
+          stdio: ["ignore", "pipe", "pipe"],
+        })
+        let stdout = ""
+        let stderr = ""
+        child.stdout.on("data", (chunk) => {
+          stdout += chunk
+        })
+        child.stderr.on("data", (chunk) => {
+          stderr += chunk
+        })
+        const exitCode = await new Promise((resolve) => child.once("close", resolve))
+        expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
+        return JSON.parse(stdout.trim())
+      }
+
+      expect(await run(true)).toEqual({ config: "ok", thread: { code: "invalid_arguments", reason: null } })
+      expect(await run(false)).toEqual({
+        config: "ok",
+        thread: { code: "internal_error", reason: "runtime_file_unavailable" },
+      })
+    })
+
+  test("#given the built extension without the thread runtime file #when freshness is checked #then it reports that output missing", async () => {
+    const outputs = await mutableOutputs()
+    const threadsOutputPath = join(dirname(outputs.omoSdkOutputPath), "threads.js")
+    await rm(threadsOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: threadsOutputPath,
+    })
   })
 
   test("#given the built extension without the omo SDK #when freshness is checked #then it reports that output missing", async () => {
