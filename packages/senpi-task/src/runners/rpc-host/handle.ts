@@ -194,7 +194,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     listeners.clearActive()
     stopHeartbeat()
     waiters.flushIdle()
-    if (turnOutcome === undefined) settleTurn(settlement.pending() ?? exitTurnOutcome(built, finalText))
+    if (turnOutcome === undefined)
+      settleTurn(
+        settlement.pending(intent === "terminated" ? "terminated" : undefined) ?? exitTurnOutcome(built, finalText),
+      )
+    settlement.cancelConfirmation()
     waiters.settleExit(built)
   }
 
@@ -204,6 +208,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     // A parked session is idle on the host: an outcome held for `agent_idle` is final (omo#9069).
     const held = settlement.pending()
     if (turnOutcome === undefined && held !== undefined) settleTurn(held)
+    settlement.cancelConfirmation()
     parked = true
     stopHeartbeat()
     listeners.emitParked(event)

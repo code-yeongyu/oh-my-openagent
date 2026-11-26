@@ -165,7 +165,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     outcome = built
     stopHeartbeat()
     flush(idleWaiters)
-    if (turnOutcome === undefined) settleTurn(settlement.pending() ?? exitTurnOutcome(built, finalText))
+    if (turnOutcome === undefined)
+      settleTurn(
+        settlement.pending(terminationRequested ? "terminated" : undefined) ?? exitTurnOutcome(built, finalText),
+      )
+    settlement.cancelConfirmation()
     for (const waiter of exitWaiters.splice(0)) {
       waiter(built)
     }

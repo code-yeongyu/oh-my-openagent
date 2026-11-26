@@ -65,8 +65,11 @@ export type TurnSettlementInput = {
 export type TurnSettlement = {
   readonly observe: (event: AgentSessionEvent) => void
   // While a completed turn is held on pending async work this is what the turn amounts to if it ends
-  // now (exit, park): the typed failure naming the abandoned work, never the interim note.
-  readonly pending: () => RunnerOutcome | undefined
+  // now (exit, park, teardown): the typed failure naming the abandoned work, never the interim note,
+  // or `cancelled` when the parent itself terminated the child.
+  readonly pending: (end?: "terminated") => RunnerOutcome | undefined
+  // The turn is ending (teardown, exit, park): disarm every confirmation. What the turn amounts to
+  // stays readable through `pending`.
   readonly cancelConfirmation: () => void
   // A wake source the handle tracks just dropped: re-offer the held error a confirmation chance.
   // No-op when nothing is held, a confirmation is already armed, or no probe was wired.
@@ -182,11 +185,16 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     confirmation = scheduleConfirmation(confirmHeld, input.settleConfirmMs)
   }
 
-  const clearConfirmation = (): void => {
-    asyncWork?.cancel()
+  const disarmConfirmation = (): void => {
     if (confirmation === undefined) return
     confirmation.cancel()
     confirmation = undefined
+  }
+
+  // A new run or a final interrupt replaces the held turn: drop the hold with its timers.
+  const clearConfirmation = (): void => {
+    asyncWork?.cancel()
+    disarmConfirmation()
   }
 
   return {
@@ -228,8 +236,12 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
       }
     },
-    pending: () => asyncWork?.abandoned() ?? held,
-    cancelConfirmation: clearConfirmation,
+    pending: (end) =>
+      asyncWork?.holding() === true ? (end === "terminated" ? { status: "cancelled" } : asyncWork.abandoned()) : held,
+    cancelConfirmation: () => {
+      asyncWork?.disarm()
+      disarmConfirmation()
+    },
     reconfirmHeld: rearm,
   }
 }

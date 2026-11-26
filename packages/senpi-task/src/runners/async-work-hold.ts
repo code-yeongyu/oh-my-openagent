@@ -28,6 +28,9 @@ export type AsyncWorkHold = {
   readonly begin: (outcome: CompletedOutcome, work: PendingAsyncWork) => void
   readonly activity: () => void
   readonly cancel: () => void
+  // The turn ends now (an exit, a park, a teardown): no further confirmation runs, and `abandoned`
+  // still names the work the turn left behind.
+  readonly disarm: () => void
   readonly holding: () => boolean
   readonly abandoned: () => RunnerOutcome | undefined
 }
@@ -56,12 +59,18 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
   let progressed = false
   let unreadable = 0
   let timer: AsyncWorkTimerHandle | undefined
+  let disarmed = false
+
+  const disarm = (): void => {
+    disarmed = true
+    timer?.cancel()
+    timer = undefined
+  }
 
   const cancel = (): void => {
     held = undefined
     work = undefined
-    timer?.cancel()
-    timer = undefined
+    disarm()
   }
 
   const finish = (outcome: RunnerOutcome): void => {
@@ -71,7 +80,7 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
   }
 
   const arm = (): void => {
-    if (held === undefined || timer !== undefined) return
+    if (held === undefined || timer !== undefined || disarmed) return
     timer = input.schedule(check, input.intervalMs)
   }
 
@@ -87,7 +96,7 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
   }
 
   const confirm = (outcome: CompletedOutcome, idle: boolean | undefined): void => {
-    if (held !== outcome || input.disposed?.() === true) return
+    if (held !== outcome || disarmed || input.disposed?.() === true) return
     const next = input.pending()
     if (next !== undefined) {
       unreadable = 0
@@ -120,6 +129,7 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
   return {
     begin: (outcome, pending) => {
       cancel()
+      disarmed = false
       held = outcome
       work = pending
       signature = pendingWorkSignature(pending)
@@ -132,6 +142,7 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
       if (held !== undefined) progressed = true
     },
     cancel,
+    disarm,
     holding: () => held !== undefined,
     abandoned: () =>
       held === undefined || work === undefined
