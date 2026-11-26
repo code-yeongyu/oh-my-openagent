@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "row": "account.adopt",
+      "field": "credential",
+      "reason": "security design 5.2: the credential arrives as a readable handle; the call has no SDK form yet",
+      "retires_with": "A1d"
+    },
+    {
+      "row": "account.credentials.handOver",
+      "field": "destination",
+      "reason": "security design 5.2: a hand-over names its destination (terminal or peer); the call has no SDK form yet",
+      "retires_with": "A1d"
+    },
+    {
+      "row": "engine.auth.apiKey",
+      "field": "destination",
+      "reason": "security design 5.5: a provider credential goes only to a named destination; the root does not serve the call yet",
+      "retires_with": "E1c"
+    },
+    {
+      "row": "engine.auth.bearerToken",
+      "field": "destination",
+      "reason": "security design 5.5: a provider credential goes only to a named destination; the root does not serve the call yet",
+      "retires_with": "E1c"
+    },
+    {
+      "row": "engine.auth.credentials",
+      "field": "destination",
+      "reason": "security design 5.5: a provider credential goes only to a named destination; the root does not serve the call yet",
+      "retires_with": "E1c"
+    }
+  ]
+}

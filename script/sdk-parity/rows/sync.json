@@ -11,8 +11,14 @@
       ],
       "input": {
         "properties": {
-          "id": {},
-          "confirmCode": {}
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirmCode": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "confirmCode"
@@ -95,8 +101,8 @@
           "signal": {}
         },
         "required": [
-          "confirm",
-          "onCode"
+          "onCode",
+          "confirm"
         ]
       },
       "cli": [
@@ -176,7 +182,10 @@
       ],
       "input": {
         "properties": {
-          "account": {}
+          "account": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "account"

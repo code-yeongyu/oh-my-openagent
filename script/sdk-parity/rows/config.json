@@ -124,8 +124,14 @@
       ],
       "input": {
         "properties": {
-          "directory": {},
-          "source_url": {}
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
