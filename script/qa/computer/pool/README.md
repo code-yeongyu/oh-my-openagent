@@ -8,7 +8,8 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
 ## What a run does
 
 1. `bun script/qa/computer/pool/macos-vm.ts --up <15|26> --run-id <id>` clones the recorded base image
-   of that major into a guest named `omo-cu-macos<major>-<id>` and starts it headless. The guest registers
+   of that major into a guest named `omo-cu-macos<major>-<id>` and starts it headless with clipboard bridging off
+   (`run --no-graphics --no-clipboard`). The guest registers
    itself as an ephemeral runner with the labels `computer-live-macos` and `macos-<major>`. `--up` waits up
    to 120 s for the hypervisor to list the guest as running; a guest that never runs is deleted and `--up`
    exits 1.
@@ -17,15 +18,18 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
    line (`script/qa/computer/pool/live-set.ts`):
 
    ```text
-   SCENARIO <name> route=<synthetic-user|virtual-hid|none> PASS oracle=<independent oracle> refusal=<refusal leg>
-   SCENARIO <name> route=<...> FAIL <what the oracle saw>
-   SCENARIO <name> route=<...> BLOCKED reason=<why it cannot run here>
+   SCENARIO <name> route=<synthetic-user|virtual-hid|none> PASS oracle=<independent oracle> refusal=<refusal leg> durationMs=<measured>
+   SCENARIO <name> route=<...> FAIL <what the oracle saw> durationMs=<measured>
+   SCENARIO <name> route=<...> BLOCKED reason=<why it cannot run here> durationMs=<measured>
    ```
 
-   then one summary line, `SET macos pass=<n> fail=<n> blocked=<n>[ reason=<reasons>]`. A set with a
-   failure, or with no scenario at all, exits 1; a set where nothing passed (every scenario blocked) exits
-   3, so a job never shows green while nothing ran. Before the macOS backend exists every scenario reads
-   `BLOCKED reason=backend_not_built`, which is the honest starting state.
+   then one summary line, `SET macos pass=<n> fail=<n> blocked=<n> degraded=<n>[ reason=<reasons>] hostLoad=<1-min load> cores=<n> p99Ms=<n>`.
+   A pass on a host whose 1-minute load exceeds its core count reads `DEGRADED` on its line and counts in `degraded=`,
+   never in `pass=`; `p99Ms` is the nearest-rank p99 of the scenarios' `durationMs` (the slowest one at today's set
+   size). A set with a failure, or with no scenario at all, exits 1; a set where nothing passed (every scenario
+   blocked) exits 3, and so does a set whose passes are all degraded, so a job never shows green while nothing green
+   ran. Before the macOS backend exists every scenario reads `BLOCKED reason=backend_not_built`, which is the honest
+   starting state.
 3. `bun script/qa/computer/pool/macos-vm.ts --down <15|26> --run-id <id>` always runs after the job and
    deletes the guest.
 
@@ -58,12 +62,15 @@ images. The last line is `sweep: <n> deleted, <n> not deleted, <n> kept`, counte
 
 | variable | meaning |
 | --- | --- |
-| `POOL_HYPERVISOR` | the hypervisor command: `clone <base> <name>`, `run --no-graphics <name>`, `list --format json`, `stop <name>`, `delete <name>` |
+| `POOL_HYPERVISOR` | the hypervisor command: `clone <base> <name>`, `run --no-graphics --no-clipboard <name>`, `list --format json`, `stop <name>`, `delete <name>` |
 | `POOL_BASE_IMAGE_15`, `POOL_BASE_IMAGE_26` | the recorded base image of each major |
 
-`macos-vm.ts` refuses, with the reason and exit 2, on a host that is not Apple-silicon macOS, has no
-hypervisor command, has no base image for the major, or where anyone is signed in at the console: guests run only on a host
-nobody is using. Teardown is never refused for that reason.
+`macos-vm.ts` refuses, with the reason and exit 2, on a host that is not Apple-silicon macOS, has no hypervisor
+command, or has no base image for the major. A host with a logged-in console user may run the pool (R-S4-1), only
+under the ruling's conditions: the guest is started headless with `--no-graphics --no-clipboard`, the run has zero
+host-input legs (no events into the host session, no GUI app launched in the console session), and the SET line
+records the host's 1-minute load, its core count and the set's p99; a leg run while the host load exceeds the core
+count is reported `DEGRADED`, never `PASS`.
 
 The first setup of a base image is a hands-on step, done once per major by a person at that Mac: sign in,
 then allow Accessibility and Screen Recording for the QA identity. Every later guest is a headless clone.

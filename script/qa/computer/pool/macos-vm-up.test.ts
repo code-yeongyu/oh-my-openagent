@@ -8,6 +8,7 @@ const plan: GuestPlan = {
   major: "15",
   baseImage: "base-macos15",
   guestName: "omo-cu-macos15-5",
+  consoleHost: null,
   labels: ["computer-live-macos", "macos-15"],
 }
 
