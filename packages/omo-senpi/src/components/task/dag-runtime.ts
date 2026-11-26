@@ -206,6 +206,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const stopFencingResumes = deps.engine.registerOwnerResumeFence(
     createDagOwnerResumeFence({
       store,
+      heldTriggers: { ...schedulerOptions, taskManager: deps.engine.manager },
       // A held scheduler's cancel, or a cancel of a run no scheduler here holds (in flight on its reservation).
       cancelling: (runId) =>
         schedulers.get(runId)?.scheduler.cancelling() === true || reservations.inFlight(runId) === "cancel",

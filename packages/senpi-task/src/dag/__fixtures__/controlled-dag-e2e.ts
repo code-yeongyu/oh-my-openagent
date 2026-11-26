@@ -8,13 +8,13 @@ import type { TeardownStepDeadline } from "../../lifecycle/teardown-budget"
 import type { DestructionPort } from "../../steering"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
 import { ImmediateRunner } from "./controlled-runner"
+import { resultPersistingManager } from "./result-persisting-manager"
 import { ownedTaskState, ownedTaskStateDir } from "../../store/__fixtures__/owned-task-state"
 import type { DagDefinition, DagNodeInput } from "../graph"
 import { createDagWaitSurface, type DagRunResult } from "../handle"
 import type { RetrySchedule } from "../infrastructure-retry"
 import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartResult } from "../manager"
 import { createDagOwnerResumeFence } from "../owner-resume-fence"
-import { persistDagNodeResult } from "../results"
 import type { TaskRecord } from "../../state"
 import {
   createDagScheduler,
@@ -67,25 +67,7 @@ export function planner(spec: Parameters<ChildPlanner>[0]): ReturnType<ChildPlan
   }
 }
 
-export function resultPersistingManager(manager: TaskManager, store: DagFileStore): TaskManager {
-  return new Proxy(manager, {
-    get(target, property) {
-      if (property !== "waitFor") {
-        const value: unknown = Reflect.get(target, property, target)
-        return typeof value === "function" ? value.bind(target) : value
-      }
-      return async (taskId: string, options?: { readonly signal?: AbortSignal }) => {
-        const record = await target.waitFor(taskId, options)
-        const owner = record.owner
-        if (owner?.kind === "dag" && record.status === "completed") {
-          const persisted = persistDagNodeResult({ store, runId: owner.runId, nodeId: owner.nodeId, record })
-          if (persisted.kind === "failed") throw new Error(persisted.diagnostic.message)
-        }
-        return record
-      }
-    },
-  })
-}
+export { resultPersistingManager } from "./result-persisting-manager"
 
 export type E2eFixtureOptions = {
   readonly project?: string
@@ -171,9 +153,16 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
         ? {}
         : {
             ownerResumeFence: (record: TaskRecord) =>
-              createDagOwnerResumeFence({ store, cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false })(
-                record,
-              ),
+              createDagOwnerResumeFence({
+                store,
+                cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false,
+                heldTriggers: {
+                  store,
+                  taskManager,
+                  hostPid: process.pid,
+                  isProcessAlive: (pid) => pid === process.pid,
+                },
+              })(record),
           }),
     }),
     store,

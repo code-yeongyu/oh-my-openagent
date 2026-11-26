@@ -78,6 +78,7 @@ export async function reopenSelfResumedTurn(
     // Marked before any await: from this step on the refused turn counts as live until its stop is
     // confirmed, for every reader of the run's live children (#11381).
     if (refusal !== undefined) ports.markRefusedStop(taskId, handle, refusal.disposition)
+    if (refusal !== undefined) recordRefusal(refusal, taskId)
     if (reservation.ok) reservation.release()
     if (refusal !== undefined) await refuseSelfResumedRun(ports, taskId, epoch, refusal)
     return
@@ -89,6 +90,15 @@ export async function reopenSelfResumedTurn(
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)
   log("senpi-task child resumed on its own after its turn settled", { taskId, runEpoch: epoch })
+}
+
+// The owner's durable record of the refusal; a failure to record never undoes the refusal itself.
+function recordRefusal(refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }>, taskId: string): void {
+  try {
+    refusal.record?.()
+  } catch (error) {
+    log("senpi-task could not record a refused self-started run", { taskId, reason: String(error) })
+  }
 }
 
 async function refuseSelfResumedRun(
