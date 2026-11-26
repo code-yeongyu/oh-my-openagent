@@ -149,8 +149,7 @@ export function threadCoreAccess(options: {
   type Ready = { readonly runtime: CheckedRuntime; readonly core: ThreadCore }
   let disposed = false
   let pending: Promise<Ready | OmoFailure> | undefined
-  const acquire = (): Promise<Ready | OmoFailure> => {
-    if (disposed) return Promise.resolve(DISPOSED)
+  const createCore = (): Promise<Ready | OmoFailure> => {
     if (pending !== undefined) return pending
     const creating: Promise<Ready | OmoFailure> = (async (): Promise<Ready | OmoFailure> => {
       const loaded = await loadRuntime()
@@ -164,8 +163,8 @@ export function threadCoreAccess(options: {
         return refuse(error, CORE_MESSAGE)
       }
     })().then((made) => {
-      // A creation that fails after a dispose began answers the disposed refusal, as a call racing dispose is promised
-      // (review 6081000144, LOW 1); its exception already reached the logger port.
+      // A creation that fails after dispose() began answers the disposed refusal (its exception already reached the
+      // logger port); a built core stays the pending result, so dispose releases it once and acquire refuses it.
       if (!isFailure(made)) return made
       if (disposed) return DISPOSED
       if (pending === creating) pending = undefined
@@ -173,6 +172,13 @@ export function threadCoreAccess(options: {
     })
     pending = creating
     return creating
+  }
+  // Dispose wins up to the moment a member runs: a call that awaited a core that was ready answers the disposed refusal
+  // when dispose() began meanwhile, so no member runs on a core dispose is releasing (design ruling on review 6081179233).
+  const acquire = async (): Promise<Ready | OmoFailure> => {
+    if (disposed) return DISPOSED
+    const made = await createCore()
+    return disposed ? DISPOSED : made
   }
   const dispose = async (): Promise<void> => {
     disposed = true

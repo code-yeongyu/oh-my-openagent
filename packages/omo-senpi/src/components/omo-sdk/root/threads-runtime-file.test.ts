@@ -225,24 +225,81 @@ describe("a dispose that races the first thread call", () => {
     expect(source.match(/\bloadRuntime\(\)/g)?.length).toBe(1)
   })
 
-  // Dispose wins (design ruling; review 6081000144, LOW 1): a call racing dispose answers the shared ROOT_DISPOSED whatever
-  // its creation then did, for every way the creation can fail, at both stages it can fail in, and the caller's store is
-  // released once.
-  const LOAD_FAILURES: Readonly<Record<string, (gate: ReturnType<typeof held>) => void>> = {
-    "the file is missing": (gate) => gate.reject(new Error(EXCEPTION_TEXT)),
-    "the file is from another build": (gate) =>
-      gate.release({ ...runtimeWith(() => undefined), RUNTIME_STAMP: "another-build" } as ThreadsRuntime),
-    "the file has a misshapen export": (gate) =>
-      gate.release({ ...runtimeWith(() => undefined), threadToolParamSchemas: [] } as unknown as ThreadsRuntime),
+  // Dispose wins, the whole class (design ruling on reviews 6081000144 and 6081179233): every outcome of the creation
+  // against every moment dispose() can land answers the shared ROOT_DISPOSED, every core built is disposed (created ==
+  // disposed), and the caller's store is released exactly once (by the core when one was built, by the namespace when
+  // none was). A load-stage outcome has no construction or ready moment, so 16 of the 24 cells exist.
+  type Gate = ReturnType<typeof held>
+  type Stage = "load" | "construct"
+  type Harness = {
+    readonly loadGate: Gate
+    readonly constructing: Promise<void>
+    readonly finish: (core: unknown) => void
+    readonly fail: (error: Error) => void
+    readonly makeCore: () => unknown
+    readonly constructRuntime: ThreadsRuntime
   }
-  const CONSTRUCT_FAILURES: Readonly<
-    Record<string, (finish: (core: unknown) => void, fail: (error: Error) => void) => void>
-  > = {
-    "the core cannot be built": (_finish, fail) => fail(new Error(CONSTRUCTION_TEXT)),
-    "the built core is misshapen": (finish) => finish({}),
+  const OUTCOMES: Readonly<Record<string, { readonly stage: Stage; readonly settle: (harness: Harness) => void }>> = {
+    "the file is missing": { stage: "load", settle: (h) => h.loadGate.reject(new Error(EXCEPTION_TEXT)) },
+    "the file is from another build": {
+      stage: "load",
+      settle: (h) =>
+        h.loadGate.release({ ...runtimeWith(() => undefined), RUNTIME_STAMP: "another-build" } as ThreadsRuntime),
+    },
+    "the file has a misshapen export": {
+      stage: "load",
+      settle: (h) =>
+        h.loadGate.release({
+          ...runtimeWith(() => undefined),
+          threadToolParamSchemas: [],
+        } as unknown as ThreadsRuntime),
+    },
+    "the core cannot be built": { stage: "construct", settle: (h) => h.fail(new Error(CONSTRUCTION_TEXT)) },
+    "the built core is misshapen": { stage: "construct", settle: (h) => h.finish({}) },
+    "the core is built": { stage: "construct", settle: (h) => h.finish(h.makeCore()) },
   }
-  const disposingNamespace = (load: () => Promise<ThreadsRuntime>) => {
-    let storeDisposed = 0
+  const MOMENTS = ["before the load", "during the load", "during the construction", "after the core is ready"] as const
+  const exists = (stage: Stage, moment: (typeof MOMENTS)[number], outcome: string) =>
+    moment === "before the load" ||
+    moment === "during the load" ||
+    (moment === "during the construction" && stage === "construct") ||
+    (moment === "after the core is ready" && outcome === "the core is built")
+
+  function harness() {
+    const counts = { created: 0, disposed: 0, store: 0 }
+    const loadGate = held()
+    let constructed: () => void = () => undefined
+    const constructing = new Promise<void>((resolve) => {
+      constructed = resolve
+    })
+    let finish: (core: unknown) => void = () => undefined
+    let fail: (error: Error) => void = () => undefined
+    const built = new Promise<unknown>((resolve, reject) => {
+      finish = resolve
+      fail = reject
+    })
+    const store = {
+      dispose: async () => {
+        counts.store += 1
+      },
+    }
+    // A built core owns the caller's store, as the real one does: its dispose releases it.
+    const makeCore = () => {
+      counts.created += 1
+      return fullCore({
+        dispose: async () => {
+          counts.disposed += 1
+          await store.dispose()
+        },
+      })
+    }
+    const constructRuntime = {
+      ...runtimeWith(() => undefined),
+      createThreadCore: () => {
+        constructed()
+        return built
+      },
+    } as unknown as ThreadsRuntime
     const served = threadsNamespace({
       agentDir: "/agent-dir-never-read",
       cwd: "/cwd-never-read",
@@ -250,63 +307,95 @@ describe("a dispose that races the first thread call", () => {
       user: "probe",
       env: {},
       principal: { kind: "script", uid: 501 },
-      loadThreadsRuntime: load,
-      ports: {
-        store: {
-          dispose: async () => {
-            storeDisposed += 1
-          },
-        } as unknown as NonNullable<Parameters<typeof threadsNamespace>[0]["ports"]>["store"],
-      },
+      loadThreadsRuntime: loadGate.load,
+      ports: { store: store as unknown as NonNullable<Parameters<typeof threadsNamespace>[0]["ports"]>["store"] },
     })
-    return { served, storeDisposed: () => storeDisposed }
+    const h: Harness = { loadGate, constructing, finish, fail, makeCore, constructRuntime }
+    return { served, counts, h }
   }
 
-  for (const [failure, settle] of Object.entries(LOAD_FAILURES))
-    test(`#given a first load held open #when dispose runs and then ${failure} #then the call answers the disposed refusal and the caller's store is released`, async () => {
-      const gate = held()
-      const { served, storeDisposed } = disposingNamespace(gate.load)
-      const call = list(served)
-      await gate.loading
-      const disposed = served.dispose?.()
-      settle(gate)
-      const [answer] = await Promise.all([call, disposed])
-      expect({ answer, storeDisposed: storeDisposed() }).toEqual({
+  for (const [outcome, { stage, settle }] of Object.entries(OUTCOMES))
+    for (const moment of MOMENTS.filter((candidate) => exists(stage, candidate, outcome)))
+      test(`#given ${outcome} #when dispose lands ${moment} #then the call answers ROOT_DISPOSED, every core built is disposed and the store is released once`, async () => {
+        const { served, counts, h } = harness()
+        let answer: unknown
+        if (moment === "before the load") {
+          await served.dispose?.()
+          answer = await list(served)
+        } else if (moment === "during the load") {
+          const call = list(served)
+          await h.loadGate.loading
+          const disposing = served.dispose?.()
+          if (stage === "load") settle(h)
+          else h.loadGate.release(h.constructRuntime)
+          ;[answer] = await Promise.all([call, disposing])
+        } else if (moment === "during the construction") {
+          const call = list(served)
+          h.loadGate.release(h.constructRuntime)
+          await h.constructing
+          const disposing = served.dispose?.()
+          settle(h)
+          ;[answer] = await Promise.all([call, disposing])
+        } else {
+          h.loadGate.release(h.constructRuntime)
+          const first = list(served)
+          await h.constructing
+          settle(h)
+          await first
+          // threads.locate reaches acquire in the same tick (no input await first), so dispose lands between the ready
+          // core and the member running on it.
+          const call = callMember(served, "threads.locate")({ thread: "t" })
+          const disposing = served.dispose?.()
+          ;[answer] = await Promise.all([call, disposing])
+        }
+        expect({ answer, created: counts.created, disposed: counts.disposed, store: counts.store }).toEqual({
+          answer: { kind: "error", error: ROOT_DISPOSED },
+          created: counts.disposed,
+          disposed: counts.created,
+          store: 1,
+        })
+      })
+
+  // Security review 6081319929, F1, per member: with the construction held, dispose() begun and the core then built, no
+  // member of that core ever runs, every member answers ROOT_DISPOSED, and the core is disposed once.
+  for (const member of Object.keys(namespace(() => Promise.resolve(runtimeWith(() => undefined))).members))
+    test(`#given a core construction held open #when ${member} runs, dispose begins and the core is then built #then it answers ROOT_DISPOSED and no member of that core runs`, async () => {
+      const { served, counts, h } = harness()
+      const ran: string[] = []
+      const recordingCore = () => {
+        const core = h.makeCore() as Record<string, unknown>
+        return Object.fromEntries(
+          Object.entries(core).map(([name, value]) => [
+            name,
+            name === "dispose" || typeof value !== "function"
+              ? value
+              : (...args: unknown[]) => {
+                  ran.push(name)
+                  return (value as (...a: unknown[]) => unknown)(...args)
+                },
+          ]),
+        )
+      }
+      h.loadGate.release(h.constructRuntime)
+      const call = callMember(served, member)(MEMBER_INPUTS[member] ?? {})
+      await h.constructing
+      const disposing = served.dispose?.()
+      h.finish(recordingCore())
+      const [answer] = await Promise.all([call, disposing])
+      expect({ answer, created: counts.created, disposed: counts.disposed, ran }).toEqual({
         answer: { kind: "error", error: ROOT_DISPOSED },
-        storeDisposed: 1,
+        created: 1,
+        disposed: 1,
+        ran: [],
       })
     })
 
-  for (const [failure, settle] of Object.entries(CONSTRUCT_FAILURES))
-    test(`#given a core construction held open #when dispose runs and then ${failure} #then the call answers the disposed refusal and the caller's store is released`, async () => {
-      let constructing: () => void = () => undefined
-      const started = new Promise<void>((resolve) => {
-        constructing = resolve
-      })
-      let finish: (core: unknown) => void = () => undefined
-      let fail: (error: Error) => void = () => undefined
-      const built = new Promise<unknown>((resolve, reject) => {
-        finish = resolve
-        fail = reject
-      })
-      const runtime = {
-        ...runtimeWith(() => undefined),
-        createThreadCore: () => {
-          constructing()
-          return built
-        },
-      } as unknown as ThreadsRuntime
-      const { served, storeDisposed } = disposingNamespace(() => Promise.resolve(runtime))
-      const call = list(served)
-      await started
-      const disposed = served.dispose?.()
-      settle(finish, fail)
-      const [answer] = await Promise.all([call, disposed])
-      expect({ answer, storeDisposed: storeDisposed() }).toEqual({
-        answer: { kind: "error", error: ROOT_DISPOSED },
-        storeDisposed: 1,
-      })
-    })
+  test("#given the dispose matrix #then it covers 16 cells: every outcome before and during the load, every construction outcome during construction, and a ready core", () => {
+    const cells = Object.entries(OUTCOMES).flatMap(([outcome, { stage }]) =>
+      MOMENTS.filter((moment) => exists(stage, moment, outcome)),
+    )
+    expect(cells.length).toBe(16)
+  })
 })
 
 // Security note (B) and review 6075851574 MEDIUM 3, one boundary: a loaded file whose core cannot be built answers every
