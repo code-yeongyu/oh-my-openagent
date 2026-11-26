@@ -703,6 +703,7 @@
     "packages/device-service-core/src/wire.ts",
     "packages/omo-senpi/src/components/agent-home/resolve-agent-home.ts",
     "packages/omo-senpi/src/components/call-budget/call-deadline.ts",
+    "packages/omo-senpi/src/components/omo-sdk/runtime-stamp.ts",
     "packages/omo-senpi/src/components/remote/aliases.ts",
     "packages/omo-senpi/src/components/remote/attach.ts",
     "packages/omo-senpi/src/components/remote/client-message-id.ts",

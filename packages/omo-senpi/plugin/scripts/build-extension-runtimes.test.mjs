@@ -8,13 +8,19 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
-import { buildOmoSdkRuntime, omoSenpiBuildDefines } from "./build-extension-core.mjs"
+import {
+  buildOmoSdkRuntime,
+  buildRuntimeFile,
+  buildSdkRuntimeFiles,
+  omoSenpiBuildDefines,
+  resolveOutputs,
+} from "./build-extension-core.mjs"
 import { checkExtensionCurrent } from "./build-extension.mjs"
-import { SDK_RUNTIME_FILES } from "./runtime-files.mjs"
+import { sdkRuntimeFilesCurrent } from "./check-extension-current.mjs"
+import { runtimeArtifactPaths, SDK_RUNTIME_FILES, sdkRuntimeOutputPaths } from "./runtime-files.mjs"
 import {
   difference,
   normalizeModulePath,
-  STATIC_SET_DEFINITION,
   STATIC_SET_PATH,
   staticModuleSet,
   staticSetDefinition,
@@ -47,6 +53,12 @@ function unexpectedStderr(stderr) {
   }
   return kept.join("\n")
 }
+
+// An SDK runtime file of a build, by its table row name (runtime-files.mjs).
+const sdkFile = (outputs, name) => sdkRuntimeOutputPaths(outputs.sdkRuntimeRoot)[name]
+const rowNamed = (name) => SDK_RUNTIME_FILES.find((row) => row.name === name)
+const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
+const packageVersion = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version
 
 // #13965: the cold builds run once as setup, bounded by their progress and CPU use, not this hook's outer bound.
 beforeAll(() => fixture.warmBuilds({ reproduction: false }), BUILD_HOOK_OUTER_BOUND_MS)
@@ -147,50 +159,50 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
   })
 
   test("#given the omo SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
-    expect(inlinedPackages((await sharedOutputs()).omoSdkInputs)).toEqual(["jsonc-parser", "typebox", "zod"])
+    expect(inlinedPackages((await sharedOutputs()).sdkRuntimeInputs.root)).toEqual(["jsonc-parser", "typebox", "zod"])
   })
 })
 
 // The provisioned SDK root runtime's cold-import decision (design lane and owner, P1b #14950): the call table, the thread
-// contracts and the thread core load on first use and the file may not grow. Raising the ceiling or adding a static path
-// reopens that decision. Since slice P1c (#15031) the thread core ships in its own file with its own ceiling: each is the
-// file's measured size (amendment 28), so thread slices move the thread file's number, not the root's.
-const OMO_SDK_RUNTIME_BYTES = 607_672
-const OMO_SDK_THREADS_RUNTIME_BYTES = 532_813
+// contracts and the thread core load on first use. Since slice P1c (#15031) every SDK runtime file has its own row in
+// runtime-files.mjs carrying its byte ceiling (the file's measured size, amendment 28) and its committed kept list, so a
+// row added there is pinned here with no other edit. Growth past a ceiling, or a new static path, reopens the decision:
+// thread slices move the thread file's number, not the root's. A size is valid only in a tree with submodules
+// initialised and a frozen install from the head's own bun.lock, built with the pinned bun.
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,
 // reached from the entry by static edges only, plus the node builtins a kept module imports, named the same in every
-// install layout. plugin/scripts/omo-sdk-static-set.mjs computes it; `bun <that file> --write` rewrites the list, and a
-// slice that changes the set edits the list in the same commit, where its reviewer sees it.
-const { definition: STATIC_SET_FILE_DEFINITION, modules: STATIC_SET } = JSON.parse(
-  readFileSync(STATIC_SET_PATH, "utf8"),
-)
+// install layout. plugin/scripts/omo-sdk-static-set.mjs computes it; `bun <that file> --write` rewrites every list, and a
+// slice that changes a set edits the list in the same commit, where its reviewer sees it.
+const { modules: STATIC_SET } = JSON.parse(readFileSync(STATIC_SET_PATH, "utf8"))
+
+/** What a row's pins say of one built file: over its ceiling or not, and how its kept modules differ from its list. */
+async function pinFindings(row, outputPath, table = SDK_RUNTIME_FILES) {
+  const bytes = Bun.file(outputPath).size
+  const { definition, modules } = JSON.parse(readFileSync(staticSetPath(row), "utf8"))
+  const { set } = await staticModuleSet(undefined, { row, table })
+  return {
+    file: row.name,
+    overCeiling: bytes > row.ceiling ? `${bytes} bytes, over its ceiling of ${row.ceiling}` : null,
+    definition: definition === staticSetDefinition(row),
+    ...difference(set, modules),
+  }
+}
+
+const pinned = (file) => ({ file, overCeiling: null, definition: true, added: [], removed: [] })
+
+describe("every SDK runtime file within its row's ceiling, shipping exactly its committed list", () => {
+  for (const row of SDK_RUNTIME_FILES)
+    test(`#given the built ${row.name} runtime file #then it is within its row's ceiling and ships exactly its row's kept list`, async () => {
+      expect(await pinFindings(row, sdkFile(await sharedOutputs(), row.name))).toEqual(pinned(row.name))
+    })
+})
 
 describe("the provisioned SDK root runtime's cold import (P1b decision)", () => {
-  test("#given the built runtime #then it is no larger than the decided ceiling", async () => {
-    const bytes = Bun.file((await sharedOutputs()).omoSdkOutputPath).size
-    expect(
-      bytes <= OMO_SDK_RUNTIME_BYTES ||
-        `the omo SDK runtime is ${bytes} bytes, over its ceiling of ${OMO_SDK_RUNTIME_BYTES}: growth reopens the P1b cold-import decision (#14950); split the thread core into its own runtime file first (the next SDK slice). A size is valid only in a tree with submodules initialised and a frozen install from the head's own bun.lock, built with the pinned bun.`,
-    ).toBe(true)
-  })
-
-  test("#given the runtime entry #then the modules that ship and run at import (kept bytes, static edges) are exactly the committed list", async () => {
-    const { set, schemaUsers } = await staticModuleSet()
-    expect(STATIC_SET_FILE_DEFINITION).toBe(STATIC_SET_DEFINITION)
-    expect({ ...difference(set, STATIC_SET), schemaLibraryImporters: schemaUsers }).toEqual({
-      added: [],
-      removed: [],
-      schemaLibraryImporters: schemaUsers,
-    })
-  })
-
   // Control: one static telemetry import added to the runtime entry is named by the comparison.
   test("#given an entry that adds one static telemetry import to the runtime entry #then the comparison names the telemetry modules it adds", async () => {
-    const dir = await mkdtemp(
-      join(fileURLToPath(new URL("../..", import.meta.url)), "src", "extension", ".static-control-"),
-    )
+    const dir = await mkdtemp(join(packageRoot, "src", "extension", ".static-control-"))
     perTestRoots.push(dir)
     await writeFile(
       join(dir, "entry.ts"),
@@ -208,22 +220,11 @@ describe("the provisioned SDK root runtime's cold import (P1b decision)", () => 
 })
 
 describe("the SDK root's thread runtime file (P1c, #15031)", () => {
-  const threadsRow = SDK_RUNTIME_FILES.find((row) => row.name === "threads")
-  const { definition, modules } = JSON.parse(readFileSync(staticSetPath(threadsRow), "utf8"))
-
-  test("#given the built thread runtime file #then it is no larger than its own ceiling", async () => {
-    const bytes = Bun.file(join(dirname((await sharedOutputs()).omoSdkOutputPath), "threads.js")).size
-    expect(
-      bytes <= OMO_SDK_THREADS_RUNTIME_BYTES ||
-        `the SDK thread runtime is ${bytes} bytes, over its ceiling of ${OMO_SDK_THREADS_RUNTIME_BYTES}: a thread slice pins the file's new measured size with its metafile and cold-import numbers (amendment 28). A size is valid only in a tree with submodules initialised and a frozen install from the head's own bun.lock, built with the pinned bun.`,
-    ).toBe(true)
-  })
-
   test("#given the root's build #then no module of the thread core is among its inputs, and its logger-port helper is", async () => {
-    const { omoSdkInputs } = await sharedOutputs()
-    expect(omoSdkInputs.filter((path) => path.includes("components/thread/sdk-core/"))).toEqual([])
-    expect(omoSdkInputs.filter((path) => /components\/thread\/.*text[^/]*\.ts$/.test(path))).toEqual([])
-    expect(omoSdkInputs.some((path) => path.endsWith("components/omo-sdk/unexpected-port.ts"))).toBe(true)
+    const { root } = (await sharedOutputs()).sdkRuntimeInputs
+    expect(root.filter((path) => path.includes("components/thread/sdk-core/"))).toEqual([])
+    expect(root.filter((path) => /components\/thread\/.*text[^/]*\.ts$/.test(path))).toEqual([])
+    expect(root.some((path) => path.endsWith("components/omo-sdk/unexpected-port.ts"))).toBe(true)
   })
 
   test("#given the thread file's build #then the thread core is among its inputs and the root's entry is not", async () => {
@@ -232,17 +233,109 @@ describe("the SDK root's thread runtime file (P1c, #15031)", () => {
     expect(threads.some((path) => path.endsWith("src/extension/omo-sdk.ts"))).toBe(false)
   })
 
-  test("#given the shipped thread runtime file #then it exports exactly what the root takes, as functions and plain data", async () => {
-    const { createThreadCore, fail, threadToolParamSchemas, ...rest } = await import("../runtime/omo-sdk/threads.js")
+  // Review 6075851574 LOW 7: the file this build wrote, so a change to the entry cannot pass against a committed bundle.
+  test("#given the freshly built thread runtime file #then it exports exactly what the root takes, as functions and plain data, with this build's stamp", async () => {
+    const outputs = await sharedOutputs()
+    const { RUNTIME_STAMP, createThreadCore, fail, threadToolParamSchemas, ...rest } = await import(
+      pathToFileURL(sdkFile(outputs, "threads")).href
+    )
     expect(Object.keys(rest)).toEqual([])
     expect([typeof createThreadCore, typeof fail]).toEqual(["function", "function"])
     expect(Object.getPrototypeOf(threadToolParamSchemas)).toBe(Object.prototype)
+    expect(RUNTIME_STAMP).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  })
+})
+
+// Review 6075851574 HIGH 1: one row is enough to add a runtime file. A third row goes through the real build (with the
+// shared stamp), its row's ceiling and kept list, the installer's derived list and the freshness comparison.
+describe("a row added to the SDK runtime file table", () => {
+  test("#given a third row #then it is built with the build's stamp, sized, kept-list-checked, listed for the installer and checked for freshness", async () => {
+    const source = await mkdtemp(join(packageRoot, "src", "extension", ".probe-row-"))
+    const out = await mkdtemp(join(tmpdir(), "omo-sdk-probe-row-"))
+    const reproduction = await mkdtemp(join(tmpdir(), "omo-sdk-probe-row-expected-"))
+    perTestRoots.push(source, out, reproduction)
+    await writeFile(
+      join(source, "entry.ts"),
+      `export { RUNTIME_STAMP } from "../../components/omo-sdk/runtime-stamp"\nexport const probe = "probe"\n`,
+    )
+    const probe = {
+      name: "probe",
+      entry: join(source, "entry.ts"),
+      output: "runtime/omo-sdk/probe.js",
+      specifier: "#omo-sdk-probe-runtime",
+      lazy: true,
+      ceiling: 4096,
+      staticSet: join(source, "kept.json"),
+    }
+    const table = [...SDK_RUNTIME_FILES, probe]
+    const defines = omoSenpiBuildDefines(packageVersion)
+
+    // built, with the stamp every file of the build carries
+    const inputs = await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(out, table), defines, table)
+    const paths = sdkRuntimeOutputPaths(out, table)
+    expect(inputs.probe.some((input) => input.endsWith("entry.ts"))).toBe(true)
+    const [probeStamp, threadsStamp] = await Promise.all(
+      [paths.probe, paths.threads].map(async (path) => (await import(pathToFileURL(path).href)).RUNTIME_STAMP),
+    )
+    expect(probeStamp).toBe(threadsStamp)
+
+    // sized and kept-list-checked by the same pins as the shipped rows; each negative control is named
+    const { set } = await staticModuleSet(undefined, { row: probe, table })
+    await writeFile(probe.staticSet, JSON.stringify({ definition: staticSetDefinition(probe), modules: set }))
+    expect(await pinFindings(probe, paths.probe, table)).toEqual(pinned("probe"))
+    expect((await pinFindings({ ...probe, ceiling: 1 }, paths.probe, table)).overCeiling).toMatch(
+      /over its ceiling of 1$/,
+    )
+    await writeFile(probe.staticSet, JSON.stringify({ definition: staticSetDefinition(probe), modules: set.slice(1) }))
+    expect((await pinFindings(probe, paths.probe, table)).added).toEqual([set[0]])
+
+    // listed for the installer, and every other row leaves it external
+    expect(runtimeArtifactPaths(table)).toContain(join("runtime", "omo-sdk", "probe.js"))
+
+    // checked for freshness: current against an independent reproduction, then missing, then stale
+    await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(reproduction, table), defines, table)
+    const expected = sdkRuntimeOutputPaths(reproduction, table)
+    expect(await sdkRuntimeFilesCurrent(paths, expected)).toEqual({ ok: true })
+    await writeFile(paths.probe, `${readFileSync(paths.probe, "utf8")}\n`)
+    expect(await sdkRuntimeFilesCurrent(paths, expected)).toEqual({
+      ok: false,
+      reason: "stale-output",
+      output: paths.probe,
+    })
+    await rm(paths.probe)
+    expect(await sdkRuntimeFilesCurrent(paths, expected)).toEqual({
+      ok: false,
+      reason: "missing-output",
+      output: paths.probe,
+    })
+  })
+})
+
+// Review 6075851574 MEDIUM 4: the SDK runtime files are written under a named plugin output root, never under a root cut
+// out of another file's path; the build and the freshness check both take their outputs from resolveOutputs.
+describe("the SDK runtime files' output root", () => {
+  test("#given an explicit root, or only a short custom extension path #then every runtime file sits at its table output under that root", () => {
+    expect(resolveOutputs({ sdkRuntimeRoot: "/srv/plugin-out" }).sdkRuntimeOutputs).toEqual(
+      sdkRuntimeOutputPaths("/srv/plugin-out"),
+    )
+    expect(resolveOutputs({ outputPath: "/tmp/omo.js" }).sdkRuntimeOutputs).toEqual(sdkRuntimeOutputPaths("/tmp"))
+    expect(resolveOutputs({ outputPath: "/tmp/omo.js", sdkRuntimeRoot: "/srv/plugin-out" }).sdkRuntimeOutputs).toEqual(
+      sdkRuntimeOutputPaths("/srv/plugin-out"),
+    )
   })
 
-  test("#given the thread runtime entry #then the modules it ships (kept bytes, static edges) are exactly its committed list", async () => {
-    const { set } = await staticModuleSet(undefined, { row: threadsRow })
-    expect(definition).toBe(staticSetDefinition(threadsRow))
-    expect(difference(set, modules)).toEqual({ added: [], removed: [] })
+  test("#given an explicit root missing one runtime file #when freshness is checked #then it names that file under that root", async () => {
+    const outputs = await mutableOutputs()
+    const root = await mkdtemp(join(tmpdir(), "omo-sdk-explicit-root-"))
+    perTestRoots.push(root)
+    const paths = sdkRuntimeOutputPaths(root)
+    await mkdir(dirname(paths.root), { recursive: true })
+    await cp(sdkFile(outputs, "root"), paths.root)
+    expect(await checkExtensionCurrent({ ...outputs, sdkRuntimeRoot: root })).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: paths.threads,
+    })
   })
 })
 
@@ -385,11 +478,11 @@ describe("omo SDK runtime", () => {
   test("#given the built omo SDK #when plain node imports it #then it exports createOmoSdk and answers typed reads with no engine", async () => {
     // given: a signed-out store port and a state dir no device service listens on
     const outputs = await sharedOutputs()
-    expect(outputs.omoSdkInputs.some((input) => input.endsWith("src/extension/omo-sdk.ts"))).toBe(true)
+    expect(outputs.sdkRuntimeInputs.root.some((input) => input.endsWith("src/extension/omo-sdk.ts"))).toBe(true)
     const home = await mkdtemp(join(tmpdir(), "omo-sdk-built-"))
     perTestRoots.push(home)
     const probe = [
-      `const sdk = await import(${JSON.stringify(pathToFileURL(outputs.omoSdkOutputPath).href)})`,
+      `const sdk = await import(${JSON.stringify(pathToFileURL(sdkFile(outputs, "root")).href)})`,
       `const omo = sdk.createOmoSdk({ env: { HOME: ${JSON.stringify(home)}, OMO_DEVICE_SERVICE_STATE_DIR: ${JSON.stringify(join(home, "state"))} }, cwd: ${JSON.stringify(home)}, home: ${JSON.stringify(home)}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
       "const [devices, status, config] = [await omo.devices.list(), await omo.deviceService.status(), await omo.config.status()]",
       "console.log(JSON.stringify({ exports: Object.keys(sdk).sort(), devices: devices.kind === 'error' ? devices.error.code : devices.kind, status: status.kind === 'ok' ? status.value.state : status.error.code, config: config.kind }))",
@@ -426,9 +519,9 @@ describe("omo SDK runtime", () => {
     perTestRoots.push(plugin)
     await mkdir(join(plugin, "runtime", "omo-sdk"), { recursive: true })
     await mkdir(join(plugin, "extensions"), { recursive: true })
-    await cp(outputs.omoSdkOutputPath, join(plugin, "runtime", "omo-sdk", "sdk.js"))
+    await cp(sdkFile(outputs, "root"), join(plugin, "runtime", "omo-sdk", "sdk.js"))
     await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
-    await cp(join(dirname(outputs.omoSdkOutputPath), "threads.js"), join(plugin, "runtime", "omo-sdk", "threads.js"))
+    await cp(sdkFile(outputs, "threads"), join(plugin, "runtime", "omo-sdk", "threads.js"))
     await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
     const probe = [
       `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
@@ -456,71 +549,133 @@ describe("omo SDK runtime", () => {
   })
 
   // Slice P1c (#15031): the thread core ships in its own file beside the root, resolved through the plugin manifest's
-  // import map, so a source-layout test proves nothing about it; this one runs the two shipped files.
-  for (const runtime of ["node", "bun"])
-    test(`#given the two built SDK files in a plugin layout #when ${runtime} runs a script #then an account call needs no thread file and a thread call loads it or refuses`, async () => {
-      const outputs = await sharedOutputs()
-      const threadsOutputPath = join(dirname(outputs.omoSdkOutputPath), "threads.js")
-      const plugin = await mkdtemp(join(tmpdir(), "omo-sdk-split-layout-"))
-      perTestRoots.push(plugin)
-      await mkdir(join(plugin, "runtime", "omo-sdk"), { recursive: true })
-      await cp(outputs.omoSdkOutputPath, join(plugin, "runtime", "omo-sdk", "sdk.js"))
-      await cp(threadsOutputPath, join(plugin, "runtime", "omo-sdk", "threads.js"))
-      await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
-      await mkdir(join(plugin, "extensions"), { recursive: true })
-      await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
-      const run = async (withThreadsFile) => {
-        if (!withThreadsFile) await rm(join(plugin, "runtime", "omo-sdk", "threads.js"), { force: true })
-        const probe = [
-          `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
-          `const root = createOmoSdk({ env: { HOME: ${JSON.stringify(plugin)} }, cwd: ${JSON.stringify(plugin)}, home: ${JSON.stringify(plugin)}, agentDir: ${JSON.stringify(join(plugin, "agent"))}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
-          "const config = await root.config.status()",
-          "const sent = await root.threads.list({})",
-          "await root.dispose()",
-          "console.log(JSON.stringify({ config: config.kind, thread: sent.kind === 'error' ? { code: sent.error.code, reason: sent.error.details?.reason ?? null } : sent.kind }))",
-        ].join("\n")
-        const child = spawn(runtime, runtime === "node" ? ["--input-type=module", "-e", probe] : ["-e", probe], {
-          stdio: ["ignore", "pipe", "pipe"],
-        })
-        let stdout = ""
-        let stderr = ""
-        child.stdout.on("data", (chunk) => {
-          stdout += chunk
-        })
-        child.stderr.on("data", (chunk) => {
-          stderr += chunk
-        })
-        const exitCode = await new Promise((resolve) => child.once("close", resolve))
-        expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
-        return JSON.parse(stdout.trim())
-      }
+  // import map, so a source-layout test proves nothing about it; these run the shipped files in a plugin layout, in a
+  // directory whose parent holds a manifest that maps the same specifiers elsewhere (security review 6075906719, L3).
+  async function pluginLayout(outputs, threadsFile = sdkFile(outputs, "threads")) {
+    const parent = await mkdtemp(join(tmpdir(), "omo-sdk-split-layout-"))
+    perTestRoots.push(parent)
+    const plugin = join(parent, "plugin")
+    await mkdir(join(plugin, "runtime", "omo-sdk"), { recursive: true })
+    await cp(sdkFile(outputs, "root"), join(plugin, "runtime", "omo-sdk", "sdk.js"))
+    await cp(threadsFile, join(plugin, "runtime", "omo-sdk", "threads.js"))
+    await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
+    await mkdir(join(plugin, "extensions"), { recursive: true })
+    await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
+    await writeFile(join(parent, "decoy.mjs"), "throw new Error('the decoy above the package was loaded')\n")
+    await writeFile(
+      join(parent, "package.json"),
+      JSON.stringify({
+        type: "module",
+        imports: Object.fromEntries(SDK_RUNTIME_FILES.map((row) => [row.specifier, "./decoy.mjs"])),
+      }),
+    )
+    return plugin
+  }
 
-      // With the file present the thread core answers for itself: no engine runs here, so it reports the host unavailable.
-      expect(await run(true)).toEqual({ config: "ok", thread: { code: "host_unavailable", reason: null } })
-      expect(await run(false)).toEqual({
+  // One process: each step's thread call is answered, then `between` (a file operation of the script) runs before the
+  // next. The output is one line per thread call: its kind, or its code and reason, and whether its text says restart.
+  async function runSteps(runtime, plugin, steps) {
+    const threads = join(plugin, "runtime", "omo-sdk", "threads.js")
+    const probe = [
+      `import { rename, writeFile, copyFile } from "node:fs/promises"`,
+      `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
+      `const root = createOmoSdk({ env: { HOME: ${JSON.stringify(plugin)} }, cwd: ${JSON.stringify(plugin)}, home: ${JSON.stringify(plugin)}, agentDir: ${JSON.stringify(join(plugin, "agent"))}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
+      `const threads = ${JSON.stringify(threads)}`,
+      "const config = await root.config.status()",
+      "const answers = []",
+      "const ask = async () => { const sent = await root.threads.list({}); answers.push(sent.kind === 'error' ? { code: sent.error.code, reason: sent.error.details?.reason ?? null, restart: sent.error.code === 'internal_error' ? /restart/i.test(sent.error.message) : null } : sent.kind) }",
+      ...steps,
+      "await root.dispose()",
+      "console.log(JSON.stringify({ config: config.kind, answers }))",
+    ].join("\n")
+    const child = spawn(runtime, runtime === "node" ? ["--input-type=module", "-e", probe] : ["-e", probe], {
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
+    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
+    return JSON.parse(stdout.trim())
+  }
+
+  // No engine runs here, so a thread core that loaded reports the host unavailable.
+  const LOADED = { code: "host_unavailable", reason: null, restart: null }
+  const UNAVAILABLE = { code: "internal_error", reason: "runtime_file_unavailable", restart: true }
+
+  for (const runtime of ["node", "bun"]) {
+    test(`#given the two built SDK files in a plugin layout #when ${runtime} runs a script #then an account call needs no thread file and a thread call loads it, never through the manifest above the package`, async () => {
+      const plugin = await pluginLayout(await sharedOutputs())
+      expect(await runSteps(runtime, plugin, ["await ask()"])).toEqual({ config: "ok", answers: [LOADED] })
+    })
+
+    // Review 6075851574 MEDIUM 5, the retry contract: the root re-imports on every call and keeps nothing itself, so a
+    // missing file put back loads on the next call of the same process.
+    test(`#given a thread file missing on the first call and put back #when ${runtime} makes the next call in the same process #then the first is refused and the next loads it`, async () => {
+      const plugin = await pluginLayout(await sharedOutputs())
+      const answered = await runSteps(runtime, plugin, [
+        "await rename(threads, `${threads}.aside`)",
+        "await ask()",
+        "await rename(`${threads}.aside`, threads)",
+        "await ask()",
+      ])
+      expect(answered).toEqual({ config: "ok", answers: [UNAVAILABLE, LOADED] })
+    })
+
+    // The platform's module loader keeps a file whose evaluation failed for the life of the process: the refusal says to
+    // restart, and replacing the file does not change that (stated, not hidden; no cache-busting second instance).
+    test(`#given a thread file whose evaluation fails #when ${runtime} replaces it and calls again in the same process #then both calls are refused and say to restart`, async () => {
+      const plugin = await pluginLayout(await sharedOutputs())
+      const answered = await runSteps(runtime, plugin, [
+        "await copyFile(threads, `${threads}.good`)",
+        "await writeFile(threads, 'throw new Error(\"evaluation failed\")\\n')",
+        "await ask()",
+        "await copyFile(`${threads}.good`, threads)",
+        "await ask()",
+      ])
+      expect(answered).toEqual({ config: "ok", answers: [UNAVAILABLE, UNAVAILABLE] })
+    })
+
+    // Design lane ruling on the security note (A), recorded behaviour B11: a root of one build with the thread file of
+    // another (an in-place update while the process ran) is refused typed, and the refusal says to restart.
+    test(`#given a root of one build and a thread file of another #when ${runtime} makes a thread call #then it answers runtime_file_mismatch and says to restart`, async () => {
+      const outputs = await sharedOutputs()
+      const other = await mkdtemp(join(tmpdir(), "omo-sdk-other-build-"))
+      perTestRoots.push(other)
+      await buildRuntimeFile(rowNamed("threads"), join(other, "threads.js"), {
+        ...omoSenpiBuildDefines(packageVersion),
+        OMO_SDK_RUNTIME_STAMP: "another-build",
+      })
+      const plugin = await pluginLayout(outputs, join(other, "threads.js"))
+      expect(await runSteps(runtime, plugin, ["await ask()"])).toEqual({
         config: "ok",
-        thread: { code: "internal_error", reason: "runtime_file_unavailable" },
+        answers: [{ code: "internal_error", reason: "runtime_file_mismatch", restart: true }],
       })
     })
+  }
 
   test("#given the built extension without the thread runtime file #when freshness is checked #then it reports that output missing", async () => {
     const outputs = await mutableOutputs()
-    const threadsOutputPath = join(dirname(outputs.omoSdkOutputPath), "threads.js")
-    await rm(threadsOutputPath)
+    await rm(sdkFile(outputs, "threads"))
     expect(await checkExtensionCurrent(outputs)).toMatchObject({
       ok: false,
       reason: "missing-output",
-      output: threadsOutputPath,
+      output: sdkFile(outputs, "threads"),
     })
   })
 
   test("#given the built extension without the omo SDK #when freshness is checked #then it reports that output missing", async () => {
     const outputs = await mutableOutputs()
-    await rm(outputs.omoSdkOutputPath)
+    await rm(sdkFile(outputs, "root"))
     expect(await checkExtensionCurrent(outputs)).toMatchObject({
       ok: false,
       reason: "missing-output",
-      output: outputs.omoSdkOutputPath,
+      output: sdkFile(outputs, "root"),
     })
   })
 })

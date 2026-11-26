@@ -1,12 +1,13 @@
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { builtinModules, createRequire } from "node:module"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { attachBuildMarker, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
+import { attachBuildMarker, minifyBundle, normalizeBuiltinImports, toPortableBuildPath } from "./build-artifact.mjs"
 import { stageRuntimePersonas } from "./persona-artifacts.mjs"
-import { SDK_RUNTIME_FILES } from "./runtime-files.mjs"
+import { SDK_RUNTIME_FILES, sdkRuntimeOutputPaths } from "./runtime-files.mjs"
 
 export function resolveBunExecutable(platform = process.platform) {
   return platform === "win32" ? "bun.exe" : "bun"
@@ -79,10 +80,9 @@ const toolkitSdkOutputPath = join(
 )
 const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
 const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
-// The account, device, device-service and configuration SDK eval cells import from OMO_SDK_ROOT.
-export const OMO_SDK_RELATIVE_PATH = join("runtime", "omo-sdk", "sdk.js")
-const omoSdkEntryPath = join(packageRoot, "src", "extension", "omo-sdk.ts")
-const omoSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, OMO_SDK_RELATIVE_PATH)
+// The account, device, device-service and configuration SDK eval cells import from OMO_SDK_ROOT. The SDK runtime files
+// (runtime-files.mjs) are written at their table outputs under one plugin output root.
+const sdkRuntimeRootPath = process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot
 // The `omo thread` CLI and connector scripts import this SDK without an agent session; it points
 // the gateway store at the worker sidecar in `extensions/` (two levels up from its own file).
 export const THREAD_SDK_RELATIVE_PATH = join("runtime", "thread-sdk", "sdk.js")
@@ -323,7 +323,7 @@ export const extensionBuildPaths = {
   supervisorOutputPath,
   toolkitSdkOutputPath,
   bunshinTsOutputPath,
-  omoSdkOutputPath,
+  sdkRuntimeRootPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
   sidePanelRuntimeOutputPath,
@@ -381,9 +381,9 @@ export function resolveOutputs(options) {
       join("runtime", "agent-toolkit-sdk", "sdk.js"),
     ),
     bunshinTsOutput: sibling(options.bunshinTsOutputPath, bunshinTsOutputPath, join("runtime", "bunshin-ts", "sdk.js")),
-    omoSdkOutput: sibling(options.omoSdkOutputPath, omoSdkOutputPath, OMO_SDK_RELATIVE_PATH),
-    sdkRuntimeOutputs: lazySdkRuntimeOutputs(
-      sibling(options.omoSdkOutputPath, omoSdkOutputPath, OMO_SDK_RELATIVE_PATH),
+    // Named explicitly or, with only `outputPath` set, beside it; never derived from another file's path.
+    sdkRuntimeOutputs: sdkRuntimeOutputPaths(
+      options.sdkRuntimeRoot ?? (options.outputPath === undefined ? sdkRuntimeRootPath : dirname(output)),
     ),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(
@@ -437,17 +437,6 @@ export const runtimeFileExternals = (row, table = SDK_RUNTIME_FILES) => [
   ...table.filter((other) => other !== row && other.lazy).map((other) => other.specifier),
 ]
 
-// The lazily loaded SDK runtime files sit at their table output under the same plugin root as the root runtime file.
-function lazySdkRuntimeOutputs(omoSdkOutput) {
-  const pluginRootOfSdk = omoSdkOutput.slice(0, omoSdkOutput.length - OMO_SDK_RELATIVE_PATH.length)
-  return Object.fromEntries(
-    SDK_RUNTIME_FILES.filter((row) => row.lazy).map((row) => [
-      row.name,
-      join(pluginRootOfSdk, ...row.output.split("/")),
-    ]),
-  )
-}
-
 export async function buildExtension(options = {}) {
   const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"))
   if (typeof packageManifest.version !== "string" || packageManifest.version.length === 0) {
@@ -464,7 +453,6 @@ export async function buildExtension(options = {}) {
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     bunshinTsOutput,
-    omoSdkOutput,
     sdkRuntimeOutputs,
     threadSdkOutput,
     rollbackRuntimeOutput,
@@ -491,10 +479,7 @@ export async function buildExtension(options = {}) {
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
   // The root's thread core carries the same parked-session wake as the thread SDK below (#14972), loaded the same way.
-  const omoSdkInputs = await buildOmoSdkRuntime(omoSdkOutput, buildDefines)
-  const sdkRuntimeInputs = {}
-  for (const row of SDK_RUNTIME_FILES.filter((candidate) => candidate.lazy))
-    sdkRuntimeInputs[row.name] = await buildRuntimeFile(row, sdkRuntimeOutputs[row.name], buildDefines)
+  const sdkRuntimeInputs = await buildSdkRuntimeFiles(sdkRuntimeOutputs, buildDefines)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
@@ -575,7 +560,6 @@ export async function buildExtension(options = {}) {
     onboardingScanRuntimeInputs,
     toolkitSdkInputs,
     bunshinTsInputs,
-    omoSdkInputs,
     sdkRuntimeInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
@@ -604,23 +588,70 @@ export async function buildExtension(options = {}) {
 
 // `assets`: the entry imports files (the Loro wasm) through Bun's file loader, which is a second output
 // that --outfile cannot write; --outdir with fixed names puts the entry at `output` and each asset beside it.
+const rootRuntimeFile = (table = SDK_RUNTIME_FILES) => table.find((row) => !row.lazy)
+
 /**
  * The one build of the SDK root runtime (`runtime/omo-sdk/sdk.js`). `keepMetafile` copies the bundler's metafile out
  * before it is removed: plugin/scripts/omo-sdk-static-set.mjs reads what this build keeps (#14950); `entry` lets its
  * control build one extra import on top of the same entry with the same settings.
  */
-export function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
-  return buildRuntimeFile(SDK_RUNTIME_FILES[0], output, buildDefines, { keepMetafile, entry })
+export function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry } = {}) {
+  return buildRuntimeFile(rootRuntimeFile(), output, buildDefines, { keepMetafile, entry })
 }
 
-/** One SDK runtime file of the table, with that row's externals; `entry` overrides the row's entry for a control build. */
+/**
+ * One SDK runtime file of the table, with that row's externals; `entry` overrides the row's entry for a control build.
+ * `table` is the declaration the externals come from (a test passes a table with an added row).
+ */
 export function buildRuntimeFile(
   row,
   output,
   buildDefines,
-  { keepMetafile, entry = join(packageRoot, row.entry) } = {},
+  { keepMetafile, entry = resolve(packageRoot, row.entry), table = SDK_RUNTIME_FILES } = {},
 ) {
-  return buildEntry(entry, output, buildDefines, runtimeFileExternals(row), { keepMetafile })
+  return buildEntry(entry, output, buildDefines, runtimeFileExternals(row, table), { keepMetafile })
+}
+
+/**
+ * Every SDK runtime file of `table` at `outputs[row.name]`, all with ONE build stamp (design lane ruling on PR 15116): a
+ * digest of the build's defines and of every source any of the files is built from, so the same sources give the same
+ * stamp (--check reproduces it) and a changed source gives a new one. The root compares it with what a loaded file
+ * exports before using it. A first pass collects the sources; the second writes every file with the stamp.
+ */
+export async function buildSdkRuntimeFiles(outputs, buildDefines, table = SDK_RUNTIME_FILES) {
+  const sources = new Set()
+  for (const row of table)
+    for (const input of await buildRuntimeFile(
+      row,
+      outputs[row.name],
+      { ...buildDefines, OMO_SDK_RUNTIME_STAMP: "" },
+      {
+        table,
+      },
+    ))
+      sources.add(input)
+  const stamp = await sourceStamp([...sources].sort(), buildDefines)
+  const inputs = {}
+  for (const row of table)
+    inputs[row.name] = await buildRuntimeFile(
+      row,
+      outputs[row.name],
+      { ...buildDefines, OMO_SDK_RUNTIME_STAMP: stamp },
+      {
+        table,
+      },
+    )
+  return inputs
+}
+
+async function sourceStamp(sources, buildDefines) {
+  const hash = createHash("sha256").update(JSON.stringify(buildDefines))
+  for (const source of sources)
+    hash
+      .update(toPortableBuildPath(source))
+      .update("\0")
+      .update(await readFile(resolve(repoRoot, source)))
+  return hash.digest("base64url")
 }
 
 async function buildEntry(

@@ -228,17 +228,22 @@ var SDK_RUNTIME_FILES = [
     entry: "src/extension/omo-sdk.ts",
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
-    lazy: false
+    lazy: false,
+    ceiling: 608704,
+    staticSet: "omo-sdk-static-modules.json"
   },
   {
     name: "threads",
     entry: "src/components/thread/sdk-core/runtime-entry.ts",
     output: "runtime/omo-sdk/threads.js",
     specifier: "#omo-sdk-threads-runtime",
-    lazy: true
+    lazy: true,
+    ceiling: 532882,
+    staticSet: "omo-sdk-threads-static-modules.json"
   }
 ];
 var runtimeArtifactPaths = (table = SDK_RUNTIME_FILES) => table.map((row) => join3(...row.output.split("/")));
+var RUNTIME_IMPORT_MAP = "package.json";
 
 // packages/omo-senpi/src/install/senpi-settings.ts
 import { constants } from "node:fs";
@@ -410,6 +415,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join5("runtime", "agent-toolkit-sdk", "sdk.js"),
   join5("runtime", "bunshin-ts", "sdk.js"),
   ...runtimeArtifactPaths(),
+  RUNTIME_IMPORT_MAP,
   join5("runtime", "thread-sdk", "sdk.js"),
   join5("runtime", "ast-grep-mcp", "cli.js"),
   join5("runtime", "lsp-daemon", "dist", "cli.js"),

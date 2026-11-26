@@ -7,7 +7,8 @@ export interface BuildExtensionOptions {
   sidePanelRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
   bunshinTsOutputPath?: string
-  omoSdkOutputPath?: string
+  /** The plugin output root the SDK runtime files (runtime-files.mjs) are written under, each at its table output. */
+  sdkRuntimeRoot?: string
   rollbackRuntimeOutputPath?: string
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
@@ -56,7 +57,8 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   computerRunWorkerInputs: string[]
   toolkitSdkInputs: string[]
   bunshinTsInputs: string[]
-  omoSdkInputs: string[]
+  /** Each SDK runtime file's bundler inputs, by its table row name. */
+  sdkRuntimeInputs: Record<string, string[]>
   rollbackRuntimeInputs: string[]
   gatewayStoreWorkerInputs: string[]
   threadSdkInputs: string[]

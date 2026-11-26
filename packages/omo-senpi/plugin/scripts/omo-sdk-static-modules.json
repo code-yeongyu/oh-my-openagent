@@ -693,6 +693,7 @@
     "packages/omo-senpi/src/components/omo-sdk/root/shipped.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/thread-failures.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/threads.ts",
+    "packages/omo-senpi/src/components/omo-sdk/runtime-stamp.ts",
     "packages/omo-senpi/src/components/omo-sdk/thread-assembly.ts",
     "packages/omo-senpi/src/components/omo-sdk/unexpected-port.ts",
     "packages/omo-senpi/src/components/telemetry/category-config-schema.ts",

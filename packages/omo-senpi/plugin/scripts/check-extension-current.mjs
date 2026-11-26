@@ -13,7 +13,6 @@ import {
   extensionBuildPaths,
   GATEWAY_STORE_WORKER_NAME,
   memorySyncAssetSources,
-  OMO_SDK_RELATIVE_PATH,
   resolveOutputs,
   THREAD_SDK_RELATIVE_PATH,
 } from "./build-extension-core.mjs"
@@ -37,7 +36,6 @@ export async function checkExtensionCurrent(options = {}) {
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     bunshinTsOutput,
-    omoSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
     memoryDoctorOutput,
@@ -65,8 +63,6 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
   const currentBunshinTs = await readBuiltEntry(bunshinTsOutput)
   if (currentBunshinTs === undefined) return { ok: false, reason: "missing-output", output: bunshinTsOutput }
-  const currentOmoSdk = await readBuiltEntry(omoSdkOutput)
-  if (currentOmoSdk === undefined) return { ok: false, reason: "missing-output", output: omoSdkOutput }
   const currentRollbackRuntime = await readBuiltEntry(rollbackRuntimeOutput)
   if (currentRollbackRuntime === undefined)
     return { ok: false, reason: "missing-output", output: rollbackRuntimeOutput }
@@ -149,11 +145,9 @@ export async function checkExtensionCurrent(options = {}) {
     return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
   const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
   if (currentThreadSdk === undefined) return { ok: false, reason: "missing-output", output: threadSdkOutput }
-  const currentSdkRuntimes = {}
-  for (const [name, path] of Object.entries(sdkRuntimeOutputs)) {
-    currentSdkRuntimes[name] = await readBuiltEntry(path)
-    if (currentSdkRuntimes[name] === undefined) return { ok: false, reason: "missing-output", output: path }
-  }
+
+  for (const path of Object.values(sdkRuntimeOutputs))
+    if ((await readBuiltEntry(path)) === undefined) return { ok: false, reason: "missing-output", output: path }
 
   const ownsReproduction = options.expectedRoot === undefined
   const tempRoot = ownsReproduction ? await mkdtemp(join(tmpdir(), "omo-senpi-build-check-")) : options.expectedRoot
@@ -167,7 +161,7 @@ export async function checkExtensionCurrent(options = {}) {
     onboardingScanRuntimeOutputPath: join(tempRoot, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
     bunshinTsOutputPath: join(tempRoot, "runtime", "bunshin-ts", "sdk.js"),
-    omoSdkOutputPath: join(tempRoot, OMO_SDK_RELATIVE_PATH),
+    sdkRuntimeRoot: tempRoot,
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
@@ -192,16 +186,12 @@ export async function checkExtensionCurrent(options = {}) {
   }
   try {
     if (ownsReproduction) await buildExtension(expected)
+    const sdkRuntimes = await sdkRuntimeFilesCurrent(sdkRuntimeOutputs, resolveOutputs(expected).sdkRuntimeOutputs)
+    if (!sdkRuntimes.ok) return sdkRuntimes
     for (const [current, built, outputFile] of [
       [currentRollbackRuntime, expected.rollbackRuntimeOutputPath, rollbackRuntimeOutput],
       [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
       [currentBunshinTs, expected.bunshinTsOutputPath, bunshinTsOutput],
-      [currentOmoSdk, expected.omoSdkOutputPath, omoSdkOutput],
-      ...Object.entries(sdkRuntimeOutputs).map(([name, path]) => [
-        currentSdkRuntimes[name],
-        resolveOutputs(expected).sdkRuntimeOutputs[name],
-        path,
-      ]),
       [currentMain, expected.outputPath, output],
       [currentTask, expected.taskOutputPath, taskOutput],
       [currentMember, expected.memberOutputPath, memberOutput],
@@ -263,6 +253,20 @@ export async function checkExtensionCurrent(options = {}) {
   } finally {
     if (ownsReproduction) await rm(tempRoot, { recursive: true, force: true })
   }
+}
+
+/**
+ * Every SDK runtime file (runtime-files.mjs, one per row) against its reproduction: `current` and `expected` map each
+ * row's name to its output path, so a row added to the table is checked like the others.
+ */
+export async function sdkRuntimeFilesCurrent(current, expected) {
+  for (const [name, path] of Object.entries(current)) {
+    const text = await readBuiltEntry(path)
+    if (text === undefined) return { ok: false, reason: "missing-output", output: path }
+    if (!artifactsMatch(text, await readFile(expected[name], "utf8")))
+      return { ok: false, reason: "stale-output", output: path }
+  }
+  return { ok: true }
 }
 
 function isErrno(error, code) {

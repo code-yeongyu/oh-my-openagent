@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url"
 
 import { REQUIRED_PLUGIN_ARTIFACTS } from "../../src/install/plugin-artifacts.ts"
 import { runtimeFileExternals } from "./build-extension-core.mjs"
-import { runtimeArtifactPaths, SDK_RUNTIME_FILES } from "./runtime-files.mjs"
+import { staticSetPath } from "./omo-sdk-static-set.mjs"
+import { RUNTIME_IMPORT_MAP, runtimeArtifactPaths, SDK_RUNTIME_FILES } from "./runtime-files.mjs"
 
 // Slice P1c (#15031): the SDK root's runtime files are one declaration table. Every list that names a runtime file is
 // derived from it, so a row added there reaches the build, the freshness check and the installer without a second
@@ -19,10 +20,19 @@ const sourceManifest = readJson(join(packageRoot, "package.json"))
 const row = (name) => SDK_RUNTIME_FILES.find((entry) => entry.name === name)
 
 describe("the SDK runtime file table", () => {
-  test("#given the table #then it declares the root and the thread core, each with its own output and specifier", () => {
-    expect(SDK_RUNTIME_FILES.map((entry) => entry.name)).toEqual(["root", "threads"])
-    expect(new Set(SDK_RUNTIME_FILES.map((entry) => entry.output)).size).toBe(SDK_RUNTIME_FILES.length)
-    expect(new Set(SDK_RUNTIME_FILES.map((entry) => entry.specifier)).size).toBe(SDK_RUNTIME_FILES.length)
+  test("#given the table #then it has one root, and every row its own name, output, specifier, ceiling and kept list", () => {
+    expect(SDK_RUNTIME_FILES.filter((entry) => !entry.lazy).map((entry) => entry.entry)).toEqual([
+      "src/extension/omo-sdk.ts",
+    ])
+    for (const key of ["name", "output", "specifier", "staticSet"])
+      expect(new Set(SDK_RUNTIME_FILES.map((entry) => entry[key])).size).toBe(SDK_RUNTIME_FILES.length)
+    for (const entry of SDK_RUNTIME_FILES) {
+      expect({ name: entry.name, ceiling: Number.isInteger(entry.ceiling) && entry.ceiling > 0 }).toEqual({
+        name: entry.name,
+        ceiling: true,
+      })
+      expect(readJson(staticSetPath(entry)).modules.length).toBeGreaterThan(0)
+    }
   })
 
   test("#given every row #then the installer requires its output and both manifests map its specifier", () => {
@@ -33,6 +43,7 @@ describe("the SDK runtime file table", () => {
     }
     for (const entry of SDK_RUNTIME_FILES.filter((candidate) => candidate.lazy))
       expect(sourceManifest.imports[entry.specifier]).toBe(`./${entry.entry}`)
+    expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(RUNTIME_IMPORT_MAP)
   })
 
   test("#given a row added to the table #then the derived artifact paths and every row's externals carry it", () => {
@@ -52,14 +63,14 @@ describe("the SDK runtime file table", () => {
 })
 
 describe("the boundary between the files carries data and functions only", () => {
-  test("#given the thread file's entry module #then every export is a plain function or plain data, never a class", async () => {
+  test("#given the thread file's entry module #then every export is a plain function or plain data (an object or the build stamp), never a class", async () => {
     const entry = await import("../../src/components/thread/sdk-core/runtime-entry.ts")
     expect(row("threads").entry).toBe("src/components/thread/sdk-core/runtime-entry.ts")
     for (const [name, value] of Object.entries(entry)) {
       const kind = typeof value
-      expect({ name, kind: kind === "function" || kind === "object" ? kind : "other" }).toEqual({
+      expect({ name, kind: ["function", "object", "string"].includes(kind) ? "allowed" : kind }).toEqual({
         name,
-        kind: kind === "function" ? "function" : "object",
+        kind: "allowed",
       })
       if (kind === "function")
         expect({ name, isClass: /^class\b/.test(Function.prototype.toString.call(value)) }).toEqual({
