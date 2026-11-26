@@ -26,18 +26,18 @@ const pinBumped = withText(base, (stdout) => stdout.split(declared.engine).join(
 
 type Versions = { readonly base: DeclaredVersions | undefined; readonly head: DeclaredVersions }
 const BUMP: Versions = { base: declared, head: bumped }
-const run = (after: Outcome, versions: Versions = BUMP) =>
+const run = (after: Outcome, versions: Versions = BUMP, before: Outcome = base) =>
   gateReport(
     input({
       scenarios,
-      base: { ...input().base, outcomes: { [ID]: base } },
+      base: { ...input().base, outcomes: { [ID]: before } },
       head: { ...input().head, outcomes: { [ID]: after } },
       versions,
     }),
   )
 
-const failsAsChange = (after: Outcome, versions: Versions = BUMP) => {
-  const report = run(after, versions)
+const failsAsChange = (after: Outcome, versions: Versions = BUMP, before: Outcome = base) => {
+  const report = run(after, versions, before)
   expect(report.versionMasked).toEqual([])
   expect(report.failures).toEqual([expect.stringContaining(`scenario ${ID} answers differently`)])
 }
@@ -58,6 +58,42 @@ describe("version mask (positive control: the engine pin bump of #15075)", () =>
   })
 })
 
+describe("version mask (the rest of the outcome is compared exactly)", () => {
+  test("#given the pin bump plus a changed exit code #then it fails", () => {
+    failsAsChange({ ...pinBumped, exit: Number(pinBumped["exit"]) + 1 })
+  })
+
+  test("#given the pin bump plus a changed stderr #then it fails", () => {
+    failsAsChange({ ...pinBumped, stderr: `${pinBumped["stderr"]}warning\n` })
+  })
+
+  test("#given the pin bump plus an added outcome field #then it fails", () => {
+    failsAsChange({ ...pinBumped, signal: "SIGTERM" })
+  })
+
+  test("#given the pin bump moved to the other stream #then it fails", () => {
+    failsAsChange({ ...pinBumped, stdout: pinBumped["stderr"], stderr: pinBumped["stdout"] })
+  })
+})
+
+describe("version mask (the reviewer's digest with another tier)", () => {
+  test("#given a version-masked scenario and a candidate in one report #then the ids line lists the candidate first and the version mark last, and the digest covers both", () => {
+    const report = gateReport(
+      input({
+        scenarios,
+        base: { ...input().base, outcomes: { [ID]: base } },
+        head: { ...input().head, outcomes: { [ID]: pinBumped } },
+        versions: BUMP,
+        changedFiles: ["packages/omo-native/bin/lib/thread.js"],
+      }),
+    )
+    expect(report.failures).toEqual([])
+    expect(report.candidates).toEqual(["threads.send"])
+    expect(renderReport(report)).toContain(`count=2 ids=threads.send,${ID}#version-mask`)
+    expect(report.digest).toBe(candidateDigest(HEAD, ["threads.send", `${ID}#version-mask`]))
+  })
+})
+
 describe("version mask (negative controls)", () => {
   test("#given the pin bump plus one other changed character #then it fails", () => {
     failsAsChange(withText(pinBumped, (stdout) => stdout.replace("omo ", "omO ")))
@@ -69,6 +105,11 @@ describe("version mask (negative controls)", () => {
 
   test("#given the head prints the placeholder text itself #then it is never masked and fails", () => {
     failsAsChange(withText(base, (stdout) => stdout.split(declared.engine).join("<ENGINE_VERSION>")))
+  })
+
+  test("#given the merge base's output carries the placeholder text #then it is never masked and the bump fails", () => {
+    const placeholderBase = withText(base, (stdout) => stdout.split(declared.engine).join("<ENGINE_VERSION>"))
+    failsAsChange(pinBumped, BUMP, placeholderBase)
   })
 
   test("#given a merge base with no native manifest #then nothing is masked and the bump fails", () => {
