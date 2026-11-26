@@ -14,8 +14,8 @@ import { type NamedProcess, processScope, processStart, processState } from "./p
 // A live holder in this scope is never broken. A wait ends PATIENCE_MS after the holder last changed and never later than
 // WAIT_CAP_MS: a holder that stays costs one patience, a queue that keeps moving is not starved.
 
-export const PATIENCE_MS = 2000
-export const WAIT_CAP_MS = 6000
+const PATIENCE_MS = 2000
+const WAIT_CAP_MS = 6000
 const RETRY_MS = 5
 /** A lock that names no holder (a crash inside the take): broken past this age. */
 export const HOLDERLESS_BREAK_AGE_MS = 5000
