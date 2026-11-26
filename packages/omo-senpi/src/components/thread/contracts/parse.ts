@@ -2,7 +2,6 @@ import { Value } from "typebox/value"
 import type { Static, TObject } from "typebox"
 
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
-import { refusal } from "../refusal-texts"
 import type { ThreadDataError } from "./results"
 
 export type ThreadParamParse<S extends TObject> = { readonly kind: "ok"; readonly value: Static<S> } | ThreadDataError
@@ -99,18 +98,4 @@ export function unknownKeys(request: unknown, known: readonly string[]): ThreadD
     `Pass only ${known.join(", ")}.`,
     { unknown },
   )
-}
-
-/**
- * No leg carries an attachment yet: the gateway delivery on this device has no field for one, and neither has the relay
- * record a send to another device becomes. So a send or a create's first prompt naming attachments (top level or in the
- * object prompt) is refused with this one typed refusal on every surface, before any effect, never sent without them.
- */
-export function attachmentsRefused(input: unknown): ThreadToolFailure | undefined {
-  const field = (from: unknown, name: string): unknown =>
-    typeof from === "object" && from !== null ? Reflect.get(from, name) : undefined
-  const attachments = field(input, "attachments") ?? field(field(input, "prompt"), "attachments")
-  if (attachments === undefined) return undefined
-  const count = Array.isArray(attachments) ? attachments.length : 1
-  return refusal("control.send_attachments_unsupported", { count: String(count) }, { field: "attachments", count })
 }

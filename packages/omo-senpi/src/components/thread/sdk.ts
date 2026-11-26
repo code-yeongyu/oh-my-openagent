@@ -1,3 +1,4 @@
+import { attachmentsRefused } from "./sdk-core/failures"
 import type { WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
 import { assembleThreadFacade } from "../omo-sdk/thread-assembly"
@@ -5,7 +6,6 @@ import type { OmoFailure } from "../omo-sdk/contract"
 import { storeRefusal } from "../omo-sdk/root/extension-codes"
 import { threadToolFailureOf } from "../omo-sdk/root/thread-failures"
 import {
-  attachmentsRefused,
   parseThreadParams,
   unknownKeys,
   threadToolParamSchemas,
