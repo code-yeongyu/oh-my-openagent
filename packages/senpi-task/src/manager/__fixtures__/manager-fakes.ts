@@ -15,6 +15,7 @@ import type { ManagedChildHandle } from "../child-handle"
 import type { ExecutionModeGate } from "../execution-mode"
 import { createTaskManager } from "../manager"
 import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -187,7 +188,7 @@ export function makeManager(
   } = {},
 ) {
   const project = options.project ?? tempProject()
-  const store = options.store ?? createTaskRecordStore({ project_dir: project })
+  const store = options.store ?? createTaskRecordStore(ownedTaskState(project))
   const inProcess = options.inProcess ?? new FakeRunner()
   const processRunner: ManagedRunner = options.process ?? new FakeRunner()
   const manager = createTaskManager({

@@ -5,6 +5,9 @@ import { runIteration } from "./chaos-drive"
 import { buildHarness } from "./chaos-harness"
 import type { InvariantId } from "./chaos-invariants"
 import { deriveSeed, hashSeed } from "./prng"
+import { useOwnedAgentDir } from "../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 // Seeded adversarial interleaving bench. Each iteration scripts fake runners through a randomized
 // mix of start/queue, completion, steer, interrupt, running/pending cancel, abortable parent waits,

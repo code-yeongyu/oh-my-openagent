@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
 import { AccountHttpError } from "../../../../memory-core/src/sync/account/http"
-const deferred = <T>() => Promise.withResolvers<T>()
+
 afterEach(disposeSyncRpcFixtures)
 
 test("#given source resolution is held #when two enables race #then only one join opens", async () => {
@@ -124,13 +124,13 @@ test("#given an expired pending result #when status is read #then expiry remains
 test("#given an operation begin held in the selected source #when pending owner disconnects #then listPending never dispatches", async () => {
   const f = await setup()
   const a = owner("a")
-  const entered = deferred<void>()
-  const release = deferred<void>()
+  const entered = Promise.withResolvers<undefined>()
+  const release = Promise.withResolvers<undefined>()
   const original = f.account.forOperation
   let lists = 0
   f.account.forOperation = async (authority) => {
     const ports = await original(authority)
-    entered.resolve()
+    entered.resolve(undefined)
     await release.promise
     return {
       ...ports,
@@ -146,7 +146,7 @@ test("#given an operation begin held in the selected source #when pending owner 
   const result = f.call("pending", a.context)
   await entered.promise
   a.retire()
-  release.resolve()
+  release.resolve(undefined)
   expect(await result).toMatchObject({ kind: "unavailable" })
   expect(lists).toBe(0)
   expect(f.counts().closes).toBe(1)

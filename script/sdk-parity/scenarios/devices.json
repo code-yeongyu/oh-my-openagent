@@ -1,0 +1,614 @@
+{
+  "domain": "devices",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "devices.list/lists-live-devices",
+      "row": "devices.list",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list"
+        }
+      ]
+    },
+    {
+      "id": "devices.list/signed-out",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.list/session-ended",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "session_ended",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": {
+            "error": {
+              "status": 401
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.list/desktop-launch",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "desktop_sign_in",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.list/service-unreachable",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "service_unreachable",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": {
+            "error": "request_failed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/renames-and-reads-back",
+      "row": "devices.rename",
+      "kind": "effect",
+      "input": {
+        "id": "dev-2",
+        "name": "studio"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "args": {
+            "id": "dev-2",
+            "name": "studio"
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": [
+            {
+              "id": "dev-2",
+              "name": "studio"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/unknown-device",
+      "row": "devices.rename",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "id": "dev-9",
+        "name": "studio"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "args": {
+            "id": "dev-9",
+            "name": "studio"
+          },
+          "count": 1,
+          "result": {
+            "error": {
+              "status": 404,
+              "code": "not_found"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/revoked-before-read-back",
+      "row": "devices.rename",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "id": "dev-2",
+        "name": "studio"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "args": {
+            "id": "dev-2",
+            "name": "studio"
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": [
+            {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/signed-out",
+      "row": "devices.rename",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {
+        "id": "dev-2",
+        "name": "studio"
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/missing-name",
+      "row": "devices.rename",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "id": "dev-2"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/by-name",
+      "row": "devices.resolve",
+      "kind": "effect",
+      "input": {
+        "device": "desktop"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "desktop"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/unknown-device",
+      "row": "devices.resolve",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "device": "nowhere"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "nowhere"
+          },
+          "count": 1,
+          "result": {
+            "error": "not_found"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/name-shared",
+      "row": "devices.resolve",
+      "kind": "refusal",
+      "refusal": "ambiguous_target",
+      "input": {
+        "device": "mac"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "mac"
+          },
+          "count": 1,
+          "result": {
+            "error": "ambiguous_target"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/service-not-installed",
+      "row": "devices.resolve",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {
+        "device": "desktop"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "args": {
+            "device": "desktop"
+          },
+          "count": 1,
+          "result": {
+            "error": "host_unavailable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/empty-device",
+      "row": "devices.resolve",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "device": ""
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/revokes-another-device",
+      "row": "devices.revoke",
+      "kind": "effect",
+      "input": {
+        "device": "desktop",
+        "confirm_name": "desktop"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 2
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "args": {
+            "id": "dev-2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/unknown-device",
+      "row": "devices.revoke",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "device": "nowhere",
+        "confirm_name": "nowhere"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": [
+            {
+              "id": "dev-1",
+              "name": "laptop",
+              "current": true
+            },
+            {
+              "id": "dev-2",
+              "name": "desktop"
+            },
+            {
+              "id": "dev-3",
+              "name": "mini"
+            }
+          ]
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/prefix-shared",
+      "row": "devices.revoke",
+      "kind": "refusal",
+      "refusal": "ambiguous_target",
+      "input": {
+        "device": "dev-",
+        "confirm_name": "desktop"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": [
+            {
+              "id": "dev-1",
+              "name": "laptop",
+              "current": true
+            },
+            {
+              "id": "dev-2",
+              "name": "desktop"
+            },
+            {
+              "id": "dev-3",
+              "name": "mini"
+            }
+          ]
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/this-device",
+      "row": "devices.revoke",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "device": "laptop",
+        "confirm_name": "laptop"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": [
+            {
+              "id": "dev-1",
+              "name": "laptop",
+              "current": true
+            },
+            {
+              "id": "dev-2",
+              "name": "desktop"
+            },
+            {
+              "id": "dev-3",
+              "name": "mini"
+            }
+          ]
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/confirm-name-mismatch",
+      "row": "devices.revoke",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "device": "dev-2",
+        "confirm_name": "mini"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 1,
+          "result": [
+            {
+              "id": "dev-1",
+              "name": "laptop",
+              "current": true
+            },
+            {
+              "id": "dev-2",
+              "name": "desktop"
+            },
+            {
+              "id": "dev-3",
+              "name": "mini"
+            }
+          ]
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/signed-out",
+      "row": "devices.revoke",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {
+        "device": "dev-2",
+        "confirm_name": "desktop"
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/missing-confirm-name",
+      "row": "devices.revoke",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "device": "dev-2"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.list/after-close",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "input": {},
+      "given": [
+        {
+          "port": "session",
+          "state": {
+            "closed": true
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

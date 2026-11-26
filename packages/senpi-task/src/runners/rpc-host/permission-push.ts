@@ -25,6 +25,7 @@ export async function reapplyPermissionPreset(input: HostSessionOpenInput, ports
         onEvent: () => {},
         bindClient: (client) => {
           side = client
+          return true
         },
       },
     )

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
 import {
@@ -34,12 +34,9 @@ describe("runtime-fallback", () => {
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
-    mock.module("../../shared/logger", () => ({
-      ...loggerModule,
-      log: (msg: string, data?: unknown) => {
-        logCalls.push({ msg, data })
-      },
-    }))
+    spyOn(loggerModule, "log").mockImplementation((msg, data) => {
+      logCalls.push({ msg, data })
+    })
 
     const runtimeFallbackModule: RuntimeFallbackModule = await import(`./hook?test=${cacheBuster}`)
     createRuntimeFallbackHook = runtimeFallbackModule.createRuntimeFallbackHook

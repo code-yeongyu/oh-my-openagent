@@ -1,0 +1,249 @@
+{
+  "domain": "devices",
+  "rows": [
+    {
+      "id": "devices.list",
+      "kind": "capability",
+      "sdk": "devices.list",
+      "today": "yes",
+      "slices": [
+        "shipped"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "devices"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "account",
+            "devices"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [
+        {
+          "name": "thread_list",
+          "branch": "devices",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": []
+        }
+      ],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "devices.rename",
+      "kind": "capability",
+      "sdk": "devices.rename",
+      "today": "yes",
+      "slices": [
+        "A1c"
+      ],
+      "input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {
+        "cli": "A1c"
+      },
+      "omitted": {
+        "tool": "Tool omitted: an account-level change a person makes"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "devices.resolve",
+      "kind": "capability",
+      "sdk": "devices.resolve",
+      "today": "partial",
+      "slices": [
+        "T1a"
+      ],
+      "input": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "device"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool and CLI omitted: resolution is part of each verb",
+        "cli": "Tool and CLI omitted: resolution is part of each verb"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "devices.revoke",
+      "kind": "capability",
+      "sdk": "devices.revoke",
+      "today": "no",
+      "slices": [
+        "A1c"
+      ],
+      "input": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirm_name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "confirm_name",
+          "device"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "account",
+            "devices",
+            "revoke"
+          ],
+          "flags": {},
+          "positionals": {
+            "id": "device"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it destroys a sign-in and is the person's decision"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.3",
+      "position": 1,
+      "ids": [
+        "devices.list"
+      ],
+      "cells": [
+        "`devices.list()`",
+        "`omo remote devices`; `omo account devices`",
+        "`thread_list` (its `devices` block)",
+        "yes; one listing after #14881",
+        "None",
+        "shipped"
+      ]
+    },
+    {
+      "table": "6.3",
+      "position": 2,
+      "ids": [
+        "devices.resolve"
+      ],
+      "cells": [
+        "`devices.resolve({ device })`",
+        "implicit in every `<device>/...`",
+        "none",
+        "partial: remote module",
+        "Tool and CLI omitted: resolution is part of each verb",
+        "T1a"
+      ]
+    },
+    {
+      "table": "6.3",
+      "position": 3,
+      "ids": [
+        "devices.rename"
+      ],
+      "cells": [
+        "`devices.rename({ id, name })`, the name bounded as the sign-in bounds it (#14523)",
+        "none",
+        "none",
+        "yes",
+        "CLI planned (A1c): `omo account devices rename`. Tool omitted: an account-level change a person makes",
+        "A1c"
+      ]
+    },
+    {
+      "table": "6.3",
+      "position": 4,
+      "ids": [
+        "devices.revoke"
+      ],
+      "cells": [
+        "`devices.revoke({ device, confirm_name })`: by id, name or unique prefix; an ambiguity revokes nothing; never this device",
+        "`omo account devices revoke <id>`",
+        "none",
+        "**no** (#14364 keeps it as its last step)",
+        "Tool omitted: it destroys a sign-in and is the person's decision",
+        "A1c"
+      ]
+    }
+  ]
+}

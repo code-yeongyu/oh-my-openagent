@@ -5,13 +5,20 @@ import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
+import { settleClosedIntake } from "./closed-intake"
 import { readEngineState, type EngineView } from "./engine-state"
+import { WAKE_MEMORY_FLOOR_BYTES } from "./memory-headroom"
+import { waitBlocksDelivery } from "../gateway/session-wait-types"
 import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
+import { ledgerDevice } from "../delivery-ledger"
 
 /** A person's wait that arose after admission is closed after this long with only the carrier attached (A3.2.6). */
 const PERSON_WAIT_CLOSE_MS = 30 * 60_000
 /** How often a carrier renews its leases and sweeps (A3.1.3). */
 const CARRIER_RENEW_MS = 20_000
+// How long a finished-looking session refused for a queued delivery is kept for that delivery to run (#13708): a wake
+// admitted during the restore starts within seconds; past this the delivery is taken as held and dropped as before.
+const QUEUED_DELIVERY_GRACE_MS = 2 * 60_000
 
 export type CarrierWakeOutcome =
   | { readonly kind: "open"; readonly session_id: string; readonly generation: number }
@@ -21,7 +28,8 @@ export type CarrierWakeOutcome =
   | { readonly kind: "gone" }
   | { readonly kind: "ambiguous"; readonly session_paths: readonly string[] }
   | { readonly kind: "not_wakeable"; readonly session_kind: Exclude<WakeSessionKind, "interactive"> }
-  | { readonly kind: "overloaded" }
+  /** The host's measured memory headroom is below the floor; the row stays requested and the sweep retries it. */
+  | { readonly kind: "host_memory_pressure"; readonly available_bytes: number; readonly floor_bytes: number }
   | { readonly kind: "not_yet"; readonly next_attempt_at: number }
   | { readonly kind: "busy"; readonly code: string }
   | { readonly kind: "deferred"; readonly attempts: number }
@@ -68,8 +76,18 @@ export type CarrierOptions = {
    * lost admission between the accept check and the retry or lease takeover starts nothing.
    */
   readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+  /**
+   * The host's memory headroom in bytes (`memory-headroom.ts` `readHostMemoryHeadroom` in production), read before a
+   * row is started: the only admission a wake has is real capacity, never a count. Undefined (no reading, or no probe)
+   * never defers a wake.
+   */
+  readonly memoryHeadroom?: () => number | undefined
+  /** The headroom a wake needs (`readWakeMemoryFloor` in production); `WAKE_MEMORY_FLOOR_BYTES` when absent. */
+  readonly memoryFloor?: () => number
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
+  /** A wake, takeover or look the carrier tends by itself threw; the row stays and the next sweep tries it again. */
+  readonly onError?: (error: unknown) => void
 }
 
 export type Carrier = {
@@ -86,6 +104,8 @@ type Carried = {
   readonly sessionId: string
   generation: number
   readonly off: () => void
+  /** When the release was first refused for a delivery since the session last worked or was refused otherwise (#13708). */
+  deliveryRefusedSince?: number
 }
 
 const HELD_ELSEWHERE = new Set(["session_held", "session_path_in_use"])
@@ -114,12 +134,6 @@ function fileSize(path: string): number {
   }
 }
 
-/** The sender's device as the intake's ledger id names it (`device:<device>/<id>`), when it does. */
-function deviceOfLedger(ledgerId: string): string | undefined {
-  const cut = ledgerId.indexOf("/")
-  return ledgerId.startsWith("device:") && cut > "device:".length ? ledgerId.slice("device:".length, cut) : undefined
-}
-
 /**
  * The carrier of woken sessions in one engine process (#13037 A3.1.3-A3.1.8, A3.2). Each carried session has its own kept
  * connection, the session's only attachment from this process. It lifts the opening gate and sends the engine's `wake`;
@@ -133,6 +147,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
   const carried = new Map<string, Carried>()
   const chains = new Map<string, Promise<unknown>>()
   const emit = options.onEvent ?? (() => undefined)
+  const report = (error: unknown): void => options.onError?.(error)
   let stopped = false
   let cancelTimer: (() => void) | undefined
 
@@ -165,17 +180,25 @@ export function createCarrier(options: CarrierOptions): Carrier {
     })
   }
 
-  /** The quiet hand-back (A3.2.4): a refusal naming a held delivery is retried once with interrupt, which drops it. */
+  /**
+   * The quiet hand-back (A3.2.4). On a held session a refusal naming a held delivery is retried once with interrupt,
+   * which drops it. A finished session refused for a delivery has one queued to run (a wake admitted while the engine
+   * was still restoring it): it is kept, not interrupted, since an interrupt parks that delivery for a person's turn,
+   * for up to QUEUED_DELIVERY_GRACE_MS; a delivery still refused after that is held, and the interrupt drops it.
+   */
   const quietRelease = async (
     entry: Carried,
-  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> => {
+    dropHeldDelivery = true,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly forDelivery?: true }> => {
     const first = await entry.connection.request({
       type: "release_session",
       sessionId: entry.sessionId,
       reason: "takeover",
     })
     if (first.success === true) return { ok: true }
-    if (codeOf(first) === "turn_active" && busyList(first).includes("delivery")) {
+    const forDelivery = codeOf(first) === "turn_active" && busyList(first).includes("delivery")
+    if (!dropHeldDelivery && forDelivery) return { ok: false, code: "turn_active", forDelivery: true }
+    if (forDelivery) {
       const second = await entry.connection.request({
         type: "release_session",
         sessionId: entry.sessionId,
@@ -239,8 +262,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "closed_waiting" }
     }
     if (renewed.row.first_waiting_at !== null) await store.woken.clearWaiting(fence)
-    if (!view.finished) return { kind: "kept", reason: "working" }
-    const released = await quietRelease(entry)
+    if (!view.finished) {
+      // Working again: a later refusal for a delivery gets its own full grace (#13709 review M1).
+      entry.deliveryRefusedSince = undefined
+      return { kind: "kept", reason: "working" }
+    }
+    const refusedSince = entry.deliveryRefusedSince
+    const graceOver = refusedSince !== undefined && store.now() - refusedSince >= QUEUED_DELIVERY_GRACE_MS
+    const released = await quietRelease(entry, graceOver)
+    if (!released.ok && released.forDelivery === true) entry.deliveryRefusedSince ??= store.now()
+    else entry.deliveryRefusedSince = undefined
     if (!released.ok) {
       if (released.code === "turn_active" || released.code === "session_busy")
         return { kind: "kept", reason: "working" }
@@ -270,8 +301,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
 
   const carry = (durableId: string, connection: CarrierHostConnection, sessionId: string, generation: number) => {
     const off = connection.onEvent((frame) => {
-      if (frame.type === "session_lifecycle" && frame.sessionId === sessionId)
-        void evaluate(durableId).catch(() => undefined)
+      if (frame.type === "session_lifecycle" && frame.sessionId === sessionId) void evaluate(durableId).catch(report)
     })
     const entry: Carried = { durableId, connection, sessionId, generation, off }
     carried.set(durableId, entry)
@@ -332,8 +362,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.kind === "gone" || target.kind === "ambiguous") return target
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
-    if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
-    const allowance = await openAllowance(durableId, target.cwd)
+    if (wait?.wait === "held" && waitBlocksDelivery(wait) && wait.file_size === fileSize(target.session_path))
+      return { kind: "held" }
+    const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
         // Only a record that is still `requested` is ended, compared on its generation: another carrier's record that
@@ -352,8 +383,14 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "wake_limit_reached" }
 
     await store.woken.request({ durable_id: durableId, session_file: target.session_path })
+    // Read outside the store's transaction: a short host defers the wake with its row requested (the send keeps
+    // answering waiting on the wake), and the sweep starts it once the headroom is back.
+    const available = options.memoryHeadroom?.()
+    const floor = available === undefined ? undefined : (options.memoryFloor?.() ?? WAKE_MEMORY_FLOOR_BYTES)
+    if (available !== undefined && floor !== undefined && available < floor)
+      return { kind: "host_memory_pressure", available_bytes: available, floor_bytes: floor }
     const started = await store.woken.start({ durable_id: durableId })
-    if (started.kind === "overloaded" || started.kind === "not_yet") return started
+    if (started.kind === "not_yet") return started
     if (started.kind !== "started") return { kind: "busy", code: "wake_in_progress" }
     const fence = { durable_id: durableId, generation: started.row.generation }
 
@@ -412,7 +449,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     }
     // A takeover opens only what a wake would open (the switches and the sender's admission included); with nothing
     // to open for, or a row that no longer allows it, the record ends and the queued rows wait for the next wake.
-    const allowance = await openAllowance(durableId, target.cwd)
+    const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
@@ -430,21 +467,24 @@ export function createCarrier(options: CarrierOptions): Carrier {
    * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
    * device (it carries the intake's ledger id) reads the wake the consumer was told and its sender's admission NOW,
    * failing closed when the answer is unknown or refused (#13456's noted follow-up); a same-device row reads
-   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open.
+   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open. A row queued
+   * before the session was closed on request is settled `target_closed` first and opens nothing (#14273).
    */
-  const openAllowance = async (durableId: string, cwd: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
-    const sameDevice = options.sameDevice?.(cwd) ?? false
+  const openAllowance = async (
+    durableId: string,
+    target: { readonly cwd: string; readonly closed_at?: number },
+  ): Promise<"open" | "switched_off" | "nothing_queued"> => {
+    const sameDevice = options.sameDevice?.(target.cwd) ?? false
     const remoteWake = options.remoteWake?.() ?? false
     let queued = false
-    for (const row of await store.list({ target_durable_id: durableId })) {
-      if (row.state !== "queued") continue
+    for (const row of await settleClosedIntake(store, durableId, target.closed_at)) {
       queued = true
       if (typeof row.ledger_id !== "string") {
         if (sameDevice) return "open"
         continue
       }
       if (!remoteWake) continue
-      const device = deviceOfLedger(row.ledger_id)
+      const device = ledgerDevice(row.ledger_id)
       if (device === undefined) continue
       if (options.admitIntake === undefined) return "open"
       const admission = await options.admitIntake(device).catch((): IntakeAdmission => "unknown")
@@ -464,16 +504,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
     const rows = await store.woken.list()
     for (const row of rows) {
       if (carried.has(row.durable_id)) {
-        await evaluate(row.durable_id).catch(() => undefined)
+        await evaluate(row.durable_id).catch(report)
         continue
       }
       if (row.state === "requested") {
         if (row.next_attempt_at === null || row.next_attempt_at <= now)
-          await serial(row.durable_id, () => wakeNow(row.durable_id)).catch(() => undefined)
+          await serial(row.durable_id, () => wakeNow(row.durable_id)).catch(report)
         continue
       }
       if (row.lease_expires_at !== null && row.lease_expires_at <= now)
-        await serial(row.durable_id, () => takeOver(row.durable_id)).catch(() => undefined)
+        await serial(row.durable_id, () => takeOver(row.durable_id)).catch(report)
     }
     return rows.length > 0 || carried.size > 0
   }
@@ -490,7 +530,10 @@ export function createCarrier(options: CarrierOptions): Carrier {
             if (hasWork) arm()
           },
           // A sweep that threw still had work to tend: the timer stays armed for the next tick (A3.1.4).
-          () => arm(),
+          (error: unknown) => {
+            report(error)
+            arm()
+          },
         )
       },
       Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3),
@@ -508,9 +551,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
           .then((hasWork) => {
             if (hasWork) arm()
           })
-          .catch(() => undefined)
+          .catch(report)
     })
-    .catch(() => undefined)
+    .catch(report)
 
   return {
     wake: (durableId) =>

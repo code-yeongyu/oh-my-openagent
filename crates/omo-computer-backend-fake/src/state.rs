@@ -40,6 +40,8 @@ pub struct FakeState {
     pub focus_record_pos: BTreeMap<FocusRecordKind, usize>,
     /// Snapshot generation -> the window it walked.
     pub snapshots: BTreeMap<u64, String>,
+    /// Root reads per window: which `ax_versions` entry the window serves.
+    pub ax_reads: BTreeMap<String, usize>,
     pub ax_event_pos: usize,
     pub stop_pressed: bool,
 }
@@ -84,6 +86,7 @@ impl FakeState {
             focus_read_pos: BTreeMap::new(),
             focus_record_pos: BTreeMap::new(),
             snapshots: BTreeMap::new(),
+            ax_reads: BTreeMap::new(),
             ax_event_pos: 0,
             stop_pressed: false,
             scenario,

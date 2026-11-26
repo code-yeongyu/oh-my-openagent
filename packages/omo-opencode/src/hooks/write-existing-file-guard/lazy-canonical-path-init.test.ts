@@ -38,13 +38,19 @@ describe("createWriteExistingFileGuardHook", () => {
     realpathNativeMock.mockClear()
     const existingFile = join(tempDir, "existing.txt")
     writeFileSync(existingFile, "content")
+    // Count only probes of the paths this hook canonicalises: late async work
+    // from an earlier file in the same process (a logger flush) also calls
+    // existsSync and must not change this hook's observed behaviour.
+    const ownPaths = new Set([tempDir, existingFile])
+    const ownProbes = (calls: ReadonlyArray<ReadonlyArray<unknown>>) =>
+      calls.filter(([path]) => typeof path === "string" && ownPaths.has(path)).length
 
     // when
     const hook = createWriteExistingFileGuardHook({ directory: tempDir } as never)
 
     // then
-    expect(existsSyncMock).toHaveBeenCalledTimes(0)
-    expect(realpathNativeMock).toHaveBeenCalledTimes(0)
+    expect(ownProbes(existsSyncMock.mock.calls)).toBe(0)
+    expect(ownProbes(realpathNativeMock.mock.calls)).toBe(0)
 
     // when
     await expect(
@@ -59,8 +65,8 @@ describe("createWriteExistingFileGuardHook", () => {
     ).rejects.toThrow("File already exists. Use edit tool instead.")
 
     // then
-    expect(existsSyncMock).toHaveBeenCalledTimes(3)
-    expect(realpathNativeMock).toHaveBeenCalledTimes(2)
+    expect(ownProbes(existsSyncMock.mock.calls)).toBe(3)
+    expect(ownProbes(realpathNativeMock.mock.calls)).toBe(2)
   })
 
   test("#given realpath throws a non-Error #when canonicalizing an existing path #then it returns the input path fallback", async () => {

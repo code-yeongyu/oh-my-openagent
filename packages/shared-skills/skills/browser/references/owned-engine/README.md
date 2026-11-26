@@ -4,10 +4,12 @@ A browser **your code launches and owns**, driven over CDP by omowright with its
 opposite of the attached engine: no user logins, full control.
 
 ```js
+const { loadOmowright } = await import("<skill-root>/scripts/omowright.mjs")
 const { omowright } = await loadOmowright()
+const { mkdtempSync, rmSync } = await import("node:fs"), { tmpdir } = await import("node:os"), { join } = await import("node:path")
 const profile = mkdtempSync(join(tmpdir(), "omowright-"))
 const browser = await omowright.connectPipe({
-  browserPath: "<CloakBrowser or chrome-headless-shell binary>",
+  browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary,   // or omowright.findCloakBrowserPath(); never a guessed path
   browserArgs: ["--headless", "--no-first-run", `--user-data-dir=${profile}`],
   storageRoot: profile,
   dialogPolicy: { accept: true },
@@ -24,8 +26,10 @@ try {
 ```
 
 `connectPipe` launches over `--remote-debugging-pipe`: no listening port, stdio drained, the
-process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to a browser something
-else launched. `connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
+process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to the DevTools endpoint
+of a browser something else launched; attaches to the same browser in one process share one
+connection, and `close()` releases only your handle (the last release disconnects).
+`connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
 fingerprint seed — the stealth path for WAF and bot-scored targets, where the attached engine's
 console capture would be a signal.
 
@@ -47,7 +51,10 @@ blocked URL, neither: use the `ultimate-browsing` skill.
 
 `OmOPage` is Playwright-shaped: `goto`, `snapshot`, `locator(ref | css)`, `click`, `fill`,
 `press`, `hover`, `check`, `selectOption`, `dragTo`, `setInputFiles`, `screenshot`, `pdf`,
-`evaluate`, `waitForURL`, `keyboard`, `mouse`, `frameLocator`. A snapshot is an accessibility tree
+`evaluate`, `keyboard`, `mouse`, `frameLocator`, `getByRole` / `getByText` / `getByLabel`, and the
+waits `waitForFunction(fn, arg, { timeout })`, `waitForResponse` / `waitForRequest`, `waitForURL`,
+`waitForLoadState`, `locator.waitFor`. `page.emulateMedia({ colorScheme, reducedMotion })` sets
+media features; raw `Emulation.*` CDP is never needed. A snapshot is an accessibility tree
 with virtual refs (`[ref=e3]`, cross-origin frames as `f1e3`); `compactSnapshot()` drops the refs
 map, about half the bytes. Readiness is a content probe (body plus interactive elements, landmarks
 or text), not a timer; `goto(url, { waitUntil: "commit" })` is the escape hatch for empty pages.
