@@ -310,6 +310,9 @@
       }
     }
   },
+  "tool-read-wait-below-bound": {
+    "threw": "Validation failed for tool \"thread_read\":\n  - wait_ms: must be >= 0\n\nReceived arguments:\n{\n  \"thread\": \"missing-thread\",\n  \"wait_ms\": -1\n}"
+  },
   "alias-thread_create-message-field": {
     "result": {
       "kind": "error",
@@ -918,6 +921,283 @@
         "details": {
           "field": "mode",
           "canonical": "delivery"
+        }
+      }
+    }
+  },
+  "unknown-field-thread_list": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_list({}). It takes: all_scope, state, query, limit, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "all_scope",
+            "state",
+            "query",
+            "limit",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_list({})",
+          "aliases": {
+            "search": "query"
+          }
+        }
+      }
+    }
+  },
+  "unknown-field-thread_rename": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_rename({}). It takes: thread, name, alias, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "name",
+            "alias",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_rename({})",
+          "aliases": {
+            "title": "name"
+          }
+        }
+      }
+    }
+  },
+  "unknown-field-thread_create": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_create({}). It takes: thread, device, alias, name, cwd, worktree, fork_from, skills, model, reasoning, permission_preset, prompt, delivery, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "device",
+            "alias",
+            "name",
+            "cwd",
+            "worktree",
+            "fork_from",
+            "skills",
+            "model",
+            "reasoning",
+            "permission_preset",
+            "prompt",
+            "delivery",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_create({})",
+          "aliases": {
+            "message": "prompt",
+            "title": "name",
+            "mode": "delivery",
+            "thinking": "reasoning",
+            "thinking_level": "reasoning"
+          }
+        }
+      }
+    }
+  },
+  "unknown-field-thread_archive": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_archive({\"thread\":\"missing-thread\"}). It takes: thread, archived, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "archived",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_archive({\"thread\":\"missing-thread\"})"
+        }
+      }
+    }
+  },
+  "unknown-field-thread_close": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_close({}). It takes: thread, idempotency_key, all_scope, force, graceful, wait_ms.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "idempotency_key",
+            "all_scope",
+            "force",
+            "graceful",
+            "wait_ms"
+          ],
+          "corrected_call": "tool.thread_close({})"
+        }
+      }
+    }
+  },
+  "unknown-field-thread_handoff": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_handoff({\"thread\":\"missing-thread\",\"message\":\"hi\"}). It takes: thread, match, message, delivery, expected_turn_id, summary, idempotency_key, all_scope.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "match",
+            "message",
+            "delivery",
+            "expected_turn_id",
+            "summary",
+            "idempotency_key",
+            "all_scope"
+          ],
+          "corrected_call": "tool.thread_handoff({\"thread\":\"missing-thread\",\"message\":\"hi\"})",
+          "aliases": {
+            "mode": "delivery"
+          }
+        }
+      }
+    }
+  },
+  "unknown-field-thread_interrupt": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_interrupt({\"thread\":\"missing-thread\"}). It takes: thread, turn_id, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "turn_id",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_interrupt({\"thread\":\"missing-thread\"})"
+        }
+      }
+    }
+  },
+  "unknown-field-thread_read": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_read({\"thread\":\"missing-thread\"}). It takes: thread, delivery_id, cursor, limit, max_bytes, wait_ms, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "delivery_id",
+            "cursor",
+            "limit",
+            "max_bytes",
+            "wait_ms",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_read({\"thread\":\"missing-thread\"})",
+          "aliases": {
+            "tail": "limit",
+            "lines": "limit",
+            "count": "limit",
+            "last": "limit",
+            "limit_bytes": "max_bytes",
+            "bytes": "max_bytes"
+          }
+        }
+      }
+    }
+  },
+  "unknown-field-thread_send": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_send({\"thread\":\"missing-thread\",\"message\":\"hi\"}). It takes: thread, message, delivery, expected_turn_id, summary, idempotency_key, collapse_key, all_scope.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "message",
+            "delivery",
+            "expected_turn_id",
+            "summary",
+            "idempotency_key",
+            "collapse_key",
+            "all_scope"
+          ],
+          "corrected_call": "tool.thread_send({\"thread\":\"missing-thread\",\"message\":\"hi\"})",
+          "aliases": {
+            "mode": "delivery"
+          }
+        }
+      }
+    }
+  },
+  "unknown-field-thread_set_model": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_set_model({\"thread\":\"missing-thread\",\"model\":\"m\"}). It takes: thread, model, provider, reasoning, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "model",
+            "provider",
+            "reasoning",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_set_model({\"thread\":\"missing-thread\",\"model\":\"m\"})"
+        }
+      }
+    }
+  },
+  "unknown-field-thread_set_reasoning": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"unknown_field\" Nothing was done.",
+        "next_action": "Call the tool again without \"unknown_field\": tool.thread_set_reasoning({\"thread\":\"missing-thread\",\"level\":\"high\"}). It takes: thread, level, scope, all_scope, idempotency_key.",
+        "details": {
+          "field": "unknown_field",
+          "accepted": [
+            "thread",
+            "level",
+            "scope",
+            "all_scope",
+            "idempotency_key"
+          ],
+          "corrected_call": "tool.thread_set_reasoning({\"thread\":\"missing-thread\",\"level\":\"high\"})"
         }
       }
     }

@@ -1,0 +1,69 @@
+{
+  "entries": [
+    {
+      "scenario": "unknown-field-thread_list",
+      "pr": "#15076",
+      "reason": "thread_list refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_list({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_rename",
+      "pr": "#15076",
+      "reason": "thread_rename refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_rename({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_create",
+      "pr": "#15076",
+      "reason": "thread_create refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_create({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_archive",
+      "pr": "#15076",
+      "reason": "thread_archive refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_archive({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_close",
+      "pr": "#15076",
+      "reason": "thread_close refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_close({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_handoff",
+      "pr": "#15076",
+      "reason": "thread_handoff refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_handoff({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_interrupt",
+      "pr": "#15076",
+      "reason": "thread_interrupt refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_interrupt({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_read",
+      "pr": "#15076",
+      "reason": "thread_read refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_read({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_send",
+      "pr": "#15076",
+      "reason": "thread_send refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_send({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_set_model",
+      "pr": "#15076",
+      "reason": "thread_set_model refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_set_model({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "unknown-field-thread_set_reasoning",
+      "pr": "#15076",
+      "reason": "thread_set_reasoning refuses a field it does not take with the same code and message; the next_action now shows the corrected tool.thread_set_reasoning({...}) call and details add corrected_call (and the tool's aliases)"
+    },
+    {
+      "scenario": "tool-read-wait-below-bound",
+      "pr": "#15076",
+      "reason": "thread_read's wait_ms lower bound moved from 1 to 0 (wait_ms 0 reads at once; toolAhead widened wait_ms), so the host's refusal of wait_ms -1 names the new bound",
+      "bound": {
+        "field": "wait_ms",
+        "from": 1,
+        "to": 0
+      }
+    }
+  ]
+}

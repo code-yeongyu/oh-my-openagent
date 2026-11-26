@@ -1,3 +1,4 @@
+import { threadToolParamSchemas } from "../../packages/omo-senpi/src/components/thread/contracts"
 import { allRows, loadDomainFiles } from "./registry"
 import type { Row } from "./schema"
 
@@ -30,6 +31,8 @@ export type ToolScenario = {
     readonly twin?: string
     readonly conflict?: boolean
   }
+  // Generated once per thread tool (LEAD ruling on #15076): a field no thread tool takes, so its refusal stays in view.
+  readonly unknownField?: boolean
 }
 
 // The loop's brief parser, driven directly: the flags it accepts and ignores must keep their value out of the brief
@@ -80,6 +83,32 @@ const ALIAS_VALUES: Readonly<Record<string, readonly [unknown, unknown]>> = {
   name: ["n1", "n2"],
   delivery: ["follow_up", "steer"],
   reasoning: ["high", "low"],
+}
+
+const REQUIRED_SAMPLES: Readonly<Record<string, unknown>> = {
+  thread: "missing-thread",
+  message: "hi",
+  model: "m",
+  level: "high",
+}
+
+// One scenario per thread tool the rows bind: its required fields and one field it does not take.
+function unknownFieldScenarios(rows: readonly Row[]): ToolScenario[] {
+  const schemas = threadToolParamSchemas as Readonly<Record<string, { readonly required?: readonly string[] }>>
+  const out = new Map<string, ToolScenario>()
+  for (const row of rows)
+    for (const entry of row.tool) {
+      if (!entry.name.startsWith("thread_") || out.has(entry.name)) continue
+      const required = schemas[entry.name]?.required ?? []
+      const args: Record<string, unknown> = { unknown_field: 1 }
+      for (const field of required) {
+        if (!(field in REQUIRED_SAMPLES))
+          throw new Error(`scenarios.ts: ${entry.name} requires ${field}, which REQUIRED_SAMPLES has no sample for`)
+        args[field] = REQUIRED_SAMPLES[field]
+      }
+      out.set(entry.name, { ...tool(`unknown-field-${entry.name}`, row.id, entry.name, args), unknownField: true })
+    }
+  return [...out.values()]
 }
 
 // Three scenarios per declared alias, once per tool: the alias alone, its field alone (the twin), and both disagreeing.
@@ -180,5 +209,7 @@ export const SCENARIOS: readonly Scenario[] = [
   }),
   tool("tool-archive-missing", "threads.archive", "thread_archive", { thread: "missing-thread" }),
   tool("tool-handoff-missing", "threads.handoff", "thread_handoff", { thread: "missing-thread", message: "hi" }),
+  tool("tool-read-wait-below-bound", "threads.readAfterWait", "thread_read", { thread: "missing-thread", wait_ms: -1 }),
   ...aliasScenarios(allRows(loadDomainFiles())),
+  ...unknownFieldScenarios(allRows(loadDomainFiles())),
 ]

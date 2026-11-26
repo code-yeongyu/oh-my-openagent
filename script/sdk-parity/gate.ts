@@ -4,6 +4,13 @@ import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
+import {
+  CHANGED_REFUSALS_PATH,
+  type ChangedRefusal,
+  changedRefusalEntryProblems,
+  changedRefusalProblem,
+  freshRefusals,
+} from "./changed-refusals"
 import { judgeUnresolvedRow } from "./row-judgement"
 import { aliasNewOnHead, aliasScenarioProblems, freshAheadEntries } from "./tool-ahead"
 import type { DiscoveredTool } from "./tool-check"
@@ -37,6 +44,11 @@ export type GateInput = {
   readonly goldens: Goldens
   // Each tree's declared omo and engine versions (version-mask.ts); the merge base's is undefined when it has no manifest.
   readonly versions: { readonly base: DeclaredVersions | undefined; readonly head: DeclaredVersions }
+  // changed-refusals.json at the merge base (undefined when it has none) and at the head.
+  readonly changedRefusals: {
+    readonly base: readonly ChangedRefusal[] | undefined
+    readonly head: readonly ChangedRefusal[]
+  }
 }
 
 export type GateReport = {
@@ -47,6 +59,7 @@ export type GateReport = {
   readonly presentationRows: readonly string[]
   readonly versionMasked: readonly string[]
   readonly toolAhead: readonly string[]
+  readonly changedRefusals: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -78,6 +91,8 @@ export function gateReport(input: GateInput): GateReport {
   const versionMasked: string[] = []
   const aheadOf = freshAheadEntries(input.head.unresolved, input.base.unresolved)
   const toolAhead: string[] = []
+  const refusals = freshRefusals(input.changedRefusals.head, input.changedRefusals.base)
+  const changedRefusals: string[] = []
   const tools = { base: input.base.tools, head: input.head.tools }
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
@@ -104,6 +119,22 @@ export function gateReport(input: GateInput): GateReport {
       versionMasked.push(`${scenario.id}#version-mask`)
       continue
     }
+    const declared = refusals.get(scenario.id)
+    if (declared !== undefined) {
+      const tools = { base: input.base.tools, head: input.head.tools }
+      const why = changedRefusalProblem(declared, scenario, before, after, {
+        ahead: aheadOf.get(scenario.capability),
+        tools,
+      })
+      if (why === undefined) changedRefusals.push(`${scenario.id}#changed-refusal`)
+      else {
+        failures.push(
+          `${scenario.capability}: scenario ${scenario.id} is declared in ${CHANGED_REFUSALS_PATH}, but ${why}`,
+        )
+        flagged.add(scenario.capability)
+      }
+      continue
+    }
     if (aliasNewOnHead(scenario, baseRows) && aheadOf.get(scenario.capability)?.aliases === true) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
@@ -124,6 +155,9 @@ export function gateReport(input: GateInput): GateReport {
     }
   }
   failures.push(...aliasScenarioProblems(input.scenarios, input.head.outcomes))
+  failures.push(
+    ...changedRefusalEntryProblems(refusals, input.scenarios, { base: input.base.outcomes, head: input.head.outcomes }),
+  )
   const slices = new Set([...input.body.matchAll(SLICE_LINE)].map((match) => match[1]))
   const atHead = unresolved
   for (const entry of input.base.unresolved ?? [])
@@ -159,6 +193,7 @@ export function gateReport(input: GateInput): GateReport {
     presentationRows: presentationRows.toSorted(),
     versionMasked: versionMasked.toSorted(),
     toolAhead: toolAhead.toSorted(),
+    changedRefusals: changedRefusals.toSorted(),
     head: input.headSha,
     // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
     // added later appends after these, so a merge that keeps both tiers keeps one order.
@@ -168,6 +203,7 @@ export function gateReport(input: GateInput): GateReport {
       ...presentationRows,
       ...versionMasked,
       ...toolAhead.toSorted().map((id) => `${id}#tool-ahead`),
+      ...changedRefusals.toSorted(),
     ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
@@ -198,6 +234,7 @@ const reviewed = (report: GateReport): string[] => [
   ...report.presentationRows,
   ...report.versionMasked,
   ...report.toolAhead.map((id) => `${id}#tool-ahead`),
+  ...report.changedRefusals,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -225,6 +262,11 @@ export function renderReport(report: GateReport): string {
   if (report.versionMasked.length > 0)
     lines.push(
       `VERSION MASK: ${report.versionMasked.map((entry) => entry.replace("#version-mask", "")).join(", ")}: equal only once each tree's own declared omo package version and engine pin (packages/omo-native/package.json) are replaced by placeholders; the reviewer confirms the version is the only difference before CLEAR.`,
+      "",
+    )
+  if (report.changedRefusals.length > 0)
+    lines.push(
+      `CHANGED REFUSAL: ${report.changedRefusals.map((entry) => entry.replace("#changed-refusal", "")).join(", ")}: refusals whose next_action or details changed with the same code and message (or, for a bound entry, only the widened bound in the message), as ${CHANGED_REFUSALS_PATH} declares in this pull request; the reviewer confirms each new advice before CLEAR.`,
       "",
     )
   if (report.toolAhead.length > 0)
