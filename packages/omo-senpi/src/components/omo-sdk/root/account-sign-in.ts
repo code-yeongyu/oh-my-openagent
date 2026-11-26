@@ -6,7 +6,7 @@ import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import type { CallOptions, OmoFailure, OmoPrincipal, OmoValue, RootCallInput } from "../contract"
 import { OMO_CODE_REGISTRY } from "../contract/codes"
 import type { OmoResult } from "../result"
-import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
+import { assertedExpectation, BEHAVIOUR_CHANGES, type Expectation } from "../contract/behaviour-changes"
 import { launchBlocked } from "./account"
 import type { MemberOf } from "./members"
 import { invalidInput } from "./assemble"
@@ -69,7 +69,8 @@ function refusalOf(refused: SignInFailure): OmoFailure {
 const shippedService = (outcome: CoreSignedIn["deviceService"]) => (outcome === "not_run" ? "not_on" : outcome)
 
 // One key, two contracts: the shipped `signIn(options)` answers its own shape, and the root's call (slice P1a-s) names a
-// method and answers the security design's shape (5.4). Replace from a session is refused before anything runs (B4).
+// method and answers the security design's shape (5.4). Once B4's evidence lands, replace from a session is refused
+// before anything runs; until then today's answer holds.
 export function accountSignIn(
   account: AccountApi,
   options: {
@@ -77,11 +78,14 @@ export function accountSignIn(
     readonly principal: OmoPrincipal
     readonly inProcess?: InProcessSignIn
     readonly custody: CustodyLog
+    /** B4's expectation for replace from a session; the behaviour-change table's asserted one unless a test passes it. */
+    readonly replaceFromSession?: Expectation
   },
 ): SignIn {
   // A session's sign-in runs only through the shipped launcher child until slice A2a moves the device-service setup
   // into a core the engine imports (script/sdk-parity/child-backed-members.json), whatever the entry supplies.
   const { access, custody } = options
+  const replaceFromSession = options.replaceFromSession ?? REPLACE_FROM_SESSION
   const inProcess = options.principal.kind === "session" ? undefined : options.inProcess
   const origin = access.origin
   function signIn(options: SignInOptions): Promise<OmoResult<SignedIn>>
@@ -90,7 +94,7 @@ export function accountSignIn(
     input: SignInOptions | RootInput,
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
-    if (input.replace === true && principalIsSession() && REPLACE_FROM_SESSION.outcome === "refuse") {
+    if (input.replace === true && principalIsSession() && replaceFromSession.outcome === "refuse") {
       await custody.refused("account.signIn", "sender_not_allowed").catch(() => false)
       return failed("sender_not_allowed", "A session cannot replace this machine's earlier device.", {
         principal: "session",

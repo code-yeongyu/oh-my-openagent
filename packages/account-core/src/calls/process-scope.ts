@@ -39,13 +39,14 @@ export type NamedProcess = { readonly pid: number; readonly start?: string | nul
 export async function processState(
   named: NamedProcess,
   own: string | null,
+  startOf: (pid: number) => Promise<string | null> = processStart,
 ): Promise<"gone" | "alive" | "elsewhere" | "unknown"> {
   if (named.scope === undefined) return (await legacyGone(named)) ? "gone" : "alive"
   if (named.scope === null || own === null) return "unknown"
   if (own !== named.scope) return "elsewhere"
   if (getPidLiveness(named.pid) === "dead") return "gone"
   if (named.start === undefined || named.start === null) return "unknown"
-  const now = await processStart(named.pid)
+  const now = await startOf(named.pid)
   if (now === null) return "unknown"
   return now === named.start ? "alive" : "gone"
 }
