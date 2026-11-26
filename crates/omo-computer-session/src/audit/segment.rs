@@ -2,7 +2,7 @@
 //! and the lines the writer builds itself (the `rotation_anchor`, a truncated event).
 
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::Path;
 
 use serde_json::{json, Value};
@@ -33,6 +33,10 @@ impl Segment {
             seq: 0,
             prev: "meta".to_owned(),
         }
+    }
+
+    pub(super) fn hand_id(&self) -> &str {
+        &self.hand_id
     }
 
     pub(super) fn meta(&self) -> Value {
@@ -114,31 +118,30 @@ pub(super) fn truncated(event: &AuditEvent) -> AuditEvent {
     }
 }
 
-/// The last `lineHash` of the audit file at `path`: the previous segment's chain link.
-/// `Ok(None)` when there is no file; a file that is there and cannot be read is an error.
-pub(super) fn last_line_hash(path: &Path) -> io::Result<Option<String>> {
-    let file = match File::open(path) {
+/// The last `lineHash` of the audit file at `path`: the previous segment's chain link, read from
+/// the file's tail only (at most two lines of `max_line` bytes, R7-7). `Ok(None)` when there is no
+/// file; a file that is there and cannot be read is an error.
+pub(super) fn last_line_hash(path: &Path, max_line: u64) -> io::Result<Option<String>> {
+    let mut file = match File::open(path) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
         opened => opened?,
     };
-    let mut last = None;
-    for text in BufReader::new(file).lines() {
-        let hash = serde_json::from_str::<Value>(&text?).ok().and_then(|line| {
-            line.get("lineHash")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        });
-        if hash.is_some() {
-            last = hash;
-        }
-    }
-    Ok(last)
+    let len = file.metadata()?.len();
+    let tail = max_line.saturating_add(1).saturating_mul(2).min(len);
+    file.seek(SeekFrom::Start(len - tail))?;
+    let mut bytes = Vec::new();
+    file.take(tail).read_to_end(&mut bytes)?;
+    Ok(bytes.split(|byte| *byte == b'\n').rev().find_map(|line| {
+        serde_json::from_slice::<Value>(line)
+            .ok()
+            .and_then(|line| line.get("lineHash").and_then(Value::as_str).map(str::to_owned))
+    }))
 }
 
 /// The chain link a new segment starts from. An audit file that cannot be read is logged
 /// (the link then restarts at `meta`, as before) instead of breaking the chain unseen.
-pub(super) fn chain_link(path: &Path) -> Option<String> {
-    last_line_hash(path).unwrap_or_else(|error| {
+pub(super) fn chain_link(path: &Path, max_line: u64) -> Option<String> {
+    last_line_hash(path, max_line).unwrap_or_else(|error| {
         eprintln!(
             "omo-computer-engine: warn audit chain link not read from {}, prev restarts at meta: {error}",
             path.display()
