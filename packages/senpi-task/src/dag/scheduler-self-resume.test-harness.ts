@@ -1,0 +1,304 @@
+// Shared fake for the self-resumed node child cases (#12134): a task manager whose children finish,
+// resume on their own (task_self_resumed), get denied residency on demand, and record every
+// start, cancel and send, plus a scheduler fixture over the in-memory DAG store.
+import { join } from "node:path"
+import * as fs from "node:fs"
+import { tmpdir } from "node:os"
+
+import type { ManagerStartSpec, TaskManager } from "../manager/types"
+import type { TaskRecord, TaskStatus } from "../state"
+import type { SendInput, SendOutcome } from "../steering"
+import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
+import { compileDag, type DagDefinition } from "./graph"
+import type { DagRunRecordV1 } from "./manager"
+import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
+import type { DagNodeId, DagNodeState, DagRunEvent, DagRunId } from "./types"
+
+export const runId = "run-self-resume" as DagRunId
+const parentSessionId = "ses-parent"
+
+export function deferred<T = void>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolve = (_value: T): void => undefined
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+export function within<T>(promise: Promise<T>, ms = 2_000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+    void promise.then(
+      (value) => {
+        clearTimeout(timeout)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
+}
+
+export function node(id: string, dependsOn: readonly string[] = []): DagDefinition["nodes"][number] {
+  return { id, prompt: `do ${id}`, category: "quick", ...(dependsOn.length === 0 ? {} : { dependsOn }) }
+}
+
+export function recordFor(nodes: DagDefinition["nodes"]): DagRunRecordV1 {
+  const createdAt = "2026-11-26T00:00:00.000Z"
+  const input: DagDefinition = { key: "self-resume", name: "self resume", nodes }
+  const compiled = compileDag(input, { at: createdAt })
+  if (!compiled.ok) throw new Error("test DAG did not compile")
+  return {
+    schemaVersion: 1,
+    checkpointSeq: 0,
+    runId,
+    runKey: input.key,
+    name: input.name,
+    parentSessionId,
+    rootSessionId: "ses-root",
+    definitionFingerprint: "definition-fingerprint",
+    definition: {
+      key: input.key,
+      name: input.name,
+      nodes: nodes.map((entry) => ({ ...entry, effectivePrompt: entry.prompt })),
+    },
+    status: "pending",
+    generation: 1,
+    createdAt,
+    updatedAt: createdAt,
+    nodes: compiled.nodes,
+    edges: compiled.edges,
+    waves: compiled.waves,
+    criticalPath: compiled.criticalPath,
+    bottlenecks: compiled.bottlenecks,
+    diagnostics: compiled.diagnostics,
+  }
+}
+
+type Signal = { readonly promise: Promise<void>; readonly resolve: () => void }
+type Task = { record: TaskRecord; completion: ReturnType<typeof deferred<TaskRecord>> }
+
+export type FakeHooks = {
+  startGate?: (nodeId: string) => Promise<void>
+  denyResidency?: (nodeId: string) => boolean
+  onCancel?: (nodeId: string) => void
+  onStart?: (nodeId: string) => void
+}
+
+export class SelfResumingTaskManager implements TaskManager {
+  readonly starts: string[] = []
+  readonly denials: string[] = []
+  readonly cancellations: string[] = []
+  readonly sends: SendInput[] = []
+  readonly hooks: FakeHooks
+  readonly #tasks = new Map<string, Task>()
+  readonly #started = new Map<string, Signal>()
+  readonly #denied = new Map<string, Signal>()
+  readonly #selfResumed = new Map<string, Set<() => void>>()
+
+  constructor(hooks: FakeHooks = {}) {
+    this.hooks = hooks
+  }
+
+  async startOwned(_spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
+    const nodeId = String(owner.nodeId)
+    await this.hooks.startGate?.(nodeId)
+    if (this.hooks.denyResidency?.(nodeId) === true) {
+      this.denials.push(nodeId)
+      this.#signal(this.#denied, nodeId).resolve()
+      const residents = [{ task_id: "task-elsewhere", name: "elsewhere", status: "running" as const }]
+      return { kind: "residency_denied", reason: "cap", cause: "residents", max_children: 1, residents }
+    }
+    const record = this.#put(nodeId, "running", owner).record
+    this.starts.push(nodeId)
+    this.hooks.onStart?.(nodeId)
+    this.#signal(this.#started, nodeId).resolve()
+    return { kind: "started", reused: false, task_id: record.task_id, status: "running", name: nodeId }
+  }
+
+  // A task record this run owns without having admitted it here (recovery hands such tasks over).
+  seed(nodeId: string, status: TaskStatus): TaskRecord {
+    const owner: DagTaskOwner = { kind: "dag", runId, nodeId: nodeId as DagNodeId, fingerprint: `fp-${nodeId}` }
+    const task = this.#put(nodeId, status, owner)
+    if (status !== "running") task.completion.resolve(task.record)
+    return task.record
+  }
+
+  whenStarted(nodeId: string): Promise<void> {
+    return this.#signal(this.#started, nodeId).promise
+  }
+
+  whenDenied(nodeId: string): Promise<void> {
+    return this.#signal(this.#denied, nodeId).promise
+  }
+
+  taskOf(nodeId: string): TaskRecord {
+    const task = this.#byNode(nodeId)
+    return task.record
+  }
+
+  complete(nodeId: string, status: TaskStatus = "completed"): void {
+    const task = this.#byNode(nodeId)
+    task.record = {
+      ...task.record,
+      status,
+      ...(status === "completed" ? { final_response: `done ${nodeId}` } : { error_message: `${status} ${nodeId}` }),
+    }
+    task.completion.resolve(task.record)
+  }
+
+  // Mirrors the manager's self-resumed reopen (omo#9069): the record runs again under the next epoch,
+  // a fresh terminal wait is armed, and subscribers are told after the record reads running.
+  selfResume(nodeId: string): void {
+    const task = this.#byNode(nodeId)
+    const epoch = task.record.notification.run_epoch + 1
+    task.record = {
+      ...task.record,
+      status: "running",
+      notification: { ...task.record.notification, run_epoch: epoch },
+      resumed_run_epoch: epoch,
+    }
+    task.completion = deferred<TaskRecord>()
+    for (const listener of [...(this.#selfResumed.get(task.record.task_id) ?? [])]) listener()
+  }
+
+  subscribeSelfResumed(taskId: string, listener: () => void): () => void {
+    const listeners = this.#selfResumed.get(taskId) ?? new Set<() => void>()
+    listeners.add(listener)
+    this.#selfResumed.set(taskId, listeners)
+    return () => listeners.delete(listener)
+  }
+
+  selfResumedListenerCount(): number {
+    return [...this.#selfResumed.values()].reduce((count, listeners) => count + listeners.size, 0)
+  }
+
+  waitFor(taskId: string): Promise<TaskRecord> {
+    const task = this.#tasks.get(taskId)
+    if (task === undefined) throw new Error(`unknown fake task ${taskId}`)
+    return task.completion.promise
+  }
+
+  async cancelTask(
+    taskId: string,
+  ): Promise<{ readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }> {
+    const task = this.#tasks.get(taskId)
+    if (task === undefined) throw new Error(`unknown fake task ${taskId}`)
+    const nodeId = String(task.record.owner?.nodeId)
+    this.cancellations.push(nodeId)
+    this.hooks.onCancel?.(nodeId)
+    const previous = task.record.status
+    this.complete(nodeId, "cancelled")
+    return { kind: "cancelled", task_id: taskId, previous_status: previous }
+  }
+
+  sendToTask(input: SendInput): Promise<SendOutcome> {
+    this.sends.push(input)
+    const record = this.#tasks.get(input.idOrName)?.record
+    if (record?.status !== "running") throw new Error(`fake send reached a ${record?.status ?? "missing"} task`)
+    return Promise.resolve({ kind: "steered", task_id: record.task_id, status: "running", delivered: "followUp" })
+  }
+
+  get(taskId: string): TaskRecord | undefined {
+    return this.#tasks.get(taskId)?.record
+  }
+  findOwnedTask(owner: Pick<DagTaskOwner, "nodeId">): TaskRecord | undefined {
+    return [...this.#tasks.values()].find((task) => task.record.owner?.nodeId === owner.nodeId)?.record
+  }
+  residencyChanged(): Promise<void> {
+    return new Promise<void>(() => undefined)
+  }
+  subscribeChild(): () => void {
+    return () => undefined
+  }
+  start(): Promise<never> {
+    throw new Error("not used")
+  }
+  continueTask(): Promise<never> {
+    throw new Error("not used")
+  }
+  interruptTask(): Promise<never> {
+    throw new Error("not used")
+  }
+  list(): readonly [] {
+    return []
+  }
+  forget(): void {}
+  getResidentHandle(): undefined {
+    return undefined
+  }
+  residentTaskIds(): readonly string[] {
+    return []
+  }
+  promoteToBackground(): boolean {
+    return false
+  }
+  wasBackground(): boolean {
+    return true
+  }
+
+  #put(nodeId: string, status: TaskStatus, owner: DagTaskOwner): Task {
+    const record: TaskRecord = {
+      task_id: `task-${nodeId}`,
+      name: nodeId,
+      parent_session_id: parentSessionId,
+      root_session_id: "ses-root",
+      depth: 1,
+      category: "quick",
+      execution_mode: "in-process",
+      model: "fake-model",
+      notify_on_terminal: true,
+      owner,
+      status,
+      residency_state: "resident",
+      created_at: "2026-11-26T00:00:00.000Z",
+      updated_at: "2026-11-26T00:00:00.000Z",
+      notification: { run_epoch: 1, notified_epoch: 0 },
+    }
+    const task: Task = { record, completion: deferred<TaskRecord>() }
+    this.#tasks.set(record.task_id, task)
+    return task
+  }
+
+  #byNode(nodeId: string): Task {
+    const task = [...this.#tasks.values()].find((entry) => String(entry.record.owner?.nodeId) === nodeId)
+    if (task === undefined) throw new Error(`unknown fake task for ${nodeId}`)
+    return task
+  }
+
+  #signal(signals: Map<string, Signal>, nodeId: string): Signal {
+    const existing = signals.get(nodeId)
+    if (existing !== undefined) return existing
+    const created: Signal = deferred()
+    signals.set(nodeId, created)
+    return created
+  }
+}
+
+export function startFixture(
+  initialRecord: DagRunRecordV1,
+  taskManager: SelfResumingTaskManager,
+  options: Pick<DagSchedulerOptions, "preAttachedTasks"> = {},
+) {
+  const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-self-resume-"))
+  const store = createInMemoryDagStore(join(root, "senpi-task"))
+  store.writeCheckpoint(runId, initialRecord)
+  let eventTime = Date.parse("2026-11-26T00:00:01.000Z")
+  const scheduler = createDagScheduler({ store, taskManager, initialRecord, ...options, now: () => eventTime++ })
+  const events = (): readonly DagRunEvent[] => store.readEvents(runId, 0, { limit: 500 }).events
+  const cleanup = (): void => fs.rmSync(root, { recursive: true, force: true })
+  // Subscribe before the trigger: resolves on the node's next transition into `to`.
+  const reaches = (nodeId: string, to: DagNodeState): Promise<void> => {
+    const reached = deferred()
+    const unsubscribe = scheduler.subscribe((event) => {
+      if (event.type !== "dag.node.transitioned" || String(event.nodeId) !== nodeId || event.to !== to) return
+      unsubscribe()
+      reached.resolve()
+    })
+    return reached.promise
+  }
+  return { scheduler, events, reaches, cleanup }
+}

@@ -11,6 +11,7 @@ import {
   type AttachedTask,
   type AttachedTaskSettlement,
 } from "./scheduler-context"
+import { flagConsumedDependents, watchSelfResume } from "./scheduler-self-resume"
 import type { DagNodeId, DagNodeErrorCode } from "./types"
 
 export function attachStarted(
@@ -142,46 +143,6 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
   return true
 }
 
-// omo#10487: a child whose turn completed can reopen itself (its background job or monitor wakes
-// it). The node then follows the task: it goes back to running and folds the resumed run's outcome
-// through the normal settle loop, so a resumed run that fails turns the node failed and the run
-// summary counts it. Dependents admitted on the earlier completion keep their own outcome;
-// dependents not yet admitted wait for the node again (or are skipped if it fails). Only a
-// completed node is re-opened (an attached node instead discards its superseded settlement),
-// and only while this scheduler runs: a terminal run is settled
-// evidence (#7412), and the task's own resumed-turn notification still reaches the parent.
-function watchSelfResume(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
-  disposeSelfResumeWatch(context, nodeId)
-  const unsubscribe = context.taskManager.subscribeSelfResumed?.(taskId, () => {
-    if (context.suspended || context.cancellationStarted) return
-    const record = context.journal.snapshot()
-    if (record.status !== "running") return
-    const node = nodeById(record, nodeId)
-    if (node.taskId !== taskId) return
-    const attached = context.attachedTasks.get(nodeId)
-    if (attached !== undefined) {
-      attached.selfResumed = true
-      return
-    }
-    if (node.state !== "completed") return
-    disposeSelfResumeWatch(context, nodeId)
-    transition(context, nodeId, "running", { kind: "resumed" })
-    attachTaskSettlement(context, nodeId, taskId)
-  })
-  if (unsubscribe !== undefined) context.selfResumeWatches.set(nodeId, unsubscribe)
-}
-
-function disposeSelfResumeWatch(context: SchedulerContext, nodeId: DagNodeId): void {
-  const dispose = context.selfResumeWatches.get(nodeId)
-  if (dispose === undefined) return
-  context.selfResumeWatches.delete(nodeId)
-  dispose()
-}
-
-export function disposeSelfResumeWatches(context: SchedulerContext): void {
-  for (const nodeId of [...context.selfResumeWatches.keys()]) disposeSelfResumeWatch(context, nodeId)
-}
-
 function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: TaskRecord): void {
   if (task.status === "pending" || task.status === "running" || task.status === "paused") {
     throw new Error(`TaskManager.waitFor returned nonterminal task ${task.task_id}`)
@@ -198,34 +159,6 @@ function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: Tas
   // A self-resumed run is a continuation of output already consumed by other nodes, not a fresh
   // attempt. Its outcome must remain visible, including typed infrastructure failures (#10487).
   if (!selfResumed) context.infrastructureRetries.retry(nodeId, task)
-}
-
-function flagConsumedDependents(context: SchedulerContext, nodeId: DagNodeId, invalidatedBy = nodeId): void {
-  const { nodes, diagnostics } = context.journal.snapshot()
-  const flagged = new Set(
-    diagnostics.flatMap((entry) =>
-      entry.kind === "node_flag" && entry.invalidatedBy !== undefined ? [entry.nodeId] : [],
-    ),
-  )
-  const invalidated = new Set([nodeId])
-  for (const dependencyId of invalidated) {
-    for (const node of nodes) {
-      if (invalidated.has(node.id) || !node.dependsOn.includes(dependencyId)) continue
-      if (node.state === "pending" || node.state === "blocked" || node.state === "skipped") continue
-      invalidated.add(node.id)
-      if (flagged.has(node.id)) continue
-      context.journal.append({
-        type: "dag.diagnostic.added",
-        diagnostic: {
-          kind: "node_flag",
-          nodeId: node.id,
-          invalidatedBy,
-          message: `input from ${invalidatedBy} was invalidated by its resumed failure; this node retains its own outcome`,
-          at: new Date(context.now()).toISOString(),
-        },
-      })
-    }
-  }
 }
 
 function taskFailure(

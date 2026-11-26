@@ -22,11 +22,20 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
     await whenAdmissionIdle(context)
     // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
     for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
-    const cancellationResults = await Promise.allSettled(
-      [...context.attachedTaskIds.values()].map((taskId) =>
-        context.taskManager.cancelTask(taskId, reason, { abort: "skip" }),
-      ),
-    )
+    // A completed node's child can resume on its own until the run is journaled cancelled; its
+    // reopen attaches the task (#12134), so drain until every attached task was cancelled once.
+    const requested = new Set<string>()
+    const cancellationResults: PromiseSettledResult<unknown>[] = []
+    for (;;) {
+      const targets = [...context.attachedTaskIds.values()].filter((taskId) => !requested.has(taskId))
+      if (targets.length === 0) break
+      for (const taskId of targets) requested.add(taskId)
+      cancellationResults.push(
+        ...(await Promise.allSettled(
+          targets.map((taskId) => context.taskManager.cancelTask(taskId, reason, { abort: "skip" })),
+        )),
+      )
+    }
     const cancellationFailure = cancellationResults.find((result) => result.status === "rejected")
     const cancelledNodeIds: DagNodeId[] = []
     for (const node of context.journal.snapshot().nodes) {
