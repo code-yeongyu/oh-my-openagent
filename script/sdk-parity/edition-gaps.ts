@@ -29,6 +29,17 @@ export const EDITION_GAPS: readonly EditionGap[] = (
 const callsFunction = (text: string, name: string): boolean =>
   new RegExp(`\\b${name.replace(/[^A-Za-z0-9_$]/g, "")}\\s*\\(`).test(text)
 
+// One walk per entry module: the OpenCode command line's import graph is large, and every gap of an edition starts there.
+const reached = new Map<string, ReadonlySet<string>>()
+const reachedFrom = (repoRoot: string, entry: string): ReadonlySet<string> => {
+  const key = `${repoRoot}\0${entry}`
+  const known = reached.get(key)
+  if (known !== undefined) return known
+  const modules = new Set(reachableModules(repoRoot, [entry]))
+  reached.set(key, modules)
+  return modules
+}
+
 export function editionGapProblems(entries: readonly EditionGap[], rows: readonly Row[], repoRoot: string): string[] {
   const problems: string[] = []
   for (const entry of entries) {
@@ -49,7 +60,7 @@ export function editionGapProblems(entries: readonly EditionGap[], rows: readonl
       problems.push(`${at}: its evidence names ${missing.join(" and ")}, which does not exist`)
       continue
     }
-    if (!reachableModules(repoRoot, [entryModule]).includes(module))
+    if (!reachedFrom(repoRoot, entryModule).has(module))
       problems.push(`${at}: stale, ${entryModule} no longer reaches ${module}; delete the entry`)
     else if (!callsFunction(readFileSync(join(repoRoot, module), "utf8"), calls))
       problems.push(`${at}: stale, ${module} no longer calls ${calls}; delete the entry`)

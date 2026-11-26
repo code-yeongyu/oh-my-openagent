@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { beforeAll, describe, expect, test } from "bun:test"
 
 import { readFileSync } from "node:fs"
 
@@ -13,6 +13,11 @@ const rows = allRows(loadDomainFiles())
 const [gap] = EDITION_GAPS
 if (gap === undefined) throw new Error("edition-gaps.json lists no gap")
 const problems = (entry: EditionGap): string => editionGapProblems([entry], rows, REPO_ROOT).join("\n")
+
+// The entries' import graphs are walked once here (the OpenCode command line's is large); every check below reads the memo.
+beforeAll(() => {
+  editionGapProblems(EDITION_GAPS, rows, REPO_ROOT)
+}, 120_000)
 
 describe("edition gaps", () => {
   test("#given the recorded gaps #then each one's evidence still holds", () => {
