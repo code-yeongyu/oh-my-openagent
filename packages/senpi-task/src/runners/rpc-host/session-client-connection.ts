@@ -65,6 +65,7 @@ export class HostSessionClient {
   private reattached = false
   private confirmingClose = false
   private openInput: HostSessionOpenInput | undefined
+  private detachments = 0
   private readonly parent: ChildParentLink
 
   constructor(options: HostSessionClientOptions) {
@@ -99,12 +100,17 @@ export class HostSessionClient {
 
   async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
     this.openInput = this.parent.named(input)
+    const detachmentsAtOpen = this.detachments
     const { opened, identity } = await openHostSessionConnection(this.openInput, {
       ...this.ports,
       onDisconnect: (error) => this.handleTransportLoss(error),
       onEvent: (record) => this.ingest(record),
       bindClient: (client) => {
+        // detach() ran while this open was dialing and had nothing to stop: binding now would leave a live
+        // connection on a released client that no teardown ever ends.
+        if (client !== undefined && this.detachments !== detachmentsAtOpen) return false
         this.client = client
+        return true
       },
     })
     this.identity = identity
@@ -214,6 +220,7 @@ export class HostSessionClient {
 
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
   async detach(): Promise<void> {
+    this.detachments += 1
     this.extensionEvents.clear()
     this.parent.close()
     const client = this.client

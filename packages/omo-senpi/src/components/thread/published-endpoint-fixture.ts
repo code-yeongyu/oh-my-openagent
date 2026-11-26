@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -11,9 +11,10 @@ import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import { createThreadTools } from "./tools"
 import { createThreadSdk } from "./sdk"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 export async function publishedWorld() {
-  const dir = mkdtempSync("/tmp/sgown-test-")
+  const dir = shortTempDir("sgown-test-")
   const store = createGatewayStore({ agentDir: dir })
   const releases: Array<() => Promise<void>> = []
   const calls: string[] = []

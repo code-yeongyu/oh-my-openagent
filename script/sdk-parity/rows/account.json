@@ -54,7 +54,18 @@
       ],
       "input": {
         "properties": {
-          "what": {}
+          "what": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "access_token"
+              },
+              {
+                "type": "string",
+                "const": "stored_credential"
+              }
+            ]
+          }
         },
         "required": [
           "what"
@@ -106,7 +117,10 @@
       ],
       "input": {
         "properties": {
-          "device": {}
+          "device": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -223,7 +237,10 @@
       ],
       "input": {
         "properties": {
-          "account": {}
+          "account": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -266,9 +283,15 @@
       "input": {
         "properties": {
           "method": {
-            "enum": [
-              "device_code",
-              "browser"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "device_code"
+              },
+              {
+                "type": "string",
+                "const": "browser"
+              }
             ]
           },
           "open_browser": {
@@ -276,7 +299,10 @@
           },
           "onUserCode": {},
           "onOpenUrl": {},
-          "deviceName": {},
+          "deviceName": {
+            "type": "string",
+            "minLength": 1
+          },
           "replace": {
             "type": "boolean"
           },
