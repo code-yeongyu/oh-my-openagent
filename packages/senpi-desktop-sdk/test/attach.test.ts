@@ -5,12 +5,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ComputerError, connect } from "../src/index"
-import {
-  type AttachEnvironment,
-  attachUds,
-  BRIDGE_REFUSED_METHODS,
-  processEnvironment,
-} from "../src/transport/attach-uds"
+import { type AttachEnvironment, attachUds, processEnvironment } from "../src/transport/attach-uds"
+import { BRIDGE_REFUSED_METHODS } from "../src/transport/bridge-refusals"
 
 const SCHEMA = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
