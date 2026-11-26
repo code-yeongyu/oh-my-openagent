@@ -30,7 +30,7 @@ import {
 import { callInputOf } from "./call-input"
 import { codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
 import { TYPED_AHEAD_INPUTS } from "./typed-ahead"
-import { scenarioProblems } from "./scenario-check"
+import { scenarioProblems, waitScenarioProblems } from "./scenario-check"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -216,6 +216,29 @@ describe("wait options against their cores (design lane ruling on review 6061342
 
   test("#given the calls marked honoured #then each is a call that can wait", () => {
     expect(HONOURED_CALLS.filter((key) => !waiting.includes(key))).toEqual([])
+  })
+
+  const ids = scenarios.flatMap((file) => file.scenarios).map((scenario) => scenario.id)
+
+  test("#given a cleared row whose call is honoured #then the table names its cancellation and deadline scenarios", () => {
+    expect(waitScenarioProblems(rows, unresolved, HONOURED_CALLS, ids)).toEqual([])
+  })
+
+  test("#given a cleared honoured fixture row missing either wait scenario #then the check names the row and the kind", () => {
+    const fixture = rows.find((row) => row.id === "threads.close")
+    if (fixture === undefined) throw new Error("no row threads.close")
+    const cleared = new Set([...unresolved].filter((id) => id !== fixture.id))
+    const without = (slug: string) => ids.filter((id) => !id.startsWith(`threads.close/${slug}`))
+    expect(waitScenarioProblems([fixture], cleared, HONOURED_CALLS, ids)).toEqual([])
+    expect(waitScenarioProblems([fixture], cleared, HONOURED_CALLS, without("caller-cancels"))).toEqual([
+      "row threads.close: cleared from unresolved.json and honoured in cancellation.ts, but has no cancellation scenario (threads.close/caller-cancels)",
+    ])
+    expect(waitScenarioProblems([fixture], cleared, HONOURED_CALLS, without("deadline-passes"))).toEqual([
+      "row threads.close: cleared from unresolved.json and honoured in cancellation.ts, but has no deadline scenario (threads.close/deadline-passes)",
+    ])
+    // Still unresolved, or not honoured, the row is not held to it.
+    expect(waitScenarioProblems([fixture], unresolved, HONOURED_CALLS, [])).toEqual([])
+    expect(waitScenarioProblems([fixture], cleared, [], [])).toEqual([])
   })
 })
 

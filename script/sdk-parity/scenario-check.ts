@@ -154,6 +154,31 @@ function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): str
   )
 }
 
+// A row cleared from unresolved.json whose call is honoured (contract/cancellation.ts) proves both wait options by
+// name: one `<row>/caller-cancels` and one `<row>/deadline-passes` scenario, or a variant of each (`...-after-write`).
+const WAIT_KINDS = [
+  ["cancellation", "caller-cancels"],
+  ["deadline", "deadline-passes"],
+] as const
+
+export function waitScenarioProblems(
+  rows: readonly Row[],
+  unresolved: ReadonlySet<string>,
+  honoured: readonly string[],
+  scenarioIds: readonly string[],
+): string[] {
+  return rows
+    .filter((row) => row.kind === "capability" && !unresolved.has(row.id) && honoured.includes(row.sdk))
+    .flatMap((row) =>
+      WAIT_KINDS.filter(
+        ([, slug]) => !scenarioIds.some((id) => id === `${row.id}/${slug}` || id.startsWith(`${row.id}/${slug}-`)),
+      ).map(
+        ([kind, slug]) =>
+          `row ${row.id}: cleared from unresolved.json and honoured in cancellation.ts, but has no ${kind} scenario (${row.id}/${slug})`,
+      ),
+    )
+}
+
 /**
  * Which slice fills each row's `scenarios` (row id to slice): each slice adds its own rows in its own pull request, and
  * the check holds both ways: a filled row must be mapped, and a mapped row must be filled.
