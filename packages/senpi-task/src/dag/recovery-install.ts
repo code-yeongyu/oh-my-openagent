@@ -64,8 +64,9 @@ export async function installRecoveredDag(
     })
     const settled = scheduler
       .run()
+      // The lease leaves with the write that ends this host's holding (a terminal status or a pause),
+      // never when the scheduler merely retires: a shutdown writes its pause after that (#15125).
       .then((record) => ({ runId: claimed.runId, kind: "resumed" as const, record, reusedOutputs }))
-      .finally(() => effects.release())
     return { kind: "installed", runId: claimed.runId, scheduler, settled }
   } catch (error) {
     effects.release()

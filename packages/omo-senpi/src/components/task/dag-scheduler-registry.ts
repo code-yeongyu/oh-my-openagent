@@ -18,8 +18,8 @@ export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promi
  * The schedulers this runtime runs, one per run. A run is scheduled here only when this runtime
  * already holds it or it is still `pending`: a `running` run nobody here holds belongs to whichever
  * process its lease names, and only recovery may decide (by that lease) to take it over (#15125).
- * Every scheduler run here holds the run's durable lease from before its first admission until it
- * settles or is retired, the way a recovered run holds the lease its claim wrote.
+ * Every scheduler run here holds the run's durable lease from before its first admission until the
+ * write that ends its holding, the way a recovered run holds the lease its claim wrote.
  */
 export function createDagSchedulerRegistry(ports: {
   readonly schedulers: Map<DagRunId, OwnedScheduler>
@@ -48,12 +48,13 @@ export function createDagSchedulerRegistry(ports: {
         return record
       })
       .finally(() => {
-        if (schedulers.get(runId) !== owned) return
-        schedulers.delete(runId)
-        releaseDagRunLease(store, runId, lease.hostPid)
+        if (schedulers.get(runId) === owned) schedulers.delete(runId)
       })
     owned.running = running
     void running.catch((error: unknown) => {
+      // A scheduler that failed holds nothing any more; a settled or retired one leaves its lease to
+      // the write that ends its holding (terminal, park, Stop, or the shutdown pause).
+      releaseDagRunLease(store, runId, lease.hostPid)
       logger.error("omo-senpi dag scheduler failed", {
         runId,
         error: error instanceof Error ? error.message : String(error),

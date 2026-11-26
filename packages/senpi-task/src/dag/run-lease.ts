@@ -5,7 +5,7 @@ import type { TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
-import type { DagNode, DagNodeId, DagRunId } from "./types"
+import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
 
 export type DagRunHolderProbe = {
   readonly taskManager: Pick<TaskManager, "get" | "findOwnedTask">
@@ -82,4 +82,22 @@ export function releaseDagRunLease(store: LeaseStore, runId: DagRunId, hostPid: 
     const { leaseHolderPid: _leaseHolderPid, previousLeaseHolderPid: _previousLeaseHolderPid, ...released } = fresh
     store.writeCheckpoint(runId, released)
   })
+}
+
+/**
+ * The lease leaves the record in the same write that ends this host's holding, never before it: a
+ * terminal status, a park or a user Stop drops it, and the shutdown pause hands it over as
+ * `previousLeaseHolderPid`. A scheduler merely retired while its run is still `running` keeps it,
+ * so no other process can read that interval as an abandoned run (#15125).
+ */
+export function leaseAfterEvent(record: DagRunRecordV1, event: DagRunEvent): DagRunRecordV1 {
+  if (event.type === "dag.run.paused") {
+    if (record.leaseHolderPid === undefined) return record
+    const { leaseHolderPid, previousLeaseHolderPid: _previous, ...released } = record
+    return event.reason === "session_shutdown" ? { ...released, previousLeaseHolderPid: leaseHolderPid } : released
+  }
+  if (event.type !== "dag.run.completed" && event.type !== "dag.run.failed" && event.type !== "dag.run.cancelled")
+    return record
+  const { leaseHolderPid: _lease, previousLeaseHolderPid: _previous, ...released } = record
+  return released
 }
