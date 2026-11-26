@@ -7,16 +7,19 @@ import path, { join } from "node:path"
 // tree it serves before any outcome is compared.
 
 // Real paths use the platform's separator (backslashes on Windows, issue #15052), and a path on another Windows drive
-// comes back from relative() as an absolute path, so both tests go through the platform's path module.
-type PathApi = Pick<typeof path, "relative" | "isAbsolute" | "sep">
+// comes back from relative() as an absolute path, so both tests go through one path dialect: the running platform's by
+// default, path.posix or path.win32 when named. On POSIX a backslash is an ordinary file-name character, not a separator.
+type PathApi = Pick<typeof path, "relative" | "isAbsolute" | "normalize" | "sep">
 
 export const isInside = (target: string, root: string, api: PathApi = path): boolean => {
   const rel = api.relative(root, target)
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${api.sep}`) && !api.isAbsolute(rel))
 }
 
-// An installed (external) package: some directory on its real path is a node_modules, whichever separator it uses.
-export const isInstalled = (real: string): boolean => real.split(/[\\/]/).includes("node_modules")
+// An installed (external) package: some directory on its real path is a node_modules. normalize() turns win32's
+// alternative separator into its own and leaves a POSIX backslash in the name it belongs to.
+export const isInstalled = (real: string, api: PathApi = path): boolean =>
+  api.normalize(real).split(api.sep).includes("node_modules")
 
 // A workspace package is linked by NAME to the base tree's own package directory, however the head reaches it: a
 // workspace link into packages/, or a copy in bun's store (a `file:` dependency), which holds the head's source too.

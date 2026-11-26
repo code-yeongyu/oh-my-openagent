@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, win32 } from "node:path"
+import { join, posix, win32 } from "node:path"
 
 import { isInside, isInstalled, isolationProblems, prepareBaseTree } from "./base-tree"
 
@@ -30,13 +30,21 @@ function trees(): { readonly head: string; readonly base: string } {
 
 // Issue #15052: Windows real paths use backslashes and another drive's path is absolute after relative(); these run the
 // Windows path rules on any host, so a separator assumption fails here before it reaches the hosted Windows leg.
-describe("real paths on Windows (#15052)", () => {
+describe("real paths per path dialect (#15052)", () => {
   test("#given backslash real paths #then an installed package is recognised by its node_modules directory", () => {
-    expect(isInstalled("C:\\work\\head\\node_modules\\left-pad")).toBe(true)
-    expect(isInstalled("C:\\work\\head\\node_modules\\.bun\\core-copy\\node_modules\\@ws\\core")).toBe(true)
-    expect(isInstalled("C:\\work\\head\\packages\\core")).toBe(false)
-    expect(isInstalled("/work/head/node_modules/left-pad")).toBe(true)
-    expect(isInstalled("/work/head/packages/node_modules-notes")).toBe(false)
+    expect(isInstalled("C:\\work\\head\\node_modules\\left-pad", win32)).toBe(true)
+    expect(isInstalled("C:\\work\\head\\node_modules\\.bun\\core-copy\\node_modules\\@ws\\core", win32)).toBe(true)
+    expect(isInstalled("C:/work/head/node_modules/left-pad", win32)).toBe(true)
+    expect(isInstalled("C:\\work\\head\\packages\\core", win32)).toBe(false)
+  })
+
+  // Review 6067780823 LOW: on POSIX a backslash is a file-name character, so only "/" separates directories there.
+  test("#given POSIX real paths with a backslash inside a name #then only a whole node_modules directory counts", () => {
+    expect(isInstalled("/work/head/node_modules/left-pad", posix)).toBe(true)
+    expect(isInstalled("/work/head/packages/node_modules-notes", posix)).toBe(false)
+    expect(isInstalled("/work/head/packages/a\\node_modules\\b", posix)).toBe(false)
+    expect(isInstalled("/work/head/node_modules\\x/core", posix)).toBe(false)
+    expect(isInside("/work/head/a\\..\\b", "/work/head", posix)).toBe(true)
   })
 
   test("#given Windows paths #then inside, a sibling, a parent and another drive are told apart", () => {
