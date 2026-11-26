@@ -7,13 +7,20 @@ import type { DagNodeId } from "./types"
 
 /**
  * The one gate for "may a child of this run start, be revived, be attached or be folded now?"
- * (#11381). Every such point asks it and differs only in what it does with a refusal: admission and
- * recovery fail the node closed, send and re-entry refuse the verb retryably, the self-resume fence
- * holds or retires the turn. Three rules, one function each, and nothing re-derives a subset:
- * 1. no child of the run is live outside a current claim - a superseded attempt's, a removed node's,
- *    or a refused turn whose stop is not confirmed (`staleLiveChildren`);
- * 2. a settled run owes no stop (`outstandingStopRefusal`);
- * 3. the task in hand is its node's current attempt (`ownedClaimAge`).
+ * (#11381): three rules, one function each, and every point calls them rather than re-deriving a
+ * subset. Points differ only in what they do with a refusal.
+ * 1. No child of the run is live outside a current claim: a superseded attempt's, a removed node's,
+ *    or a refused turn whose stop is not confirmed (`staleLiveChildren`, liveness by `isLiveOwnedTask`).
+ *    Admission and the re-entry sweep stop such a child and fail the ready nodes; recovery stops it and
+ *    fails every start; send refuses. Retry and amend leave it to the re-entered scheduler's fence.
+ * 2. A settled run owes no stop (`outstandingStopRefusal`). Send, retry and every re-entry refuse; amend
+ *    drains first; snapshot, wait, attach and list report it.
+ * 3. The task in hand is its node's current attempt (`ownedClaimAge`). Admission adopts only the
+ *    current claim, recovery never folds or attaches another, send refuses, and the self-resume fence
+ *    retires anything else. The manager's owned start is the same rule's process-local fence: it never
+ *    starts or reuses beside another live claim (`RefusedStops.isLive`).
+ * One gate object would not fit: admission and recovery act on a whole pass, send on one task, and the
+ * self-resume fence answers inside a record mutation that must not read beyond the run's checkpoint.
  */
 export type StaleLiveChild = { readonly nodeId: DagNodeId; readonly taskId: string }
 

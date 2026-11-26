@@ -7,14 +7,17 @@ import { TERMINAL_DAG_RUN_STATUSES, type DagRunId } from "./types"
 const ALLOW: OwnerResumeVerdict = { kind: "allow" }
 
 /**
- * The DAG side of the self-resume fence (#11381). The decision rests on the run's DURABLE checkpoint:
- * every journal append rewrites it synchronously, and the manager asks inside the record mutation
- * that would reopen the child, so no amendment, retry or terminal append can land between the read
- * and the reopen. The claim must be the node's CURRENT one by the shared classifier and the run must
- * not be settled. A refusal also says what happens to the run it stops: a superseded or removed claim,
- * or a cancelled or cancelling run, is retired; a current claim of a failed or completed run is held. A loaded scheduler may only ADD a refusal - a cancellation that started but has not
- * journaled yet - and never allows what the checkpoint refuses. An unknown run, or an active one with
- * no scheduler loaded, keeps today's behaviour: the child reopens and is re-watched.
+ * The DAG side of the self-resume fence (#11381). The decision rests on the run's DURABLE checkpoint,
+ * which every journal append rewrites synchronously. The manager asks inside the record mutation that
+ * would reopen the child, so within ONE process - the one holding the run, its journal writers and
+ * this manager - no amendment, retry or terminal append can land between the read and the reopen.
+ * That is same-process ordering only: exclusion across processes is the run lease's job, not this
+ * read's. The claim must be the node's CURRENT one by the shared classifier and the run must not be
+ * settled. A refusal also says what happens to the run it stops: a superseded or removed claim, or a
+ * cancelled or cancelling run, is retired; a current claim of a failed or completed run is held. A
+ * loaded scheduler may only ADD a refusal - a cancellation that started but has not journaled yet -
+ * and never allows what the checkpoint refuses. An unknown run, or an active one with no scheduler
+ * loaded, keeps today's behaviour: the child reopens and is re-watched.
  */
 export function createDagOwnerResumeFence(ports: {
   readonly store: DagFileStore

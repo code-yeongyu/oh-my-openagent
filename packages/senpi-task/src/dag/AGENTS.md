@@ -40,13 +40,29 @@ Recovery resolves the newest owned task of the node's CURRENT `execAttempt` (`re
 
 ## Owned children: one cancellation rule (#11381)
 
-- **Resume fence.** A settled child runs again only through the manager's self-resume reopen. For a DAG-owned record the manager asks `owner-resume-fence.ts` inside the same record mutation. The answer rests on the run's durable checkpoint, which every journal append rewrites synchronously: the claim must be current by `owned-attempt.ts` and the run must not be settled. A loaded scheduler may only add a refusal, for a cancellation that has not journaled yet. The refusal carries a disposition, recorded in `task_self_resume_refused`. `retire` covers a superseded or removed claim and a cancelled or cancelling run, and tears the child down. `hold` covers a current claim of a failed or completed run: it aborts only the unsolicited turn and leaves the child settled, resident and send-revivable, so `node-send`'s revive remedy keeps working.
-- **Sweeps deal only with children already live.**
-  - Run cancel (`run-children-stop.ts`) drains the run's whole live set to a fixed point. Attached children keep the deferred outcome boundary; any child still live fails the cancel with `DagRunChildrenLiveError`.
-  - No node is admitted in a pass after which a superseded or removed-node child is still live (`fenceStaleChildren`). The ready nodes fail with the retryable `stale_attempt_alive`, and node retry recovers.
-  - The owned start refuses start and reuse while any other live claim exists.
-  - Recovery stops stale siblings before it returns, attaches or folds a current claim.
-- **Outstanding stop.** A terminal run that still owns a live child owes a stop. `outstanding-stop.ts` derives it from durable state; nothing is stored. Snapshot and wait carry `outstandingStop`, and amend, retry and every re-entry refuse with `run_still_active` until a repeated cancel drains the run.
+- **One child gate** (`child-gate.ts`): may a child of this run start, be revived, be attached or be folded now? It is three rules, one function each, and every point calls them:
+  1. no child of the run is live outside a current claim: a superseded attempt's, a removed node's, or a refused turn whose stop is not confirmed (`staleLiveChildren`, with liveness from `isLiveOwnedTask`);
+  2. a settled run owes no stop (`outstandingStopRefusal`);
+  3. the task in hand is its node's current attempt (`ownedClaimAge`).
+
+  The points are admission, the re-entry sweep, recovery start/attach/fold, explicit send, retry and amend, the self-resume fence, and the read surfaces. They differ only in what they do with a refusal.
+- **Resume fence.** A settled child runs again only through the manager's self-resume reopen. The manager asks `owner-resume-fence.ts` inside the record mutation, and the answer rests on the run's checkpoint, which every journal append rewrites synchronously. That gives same-process ordering for the process holding the run; exclusion across processes is the run lease's job.
+  - `retire` covers a superseded or removed claim and a cancelled or cancelling run, and ends the child.
+  - `hold` covers a current claim of a failed or completed run. It stops only the unsolicited turn and keeps the child resident and send-revivable.
+- **Refused turn, stop not confirmed.** The manager marks this (`manager/refused-stops.ts`) in the same step as the refusal, and clears it only when the runner confirms: for a hold, the abort settled and the turn's outcome was observed; for a retire, the teardown settled; or the handle is gone.
+  - Until then the task counts as live everywhere (`TaskManager.selfResumeStopPending`). A timed-out or rejected step keeps it (`task_self_resume_stop_unconfirmed`).
+  - A cancel awaits or re-issues the stop; a hold becomes a retire once the run is cancelled or cancelling.
+  - A send awaits the stop and answers the retryable `unresponsive` while it is unconfirmed.
+  - The marker is in memory. An in-process child's turn dies with its process; a host-session child's turn that outlives the process is not re-fenced by a new process (see the #15135 report).
+- **Stopping and admitting.**
+  - Run cancel drains the run's whole live set to a fixed point and fails with `DagRunChildrenLiveError` while a child stays live.
+  - Admission and recovery never start a node while a rule-1 child survives its stop; the ready nodes fail with the retryable `stale_attempt_alive`.
+  - The owned start refuses start and reuse while another live claim exists.
+  - Recovery stops stale claims before it returns a current one, and reads the current claim again after any awaited stop.
+- **Outstanding stop.** It is derived, not stored: a terminal run that still owns a live child owes a stop.
+  - Snapshot, wait, attach and list carry `outstandingStop`; the list reads the task records once per batch.
+  - The dag tool and the status widget name it.
+  - Send, retry and re-entry refuse with `run_still_active`. Amend validates first, then drains, and refuses if a child stays live.
 
 ## Conventions
 
