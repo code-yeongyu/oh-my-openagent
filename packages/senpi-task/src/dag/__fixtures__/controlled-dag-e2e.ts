@@ -3,9 +3,10 @@
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
 import { createTaskManager } from "../../manager/manager"
-import type { ManagedChildHandle } from "../../manager/child-handle"
-import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, TaskManager } from "../../manager/types"
+import type { AdmitResident, ChildPlanner, ManagedRunner, TaskManager } from "../../manager/types"
+import type { DestructionPort } from "../../steering"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
+import { ImmediateRunner } from "./controlled-runner"
 import { ownedTaskState, ownedTaskStateDir } from "../../store/__fixtures__/owned-task-state"
 import type { DagDefinition, DagNodeInput } from "../graph"
 import { createDagWaitSurface, type DagRunResult } from "../handle"
@@ -62,148 +63,6 @@ export function planner(spec: Parameters<ChildPlanner>[0]): ReturnType<ChildPlan
   }
 }
 
-export type ScriptedOutcome =
-  | { readonly status: "completed"; readonly finalResponse: string }
-  | {
-      readonly status: "error"
-      readonly killed: boolean
-      readonly failure: { readonly kind: "child-prompt-failed" | "child-unresponsive"; readonly message: string }
-    }
-
-export function completed(name: string): ScriptedOutcome {
-  return { status: "completed", finalResponse: `output:${name}` }
-}
-
-export function failed(name: string): ScriptedOutcome {
-  return {
-    status: "error",
-    killed: false,
-    failure: { kind: "child-prompt-failed", message: `failure:${name}` },
-  }
-}
-
-export function infrastructureFailed(name: string): ScriptedOutcome {
-  return {
-    status: "error",
-    killed: false,
-    failure: { kind: "child-unresponsive", message: `unresponsive:${name}` },
-  }
-}
-
-export type ControlledHandle = {
-  readonly handle: ManagedChildHandle
-  readonly settle: (outcome: ScriptedOutcome) => void
-  /** Starts a run on the child's own (a woken monitor) and resolves once the manager reopened the record. */
-  readonly selfResume: () => Promise<void>
-}
-
-export function controlledHandle(taskId: string): ControlledHandle {
-  // Outcomes are queued, not overwritten: the first waitForOutcome() takes the first settle, and a
-  // revived child re-tracked under a new run epoch takes the NEXT one instead of replaying it.
-  const pending: ScriptedOutcome[] = []
-  const waiters: Array<(outcome: ScriptedOutcome) => void> = []
-  const settle = (value: ScriptedOutcome): void => {
-    const waiter = waiters.shift()
-    if (waiter === undefined) pending.push(value)
-    else waiter(value)
-  }
-  const waitForOutcome = (): Promise<ScriptedOutcome> => {
-    const ready = pending.shift()
-    if (ready !== undefined) return Promise.resolve(ready)
-    return new Promise<ScriptedOutcome>((resolve) => waiters.push(resolve))
-  }
-  const selfResumedListeners = new Set<() => void>()
-  let reopened: (() => void) | undefined
-  return {
-    settle,
-    selfResume: () =>
-      new Promise<void>((resolve) => {
-        reopened = resolve
-        for (const listener of [...selfResumedListeners]) listener()
-      }),
-    handle: {
-      publishTaskStatus: (status) => {
-        if (status === "running") reopened?.()
-        return Promise.resolve()
-      },
-      onSelfResumed: (listener) => {
-        selfResumedListeners.add(listener)
-        return () => selfResumedListeners.delete(listener)
-      },
-      task_id: taskId,
-      sessionId: `child-${taskId}`,
-      pid: undefined,
-      steer: () => Promise.resolve(),
-      followUp: () => Promise.resolve(),
-      abort: () => Promise.resolve(),
-      subscribe: () => () => undefined,
-      waitForOutcome,
-      lastAssistantText: () => undefined,
-      dispose: () => Promise.resolve(),
-    },
-  }
-}
-
-export class ControlledRunner implements ManagedRunner {
-  readonly startedSpecs: ManagedStartSpec[] = []
-  readonly #handles = new Map<string, ControlledHandle>()
-  readonly #startWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
-  readonly #onSettle?: () => void
-
-  constructor(onSettle?: () => void) {
-    this.#onSettle = onSettle
-  }
-
-  start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
-    this.startedSpecs.push(spec)
-    const controlled = controlledHandle(spec.taskId)
-    this.#handles.set(spec.prompt.replace(/^do /, ""), controlled)
-    for (const waiter of [...this.#startWaiters]) {
-      if (this.startedSpecs.length >= waiter.count) waiter.resolve()
-    }
-    return Promise.resolve(controlled.handle)
-  }
-
-  whenStarted(count: number): Promise<void> {
-    if (this.startedSpecs.length >= count) return Promise.resolve()
-    return new Promise((resolve) => this.#startWaiters.push({ count, resolve }))
-  }
-
-  settle(name: string, outcome: ScriptedOutcome): void {
-    const controlled = this.#handles.get(name)
-    if (controlled === undefined) throw new Error(`missing controlled child ${name}`)
-    this.#onSettle?.()
-    controlled.settle(outcome)
-  }
-
-  selfResume(name: string): Promise<void> {
-    const controlled = this.#handles.get(name)
-    if (controlled === undefined) throw new Error(`missing controlled child ${name}`)
-    return controlled.selfResume()
-  }
-}
-
-export class ImmediateRunner implements ManagedRunner {
-  readonly startedSpecs: ManagedStartSpec[] = []
-
-  start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
-    this.startedSpecs.push(spec)
-    const output = `output:${spec.prompt.replace(/^do /, "")}`
-    return Promise.resolve({
-      task_id: spec.taskId,
-      sessionId: `child-${spec.taskId}`,
-      pid: undefined,
-      steer: () => Promise.resolve(),
-      followUp: () => Promise.resolve(),
-      abort: () => Promise.resolve(),
-      subscribe: () => () => undefined,
-      waitForOutcome: () => Promise.resolve({ status: "completed", finalResponse: output }),
-      lastAssistantText: () => output,
-      dispose: () => Promise.resolve(),
-    })
-  }
-}
-
 export function resultPersistingManager(manager: TaskManager, store: DagFileStore): TaskManager {
   return new Proxy(manager, {
     get(target, property) {
@@ -234,6 +93,7 @@ export type E2eFixtureOptions = {
   readonly materializeSkills?: ReturnType<typeof createDagSkillMaterializer>
   readonly maxRunsPerSession?: number
   readonly scheduleRetry?: RetrySchedule
+  readonly destruction?: DestructionPort
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
   // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
   readonly store?: DagFileStore
@@ -258,6 +118,7 @@ export type E2eFixture = {
   readonly retry: (runId: DagRunId, nodeIds?: readonly DagNodeId[]) => DagRunReentry
   readonly amend: (input: DagDefinition, runId: DagRunId) => Promise<DagRunReentry>
   readonly send: (runId: DagRunId, nodeId: DagNodeId, message: string) => Promise<DagNodeSendResult>
+  readonly cancel: (runId: DagRunId, reason?: string) => Promise<void>
 }
 
 export function createE2eFixture(options: E2eFixtureOptions & { readonly project: string }): E2eFixture {
@@ -286,6 +147,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       }),
       cwd: project,
       ...(options.admit === undefined ? {} : { admit: options.admit }),
+      ...(options.destruction === undefined ? {} : { destruction: options.destruction }),
     }),
     store,
   )
@@ -374,6 +236,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       return reentry
     },
     send: (runId, nodeId, message) => nodeControls(runId).sendToNode(runId, nodeId, message),
+    cancel: (runId, reason) => nodeControls(runId).cancel(runId, reason),
   }
 
   function nodeControls(runId: DagRunId): DagScheduler {

@@ -33,17 +33,19 @@ import {
   categoryNode,
   definition,
   planner,
-  completed,
-  failed,
-  infrastructureFailed,
-  ControlledRunner,
-  ImmediateRunner,
   resultPersistingManager,
   createE2eFixture,
   identityMaterializer,
   type E2eFixtureOptions,
   type E2eFixture,
 } from "./__fixtures__/controlled-dag-e2e"
+import {
+  completed,
+  failed,
+  infrastructureFailed,
+  ControlledRunner,
+  ImmediateRunner,
+} from "./__fixtures__/controlled-runner"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to

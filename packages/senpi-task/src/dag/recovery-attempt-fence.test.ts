@@ -6,16 +6,14 @@ import { join } from "node:path"
 import { createDagRecovery, type InstalledDagRun } from "./recovery"
 import type { DagNodeId, DagRunId } from "./types"
 import {
-  ControlledRunner,
   categoryNode,
-  completed,
   createE2eFixture,
   definition,
-  failed,
   identityMaterializer,
   parentSessionId,
   type E2eFixture,
 } from "./__fixtures__/controlled-dag-e2e"
+import { ControlledRunner, completed, failed } from "./__fixtures__/controlled-runner"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 

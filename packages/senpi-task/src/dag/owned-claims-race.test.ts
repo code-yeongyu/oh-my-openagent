@@ -5,15 +5,8 @@ import { join } from "node:path"
 
 import type { DagNodeId } from "./types"
 import { RetryClock } from "./infra-retry-fixture"
-import {
-  ControlledRunner,
-  categoryNode,
-  completed,
-  createE2eFixture,
-  definition,
-  identityMaterializer,
-  infrastructureFailed,
-} from "./__fixtures__/controlled-dag-e2e"
+import { categoryNode, createE2eFixture, definition, identityMaterializer } from "./__fixtures__/controlled-dag-e2e"
+import { ControlledRunner, completed, infrastructureFailed } from "./__fixtures__/controlled-runner"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 

@@ -12,13 +12,17 @@ import {
 } from "./scheduler-context"
 import { ownedClaimAge } from "./owned-attempt"
 import { disposePromotionWatch } from "./scheduler-task-attachment"
+import { stopRunChildren, stopSettledRunChildren } from "./run-children-stop"
 import type { DagNodeId, DagRunId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
 export async function cancelRun(context: SchedulerContext, runId: DagRunId, reason?: string): Promise<void> {
   const snapshot = context.journal.snapshot()
   if (snapshot.runId !== runId) throw new Error(`scheduler does not own DAG run "${runId}"`)
-  if (snapshot.status === "completed" || snapshot.status === "failed" || snapshot.status === "cancelled") return
+  // A settled run keeps no node to cancel, but a child it owns can still be live (#11381).
+  if (snapshot.status === "completed" || snapshot.status === "failed" || snapshot.status === "cancelled") {
+    return stopSettledRunChildren(context.taskManager, snapshot, reason)
+  }
   if (context.cancellationOperation !== undefined) return context.cancellationOperation
 
   context.cancellationStarted = true
@@ -33,16 +37,12 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
     await whenAdmissionIdle(context)
     // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
     for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
-    // Every child the run owns, not only the attached ones: a completed node's child that resumed on
-    // its own is no longer attached but still works in the node's worktree (#11381).
-    const taskIds = new Set(context.attachedTaskIds.values())
-    for (const node of context.journal.snapshot().nodes) {
-      for (const owned of liveOwnedTasks(context, node.id)) taskIds.add(owned.task_id)
-    }
-    const cancellationResults = await Promise.allSettled(
-      [...taskIds].map((taskId) => context.taskManager.cancelTask(taskId, reason, { abort: "skip" })),
+    const failure = await stopRunChildren(
+      context.taskManager,
+      context.journal.snapshot(),
+      new Set(context.attachedTaskIds.values()),
+      reason,
     )
-    const cancellationFailure = cancellationResults.find((result) => result.status === "rejected")
     const cancelledNodeIds: DagNodeId[] = []
     for (const node of context.journal.snapshot().nodes) {
       if (TERMINAL_NODE_STATES.has(node.state)) continue
@@ -54,7 +54,7 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
       Object.assign(dagRunCancelledEvent({ reason, counts: countNodes(cancelled.nodes) }), { cancelledNodeIds }),
     )
     context.attachedTaskIds.clear()
-    if (cancellationFailure?.status === "rejected") throw cancellationFailure.reason
+    if (failure !== undefined) throw failure
   } finally {
     context.resolveCancellationCompleted()
   }

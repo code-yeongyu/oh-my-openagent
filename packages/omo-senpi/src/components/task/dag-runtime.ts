@@ -13,6 +13,7 @@ import {
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
+  stopSettledRunChildren,
   type DagDefinition,
   type DagFileStore,
   type DagLeaseWatchOptions,
@@ -253,7 +254,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
     const sessionId = deps.engine.runtime.sessionId() ?? ""
     const record = coreManager.record(runId, sessionId)
-    if (TERMINAL_RUN_STATUSES.has(record.status)) return
+    // A settled run has no scheduler to ask, but a child it owns can still be live (#11381).
+    if (TERMINAL_RUN_STATUSES.has(record.status)) return stopSettledRunChildren(taskManager, record, reason)
     // A user-stopped run has no live scheduler holding its children: end each paused child first,
     // journal the run cancelled, and only then let the parent's fence for the run go.
     const userStopped = record.status === "paused" && record.pause?.reason === "user_stop"
