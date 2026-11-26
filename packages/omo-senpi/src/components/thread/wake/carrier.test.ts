@@ -420,7 +420,7 @@ describe("waiting for a person (A3.2.6)", () => {
     expect(await store.sessionWait.read({ durable_id: "t" })).toMatchObject({ wait: "waiting" })
   })
 
-  // relay#1554: a turn that ended asking its owner a question opens no prompt; the engine starts a turn for a peer's
+  // #15171: a turn that ended asking its owner a question opens no prompt; the engine starts a turn for a peer's
   // message there, so the carrier must send the wake that runs the drain, or the row waits for a turn nothing starts.
   test("#given a session whose last turn ended asking its owner a question #when a row from another device wakes it #then the engine's wake is sent and no person's wait is stored", async () => {
     const { fake, store, carrier, file, intakeRow } = await setup({

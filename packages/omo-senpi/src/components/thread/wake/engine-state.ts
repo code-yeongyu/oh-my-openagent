@@ -3,7 +3,8 @@
  * nothing runs and no person is asked; a person's wait is a prompt still open on the session (a question in
  * `pendingQuestions`, a dialog in `pendingDialogs`), the same reading as the live send's `parkedOnApproval`. The
  * lifecycle's own human waits (a turn that ended asking its owner, a blocked goal, a stall) open no prompt: the engine
- * starts a turn for a peer's message there, so they are not a person's wait (relay#1554). Held is a hold or a paused session. Background work and children are work: the carrier never releases then.
+ * starts a turn for a peer's message there, so they are not a person's wait (#15171). Held is a hold or a paused
+ * session. Background work and children are work: the carrier never releases then.
  */
 export type EngineView = {
   readonly held: boolean
