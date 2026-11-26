@@ -1,5 +1,6 @@
 import type { ThreadToolFailure } from "../../thread/errors"
-import { OMO_CODE_REGISTRY, type OmoCode, type OmoFailure } from "../contract"
+import type { OmoFailure } from "../contract"
+import { OMO_CODE_REGISTRY, type OmoCode } from "../contract/codes"
 import { carriesReservedKey, RESTORE_KEY, restored, restoreOf, withRestore } from "./restore"
 
 const isRegistered = (code: string): code is Exclude<OmoCode, "not_implemented"> =>

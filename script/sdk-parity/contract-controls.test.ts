@@ -137,6 +137,31 @@ describe("negative controls of the P1a checks", () => {
     expect(problems).toContain("scenario threads.setModel/missing is not in the scenario table")
     expect(problems).toContain("row threads.setModel: scenarios stays empty in P1a")
   })
+
+  test("#given a field the table passes a callback #when its row leaves it untyped #then the check names it, and not when it is typed", () => {
+    const untyped = rows.map((row) =>
+      row.id === "account.signIn"
+        ? { ...row, input: { ...row.input, properties: { ...row.input.properties, onUserCode: {} } } }
+        : row,
+    )
+    const named = "onUserCode is passed a callback, but row account.signIn does not type it as one"
+    expect(scenarioProblems(untyped, contract, scenarios).join("\n")).toContain(named)
+    expect(scenarioProblems(rows, contract, scenarios).join("\n")).not.toContain(named)
+  })
+
+  test("#given the owner-slice map #then a filled row it maps passes, a mapped row left empty fails, and a mapped id that is no row fails", () => {
+    const filled = rows.map((row) =>
+      row.id === "threads.setModel" ? { ...row, scenarios: { effect: ["threads.setModel/by-id"], refusal: [] } } : row,
+    )
+    const mapped = scenarioProblems(filled, contract, scenarios, { "threads.setModel": "T1b-m" }).join("\n")
+    expect(mapped).not.toContain("row threads.setModel: scenarios stays empty")
+    expect(scenarioProblems(rows, contract, scenarios, { "threads.setModel": "T1b-m" })).toContain(
+      "row threads.setModel: scenario-fill-owners.json maps it to slice T1b-m, which has not filled its scenarios",
+    )
+    expect(scenarioProblems(rows, contract, scenarios, { "threads.nothing": "P1b" })).toContain(
+      "scenario-fill-owners.json names threads.nothing, which is not a P1a row",
+    )
+  })
 })
 
 // Review 6061342489 M2 and M3: an expectation is a port operation, and the held table is checked as a contract.

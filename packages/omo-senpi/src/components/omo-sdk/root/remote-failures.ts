@@ -1,5 +1,6 @@
 import type { RemoteFailure } from "../../remote/types"
-import { OMO_CODE_REGISTRY, type OmoCode, type OmoFailure } from "../contract"
+import type { OmoFailure } from "../contract"
+import { OMO_CODE_REGISTRY, type OmoCode } from "../contract/codes"
 import { carriesReservedKey, restored, restoreOf, withRestore } from "./restore"
 import { reservedKeyRefusal } from "./thread-failures"
 
