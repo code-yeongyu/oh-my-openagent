@@ -2,7 +2,7 @@ import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { createAsyncWorkHold } from "../async-work-hold"
-import type { PendingAsyncWork } from "../pending-async-work"
+import { finishedTurnOutcome, type PendingAsyncWork } from "../pending-async-work"
 import { agentEndOutcome } from "./turn-outcome"
 
 type AgentEndEvent = Extract<AgentSessionEvent, { readonly type: "agent_end" }>
@@ -252,8 +252,14 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
       }
     },
-    pending: (end) =>
-      asyncWork?.holding() === true ? (end === "terminated" ? { status: "cancelled" } : asyncWork.abandoned()) : held,
+    pending: (end) => {
+      // A held turn, or a completed answer whose agent_idle never came while the engine already
+      // reported the child's own work pending: the turn ends now, so that work decides (omo#10487).
+      if (asyncWork?.holding() === true) return end === "terminated" ? { status: "cancelled" } : asyncWork.abandoned()
+      const work = held?.status === "completed" ? input.pendingAsyncWork?.() : undefined
+      if (held?.status !== "completed" || work === undefined) return held
+      return end === "terminated" ? { status: "cancelled" } : finishedTurnOutcome(held.finalResponse, work)
+    },
     cancelConfirmation: () => {
       asyncWork?.disarm()
       disarmConfirmation()
