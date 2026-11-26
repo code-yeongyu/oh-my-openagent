@@ -114,29 +114,89 @@ describe("ends of a pending revival under a waiting workflow node (#15150)", () 
     expect(nodeStates(store)).toEqual(["k-hang:failed:resume_task_orphaned", "k-after:skipped"])
     expect(f.store.load(hang)).toMatchObject({ status: "running", killed: true, failure_kind: "suspended_unresumable" })
   })
+})
 
-  for (const [teardown, stop] of [
-    ["the lifecycle is disposed", (f: ReturnType<typeof overCapacity>) => f.lifecycle.dispose?.()],
-    [
-      "the session's retries stop for shutdown",
-      (f: ReturnType<typeof overCapacity>) =>
-        f.lifecycle.suspendOnSessionShutdown({ parentSessionId: PARENT, reason: "quit" }),
-    ],
-  ] as const) {
-    test(`#given a waiting node #when ${teardown} #then the waiter ends, the run parks and the node is not journaled failed`, async () => {
-      // given
-      const f = overCapacity()
-      const { store } = await reopenOverCapacity(f)
-      const run = await recoverRun(f, store)
-      expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
-
-      // when
-      await stop(f)
-
-      // then - the scheduler holds no child it can follow, so it parks the run for the next recovery
-      expect((await bounded(run.settled)).record?.status).toBe("paused")
-      expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
-      expect(nodeTransitions(store, "k-hang")).toEqual([])
+/** Every recovery of the run in turn (at most `rounds`), with the status each one's scheduler settled to. */
+async function recoveries(f: ReturnType<typeof overCapacity>, store: Parameters<typeof nodeStates>[0], rounds: number) {
+  const settled: (string | undefined)[] = []
+  for (let round = 0; round < rounds; round += 1) {
+    const run = await recoverRun(f, store).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "workflow recovery claimed no run") return undefined
+      throw error
     })
+    if (run === undefined) break
+    settled.push((await bounded(run.settled)).record?.status)
   }
+  return settled
+}
+
+// Mirrors revivalObligation's decision table (lifecycle/revival-pending.ts): ownership first.
+describe("the revival obligation's answers, ownership first (#15150 review 2)", () => {
+  test("#given a child whose parent is not this engine's session and whose retries were stopped #when the run is recovered #then the node fails as orphaned at once and the run never parks", async () => {
+    // given - an earlier session of this engine shut down; the current session does not own its child
+    const f = overCapacity()
+    const { store } = await reopenOverCapacity(f)
+    f.state.live = false
+    await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: PARENT, reason: "quit" })
+
+    // when - recovery runs, and runs again if the first one parked the run
+    const settled = await recoveries(f, store, 2)
+
+    // then
+    expect(settled).toEqual(["failed"])
+    expect(nodeStates(store)).toEqual(["k-hang:failed:resume_task_orphaned", "k-after:skipped"])
+  })
+
+  test("#given a child not owned here whose retries were not stopped #when the run is recovered #then the node fails as orphaned at once", async () => {
+    // given
+    const f = overCapacity()
+    const { store } = await reopenOverCapacity(f)
+    f.state.live = false
+
+    // when
+    const settled = await recoveries(f, store, 2)
+
+    // then
+    expect(settled).toEqual(["failed"])
+    expect(nodeStates(store)).toEqual(["k-hang:failed:resume_task_orphaned", "k-after:skipped"])
+  })
+
+  test("#given an owned waiting node #when its session's retries stop for shutdown #then it is released unjournaled, the run parks once, and the next session start re-decides", async () => {
+    // given
+    const f = overCapacity()
+    const { hang, store } = await reopenOverCapacity(f)
+    const run = await recoverRun(f, store)
+    expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
+
+    // when
+    await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: PARENT, reason: "quit" })
+
+    // then - parked once, never failed
+    expect((await bounded(run.settled)).record?.status).toBe("paused")
+    expect(nodeTransitions(store, "k-hang")).toEqual([])
+
+    // when - the session starts again: its retries resume and the child is owed again
+    await f.lifecycle.reconcileOnSessionStart(PARENT)
+    const again = await recoverRun(f, store)
+
+    // then
+    expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
+    expect(f.lifecycle.pendingRevivals?.obligation(hang)).toBe("owed")
+    await again.scheduler.suspend()
+  })
+
+  test("#given a waiting node #when the lifecycle is disposed #then it is released unjournaled and the run parks", async () => {
+    // given
+    const f = overCapacity()
+    const { store } = await reopenOverCapacity(f)
+    const run = await recoverRun(f, store)
+
+    // when
+    f.lifecycle.dispose?.()
+
+    // then
+    expect((await bounded(run.settled)).record?.status).toBe("paused")
+    expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
+    expect(nodeTransitions(store, "k-hang")).toEqual([])
+  })
 })
