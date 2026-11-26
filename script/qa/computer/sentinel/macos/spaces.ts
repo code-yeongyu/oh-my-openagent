@@ -81,7 +81,8 @@ async function enableSpaceHotkeys(): Promise<string> {
   return reread.code === 0 ? "hotkeys=on" : `hotkeys_reread_failed:${reread.text}`
 }
 
-// No notification announces that Mission Control is on screen, so its accessibility group is read until it exists.
+// None of the accessibility notifications the sentinel observes fires when Mission Control shows, so the Dock's
+// Mission Control group is read until it exists.
 async function missionControlShown(deadlineMs: number): Promise<boolean> {
   const until = Date.now() + deadlineMs
   while (Date.now() < until) {
@@ -96,8 +97,11 @@ export async function ensureSecondSpace(session: MacSession): Promise<string> {
   const hotkeys = await enableSpaceHotkeys()
   const opened = await output(["/usr/bin/open", "-a", "Mission Control"])
   if (opened.code !== 0) return `mission_control_failed:${opened.text}`
-  if (!(await missionControlShown(MISSION_CONTROL_DEADLINE_MS)))
+  if (!(await missionControlShown(MISSION_CONTROL_DEADLINE_MS))) {
+    // Mission Control may still show after the deadline; Escape closes it so it does not sit over the trials.
+    await output(["/usr/bin/osascript", "-e", `tell application "System Events" to key code 53`])
     return `mission_control_not_shown_within_${MISSION_CONTROL_DEADLINE_MS}ms ${hotkeys}`
+  }
   const planter = session.planter
   if (planter !== undefined) {
     const hovered = planter.next((line) => line.ctl === "hovered", 3_000, "pointer at the top edge")
