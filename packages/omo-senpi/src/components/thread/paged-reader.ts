@@ -12,9 +12,8 @@
  * `cursor_stale`, as on every other source.
  */
 
-import { THREAD_READ_DEFAULT_BYTES } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
-import { takeWithinBudget } from "./read-budget"
+import { readBudget, takeWithinBudget } from "./read-budget"
 import { THREAD_TAIL_DEFAULT_ITEMS, type ThreadTranscriptEntry } from "./reader"
 
 /** The newest context messages of a session (at least the window's 60 unless it has fewer), oldest first. */
@@ -75,6 +74,8 @@ export function selectEntryPage(
   tail: ContextTail,
   read: { readonly max_bytes?: number; readonly cursor?: string },
 ): EntryPageRead {
+  const budget = readBudget(read.max_bytes)
+  if (budget.kind === "error") return budget
   const { messages, revision } = tail
   let floor = Math.max(0, messages.length - CONTEXT_TAIL_MESSAGES)
   let end = messages.length
@@ -87,7 +88,7 @@ export function selectEntryPage(
   }
   const { selected } = takeWithinBudget(
     messages.slice(floor, end).map((entry) => entry.message),
-    read.max_bytes ?? THREAD_READ_DEFAULT_BYTES,
+    budget.maxBytes,
     "end",
   )
   const start = end - selected.length

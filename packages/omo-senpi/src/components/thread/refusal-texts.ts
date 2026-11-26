@@ -2,6 +2,7 @@ import { ADDRESS_TEXTS } from "./address/refusal-texts"
 import { CONTROL_TEXTS } from "./control/refusal-texts"
 import type { ThreadErrorCode } from "./errors"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
+import { READ_TEXTS } from "./read-refusal-texts"
 import { RELAY_TEXTS } from "./remote/refusal-texts"
 
 // The one producer of a keyed refusal's sentence (#14951, design lane ruling): each refusal is TEMPLATE DATA with named
@@ -22,7 +23,7 @@ export type GuidanceText = {
   readonly guidance: string
 }
 
-export const REFUSAL_TEXTS = { ...CONTROL_TEXTS, ...ADDRESS_TEXTS, ...RELAY_TEXTS } as const
+export const REFUSAL_TEXTS = { ...CONTROL_TEXTS, ...ADDRESS_TEXTS, ...RELAY_TEXTS, ...READ_TEXTS } as const
 type Texts = typeof REFUSAL_TEXTS
 export type RefusalId = { [K in keyof Texts]: Texts[K] extends RefusalText ? K : never }[keyof Texts]
 export type GuidanceId = { [K in keyof Texts]: Texts[K] extends GuidanceText ? K : never }[keyof Texts]

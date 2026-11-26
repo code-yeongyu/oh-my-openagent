@@ -28,9 +28,9 @@
 import { closeSync, openSync, readSync } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
-import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
+import type { ThreadReadSource } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
-import { takeWithinBudget } from "./read-budget"
+import { readBudget, takeWithinBudget } from "./read-budget"
 
 /** Default number of trailing entries a tail read returns. */
 export const THREAD_TAIL_DEFAULT_ITEMS = 60
@@ -285,24 +285,9 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     }
   }
 
-  if (opts.max_bytes !== undefined) {
-    if (!isPositiveInteger(opts.max_bytes)) {
-      return fail(
-        "invalid_arguments",
-        `max_bytes must be a positive whole number; received ${String(opts.max_bytes)}.`,
-        `Retry with max_bytes between 1 and ${THREAD_READ_MAX_BYTES}, or omit it to take the default ${THREAD_READ_DEFAULT_BYTES}.`,
-      )
-    }
-    if (opts.max_bytes > THREAD_READ_MAX_BYTES) {
-      return fail(
-        "message_too_large",
-        `max_bytes ${opts.max_bytes} exceeds the ${THREAD_READ_MAX_BYTES}-byte hard cap.`,
-        `Re-read with max_bytes at most ${THREAD_READ_MAX_BYTES} and follow next_cursor for the rest of the transcript.`,
-      )
-    }
-  }
-
-  const maxBytes = opts.max_bytes ?? THREAD_READ_DEFAULT_BYTES
+  const budget = readBudget(opts.max_bytes)
+  if (budget.kind === "error") return budget
+  const { maxBytes } = budget
   const tailItems = opts.tail_items ?? THREAD_TAIL_DEFAULT_ITEMS
 
   let cursor: Cursor | null = null
