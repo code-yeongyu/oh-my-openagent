@@ -137,4 +137,23 @@ describe("the in-process pending-work window (omo#10487)", () => {
     expect(h.scheduler.pending()).toBe(0)
     await h.handle.dispose()
   })
+
+  test("#given a cell pending at the turn's end #when it drains before prompt() resolves and the child is then disposed #then the outcome is async_work_pending", async () => {
+    // given
+    const h = harness(DETACHED_CELL_WAITS)
+    h.emit(assistantEnd(PROGRESS_NOTE))
+    h.emit({ type: "agent_end" })
+    h.drain()
+    await h.resolvePrompt()
+
+    // when
+    await h.handle.dispose()
+    await flushSettlement()
+
+    // then
+    const outcome = h.settled()
+    expect(outcome?.status).toBe("error")
+    if (outcome?.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+  })
 })

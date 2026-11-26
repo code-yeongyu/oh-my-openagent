@@ -185,4 +185,21 @@ describe("respawn of a child whose last turn waited on its own async work (omo#1
       await handle.dispose()
     }
   }, 5_000)
+
+  test("#given a fresh parent #when the reopened transcript records the cell pending after the note and then drained #then the turn still ends as async_work_pending", async () => {
+    // given - a positive record, then the zero record the engine appends when the cell drains
+    const c = await detachedChild(PROGRESS_NOTE)
+    appendLifecycle(c.session.sessionPath, DETACHED_CELL_WAITS)
+    appendLifecycle(c.session.sessionPath)
+    await c.host.restart()
+
+    // when
+    const handle = await c.respawn()
+    try {
+      // then
+      expectAbandoned(await handle.waitForOutcome())
+    } finally {
+      await handle.dispose()
+    }
+  }, 5_000)
 })
