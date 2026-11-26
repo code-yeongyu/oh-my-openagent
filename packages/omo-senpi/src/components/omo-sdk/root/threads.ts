@@ -69,10 +69,15 @@ const EXTENSION_UNEXPECTED: OmoFailure = {
   },
 }
 
+// Thrown by the core accessor once dispose() began; every member answers it as ROOT_DISPOSED, so no catch below
+// may turn it into its own answer.
+const CORE_NOT_CREATED = new Error("root_disposed")
+
 async function settledExtension<T>(run: () => Promise<T>): Promise<T | undefined> {
   try {
     return await run()
-  } catch {
+  } catch (error) {
+    if (error === CORE_NOT_CREATED) throw error
     return undefined
   }
 }
@@ -117,9 +122,8 @@ export function threadsNamespace(options: {
   // nothing (review comment 7202063494).
   let disposed = false
   let core: Promise<ThreadCore> | undefined
-  const NOT_CREATED = new Error("root_disposed")
   const thread = (): Promise<ThreadCore> => {
-    if (disposed && core === undefined) return Promise.reject(NOT_CREATED)
+    if (disposed && core === undefined) return Promise.reject(CORE_NOT_CREATED)
     return (core ??= import("../../thread/sdk-core").then(({ createThreadCore }) =>
       createThreadCore({
         agentDir: options.agentDir,
@@ -216,6 +220,7 @@ export function threadsNamespace(options: {
       try {
         return { kind: "ok", value: await (await thread()).warm() }
       } catch (error) {
+        if (error === CORE_NOT_CREATED) throw error
         // The warm's own transport error, as `omo daemon run` prints it today; slice C1a words it as the daemon core's.
         const message = error instanceof Error ? error.message : String(error)
         return { kind: "error", error: { code: "internal_error", message, next_action: "Run omo daemon run again." } }
@@ -230,7 +235,7 @@ export function threadsNamespace(options: {
         try {
           return await (member as (...a: unknown[]) => Promise<unknown>)(...args)
         } catch (error) {
-          if (error === NOT_CREATED) return { kind: "error", error: ROOT_DISPOSED }
+          if (error === CORE_NOT_CREATED) return { kind: "error", error: ROOT_DISPOSED }
           throw error
         }
       },

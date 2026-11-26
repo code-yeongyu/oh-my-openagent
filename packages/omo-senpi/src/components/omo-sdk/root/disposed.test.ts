@@ -189,7 +189,9 @@ describe("a disposed or closed root", () => {
     expect(wrong).toEqual([])
   })
 
-  test("#given a threads member already running #when its namespace is disposed before it reaches the core #then it answers the disposed refusal and no core is created", async () => {
+  // Code delta review 7202772023: every member of the namespace, called after its dispose() began, answers the disposed
+  // refusal, including those whose own catch handles a failure (extensions.register, extensions.call, daemon.warm).
+  test("#given a disposed threads namespace #when each of its members is called #then each answers the disposed refusal or its own refusal decided before the core", async () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-sdk-disposed-ns-"))
     dirs.push(dir)
     const namespace = threadsNamespace({
@@ -200,8 +202,26 @@ describe("a disposed or closed root", () => {
       env: { HOME: dir },
       principal: { kind: "script", uid: 501 },
     })
-    const listing = (namespace.members["threads.list"] as (input: unknown) => Promise<unknown>)({})
     await namespace.dispose?.()
-    expect(await listing).toEqual({ kind: "error", error: ROOT_DISPOSED })
+    const valid: Record<string, unknown> = {
+      "threads.extensions.register": { name: "probe.ext", migrations: [], moduleUrl: "file:///probe/ext.js" },
+      "threads.extensions.call": { name: "probe.ext", op: "ping", args: {} },
+    }
+    const answers: Record<string, unknown> = {}
+    for (const [key, member] of Object.entries(namespace.members)) {
+      const settled = (await (member as (input: unknown) => unknown)(valid[key] ?? {})) as {
+        kind?: string
+        error?: { code?: string; details?: { reason?: string } }
+      }
+      answers[key] = settled.error?.details?.reason ?? settled.error?.code ?? settled.kind
+    }
+    // A member refused before it reaches the core (a field it does not act on yet) keeps that answer.
+    const other = Object.entries(answers).filter(
+      ([, answer]) => answer !== "root_disposed" && answer !== "not_implemented",
+    )
+    expect(other).toEqual([])
+    expect(answers["threads.extensions.register"]).toBe("root_disposed")
+    expect(answers["threads.extensions.call"]).toBe("root_disposed")
+    expect(answers["daemon.warm"]).toBe("root_disposed")
   })
 })
