@@ -2557,7 +2557,7 @@ const LOGIC_CHECKS: readonly Check[] = [
     finding: "MEDIUM lowering-only helper start (#13885)",
     async run() {
       const bad: string[] = []
-      const self = source("probe-sp-n.ts")
+      const self = source("probe-sp-n.ts").replace(/\r\n?/g, "\n")
       const fn = self.slice(self.indexOf("async function medium("), self.indexOf("const MEDIUM_LABEL"))
       if (/runas/.test(fn.replace(/^\s*\/\/.*$/gm, ""))) bad.push("medium() still starts the helper through runas")
       if (!/await leg\(ctx, "start-medium", \{ command: psCommand\(/.test(fn)) bad.push("medium() does not use the start-medium leg")
@@ -2568,7 +2568,11 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!/function Leg-start-medium\(\$a\) \{ Emit \(\[SpN\]::StartMedium\(/.test(source("sp-n-legs-delivery.ps1")))
         bad.push("no start-medium leg")
       // lowering only: a restricted copy of the run's own token, labelled Medium, and nothing else
-      const med = existsSync(join(HERE, "sp-n-native-medium.ps1")) ? source("sp-n-native-medium.ps1") : ""
+      // line endings normalised: the Windows checkout gives .ps1 files CRLF (no .gitattributes rule), and these
+      // patterns read \n and line ends (run 45859812528 failed its PRECONDITION self-test on CRLF only)
+      const med = existsSync(join(HERE, "sp-n-native-medium.ps1"))
+        ? source("sp-n-native-medium.ps1").replace(/\r\n?/g, "\n")
+        : ""
       if (!med) bad.push("sp-n-native-medium.ps1 is missing")
       const code = med.replace(/^\s*(#|\/\/).*$/gm, "")
       const banned = code.match(
@@ -2948,7 +2952,7 @@ const LOGIC_CHECKS: readonly Check[] = [
         (c) => !c.finding.startsWith("ENDINGS") && c.finding.startsWith("PSMODULE"),
       ).concat(
         LOGIC_CHECKS.filter((c) =>
-          /return-in-loop|positive-control|foreground|last-error|webview2|OWNER|SWALLOW/.test(c.finding),
+          /return-in-loop|positive-control|foreground|last-error|webview2|OWNER|SWALLOW|MEDIUM|WHEEL/.test(c.finding),
         ),
       )
       const runAll = async (as: ((t: string) => string) | undefined) => {
