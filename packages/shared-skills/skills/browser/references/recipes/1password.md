@@ -17,6 +17,7 @@ Therefore: borrow the existing tab, read, return it. Do not open, do not navigat
 "refresh to fix" anything.
 
 ```js
+// given: session (the attached session from SKILL.md)
 const { tabs } = await session.tabList({ scope: "user" })          // find the already-signed-in tab by URL
 const vault = tabs.find((t) => /my\.1password\.com\/(?:vaults|app)/.test(t.url))
 await session.tabBorrow(vault.tab_id)                               // the user confirms

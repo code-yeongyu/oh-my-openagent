@@ -48,6 +48,7 @@ person, a deploy, a slow job) is **never awaited in a cell**. Subscribe first, s
 without `await`, and end the cell; the event wakes you on success and on timeout alike:
 
 ```js
+// given: page
 const flag = `${(await import("node:os")).tmpdir()}/signed-in-${Date.now()}.flag`
 await tool.monitor({ description: "sign-in finished", path: flag, event: "create" })
 globalThis.wait = page.waitForFunction(() => !!document.querySelector("[data-user]"), undefined, { timeout: 600_000 })

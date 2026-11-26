@@ -36,6 +36,7 @@ and the `dialog.url` getter). A listener can answer it itself, which replaces th
 dialog; a listener that only observes leaves it to the policy:
 
 ```js
+// given: page, omowright
 page.on("dialog", (dialog) => dialog.type() === "prompt" ? dialog.accept("42") : dialog.dismiss())
 ```
 

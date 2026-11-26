@@ -7,6 +7,7 @@ next week. Watching traffic costs nothing on a target you own, and the page cann
 **Snoop before you scrape.** Scroll-and-parse is the fallback, not the default.
 
 ```js
+// given: omowright, page, url
 const snoop = omowright.createNetworkSnoop(page, { maxBodyBytes: 512 * 1024 })
 await page.goto(url)
 const hit = await snoop.waitFor({ url: /\/api\/search/, mimeType: "application/json" }, { timeoutMs: 10_000 })
@@ -25,6 +26,7 @@ reason.
 ## Collecting through infinite scroll
 
 ```js
+const items = []
 for await (const item of omowright.collectWhileScrolling(page, snoop, { minItems: 200, maxScrolls: 10, extract: (json) => json.items })) {
   items.push(item)                           // one extracted item per iteration, already de-duplicated
 }
