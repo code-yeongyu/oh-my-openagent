@@ -146,18 +146,54 @@ async function declarations(): Promise<Artifacts> {
   }
 }
 
+/**
+ * Every path where what a commit ships differs from the build: an artifact git does not track (missing, or written but
+ * never added), one with other bytes, or a tracked file in the types tree the build no longer emits.
+ */
+export function staleArtifacts(
+  artifacts: ReadonlyMap<string, string>,
+  typesRoot: string,
+  tracked: ReadonlySet<string>,
+): string[] {
+  const extra = new Set([...tracked].filter((path) => path.startsWith(`${typesRoot}/`)))
+  const differing = [...artifacts]
+    .filter(([path, text]) => {
+      extra.delete(path)
+      return !tracked.has(path) || !existsSync(path) || readFileSync(path, "utf8") !== text
+    })
+    .map(([path]) => path)
+  return [...differing, ...extra]
+}
+
+/** The files git tracks under `dir`, as absolute paths: the outputs a commit ships, whatever else is on disk. */
+async function trackedFiles(dir: string): Promise<Set<string>> {
+  const git = Bun.spawn(["git", "ls-files", "-z", "--", relative(root, dir)], {
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(git.stdout).text(),
+    new Response(git.stderr).text(),
+    git.exited,
+  ])
+  if (code !== 0) throw new Error(`git ls-files failed (${code}): ${stderr}`)
+  return new Set(
+    stdout
+      .split("\0")
+      .filter((path) => path !== "")
+      .map((path) => join(root, path)),
+  )
+}
+
 export async function buildRemoteSdk(check = false): Promise<void> {
   const artifacts = await declarations()
   artifacts.set(join(lib, "remote-sdk.generated.js"), await bundle())
   if (check) {
-    const tracked = new Set(walk(join(lib, TYPES_DIR)))
-    const stale = [...artifacts].filter(([path, text]) => {
-      tracked.delete(path)
-      const file = Bun.file(path)
-      return file.size === 0 || readFileSync(path, "utf8") !== text
-    })
-    if (stale.length > 0 || tracked.size > 0) {
-      throw new Error("Remote SDK bundle is stale; run bun script/build-remote-sdk.ts")
+    const stale = staleArtifacts(artifacts, join(lib, TYPES_DIR), await trackedFiles(lib))
+    if (stale.length > 0) {
+      const listed = stale.map((path) => relative(root, path)).join("\n  ")
+      throw new Error(`Remote SDK bundle is stale; run bun script/build-remote-sdk.ts\n  ${listed}`)
     }
     return
   }

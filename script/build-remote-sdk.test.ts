@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
-import { buildRemoteSdk } from "./build-remote-sdk"
+import { buildRemoteSdk, staleArtifacts } from "./build-remote-sdk"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const lib = join(root, "packages/omo-native/bin/lib")
@@ -72,6 +72,55 @@ const consumerTypecheck = (moduleResolution: "nodenext" | "bundler") => {
 describe("omo-ai/remote build", () => {
   test("the bundle and its declarations match their source", async () => {
     await buildRemoteSdk(true)
+  })
+
+  const SHIPPED = ["types/a.d.ts", "bundle.js"] as const
+  // --check on a checkout without the generated outputs (a car whose train top generates them) must report them
+  // stale, not crash walking the absent types tree.
+  test.each([
+    ["current", (_: string) => {}, SHIPPED, []],
+    [
+      "the types tree absent",
+      (dir: string) => rmSync(join(dir, "types"), { recursive: true }),
+      SHIPPED,
+      ["types/a.d.ts"],
+    ],
+    [
+      "an artifact with other bytes",
+      (dir: string) => writeFileSync(join(dir, "bundle.js"), "old"),
+      SHIPPED,
+      ["bundle.js"],
+    ],
+    ["a declaration built but never added to git", (_: string) => {}, ["bundle.js"], ["types/a.d.ts"]],
+    [
+      "a tracked declaration the build no longer emits",
+      (dir: string) => writeFileSync(join(dir, "types/gone.d.ts"), ""),
+      [...SHIPPED, "types/gone.d.ts"],
+      ["types/gone.d.ts"],
+    ],
+    [
+      "an untracked leftover the build no longer emits",
+      (dir: string) => writeFileSync(join(dir, "types/gone.d.ts"), ""),
+      SHIPPED,
+      [],
+    ],
+  ] as const)("#given %s #when checked #then the stale paths are listed", (_, mutate, tracked, expected) => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-remote-sdk-stale-"))
+    try {
+      mkdirSync(join(dir, "types"))
+      const artifacts = new Map([
+        [join(dir, "types/a.d.ts"), "export {}\n"],
+        [join(dir, "bundle.js"), "new"],
+      ])
+      for (const [path, text] of artifacts) writeFileSync(path, text)
+      mutate(dir)
+      const trackedPaths = new Set(tracked.map((path) => join(dir, path)))
+      expect(staleArtifacts(artifacts, join(dir, "types"), trackedPaths).map((path) => relative(dir, path))).toEqual([
+        ...expected,
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   for (const moduleResolution of ["nodenext", "bundler"] as const)
