@@ -104,6 +104,57 @@ const GOLDENS: readonly Golden[] = [
     next: UPDATE_HERE,
   },
   {
+    id: "control.unload_unsupported",
+    slots: { thread: "dur-1" },
+    message: "The engine holding thread dur-1 does not take unload_session: it runs a senpi from before unload.",
+    next: "Update omo on the device holding it and restart its host, or close the thread instead.",
+  },
+  {
+    id: "control.unload_not_held",
+    slots: { thread: "dur-on-b", reason: "unknown_session" },
+    message: "No engine holds thread dur-on-b now: its host answered unknown_session.",
+    next: "List the threads again (threads.list) and unload the thread by the address it lists.",
+  },
+  {
+    id: "control.unload_working",
+    slots: { thread: "dur-1", state: "turn_active: an agent run" },
+    message: "Thread dur-1 is still working (turn_active: an agent run), so it was not unloaded.",
+    next: "Wait for its turn to end, or unload it with interrupt: true to stop the turn first.",
+  },
+  {
+    id: "control.unload_children",
+    slots: { thread: "dur-1", state: "children_live: child tasks still working" },
+    message:
+      "Thread dur-1 has child tasks or sessions still working (children_live: child tasks still working), so it was not unloaded.",
+    next: 'Wait for them to finish, or unload it with children: "detach" to leave them running.',
+  },
+  {
+    id: "control.unload_extension_work",
+    slots: { thread: "dur-1", state: "extension_work: work published by monitor" },
+    message:
+      "Thread dur-1 runs work its extensions published (extension_work: work published by monitor), which an unload stops for good, so it was not unloaded.",
+    next: "Let that work finish, or unload it with force: true to stop it.",
+  },
+  {
+    id: "control.unload_attached",
+    slots: { thread: "dur-1", state: "attached: 1 other client(s) attached" },
+    message: "Other clients hold thread dur-1 (attached: 1 other client(s) attached), so it was not unloaded.",
+    next: "Ask them to detach, or unload it with force: true (they see the session parked).",
+  },
+  {
+    id: "control.unload_host_draining",
+    slots: { thread: "dur-1" },
+    message: "The host holding thread dur-1 is shutting down and refused to unload it.",
+    next: "Retry once that host has restarted.",
+  },
+  {
+    id: "control.unload_refused",
+    slots: { thread: "dur-1", state: "unsupported: the session has no file to reopen it by" },
+    message:
+      "The host holding thread dur-1 refused to unload it (unsupported: the session has no file to reopen it by).",
+    next: "Read the thread and retry once its work settles.",
+  },
+  {
     id: "control.wait_unsupported",
     slots: { thread: "dur-1" },
     message: "The host holding thread dur-1 cannot report when its turn ends.",

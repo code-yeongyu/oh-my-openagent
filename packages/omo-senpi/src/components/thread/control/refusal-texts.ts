@@ -98,6 +98,47 @@ export const CONTROL_TEXTS = {
     message: "The host holding thread {thread} does not accept close requests.",
     next_action: UPDATE_HERE,
   },
+  "control.unload_unsupported": {
+    code: "unsupported",
+    message: "The engine holding thread {thread} does not take unload_session: it runs a senpi from before unload.",
+    next_action: "Update omo on the device holding it and restart its host, or close the thread instead.",
+  },
+  "control.unload_not_held": {
+    code: "not_found",
+    message: "No engine holds thread {thread} now: its host answered {reason}.",
+    next_action: "List the threads again (threads.list) and unload the thread by the address it lists.",
+  },
+  "control.unload_working": {
+    code: "turn_active",
+    message: "Thread {thread} is still working ({state}), so it was not unloaded.",
+    next_action: "Wait for its turn to end, or unload it with interrupt: true to stop the turn first.",
+  },
+  "control.unload_children": {
+    code: "turn_active",
+    message: "Thread {thread} has child tasks or sessions still working ({state}), so it was not unloaded.",
+    next_action: 'Wait for them to finish, or unload it with children: "detach" to leave them running.',
+  },
+  "control.unload_extension_work": {
+    code: "turn_active",
+    message:
+      "Thread {thread} runs work its extensions published ({state}), which an unload stops for good, so it was not unloaded.",
+    next_action: "Let that work finish, or unload it with force: true to stop it.",
+  },
+  "control.unload_attached": {
+    code: "foreign_live_owner",
+    message: "Other clients hold thread {thread} ({state}), so it was not unloaded.",
+    next_action: "Ask them to detach, or unload it with force: true (they see the session parked).",
+  },
+  "control.unload_host_draining": {
+    code: "host_unavailable",
+    message: "The host holding thread {thread} is shutting down and refused to unload it.",
+    next_action: "Retry once that host has restarted.",
+  },
+  "control.unload_refused": {
+    code: "unsupported",
+    message: "The host holding thread {thread} refused to unload it ({state}).",
+    next_action: "Read the thread and retry once its work settles.",
+  },
   "control.wait_unsupported": {
     code: "unsupported",
     message: "The host holding thread {thread} cannot report when its turn ends.",
