@@ -45,6 +45,8 @@ export interface AccountCommandDependencies {
   readonly readStdin: () => Promise<string>
   readonly output: (line: string) => void
   readonly error: (line: string) => void
+  /** The wait between sign-in polls; absent, real time. */
+  readonly sleep?: (ms: number) => Promise<void>
 }
 
 const deviceOf = (credentials: Credentials) => ({ id: credentials.device.id, name: credentials.device.name })

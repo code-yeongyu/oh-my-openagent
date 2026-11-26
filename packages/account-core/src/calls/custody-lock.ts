@@ -1,4 +1,5 @@
-import { link, readFile, rename, stat, unlink, writeFile } from "node:fs/promises"
+import { randomUUID } from "node:crypto"
+import { link, readFile, unlink, writeFile } from "node:fs/promises"
 import { setTimeout as delay } from "node:timers/promises"
 
 import {
@@ -10,10 +11,9 @@ import {
 // The custody log's own lock (security design 8.2; reviews 6065710236 N1 and N4, 6066498814 Y1 and Y2, with the security
 // owner's ruling on Y2): every append and the recovery step take it, so a prune never drops a record appended while it
 // ran and two recoveries never close one operation twice. It is a file beside the log, created whole (written aside,
-// then linked into place) with its holder's pid and start identity. It is broken ONLY when that holder is proven dead:
-// the pid is gone, or the process now under it started at another time. A break moves the lock aside by rename and keeps
-// it only if it is the lock that was judged; a lock another waiter took in between is linked back, never overwritten. A
-// live holder's lock is never broken; a call waits at most LOCK_WAIT_MS for it, then reports its record unwritten.
+// then linked into place) with its holder's pid and start identity, and broken ONLY when that holder is proven dead: the
+// pid is gone, or the process under it now started at another time. A live holder's lock is never broken; a call waits
+// at most LOCK_WAIT_MS for it, then reports its record unwritten.
 
 export const LOCK_WAIT_MS = 2000
 const RETRY_MS = 5
@@ -38,29 +38,31 @@ async function provenDead(holder: Holder): Promise<boolean> {
   return now !== null && startIdentitiesConflict(holder.start, now)
 }
 
-async function judgedDead(lockPath: string): Promise<{ readonly ino: number } | undefined> {
-  const held = await stat(lockPath).catch(() => undefined)
-  const holder = holderOf(await readFile(lockPath, "utf8").catch(() => ""))
-  if (held === undefined || holder === undefined) return undefined
-  return (await provenDead(holder)) ? { ino: held.ino } : undefined
+async function holderDead(path: string): Promise<boolean> {
+  const holder = holderOf(await readFile(path, "utf8").catch(() => ""))
+  return holder !== undefined && (await provenDead(holder))
 }
 
-async function breakLock(lockPath: string, judged: { readonly ino: number }): Promise<void> {
-  const aside = `${lockPath}.${process.pid}.${Date.now()}.broken`
-  if (
-    !(await rename(lockPath, aside).then(
-      () => true,
-      () => false,
-    ))
-  )
-    return
-  const moved = await stat(aside).catch(() => undefined)
-  if (moved !== undefined && moved.ino !== judged.ino) await link(aside, lockPath).catch(() => undefined)
-  await unlink(aside).catch(() => undefined)
+// Breakers are serialized by a second lock beside the first. Under it, the lock is judged again and removed: no taker can
+// create the lock meanwhile (it exists until removed) and no other breaker can remove it, so a lock taken by a live
+// waiter is never the one removed. A break lock whose own holder is proven dead is removed the same way it was judged.
+async function breakIfDead(lockPath: string): Promise<boolean> {
+  const breakPath = `${lockPath}.break`
+  if (!(await take(breakPath))) {
+    if (await holderDead(breakPath)) await unlink(breakPath).catch(() => undefined)
+    return false
+  }
+  try {
+    if (!(await holderDead(lockPath))) return false
+    await unlink(lockPath).catch(() => undefined)
+    return true
+  } finally {
+    await unlink(breakPath).catch(() => undefined)
+  }
 }
 
 async function take(lockPath: string): Promise<boolean> {
-  const staged = `${lockPath}.${process.pid}.${Date.now()}.taking`
+  const staged = `${lockPath}.${randomUUID()}.taking`
   await writeFile(staged, JSON.stringify({ pid: process.pid, start: await getProcessStartIdentity(process.pid) }), {
     mode: 0o600,
   })
@@ -84,9 +86,8 @@ export async function withCustodyLock<T>(
   const lockPath = `${logPath}.lock`
   for (;;) {
     if (await take(lockPath)) break
-    const judged = await judgedDead(lockPath)
-    if (judged !== undefined) await breakLock(lockPath, judged)
-    else if (Date.now() >= deadline) return undefined
+    if (await breakIfDead(lockPath)) continue
+    if (Date.now() >= deadline) return undefined
     else await delay(RETRY_MS)
   }
   try {

@@ -78,7 +78,7 @@ describe("omo account sign-in and the custody log", () => {
     const api = fakeApi(async (request) => {
       const path = new URL(request.url).pathname
       if (path === "/v1/health") return Response.json({ ok: true })
-      if (path === "/v1/device/code") return Response.json({ ...minted, intervalSeconds: 0 })
+      if (path === "/v1/device/code") return Response.json(minted)
       if (path === "/v1/device/token") return Response.json(grant)
       return new Response("", { status: 404 })
     })
@@ -95,6 +95,7 @@ describe("omo account sign-in and the custody log", () => {
         readStdin: async () => "",
         output: () => undefined,
         error: () => undefined,
+        sleep: async () => undefined,
       },
       ["sign-in"],
     )
