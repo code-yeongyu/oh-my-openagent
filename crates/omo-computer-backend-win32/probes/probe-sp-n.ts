@@ -471,13 +471,21 @@ async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json> {
   if (started.label !== MEDIUM_LABEL)
     throw new Error(`the helper started with label ${str(started.label)}, not Medium (${MEDIUM_LABEL})`)
   return waitFile(out, 60_000, { started: `${out}.started`, alive: pidAlive }).catch((e: Error) => {
-    // the helper's own words: its exit code if it ended within 3 s, and the tail of its stdout and stderr
-    const exit = started.exitedWithin3s === undefined ? "" : `; exited within 3 s with ${str(started.exitedWithin3s)}`
-    const said = existsSync(log) ? clean(readFileSync(log, "utf8")).slice(-400) : ""
-    throw new Error(`${e.message}${exit}${said ? `; helper output: ${said}` : "; no helper output"}`)
+    throw new Error(mediumFailure(e.message, started, existsSync(log) ? clean(readFileSync(log, "utf8")).slice(-400) : ""))
   })
 }
 const MEDIUM_LABEL = "S-1-16-8192"
+
+// Why a Medium helper wrote nothing, in its own words: the start leg's exit status when it ended within 3 s, in hex
+// with the system's text (an NTSTATUS such as 0xC0000142 when it died in the loader, before sp-n.ps1's first line),
+// and the tail of its stdout and stderr.
+function mediumFailure(why: string, started: Json, said: string): string {
+  const code = started.exitedWithin3s
+  const text = started.exitText ? ` (${str(started.exitText)})` : ""
+  const exit =
+    typeof code === "number" ? `; exited within 3 s with 0x${(code >>> 0).toString(16).toUpperCase().padStart(8, "0")}${text}` : ""
+  return `${why}${exit}${said ? `; helper output: ${said}` : "; no helper output"}`
+}
 
 // A command as SYSTEM through a one-shot scheduled task (Session 0). The task runs a .cmd wrapper, because
 // schtasks refuses a /TR command longer than 261 characters.
@@ -2577,6 +2585,30 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!/CreateRestrictedToken\(own, LUA_TOKEN,/.test(code)) bad.push("the helper token is not a LUA restricted copy of the run's own token")
       if (!/OpenProcessToken\(GetCurrentProcess\(\),/.test(code)) bad.push("the token is not this process's own")
       if (!/h\["label"\] = LabelOf\(pi\.hProcess\)/.test(code)) bad.push("the started process's label is not read back")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    // Hosted run 45856172603: all five rows read only "the helper never started (no start marker)". A Medium helper
+    // that writes nothing is named by its exit status in hex with the system's text, or by its own output.
+    finding: "SILENT medium helper names its exit status (run 45856172603)",
+    async run() {
+      const bad: string[] = []
+      const why = "uipi.medium.json: not written within 60 s; the helper never started (no start marker)"
+      const early = mediumFailure(why, { pid: 7, label: MEDIUM_LABEL, exitedWithin3s: 3221225794, exitText: "{DLL Initialization Failed}" }, "")
+      if (!early.startsWith(why)) bad.push(`the deadline reason is dropped: ${early}`)
+      if (!early.includes("exited within 3 s with 0xC0000142 ({DLL Initialization Failed})"))
+        bad.push(`an early exit does not read as its NTSTATUS in hex with its text: ${early}`)
+      if (!early.endsWith("; no helper output")) bad.push(`a silent helper is not named silent: ${early}`)
+      const spoke = mediumFailure(why, { pid: 7, label: MEDIUM_LABEL }, "Access to the path is denied.")
+      if (spoke.includes("exited") || !spoke.endsWith("; helper output: Access to the path is denied."))
+        bad.push(`a helper still running with output reads: ${spoke}`)
+      const plain = mediumFailure(why, { pid: 7, label: MEDIUM_LABEL, exitedWithin3s: 1 }, "")
+      if (!plain.includes("exited within 3 s with 0x00000001;")) bad.push(`a plain exit code reads: ${plain}`)
+      const self = source("probe-sp-n.ts")
+      const fn = self.slice(self.indexOf("async function medium("), self.indexOf("const MEDIUM_LABEL"))
+      if (!/throw new Error\(mediumFailure\(e\.message, started, /.test(fn)) bad.push("medium() does not report through mediumFailure")
+      if (!/h\["exitText"\] = /.test(source("sp-n-native-medium.ps1"))) bad.push("StartMedium does not read the exit status's text")
       return bad.length ? bad.join("; ") : undefined
     },
   },

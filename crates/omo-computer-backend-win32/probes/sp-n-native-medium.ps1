@@ -18,6 +18,7 @@ public static partial class SpN {
   [StructLayout(LayoutKind.Sequential)] struct SECURITY_ATTRIBUTES { public int nLength; public IntPtr lpSecurityDescriptor; public bool bInheritHandle; }
   [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern IntPtr CreateFileW(string name, uint access, uint share, ref SECURITY_ATTRIBUTES sa, uint disposition, uint flags, IntPtr template);
   [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
+  [DllImport("ntdll.dll")] static extern uint RtlNtStatusToDosError(uint status);
   [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
   [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
   [DllImport("advapi32.dll", SetLastError = true)] static extern bool CreateRestrictedToken(IntPtr existing, uint flags, uint nDisable, IntPtr disable, uint nDelete, IntPtr delete, uint nRestrict, IntPtr restrict, out IntPtr created);
@@ -64,12 +65,22 @@ public static partial class SpN {
         throw Failed("CreateProcessAsUserW");
       var h = H(); h["pid"] = pi.dwProcessId; h["label"] = LabelOf(pi.hProcess);
       uint code;
-      if (WaitForSingleObject(pi.hProcess, 3000) == 0 && GetExitCodeProcess(pi.hProcess, out code)) h["exitedWithin3s"] = (long)code;
+      if (WaitForSingleObject(pi.hProcess, 3000) == 0 && GetExitCodeProcess(pi.hProcess, out code)) {
+        h["exitedWithin3s"] = (long)code;
+        h["exitText"] = ExitText(code);
+      }
       return h;
     } finally {
       foreach (var x in new[] { own, lowered, output, pi.hProcess, pi.hThread }) if (x != IntPtr.Zero) CloseHandle(x);
       if (sid != IntPtr.Zero) LocalFree(sid);
     }
+  }
+
+  // The system's text for an exit status: an error status (0xC...) through its Win32 error, else the code itself.
+  static string ExitText(uint code) {
+    const uint ERROR_MR_MID_NOT_FOUND = 317;
+    uint win32 = code >= 0xC0000000 ? RtlNtStatusToDosError(code) : code;
+    return win32 == ERROR_MR_MID_NOT_FOUND ? "no system text" : new System.ComponentModel.Win32Exception((int)win32).Message;
   }
 
   // The mandatory label SID of a process, as text.
