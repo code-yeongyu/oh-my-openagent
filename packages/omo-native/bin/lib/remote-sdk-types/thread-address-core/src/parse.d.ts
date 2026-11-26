@@ -27,7 +27,7 @@ export type ParsedAddress = {
 };
 /**
  * The one reading of an address text (design section 2). `<device>/<thread>` splits on its single `/` unless the text is
- * a path: a first part starting with `.` or `~`, a drive letter, or a `.jsonl` file. Any other text is a bare address.
+ * a path: a first part starting with `.` or `~`, a drive prefix, any backslash, or a `.jsonl` file. Any other text is a bare address.
  * A thread name may contain `/` itself, so the resolver still tries the whole text when the device reading misses.
  */
 export declare function parseAddress(input: string): ParsedAddress;
