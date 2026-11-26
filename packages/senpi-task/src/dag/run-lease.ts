@@ -5,7 +5,7 @@ import type { TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
-import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { TERMINAL_DAG_RUN_STATUSES, type DagNode, type DagNodeId, type DagRunEvent, type DagRunId } from "./types"
 
 export type DagRunHolderProbe = {
   readonly taskManager: Pick<TaskManager, "get" | "findOwnedTask">
@@ -79,6 +79,14 @@ export function releaseDagRunLease(store: LeaseStore, runId: DagRunId, hostPid: 
  * so no other process can read that interval as an abandoned run (#15125).
  */
 export function leaseAfterEvent(record: DagRunRecordV1, event: DagRunEvent): DagRunRecordV1 {
+  // A send that revived a child of a settled run held the run for it; the fold of the last such
+  // child's outcome is the write that ends that holding.
+  if (event.type === "dag.node.transitioned" && event.from === "running") {
+    if (record.leaseHolderPid === undefined || !TERMINAL_DAG_RUN_STATUSES.has(record.status)) return record
+    if (record.nodes.some((node) => node.state === "running" || node.state === "scheduled")) return record
+    const { leaseHolderPid: _lease, ...released } = record
+    return released
+  }
   if (event.type === "dag.run.paused") {
     if (record.leaseHolderPid === undefined) return record
     const { leaseHolderPid, previousLeaseHolderPid: _previous, ...released } = record

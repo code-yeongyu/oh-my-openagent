@@ -131,6 +131,24 @@ export const dagRunEligibility = {
     (parentSessionId: string): Eligibility =>
     (fresh) =>
       fresh.parentSessionId === parentSessionId && LIVE_STATUSES.has(fresh.status) && !stoppedByUser(fresh),
+  /**
+   * A send that revives a child of a settled run this host does not hold: of this session, `failed`
+   * (completed and cancelled stay refused), the node exists and has a child. It takes the run over.
+   */
+  sendRevive:
+    (parentSessionId: string, nodeId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId &&
+      fresh.status === "failed" &&
+      fresh.nodes.some((node) => node.id === nodeId && node.taskId !== undefined),
+  /** A send that steers or queues into a live child: decided without taking anything. */
+  sendSteer:
+    (parentSessionId: string, nodeId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId &&
+      STOPPABLE_STATUSES.has(fresh.status) &&
+      !stoppedByUser(fresh) &&
+      fresh.nodes.some((node) => node.id === nodeId && node.taskId !== undefined),
   /** The user's Stop: live or paused, not already under this Stop or a newer one. */
   userStop:
     (pauseSeq: number): Eligibility =>
@@ -139,7 +157,13 @@ export const dagRunEligibility = {
 } as const
 
 export type DagRunAcquisition<T extends LeasedRecord> =
-  | { readonly kind: "acquired"; readonly record: T; readonly reservation: DagRunReservation | undefined }
+  | {
+      readonly kind: "acquired"
+      readonly record: T
+      readonly reservation: DagRunReservation | undefined
+      // True when this acquisition wrote the lease; false when this host already held it.
+      readonly leaseTaken: boolean
+    }
   | { readonly kind: "not_eligible"; readonly record: T }
   | { readonly kind: "held"; readonly holderPid: number }
   | { readonly kind: "busy"; readonly operation: string }
@@ -213,8 +237,8 @@ function writeLease<T extends LeasedRecord>(
 ): DagRunAcquisition<T> {
   const claimed = request.claim?.(fresh) ?? fresh
   if (claimed === fresh && fresh.leaseHolderPid === request.probe.hostPid)
-    return { kind: "acquired", record: fresh, reservation }
+    return { kind: "acquired", record: fresh, reservation, leaseTaken: false }
   const record = { ...claimed, leaseHolderPid: request.probe.hostPid }
   store.writeCheckpoint(runId, record)
-  return { kind: "acquired", record, reservation }
+  return { kind: "acquired", record, reservation, leaseTaken: fresh.leaseHolderPid !== request.probe.hostPid }
 }
