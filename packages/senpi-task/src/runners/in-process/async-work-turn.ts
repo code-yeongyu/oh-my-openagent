@@ -1,5 +1,5 @@
 import { createAsyncWorkHold, type AsyncWorkScheduler } from "../async-work-hold"
-import { asyncWorkPendingOutcome, readLifecyclePendingWork } from "../pending-async-work"
+import { readLifecyclePendingWork } from "../pending-async-work"
 import type { ChildSessionEvent, ChildSessionListener, RunnerOutcome } from "./child-handle"
 
 export type InProcessAsyncWorkOptions = {
@@ -65,14 +65,6 @@ export function createInProcessAsyncWork(input: {
         schedule: input.options?.schedule ?? defaultSchedule,
         intervalMs: input.options?.intervalMs ?? DEFAULT_INTERVAL_MS,
         staleLimitMs: input.options?.staleLimitMs,
-        // senpi delivers no completion notification to a print-mode session (senpi-codemode's
-        // EvalNotifier skips print/json), and an in-process child is bound in print mode: work that
-        // drains without an engine turn was never handed back to the child, so it has no answer.
-        drained: (_held, finished) =>
-          asyncWorkPendingOutcome(
-            finished,
-            "it finished, but nothing woke the child to answer it; resume it with task_send",
-          ),
       })
       const own: Release = (value) => {
         if (release !== own) return

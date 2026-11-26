@@ -52,8 +52,9 @@ export type TurnSettlementInput = {
   // senpi still emits `agent_idle` while that work runs, so a COMPLETED outcome is not terminal then:
   // the work's completion wakes the child into the turn that produces its real answer. The outcome is
   // held from that `agent_idle` (createAsyncWorkHold) and settles once the work drains and the probe
-  // reads an idle session, or as the typed `async_work_pending` failure if the work stops
-  // progressing for `asyncWorkStaleLimitMs`. Absent: a completed outcome settles on `agent_idle`.
+  // reads an idle session with no new turn - always as the typed `async_work_pending` failure, never the
+  // interim note - or the same way if it stops progressing for `asyncWorkStaleLimitMs`. Absent: a
+  // completed outcome settles on `agent_idle`.
   readonly pendingAsyncWork?: () => PendingAsyncWork | undefined
   readonly asyncWorkStaleLimitMs?: number
   // Teardown detached/tore down the handle while a probe was in flight: that flight must never
@@ -221,6 +222,9 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
         }
         case "agent_idle": {
+          // A turn already held on its pending work ends only by a new run, the hold's own
+          // confirmation, or teardown: a repeated idle record carries no answer (omo#10487).
+          if (asyncWork?.holding() === true) return
           clearConfirmation()
           const outcome = held
           const work = outcome?.status === "completed" ? input.pendingAsyncWork?.() : undefined

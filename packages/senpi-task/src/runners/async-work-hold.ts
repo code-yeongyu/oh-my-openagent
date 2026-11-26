@@ -18,10 +18,6 @@ export type AsyncWorkHoldInput = {
   readonly staleLimitMs?: number
   readonly maxUnreadable?: number
   readonly disposed?: () => boolean
-  // What a held turn amounts to once its work drained and the session idles with no turn started:
-  // by default the held completion. A runner whose engine delivers no completion notification
-  // answers with the typed failure instead, since nothing will ever wake that child to answer.
-  readonly drained?: (held: CompletedOutcome, work: PendingAsyncWork) => RunnerOutcome
 }
 
 export type AsyncWorkHold = {
@@ -35,25 +31,30 @@ export type AsyncWorkHold = {
   readonly abandoned: () => RunnerOutcome | undefined
 }
 
+type Held = {
+  readonly outcome: CompletedOutcome
+  work: PendingAsyncWork
+}
+
 function duration(ms: number): string {
   return ms >= 60_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 1_000)} s`
 }
 
 /**
- * Holds a completed turn while the child's own async work is pending (omo#10487). Every
- * confirmation reads the session's state and the engine's pending work again: once the work is
- * gone and the session is idle the held completion settles; if the work's completion wakes the
- * child into a new turn, the caller cancels the hold and that turn's outcome is the result. The
- * wait is bounded by progress, not by wall clock: any child activity or any change in the pending
- * work restarts it, and only work that stays exactly as it was for `staleLimitMs` settles as the
- * typed `async_work_pending` failure.
+ * Holds a completed turn while the child's own async work is pending (omo#10487). The held outcome is
+ * an interim progress note, so it is NEVER the result: a turn the work's completion starts replaces
+ * the hold (the caller cancels it and that turn's outcome is the result), and every other way the
+ * hold ends is the typed `async_work_pending` failure naming the work - the work drained and the
+ * session idles with no new turn, the session state stays unreadable, or the work stops progressing.
+ * Every confirmation reads the session's state and the engine's pending work again. The wait is
+ * bounded by progress, not by wall clock: any child activity or any change in the pending work
+ * restarts it.
  */
 export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
   const staleLimitMs = input.staleLimitMs ?? DEFAULT_ASYNC_WORK_STALE_LIMIT_MS
   const maxStaleChecks = Math.max(1, Math.ceil(staleLimitMs / input.intervalMs))
   const maxUnreadable = input.maxUnreadable ?? 3
-  let held: CompletedOutcome | undefined
-  let work: PendingAsyncWork | undefined
+  let held: Held | undefined
   let signature = ""
   let staleChecks = 0
   let progressed = false
@@ -69,11 +70,11 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
 
   const cancel = (): void => {
     held = undefined
-    work = undefined
     disarm()
   }
 
-  const finish = (outcome: RunnerOutcome): void => {
+  const fail = (current: Held, why: string): void => {
+    const outcome = asyncWorkPendingOutcome(current.work, why)
     cancel()
     if (input.disposed?.() === true) return
     input.settle(outcome)
@@ -84,45 +85,45 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
     timer = input.schedule(check, input.intervalMs)
   }
 
-  const stillPending = (next: PendingAsyncWork): boolean => {
+  const stillPending = (current: Held, next: PendingAsyncWork): boolean => {
     const nextSignature = pendingWorkSignature(next)
     staleChecks = progressed || nextSignature !== signature ? 0 : staleChecks + 1
     progressed = false
     signature = nextSignature
-    work = next
+    current.work = next
     if (staleChecks < maxStaleChecks) return true
-    finish(asyncWorkPendingOutcome(next, `none of it progressed for ${duration(staleLimitMs)}`))
+    fail(current, `none of it progressed for ${duration(staleLimitMs)}`)
     return false
   }
 
-  const confirm = (outcome: CompletedOutcome, idle: boolean | undefined): void => {
-    if (held !== outcome || disarmed || input.disposed?.() === true) return
+  const confirm = (current: Held, idle: boolean | undefined): void => {
+    if (held !== current || disarmed || input.disposed?.() === true) return
     const next = input.pending()
     if (next !== undefined) {
       unreadable = 0
-      if (stillPending(next)) arm()
+      if (stillPending(current, next)) arm()
       return
     }
     if (idle === undefined) {
       unreadable += 1
-      if (unreadable >= maxUnreadable) finish(outcome)
+      if (unreadable >= maxUnreadable) fail(current, "its session state could not be read after that work drained")
       else arm()
       return
     }
     unreadable = 0
     if (!idle) arm()
-    else finish(work === undefined || input.drained === undefined ? outcome : input.drained(outcome, work))
+    else fail(current, "it finished, but nothing woke the child to answer it; resume it with task_send")
   }
 
   function check(): void {
     timer = undefined
-    const outcome = held
-    if (outcome === undefined) return
+    const current = held
+    if (current === undefined) return
     void Promise.resolve()
       .then(input.idle)
       .then(
-        (idle) => confirm(outcome, idle),
-        () => confirm(outcome, undefined),
+        (idle) => confirm(current, idle),
+        () => confirm(current, undefined),
       )
   }
 
@@ -130,8 +131,7 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
     begin: (outcome, pending) => {
       cancel()
       disarmed = false
-      held = outcome
-      work = pending
+      held = { outcome, work: pending }
       signature = pendingWorkSignature(pending)
       staleChecks = 0
       progressed = false
@@ -145,8 +145,6 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
     disarm,
     holding: () => held !== undefined,
     abandoned: () =>
-      held === undefined || work === undefined
-        ? undefined
-        : asyncWorkPendingOutcome(work, "the child stopped before that work settled"),
+      held === undefined ? undefined : asyncWorkPendingOutcome(held.work, "the child stopped before that work settled"),
   }
 }

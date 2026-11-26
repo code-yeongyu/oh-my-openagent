@@ -387,7 +387,7 @@ function completedEnd(): unknown {
 }
 
 describe("createTurnSettlement completed with pending async work (senpi#3492, omo#10487)", () => {
-  test("#given a completed turn whose own async work is still pending #when agent_idle arrives #then the outcome stays pending until the work releases and the idle probe confirms", async () => {
+  test("#given a completed turn whose own async work is still pending #when agent_idle arrives #then the outcome stays pending until the work releases and the idle probe confirms no turn answered it", async () => {
     // given - a detached eval cell is live while the child ends its turn
     const probe = countingProbe(idleState)
     let workLive = true
@@ -423,10 +423,14 @@ describe("createTurnSettlement completed with pending async work (senpi#3492, om
     const settled = fixture.nextSettled()
     fixture.scheduler.runNext()
 
-    // then - the idle probe is the real turn end and the completed outcome settles
+    // then - the work drained and no turn answered it: the held progress note is never the result
+    // (review finding 1 on #15137); a turn the work's notification starts later supersedes this
     const outcome = await settled
     expect(probe.calls()).toBe(2)
-    expect(outcome).toEqual({ status: "completed", finalResponse: "wrote the report" })
+    expect(outcome.status).toBe("error")
+    if (outcome.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+    expect(outcome.failure.message).toContain("nothing woke the child")
   })
 
   test("#given a completed turn held on pending async work #when the work makes no progress past the bound #then it settles as the typed async_work_pending failure, never completed", async () => {

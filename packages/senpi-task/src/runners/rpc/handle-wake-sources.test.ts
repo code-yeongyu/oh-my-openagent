@@ -217,7 +217,7 @@ describe("createRpcChildHandle goal wake-source tracking (senpi#3262)", () => {
 })
 
 describe("createRpcChildHandle pending async work (senpi#3492, omo#10487)", () => {
-  test("#given a detached eval cell still in flight #when the child ends its turn clean #then the task stays running until the cell drains and the idle probe confirms", async () => {
+  test("#given a detached eval cell still in flight #when the child ends its turn clean #then the task stays running until the cell drains and the idle probe confirms no turn answered it", async () => {
     // given - the child detached a cell during its turn; the cell has not settled yet
     const scheduler = createManualSettlementScheduler()
     const harness = createHarness(60_000, scheduler.scheduler)
@@ -257,9 +257,12 @@ describe("createRpcChildHandle pending async work (senpi#3492, omo#10487)", () =
     expect(scheduler.pending()).toBe(1)
     scheduler.runNext()
 
-    // then - the idle probe confirms and the completed turn is reported
+    // then - the cell drained and no turn answered it: the held note is never the result (review
+    // finding 1 on #15137); a turn the cell's notification starts later supersedes this
     const outcome = await harness.handle.waitForOutcome()
-    expect(outcome).toEqual({ status: "completed", finalResponse: "done" })
+    expect(outcome.status).toBe("error")
+    if (outcome.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
     await harness.handle.dispose()
   })
 })
