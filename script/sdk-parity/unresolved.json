@@ -458,36 +458,6 @@
       "issue": "new"
     },
     {
-      "id": "install.setup.apply",
-      "gap": "no SDK call",
-      "slice": "C1c",
-      "issue": "new"
-    },
-    {
-      "id": "install.setup.detect",
-      "gap": "no SDK call",
-      "slice": "C1c",
-      "issue": "new"
-    },
-    {
-      "id": "install.setup.plan",
-      "gap": "no SDK call",
-      "slice": "C1c",
-      "issue": "new"
-    },
-    {
-      "id": "install.update",
-      "gap": "no SDK call",
-      "slice": "C1c",
-      "issue": "new"
-    },
-    {
-      "id": "install.version",
-      "gap": "no SDK call",
-      "slice": "C1c",
-      "issue": "new"
-    },
-    {
       "id": "mcp.oauth.login",
       "gap": "no SDK call",
       "slice": "OC1c",

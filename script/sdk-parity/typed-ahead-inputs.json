@@ -29,12 +29,6 @@
       "field": "destination",
       "reason": "security design 5.5: a provider credential goes only to a named destination; the root does not serve the call yet",
       "retires_with": "E1c"
-    },
-    {
-      "row": "install.setup.apply",
-      "field": "decide",
-      "reason": "consent each: install.setup.apply asks the caller's decide once per pending stage, before that stage writes; the row gains the field when its call is served",
-      "retires_with": "C1c"
     }
   ]
 }
