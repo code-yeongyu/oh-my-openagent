@@ -62,6 +62,7 @@ export { isTransportLostMessage, TRANSPORT_LOST_REASON } from "./transport-loss"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
 export {
   acceptedStopOwnsRun,
+  burnUndoneRun,
   currentRunStartEpoch,
   fenceRun,
   LEGACY_RUN_START_EPOCH,

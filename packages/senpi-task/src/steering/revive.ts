@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { getLifecycleDetachedRevival } from "../lifecycle/port"
-import { acceptedStopOwnsRun, type TaskRecord } from "../state"
+import { acceptedStopOwnsRun, burnUndoneRun, type TaskRecord } from "../state"
 import {
   buildRevived,
   deliveryUncertain,
@@ -281,7 +281,11 @@ function restoreRefusedWarmRevival(port: SteeringPort, terminal: TaskRecord, rev
       )
         return fresh
       const { pending_steering: _queueAtRevival, ...finished } = terminal
-      return fresh.pending_steering === undefined ? finished : { ...finished, pending_steering: fresh.pending_steering }
+      // The undone epoch was issued (the revived event names it), so it is burnt exactly as the cold rollback burns it.
+      return burnUndoneRun(
+        fresh.pending_steering === undefined ? finished : { ...finished, pending_steering: fresh.pending_steering },
+        fresh,
+      )
     })
   } catch (error) {
     log("senpi-task warm revival restore failed", {

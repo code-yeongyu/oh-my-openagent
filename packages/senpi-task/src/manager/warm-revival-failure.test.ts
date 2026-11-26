@@ -57,7 +57,9 @@ describe("warm revival whose prompt the live child refuses", () => {
     const retried = await manager.sendToTask({ idOrName: started.task_id, message: "continue" })
 
     // then
-    expect(retried).toMatchObject({ kind: "revived", run_epoch: 1 })
+    // The refused revival issued epoch 1 (a handle may name it): the retry runs under a generation never issued before.
+    expect(store.load(started.task_id)?.burnt_epoch).toBe(1)
+    expect(retried).toMatchObject({ kind: "revived", run_epoch: 2 })
     const second = manager.waitFor(started.task_id, { signal: AbortSignal.timeout(5000) })
     fake.settle({ status: "completed", finalResponse: "second" })
     expect(await second).toMatchObject({ status: "completed", final_response: "second" })
