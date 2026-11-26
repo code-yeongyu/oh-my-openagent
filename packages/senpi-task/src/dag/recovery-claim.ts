@@ -1,7 +1,7 @@
 // The claim: whether a session may take a paused or interrupted run over, decided under the run lock
 // from who holds it (`run-lease.ts`) and whether this process still schedules it.
 import type { RecoverableRecord, RecoveryContext } from "./recovery"
-import { liveChildOwner } from "./run-lease"
+import { runHolder } from "./run-lease"
 import type { DagRunId } from "./types"
 
 export type ClaimedRun =
@@ -52,8 +52,7 @@ export function claimPausedRun(context: RecoveryContext, runId: DagRunId, parent
     const interrupted = fresh.status === "running" && context.isRunHeldInProcess?.(runId) === false
     if (fresh.status !== "paused" && !interrupted) return { kind: "skipped", reason: "not_paused" }
     if (fresh.parentSessionId !== parentSessionId) return { kind: "skipped", reason: "foreign_session" }
-    const priorHolder =
-      fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid ?? (interrupted ? liveChildOwner(context, fresh) : undefined)
+    const priorHolder = runHolder(context, fresh)
     if (priorHolder !== undefined && holderStillLive(context, runId, priorHolder)) {
       return { kind: "skipped", reason: "live_lease", holderPid: priorHolder }
     }

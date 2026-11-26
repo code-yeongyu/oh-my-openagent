@@ -37,6 +37,7 @@ async function killedHostFixture(
   name: string,
   holder: { alive: boolean },
   leftAt: "mid-node" | "between-nodes" = "mid-node",
+  leftAs: "running" | "shutdown-paused" = "running",
 ) {
   const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-killed-${name}-`))
   cleanupRoots.push(cwd)
@@ -65,7 +66,12 @@ async function killedHostFixture(
     leftAt === "mid-node"
       ? record.nodes
       : record.nodes.map((entry) => (entry.id === "first" ? { ...entry, state: "completed" as const } : entry))
-  store.writeCheckpoint(runId, { ...record, nodes, status: "running", leaseHolderPid: FOREIGN_HOST_PID })
+  store.writeCheckpoint(
+    runId,
+    leftAs === "running"
+      ? { ...record, nodes, status: "running", leaseHolderPid: FOREIGN_HOST_PID }
+      : { ...record, nodes, status: "paused", previousLeaseHolderPid: FOREIGN_HOST_PID },
+  )
 
   const timers = new ManualTimers()
   const errors: string[] = []
@@ -207,6 +213,29 @@ describe("DAG runtime recovery of a run its host left running", () => {
     // then
     expect(refusal).toEqual(expect.objectContaining({ code: "run_not_owned" }))
     expect(status()).toBe("running")
+    expect(eventTypes()).toEqual(before)
+    runtime.dispose()
+  })
+
+  test("#given a run paused for shutdown by a host that is still draining #when the successor cancels it #then the cancel is refused while that previous holder lives", async () => {
+    // given
+    const fixture = await killedHostFixture("draining-cancel", { alive: true }, "between-nodes", "shutdown-paused")
+    const { runId, runtime, eventTypes, status } = fixture
+    await within(runtime.attach(), "attach")
+    const before = eventTypes()
+
+    // when
+    const refusal = await within(
+      runtime.cancel(runId).then(
+        () => undefined,
+        (error: unknown) => error,
+      ),
+      "runtime.cancel",
+    )
+
+    // then
+    expect(refusal).toEqual(expect.objectContaining({ code: "run_not_owned" }))
+    expect(status()).toBe("paused")
     expect(eventTypes()).toEqual(before)
     runtime.dispose()
   })

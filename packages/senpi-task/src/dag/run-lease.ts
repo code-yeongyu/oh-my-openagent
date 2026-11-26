@@ -49,8 +49,17 @@ export function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1)
   return undefined
 }
 
+/**
+ * The one answer to "who holds this run": its lease, else the host that paused it for shutdown and
+ * may still be draining, else (for a record naming neither) the live owner of an active child. The
+ * claim, the unheld cancel and the shutdown pause all ask this (#15125).
+ */
+export function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): number | undefined {
+  return record.leaseHolderPid ?? record.previousLeaseHolderPid ?? liveChildOwner(probe, record)
+}
+
 export function liveForeignHolder(probe: DagRunHolderProbe, record: LeasedRecord): number | undefined {
-  const holder = record.leaseHolderPid ?? liveChildOwner(probe, record)
+  const holder = runHolder(probe, record)
   return holder !== undefined && holder !== probe.hostPid && probe.isProcessAlive(holder) ? holder : undefined
 }
 
