@@ -1,5 +1,4 @@
 import { dagRunCancelledEvent } from "./events"
-import type { TaskRecord } from "../state"
 import {
   countNodes,
   errorMessage,
@@ -11,7 +10,7 @@ import {
   TERMINAL_NODE_STATES,
   type SchedulerContext,
 } from "./scheduler-context"
-import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
+import { ownedClaimAge } from "./owned-attempt"
 import { disposePromotionWatch } from "./scheduler-task-attachment"
 import type { DagNodeId, DagRunId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
@@ -81,37 +80,9 @@ export function supersededChildren(context: SchedulerContext): readonly Supersed
     const live = liveOwnedTasks(context, node.id)
     if (live.length === 0) return []
     return live
-      .filter((task) => createdForEarlierAttempt(task, execAttempt, record))
+      .filter((task) => ownedClaimAge(task, record) === "superseded")
       .map((task) => ({ nodeId: node.id, taskId: task.task_id, execAttempt }))
   })
-}
-
-function createdForEarlierAttempt(task: TaskRecord, execAttempt: number, record: DagRunRecordV1): boolean {
-  const created = task.owner?.execAttempt
-  if (created !== undefined) return created < execAttempt
-  // An unrelated amend changes the run fingerprint without bumping this node's attempt. Legacy
-  // records need positive evidence of an older attempt, not a mismatch with today's definition.
-  const definitions = new Set([
-    record.definitionFingerprint,
-    ...(record.amendHistory ?? []).map((amend) => amend.previousFingerprint),
-  ])
-  for (const definitionFingerprint of definitions) {
-    for (let attempt = 0; attempt < execAttempt; attempt += 1) {
-      if (
-        task.owner !== undefined &&
-        task.owner.fingerprint ===
-          dagFingerprint(
-            ownerFingerprintInput({
-              definitionFingerprint,
-              nodeId: task.owner.nodeId,
-              execAttempt: attempt,
-            }),
-          )
-      )
-        return true
-    }
-  }
-  return false
 }
 
 /**

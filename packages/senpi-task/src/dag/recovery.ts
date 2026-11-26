@@ -4,6 +4,7 @@ import { join } from "node:path"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagScheduler } from "./scheduler"
 import { installRecoveredDag } from "./recovery-install"
+import { resolveRecoveredNodeTask } from "./recovery-attempt"
 import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 
 import { defaultSignaller } from "../lifecycle/context"
@@ -335,13 +336,15 @@ async function reconcileNodes(
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue
     if (observed.state !== "scheduled" && observed.state !== "running" && observed.state !== "paused") continue
 
-    const owned = context.taskManager.findOwnedTask(ownerKey(journal.snapshot(), observed.id))
-    // Retrying retains taskId until the next admission batch attaches its replacement. The
-    // newest owner is authoritative even if that replacement launched before the batch committed.
-    let task = owned ?? (observed.taskId === undefined ? undefined : context.taskManager.get(observed.taskId))
+    const resolving = resolveRecoveredNodeTask(context.taskManager, journal.snapshot(), observed)
+    const resolved = resolving instanceof Promise ? await resolving : resolving
+    if (resolved.kind === "fail") {
+      failNode(journal, observed.id, resolved.code, resolved.message, context.now, pendingErrors)
+      continue
+    }
+    let task = resolved.kind === "task" ? resolved.task : undefined
     if (task !== undefined && observed.taskId !== task.task_id) attachTask(journal, observed.id, task.task_id)
-
-    if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {
+    if (resolved.kind === "start") {
       const result = await context.taskManager.startOwned(
         {
           ...startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
@@ -651,10 +654,6 @@ function taskOwner(record: DagRunRecordV1, nodeId: DagNodeId): DagTaskOwner {
       }),
     ),
   }
-}
-
-function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
-  return { kind: "dag" as const, runId: record.runId, nodeId }
 }
 
 function nodeById(record: DagRunRecordV1, nodeId: DagNodeId) {
