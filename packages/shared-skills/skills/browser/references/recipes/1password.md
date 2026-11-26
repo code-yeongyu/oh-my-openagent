@@ -47,6 +47,7 @@ Other automation may be driving the same window.
 ## If it is locked
 
 ```js
+const flag = `${(await import("node:os")).tmpdir()}/unlocked-${Date.now()}.flag`
 await tool.monitor({ description: "1Password unlocked", path: flag, event: "create" })   // subscribe first
 globalThis.help = session.requestHelp({ prompt: "Please unlock 1Password in this tab, then continue." })
   .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))

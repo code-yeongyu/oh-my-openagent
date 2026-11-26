@@ -173,6 +173,7 @@ Never invent tab ids and never repeat a denied borrow.
 ## Humans
 
 ```js
+const flag = `${(await import("node:os")).tmpdir()}/help-${Date.now()}.flag`
 await tool.monitor({ description: "help finished", path: flag, event: "create" })   // subscribe first
 globalThis.help = session.requestHelp({ prompt, title, targets: ["@e4"], completionCriteria, timeoutMs })
   .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))
