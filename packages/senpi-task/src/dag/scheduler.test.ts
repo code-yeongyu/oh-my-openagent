@@ -233,22 +233,20 @@ class FakeTaskManager implements TaskManager {
     this.owners.push(owner)
     if (this.#options.rejectStartNodeIds?.includes(nodeId) === true) throw new Error(`start rejected ${nodeId}`)
     this.startedSpecs.push(spec)
-    const existing = [...this.#tasks.values()].find((entry) => entry.record.owner?.nodeId === owner.nodeId)
-    if (existing !== undefined) {
-      // Mirrors the real manager: an identical fingerprint reuses the persisted task, while a
-      // terminal record with a different fingerprint releases its claim so a retry starts fresh.
-      const terminal = existing.record.status !== "pending" && existing.record.status !== "running"
-      if (existing.record.owner?.fingerprint === owner.fingerprint || !terminal) {
-        return {
-          kind: "started",
-          reused: true,
-          task_id: existing.record.task_id,
-          status: existing.record.status,
-          name: existing.record.name ?? existing.record.task_id,
-        }
-      }
-      this.#tasks.delete(existing.record.task_id)
+    // Mirrors the real manager: an identical fingerprint reuses the newest claim, any other LIVE claim
+    // is an owner_conflict the scheduler classifies, and settled claims release so a retry starts fresh.
+    const claims = this.findOwnedTasks(owner)
+    const newest = claims.at(-1)
+    if (newest !== undefined && newest.owner?.fingerprint === owner.fingerprint) {
+      const reused = { task_id: newest.task_id, status: newest.status, name: newest.name ?? newest.task_id }
+      return { kind: "started", reused: true, ...reused }
     }
+    const live = claims.findLast((claim) => claim.status === "pending" || claim.status === "running")
+    if (live !== undefined) {
+      const conflict = { task_id: live.task_id, existing_fingerprint: live.owner?.fingerprint ?? "" }
+      return { kind: "owner_conflict", ...conflict, requested_fingerprint: owner.fingerprint }
+    }
+    for (const claim of claims) this.#tasks.delete(claim.task_id)
     const startFailureKind =
       this.#options.startFailureKinds?.[nodeId] ??
       (this.#options.startFailureNodeIds?.includes(nodeId) === true ? "start_failed" : undefined)

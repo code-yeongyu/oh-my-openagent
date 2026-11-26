@@ -563,9 +563,9 @@ class TaskManagerImpl implements TaskManager {
       // still live: an older attempt's child can resume on its own behind a newer one (#11381).
       const live = records.findLast((claim) => !isTerminalRecord(claim))
       if (live === undefined) return undefined
-      // Only a same-attempt duplicate is adoptable (#7412); an earlier attempt's task is not (#11381).
+      // Which live claim this is - same attempt, earlier, or newer - the DAG layer decides (#11381).
       return {
-        kind: (live.owner?.execAttempt ?? 0) === (owner.execAttempt ?? 0) ? "owner_conflict" : "owner_superseded",
+        kind: "owner_conflict",
         task_id: live.task_id,
         existing_fingerprint: live.owner?.fingerprint ?? "",
         requested_fingerprint: owner.fingerprint,

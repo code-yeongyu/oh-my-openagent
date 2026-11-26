@@ -681,8 +681,6 @@ function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "starte
       return { code: "start_failed", message: result.error_message }
     case "owner_conflict":
       return { code: "start_failed", message: `DAG task owner conflicts with existing task ${result.task_id}` }
-    case "owner_superseded":
-      return { code: "stale_attempt_alive", message: `task ${result.task_id} of a superseded attempt is still live` }
   }
 }
 
