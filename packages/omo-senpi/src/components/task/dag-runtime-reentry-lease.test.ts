@@ -199,4 +199,29 @@ describe("DAG runtime re-entry takes the run's lease first", () => {
     expect(runner.handles).toHaveLength(1)
     runtime.dispose()
   })
+
+  test("#given an amend re-entering a settled run #when a cancel arrives before the run is revived #then the cancel waits for the re-entry and the run ends cancelled, never resumed after it", async () => {
+    // given
+    const { runId, store, runtime, runner } = await cancelledRun("cancel-during-amend")
+
+    // when - the amend holds the reservation and has written its amendment; the revival follows its await
+    const amending = runtime.amend(runId, definition("one again"))
+    const cancelling = runtime.cancel(runId)
+    await within(amending, "the amend")
+    await within(cancelling, "the cancel")
+
+    // then
+    const runEvents = store
+      .readEvents(runId, 0, { limit: 500 })
+      .events.map((event) => event.type)
+      .filter((type) => type.startsWith("dag.run."))
+    expect(runEvents.at(-1)).toBe("dag.run.cancelled")
+    expect(store.readCheckpoint<Leased>(runId)?.status).toBe("cancelled")
+    for (const handle of runner.handles) {
+      expect(["cancelled", "completed", "error", "interrupted", "lost"]).toContain(
+        runtime.taskRecord(handle.spec.taskId)?.status ?? "",
+      )
+    }
+    runtime.dispose()
+  })
 })

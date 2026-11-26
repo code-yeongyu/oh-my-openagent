@@ -224,7 +224,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   })
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
     const sessionId = deps.engine.runtime.sessionId() ?? ""
-    if (TERMINAL_RUN_STATUSES.has(coreManager.record(runId, sessionId).status)) return
+    // Only who may cancel is checked here; whether there is anything to cancel is decided inside the
+    // run's reservation (`dag-run-cancel.ts`), after any re-entry or installation in flight (#15125).
+    coreManager.record(runId, sessionId)
     // A user-stopped run then lets the parent's fence for the run go.
     const record = await cancelRun(runId, sessionId, reason)
     if (record === undefined || record.status !== "paused" || record.pause?.reason !== "user_stop") return
