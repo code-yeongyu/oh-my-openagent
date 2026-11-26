@@ -1,5 +1,6 @@
 // Who holds a DAG run: the durable lease a scheduler records, and the evidence that stands in for it
 // on a checkpoint written before every scheduler recorded one.
+import { isTerminalRecord } from "../manager/manager-helpers"
 import type { TaskManager } from "../manager/types"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
@@ -18,13 +19,20 @@ export function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
   return { kind: "dag" as const, runId: record.runId, nodeId }
 }
 
-// A first-generation run records no lease, so the process that still owns its attached children
-// stands in for the holder. Lifecycle reconcile runs first and takes over the children of a dead
-// owner, so a record still under a live foreign pid means that process is running them.
+// A run checkpointed before schedulers recorded a lease names no holder, so the process that still
+// owns its active children stands in for it. Lifecycle reconcile runs first and takes over the
+// children of a dead owner, so a child still under a live foreign pid means that process runs it.
+// Each node's child is resolved the way reconcile resolves it (newest owned task first: the
+// checkpoint's taskId may still name a prior attempt), and an ended child holds nothing even though
+// its resident record keeps the pid of the host that ran it.
 export function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): number | undefined {
   for (const node of record.nodes) {
-    if (node.taskId === undefined || (node.state !== "scheduled" && node.state !== "running")) continue
-    const owner = probe.taskManager.get(node.taskId)?.host_pid
+    if (node.state !== "scheduled" && node.state !== "running") continue
+    const task =
+      probe.taskManager.findOwnedTask(ownerKey(record, node.id)) ??
+      (node.taskId === undefined ? undefined : probe.taskManager.get(node.taskId))
+    if (task === undefined || isTerminalRecord(task)) continue
+    const owner = task.host_pid
     if (owner !== undefined && owner !== probe.hostPid && probe.isProcessAlive(owner)) return owner
   }
   return undefined

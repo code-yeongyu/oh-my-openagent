@@ -135,8 +135,9 @@ export class LongRunningTaskManager implements TaskManager {
     }
   }
 
+  // The LAST match wins, as in the real manager: a retried node's newest claim is its live owner.
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].find(
+    return [...this.#tasks.values()].findLast(
       ({ record }) =>
         record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
     )?.record
