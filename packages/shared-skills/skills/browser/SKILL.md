@@ -36,7 +36,7 @@ nothing follows them.
 
 | Waiting for | Owned | Attached |
 |---|---|---|
-| Page content appearing or changing | `page.waitForFunction(fn, undefined, { timeout })` (options are the THIRD argument), `page.locator(ref).waitFor()` | `navigate(url, { waitUntil: "networkidle" })`; later, `evaluate` a promise that resolves on the state (`{ awaitPromise: true, timeoutMs, context }`) |
+| Page content appearing or changing | `page.waitForFunction(fn, undefined, { timeout })` (options are the THIRD argument), `page.locator(ref).waitFor()` | `navigate(url, { waitUntil: "networkidle" })`; later, `session.waitForElement(target, { state: "visible", timeoutMs })`, or for any other state `evaluate` a promise that resolves on it (`{ awaitPromise: true, timeoutMs, context }`) |
 | The request an action triggers | `const got = page.waitForResponse("**/api/x")`, act, `await got` | `waitForNavigation()` after an action that navigates |
 | A feed that loads more as you scroll | `omowright.collectWhileScrolling(page, snoop, { minItems, maxScrolls, extract })` over a `createNetworkSnoop`: [network.md](references/owned-engine/network.md) | `session.scrollTo(target)`, then wait as in the first row |
 | A person | `requestHuman(page, { prompt, until })` | `session.requestHelp({ prompt, targets })` |
@@ -59,7 +59,7 @@ the page (a dev server, a build) watch a command instead:
 `tool.monitor({ description, command: "until curl -sf localhost:3000 >/dev/null; do sleep 1; done; printf 'READY\\n'", filter: "^READY$" })`.
 
 **3. READ WITHIN A TOKEN BUDGET.** Read the smallest thing that answers the question:
-`session.observe({ maxTokens: 4000 })` attached; `omowright.compactSnapshot(await page.snapshot({ find: "Checkout" }))`
+`session.observe({ maxTokens: 4000 })` attached, and `session.read(target)` for the text, value or attributes of a few nodes; `omowright.compactSnapshot(await page.snapshot({ find: "Checkout" }))`
 owned (`{ interactive: true }` for controls only, `{ diff: true }` after an action).
 `omowright.snapshotTokens(snapshot).estTokens` measures a tree before you print it. From
 `evaluate`, return the fields you need; never print `getHtml()`, `innerHTML` or a page's `innerText`.
@@ -87,13 +87,13 @@ Launch, network capture, frames, coordinates and CAPTCHA: [references/owned-engi
 
 ```js
 globalThis.session = await omowright.connectBrowserSkill({ name: "<task>", focused: false })
-const sync = async () => (await session.cooperate("sync")).context_id                      // one context per gated action
-await session.navigate("https://example.com/", { waitUntil: "load" })                      // first navigate of the untouched tab: no context
+const sync = async () => (await session.cooperate("sync")).context_id                      // strict policy: one context per gated action
+await session.navigate("https://example.com/", { waitUntil: "load" })                      // the first navigate needs no context
 const vom = await session.observe({ maxTokens: 4000 })                                     // @eN refs; shadow DOM and frames included
-await session.click("@e7", { context: await sync() })
-await session.fill("#q", "hello", { context: await sync() })
-await session.press("Enter", { context: await sync() })
-await session.waitForNavigation({ waitUntil: "load" })
+const heading = await session.read("h1")                                                   // text, value, attributes: no context, no script
+await session.click("h1", { context: await sync(), expect: [{ target: "h1", field: "text", equals: "Example Domain" }] })
+await session.press("End", { context: await sync() })
+await session.navigate("https://example.org/", { waitUntil: "load", context: await sync() })
 const shot = await session.screenshot()                                                    // { buffer, width, height, captureId }
 // the task's last cell, on success and failure: await session.stop()                      // returns borrowed tabs
 ```
@@ -101,11 +101,15 @@ const shot = await session.screenshot()                                         
 1. **Refs are reissued by every read.** Act on a ref in the cycle you read it; navigation and large
    DOM changes stale all of them.
 2. **Two identical failures mean change approach, not retry.** A third identical attempt is a defect.
-3. **Sync before every gated action except that first navigate.** A context from
-   `session.cooperate("sync")` is good for one action; plain reads (`observe`, `snapshot`,
-   `screenshot()`, `waitForNavigation`) need none. On `cooperation_sync_required` the person is
-   using the tab: `session.cooperate("wait", { timeoutMs: 25_000 })` until `ready`, read again and
-   replan; never replay the refused action.
+3. **Sync before every gated action except the first navigate.** Under the default `strict`
+   policy a context from `session.cooperate("sync")` is good for one action; reads (`observe`,
+   `read`, `snapshot`, `screenshot()`, `waitForElement`, `waitForNavigation`) need none. `expect`
+   names facts the extension checks right before the input; a false one refuses the action with
+   `precondition_failed` and nothing reaches the page. The `target` policy reuses one context
+   across DOM actions: [references/commands.md](references/commands.md). On
+   `cooperation_sync_required` the person is using the tab:
+   `session.cooperate("wait", { timeoutMs: 25_000 })` until `ready`, read again and replan; never
+   replay the refused action.
 4. **Borrow a user tab explicitly** (`tabList({ scope: "user" })`, `tabBorrow(id)`, `tabReturn(id)`).
    Borrowing prompts the user; never invent tab ids and never repeat a denied borrow.
 5. **Always `stop()` the session**, and keep `focused: false`: the browser belongs to someone who is
