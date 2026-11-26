@@ -69,20 +69,28 @@ permissions:
   actions: write
 
 jobs:
-  # A pinned release owns the CI run its gate waits on (#15094). ci.yml keeps only the newest pending dev push run,
-  # so a later merge could cancel the pin's own push run while it waits; a run dispatched on refs/heads/release-ci/<sha>
-  # is alone in its concurrency group. GITHUB_TOKEN may create the ref and dispatch, and a ref it creates starts no
-  # push run. Skipped when a green run already exists or the pin's ci.yml predates the dispatch trigger.
+  # A pinned release owns the CI run its gate waits on (#15094). ci.yml keeps only the newest pending dev push run, so
+  # a later merge could cancel the pin's push run while it waits; a run dispatched on refs/heads/release-ci/<sha> is
+  # alone in its concurrency group. The source is admitted (read-only) before anything is written or dispatched.
+  # GITHUB_TOKEN creates the ref (which starts no push run) and dispatches; the run it gets is recorded by id, so the
+  # gate judges that run and no other dispatch. Skipped when the pin's ci.yml predates the dispatch trigger.
   pin-ci:
     if: inputs.source_sha != '' && inputs.prepared_release_sha == '' && inputs.lazycodex_only != true
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       actions: write
       contents: write
     outputs:
-      pinned: ${{ steps.pin.outputs.pinned }}
+      ref_owned: ${{ steps.pin.outputs.ref_owned }}
+      ci_run_id: ${{ steps.pin.outputs.ci_run_id }}
+      source_sha: ${{ steps.pin.outputs.source_sha }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Dispatch CI on the pinned source's own ref
         id: pin
         shell: bash
@@ -90,19 +98,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+          CI_BASIS_RECEIPT: ${{ inputs.ci_basis_receipt }}
+          PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
         run: |
           set -euo pipefail
-          echo "pinned=false" >> "$GITHUB_OUTPUT"
-          if ! [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "source_sha is not a full commit SHA; gate-reuse refuses it."
-            exit 0
-          fi
-          green="$(gh api --method GET "repos/${GH_REPO}/actions/workflows/ci.yml/runs" -f head_sha="$SOURCE_SHA" -f per_page=100 \
-            --jq '[.workflow_runs[] | select((.event == "push" or .event == "workflow_dispatch") and .status == "completed" and .conclusion == "success")] | length')"
-          if [ "$green" != "0" ]; then
-            echo "A green CI run already exists for ${SOURCE_SHA}; nothing to dispatch."
-            exit 0
-          fi
+          source .github/scripts/release-source-admission.sh
+          admit_release_source
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
           triggers="$(gh api -H "Accept: application/vnd.github.raw+json" "repos/${GH_REPO}/contents/.github/workflows/ci.yml?ref=${SOURCE_SHA}" \
             | yq -o=json | jq -c '.on | keys')"
           if ! jq -e 'index("workflow_dispatch")' <<< "$triggers" > /dev/null; then
@@ -117,9 +120,23 @@ jobs:
               exit 1
             fi
           fi
+          # Owned from here on, whatever happens next, so unpin-ci removes it.
+          echo "ref_owned=true" >> "$GITHUB_OUTPUT"
+          since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           gh workflow run ci.yml --ref "$ref"
-          echo "pinned=true" >> "$GITHUB_OUTPUT"
-          echo "Dispatched ci.yml on ${ref}." >> "$GITHUB_STEP_SUMMARY"
+          for attempt in $(seq 1 30); do
+            run_id="$(gh api --method GET "repos/${GH_REPO}/actions/workflows/ci.yml/runs" -f branch="$ref" -f event=workflow_dispatch -f per_page=20 \
+              | jq -r --arg sha "$SOURCE_SHA" --arg since "$since" \
+                '[.workflow_runs[] | select(.head_sha == $sha and .created_at >= $since)] | sort_by(.created_at) | first | .id // empty')"
+            if [ -n "$run_id" ]; then
+              echo "ci_run_id=${run_id}" >> "$GITHUB_OUTPUT"
+              echo "Dispatched ci.yml on ${ref}: run ${run_id}." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::The ci.yml run dispatched on ${ref} did not appear within 5 minutes."
+          exit 1
 
   gate-reuse:
     needs: [pin-ci]
@@ -227,32 +244,13 @@ jobs:
           ACTOR: ${{ github.actor }}
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
           REPOSITORY: ${{ github.repository }}
+          RELEASE_CI_RUN: ${{ needs.pin-ci.outputs.ci_run_id }}
         run: |
           set -euo pipefail
 
           if [ -n "$SOURCE_SHA" ]; then
-            if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]] ||
-              [ "$LAZYCODEX_ONLY" = true ] || [ -n "$CI_BASIS_RECEIPT" ]; then
-              echo "::error::source_sha requires a full commit SHA, a version stamp, and hosted push CI."
-              exit 1
-            fi
-            SOURCE_SHA="$(git rev-parse --verify "$SOURCE_SHA")"
-            if [ "$(git cat-file -t "$SOURCE_SHA")" != commit ] || ! git merge-base --is-ancestor "$SOURCE_SHA" origin/dev; then
-              echo "::error::source_sha ${SOURCE_SHA} is not on dev."
-              exit 1
-            fi
-            if ! git merge-base --is-ancestor refs/remotes/origin/master "$SOURCE_SHA"; then
-              echo "::error::Pinned source ${SOURCE_SHA} does not contain origin/master; refusing a release that cannot fast-forward the mirror."
-              exit 1
-            fi
-            if [ -n "$PREPARED_RELEASE_SHA" ] && {
-              [ "$PREPARED_RELEASE_SHA" != "$GITHUB_SHA" ] ||
-              [ "$(git rev-parse HEAD^1)" != "$SOURCE_SHA" ] ||
-              ! git merge-base --is-ancestor "$PREPARED_RELEASE_SHA" origin/dev;
-            }; then
-              echo "::error::The prepared source must be a merged stamp whose first parent is ${SOURCE_SHA}."
-              exit 1
-            fi
+            source .github/scripts/release-source-admission.sh
+            admit_release_source
           fi
 
           # Explicit, logged waiver of the hosted CI wait. An empty receipt keeps the default path below.
@@ -346,20 +344,36 @@ jobs:
 
           # Unpinned releases can also use the release-state PR's CI at the prepared SHA.
           # Pinned releases require a push and proof that its heavy validation actually ran.
-          # A pinned release counts a dev push run or the run it dispatched on its own release-ci/<sha> ref (pin-ci, #15094).
+          # The pinned source also counts the one run pin-ci dispatched for it (#15094), by run id, never any other dispatch.
           wait_for_ci() {
-            local sha="$1" event="${2:-}" push_run events='["push","workflow_dispatch"]'
-            if [ "$event" != "push" ]; then events='null'; fi
-            for attempt in $(seq 1 120); do
+            local sha="$1" event="${2:-}" push_run owned="" owned_status="" owned_conclusion=""
+            if [ "$event" = "push" ]; then set -- -f "event=push"; else set --; fi
+            if [ "$event" = "push" ] && [ "$sha" = "$SOURCE_SHA" ]; then owned="${RELEASE_CI_RUN:-}"; fi
+            # Its own run starts with the release, so it gets a full CI run's time (about 70 minutes) plus margin.
+            local attempts=120
+            if [ -n "$owned" ]; then attempts=400; fi
+            for attempt in $(seq 1 "$attempts"); do
               RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
                 "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
-                -f head_sha="$sha" -f per_page=100)"
-              RUNS="$(jq --argjson events "$events" \
-                '.workflow_runs |= map(select($events == null or (.event as $e | $events | index($e))))' <<< "$RUNS")"
+                -f head_sha="$sha" "$@" -f per_page=100)"
 
               if [ "$event" = "push" ]; then
                 push_run="$(select_green_push "$sha" <<< "$RUNS")"
                 SUCCESS_ID="${push_run%%$'\t'*}"
+                if [ -z "$SUCCESS_ID" ] && [ -n "$owned" ]; then
+                  OWNED="$(retry_gh "Read the release's own CI run" gh api "repos/${REPOSITORY}/actions/runs/${owned}" \
+                    --jq '[.id, .run_attempt, .head_sha, .event, .head_branch, .status, (.conclusion // "none")] | @tsv')"
+                  IFS=$'\t' read -r owned_id owned_attempt owned_sha owned_event owned_branch owned_status owned_conclusion <<< "$OWNED"
+                  if [ "$owned_id" != "$owned" ] || [ "$owned_sha" != "$sha" ] || [ "$owned_event" != workflow_dispatch ] ||
+                    [ "$owned_branch" != "release-ci/${sha}" ]; then
+                    echo "::error::CI run ${owned} is not the run pin-ci dispatched for ${sha} on release-ci/${sha}."
+                    return 1
+                  fi
+                  if [ "$owned_status" = completed ] && [ "$owned_conclusion" = success ]; then
+                    push_run="$(printf '%s\t%s\t%s' "$owned_id" "$owned_attempt" "$owned_sha")"
+                    SUCCESS_ID="$owned_id"
+                  fi
+                fi
               else
                 SUCCESS_ID="$(jq -r --arg sha "$sha" '
                   [.workflow_runs[] | select(.head_sha == $sha and .status == "completed" and .conclusion == "success")]
@@ -394,17 +408,23 @@ jobs:
                 return 0
               fi
 
-              # Fail fast: a job that already concluded red in a run still in progress decides the outcome now, not when
+              # With its own run, the release judges only that run: another run's verdict (a superseded push, an older
+              # attempt) never decides it. It fails fast: a job that already concluded red decides the outcome now, not when
               # the run ends (the 5.1.84 cut's run went red at minute 11 of 66). A cancelled job is not a verdict.
-              if [ "$event" = "push" ]; then
-                for active in $(jq -r --arg sha "$sha" '.workflow_runs[] | select(.head_sha == $sha and .status != "completed") | .id' <<< "$RUNS"); do
-                  RED="$(retry_gh "Read CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${active}/jobs?filter=latest&per_page=100" \
-                    --jq '[.jobs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure")) | "\(.name)=\(.conclusion)"] | join(", ")')"
-                  if [ -n "$RED" ]; then
-                    echo "::error::CI run ${active} for ${sha} is still running but already failed: ${RED}."
-                    return 1
-                  fi
-                done
+              if [ -n "$owned" ]; then
+                if [ "$owned_status" = completed ]; then
+                  echo "::error::The release's own CI run ${owned} for ${sha} concluded ${owned_conclusion}."
+                  return 1
+                fi
+                RED="$(retry_gh "Read the release's own CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${owned}/jobs?filter=latest&per_page=100" \
+                  --jq '[.jobs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure")) | "\(.name)=\(.conclusion)"] | join(", ")')"
+                if [ -n "$RED" ]; then
+                  echo "::error::The release's own CI run ${owned} for ${sha} is still running but already failed: ${RED}."
+                  return 1
+                fi
+                echo "Waiting for the release's own CI run ${owned} on ${sha} (attempt ${attempt}/${attempts})."
+                sleep 15
+                continue
               fi
 
               ACTIVE_COUNT="$(jq -r --arg sha "$sha" '
@@ -421,7 +441,7 @@ jobs:
                 echo "::error::CI completed without a successful run for ${sha}."
                 return 1
               fi
-              echo "Waiting for successful CI on ${sha} (attempt ${attempt}/120)."
+              echo "Waiting for successful CI on ${sha} (attempt ${attempt}/${attempts})."
               sleep 15
             done
 
@@ -467,13 +487,16 @@ jobs:
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
-  # The release-ci ref only names the run's commit; the run and its record stay after the ref is gone.
+  # The release-ci ref only names the run's commit; the run and its record stay after the ref is gone. Runs on every
+  # outcome once pin-ci owned the ref (including a failed or cancelled release), deletes the ref only while it still
+  # names the pinned source, and stops the release's own run if the gate no longer needs it.
   unpin-ci:
     needs: [pin-ci, gate-reuse]
-    if: always() && inputs.prepared_release_sha == '' && needs.pin-ci.outputs.pinned == 'true'
+    if: always() && inputs.prepared_release_sha == '' && needs.pin-ci.outputs.ref_owned == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
+      actions: write
       contents: write
     steps:
       - name: Delete the pinned source's CI ref
@@ -481,8 +504,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
-        run: gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/release-ci/${SOURCE_SHA}"
+          SOURCE_SHA: ${{ needs.pin-ci.outputs.source_sha }}
+          CI_RUN_ID: ${{ needs.pin-ci.outputs.ci_run_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "$CI_RUN_ID" ] &&
+            [ "$(gh api "repos/${GH_REPO}/actions/runs/${CI_RUN_ID}" --jq .status)" != completed ]; then
+            gh run cancel "$CI_RUN_ID" || echo "::warning::Could not cancel CI run ${CI_RUN_ID}; it finishes on its own."
+          fi
+          ref="heads/release-ci/${SOURCE_SHA}"
+          if ! existing="$(gh api "repos/${GH_REPO}/git/ref/${ref}" --jq .object.sha 2>/dev/null)"; then
+            echo "refs/${ref} is already gone."
+            exit 0
+          fi
+          if [ "$existing" != "$SOURCE_SHA" ]; then
+            echo "::error::refs/${ref} now names ${existing}, not ${SOURCE_SHA}; leaving it for a maintainer."
+            exit 1
+          fi
+          gh api --method DELETE "repos/${GH_REPO}/git/refs/${ref}"
 
   preflight-trust:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9933.
