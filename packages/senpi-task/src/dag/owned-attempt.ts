@@ -9,13 +9,14 @@ export type OwnedClaimAge = "current" | "superseded" | "newer"
  * The one rule every reader of a run's owned tasks uses - the re-entry sweep, admission, and
  * recovery (#11381). An owner's explicit execAttempt decides. A legacy owner written before it
  * carried one is matched against the fingerprints of every definition the run has had; without
- * positive evidence of an attempt it counts as current, never as a stale child to stop.
+ * positive evidence of an attempt it counts as current, never as a stale child to stop. A task of a
+ * node the definition no longer has was superseded by the amendment that removed it.
  */
 export function ownedClaimAge(task: TaskRecord, record: DagRunRecordV1): OwnedClaimAge {
   const owner = task.owner
   if (owner === undefined) return "current"
   const node = record.nodes.find((entry) => entry.id === owner.nodeId)
-  if (node === undefined) return "current"
+  if (node === undefined) return "superseded"
   const current = node.execAttempt ?? 0
   const created = owner.execAttempt ?? legacyAttempt(owner, record, current)
   if (created === undefined || created === current) return "current"

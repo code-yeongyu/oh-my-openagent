@@ -4,15 +4,13 @@ import {
   errorMessage,
   failNode,
   isLiveTask,
-  liveOwnedTasks,
-  nodeById,
   transition,
   TERMINAL_NODE_STATES,
   type SchedulerContext,
 } from "./scheduler-context"
 import { ownedClaimAge } from "./owned-attempt"
 import { disposePromotionWatch } from "./scheduler-task-attachment"
-import { stopRunChildren, stopSettledRunChildren } from "./run-children-stop"
+import { liveRunChildren, stopRunChildren, stopSettledRunChildren } from "./run-children-stop"
 import type { DagNodeId, DagRunId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
@@ -66,23 +64,20 @@ export async function cancelledSnapshot(context: SchedulerContext): Promise<DagR
   return context.journal.snapshot()
 }
 
-type SupersededChild = { readonly nodeId: DagNodeId; readonly taskId: string; readonly execAttempt: number }
+type SupersededChild = { readonly nodeId: DagNodeId; readonly taskId: string }
 
 /**
- * Live children of an earlier attempt of any node (an amend or a retry bumped its execAttempt), the
- * newest record or not: an older attempt's child can resume after the next attempt's task exists.
+ * Live children the run owns that no longer belong to any current attempt: an earlier attempt of a
+ * node (an amend or a retry bumped its execAttempt), the newest record or not, or a node an amendment
+ * removed. An older attempt's child can resume after the next attempt's task exists.
  */
 export function supersededChildren(context: SchedulerContext): readonly SupersededChild[] {
   const record = context.journal.snapshot()
-  return record.nodes.flatMap((node) => {
-    const execAttempt = node.execAttempt ?? 0
-    if (execAttempt === 0) return []
-    const live = liveOwnedTasks(context, node.id)
-    if (live.length === 0) return []
-    return live
-      .filter((task) => ownedClaimAge(task, record) === "superseded")
-      .map((task) => ({ nodeId: node.id, taskId: task.task_id, execAttempt }))
-  })
+  return liveRunChildren(context.taskManager, record).flatMap((task) =>
+    task.owner === undefined || ownedClaimAge(task, record) !== "superseded"
+      ? []
+      : [{ nodeId: task.owner.nodeId, taskId: task.task_id }],
+  )
 }
 
 /**
@@ -99,9 +94,7 @@ export async function disposeSupersededChildren(
   let results: PromiseSettledResult<unknown>[]
   try {
     results = await Promise.allSettled(
-      stale.map(({ nodeId, taskId, execAttempt }) =>
-        context.taskManager.cancelTask(taskId, `superseded by attempt ${execAttempt} of DAG node "${nodeId}"`),
-      ),
+      stale.map(({ nodeId, taskId }) => context.taskManager.cancelTask(taskId, supersededReason(context, nodeId))),
     )
   } finally {
     context.admissionInProgress = false
@@ -111,8 +104,9 @@ export async function disposeSupersededChildren(
   stale.forEach(({ nodeId, taskId }, index) => {
     const task = context.taskManager.get(taskId)
     if (!isLiveTask(task)) return
-    // Only a node still to be admitted can fail closed; an already settled or attached node keeps its state.
-    const state = nodeById(context.journal.snapshot(), nodeId).state
+    // Only a node still to be admitted can fail closed; an already settled or attached node keeps its
+    // state, and a removed node has none - its child stays the run cancel's to stop.
+    const state = context.journal.snapshot().nodes.find((node) => node.id === nodeId)?.state
     if (state !== "pending" && state !== "blocked") return
     const result = results[index]
     const cause = result?.status === "rejected" ? `: ${errorMessage(result.reason)}` : ""
@@ -123,6 +117,13 @@ export async function disposeSupersededChildren(
       `task ${taskId} of a superseded attempt is still ${task?.status} and could not be stopped${cause}`,
     )
   })
+}
+
+function supersededReason(context: SchedulerContext, nodeId: DagNodeId): string {
+  const node = context.journal.snapshot().nodes.find((entry) => entry.id === nodeId)
+  return node === undefined
+    ? `DAG node "${nodeId}" was removed by an amendment`
+    : `superseded by attempt ${node.execAttempt ?? 0} of DAG node "${nodeId}"`
 }
 
 export function whenAdmissionIdle(context: SchedulerContext): Promise<void> {

@@ -13,7 +13,7 @@ import type { TaskRecord, TaskStatus } from "../state"
 import { compileDag, type DagDefinition } from "./graph"
 import { subscribeDagJournal } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import type { DagTaskOwner, OwnedStartResult, DagTaskOwnerScope } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
@@ -162,14 +162,14 @@ class LongRunningTaskManager implements TaskManager {
     )?.record
   }
 
-  findOwnedTasks(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): readonly TaskRecord[] {
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
     return [...this.#tasks.values()]
       .map(({ record }) => record)
       .filter(
         (record) =>
           record.owner?.kind === owner.kind &&
           record.owner.runId === owner.runId &&
-          record.owner.nodeId === owner.nodeId,
+          (owner.nodeId === undefined || record.owner.nodeId === owner.nodeId),
       )
   }
 

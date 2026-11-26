@@ -19,10 +19,9 @@ export class DagRunChildrenLiveError extends Error {
   }
 }
 
+/** Keyed by run, not by today's nodes: an amendment can remove a node whose child still runs. */
 export function liveRunChildren(taskManager: TaskManager, record: DagRunRecordV1): readonly TaskRecord[] {
-  return record.nodes.flatMap((node) =>
-    taskManager.findOwnedTasks({ kind: "dag", runId: record.runId, nodeId: node.id }).filter(isLiveTask),
-  )
+  return taskManager.findOwnedTasks({ kind: "dag", runId: record.runId }).filter(isLiveTask)
 }
 
 /**

@@ -14,7 +14,7 @@ import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import type { DagTaskOwner, OwnedStartResult, DagTaskOwnerScope } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunId } from "./types"
@@ -198,14 +198,14 @@ class HoldingTaskManager implements TaskManager {
     )?.record
   }
 
-  findOwnedTasks(ownerKey: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): readonly TaskRecord[] {
+  findOwnedTasks(ownerKey: DagTaskOwnerScope): readonly TaskRecord[] {
     return [...this.#tasks.values()]
       .map(({ record }) => record)
       .filter(
         (record) =>
           record.owner?.kind === ownerKey.kind &&
           record.owner.runId === ownerKey.runId &&
-          record.owner.nodeId === ownerKey.nodeId,
+          (ownerKey.nodeId === undefined || record.owner.nodeId === ownerKey.nodeId),
       )
   }
 

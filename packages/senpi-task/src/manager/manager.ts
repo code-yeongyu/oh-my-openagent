@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { log } from "@oh-my-opencode/utils"
 
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { DagTaskOwner, DagTaskOwnerKey, DagTaskOwnerScope, OwnedStartResult } from "../dag/owner"
 import {
   endFallbackHandoff,
   forgetClosedChild,
@@ -543,14 +543,14 @@ class TaskManagerImpl implements TaskManager {
     return this.findOwnedTasks(owner).at(-1)
   }
 
-  findOwnedTasks(owner: DagTaskOwnerKey): readonly TaskRecord[] {
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
     return this.#options.store
       .list()
       .records.filter(
         (record) =>
           record.owner?.kind === owner.kind &&
           record.owner.runId === owner.runId &&
-          record.owner.nodeId === owner.nodeId,
+          (owner.nodeId === undefined || record.owner.nodeId === owner.nodeId),
       )
   }
 

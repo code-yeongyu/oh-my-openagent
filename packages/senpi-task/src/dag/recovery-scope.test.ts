@@ -6,7 +6,7 @@ import { join, relative } from "node:path"
 import type { ListScope, ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
 import { createDagManager, type DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import type { DagTaskOwner, OwnedStartResult, DagTaskOwnerScope } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunId } from "./types"
@@ -91,10 +91,10 @@ class SettledTasks implements TaskManager {
       (task) => task.owner?.runId === owner.runId && task.owner.nodeId === owner.nodeId,
     )
   }
-  findOwnedTasks(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">) {
+  findOwnedTasks(owner: DagTaskOwnerScope) {
     this.touches.push(owner.runId)
     return [...this.tasks.values()].filter(
-      (task) => task.owner?.runId === owner.runId && task.owner.nodeId === owner.nodeId,
+      (task) => task.owner?.runId === owner.runId && (owner.nodeId === undefined || task.owner.nodeId === owner.nodeId),
     )
   }
   async waitFor(id: string) {
