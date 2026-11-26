@@ -1,0 +1,625 @@
+{
+  "domain": "install",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "install.plugin/authority-base",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": true,
+        "skip_auth": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write"
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/authority-codex-autonomous",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": true,
+        "skip_auth": true,
+        "codex_autonomous": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "codex_autonomous": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.version/host-read-refuses-connector",
+      "row": "install.version",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/host-change-refuses-connector",
+      "row": "install.update",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/host-change-refuses-session",
+      "row": "install.update",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/host-change-refuses-service",
+      "row": "install.update",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/host-change-refuses-connector",
+      "row": "install.setup.apply",
+      "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": [
+              {
+                "id": "x-id",
+                "installed": true,
+                "providers": [
+                  "x-providers"
+                ],
+                "credentialTypes": [
+                  "x-credentialTypes"
+                ],
+                "modelHint": "x-modelHint",
+                "notices": [
+                  "x-notices"
+                ],
+                "importableCount": 1
+              }
+            ]
+          },
+          "stages": [
+            {
+              "id": "x-id",
+              "description": "x-description"
+            }
+          ]
+        },
+        "consent": "all"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/host-change-refuses-session",
+      "row": "install.setup.apply",
+      "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": [
+              {
+                "id": "x-id",
+                "installed": true,
+                "providers": [
+                  "x-providers"
+                ],
+                "credentialTypes": [
+                  "x-credentialTypes"
+                ],
+                "modelHint": "x-modelHint",
+                "notices": [
+                  "x-notices"
+                ],
+                "importableCount": 1
+              }
+            ]
+          },
+          "stages": [
+            {
+              "id": "x-id",
+              "description": "x-description"
+            }
+          ]
+        },
+        "consent": "all"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/host-change-refuses-service",
+      "row": "install.setup.apply",
+      "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": [
+              {
+                "id": "x-id",
+                "installed": true,
+                "providers": [
+                  "x-providers"
+                ],
+                "credentialTypes": [
+                  "x-credentialTypes"
+                ],
+                "modelHint": "x-modelHint",
+                "notices": [
+                  "x-notices"
+                ],
+                "importableCount": 1
+              }
+            ]
+          },
+          "stages": [
+            {
+              "id": "x-id",
+              "description": "x-description"
+            }
+          ]
+        },
+        "consent": "all"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/host-change-refuses-connector",
+      "row": "install.cleanup",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/host-change-refuses-session",
+      "row": "install.cleanup",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/host-change-refuses-service",
+      "row": "install.cleanup",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.detect/host-change-refuses-connector",
+      "row": "install.setup.detect",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.detect/host-change-refuses-session",
+      "row": "install.setup.detect",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.detect/host-change-refuses-service",
+      "row": "install.setup.detect",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/host-change-refuses-connector",
+      "row": "install.setup.plan",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/host-change-refuses-session",
+      "row": "install.setup.plan",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/host-change-refuses-service",
+      "row": "install.setup.plan",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/codex-autonomous-refuses-connector",
+      "row": "install.plugin",
+      "input": {
+        "interactive": true,
+        "skip_auth": true,
+        "codex_autonomous": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/codex-autonomous-refuses-session",
+      "row": "install.plugin",
+      "input": {
+        "interactive": true,
+        "skip_auth": true,
+        "codex_autonomous": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/codex-autonomous-refuses-service",
+      "row": "install.plugin",
+      "input": {
+        "interactive": true,
+        "skip_auth": true,
+        "codex_autonomous": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencode-change-refuses-connector",
+      "row": "install.plugin",
+      "input": {
+        "interactive": true,
+        "skip_auth": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencode-change-refuses-session",
+      "row": "install.plugin",
+      "input": {
+        "interactive": true,
+        "skip_auth": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencode-change-refuses-service",
+      "row": "install.plugin",
+      "input": {
+        "interactive": true,
+        "skip_auth": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/opencode-change-refuses-connector",
+      "row": "install.cleanup",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/opencode-change-refuses-session",
+      "row": "install.cleanup",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/opencode-change-refuses-service",
+      "row": "install.cleanup",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.localVersion/opencode-read-refuses-connector",
+      "row": "install.localVersion",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.localVersion/opencode-read-refuses-service",
+      "row": "install.localVersion",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

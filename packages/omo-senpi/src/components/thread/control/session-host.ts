@@ -39,6 +39,9 @@ export function createdThreadId(callerId: string, idempotencyKey: string): strin
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
+/** The engine capability that says `open_session` forks a session on `forkFrom` (senpi#7085). */
+export const OPEN_SESSION_FORK = "open_session_fork"
+
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */
 /** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
@@ -85,6 +88,11 @@ export type SessionHost = {
   /** The threads visible on that device: this device's address book, or the account listing's live rows of that device. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
   /**
+   * Whether that device's engine forks on `open_session { forkFrom }` (capability `open_session_fork`, #13031). An
+   * engine without it opens a blank session instead, so thread_create refuses `fork_from` there before any open.
+   */
+  readonly forks: () => Promise<boolean>
+  /**
    * `confirmReach`: thread_create goes on to use the new session, so another device's host first checks that its route
    * reaches the session it opened (#14394), with the name it applies or one state read. It is a hint to the host,
    * never a field of the engine's open.
@@ -93,4 +101,14 @@ export type SessionHost = {
     request: SessionOpenRequest,
     options?: { readonly confirmReach?: boolean },
   ) => Promise<SessionOpenOutcome>
+  /**
+   * Another device's host only: the session that device lists under the id a create derived from its idempotency key,
+   * which an earlier run under that key made though its reply was lost, finished as its open would have been (named,
+   * its reach checked). Undefined when the device lists no such session: nothing proves the earlier open ran there.
+   * `worktree`: the one the earlier run made for it on that device, answered with the thread as its open would have (#14569).
+   */
+  readonly adopt?: (
+    request: { readonly durableSessionId: string; readonly name?: string; readonly worktree?: ThreadWorktree },
+    options?: { readonly confirmReach?: boolean },
+  ) => Promise<SessionOpenOutcome | undefined>
 }

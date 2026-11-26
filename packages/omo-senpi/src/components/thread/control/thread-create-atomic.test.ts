@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
-import { hashArgs } from "../gateway/bindings"
+import { hashArgs } from "../gateway/hash-args"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { ThreadHostSession } from "../tools"
 import { createdThreadId } from "./session-host"
@@ -17,6 +17,15 @@ type Created = Extract<ThreadToolResult, { kind: "ok" }> & {
 }
 
 describe("thread_create survives a lost open reply (#14060)", () => {
+  test("a same-key create replay reports the original thread as deduplicated", async () => {
+    const { run, openSession } = surface(undefined, { openLosesReply: 0 })
+    const args = { name: "replay", idempotency_key: "create-replay" }
+    const thread = createdThreadId("dur-caller", args.idempotency_key)
+    expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread, deduplicated: false })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread, deduplicated: true })
+    expect(openSession).toHaveBeenCalledTimes(1)
+  })
+
   test("#given the host makes the session but the reply is lost #when thread_create runs with a prompt #then it answers that thread and admits the prompt once", async () => {
     const { run, openSession, enqueuedFor } = surface(undefined, { openLosesReply: 1 })
     const result = (await run("thread_create", {
@@ -39,13 +48,14 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     const id = createdThreadId("dur-caller", "atomic-2")
     expect(enqueuedFor(id)).toBe(0)
     const retry = (await run("thread_create", args)) as Created
-    expect(retry).toMatchObject({ kind: "ok", thread: id })
+    expect(retry).toMatchObject({ kind: "ok", thread: id, deduplicated: true })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(enqueuedFor(id)).toBe(1)
     const again = (await run("thread_create", args)) as Created
-    // A third run under the key finds the same thread; the prompt's own receipt answers it as already delivered.
-    expect(again).toMatchObject({ kind: "ok", thread: id, prompt: { deduplicated: true } })
+    // #14623 H1: the recovery's answer was recorded, so a third run under the key replays it and runs nothing.
+    expect(again).toEqual(retry)
     expect(openSession).toHaveBeenCalledTimes(1)
+    expect(enqueuedFor(id)).toBe(1)
   })
 
   test("#given a host that ignores the derived id and a lost reply #when the create is retried under the same key #then idempotency_uncertain and no second thread", async () => {

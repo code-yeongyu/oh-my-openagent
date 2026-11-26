@@ -1,6 +1,7 @@
 import { contextCwd } from "../request-context.js"
 import { getDisabledServerIds, getMergedServers } from "./config-loader.js"
 import { withHostJsRuntime } from "./host-js-runtime.js"
+import { nativeTypescriptCommand, nativeTypescriptSearchDirectory } from "./native-typescript.js"
 import { BUILTIN_SERVERS, LSP_INSTALL_HINTS } from "./server-definitions.js"
 import { isServerInstalled, resolveServerBinary } from "./server-installation.js"
 import type { ServerLookupResult } from "./types.js"
@@ -22,12 +23,34 @@ function usesBuiltinCommand(id: string, command: string[]): boolean {
   )
 }
 
-export function findServerForExtension(ext: string): ServerLookupResult {
+/**
+ * Picks the server for `ext`. `targetPath` is the file or directory being served; when given, a
+ * TypeScript 7 compiler is looked up from that target's project instead of the request cwd, so a
+ * monorepo package on TypeScript 7 is served by its own `tsc` while the session sits at the root.
+ */
+export function findServerForExtension(ext: string, targetPath?: string): ServerLookupResult {
   const servers = getMergedServers()
   const workingDirectory = contextCwd()
+  const searchDirectory = nativeTypescriptSearchDirectory(targetPath, workingDirectory)
 
   for (const server of servers) {
     if (!server.extensions.includes(ext)) continue
+    const nativeTypescript = nativeTypescriptCommand(server, searchDirectory)
+    if (nativeTypescript !== null) {
+      // The builtin initialization is typescript-language-server's option set; tsc gets only
+      // what a config file supplied.
+      return {
+        status: "found",
+        server: {
+          id: server.id,
+          command: withHostJsRuntime(server.id, nativeTypescript),
+          extensions: server.extensions,
+          priority: server.priority,
+          ...(server.env === undefined ? {} : { env: server.env }),
+          ...(server.configuredInitialization === undefined ? {} : { initialization: server.configuredInitialization }),
+        },
+      }
+    }
     const binaryPath = resolveServerBinary(server.command, workingDirectory)
     if (binaryPath !== null) {
       const resolvedServer = {
@@ -94,6 +117,7 @@ export function getAllServers(): ServerStatus[] {
   const servers = getMergedServers()
   const disabled = getDisabledServerIds()
   const workingDirectory = contextCwd()
+  const nativeSearchDirectory = nativeTypescriptSearchDirectory(undefined, workingDirectory)
 
   const result: ServerStatus[] = []
   const seen = new Set<string>()
@@ -102,7 +126,9 @@ export function getAllServers(): ServerStatus[] {
     if (seen.has(server.id)) continue
     result.push({
       id: server.id,
-      installed: isServerInstalled(server.command, workingDirectory),
+      installed:
+        isServerInstalled(server.command, workingDirectory) ||
+        nativeTypescriptCommand(server, nativeSearchDirectory) !== null,
       extensions: server.extensions,
       disabled: false,
       source: server.source,

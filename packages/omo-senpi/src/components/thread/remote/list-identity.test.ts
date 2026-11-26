@@ -45,6 +45,24 @@ describe("thread_list row identity (#14305 U6)", () => {
   })
 })
 
+describe("thread_list row times (#14474)", () => {
+  test("#given b lists a session whose thread id is a UUIDv7 #when thread_list runs #then created_at is the time in the id and updated_at the row's own", async () => {
+    // 0x019a8d7c5e00 ms is 2025-11-16T16:25:29.344Z; B_ROW's updated_ms is 2023-11-14T22:13:20.000Z.
+    const v7 = { ...B_ROW, session_id: "rk-v7", durable_id: "019a8d7c-5e00-7abc-8def-0123456789ab", title: "v7 on b" }
+    const listed = onB(await surface(account({ rows: [v7] }).remote).run("thread_list", {}))
+    expect(listed.map((thread) => [thread.created_at, thread.updated_at])).toEqual([
+      ["2025-11-16T16:25:29.344Z", "2023-11-14T22:13:20.000Z"],
+    ])
+  })
+
+  test("#given b lists a session whose thread id is no UUIDv7 #when thread_list runs #then created_at stays the row's time", async () => {
+    const listed = onB(await surface(account().remote).run("thread_list", {}))
+    expect(listed.map((thread) => [thread.created_at, thread.updated_at])).toEqual([
+      ["2023-11-14T22:13:20.000Z", "2023-11-14T22:13:20.000Z"],
+    ])
+  })
+})
+
 describe("thread_list row names (#14305 U6)", () => {
   test("#given b lists a session with no name #when thread_list runs with and without a state filter #then the row shows the same fallback both times and says unnamed", async () => {
     const { run } = surface(account({ rows: [{ ...B_ROW, title: "" }] }).remote)

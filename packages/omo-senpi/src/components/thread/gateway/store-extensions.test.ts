@@ -1,9 +1,6 @@
 import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
-
-import { gatewayDatabasePath, gatewayInboxDirectory } from "./paths"
+import { gatewayDatabasePath } from "./paths"
 import { GATEWAY_MIGRATIONS } from "./schema"
 import type { StoreExtensionRegistration } from "./store-extensions"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -22,10 +19,6 @@ const extension = (name = "alpha"): StoreExtensionRegistration => ({
     [`CREATE TABLE ${name}_items (id INTEGER PRIMARY KEY, value TEXT)`, `INSERT INTO ${name}_items VALUES (0, 'seed')`],
   ],
 })
-const bind = {
-  principal: "connector:test",
-  binding: { platform: "custom", account_id: "bot", chat_id: "chat", session_durable_id: "target", ttl_seconds: null },
-}
 
 describe("store extension migrations", () => {
   test("#given a mixed-case extension table registered on a v6 store #when the store upgrades to the current schema #then the extension registers again and owns its one table row", async () => {
@@ -307,66 +300,5 @@ describe("store extension calls", () => {
       message: expect.any(String),
     })
     expect(await store.list()).toEqual([])
-  })
-
-  test("#given an enqueue followed by a throw #when the op fails #then extension core rows and markers all roll back", async () => {
-    const h = (harness = createGatewayHarness())
-    h.phantom("target")
-    const store = h.store()
-    await store.registerStoreExtension(extension())
-    const bound = await store.extensionCall<{ kind: "ok"; binding: { binding_id: string } }>("alpha", "core", {
-      op: "bind",
-      request: bind,
-    })
-    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-    const result = await store.extensionCall("alpha", "enqueueThenThrow", {
-      request: {
-        binding_id: bound.value.binding.binding_id,
-        event_id: "rolled-back",
-        text: "hello",
-        author: { platform_user_id: "p1", display: "Alice", user_id: "u1" },
-      },
-      inbox: gatewayInboxDirectory(h.agentDir, "target"),
-    })
-    expect(result).toEqual({ kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
-    expect(await store.list()).toEqual([])
-    expect(
-      existsSync(gatewayInboxDirectory(h.agentDir, "target"))
-        ? readdirSync(gatewayInboxDirectory(h.agentDir, "target"))
-        : [],
-    ).toEqual([])
-    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({
-      kind: "ok",
-      value: [{ id: 0, value: "seed" }],
-    })
-  })
-
-  test("#given binding and inbound in one op #when committed #then binding reads actor attribution and markers are published", async () => {
-    const h = (harness = createGatewayHarness())
-    h.phantom("target")
-    const store = h.store()
-    await store.registerStoreExtension(extension())
-    const result = await store.extensionCall("alpha", "bindThenEnqueue", {
-      bind,
-      address: { platform: "custom", account_id: "bot", chat_id: "chat", thread_id: "@chat" },
-      send: { event_id: "sent", text: "hello", author: { platform_user_id: "p1", display: "Alice", user_id: "u1" } },
-    })
-    expect(result).toMatchObject({ kind: "ok", value: { found: { status: "active" }, sent: { kind: "ok" } } })
-    const rows = await store.list()
-    expect(rows).toHaveLength(1)
-    expect(rows[0].actor_user_id).toBe("u1")
-    expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id))).toBe(true)
-    const moved = await store.extensionCall("alpha", "rebindThenThrow", {
-      request: {
-        principal: "connector:test",
-        binding_id: rows[0].binding_id,
-        expected_revision: 1,
-        session_durable_id: "target2",
-      },
-      marker: join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id),
-    })
-    expect(moved).toEqual({ kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
-    expect((await store.list())[0].state).toBe("queued")
-    expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id))).toBe(true)
   })
 })

@@ -15,7 +15,6 @@ describe("createNativeSkillSources", () => {
   const { sources, names } = createNativeSkillSources(repoRoot)
 
   const expectedOrderedNames = [
-    "dag-library",
     "give-me-tips",
     "hyperplan",
     "init-deep",

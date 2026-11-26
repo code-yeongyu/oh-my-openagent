@@ -1,3 +1,7 @@
+## 2026-11-26 - A detach during an in-flight open ends that open's connection (#15069)
+
+`HostSessionClient.detach()` could not reach a client the open had not bound yet, so the open went on, bound a live host connection and opened the session on a client its owner had already released. The open now checks for a detach before binding; if one happened it stops the new client and rejects with `HostSessionDetachedError`.
+
 ## 2026-11-20 - a typed socket probe shared with omo sync status (#14437)
 
 `runners/rpc-host/busy-host.ts` gains `probeSocket` (`accepts` / `refused` / `unknown` with a reason): ECONNREFUSED and ENOENT are `refused`, a permission error or no answer within the timeout is `unknown`. `socketAcceptsConnection` is now `probeSocket(...).kind === "accepts"`, so the liveness path is unchanged, and `omo sync status` uses the same probe instead of a copy.
