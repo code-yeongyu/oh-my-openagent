@@ -46,11 +46,6 @@ export const ADDRESS_PURITY_OFFENDERS: Readonly<Record<string, Offender>> = {
     uses: ["resolveDevice"],
     removedBy: "T1a deliverable 4: omo account devices revoke resolves its device through devices.resolve on the root",
   },
-  "packages/omo-senpi/src/components/thread/tools/internals.ts": {
-    uses: ["resolveTarget"],
-    removedBy:
-      "T1a: the send book's disk scan asks the address core whether a name matched (sendAddressBook into address/)",
-  },
 }
 
 // T1a deliverable 6 (#14937 carried): the stale-route recovery of a send lives once, in the thread core's relay transport
