@@ -10,7 +10,8 @@ import type { TaskRecord } from "../../state"
 import type { TaskRecordStore } from "../../store"
 import { createTaskRecordStore } from "../../store"
 import { createTaskLifecycle } from "../create"
-import type { LifecycleDeps, ResidentHandle, RespawnFailureCode } from "../port"
+import type { LifecycleDeps, RespawnFailureCode } from "../port"
+import { managerResidencyRegistry } from "./live-parent-registry"
 import { hostLifecycleDeps, hostSession } from "./host-session-fakes"
 import { settings, tempStore } from "./lifecycle-fakes"
 import { bounded, recoveryClock, signal } from "./live-parent-clock"
@@ -18,7 +19,10 @@ import { observeLifecycleStore } from "./observed-lifecycle-store"
 
 export { bounded, signal } from "./live-parent-clock"
 
-export function liveParentFixture(mode: "in-process" | "child-process" | "host-session" = "in-process") {
+export function liveParentFixture(
+  mode: "in-process" | "child-process" | "host-session" = "in-process",
+  overrides: Record<string, unknown> = {},
+) {
   let backing = tempStore()
   const messages: ParentNotifierMessage[] = []
   const terminals: TaskRecord[] = []
@@ -69,6 +73,7 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
     default_concurrency: 1,
     global_concurrency: 0,
     resident_idle_timeout_ms: 600_000,
+    ...overrides,
   })
   const newManager = () =>
     makeManager({
@@ -99,30 +104,11 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
   let respawnStarted = signal<void>()
   let closeGate: ReturnType<typeof signal<void>> | undefined
   let closeStarted = signal<void>()
-  const registry = {
-    get: (id: string): ResidentHandle | undefined => {
-      const handle = manager.getResidentHandle(id)
-      return handle === undefined
-        ? undefined
-        : {
-            task_id: id,
-            kind: mode === "child-process" ? "rpc" : mode,
-            pid: handle.pid,
-            abort: handle.abort,
-            dispose: handle.dispose,
-            terminate: handle.terminate ?? (async () => undefined),
-          }
-    },
-    entries: (): readonly ResidentHandle[] =>
-      manager.residentTaskIds().flatMap((id) => {
-        const handle = registry.get(id)
-        return handle === undefined ? [] : [handle]
-      }),
-    forget: (id: string, options: Parameters<typeof manager.forget>[1]) => manager.forget(id, options),
-    hasPendingSends: () => false,
-    ownsRecord: (record: { readonly parent_session_id: string }) =>
-      state.live && record.parent_session_id === "parent-1",
-  }
+  const registry = managerResidencyRegistry(
+    () => manager,
+    mode,
+    (record) => state.live && record.parent_session_id === "parent-1",
+  )
   const subscription = {
     onStoreMutation: (listener: () => void) => {
       listeners.add(listener)
