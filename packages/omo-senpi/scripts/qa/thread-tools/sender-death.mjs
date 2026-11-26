@@ -69,7 +69,7 @@ await runScenario("sender-death", async ({ report, scratch, startTui }) => {
       }
       rejectPromise(
         new Error(
-          `sender did not exit within ${SENDER_EXIT_TIMEOUT_MS}ms: ${JSON.stringify(output.join("").slice(0, 300))}`,
+          `sender did not exit within ${SENDER_EXIT_TIMEOUT_MS}ms: ${JSON.stringify(output.join("").slice(-4000))}`,
         ),
       )
     }, SENDER_EXIT_TIMEOUT_MS)
@@ -85,7 +85,7 @@ await runScenario("sender-death", async ({ report, scratch, startTui }) => {
   report.assert(
     "sender-killed-at-commit",
     signal === "SIGKILL" && !output.join("").includes("DONE"),
-    `code=${code} signal=${signal} output=${JSON.stringify(output.join("").slice(0, 300))}`,
+    `code=${code} signal=${signal} output=${JSON.stringify(output.join("").slice(-4000))}`,
   )
   const rows = await storeRows(
     scratch.agentDir,
