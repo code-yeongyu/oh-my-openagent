@@ -1,5 +1,6 @@
 import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runners/in-process/child-handle"
 import { mapExitOutcomeToError } from "../runners/rpc/exit-mapping"
+import { finishedTurnOutcome } from "../runners/pending-async-work"
 import type { HostSessionChildHandle } from "../runners/rpc-host/handle-port"
 import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
 import type {
@@ -65,7 +66,8 @@ export type ManagedChildHandle = {
   effectiveModel?(): EffectiveModel | undefined
   // A daemon-session child whose session parked - itself (its recorded endpoint refused a reattach) or
   // by its host (idle sweep, generation handoff): the record parks with that reason either way.
-  onParked?(listener: (event: { readonly reason: SuspensionReason }) => void): () => void
+  // `settledTurn`: the park itself ended the run's turn, whose outcome is persisted before the record parks.
+  onParked?(listener: (event: { readonly reason: SuspensionReason; readonly settledTurn?: true }) => void): () => void
   // A daemon-session child the host swapped under its live routing handle: the record's session
   // identity is re-stamped from this event (F9); the child keeps running on the new transcript.
   onReplaced?(listener: (event: HostSessionReplaced) => void): () => void
@@ -236,7 +238,8 @@ async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
   // Legacy handles without the observation seam retain their prior text behavior, so a revived turn
   // cannot silently reuse the previous turn's final text.
   const finalResponse = hasTerminalReader ? terminal?.text : handle.lastAssistantText()
-  if (finalResponse !== undefined && finalResponse.length > 0) return { status: "completed", finalResponse }
+  // A legacy handle reports no engine lifecycle: the documented unrecorded case (omo#10487).
+  if (finalResponse !== undefined && finalResponse.length > 0) return finishedTurnOutcome(finalResponse, "unrecorded")
   return {
     status: "error",
     failure: {

@@ -61,6 +61,7 @@ interface LiveSession {
   readonly attachments: Set<Socket>
   parked: boolean
   streaming: boolean
+  lifecycle?: unknown
   process: ChildProcess | undefined
   processExit: Promise<void> | undefined
 }
@@ -255,6 +256,15 @@ export class FakeSessionTable {
 
   isStreaming(routingId: string): boolean {
     return this.#byRouting(routingId)?.streaming === true
+  }
+
+  setLifecycle(routingId: string, lifecycle: unknown): void {
+    const session = this.#byRouting(routingId)
+    if (session !== undefined) session.lifecycle = lifecycle
+  }
+
+  lifecycle(routingId: string): unknown {
+    return this.#byRouting(routingId)?.lifecycle
   }
 
   #mintRouting(): string {

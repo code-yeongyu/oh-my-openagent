@@ -12,8 +12,10 @@ import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked, HostSessionReplaced } from "./session-client"
 import type { TransportRecoveryOptions } from "./transport-recovery"
 import type { CatalogModelIdentity } from "../pinned-model-equivalence"
+import type { PendingWorkEvidence } from "../pending-async-work"
+import type { TurnSettlementScheduler } from "../rpc/turn-settlement"
 import type { TaskRecord } from "../../state"
-import type { HostTurnReconciliation, InputEffectStatus, ReconciledTurnNotice } from "./reconcile-turn"
+import type { HostTurnReconciliation, ReconciledTurnNotice } from "./reconcile-turn"
 import type { TaskParentWire } from "../task-parent-control"
 import type { HostLivenessStatus } from "./handle-heartbeat"
 import type { HostPendingInputs } from "./session-transport"
@@ -22,6 +24,13 @@ import type { HostPendingInputs } from "./session-transport"
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
  * an interface, not the client class, so a suite can drive the handle over an in-memory session.
  */
+
+/**
+ * A park as the handle reports it: `settledTurn` when the park itself ended the run's turn (a turn
+ * held on the child's own async work ends as that abandoned work), so the owner persists that outcome
+ * before it parks the record (omo#10487).
+ */
+export type HostSessionParkNotice = HostSessionParked & { readonly settledTurn?: true }
 
 /** The heartbeat reads liveness and the durable session id off `get_state`; recovery reads whether a turn still runs. */
 export interface HostSessionLiveness {
@@ -35,6 +44,8 @@ export interface HostSessionLiveness {
   // check compares it with the requested provider/modelId (#9722).
   readonly model?: CatalogModelIdentity
   readonly serviceTier?: string
+  // The engine's SessionLifecycle; its `waitingOn` is the child's pending async work (omo#10487).
+  readonly lifecycle?: unknown
 }
 
 /** `HostSessionClient` satisfies this structurally. The transport error itself is never read. */
@@ -97,6 +108,8 @@ export type HostSessionHandleOptions = {
   readonly shardEvents?: HostShardEvents
   /** How long a lost transport may take to come back before the child ends `transport lost`. */
   readonly transportRecovery?: TransportRecoveryOptions
+  /** Test seam: drives the settle confirmation by hand instead of a real timer. */
+  readonly settlementScheduler?: TurnSettlementScheduler
 }
 
 export type HostSessionChildHandle = RpcChildHandle & {
@@ -120,7 +133,7 @@ export type HostSessionChildHandle = RpcChildHandle & {
   /** End the session on the host without aborting a turn first (`clean`). */
   close(): Promise<void>
   /** The daemon suspended the session: no exit, no status change - the record parks. */
-  onParked(listener: (event: HostSessionParked) => void): () => void
+  onParked(listener: (event: HostSessionParkNotice) => void): () => void
   /** The host swapped the session under the live routing handle: the child follows the new transcript. */
   onReplaced(listener: (event: HostSessionReplaced) => void): () => void
   /** A durable session id learned after spawn, because the open's own state read did not return one. */
@@ -128,7 +141,7 @@ export type HostSessionChildHandle = RpcChildHandle & {
   /** A reattach left a turn that was in flight at the loss running on the new port. */
   onTurnResumed(listener: () => void): () => void
   onSelfResumed(listener: () => void): () => void
-  adoptFinishedTurn(finalResponse: string): Promise<void>
+  adoptFinishedTurn(finalResponse: string, evidence: PendingWorkEvidence): Promise<void>
   startInitialPrompt(text: string): Promise<void>
   /** The connection is down and being recovered: nothing sent to the child can land yet. */
   transportRecovering(): boolean

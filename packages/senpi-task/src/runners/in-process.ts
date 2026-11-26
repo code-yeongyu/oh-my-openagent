@@ -26,6 +26,7 @@ import {
 } from "./in-process/create-child-session"
 import { assertPinnedModelHonoured } from "./in-process/pin-check"
 import { assertUsableSessionFile } from "./in-process/session-file-guard"
+import { sessionTailReconciliation } from "../manager/interrupted-turn"
 import { RunnerError } from "./in-process/runner-error"
 import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -65,6 +66,7 @@ export type DepthPolicy = {
 // Per-child construction spec. `model`, `authStorage`, `modelRegistry` reuse senpi's own option
 // types so the parent's auth/models resolve normally against the parent's real agentDir.
 export type ChildSpec = {
+  readonly onProviderRequest?: () => void
   readonly taskId: string
   readonly cwd: string
   // Isolated persistence dir for the child's JSONL transcript:
@@ -323,9 +325,12 @@ export class InProcessRunner {
       throw new RunnerError({ kind: "session_unavailable", message: sessionResumeMessage(error), cause: error })
     }
 
+    // omo#10487: the file's own lifecycle records decide whether its last answer was a held note.
+    const tail = await sessionTailReconciliation(sessionPath)
     return createRestoredChildHandle({
       taskId: spec.taskId,
       session,
+      workEvidence: tail?.workEvidence ?? "unrecorded",
       ...(spec.completion === undefined ? {} : { completion: spec.completion }),
     })
   }
