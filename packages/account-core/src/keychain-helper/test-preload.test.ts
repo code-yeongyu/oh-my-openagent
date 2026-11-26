@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { storeEnable, storeSwitchPort } from "../calls/store"
 import { resolveHelperAccess } from "./access"
+import { spawnDetachedHelper } from "./client"
 import { helperAccess } from "./darwin-backend"
 import { keychainProcessState } from "./process-state"
 import { KeychainHelperUnderTestPreload, underTestPreload } from "./test-preload"
@@ -36,6 +37,18 @@ describe("the keychain helper under the test preload", () => {
     const refused = resolveHelperAccess(["/opt/omo/omo-keychain"], { port: "a throwaway port", verify, pin })
     await expect(refused).rejects.toBeInstanceOf(KeychainHelperUnderTestPreload)
     await expect(refused).rejects.toThrow("a throwaway port")
+    expect(touched).toEqual([])
+  })
+
+  test("#given a port that passes the real spawner by name #then it is refused like one that passes none", async () => {
+    const { touched, verify, pin } = reached()
+    const refused = resolveHelperAccess(["/opt/omo/omo-keychain"], {
+      port: "a port naming the real spawner",
+      verify,
+      pin,
+      spawn: spawnDetachedHelper,
+    })
+    await expect(refused).rejects.toBeInstanceOf(KeychainHelperUnderTestPreload)
     expect(touched).toEqual([])
   })
 
