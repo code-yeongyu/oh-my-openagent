@@ -89,16 +89,25 @@ describe("the omo SDK's one device listing", () => {
   })
 
   test("#given the omo SDK's sources #then devices.list reaches the remote module only through its barrel's session factory", () => {
-    const reaches = sdkFiles.flatMap((fact) =>
-      fact.edges
-        .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
-        .map((edge) => ({
-          file: fact.file,
-          target: resolve(fact.file, edge.specifier),
-          values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
-        })),
-    )
+    // Value reaches only: the SDK contract's type-only imports of remote/types.ts carry no runtime path.
+    const reaches = sdkFiles
+      .flatMap((fact) =>
+        fact.edges
+          .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
+          .map((edge) => ({
+            file: fact.file,
+            target: resolve(fact.file, edge.specifier),
+            values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
+          })),
+      )
+      .filter((reach) => reach.values.length > 0)
     expect(reaches).toEqual([
+      // The contract's code table, data only: no device or session client.
+      {
+        file: "packages/omo-senpi/src/components/omo-sdk/contract/code-sources.ts",
+        target: "packages/omo-senpi/src/components/remote/codes.ts",
+        values: ["REMOTE_CODES"],
+      },
       {
         file: "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
         target: "packages/omo-senpi/src/components/remote/index.ts",
