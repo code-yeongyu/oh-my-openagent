@@ -1,7 +1,7 @@
 import type { StorePort } from "@oh-my-opencode/account-core/calls/store"
-import type { CustodyCapability, CustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
+import type { CustodyCapability, CustodyLog, CustodyPrincipal } from "@oh-my-opencode/account-core/calls/custody-log"
 import type { AccountAccess } from "../access"
-import type { OmoResult } from "../result"
+import { type OmoResult, refused } from "../result"
 import type { OmoPrincipal, RootCallKey } from "../contract"
 import type { MemberOf, NamespaceServing } from "./members"
 
@@ -44,19 +44,35 @@ function principalId(principal: OmoPrincipal): string {
   }
 }
 
-/** This root's custody log: the account home's own, its principal the root's; the log itself loads on its first record. */
-export function rootCustodyLog(principal: OmoPrincipal): CustodyLog {
+const loadCustodyLog = async (principal: CustodyPrincipal): Promise<CustodyLog> => {
+  const [{ custodyLog }, { accountHome }] = await Promise.all([
+    import("@oh-my-opencode/account-core/calls/custody-log"),
+    import("@oh-my-opencode/account-core/credential-lock"),
+  ])
+  return custodyLog({ home: accountHome(), principal })
+}
+
+/**
+ * This root's custody log: the account home's own, its principal the root's; the log itself loads on its first record.
+ * A load that fails writes no record and says so (the call answers with its audit-unavailable note, a boundary refusal
+ * still answers), and is not kept: the next record loads again. `load` is the real loader unless a test passes its own.
+ */
+export function rootCustodyLog(principal: OmoPrincipal, load = loadCustodyLog): CustodyLog {
   let log: Promise<CustodyLog> | undefined
   const loaded = () =>
-    (log ??= Promise.all([
-      import("@oh-my-opencode/account-core/calls/custody-log"),
-      import("@oh-my-opencode/account-core/credential-lock"),
-    ]).then(([{ custodyLog }, { accountHome }]) =>
-      custodyLog({ home: accountHome(), principal: { kind: principal.kind, id: principalId(principal) } }),
-    ))
+    (log ??= load({ kind: principal.kind, id: principalId(principal) }).catch((error: unknown) => {
+      log = undefined
+      throw error
+    }))
   return {
-    begin: async (capability) => (await loaded()).begin(capability),
-    refused: async (capability, code) => (await loaded()).refused(capability, code),
+    begin: async (capability) => {
+      const ready = await loaded().catch(() => undefined)
+      return ready === undefined ? NO_LOG.begin(capability) : ready.begin(capability)
+    },
+    refused: async (capability, code) => {
+      const ready = await loaded().catch(() => undefined)
+      return ready === undefined ? false : ready.refused(capability, code)
+    },
   }
 }
 
@@ -83,16 +99,31 @@ export type AccountNamespaceOptions = {
   readonly env: Readonly<Record<string, string | undefined>>
   readonly cwd: string
   readonly store?: StorePort
+  /** How the call bodies load; the real module unless a test passes its own. */
+  readonly load?: () => Promise<Pick<typeof import("./account-members"), "accountMembers">>
 }
 
+// A load that fails answers this, never the loader's own words or a module path (security design 6).
+const UNLOADED = refused("internal_error", "the account calls could not be loaded", "retry; report it if it repeats")
+
 export function accountNamespace(options: AccountNamespaceOptions): NamespaceServing {
+  const load = options.load ?? (() => import("./account-members"))
   let bodies: Promise<NamespaceServing["members"]> | undefined
-  const loaded = () => (bodies ??= import("./account-members").then(({ accountMembers }) => accountMembers(options)))
+  // A failed load is not kept: the next call tries again.
+  const loaded = () =>
+    (bodies ??= load()
+      .then(({ accountMembers }) => accountMembers(options))
+      .catch((error: unknown) => {
+        bodies = undefined
+        throw error
+      }))
   const members = Object.fromEntries(
     ACCOUNT_CALLS.map((key) => [
       key,
       async (...args: unknown[]) => {
-        const member = (await loaded())[key] as (...inner: unknown[]) => unknown
+        const loadedMembers = await loaded().catch(() => undefined)
+        if (loadedMembers === undefined) return UNLOADED
+        const member = loadedMembers[key] as (...inner: unknown[]) => unknown
         return member(...args)
       },
     ]),
