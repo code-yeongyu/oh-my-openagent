@@ -52,7 +52,7 @@ function world() {
   return { send, onB, root }
 }
 
-describe("one key, one thread, one delivery across surfaces of one class", () => {
+describe("cross-surface same-class dedup: one key, one thread, one delivery across surfaces of one class", () => {
   for (const first of SURFACES)
     for (const second of SURFACES.filter((via) => via !== first))
       test(`#given ${first} sent under a key to the thread here #when ${second} repeats it #then the repeat answers the first delivery's identifiers, deduplicated`, async () => {
@@ -82,7 +82,7 @@ describe("one key, one thread on b: two senders, until the derived holder id (T1
     }
 })
 
-describe("a conflict carries no text from either message", () => {
+describe("conflict with no text from either side: a conflict carries no text from either message", () => {
   test("#given a key used for one message #when another message reuses it on another surface #then idempotency_conflict naming neither message", async () => {
     const { send } = world()
     await send("tool", "dur-local", "first cnry-1d7a", "k-conflict")
@@ -92,7 +92,7 @@ describe("a conflict carries no text from either message", () => {
   })
 })
 
-describe("connector and service never share a person's book", () => {
+describe("cross-class isolation: connector and service never share a person's book", () => {
   for (const kind of ["connector", "service"] as const)
     test(`#given a person sent under a key #when a ${kind} repeats the key #then it gets its own answer, never the person's replay, and the person's next repeat is still a repeat`, async () => {
       const { root } = world()
