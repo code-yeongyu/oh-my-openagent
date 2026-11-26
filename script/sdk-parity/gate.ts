@@ -192,6 +192,8 @@ export function gateReport(input: GateInput): GateReport {
     presentationRows: presentationRows.toSorted(),
     versionMasked: versionMasked.toSorted(),
     head: input.headSha,
+    // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
+    // added later appends after these, so a merge that keeps both tiers keeps one order.
     digest: candidateDigest(input.headSha, [
       ...candidates,
       ...liveSchema.map((id) => `${id}#live-schema`),
