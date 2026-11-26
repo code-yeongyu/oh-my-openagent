@@ -30,10 +30,12 @@ export function failedSchedulerRun(
     readonly lease?: number
     readonly closure?: PausedNodeHoldPort
     readonly wrap?: (base: DagFileStore) => DagFileStore
+    readonly directory?: string
+    readonly recover?: (sessionId: string) => Promise<void>
   } = {},
 ) {
-  const directory = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-scheduler-failure-handler-"))
-  cleanupRoots.push(directory)
+  const directory = options.directory ?? fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-scheduler-failure-handler-"))
+  if (options.directory === undefined) cleanupRoots.push(directory)
   const base = createDagFileStore({ project_dir: directory })
   const store = options.wrap?.(base) ?? base
   const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(
@@ -56,8 +58,10 @@ export function failedSchedulerRun(
     },
   })
   const reservations = createDagRunReservations()
-  const logs: Array<{ readonly level: string; readonly message: string }> = []
-  const log = (level: string) => (message: string) => void logs.push({ level, message })
+  const logs: Array<{ readonly level: string; readonly message: string; readonly fields?: Record<string, unknown> }> =
+    []
+  const log = (level: string) => (message: string, fields?: Record<string, unknown>) =>
+    void logs.push({ level, message, ...(fields === undefined ? {} : { fields }) })
   const recovered: string[] = []
   const state = { held: false }
   const read = () => base.readCheckpoint<DagRunRecordV1 & { readonly leaseHolderPid?: number }>(runId)
@@ -73,6 +77,7 @@ export function failedSchedulerRun(
     closure: options.closure ?? { closeHold: async () => undefined },
     recover: async (sessionId) => {
       recovered.push(sessionId)
+      if (options.recover !== undefined) return options.recover(sessionId)
       const fresh = read()
       if (fresh?.status === "running" && fresh.leaseHolderPid === undefined) state.held = true
     },
@@ -80,6 +85,7 @@ export function failedSchedulerRun(
   const fail = () => handler.failed(runId, running.parentSessionId, "fault")
   const events = () => base.readEvents(runId, 0, { limit: 100 }).events
   return {
+    directory,
     base,
     store,
     running,

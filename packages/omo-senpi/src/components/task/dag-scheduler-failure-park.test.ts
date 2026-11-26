@@ -95,8 +95,8 @@ describe("DAG park after a repeated scheduler failure", () => {
     expect(refused).toBe(true)
     expect(run.read()?.leaseHolderPid).toBeUndefined()
     expect(run.read()?.status).toBe("running")
-    expect(run.logs.map((entry) => entry.message)).toContain(
-      "omo-senpi dag run could not be handed on after its scheduler failed",
+    expect(run.logs).toContainEqual(
+      expect.objectContaining({ level: "error", fields: expect.objectContaining({ runId }) }),
     )
 
     // and cancel works on it; a retry is refused as still running, with its typed code

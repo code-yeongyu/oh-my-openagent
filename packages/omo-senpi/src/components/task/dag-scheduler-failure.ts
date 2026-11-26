@@ -70,6 +70,7 @@ export function createSchedulerFailureHandler(ports: {
         ports.logger.warn("omo-senpi dag run not parked: its checkpoint is missing", { runId })
         return "done"
     }
+    let nodesFailed = false
     try {
       const unclosed = new Map<DagNodeId, string>()
       await endPausedRunChildren(ports.children, acquired.record, ports.closure, (nodeId, taskId, cause) => {
@@ -95,13 +96,21 @@ export function createSchedulerFailureHandler(ports: {
         journal.append(
           dagNodeTransitionedEvent({ nodeId: node.id, from: node.state, to: "failed", reason: { kind: "failed" } }),
         )
+      nodesFailed = true
       journal.append(dagRunPausedEvent({ reason: DAG_SCHEDULER_FAILED_PAUSE_REASON }))
       ports.logger.warn("omo-senpi dag run parked after its scheduler failed again", { runId, error })
       return "done"
     } catch (cause) {
       // Belt for every other throwing path: never leave this host's lease on a run nothing drives.
       if (acquired.leaseTaken) releaseDagRunLease(store, runId, ports.probe.hostPid)
-      throw cause
+      const reason = cause instanceof Error ? cause.message : String(cause)
+      ports.logger.error(
+        nodesFailed
+          ? `omo-senpi dag run ${runId}: writing its scheduler_failed pause failed (${reason}); its nodes are failed and its lease is released; the run still reads running and will be settled at the next session start`
+          : `omo-senpi dag run ${runId}: parking it after its scheduler failed again failed (${reason}); its lease is released; the run still reads running and the next session start's recovery takes it`,
+        { runId, error: reason },
+      )
+      return "done"
     } finally {
       failures.delete(runId)
       acquired.reservation?.release()
