@@ -124,7 +124,7 @@ describe("custody records at the root", () => {
     expect(calls).toEqual(["refused account.signIn unsupported"])
   })
 
-  test("#given forget with an empty device #then the refusal is recorded inside the operation, before nothing is touched", async () => {
+  test("#given forget with an empty device #then one boundary record and nothing is touched", async () => {
     const touched: string[] = []
     const touch = (port: string) => async (): Promise<never> => {
       touched.push(port)
@@ -149,7 +149,7 @@ describe("custody records at the root", () => {
       error: { details: { reason: "empty_device" } },
     })
     expect({ calls, touched }).toEqual({
-      calls: ["begin account.forget", "end account.forget refused empty_device"],
+      calls: ["refused account.forget empty_device"],
       touched: [],
     })
   })

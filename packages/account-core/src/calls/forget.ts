@@ -51,7 +51,10 @@ export async function accountForget(
   deps: ForgetDependencies,
   input: { readonly device?: string },
 ): Promise<CallOutcome<Forgotten, ForgetRefusal>> {
-  return audited(deps.custody, "account.forget", async () =>
-    input.device === "" ? refusedWith({ code: "empty_device" as const }) : forget(deps, input.device),
-  )
+  // An empty argument is a boundary refusal (security design 8.2): one terminal record, no operation, no target.
+  if (input.device === "") {
+    await deps.custody?.refused("account.forget", "empty_device").catch(() => false)
+    return refusedWith({ code: "empty_device" as const })
+  }
+  return audited(deps.custody, "account.forget", () => forget(deps, input.device))
 }
