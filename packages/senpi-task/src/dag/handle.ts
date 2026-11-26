@@ -1,4 +1,5 @@
 // allow: SIZE_OK - the wait/attach contract keeps ownership checks, terminal projection, and waiter bookkeeping on one surface so no caller can observe a half-applied terminal state.
+import { withOutstandingStop, type DagOwnedTaskReader } from "./outstanding-stop"
 import type { TaskRunStats } from "../state/types"
 import { countDagNodes as countNodes } from "./counts"
 import { subscribeDagJournal, type DagJournalListener } from "./journal"
@@ -62,6 +63,8 @@ export type DagWaitSurfaceOptions = {
   readonly cancel?: (runId: DagRunId, reason?: string) => void | Promise<void>
   /** Node output source; defaults to the durable per-node result artifact written by the scheduler. */
   readonly readOutput?: (runId: DagRunId, nodeId: DagNodeId) => string | null
+  /** Task records of the run's children: a settled run's outstanding stop is read from them. */
+  readonly ownedTasks?: DagOwnedTaskReader
 }
 
 export type DagWaitSurface = {
@@ -128,7 +131,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     const onJournalEvent = (): void => {
       const current = store.readCheckpoint<DagRunRecordV1>(runId)
       if (current === null || !TERMINAL_DAG_RUN_STATUSES.has(current.status)) return
-      settleWaiters(runId, projectResult(current, store, readOutput))
+      settleWaiters(runId, projectResult(current, store, readOutput, options.ownedTasks))
     }
     // The durable journal channel covers scheduler instances that are distinct from the adapter's
     // live event subscription. Abandoning a wait promise drops neither subscription nor the run.
@@ -137,7 +140,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     // The run may have gone terminal between the ownership read and the subscription.
     const now = store.readCheckpoint<DagRunRecordV1>(runId)
     if (now !== null && TERMINAL_DAG_RUN_STATUSES.has(now.status)) {
-      settleWaiters(runId, projectResult(now, store, readOutput))
+      settleWaiters(runId, projectResult(now, store, readOutput, options.ownedTasks))
     }
   }
 
@@ -145,7 +148,8 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     // async so every pre-dispatch rejection reaches the caller as a rejected promise.
     wait: async (runId, parentSessionId) => {
       const record = ownedRecord(runId, parentSessionId)
-      if (TERMINAL_DAG_RUN_STATUSES.has(record.status)) return projectResult(record, store, readOutput)
+      if (TERMINAL_DAG_RUN_STATUSES.has(record.status))
+        return projectResult(record, store, readOutput, options.ownedTasks)
       return new Promise<DagRunResult>((resolve) => {
         register(runId, resolve)
       })
@@ -154,7 +158,10 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
       ownedRecord(runId, parentSessionId)
       return {
         runId,
-        snapshot: () => projectSnapshot(ownedRecord(runId, parentSessionId)),
+        snapshot: () => {
+          const record = ownedRecord(runId, parentSessionId)
+          return withOutstandingStop(projectSnapshot(record), options.ownedTasks, record)
+        },
         done: () => surface.wait(runId, parentSessionId),
         cancel: async (reason) => {
           ownedRecord(runId, parentSessionId)
@@ -171,6 +178,7 @@ function projectResult(
   record: DagRunRecordV1,
   store: DagFileStore,
   readOutput: (runId: DagRunId, nodeId: DagNodeId) => string | null,
+  ownedTasks: DagOwnedTaskReader | undefined,
 ): DagRunResult {
   const cancelReason = record.status === "cancelled" ? readCancelReason(store, record.runId) : DEFAULT_CANCEL_REASON
   const nodes: Record<string, DagTerminalNodeResult> = {}
@@ -178,7 +186,8 @@ function projectResult(
     const terminal = projectNode(node, record.runId, cancelReason, readOutput)
     if (terminal !== null) nodes[node.id] = terminal
   }
-  return { runId: record.runId, status: record.status, snapshot: projectSnapshot(record), nodes }
+  const snapshot = withOutstandingStop(projectSnapshot(record), ownedTasks, record)
+  return { runId: record.runId, status: record.status, snapshot, nodes }
 }
 
 // Nonterminal nodes are omitted rather than invented: a terminal run has no nonterminal node, so an

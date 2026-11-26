@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { log } from "@oh-my-opencode/utils"
 
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { DagTaskOwner, DagTaskOwnerKey, DagTaskOwnerScope, OwnedStartResult } from "../dag/owner"
 import {
   endFallbackHandoff,
   forgetClosedChild,
@@ -33,6 +33,7 @@ import type {
   TaskRunStats,
 } from "../state"
 import { createSelfResumedListeners, reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
+import { ownedClaims, ownedStartResult } from "./owned-claims"
 import { createSteeringEngine } from "../steering"
 import type {
   CancelOptions,
@@ -103,6 +104,8 @@ import { createHeldSend } from "./held-send"
 import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
 import { defaultSignaller } from "../lifecycle/context"
+import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
+import { cancelBehindRefusedStop, RefusedStops, sendBehindRefusedStop } from "./refused-stops"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
 import { AdmissionBarrier, type ResumeCredential } from "../pause/admission-barrier"
@@ -258,6 +261,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #sendCounts = new Map<string, number>()
   readonly #stopsPending = new PendingStops()
   readonly #steering: SteeringEngine
+  readonly #refusedStops: RefusedStops
   readonly #isolation: IsolationWiring
   readonly #outcome: OutcomeTracker
   readonly #runPause: ReturnType<typeof createTaskRunPause>
@@ -359,6 +363,15 @@ class TaskManagerImpl implements TaskManager {
       now: this.#now,
     }
     this.#steering = createSteeringEngine(port)
+    this.#refusedStops = new RefusedStops({
+      store: options.store,
+      deadline: options.teardownStepDeadline ?? defaultTeardownStepDeadline,
+      load: (taskId) => this.#tryLoad(taskId) ?? undefined,
+      liveHandle: (taskId) => this.#live.get(taskId)?.handle,
+      ...(options.ownerResumeFence === undefined ? {} : { fence: options.ownerResumeFence }),
+      ...(options.destruction === undefined ? {} : { destruction: options.destruction }),
+      forget: (taskId) => this.forget(taskId, { path: "end" }),
+    })
     this.#isolation = createIsolationWiring({
       runtime: options.isolation,
       store: options.store,
@@ -525,7 +538,7 @@ class TaskManagerImpl implements TaskManager {
 
     return withTaskRecordLockAsync(lockPath, async () => {
       spec.admission?.assertOpen()
-      const raced = this.#ownedResult(owner)
+      const raced = ownedStartResult(this.findOwnedTasks(owner), owner, (claim) => this.#refusedStops.isLive(claim))
       if (raced !== undefined) return raced
       const result = await withResidentStart(
         this.#options,
@@ -541,39 +554,11 @@ class TaskManagerImpl implements TaskManager {
   // execAttempt-scoped fingerprint, and task ids sort by creation, so the newest claim is the live
   // one. The superseded record keeps its dag owner marker (spawn-time launcher stripping reads it).
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined {
-    return this.#options.store
-      .list()
-      .records.findLast(
-        (record) =>
-          record.owner?.kind === owner.kind &&
-          record.owner.runId === owner.runId &&
-          record.owner.nodeId === owner.nodeId,
-      )
+    return this.findOwnedTasks(owner).at(-1)
   }
 
-  #ownedResult(owner: DagTaskOwner): OwnedStartResult | undefined {
-    const record = this.findOwnedTask(owner)
-    if (record === undefined) return undefined
-    if (record.owner?.fingerprint !== owner.fingerprint) {
-      // A settled record cannot be re-run in place, so a differing fingerprint on it is a retry:
-      // ownership moves to the fresh task. Only a LIVE task with a different fingerprint is a
-      // genuine conflict between two callers over one running child.
-      if (isTerminalRecord(record)) return undefined
-      return {
-        kind: "owner_conflict",
-        task_id: record.task_id,
-        existing_fingerprint: record.owner?.fingerprint ?? "",
-        requested_fingerprint: owner.fingerprint,
-      }
-    }
-    return {
-      kind: "started",
-      reused: true,
-      task_id: record.task_id,
-      status: record.status,
-      name: record.name ?? record.task_id,
-      ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
-    }
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
+    return ownedClaims(this.#options.store.list().records, owner)
   }
 
   async #startResolved(
@@ -809,6 +794,8 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
+    const behind = await sendBehindRefusedStop(this.#refusedStops, input.idOrName)
+    if (behind !== undefined) return behind
     const outcome = await this.#steering.sendToTask(input)
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
     return outcome
@@ -824,6 +811,12 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
+    const refused = await cancelBehindRefusedStop(
+      this.#refusedStops,
+      idOrName,
+      () => this.#tryLoad(idOrName)?.status ?? "completed",
+    )
+    if (refused !== undefined) return refused
     const outcome = await this.#steering.cancelTask(idOrName, reason, options)
     if (outcome.kind === "cancelled") {
       this.#removeCapacityWaiter(outcome.task_id)
@@ -1687,7 +1680,14 @@ class TaskManagerImpl implements TaskManager {
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
       trackOutcome: (taskId, handle, model, epoch) => this.#outcome.trackOutcome(taskId, handle, model, epoch),
       announce: (taskId) => this.#selfResumed.announce(taskId),
+      ...(this.#options.ownerResumeFence === undefined ? {} : { ownerResumeFence: this.#options.ownerResumeFence }),
+      markRefusedStop: (taskId, handle, disposition) => this.#refusedStops.mark(taskId, handle, disposition),
+      stopRefusedRun: (taskId) => this.#refusedStops.attempt(taskId),
     }
+  }
+
+  selfResumeStopPending(taskId: string): boolean {
+    return this.#refusedStops.pending(taskId)
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {

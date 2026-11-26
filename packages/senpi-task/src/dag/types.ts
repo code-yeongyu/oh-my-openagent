@@ -128,6 +128,7 @@ export const DAG_NODE_ERROR_CODES = [
   "resume_task_orphaned",
   "lost_while_paused",
   "journal_corrupt",
+  "stale_attempt_alive",
 ] as const
 
 export type DagNodeErrorCode = (typeof DAG_NODE_ERROR_CODES)[number]
@@ -258,6 +259,9 @@ export type DagRunSnapshot = {
   // One entry per accepted amendment. Observe surfaces read this projection, so it must carry the
   // history rather than making them reach for the raw record. Absent on never-amended runs.
   readonly amendHistory?: readonly AmendRecord[]
+  // A settled run that still owns live children owes a stop (#11381): derived from the task records at
+  // read time, never stored. Absent when the run is active or owes nothing.
+  readonly outstandingStop?: { readonly liveTaskIds: readonly string[] }
   // Host pid holding the resume lease on a paused run. Display surfaces need it to tell a run that
   // is being resumed right now from one that is genuinely parked. Absent unless a claim is held.
   readonly leaseHolderPid?: number

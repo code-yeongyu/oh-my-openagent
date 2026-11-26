@@ -72,6 +72,27 @@ export function disposeSelfResumeWatches(context: SchedulerContext): void {
   for (const nodeId of [...context.selfResumeWatches.keys()]) disposeSelfResumeWatch(context, nodeId)
 }
 
+// A residency-denied node was scheduled but never admitted. If a dependency stopped being completed
+// meanwhile (its child resumed on its own, #12134), it returns to the frontier and waits for that
+// dependency's resumed outcome like any pending node; it is skipped if that outcome fails.
+export function stillAdmissible(context: SchedulerContext, denied: readonly DagNodeId[]): DagNodeId[] {
+  const admissible: DagNodeId[] = []
+  for (const nodeId of denied) {
+    const snapshot = context.journal.snapshot()
+    const ready = nodeById(snapshot, nodeId).dependsOn.every(
+      (dependencyId) => nodeById(snapshot, dependencyId).state === "completed",
+    )
+    if (ready) {
+      admissible.push(nodeId)
+      continue
+    }
+    context.residencyQueued.delete(nodeId)
+    // Same shape recovery uses for a scheduled node it could not admit (recovery.ts).
+    transition(context, nodeId, "pending", { kind: "resumed" })
+  }
+  return admissible
+}
+
 export function flagConsumedDependents(context: SchedulerContext, nodeId: DagNodeId, invalidatedBy = nodeId): void {
   const { nodes, diagnostics } = context.journal.snapshot()
   const flagged = new Set(

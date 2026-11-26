@@ -11,7 +11,8 @@ import type { CancelOptions, CancelOutcome, SendInput, SendOutcome } from "../st
 import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import { ownedClaims } from "../manager/owned-claims"
+import type { DagTaskOwner, DagTaskOwnerScope, OwnedStartResult } from "./owner"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
 import type { DagNodeId, DagNodeState, DagRunEvent, DagRunId } from "./types"
 
@@ -206,6 +207,12 @@ export class SelfResumingTaskManager implements TaskManager {
   }
   findOwnedTask(owner: Pick<DagTaskOwner, "nodeId">): TaskRecord | undefined {
     return [...this.#tasks.values()].find((task) => task.record.owner?.nodeId === owner.nodeId)?.record
+  }
+  findOwnedTasks(scope: DagTaskOwnerScope): readonly TaskRecord[] {
+    return ownedClaims(
+      [...this.#tasks.values()].map((task) => task.record),
+      scope,
+    )
   }
   readonly residencyChanged = (): Promise<void> => new Promise<void>(() => undefined)
   readonly subscribeChild = (): (() => void) => () => undefined

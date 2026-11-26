@@ -52,6 +52,8 @@ export interface DagStatusRunSnapshot {
   // Resume lease owner, written by the dag recovery claim and cleared on shutdown pause. A paused
   // run still carrying a LIVE pid is mid-resume, not idle; absent on legacy records.
   readonly leaseHolderPid?: number
+  // A settled run that still owns a live child owes a stop (#11381); absent when it owes nothing.
+  readonly outstandingStop?: { readonly liveTaskIds: readonly string[] }
 }
 
 export interface DagRunRowsOptions {
@@ -151,7 +153,8 @@ function runHeaderRow(run: DagStatusRunSnapshot, isAlive: (pid: number) => boole
   const icon = paused ? PAUSED_RUN_ICON : (NODE_ICONS[run.status] ?? "○")
   const name = excerptRendererText(normalizeRendererText(run.name), LABEL_MAX)
   const status = paused ? pausedStatusText(run, isAlive) : normalizeRendererText(run.status)
-  return `${icon} ${name} ${status} ${waveLabel(run)} ${countsLabel(run)}`
+  const owed = run.outstandingStop === undefined ? "" : " stop owed"
+  return `${icon} ${name} ${status}${owed} ${waveLabel(run)} ${countsLabel(run)}`
 }
 
 // Priority is deliberate. A live lease means another process already claimed this run and is

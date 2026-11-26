@@ -14,6 +14,7 @@ import type {
   TaskStatus,
 } from "../state"
 import type { DestructionPort, SendOutcome } from "../steering"
+import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
@@ -276,6 +277,14 @@ export type TrustedRespawnLaunch = {
 
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
+/** An owner's answer on whether its settled child may reopen for a run the child started on its own. */
+export type OwnerResumeVerdict =
+  | { readonly kind: "allow" }
+  // `retire` tears the child down (its claim is over); `hold` only stops the unsolicited turn and
+  // leaves the settled child as resident and send-revivable as it was before it started that turn.
+  | { readonly kind: "refuse"; readonly reason: string; readonly disposition: "retire" | "hold" }
+export type OwnerResumeFence = (record: TaskRecord) => OwnerResumeVerdict
+
 export type TaskManagerOptions = {
   readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
   readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
@@ -298,6 +307,11 @@ export type TaskManagerOptions = {
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.
   readonly destruction?: DestructionPort
+  // Asked about a DAG-owned record inside the same record mutation that would reopen its settled child
+  // for a run the child started on its own (#11381); absent -> every such reopen proceeds.
+  readonly ownerResumeFence?: OwnerResumeFence
+  // Budget for each step of stopping a refused self-started turn; injectable so a test owns the clock.
+  readonly teardownStepDeadline?: TeardownStepDeadline
   // Injected by the todo-17 wiring. Consulted at spawn so the residency cap (LRU eviction) gates a
   // new child; absent -> admission is skipped (pre-wiring/unit behaviour, no cap enforcement).
   readonly admit?: AdmitResident
