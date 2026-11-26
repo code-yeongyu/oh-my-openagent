@@ -1,4 +1,5 @@
 import ts from "@typescript/typescript6"
+import { createBindingScopes } from "./no-raw-tls-client-scope"
 
 export type AllowlistEntry = { file: string; call: string; count: number; reason: string }
 export type ScanItem = { path: string; content: string }
@@ -107,16 +108,17 @@ export function normalizeCallText(text: string): string {
 export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHit[] {
   const source = parse(content, file),
     list = allNodes(source)
-  const bindings = new Map<string, Binding>(
+  const globals = new Map<string, Binding>(
     [...Object.keys(CLIENTS), "globalThis"].map((module) => [module, { module }]),
   )
+  const bindings = createBindingScopes(list, globals)
   const builtinNames = new Set<string>()
   const requireFactories = new Set<string>()
   const requireNames = new Set(["require", "__require"])
   const kind = (expression: ts.Expression | undefined): Binding | undefined => {
     if (!expression) return undefined
     const node = unwrap(expression)
-    if (ts.isIdentifier(node)) return bindings.get(node.text)
+    if (ts.isIdentifier(node)) return bindings.resolve(node)
     if (ts.isAwaitExpression(node)) return kind(node.expression)
     if (ts.isCallExpression(node)) {
       const callee = unwrap(node.expression),
@@ -154,7 +156,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const name = member(node)
       const base = kind(node.expression)
-      if (base?.module === "globalThis" && name) return bindings.get(name)
+      if (base?.module === "globalThis" && name) return globals.get(name)
       if (base && name && CLIENTS[base.module]?.includes(name)) return { ...base, member: name }
       if (base?.member && (name === "call" || name === "apply")) return base
     }
@@ -164,7 +166,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)) {
       const specifier = literal(node.moduleReference.expression),
         module = specifier?.replace(/^node:/, "")
-      if (specifier && module && CLIENTS[module]) bindings.set(node.name.text, { module, specifier })
+      if (specifier && module && CLIENTS[module]) bindings.declare(node.name, { module, specifier })
     }
     if (!ts.isImportDeclaration(node) || node.importClause?.isTypeOnly) continue
     const specifier = literal(node.moduleSpecifier),
@@ -172,25 +174,22 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
     const clause = node.importClause,
       named = clause?.namedBindings
     if (!module || !specifier) continue
-    if (clause?.name && CLIENTS[module]) bindings.set(clause.name.text, { module, specifier })
-    if (named && ts.isNamespaceImport(named) && CLIENTS[module]) bindings.set(named.name.text, { module, specifier })
+    if (clause?.name && CLIENTS[module]) bindings.declare(clause.name, { module, specifier })
+    if (named && ts.isNamespaceImport(named) && CLIENTS[module]) bindings.declare(named.name, { module, specifier })
     if (named && ts.isNamedImports(named))
       for (const spec of named.elements) {
         if (spec.isTypeOnly) continue
         const name = (spec.propertyName ?? spec.name).text
         if (module === "module" && name === "createRequire") requireFactories.add(spec.name.text)
         if (CLIENTS[module])
-          bindings.set(spec.name.text, name === "default" ? { module, specifier } : { module, member: name, specifier })
+          bindings.declare(spec.name, name === "default" ? { module, specifier } : { module, member: name, specifier })
       }
   }
   let changed: boolean
   do {
     changed = false
-    const bind = (name: string, value: Binding): void => {
-      if (!bindings.has(name)) {
-        bindings.set(name, value)
-        changed = true
-      }
+    const bind = (name: ts.Identifier, value: Binding): void => {
+      if (bindings.declare(name, value)) changed = true
     }
     for (const node of list) {
       if (!ts.isVariableDeclaration(node) || !node.initializer) continue
@@ -203,7 +202,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
         requireFactories.has(init.expression.text)
       )
         requireNames.add(node.name.text)
-      if (ts.isIdentifier(node.name) && value) bind(node.name.text, value)
+      if (ts.isIdentifier(node.name) && value) bind(node.name, value)
       if (ts.isObjectBindingPattern(node.name))
         for (const spec of node.name.elements) {
           const name = spec.propertyName
@@ -217,8 +216,8 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
           )
             builtinNames.add(spec.name.text)
           if (value && ts.isIdentifier(spec.name)) {
-            if (name === "default" && CLIENTS[value.module]) bind(spec.name.text, value)
-            else if (CLIENTS[value.module]?.includes(name)) bind(spec.name.text, { ...value, member: name })
+            if (name === "default" && CLIENTS[value.module]) bind(spec.name, value)
+            else if (CLIENTS[value.module]?.includes(name)) bind(spec.name, { ...value, member: name })
           }
         }
     }
