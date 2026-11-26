@@ -10,7 +10,7 @@ daemon's tool surface; options are the daemon's parameter names in camelCase.
 const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false, browser: "<instance id>", width: 1200, height: 800 })
 session.sessionId            // four letters, e.g. "ckhg"
 session.browserInstanceId    // which connected browser owns the Agent Window
-await session.stop()         // ALWAYS, on success and failure
+// the task's last cell, on success and failure: await session.stop()   (the examples below use this session)
 ```
 
 `browser` is needed only when more than one browser is connected (`bskDoctor()` lists them).

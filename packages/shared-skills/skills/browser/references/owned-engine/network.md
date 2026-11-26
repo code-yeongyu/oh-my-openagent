@@ -9,11 +9,13 @@ next week. Watching traffic costs nothing on a target you own, and the page cann
 ```js
 // given: omowright, page, url
 const snoop = omowright.createNetworkSnoop(page, { maxBodyBytes: 512 * 1024 })
-await page.goto(url)
-const hit = await snoop.waitFor({ url: /\/api\/search/, mimeType: "application/json" }, { timeoutMs: 10_000 })
-const rows = snoop.popJson()                 // every buffered JSON body, drained
+const [hit] = await Promise.all([            // subscribe first: waitFor sees only responses that arrive after it
+  snoop.waitFor({ url: /\/api\/search/, mimeType: "application/json" }, { timeoutMs: 10_000 }),
+  page.goto(url),
+])
 console.log(snoop.summary({ max: 20 }))      // one line per request: method status mime size url
-snoop.dispose()
+const rows = snoop.popJson()                 // every buffered JSON body, drained
+// snoop stays subscribed for the next example; when you are done with this page's traffic: snoop.dispose()
 ```
 
 ## Wait for a request, never for a clock
@@ -28,8 +30,9 @@ reason.
 ```js
 const items = []
 for await (const item of omowright.collectWhileScrolling(page, snoop, { minItems: 200, maxScrolls: 10, extract: (json) => json.items })) {
-  items.push(item)                           // one extracted item per iteration, already de-duplicated
+  items.push(item)                           // one extracted item per iteration; an item the API sends twice arrives twice
 }
+snoop.dispose()                              // unsubscribe once the collection is over
 ```
 
 Scroll, collect what is new, stop on a target count or a scroll ceiling. Bound both, so a page
