@@ -120,6 +120,7 @@ export function gateReport(input: GateInput): GateReport {
       }
     }
   }
+  const added = new Set<string>()
   for (const scenario of input.scenarios) {
     const [before, after] = [input.base.outcomes[scenario.id], input.head.outcomes[scenario.id]]
     if (after === undefined) {
@@ -128,8 +129,19 @@ export function gateReport(input: GateInput): GateReport {
       )
       continue
     }
-    // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
-    if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
+    // A scenario only the head has changes its row on purpose (T1b-m's finding): never a closure-only candidate. Under an
+    // unresolved gap it fails; on a cleared row it needs the body's SDK-Parity-Changed line (checked below).
+    if (before === undefined) {
+      if (initialization || !baseRows.has(scenario.capability)) continue
+      if (unresolved.has(scenario.capability))
+        failures.push(
+          `${scenario.capability}: scenario ${scenario.id} is new in this pull request under an unresolved gap; add the SDK call ${scenario.capability} and clear the row, or keep the scenario out`,
+        )
+      else added.add(scenario.capability)
+      flagged.add(scenario.capability)
+      continue
+    }
+    if (JSON.stringify(before) === JSON.stringify(after)) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
       const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
@@ -190,6 +202,11 @@ export function gateReport(input: GateInput): GateReport {
         `SDK-Parity-Changed names ${id}, which is still in unresolved.json; a declared change leaves it with its run evidence`,
       )
   const changedRows = declared.filter((id) => rowIds.has(id) && !unresolved.has(id))
+  for (const id of added)
+    if (!changedRows.includes(id))
+      failures.push(
+        `${id}: this pull request adds scenarios to it; declare the change with an "SDK-Parity-Changed: ${id}" line`,
+      )
   return {
     failures,
     candidates,

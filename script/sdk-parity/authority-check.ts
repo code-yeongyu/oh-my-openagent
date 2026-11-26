@@ -91,10 +91,17 @@ export function sectionFourRows(document: string): DocumentRow[] {
  * A row of section 4 with no line yet, waiting for its owner slice (closed, self-retiring list). `row` is the row's first
  * backticked call or the start of its first column; `slice` equals the row's Owner slice column where its table has one.
  */
-export type AwaitingOwnerRow = { readonly section: string; readonly row: string; readonly slice: string }
+export type AwaitingOwnerRow = {
+  readonly section: string
+  /** The row's first cell, verbatim: with the section, the row's exact identity. */
+  readonly row: string
+  readonly slice: string
+  /** Who decided the slice, for a row whose table has no Owner slice column. */
+  readonly decidedBy?: string
+}
 
 const awaits = (entry: AwaitingOwnerRow, row: DocumentRow): boolean =>
-  entry.section === row.section && (rowKey(row.capability) === entry.row || row.capability.startsWith(entry.row))
+  entry.section === row.section && row.capability === entry.row
 
 /**
  * Every call an awaiting row names stays without a line, so each of its (call, principal) pairs is either in the
@@ -155,16 +162,27 @@ export function documentRowProblems(
   // names where its table has one, and goes stale once a line covers the row. An entry whose row the document does not
   // have is inert (a document older than the revision that adds it); with `exact`, it fails, so the revision's own text
   // validates every entry.
+  const seen = new Set<string>()
   for (const entry of awaiting) {
-    const row = rows.find((candidate) => awaits(entry, candidate))
+    const name = `${entry.section} "${entry.row.slice(0, 60)}"`
+    const identity = `${entry.section}\n${entry.row}`
+    if (seen.has(identity)) problems.push(`awaiting row ${name}: listed twice`)
+    seen.add(identity)
+    const matched = rows.filter((candidate) => awaits(entry, candidate))
+    if (matched.length > 1) problems.push(`awaiting row ${name}: matches ${matched.length} rows of the document`)
+    const row = matched[0]
     if (row === undefined) {
-      if (exact) problems.push(`awaiting row ${entry.section} ${entry.row}: not a row of the document`)
+      if (exact) problems.push(`awaiting row ${name}: not a row of the document`)
       continue
     }
     if (row.owner !== undefined && row.owner !== entry.slice)
-      problems.push(`awaiting row ${entry.row}: slice "${entry.slice}" is not the document's "${row.owner}"`)
+      problems.push(`awaiting row ${name}: slice "${entry.slice}" is not the document's "${row.owner}"`)
+    if (row.owner === undefined && (entry.decidedBy ?? "") === "")
+      problems.push(
+        `awaiting row ${name}: its table has no Owner slice column, so the entry names who decided its slice`,
+      )
     if (lines.some((line) => source(line) === row.capability && line.section === row.section))
-      problems.push(`awaiting row ${entry.row}: stale, a line now covers it; delete the entry`)
+      problems.push(`awaiting row ${name}: stale, a line now covers it; delete the entry`)
   }
   for (const line of lines) {
     const row = rows.find((candidate) => candidate.capability === source(line) && candidate.section === line.section)

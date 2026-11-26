@@ -1,94 +1,98 @@
 {
-  "version": 2,
+  "version": 3,
   "rows": [
     {
       "section": "4.1",
-      "row": "A send repeated under one idempotency key",
-      "slice": "T1b"
+      "row": "A send repeated under one idempotency key on one thread: one book in the core send operation, scoped by thread, key and principal class. A repeat delivers nothing and answers the delivery's identifiers (message id, turn id) and its kind, never message text; the kind is the one recorded when the first call was answered until the truthful-delivery slice (D1) merges, and the delivery's current kind from then on, as the first-party design's amendment 16 states; a different message under the same key answers the typed conflict with no text from either message",
+      "slice": "T1b",
+      "decidedBy": "design lane (t724), 2026-11-26: the owner slice of a row without an Owner slice column"
     },
     {
       "section": "4.1",
-      "row": "A steer's turn guard",
-      "slice": "T1a"
+      "row": "A steer's turn guard (`expected_turn_id`): the id is a concurrency guard, not a permission, and who must supply it is decided once in the core, before any transport, the same on every leg",
+      "slice": "T1a",
+      "decidedBy": "design lane (t724), 2026-11-26: the owner slice of a row without an Owner slice column"
     },
     {
       "section": "4.2",
       "row": "`account.show`, `account.signInCheck` (reads)",
-      "slice": "A1b"
+      "slice": "A1b",
+      "decidedBy": "design lane (t724), 2026-11-26: the owner slice of a row without an Owner slice column"
     },
     {
       "section": "4.3",
-      "row": "The conditions on `install.setup.apply`",
-      "slice": "C1c"
+      "row": "The conditions on `install.setup.apply`, for the principals the row above allows: it applies only a plan that this root's own `install.setup.plan` call answered, never a plan a caller composed or altered, and it asks the caller's consent callback before each stage's write; a stage without consent writes nothing",
+      "slice": "C1c",
+      "decidedBy": "design lane (t724), 2026-11-26: the owner slice of a row without an Owner slice column"
     },
     {
       "section": "4.6",
-      "row": "threads.resolve",
+      "row": "`threads.resolve`, `threads.locate`, `devices.resolve`, `threads.aliases.resolve`: turning an address, an alias or a device name into the row it names",
       "slice": "T1a; T1c for the alias"
     },
     {
       "section": "4.6",
-      "row": "threads.readAfterWait",
+      "row": "`threads.readAfterWait`: wait for the turn to end, then read",
       "slice": "T1b"
     },
     {
       "section": "4.6",
-      "row": "threads.messages",
+      "row": "`threads.messages`: the engine's own message list of a session on this device",
       "slice": "T1b"
     },
     {
       "section": "4.6",
-      "row": "threads.aliases.set",
+      "row": "`threads.aliases.set`",
       "slice": "T1c"
     },
     {
       "section": "4.6",
-      "row": "threads.aliases.clear",
+      "row": "`threads.aliases.clear`",
       "slice": "T1c"
     },
     {
       "section": "4.6",
-      "row": "threads.release",
+      "row": "`threads.release`, `threads.adopt`: taking a session away from its host",
       "slice": "T1c"
     },
     {
       "section": "4.6",
-      "row": "daemon.run",
+      "row": "`daemon.run`, `daemon.shardPath`",
       "slice": "C1a"
     },
     {
       "section": "4.6",
-      "row": "daemon.warm",
+      "row": "`daemon.warm`",
       "slice": "C1a"
     },
     {
       "section": "4.6",
-      "row": "diagnostics.models",
+      "row": "`diagnostics.models`: the resolver's view of the model chains",
       "slice": "C1b"
     },
     {
       "section": "4.6",
-      "row": "install.sdkRoot",
+      "row": "`install.sdkRoot`: the directory of the SDK entry",
       "slice": "P1b; X1b for the session's root"
     },
     {
       "section": "4.6",
-      "row": "engine.config.agentDir",
+      "row": "`engine.config.agentDir`, `engine.tips`, `engine.promptSizes` without a launch setup (reads)",
       "slice": "E1c"
     },
     {
       "section": "4.6",
-      "row": "engine.config.resources",
+      "row": "`engine.config.resources` as a read",
       "slice": "A later slice, with a cell of its own"
     },
     {
       "section": "4.6",
-      "row": "engine.models.update",
+      "row": "`engine.models.update` (it fetches and writes the model catalog), `engine.sessions.exportHtml` (it writes a file where the caller says), `engine.sessionOfPid` (a host integration's lookup from a process to its session)",
       "slice": "E1c"
     },
     {
       "section": "4.6",
-      "row": "toolkit.help",
+      "row": "The ten loop operations of the OpenCode edition on a bound loop session: `toolkit.help`, `status`, `criteria`, `createGoals`, `addGoal`, `completeGoals`, `recordEvidence`, `recordReviewBlockers`, `checkpoint`, `steer`",
       "slice": "OC2"
     }
   ]

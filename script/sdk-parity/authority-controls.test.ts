@@ -268,29 +268,56 @@ describe("negative controls of custody and the held table (#14949)", () => {
         docRow: undefined,
       },
     ]
-    expect(documentRowProblems(lined, revision, awaiting).join("\n")).toContain(
-      "awaiting row install.sdkRoot: stale, a line now covers it; delete the entry",
-    )
+    const named = (problems: readonly string[], row: string, suffix: string) =>
+      problems.some((problem) => problem.includes(row.slice(0, 40)) && problem.endsWith(suffix))
+    expect(
+      named(
+        documentRowProblems(lined, revision, awaiting),
+        sdkRoot.capability,
+        "stale, a line now covers it; delete the entry",
+      ),
+    ).toBe(true)
     expect(
       documentRowProblems(
         PRINCIPAL_MATRIX,
         revision,
-        awaiting.filter((entry) => entry.row !== "daemon.run"),
+        awaiting.filter((entry) => !entry.row.startsWith("`daemon.run`")),
       ).join("\n"),
     ).toContain('row "`daemon.run`, `daemon.shardPath`": no line of the matrix')
     expect(
       documentRowProblems(
         PRINCIPAL_MATRIX,
         revision,
-        awaiting.map((entry) => (entry.row === "daemon.run" ? { ...entry, slice: "T1a" } : entry)),
+        awaiting.map((entry) => (entry.row.startsWith("`daemon.run`") ? { ...entry, slice: "T1a" } : entry)),
       ).join("\n"),
-    ).toContain('awaiting row daemon.run: slice "T1a" is not the document\'s "C1a"')
-    const typo = [...awaiting, { section: "4.6", row: "threads.teleport", slice: "T1a" }]
-    expect(documentRowProblems(PRINCIPAL_MATRIX, revision, typo, true)).toContain(
-      "awaiting row 4.6 threads.teleport: not a row of the document",
-    )
-    expect(documentRowProblems(PRINCIPAL_MATRIX, withoutSixth, typo)).not.toContain(
-      "awaiting row 4.6 threads.teleport: not a row of the document",
-    )
+    ).toContain('slice "T1a" is not the document\'s "C1a"')
+    // Exact identity (reviewer's LOW at 17a5459fe4): a prefix, an unknown row, a duplicate and a row without its decider fail.
+    const typo = [...awaiting, { section: "4.6", row: "`threads.teleport`", slice: "T1a" }]
+    const missing = 'awaiting row 4.6 "`threads.teleport`": not a row of the document'
+    expect(documentRowProblems(PRINCIPAL_MATRIX, revision, typo, true)).toContain(missing)
+    expect(documentRowProblems(PRINCIPAL_MATRIX, withoutSixth, typo)).not.toContain(missing)
+    const daemon = awaiting.find((entry) => entry.row.startsWith("`daemon.run`"))
+    if (daemon === undefined) throw new Error("no daemon.run entry")
+    const prefix = awaiting.map((entry) => (entry === daemon ? { ...entry, row: "`daemon.run`" } : entry))
+    expect(
+      named(documentRowProblems(PRINCIPAL_MATRIX, revision, prefix, true), "`daemon.run`", "not a row of the document"),
+    ).toBe(true)
+    expect(
+      named(documentRowProblems(PRINCIPAL_MATRIX, revision, [...awaiting, daemon]), daemon.row, "listed twice"),
+    ).toBe(true)
+    const twin = revision.replace(daemon.row, `${daemon.row} | x | x | x | x | C1a | x |\n| ${daemon.row}`)
+    expect(
+      named(documentRowProblems(PRINCIPAL_MATRIX, twin, awaiting), daemon.row, "matches 2 rows of the document"),
+    ).toBe(true)
+    const undecided = awaiting.map((entry) => {
+      if (entry.decidedBy === undefined) return entry
+      const { decidedBy: _decidedBy, ...rest } = entry
+      return rest
+    })
+    expect(
+      documentRowProblems(PRINCIPAL_MATRIX, revision, undecided).some((problem) =>
+        problem.endsWith("its table has no Owner slice column, so the entry names who decided its slice"),
+      ),
+    ).toBe(true)
   })
 })
