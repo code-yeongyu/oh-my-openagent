@@ -74,7 +74,11 @@ type BindingScopes<T> = {
   readonly globalProperty: (name: string) => T | undefined
 }
 
-export function createBindingScopes<T>(nodes: readonly ts.Node[], globals: ReadonlyMap<string, T>): BindingScopes<T> {
+export function createBindingScopes<T>(
+  nodes: readonly ts.Node[],
+  globals: ReadonlyMap<string, T>,
+  runtimeGlobals: ReadonlySet<string>,
+): BindingScopes<T> {
   const tracked = new Map<ts.Identifier, T>()
   const implicitGlobals = new Map<string, T>()
   const byScope = new Map<ts.Node, Map<string, Declaration[]>>()
@@ -85,7 +89,7 @@ export function createBindingScopes<T>(nodes: readonly ts.Node[], globals: Reado
     if (list) list.push(declaration)
     else map.set(key, [declaration])
   }
-  for (const declaration of nodes.flatMap((node) => declarationsOf(node, usersOfArguments))) {
+  for (const declaration of nodes.flatMap((node) => declarationsOf(node, usersOfArguments, runtimeGlobals))) {
     index(byText, declaration.name.text, declaration)
     const names = byScope.get(declaration.scope) ?? new Map<string, Declaration[]>()
     byScope.set(declaration.scope, names)

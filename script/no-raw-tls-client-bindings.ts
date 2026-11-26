@@ -12,6 +12,9 @@ type Site = { readonly names: readonly ts.Identifier[]; readonly scope: ts.Node;
 type BindingRule = {
   readonly shadows: string
   readonly branches: readonly string[]
+  // An import without the type keyword may still name only a type: a whole-program emit then erases it, and a runtime
+  // global of the same name stays reachable. Such an import never shadows a runtime global's name.
+  readonly mayNameOnlyAType?: true
   readonly site: (node: ts.Node, argumentsUsers: ReadonlySet<ts.Node>) => Site | undefined
 }
 
@@ -180,8 +183,9 @@ export const BINDING_KINDS: ReadonlyMap<ts.SyntaxKind, BindingRule> = new Map<ts
   [
     ts.SyntaxKind.ImportClause,
     {
-      shadows: "its default name, unless type-only",
-      branches: ["value", "type-only"],
+      shadows: "its default name, unless type-only or the name of a runtime global",
+      branches: ["value", "type-only", "a runtime global's name"],
+      mayNameOnlyAType: true,
       site: (node) => (ts.isImportClause(node) ? named(node, node.getSourceFile(), !node.isTypeOnly) : undefined),
     },
   ],
@@ -197,8 +201,9 @@ export const BINDING_KINDS: ReadonlyMap<ts.SyntaxKind, BindingRule> = new Map<ts
   [
     ts.SyntaxKind.ImportSpecifier,
     {
-      shadows: "unless the import or the specifier is type-only",
-      branches: ["value", "type-only import", "type-only specifier"],
+      shadows: "unless the import or the specifier is type-only, or it binds the name of a runtime global",
+      branches: ["value", "type-only import", "type-only specifier", "a runtime global's name"],
+      mayNameOnlyAType: true,
       site: (node) =>
         ts.isImportSpecifier(node)
           ? named(node, node.getSourceFile(), !node.isTypeOnly && !node.parent.parent.isTypeOnly)
@@ -241,9 +246,18 @@ export const NEVER_SHADOWS: ReadonlyMap<ts.SyntaxKind, string> = new Map([
   [ts.SyntaxKind.JSDocPropertyTag, "a comment: binds nothing at runtime"],
 ])
 
-export function declarationsOf(node: ts.Node, argumentsUsers: ReadonlySet<ts.Node>): Declaration[] {
-  const site = BINDING_KINDS.get(node.kind)?.site(node, argumentsUsers)
-  if (!site) return []
+export function declarationsOf(
+  node: ts.Node,
+  argumentsUsers: ReadonlySet<ts.Node>,
+  runtimeGlobals: ReadonlySet<string>,
+): Declaration[] {
+  const rule = BINDING_KINDS.get(node.kind)
+  const site = rule?.site(node, argumentsUsers)
+  if (!rule || !site) return []
   const shadows = site.runtime && !isAmbient(node)
-  return site.names.map((name) => ({ name, scope: site.scope, shadows }))
+  return site.names.map((name) => ({
+    name,
+    scope: site.scope,
+    shadows: shadows && !(rule.mayNameOnlyAType && runtimeGlobals.has(name.text)),
+  }))
 }

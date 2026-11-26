@@ -36,6 +36,9 @@ const ALL: readonly Placement[] = ["module before", "module after", "function bo
 const MODULE: readonly Placement[] = ["module before", "module after"]
 const stmts = (at: readonly Placement[], ...declares: ((n: string) => string)[]): Form[] =>
   declares.map((declare) => ({ at, declare }))
+// The module behind "./t" in the whole-program emit: its exports named like a runtime global are types only.
+const TYPES_ONLY_MODULE =
+  "export interface Bun { x: number }\nexport type Other = number\nexport default interface D { x: number }\n"
 const NS = "namespace NS { export type T = number; export const v = { connect() {} } }"
 
 const FORMS: Record<string, readonly (Form | Program)[]> = {
@@ -132,6 +135,7 @@ const FORMS: Record<string, readonly (Form | Program)[]> = {
   "ImportEqualsDeclaration: type-only": stmts(MODULE, (n) => `import type ${n} = require("m");`),
   "ImportClause: value": stmts(MODULE, (n) => `import ${n} from "m";`),
   "ImportClause: type-only": stmts(MODULE, (n) => `import type ${n} from "m";`),
+  "ImportClause: a runtime global's name": stmts(MODULE, (n) => `import ${n} from "./t";`),
   "NamespaceImport: value": stmts(MODULE, (n) => `import * as ${n} from "m";`),
   "NamespaceImport: type-only": stmts(MODULE, (n) => `import type * as ${n} from "m";`),
   "ImportSpecifier: value": stmts(
@@ -149,6 +153,11 @@ const FORMS: Record<string, readonly (Form | Program)[]> = {
     (n) => `import { type x as ${n} } from "m";`,
     (n) => `import { type ${n} } from "m";`,
     (n) => `import { type x as ${n}, y } from "m";`,
+  ),
+  "ImportSpecifier: a runtime global's name": stmts(
+    MODULE,
+    (n) => `import { ${n} } from "./t";`,
+    (n) => `import { Other as ${n} } from "./t";`,
   ),
 }
 
@@ -204,13 +213,23 @@ const TRANSPILERS = {
     let out = ""
     const options = { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, noLib: true, types: [] }
     const host = ts.createCompilerHost(options)
-    host.getSourceFile = (name, version) => (name === "x.ts" ? ts.createSourceFile(name, source, version) : undefined)
-    host.fileExists = (name) => name === "x.ts"
-    host.readFile = (name) => (name === "x.ts" ? source : undefined)
-    host.writeFile = (_name, text) => {
-      out = text
+    const files = new Map([
+      ["x.ts", source],
+      ["t.ts", TYPES_ONLY_MODULE],
+      ["globals.d.ts", "declare var Bun: any\ndeclare var o: any\n"],
+    ])
+    const local = (name: string) => name.replace(/^\/+/, "")
+    host.getSourceFile = (name, version) => {
+      const text = files.get(local(name))
+      return text === undefined ? undefined : ts.createSourceFile(local(name), text, version)
     }
-    ts.createProgram(["x.ts"], options, host).emit()
+    host.getCurrentDirectory = () => "/"
+    host.fileExists = (name) => files.has(local(name))
+    host.readFile = (name) => files.get(local(name))
+    host.writeFile = (name, text) => {
+      if (local(name) === "x.js") out = text
+    }
+    ts.createProgram(["x.ts", "globals.d.ts"], options, host).emit()
     return reaches(out, module)
   },
   tsc: (source: string, module: boolean): boolean | undefined => {

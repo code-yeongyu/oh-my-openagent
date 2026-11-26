@@ -12,6 +12,8 @@ const CLIENTS: Record<string, readonly string[]> = {
   http2: ["connect"],
   Bun: ["connect"],
 }
+// Of the roots above, the ones that are real globals at runtime: an unbound tls/https/http2 name throws, Bun does not.
+const RUNTIME_GLOBALS: ReadonlySet<string> = new Set(["Bun", "globalThis"])
 
 function parse(content: string, file: string): ts.SourceFile {
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true)
@@ -111,7 +113,7 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
   const globals = new Map<string, Binding>(
     [...Object.keys(CLIENTS), "globalThis"].map((module) => [module, { module }]),
   )
-  const bindings = createBindingScopes(list, globals)
+  const bindings = createBindingScopes(list, globals, RUNTIME_GLOBALS)
   const builtinNames = new Set<string>()
   const requireFactories = new Set<string>()
   const requireNames = new Set(["require", "__require"])

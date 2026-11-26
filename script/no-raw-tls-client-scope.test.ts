@@ -49,6 +49,9 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
   })
 
   test.each([
+    ["a named import of the runtime global's name", 'import { Bun } from "./t"; Bun.connect(options)'],
+    ["a renamed import to the runtime global's name", 'import { Other as Bun } from "./t"; Bun.connect(options)'],
+    ["a default import under the runtime global's name", 'import Bun from "./t"; Bun.connect(options)'],
     ["a lone function signature", "function Bun(): void; Bun.connect(options)"],
     ["a lone function signature after the call", "Bun.connect(options); function Bun(): void;"],
     ["a lone signature inside a function", "function f() { function Bun(): void; return Bun.connect(options) }"],
