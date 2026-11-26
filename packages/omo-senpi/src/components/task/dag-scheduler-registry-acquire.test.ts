@@ -71,10 +71,11 @@ describe("DAG scheduler registry acquisition of a pending run", () => {
       const registry = createDagSchedulerRegistry({
         schedulers,
         store,
-        schedulerOptions: { store, taskManager, isProcessAlive },
+        schedulerOptions: { reservations: createDagRunReservations(), store, taskManager, isProcessAlive },
         logger: quietLogger,
         isProcessAlive,
         reservations: createDagRunReservations(),
+        recover: async () => undefined,
       })
       const eventsBefore = base.readEvents(runId, 0, { limit: 500 }).events.length
 

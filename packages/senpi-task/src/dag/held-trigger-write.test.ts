@@ -46,6 +46,7 @@ async function stoppedRunWithChangeAtTheWrite(change: (current: Leased) => Lease
   const fence = createDagOwnerResumeFence({
     store,
     heldTriggers: {
+      reservations: run.reservations,
       store,
       taskManager: run.fixture.taskManager,
       hostPid: THIS_HOST,

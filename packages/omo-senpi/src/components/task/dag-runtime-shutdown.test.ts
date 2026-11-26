@@ -61,7 +61,7 @@ describe("DAG committed shutdown holds the runs it pauses", () => {
     const isProcessAlive = (pid: number): boolean => pid === process.pid
     const cancelRun = createDagRunCancel({
       store,
-      schedulerOptions: { store, taskManager, isProcessAlive },
+      schedulerOptions: { reservations: reservations, store, taskManager, isProcessAlive },
       schedulers,
       reservations,
       holders: { taskManager, hostPid: process.pid, isProcessAlive },

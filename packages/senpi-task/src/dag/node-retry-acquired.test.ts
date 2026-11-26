@@ -12,6 +12,7 @@ import type { DagRunRecordV1 } from "./manager"
 import { retryDagNodes } from "./node-retry"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
@@ -51,9 +52,16 @@ describe("DAG retry decided on the acquired record", () => {
     // when
     let refusal: unknown
     try {
-      retryDagNodes({ store, taskManager: new LongRunningTaskManager(), initialRecord: failed }, runId, [
-        "broken" as DagNodeId,
-      ])
+      retryDagNodes(
+        {
+          reservations: createDagRunReservations(),
+          store,
+          taskManager: new LongRunningTaskManager(),
+          initialRecord: failed,
+        },
+        runId,
+        ["broken" as DagNodeId],
+      )
     } catch (error) {
       refusal = error
     }
@@ -92,9 +100,16 @@ describe("DAG retry decided on the acquired record", () => {
     // when
     let refusal: unknown
     try {
-      retryDagNodes({ store, taskManager: new LongRunningTaskManager(), initialRecord: stopped }, runId, [
-        "broken" as DagNodeId,
-      ])
+      retryDagNodes(
+        {
+          reservations: createDagRunReservations(),
+          store,
+          taskManager: new LongRunningTaskManager(),
+          initialRecord: stopped,
+        },
+        runId,
+        ["broken" as DagNodeId],
+      )
     } catch (error) {
       refusal = error
     }
@@ -134,6 +149,7 @@ describe("DAG retry decided on the acquired record", () => {
     try {
       retryDagNodes(
         {
+          reservations: createDagRunReservations(),
           store,
           taskManager: new LongRunningTaskManager(),
           hostPid: 101,

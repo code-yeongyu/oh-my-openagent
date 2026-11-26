@@ -24,6 +24,7 @@ import {
   type DagScheduler,
 } from "../scheduler"
 import type { createDagSkillMaterializer } from "../skills"
+import { createDagRunReservations } from "../run-reservations"
 import { createDagFileStore, type DagFileStore } from "../store"
 import { noLiveHolder } from "./reattached-run"
 import type { DagNodeId, DagRunEvent, DagRunId } from "../types"
@@ -157,6 +158,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
                 store,
                 cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false,
                 heldTriggers: {
+                  reservations,
                   store,
                   taskManager,
                   hostPid: process.pid,
@@ -178,6 +180,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
     ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
   })
   const schedulers = new Map<DagRunId, DagScheduler>()
+  const reservations = createDagRunReservations()
   const runs = new Map<DagRunId, Promise<DagRunRecordV1>>()
   const waitSurface = createDagWaitSurface({
     store,
@@ -201,6 +204,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       const runId = started.snapshot.runId
       if (!schedulers.has(runId) && started.snapshot.status === "pending") {
         const scheduler = createDagScheduler({
+          reservations,
           store,
           taskManager,
           initialRecord: manager.record(runId, parentSessionId),
@@ -245,6 +249,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
     async amend(input, runId) {
       await manager.amend({ holder: noLiveHolder, runId, definition: input, parentSessionId })
       const reentry = reenterDagRun({
+        reservations,
         store,
         taskManager,
         initialRecord: manager.record(runId, parentSessionId),
@@ -266,6 +271,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
     const existing = schedulers.get(runId)
     if (existing !== undefined) return existing
     const fresh = createDagScheduler({
+      reservations,
       store,
       taskManager,
       initialRecord: manager.record(runId, parentSessionId),

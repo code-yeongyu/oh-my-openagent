@@ -11,6 +11,7 @@ import { createDagFileStore, createDagScheduler, type DagRunRecordV1 } from "@oh
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime } from "./dag-runtime"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-reservations"
 import { dagNode, recoveryEngine, ScriptedRunner, within } from "./dag-runtime-recovery.test-support"
 
 const cleanupRoots: string[] = []
@@ -61,6 +62,7 @@ async function parkedRun(name: string, pausedBy: "nobody" | "this host" = "nobod
   const nodes = paused.nodes.map((entry) => (entry.id === "side" ? { ...entry, state: "failed" as const } : entry))
   store.writeCheckpoint(runId, { ...paused, nodes, status: "running" })
   const parked = await createDagScheduler({
+    reservations: createDagRunReservations(),
     store,
     taskManager: engine.manager,
     initialRecord: { ...paused, nodes, status: "running" },

@@ -10,6 +10,7 @@ import { LongRunningTaskManager, node, owner, pausedRecord, runId, taskRecord } 
 import type { DagDefinition } from "./graph"
 import { reenterDagRun } from "./run-reentry"
 import { createDagFileStore } from "./store"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const THIS_HOST_PID = 101
@@ -42,6 +43,7 @@ describe("DAG re-entry under the one holder rule", () => {
     let refusal: unknown
     try {
       reenterDagRun({
+        reservations: createDagRunReservations(),
         store,
         taskManager: manager,
         initialRecord: settled,

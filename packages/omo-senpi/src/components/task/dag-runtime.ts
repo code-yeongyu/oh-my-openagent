@@ -157,8 +157,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
-    // Control verbs judge a lease by the same probe recovery and the registry use.
+    // The same probe and (required) reservations as recovery and the registry, revive watchers included.
     isProcessAlive,
+    reservations,
   }
 
   const subscribe = (runId: DagRunId, listener: (event: DagRunEvent) => void): (() => void) => {
@@ -220,6 +221,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     logger: deps.logger,
     isProcessAlive,
     reservations,
+    recover: (sessionId) => sweeps.recover({ sessionId }),
   })
   const holders = { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive }
 

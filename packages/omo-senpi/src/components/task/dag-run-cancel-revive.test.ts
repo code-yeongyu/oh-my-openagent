@@ -49,7 +49,13 @@ async function failedRunWithRevivedA() {
   const taskA = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id ?? ""
   const reservations = createDagRunReservations()
   const alive = (pid: number): boolean => pid === THIS_HOST || pid === OTHER_HOST
-  const options = { store: fixture.store, taskManager: fixture.taskManager, hostPid: THIS_HOST, isProcessAlive: alive }
+  const options = {
+    store: fixture.store,
+    taskManager: fixture.taskManager,
+    hostPid: THIS_HOST,
+    isProcessAlive: alive,
+    reservations,
+  }
   const reservation = await reserveWhenFree(reservations, runId, "send")
   const revived = await sendToDagNode(
     { ...options, initialRecord: fixture.manager.record(runId, parentSessionId), reservation, reservations },

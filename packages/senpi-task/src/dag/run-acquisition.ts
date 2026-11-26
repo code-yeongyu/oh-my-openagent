@@ -82,6 +82,11 @@ export const dagRunEligibility = {
     (parentSessionId: string): Eligibility =>
     (fresh) =>
       fresh.parentSessionId === parentSessionId,
+  /** Parking a run whose scheduler here failed: of this session, still `running`, no scheduler here holds it. */
+  parkFailed:
+    (parentSessionId: string, heldHere: () => boolean): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId && fresh.status === "running" && !heldHere(),
   /** The shutdown pause: of this session, still live, not stopped by the user. */
   shutdownPause:
     (parentSessionId: string): Eligibility =>

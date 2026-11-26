@@ -80,7 +80,14 @@ export function sendRun(
   }
   const otherRetry = (nodeId: string) =>
     retryDagNodes(
-      { store: base, taskManager, hostPid: OTHER_HOST, isProcessAlive: alive, initialRecord: failed },
+      {
+        reservations: reservations,
+        store: base,
+        taskManager,
+        hostPid: OTHER_HOST,
+        isProcessAlive: alive,
+        initialRecord: failed,
+      },
       runId,
       [nodeId as DagNodeId],
     )

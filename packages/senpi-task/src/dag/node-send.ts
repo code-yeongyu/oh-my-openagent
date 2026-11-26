@@ -53,6 +53,7 @@ export async function sendToDagNode(
     if (decision.kind === "revive" && decision.leaseTaken)
       releaseDagRunLease(options.store, runId, options.hostPid ?? process.pid)
   }
+  let revived = false
   try {
     // `classifySend` admitted steer and revive only for a node with a child.
     const taskId = node?.taskId
@@ -80,11 +81,13 @@ export async function sendToDagNode(
       callerSessionId: record.parentSessionId,
       allScope: true,
     })
+    // From a revived child on, the send never gives the lease back: the revive watcher owns its end.
+    revived = outcome.kind === "revived"
     const result = foldSendOutcome(options, record, node, taskId, outcome, watchRevived)
-    if (result.delivery !== "revive") giveBack()
+    if (!revived) giveBack()
     return result
   } catch (error) {
-    giveBack()
+    if (!revived) giveBack()
     throw error
   }
 }
@@ -124,15 +127,12 @@ function foldSendOutcome(
       )
       return { nodeId, taskId, delivery: "steer" }
     case "revived": {
+      // The child runs now: its watcher is armed before any fallible write and owns the lease's end.
+      const settled = watchRevived?.(nodeId, taskId) ?? watchRevivedTask(options, nodeId, taskId)
       const journal = controlJournal(options, record)
       journal.append(dagNodeSteeredEvent({ nodeId, taskId, delivery: "revive" }))
       journal.append(dagNodeTransitionedEvent({ nodeId, from: node.state, to: "running", reason: { kind: "revived" } }))
-      return {
-        nodeId,
-        taskId,
-        delivery: "revive",
-        settled: watchRevived?.(nodeId, taskId) ?? watchRevivedTask(options, nodeId, taskId),
-      }
+      return { nodeId, taskId, delivery: "revive", settled }
     }
     case "delivery_uncertain":
       throw new DagNodeControlError({

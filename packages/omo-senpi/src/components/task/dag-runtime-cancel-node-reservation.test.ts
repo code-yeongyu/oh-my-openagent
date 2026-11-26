@@ -69,7 +69,7 @@ describe("DAG node cancel while the user's Resume installs the run", () => {
     })
     const controls = createDagRuntimeControls({
       coreManager: createDagManager({ store }),
-      schedulerOptions: { store, taskManager, isProcessAlive },
+      schedulerOptions: { reservations: reservations, store, taskManager, isProcessAlive },
       schedulers: new Map(),
       reservations,
       holdsRun: () => false,

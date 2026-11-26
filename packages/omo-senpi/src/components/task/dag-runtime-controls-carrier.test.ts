@@ -52,7 +52,12 @@ describe("DAG runtime control verbs on a run this host does not hold", () => {
     const stopObserving = observeDagSchedulers(taskManager, (scheduler) => built.push(scheduler))
     const controls = createDagRuntimeControls({
       coreManager: createDagManager({ store }),
-      schedulerOptions: { store, taskManager, isProcessAlive: (pid) => pid === FOREIGN_HOST_PID },
+      schedulerOptions: {
+        reservations: createDagRunReservations(),
+        store,
+        taskManager,
+        isProcessAlive: (pid) => pid === FOREIGN_HOST_PID,
+      },
       schedulers: new Map(),
       reservations: createDagRunReservations(),
       holdsRun: () => false,

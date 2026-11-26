@@ -22,6 +22,7 @@ import { createDagRecovery } from "./recovery"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagNodeId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
@@ -122,6 +123,7 @@ describe("DAG resume without blocking on a reattached child", () => {
     store.writeResult(runId, "reattached", "durable reattached output")
     manager.add(taskRecord(owner("reattached"), "completed", "task-reattached"))
     const scheduler = createDagScheduler({
+      reservations: createDagRunReservations(),
       store,
       taskManager: manager,
       initialRecord,

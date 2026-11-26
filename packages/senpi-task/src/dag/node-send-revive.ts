@@ -16,7 +16,13 @@ import { persistDagNodeResult } from "./results"
 import { acquireDagRun, classifySend, dagRunEligibility, decideDagRun, type DagSendClass } from "./run-acquisition"
 import { reserveWhenFree } from "./run-reservations"
 import type { DagSchedulerOptions } from "./scheduler"
-import { type DagNodeError, type DagNodeErrorCode, type DagNodeId, type DagRunId } from "./types"
+import {
+  TERMINAL_DAG_RUN_STATUSES,
+  type DagNodeError,
+  type DagNodeErrorCode,
+  type DagNodeId,
+  type DagRunId,
+} from "./types"
 
 export type DagSendDecision =
   | { readonly kind: "guidance"; readonly record: DagRunRecordV1 }
@@ -140,12 +146,11 @@ export async function watchRevivedTask(options: DagSchedulerOptions, nodeId: Dag
     settled = { error }
   }
   const runId = options.initialRecord.runId
-  const hold =
-    options.reservations === undefined ? undefined : await reserveWhenFree(options.reservations, runId, "revive fold")
+  const hold = await reserveWhenFree(options.reservations, runId, "revive fold")
   try {
     foldRevived(options, nodeId, taskId, settled)
   } finally {
-    hold?.release()
+    hold.release()
   }
 }
 
@@ -157,7 +162,9 @@ function foldRevived(
 ): void {
   const now = options.now ?? Date.now
   const runId = options.initialRecord.runId
-  if (!stillRevived(currentRecord(options, runId), nodeId, taskId)) return
+  // The node never became running with this child (the send's own write failed): nothing to fold, and
+  // the lease this revive held is released if no node of the settled run is active any more.
+  if (!stillRevived(currentRecord(options, runId), nodeId, taskId)) return releaseIdleLease(options, runId)
   if ("error" in settled)
     return failRevivedNode(options, nodeId, taskId, "task_error", controlErrorMessage(settled.error), now)
   if (settled.status === "pending" || settled.status === "running" || settled.status === "paused")
@@ -174,6 +181,17 @@ function foldRevived(
   controlJournal(options, currentRecord(options, runId), undefined, skip).append(
     dagNodeTransitionedEvent({ nodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }),
   )
+}
+
+function releaseIdleLease(options: DagSchedulerOptions, runId: DagRunId): void {
+  const hostPid = options.hostPid ?? process.pid
+  options.store.withRunLock(runId, () => {
+    const fresh = options.store.readCheckpoint<DagRunRecordV1 & { readonly leaseHolderPid?: number }>(runId)
+    if (fresh === null || fresh.leaseHolderPid !== hostPid || !TERMINAL_DAG_RUN_STATUSES.has(fresh.status)) return
+    if (fresh.nodes.some((node) => node.state === "running" || node.state === "scheduled")) return
+    const { leaseHolderPid: _lease, ...released } = fresh
+    options.store.writeCheckpoint(runId, released)
+  })
 }
 
 // The fold applies only while the node still runs this revived child (decided again under the

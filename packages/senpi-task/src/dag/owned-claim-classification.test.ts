@@ -17,6 +17,7 @@ import {
   rootSessionId,
 } from "./__fixtures__/controlled-dag-e2e"
 import { ControlledRunner, completed } from "./__fixtures__/controlled-runner"
+import { createDagRunReservations } from "./run-reservations"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
@@ -70,6 +71,7 @@ async function liveChildOfNodeA(owner: (record: DagRunRecordV1) => Omit<DagTaskO
   }
   fixture.store.writeCheckpoint(record.runId, prepared)
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store: fixture.store,
     taskManager: fixture.taskManager,
     initialRecord: prepared,

@@ -85,7 +85,7 @@ export async function unscheduledRun(
   const read = () => fixture.store.readCheckpoint<Leased>(runId)
   const reservations = createDagRunReservations()
   const isProcessAlive = (pid: number): boolean => pid === THIS_HOST
-  const options = { store: fixture.store, taskManager, hostPid: THIS_HOST, isProcessAlive }
+  const options = { store: fixture.store, taskManager, hostPid: THIS_HOST, isProcessAlive, reservations }
   /** Runs `verb` the way the runtime's controls do: under the run's reservation, from the fresh record. */
   const reserved = async <T>(operation: string, verb: (context: VerbContext) => T | Promise<T>): Promise<T> => {
     const reservation = await reserveWhenFree(reservations, runId as DagRunId, operation)
