@@ -70,8 +70,10 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     expect(openSession).toHaveBeenCalledTimes(1)
   })
 
-  test("#given a create on another device whose earlier run failed #when it is retried under the same key #then idempotency_uncertain and nothing reaches that device", async () => {
-    const a = account()
+  // #15002: a device that can prove it holds nothing under the derived id is opened again; one whose engine cannot say
+  // (it predates find_session) may hold a thread nothing here finds, so the retry stays uncertain and opens nothing.
+  test("#given a create on another device whose earlier run failed and a device that cannot look the thread up #when it is retried under the same key #then idempotency_uncertain and nothing reaches that device", async () => {
+    const a = account({ sessionFiles: "none" })
     const { run, store } = surface(a.remote)
     const args = { device: "studio", name: "remote-retry", idempotency_key: "atomic-4" }
     const scope = { principal: "session:dur-caller", operation: "thread_create", idempotency_key: "atomic-4" }

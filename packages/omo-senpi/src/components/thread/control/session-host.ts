@@ -42,6 +42,12 @@ export function createdThreadId(callerId: string, idempotencyKey: string): strin
 /** The engine capability that says `open_session` forks a session on `forkFrom` (senpi#7085). */
 export const OPEN_SESSION_FORK = "open_session_fork"
 
+/**
+ * The host capability that says `open_session` creates a new session under the `durableSessionId` it asks for; such a
+ * host refuses a second live session under one id (`session_id_in_use`), whenever the two opens reach it.
+ */
+export const DURABLE_SESSION_ID = "durable_session_id"
+
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */
 /** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
@@ -111,4 +117,10 @@ export type SessionHost = {
     request: { readonly durableSessionId: string; readonly name?: string; readonly worktree?: ThreadWorktree },
     options?: { readonly confirmReach?: boolean },
   ) => Promise<SessionOpenOutcome | undefined>
+  /**
+   * Another device's host only (#15002): true when an open under `durableSessionId` now cannot make a second session:
+   * that device's engine creates under the asked id (`DURABLE_SESSION_ID`, so a lost open that lands later is refused
+   * beside it) and answers that it holds no session or session file under it. False when either cannot be confirmed.
+   */
+  readonly unopened?: (durableSessionId: string) => Promise<boolean>
 }

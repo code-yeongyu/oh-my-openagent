@@ -196,6 +196,44 @@ export async function createThread(
       if (found.kind === "live") return { kind: "ok", thread: found.thread }
       return found.kind === "file" ? await plan.host.open(fileOpen(found)) : undefined
     }
+    const openNew = () =>
+      plan.host.open(
+        {
+          ...plan.request,
+          ...(openName === undefined ? {} : { name: openName }),
+          ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+          ...(preset === undefined ? {} : { permissionPreset: preset }),
+          ...(plan.creates ? launch.profile : {}),
+          ...(createdId === undefined ? {} : { durableSessionId: createdId }),
+        },
+        // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
+        { confirmReach: plan.creates },
+      )
+    // #15002: a create on another device left uncertain names the thread its key derives, and, when the caller gave the
+    // key, that a retry under it is safe: the retry adopts a session an earlier run made, or opens one only where the
+    // device proves none exists (`unopened`), so it never makes a second.
+    const keyedUncertain = (result: ThreadToolResult): ThreadToolResult => {
+      const device = plan.host.device
+      if (result.kind !== "error" || result.error.code !== "idempotency_uncertain") return result
+      if (createdId === undefined || device === undefined) return result
+      const key = value.idempotency_key
+      return {
+        kind: "error",
+        error: {
+          ...result.error,
+          next_action:
+            key === undefined
+              ? `Read thread ${createdId} on device ${device} (tool.thread_read({ thread }) in an eval cell) once tool.thread_list({ all_scope: true }) lists it, before creating it again.`
+              : `Retry tool.thread_create() in an eval cell with the same idempotency_key (${key}): a thread an earlier run made under it is answered as this create's (named, its prompt sent once), and none is opened twice.`,
+          details: {
+            ...result.error.details,
+            device,
+            thread: createdId,
+            ...(key === undefined ? {} : { retry_same_key_safe: true }),
+          },
+        },
+      }
+    }
     let outcome: SessionOpenOutcome
     if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
@@ -211,28 +249,25 @@ export async function createThread(
               },
               { confirmReach: true },
             )
-      if (found === undefined) return stillUncertain()
-      outcome = found
+      // #15002: the earlier open made nothing the device holds (it was lost on the way): open it now under the same id.
+      // A worktree the earlier run made stays its own, so that create is never opened a second time elsewhere.
+      if (found !== undefined) outcome = found
+      else if (
+        createdId !== undefined &&
+        firstWorktree === undefined &&
+        (await plan.host.unopened?.(createdId)) === true
+      )
+        outcome = await openNew()
+      else return keyedUncertain(stillUncertain())
     } else
       try {
-        outcome = await plan.host.open(
-          {
-            ...plan.request,
-            ...(openName === undefined ? {} : { name: openName }),
-            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-            ...(preset === undefined ? {} : { permissionPreset: preset }),
-            ...(plan.creates ? launch.profile : {}),
-            ...(createdId === undefined ? {} : { durableSessionId: createdId }),
-          },
-          // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
-          { confirmReach: plan.creates },
-        )
+        outcome = await openNew()
       } catch (error) {
         const found = await reopened()
         if (found === undefined) throw error
         outcome = found
       }
-    if (outcome.kind === "error") return outcome
+    if (outcome.kind === "error") return keyedUncertain(outcome)
     opened = outcome.thread
     const created: ThreadToolResult = {
       ...openedResult(outcome.thread, deduplicated),
