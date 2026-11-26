@@ -1,13 +1,13 @@
 ---
 name: git
-description: "Local git from eval cells: commit, push, worktree, base sync, rebase/squash/fixup, and history search (blame, bisect, log -S, reflog). Load before a task's first commit, push or worktree, or pass load_skills=['git'] to the task that commits. GitHub PRs, checks and merges: `github` skill. Triggers: 'commit', 'push', 'rebase', 'worktree', 'who wrote', 'when was X added'."
+description: "Local git: commit, push, worktree, base sync, rebase/squash/fixup, and history search (blame, bisect, log -S, reflog). Load before a task's first commit, push or worktree, or pass load_skills=['git'] to the task that commits. GitHub PRs, checks and merges: `github` skill. Triggers: 'commit', 'push', 'rebase', 'worktree', 'who wrote', 'when was X added'."
 ---
 
 # Git
 
 Load this skill with the read tool, `tool.read({ path })` inside a cell, or `load_skills`, because those paths apply the user's git settings and the bare prelude `read(path)` does not.
 
-Local git: state, commits, worktrees, base sync, history rewrite, push, history questions. Anything on GitHub itself (pull requests, checks, issues, merging) is the `github` skill where the harness has one; hand it the head SHA you pushed.
+Local git: state, commits, worktrees, base sync, history rewrite, push, history questions. Anything on GitHub itself (pull requests, checks, issues, merging) is the `github` skill; hand it the head SHA you pushed.
 
 Commit, push, rebase, reset, stash or delete only when the user asked for it or a workflow they started requires it (ulw-loop commits each verified unit; a PR workflow pushes its branch). An investigative ask ends with findings.
 
@@ -55,7 +55,7 @@ const [state, head] = await Promise.all([git(R, "status", "--short", "--branch")
 - Never rewrite `main`, `master`, `dev` or a release branch. On your own pushed branch use `--force-with-lease`, never `--force`.
 - Fixups: `git commit --fixup=<hash>`, then `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <base>`. A rebase gone wrong: `git rebase --abort` first, reflog after.
 - `reset --hard` and `clean` destroy uncommitted work: run them only in a tree whose `status` you just read.
-- After a push, read the head back and hand it on in the same cell: `const sha = (await git(R, "ls-remote", "origin", `refs/heads/${branch}`)).slice(0, 40)`, then, where the `github` skill is available, its `pr.wait({ repo, number, headSha: sha })` and `pr.merge({ matchHeadSha: sha })`. Never poll with `sleep`.
+- After a push, read the head back and hand it on in the same cell: `const sha = (await git(R, "ls-remote", "origin", `refs/heads/${branch}`)).slice(0, 40)`, then the `github` skill's `pr.wait({ repo, number, headSha: sha })` and `pr.merge({ matchHeadSha: sha })`. Never poll with `sleep`.
 
 ## History questions
 

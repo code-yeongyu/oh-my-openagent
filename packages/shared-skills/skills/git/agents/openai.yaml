@@ -1,6 +1,6 @@
 interface:
   display_name: "git (omo)"
-  short_description: "Local git from eval cells: commits, worktrees, base sync, push, history"
+  short_description: "Local git: commits, worktrees, base sync, push, history"
   search_terms:
     - "git"
     - "git-master"
