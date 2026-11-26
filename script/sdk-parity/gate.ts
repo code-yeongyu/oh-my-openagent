@@ -1,4 +1,5 @@
 import { type BaselineEntry, sha256 } from "./baseline"
+import { type Goldens, type PresentationRow, presentationProblems } from "./presentation"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
@@ -24,12 +25,15 @@ export type GateInput = {
   readonly changedFiles: readonly string[]
   readonly body: string
   readonly headSha: string
+  readonly presentation: readonly PresentationRow[]
+  readonly goldens: Goldens
 }
 
 export type GateReport = {
   readonly failures: readonly string[]
   readonly candidates: readonly string[]
   readonly liveSchema: readonly string[]
+  readonly presentation: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -80,6 +84,7 @@ export function gateReport(input: GateInput): GateReport {
   const initialization = input.base.rows === undefined
   const baseRows = new Map((input.base.rows ?? []).map((row) => [row.id, row]))
   const flagged = new Set<string>()
+  const presentation: string[] = []
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
@@ -113,8 +118,17 @@ export function gateReport(input: GateInput): GateReport {
     // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
     if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
+      const notPresentation = presentationProblems(scenario, before, after, input.presentation, input.goldens)
+      if (notPresentation.length === 0) {
+        presentation.push(scenario.id)
+        continue
+      }
+      const why =
+        "usage" in scenario && scenario.usage !== undefined
+          ? `; it is not presentation-only: ${notPresentation.join("; ")}`
+          : ""
       failures.push(
-        `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}`,
+        `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}${why}`,
       )
       flagged.add(scenario.capability)
     }
@@ -150,8 +164,13 @@ export function gateReport(input: GateInput): GateReport {
     failures,
     candidates,
     liveSchema,
+    presentation: presentation.toSorted(),
     head: input.headSha,
-    digest: candidateDigest(input.headSha, [...candidates, ...liveSchema.map((id) => `${id}#live-schema`)]),
+    digest: candidateDigest(input.headSha, [
+      ...candidates,
+      ...liveSchema.map((id) => `${id}#live-schema`),
+      ...presentation.map((id) => `${id}#presentation`),
+    ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
   }
@@ -173,10 +192,12 @@ export function goldenProblems(
     )
 }
 
-// The ids a reviewer's line covers: the candidates and the built rows marked for the live-schema check.
+// The ids a reviewer's line covers: the candidates, the built rows marked for the live-schema check and the scenarios
+// passed as presentation-only.
 const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
+  ...report.presentation.map((id) => `${id}#presentation`),
 ]
 
 export function renderReport(report: GateReport): string {
@@ -194,6 +215,11 @@ export function renderReport(report: GateReport): string {
   if (report.liveSchema.length > 0)
     lines.push(
       `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer confirms against the live schema that the set of accepted inputs is the same in both directions (nothing newly refused, nothing newly accepted) before CLEAR.`,
+      "",
+    )
+  if (report.presentation.length > 0)
+    lines.push(
+      `PRESENTATION ONLY: ${report.presentation.join(", ")}: the usage text of an existing verb changed with the exit code, the structure and every other line equal, as named in script/sdk-parity/presentation.json; the reviewer confirms the change is wording, not a capability, before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

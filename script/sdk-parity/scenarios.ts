@@ -7,6 +7,9 @@ export type CliScenario = {
   readonly capability: string
   readonly surface: "native" | "opencode"
   readonly argv: readonly string[]
+  // The command whose `usage: omo <command>` block the output carries; only that block can take a presentation-only
+  // change (presentation.ts).
+  readonly usage?: string
 }
 
 export type ToolScenario = {
@@ -28,11 +31,12 @@ export type LoopParseScenario = {
 
 export type Scenario = CliScenario | ToolScenario | LoopParseScenario
 
-const native = (id: string, capability: string, argv: readonly string[]): CliScenario => ({
+const native = (id: string, capability: string, argv: readonly string[], usage?: string): CliScenario => ({
   id,
   capability,
   surface: "native",
   argv,
+  ...(usage === undefined ? {} : { usage }),
 })
 const opencode = (id: string, capability: string, argv: readonly string[]): CliScenario => ({
   id,
@@ -56,9 +60,9 @@ export const SCENARIOS: readonly Scenario[] = [
   native("native-daemon-help", "daemon.run", ["daemon", "--help"]),
   native("native-daemon-attach-retired", "retired.daemon-attach", ["daemon", "attach"]),
   native("native-daemon-foreground-retired", "retired.daemon-run-foreground", ["daemon", "run", "--foreground"]),
-  native("native-remote-help", "deviceService.status", ["remote", "help"]),
-  native("native-remote-unknown", "deviceService.status", ["remote", "bogus"]),
-  native("native-remote-open-no-device", "threads.create", ["remote", "open"]),
+  native("native-remote-help", "deviceService.status", ["remote", "help"], "remote"),
+  native("native-remote-unknown", "deviceService.status", ["remote", "bogus"], "remote"),
+  native("native-remote-open-no-device", "threads.create", ["remote", "open"], "remote"),
   native("native-update-all-refused", "install.update", ["update", "--all"]),
   native("native-update-unknown-flag", "install.update", ["update", "--bogus"]),
   native("native-account-usage", "account.show", ["account"]),
