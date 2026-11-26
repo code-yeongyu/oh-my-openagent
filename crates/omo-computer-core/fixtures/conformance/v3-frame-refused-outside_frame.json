@@ -1,7 +1,7 @@
 {
   "description": "A click at (900,10) on an 800x600 window frame answers InvalidCoordinateFrame{outside_frame} and sends nothing.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

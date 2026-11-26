@@ -1,4 +1,7 @@
 {
+  "consent": {
+    "stopHotkey": null
+  },
   "windows": [
     {
       "id": "101",
