@@ -83,6 +83,7 @@ export function registerDagPauseSource(ports: {
       retire: createStopRetirement(ports),
       prepareResume: (runId) => ports.clearAdmissionLatch(runId),
       warn: (message, fields) => deps.logger.warn(message, fields),
+      reserve: async (runId) => (await reserveWhenFree(ports.reservations, runId, "guidance dispatch")).release,
       recovery: ports.recovery,
       adopt: ports.adoptInstalled,
       cancel: async (runId) => {

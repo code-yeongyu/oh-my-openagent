@@ -81,11 +81,42 @@ export function createDagRunPauseSource(ports: {
   cancel(runId: DagRunId): Promise<void>
   readonly deliverGuidance?: DagGuidanceDelivery
   warn?(message: string, fields?: Record<string, unknown>): void
+  // Holds the run's reservation (waiting while another operation holds it) and returns its release.
+  reserve?(runId: DagRunId): Promise<() => void>
 }): RunPauseSource {
   const active = (parent: string) =>
     ports
       .records(parent)
       .filter((record) => record.status === "pending" || record.status === "running" || record.status === "paused")
+  const dispatchRunGuidance = async (listed: DagRunRecordV1): Promise<void> => {
+    const options = ports.options(listed)
+    const record = options.store.readCheckpoint<DagRunRecordV1>(listed.runId) ?? listed
+    const journal = controlJournal(options, record)
+    const guidance = [...(record.guidance ?? [])].sort(
+      (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+    )
+    for (const entry of guidance) {
+      const targets = record.nodes
+        .filter((node) => (entry.scope.kind === "node" ? node.id === entry.scope.nodeId : node.state !== "completed"))
+        .map((node) => ({
+          nodeId: node.id,
+          ...(node.state === "running" || node.state === "paused" ? { taskId: node.taskId } : {}),
+        }))
+      await dispatchGuidance([entry], targets, {
+        save: (entries) => {
+          for (const guidance of entries)
+            journal.append({
+              type: guidance.state === "delivered" ? "dag.guidance.delivered" : "dag.guidance.dispatching",
+              guidance,
+            })
+        },
+        deliver: async (taskId, input) => {
+          if (ports.deliverGuidance === undefined) throw new Error("run guidance custody port is not configured")
+          return ports.deliverGuidance(taskId, input)
+        },
+      })
+    }
+  }
   return {
     refs: (parent) => active(parent).map((record) => ({ kind: "dag", id: record.runId })),
     async quiesce(parent, pauseSeq) {
@@ -103,34 +134,13 @@ export function createDagRunPauseSource(ports: {
       }
     },
     async dispatchGuidance(parent) {
-      for (const record of active(parent)) {
-        const options = ports.options(record)
-        const journal = controlJournal(options, record)
-        const guidance = [...(record.guidance ?? [])].sort(
-          (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-        )
-        for (const entry of guidance) {
-          const targets = record.nodes
-            .filter((node) =>
-              entry.scope.kind === "node" ? node.id === entry.scope.nodeId : node.state !== "completed",
-            )
-            .map((node) => ({
-              nodeId: node.id,
-              ...(node.state === "running" || node.state === "paused" ? { taskId: node.taskId } : {}),
-            }))
-          await dispatchGuidance([entry], targets, {
-            save: (entries) => {
-              for (const guidance of entries)
-                journal.append({
-                  type: guidance.state === "delivered" ? "dag.guidance.delivered" : "dag.guidance.dispatching",
-                  guidance,
-                })
-            },
-            deliver: async (taskId, input) => {
-              if (ports.deliverGuidance === undefined) throw new Error("run guidance custody port is not configured")
-              return ports.deliverGuidance(taskId, input)
-            },
-          })
+      for (const listed of active(parent)) {
+        // Delivered and recorded under the run's reservation, from the record read once it is held.
+        const release = (await ports.reserve?.(listed.runId)) ?? (() => undefined)
+        try {
+          await dispatchRunGuidance(listed)
+        } finally {
+          release()
         }
       }
     },
