@@ -99,6 +99,5 @@ describe("T1a: omo remote session verbs on an ended session, as they answer toda
         sent: [...pin.sent],
       })
     },
-    60_000,
   )
 })

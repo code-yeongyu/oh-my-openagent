@@ -186,27 +186,22 @@ describe("resolve: the canonical thread string round-trips", () => {
         thread: first.thread,
       })
     },
-    60_000,
   )
 })
 
 describe("resolve: design section 5's policy table", () => {
-  test.each(ROWS.map((row) => [row.rule, row] as const))(
-    "%s",
-    async (_rule, row) => {
-      const td = createTwoDevices(row.setup)
-      cleanups.push(td.cleanup)
-      const resolved = await resolve(
-        { remote: td.remote, workspace: row.setup?.workspace ?? process.cwd(), book: () => td.entries },
-        row.address,
-        row.request,
-      )
-      const got =
-        resolved.kind === "error"
-          ? resolved.code
-          : `${resolved.leg} ${sym(resolved.device?.id ?? HERE.id)}/${sym(resolved.id)}${resolved.all_scope === true ? " all_scope" : ""}`
-      expect(got).toBe(row.want)
-    },
-    60_000,
-  )
+  test.each(ROWS.map((row) => [row.rule, row] as const))("%s", async (_rule, row) => {
+    const td = createTwoDevices(row.setup)
+    cleanups.push(td.cleanup)
+    const resolved = await resolve(
+      { remote: td.remote, workspace: row.setup?.workspace ?? process.cwd(), book: () => td.entries },
+      row.address,
+      row.request,
+    )
+    const got =
+      resolved.kind === "error"
+        ? resolved.code
+        : `${resolved.leg} ${sym(resolved.device?.id ?? HERE.id)}/${sym(resolved.id)}${resolved.all_scope === true ? " all_scope" : ""}`
+    expect(got).toBe(row.want)
+  })
 })

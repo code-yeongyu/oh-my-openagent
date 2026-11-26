@@ -657,6 +657,5 @@ describe("T1a deliverable 1: every resolving entry over one address table, as it
       cleanups.push(td.cleanup)
       expect(await ENTRIES[entry](td, row.address)).toBe(row.answers[entry])
     },
-    60_000,
   )
 })
