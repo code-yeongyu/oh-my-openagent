@@ -177,7 +177,7 @@ describe("bundle guard push gate (#15072)", () => {
     expect(() => deriveBundleGuards(notARepo)).toThrow(/git ls-files/)
   })
 
-  test("#given a head ref that does not exist #when the gate runs #then it fails naming the ref", () => {
+  test("#given a head ref that does not exist #when the gate runs #then it fails naming the ref (a pin: the diff step already refused it before the git-error fix)", () => {
     // given
     const { root, base } = fixtureRepo()
 
