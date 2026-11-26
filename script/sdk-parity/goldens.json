@@ -96,7 +96,7 @@
   },
   "native-version": {
     "exit": 0,
-    "stdout": "omo 5.1.84 (engine: senpi 2026.11.23)\n",
+    "stdout": "omo 5.1.84 (engine: senpi 2026.11.26)\n",
     "stderr": ""
   },
   "opencode-help": {
