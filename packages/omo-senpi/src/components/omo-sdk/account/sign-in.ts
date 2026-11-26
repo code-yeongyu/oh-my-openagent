@@ -93,9 +93,11 @@ export async function runSignIn(
     }
   }
   const args = ["account", "sign-in", "--stdin"]
+  // The root that starts the verb writes this call's custody records (root/account-sign-in.ts), so the verb does not.
   const stdin = JSON.stringify({
     ...(options.deviceName === undefined ? {} : { deviceName: options.deviceName }),
     ...(options.replace === true ? { replace: true } : {}),
+    custodyRecordedByCaller: true,
   })
   try {
     await run({ args, stdin, env: { ...input.env, OMO_SERVICE_API_URL: input.origin }, onLine, signal })

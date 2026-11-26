@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "member": "account.signIn",
+      "principal": "session",
+      "reason": "the device-service setup after a fresh sign-in lives in launcher-only code (runLoginSetup in packages/omo-native/remote-bootstrap.ts), which the engine's root cannot import; a session's root keeps the shipped launcher child so its caller keeps the device-service outcome it gets today; for the same reason its browser method answers unsupported with reason child_backed_sign_in, which is today's truth: the launcher child has no browser route; the account non-disclosure scan (account-non-disclosure*.test.ts) does not read the child's argv or environment, and the slice that retires this entry runs that scan over the in-process path that replaces the child",
+      "retires_with": "A2a"
+    }
+  ]
+}

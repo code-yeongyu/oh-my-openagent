@@ -1,11 +1,9 @@
+import { createCredentialStore, type CredentialStore, INTERACTIVE_READ_WAIT } from "../account-core/src/keystore"
+import { serviceAccountsOpen } from "../account-core/src/accounts-gate"
+import { accountSignIn, type SignInRequest } from "../account-core/src/calls/sign-in"
+import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
-import {
-  createCredentialStore,
-  type CredentialStore,
-  INTERACTIVE_READ_WAIT,
-  InvalidCredentialState,
-} from "../account-core/src/keystore"
 import { type Credentials, credentialSchema, serviceOrigin } from "../account-core/src/protocol"
 import { registerHelperCandidates } from "../account-core/src/keychain-helper/darwin-backend"
 import {
@@ -14,10 +12,11 @@ import {
   type DeviceServiceHandoff,
   type Session,
 } from "../account-core/src/session"
-import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
 import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"
+import { AUDIT_UNAVAILABLE_NOTE, type CustodyLog, processCustodyLog } from "../account-core/src/calls/custody-log"
+import { accountForget } from "../account-core/src/calls/forget"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { accountStoreDependencies, runAccountStore } from "./account-store"
@@ -46,6 +45,8 @@ export interface AccountCommandDependencies {
   readonly readStdin: () => Promise<string>
   readonly output: (line: string) => void
   readonly error: (line: string) => void
+  /** The wait between sign-in polls; absent, real time. */
+  readonly sleep?: (ms: number) => Promise<void>
 }
 
 const deviceOf = (credentials: Credentials) => ({ id: credentials.device.id, name: credentials.device.name })
@@ -58,10 +59,11 @@ const reply = (dependencies: AccountCommandDependencies, value: unknown, code: n
 const retireHook = (dependencies: AccountCommandDependencies): BeforeKeysDiscarded =>
   dependencies.beforeKeysDiscarded ?? (async () => undefined)
 
-const sessionOf = (dependencies: AccountCommandDependencies): Session =>
+const sessionOf = (dependencies: AccountCommandDependencies, signal?: AbortSignal): Session =>
   createSession({
     api: dependencies.api,
     store: dependencies.store,
+    ...(signal === undefined ? {} : { signal }),
     beforeKeysDiscarded: retireHook(dependencies),
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
     ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
@@ -145,7 +147,6 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       return current === null ? signedOut(dependencies, sessionOf(dependencies)) : reply(dependencies, current)
     }
     case "forget": {
-      const session = sessionOf(dependencies)
       if (flags.length > 0) {
         const device = flags[1]
         if (
@@ -158,30 +159,29 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           dependencies.error("omo account forget: use forget or forget --device <id>")
           return ACCOUNT_EXIT.invalid
         }
-        try {
-          let forgotten = false
-          const code = await session.update(async (current) => {
-            if (current !== null && current.device.id !== device) {
-              dependencies.error(
-                `omo account forget --device acts on this device only; sign out device ${device} with omo account devices revoke ${device}`,
-              )
-              return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
-            }
-            if (current !== null) await session.discard(current, "forget")
-            await dependencies.store.clear()
-            forgotten = true
-            return reply(dependencies, { forgotten: true })
-          })
-          if (forgotten) await dependencies.deviceService?.forget()
-          return code
-        } catch (error) {
-          if (!(error instanceof InvalidCredentialState)) throw error
-          dependencies.error(error.message)
-          return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
-        }
       }
-      await session.forget()
-      return reply(dependencies, { forgotten: true })
+      const forgotten = await accountForget(
+        {
+          session: sessionOf(dependencies),
+          store: dependencies.store,
+          ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
+          custody: processCustodyLog(),
+        },
+        flags.length === 0 ? {} : { device: flags[1] },
+      )
+      if (forgotten.kind === "ok") {
+        if (forgotten.value.auditUnavailable === true) dependencies.error(AUDIT_UNAVAILABLE_NOTE)
+        return reply(dependencies, { forgotten: true })
+      }
+      if (forgotten.code === "unreadable_credential") {
+        dependencies.error(forgotten.message)
+        return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
+      }
+      if (forgotten.code === "empty_device") return ACCOUNT_EXIT.invalid
+      dependencies.error(
+        `omo account forget --device acts on this device only; sign out device ${flags[1]} with omo account devices revoke ${flags[1]}`,
+      )
+      return reply(dependencies, { forgotten: false, device: forgotten.device }, ACCOUNT_EXIT.conflict)
     }
     case "store":
       return runAccountStore(accountStoreDependencies(dependencies.api, dependencies), flags)
@@ -193,6 +193,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           ...dependencies,
           session: sessionOf(dependencies),
           setUpDeviceService: dependencies.setUpDeviceService ?? (async () => "not_on"),
+          custody: processCustodyLog(),
         },
         flags,
       )
@@ -231,26 +232,67 @@ export async function runAccountCommand(
 ): Promise<void> {
   registerHelperCandidates(options.helperCandidates ?? [])
   const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
-  // One store per command: its keyring check and fallback notice are per store (#10658 review).
-  let store: CredentialStore | undefined
+  const stderr = (line: string): void => {
+    process.stderr.write(`${line}\n`)
+  }
   process.exitCode = await runAccountVerb(
-    {
-      api,
-      get store() {
-        store ??= createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
-        return store
-      },
-      pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-      beforeKeysDiscarded: retireSyncPinOnDiscard({
-        pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-        log: (line) => process.stderr.write(`${line}\n`),
-      }),
-      deviceService: cliDeviceServiceHandoff({ api, log: (line) => process.stderr.write(`${line}\n`) }),
-      setUpDeviceService: setUpRemoteAfterSignIn,
+    launcherAccountDependencies(api, {
+      log: stderr,
       readStdin: () => new Response(Bun.stdin.stream()).text(),
       output: (line) => process.stdout.write(`${line}\n`),
-      error: (line) => process.stderr.write(`${line}\n`),
-    },
+      error: stderr,
+    }),
     args.slice(1),
+  )
+}
+
+type Io = Pick<AccountCommandDependencies, "readStdin" | "output" | "error"> & { readonly log: (line: string) => void }
+
+/** This machine's account as the launcher reaches it: its credential store, sync pin, device service and setup. */
+function launcherAccountDependencies(api: string, io: Io) {
+  const pinDir = () => syncPinDir(resolveMemoryRoot(process.env, process.cwd()))
+  // One store per command: its keyring check and fallback notice are per store (#10658 review).
+  let store: CredentialStore | undefined
+  return {
+    api,
+    get store() {
+      store ??= createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
+      return store
+    },
+    pinDir,
+    beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir, log: io.log }),
+    deviceService: cliDeviceServiceHandoff({ api, log: io.log }),
+    setUpDeviceService: () => setUpRemoteAfterSignIn(io.log),
+    ...io,
+  }
+}
+
+const silent = (): void => undefined
+
+/**
+ * account.signIn for the omo-ai/sdk entry (security design 5.4): the launcher's own sign-in, run in the caller's process
+ * with exactly the dependencies `omo account sign-in` uses. Nothing is printed: the caller hears the codes through
+ * onUserCode and the outcome through the answer.
+ */
+export function signInInLauncher(api: string, request: SignInRequest, custody?: CustodyLog) {
+  const deps = launcherAccountDependencies(api, {
+    log: silent,
+    output: silent,
+    error: silent,
+    readStdin: async () => "",
+  })
+  const { store, deviceService, setUpDeviceService } = deps
+  const session = sessionOf(deps, request.signal)
+  return accountSignIn(
+    {
+      api,
+      session,
+      store,
+      deviceService,
+      accountsOpen: serviceAccountsOpen(),
+      setUpDeviceService,
+      ...(custody === undefined ? {} : { custody }),
+    },
+    request,
   )
 }

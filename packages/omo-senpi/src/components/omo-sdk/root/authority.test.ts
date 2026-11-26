@@ -49,6 +49,26 @@ function untouchedRoot(principal: OmoPrincipal, root: Readonly<Record<string, un
     session: { accessToken: touch("session"), request: touch("session") },
     deviceServiceStatus: touch("deviceService"),
     signInProcess: touch("process"),
+    accountSession: {
+      session: {
+        logout: touch("accountSession"),
+        forget: touch("accountSession"),
+        update: touch("accountSession"),
+        discard: touch("accountSession"),
+      },
+      store: { clear: touch("accountSession") },
+      deviceService: { forget: touch("accountSession") },
+    },
+    accountStore: {
+      platform: "darwin",
+      available: touch("accountStore"),
+      status: () => {
+        touched.push("accountStore")
+        throw new Error("accountStore was touched")
+      },
+      enable: touch("accountStore"),
+      disable: touch("accountStore"),
+    },
   }
   const sdk = assembleOmoSdk(
     { ...root, principal, env: { OMO_SERVICE_API_URL: "https://accounts.example.test" }, cwd: "/work", ports },

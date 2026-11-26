@@ -76,7 +76,10 @@ describe.skipIf(process.platform !== "darwin")(
           spawned++
           throw new Error("an unverified helper must never be spawned")
         }
-        const access = await resolveHelperAccess(paths, { spawn })
+        const access = await resolveHelperAccess(paths, {
+          port: "a test port",
+          spawn,
+        })
         expect(access).toEqual({ kind: "invalid", rejected: paths })
         expect(spawned).toBe(0)
       },

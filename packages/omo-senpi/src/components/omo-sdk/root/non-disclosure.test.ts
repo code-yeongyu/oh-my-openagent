@@ -150,6 +150,9 @@ const PORT_NAMES = {
   now: true,
   deviceServiceStatus: true,
   signInProcess: true,
+  accountSession: true,
+  accountStore: true,
+  custody: true,
 } as const satisfies Record<keyof OmoSdkPorts, true>
 
 function notFake(ports: OmoSdkPorts): string[] {
@@ -197,6 +200,30 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     },
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
+    // Slice A1b's ports: sign-out and forget act on this session and store; the store switch never reaches a helper.
+    accountSession: {
+      session: {
+        logout: fault ? failing(CANARIES.oauthToken) : async () => true,
+        forget: async () => undefined,
+        update: failing(CANARIES.refreshToken),
+        discard: async () => undefined,
+      },
+      store: { clear: fault ? failing(CANARIES.refreshToken) : async () => undefined },
+    },
+    accountStore: {
+      platform: "darwin",
+      available: async () => !fault,
+      status: () => ({ store: "login", state: "absent", path: join(home, "credential-keychain") }),
+      enable: fault
+        ? failing(CANARIES.privateKey)
+        : async () =>
+            ({ kind: "refused", code: "switch_failed", message: "a fake store switch", store: "login" }) as never,
+      disable: fault
+        ? failing(CANARIES.privateKey)
+        : async () =>
+            ({ kind: "refused", code: "switch_failed", message: "a fake store switch", store: "login" }) as never,
+    },
+    custody: { begin: async () => ({ recorded: true, end: async () => true }), refused: async () => true },
     host: canaryHost(fault),
     // With ports faulting the gateway store faults too; healthy, it is a store the scan builds in its own scratch agent
     // dir, so its file is read column by column.
@@ -247,6 +274,16 @@ function recorded<T>(value: T, port: string): T {
         ? Reflect.get(target, name, receiver)
         : recorded(Reflect.get(target, name, receiver), `${port}.${name}`),
   }) as T
+}
+
+// The one port a boundary refusal writes through: the account namespace's declared refusal recorder (security design
+// 8.2 item 4, design lane ruling M3). A refused cell that reaches any other port is named.
+const REFUSAL_RECORDER = "ports.custody.refused"
+function refusedCellsPastTheirRecorder(
+  refusedKeys: Iterable<string>,
+  reached: readonly { readonly key: string; readonly port: string }[],
+): string[] {
+  return [...refusedKeys].filter((key) => reached.some((touch) => touch.key === key && touch.port !== REFUSAL_RECORDER))
 }
 
 // The pure calls (the registry's closed list): they touch no port.
@@ -384,6 +421,16 @@ describe("the non-disclosure scan over the whole root", () => {
       nested: [{ error: new Error(`failed with ${CANARIES.privateKey}`) }],
     }
     expect(canariesIn(planted).length).toBeGreaterThanOrEqual(3)
+  })
+
+  test("#given a refused cell that reaches a port other than the custody recorder #when the reach rule reads the touches #then that cell is named (negative control)", () => {
+    const reached = [
+      { key: "account.signOut", port: REFUSAL_RECORDER },
+      { key: "account.signOut", port: "ports.accountSession.session.logout" },
+      { key: "account.forget", port: REFUSAL_RECORDER },
+      { key: "account.whoami", port: "ports.session.request" },
+    ]
+    expect(refusedCellsPastTheirRecorder(["account.signOut", "account.forget"], reached)).toEqual(["account.signOut"])
   })
 
   test("#given the scan's ports with one left at its default #then the scan refuses to run, naming it (control)", () => {
@@ -532,7 +579,7 @@ describe("the non-disclosure scan over the whole root", () => {
             captured
               .filter((entry) => entry.key === key)
               .every((entry) => (errorOf(entry) as { readonly code?: unknown } | undefined)?.code === "not_implemented")
-          expect([...refused.keys()].filter(touched)).toEqual([])
+          expect(refusedCellsPastTheirRecorder(refused.keys(), touches)).toEqual([])
           expect([...PURE_CALLS].filter(touched)).toEqual([])
           const silent: string[] = (Object.keys(ROOT_CALLS) as RootCallKey[]).filter(
             (key) => !refused.has(key) && !PURE_CALLS.has(key) && !unbuilt(key) && !touched(key),

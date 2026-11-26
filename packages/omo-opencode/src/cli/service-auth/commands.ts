@@ -1,13 +1,13 @@
 import { Command } from "commander"
+import { accountSignIn, DEFAULT_ACCOUNTS_ORIGIN } from "@oh-my-opencode/account-core/calls/sign-in"
+import { AUDIT_UNAVAILABLE_NOTE, processCustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
+import { accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
+import { accountWhoami, notSignedInMessage } from "@oh-my-opencode/account-core/calls/whoami"
 import { isCancel, select, confirm } from "@clack/prompts"
 import { serviceAccountsOpen } from "@oh-my-opencode/account-core/accounts-gate"
 import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
-import { openSignInBrowser } from "@oh-my-opencode/account-core/browser"
-import { deviceName, devicePlatform } from "@oh-my-opencode/account-core/device-name"
-import { advertisesMachineIdentity, readMachineDigest } from "@oh-my-opencode/account-core/machine-digest"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "@oh-my-opencode/account-core/keystore"
 import { beginLogin } from "@oh-my-opencode/account-core/login-prelude"
-import { signInByRoute } from "@oh-my-opencode/account-core/login-routes"
 import { type ChooseDevice, type ListedDevice, serviceOrigin, SignInError } from "@oh-my-opencode/account-core/protocol"
 import { decideReplace } from "@oh-my-opencode/account-core/replace-device"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
@@ -55,8 +55,7 @@ const chooseDevice: ChooseDevice = async (devices) => {
   return agreed === true ? chosen : null
 }
 
-/** The OmO sign-in page. `accounts.omo.dev` is the identity provider's own account portal (#9965). */
-export const DEFAULT_ACCOUNTS_ORIGIN = "https://signin.omo.dev"
+export { DEFAULT_ACCOUNTS_ORIGIN }
 
 /** The default OmO API origin; a different one is printed before any device code (#13265). */
 const DEFAULT_API_ORIGIN = "https://api.omo.dev"
@@ -91,8 +90,9 @@ async function run(
       }),
     })
     if (action === "logout") {
-      const revoked = await session.logout()
+      const { revoked, auditUnavailable } = await accountSignOut({ session, custody: processCustodyLog() })
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
+      if (auditUnavailable === true) console.error(AUDIT_UNAVAILABLE_NOTE)
       if (!revoked)
         console.error(
           "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
@@ -100,53 +100,44 @@ async function run(
       return
     }
     if (action === "whoami") {
-      await session.accessToken()
-      const [saved, email] = await Promise.all([store.read(), session.accountEmail().catch(() => undefined)])
+      const read = await accountWhoami({ store, session })
+      if (read.kind === "refused") throw new SignInError(notSignedInMessage())
+      const { device, account } = read.value
+      const email = account.kind === "read" ? account.email : undefined
       console.log(
-        saved
-          ? email === undefined
-            ? `Signed in to ${api} as ${terminalText(saved.device.name)}.`
-            : `Signed in to ${api} as ${terminalText(email)} (${terminalText(saved.device.name)}).`
-          : "Not signed in.",
+        email === undefined
+          ? `Signed in to ${api} as ${terminalText(device.name)}.`
+          : `Signed in to ${api} as ${terminalText(email)} (${terminalText(device.name)}).`,
       )
       noteDedicatedStore()
       return
     }
-    // Local sign-in and the device service first, so an already-signed-in computer is told to log out
-    // even when accounts are unreachable. A logged-out computer then hears a health failure as itself.
-    const health = await beginLogin(session, deviceService, api)
-    const machineDigest = advertisesMachineIdentity(health) ? await readMachineDigest() : undefined
-    const digest = machineDigest === undefined ? {} : { machineDigest }
-    const name = deviceName()
-    const platform = devicePlatform()
-    // #13265: a redirected API origin is visible before any code prints, and the success line names the account
-    // (C5): a wrong-account approval is silent no longer, and a failed account read still says how to see it.
-    if (api !== DEFAULT_API_ORIGIN) console.log(`OmO API: ${api}`)
-    const signedIn = async () => {
-      const email = await session.accountEmail().catch(() => undefined)
-      console.log(
-        email === undefined
-          ? "Signed in to OmO. The account could not be read; run omo whoami to see it."
-          : `Signed in to OmO as ${terminalText(email)}.`,
-      )
-      noteDedicatedStore()
-    }
-    const { replacedDeviceId } = await signInByRoute(session, {
-      ...(!options.device && options.browser !== false
-        ? {
-            loopback: {
-              accounts: accountsOrigin(options, process.env),
-              name,
-              platform,
-              open: openSignInBrowser,
-              chooseDevice,
-              ...digest,
-            },
-          }
-        : {}),
-      device: {
-        name,
-        platform,
+    // Local sign-in and the device service first (the core's prelude), so an already-signed-in computer is told to log
+    // out even when accounts are unreachable. #13265: a redirected API origin is visible before any code prints, and the
+    // success line names the account (C5): a wrong-account approval is silent no longer, and a failed account read still
+    // says how to see it.
+    const signedIn = await accountSignIn(
+      {
+        api,
+        session,
+        store,
+        ...(deviceService === undefined ? {} : { deviceService }),
+        accountsOpen: serviceAccountsOpen(),
+        custody: processCustodyLog(),
+      },
+      {
+        method: options.device ? "device_code" : "browser",
+        openBrowser: options.browser !== false,
+        accounts: accountsOrigin(options, process.env),
+        signal: controller.signal,
+        onStarted: () => {
+          if (api !== DEFAULT_API_ORIGIN) console.log(`OmO API: ${api}`)
+        },
+        onUserCode: (code) => {
+          console.log(`Open ${code.verificationUri}`)
+          console.log(`User code: ${code.userCode}`)
+          console.log(`Matching code: ${code.matchingCode}`)
+        },
         chooseDevice,
         replaceDevice: decideReplace({
           replace: options.replace === true,
@@ -154,23 +145,31 @@ async function run(
           confirm: async (message) => (await confirm({ message, initialValue: false })) === true,
           log: (line) => console.log(line),
         }),
-        ...digest,
-        show: (code) => {
-          console.log(`Open ${code.verificationUri}`)
-          console.log(`User code: ${code.userCode}`)
-          console.log(`Matching code: ${code.matchingCode}`)
-        },
       },
-    })
+    )
+    if (signedIn.kind === "refused")
+      throw signedIn.code === "accounts_closed"
+        ? new SignInError(CLOSED_LOGIN_MESSAGE)
+        : signedIn.code === "cancelled"
+          ? new SignInError("Sign-in cancelled.")
+          : (signedIn.cause ?? new Error(signedIn.message))
+    const { replacedDeviceId, auditUnavailable } = signedIn.value
+    if (auditUnavailable === true) console.error(AUDIT_UNAVAILABLE_NOTE)
     if (replacedDeviceId !== undefined)
       console.log(`This computer's earlier OmO device (id ${terminalText(replacedDeviceId)}) was signed out.`)
-    await signedIn()
+    const email = await session.accountEmail().catch(() => undefined)
+    console.log(
+      email === undefined
+        ? "Signed in to OmO. The account could not be read; run omo whoami to see it."
+        : `Signed in to OmO as ${terminalText(email)}.`,
+    )
+    noteDedicatedStore()
   } catch (error) {
     console.error(
-      controller.signal.aborted
-        ? "Sign-in cancelled."
-        : error instanceof SignInError
-          ? error.message
+      error instanceof SignInError
+        ? error.message
+        : controller.signal.aborted
+          ? "Sign-in cancelled."
           : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.",
     )
     process.exitCode = 1

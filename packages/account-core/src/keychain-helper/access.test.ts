@@ -33,6 +33,7 @@ describe("helper access: verified fall-through (#11262 addendum row 10, ruling 2
     }
     verdicts["/pinned/later/omo-keychain"] = "valid"
     const access = await resolveHelperAccess(["/first/omo-keychain", "/later/omo-keychain"], {
+      port: "a test port",
       verify: async (path) => verdicts[path] ?? "missing",
       spawn,
       pin,
@@ -87,6 +88,7 @@ describe("a signature checker that throws, at every call site (#11586 and #11613
       const verify = throwingOnCall(throwOn)
       const resolve = () =>
         resolveHelperAccess([source], {
+          port: "a test port",
           verify,
           spawn: neverSpawn,
           pin: (from, check) => pinVerifiedCopy(from, check, pins),
@@ -101,6 +103,7 @@ describe("a signature checker that throws, at every call site (#11586 and #11613
   test("#given the checker throws before a spawn #when the store calls the helper #then a typed HelperProtocolError and nothing is spawned", async () => {
     const { source, pins } = helperOnDisk()
     const access = await resolveHelperAccess([source], {
+      port: "a test port",
       verify: throwingOnCall(3),
       spawn: neverSpawn,
       pin: (from, check) => pinVerifiedCopy(from, check, pins),

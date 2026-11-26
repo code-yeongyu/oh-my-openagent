@@ -1,3 +1,5 @@
+import type { CustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
+import type { StorePort } from "@oh-my-opencode/account-core/calls/store"
 import type { AccessPorts } from "./access"
 import type { AccountApi, SignInProcess } from "./account"
 import type { ConfigApi } from "./config"
@@ -11,6 +13,10 @@ export type OmoSdkPorts = AccessPorts &
     readonly deviceServiceStatus?: DeviceServiceStatusPort
     /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
     readonly signInProcess?: SignInProcess
+    /** OmO's own keychain as `account.store.*` reads and switches it; absent, the account core over the keychain helper. */
+    readonly accountStore?: StorePort
+    /** The custody log the custody-bearing account calls write (security design 8.2); absent, this user's account home's. */
+    readonly custody?: CustodyLog
   }
 
 export type OmoSdkOptions = {

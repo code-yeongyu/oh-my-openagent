@@ -28,12 +28,19 @@ export type { ControlSessionWakeState as WakeState } from "../../../../../../dev
 export type SignInCheck = { readonly ready: true }
 
 /** `omo logout`: the stored credential and device keys are gone; `revoked` is whether the service confirmed the revoke. */
-export type SignedOut = { readonly signedOut: true; readonly revoked: boolean }
+export type SignedOut = { readonly signedOut: true; readonly revoked: boolean; readonly audit_unavailable?: true }
 
-export type Forgotten = { readonly forgotten: true }
+/** `audit_unavailable`: a custody record could not be written (security design 8.2); the call ran as it always has. */
+export type Forgotten = { readonly forgotten: true; readonly audit_unavailable?: true }
 
-/** `omo account store status|enable|disable` (N/account-store.ts): where the sign-in lives on this machine. */
-export type AccountStore = { readonly store: "omo" | "login"; readonly state?: string; readonly path?: string }
+/**
+ * `omo account store status|enable|disable`: one shape per verb, what each prints today (design lane ruling,
+ * 2026-11-26). Typed fields only; the path is the store's own location.
+ */
+export type { StoreDisabled, StoreEnabled, StoreStatus } from "@oh-my-opencode/account-core/calls/store"
+
+/** `omo account show`: the record it prints (design lane ruling of 2026-11-26 on typed results); never a token or a key. */
+export type { AccountShown } from "@oh-my-opencode/account-core/calls/show"
 
 export type Revoked = { readonly revoked: true; readonly device: { readonly id: string; readonly name: string } }
 

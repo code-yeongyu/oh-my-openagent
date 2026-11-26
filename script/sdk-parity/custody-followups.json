@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "finding": "security design 8.2: a diagnostics.run finding reports that the custody log could not be written (review 6065710236 N7, L3)",
+      "waits_for": "diagnostics.run",
+      "owner": "C1b",
+      "pull_request": 14984,
+      "reason": "no core serves diagnostics.run on this base, so there is no finding list to add it to; the account calls already carry audit_unavailable and the CLI prints the note"
+    }
+  ]
+}

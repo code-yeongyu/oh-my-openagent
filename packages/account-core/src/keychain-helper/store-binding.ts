@@ -15,6 +15,7 @@ import { createCreatorHandOff, desktopRuntimeCandidates, HANDOFF_ENV } from "./c
 import { dedicatedStoreState } from "./dedicated-store"
 import { keychainProcessState } from "./process-state"
 import { gatedSecrets } from "./secrets-gate"
+import { isInjectedSecrets } from "./test-preload"
 
 /** The session-lock view of a store (#11262 design 3.3, 3.4, 3.6): every keychain change inside one locked section. */
 export type LockedStore<T> = {
@@ -40,9 +41,6 @@ const readers = new Map<DarwinBackend, SecretApi>()
 // A launcher-child preload that stands in for the OS store (cli-keystore, accounts-closed fixtures) replaces Bun.secrets
 // with a fake and marks it, so the fake never counts as the real macOS store and never reaches the signed helper or the
 // login Keychain (#11262: on darwin it took the helper path from a non-GUI test child and failed at the real Keychain).
-const INJECTED_SECRETS = Symbol.for("omo.test.injectedSecrets")
-const isInjectedSecrets = (api: SecretApi): boolean =>
-  (api as { readonly [INJECTED_SECRETS]?: unknown })[INJECTED_SECRETS] === true
 const backends = new Map<string, Promise<DarwinBackend | null>>()
 
 // Addendum change 1: at most one hand-off attempt per process (shared by every bundled copy), to the installed and
@@ -94,7 +92,7 @@ export function bindKeychainHelper(input: {
     const cacheKey = `${key.service}\n${key.name}\n${input.background ? "bounded" : "interactive"}\n${dedicated ? "omo" : "login"}`
     const known = options === undefined ? backends.get(cacheKey) : owned.get(dedicated)
     if (known !== undefined) return known
-    const created = (options?.access ?? helperAccess)().then((access) => {
+    const created = (options?.access ?? (() => helperAccess("the credential store")))().then((access) => {
       if (access.kind !== "ready") {
         if (dedicated) throw dedicatedHelperMissing()
         return null

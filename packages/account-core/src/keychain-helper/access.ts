@@ -10,6 +10,7 @@ import {
 import { locateHelper } from "./location"
 import { type PinResult, pinVerifiedCopy } from "./pin"
 import { processSignatureChecker, type SignatureVerdict } from "./signature"
+import { KeychainHelperUnderTestPreload, underTestRun } from "./test-preload"
 
 export type HelperAccess =
   | {
@@ -25,16 +26,21 @@ export type HelperAccess =
  * The only way the store reaches a helper process. The located copy is pinned (copied into this process's private
  * directory and verified there), and the pinned copy is checked again before EVERY spawn through the process's one
  * checker. So an unsigned, ad-hoc-signed or tampered file is never executed: not at resolution, not after a later
- * swap at the original path (never spawned), and not after a change to the pinned copy (refused).
+ * swap at the original path (never spawned), and not after a change to the pinned copy (refused). Under the test
+ * preload a port that brings no fake spawner is refused before anything is located, pinned, verified or spawned.
  */
 export async function resolveHelperAccess(
   candidates: readonly string[],
   options: {
+    /** The port this access serves, named in the refusal a test preload gives it. */
+    readonly port: string
     readonly verify?: (path: string) => Promise<SignatureVerdict>
     readonly spawn?: HelperSpawner
     readonly pin?: (source: string, verify: (path: string) => Promise<SignatureVerdict>) => Promise<PinResult>
-  } = {},
+  },
 ): Promise<HelperAccess> {
+  if (underTestRun() && (options.spawn === undefined || options.spawn === spawnDetachedHelper))
+    throw new KeychainHelperUnderTestPreload(options.port)
   const verify = options.verify ?? processSignatureChecker()
   let source: string
   let pin: PinResult

@@ -5,13 +5,13 @@ import type * as result from "../results/account"
 // The devices, account, deviceService and sync namespaces (first-party design 6.3 to 6.6).
 export const ACCOUNT_CALLS = {
   "account.whoami": valueCall<result.WhoAmI>()(input.AccountWhoami),
-  "account.show": valueCall<result.AccountShowResult>()(input.AccountShow),
+  "account.show": valueCall<result.AccountShown>()(input.AccountShow),
   "account.signInCheck": instantCall<result.SignInCheck>()(input.AccountSignInCheck),
   "account.signOut": valueCall<result.SignedOut>()(input.AccountSignOut),
   "account.forget": valueCall<result.Forgotten>()(input.AccountForget),
-  "account.store.status": valueCall<result.AccountStore>()(input.AccountStoreStatus),
-  "account.store.enable": valueCall<result.AccountStore>()(input.AccountStoreEnable),
-  "account.store.disable": valueCall<result.AccountStore>()(input.AccountStoreDisable),
+  "account.store.status": valueCall<result.StoreStatus>()(input.AccountStoreStatus),
+  "account.store.enable": valueCall<result.StoreEnabled>()(input.AccountStoreEnable),
+  "account.store.disable": valueCall<result.StoreDisabled>()(input.AccountStoreDisable),
   "devices.list": valueCall<readonly result.LiveDevice[]>()(input.DevicesList),
   "devices.rename": valueCall<result.LiveDevice>()(input.DevicesRename),
   "devices.resolve": valueCall<result.DeviceRow>()(input.DevicesResolve),

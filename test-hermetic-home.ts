@@ -81,6 +81,9 @@ function installHermeticSecrets(): void {
       [Symbol.for("omo.test.injectedSecrets")]: true,
     },
   })
+  // A process a test starts with this environment carries the mark, so the keychain helper guard refuses there too
+  // (account-core keychain-helper/test-preload.ts TEST_RUN_MARK; its test spawns children to prove both agree).
+  process.env.OMO_TEST_RUN = "1"
 }
 
 // git >= 2.47 follows a commit, merge, fetch or push with a detached `git maintenance run --auto`. No test started

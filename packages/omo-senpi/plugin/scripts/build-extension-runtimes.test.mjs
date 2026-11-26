@@ -210,7 +210,6 @@ const DECIDED_ZOD = [
   "packages/omo-opencode/src/cli/service-auth/refresh-attempt.ts",
   "packages/omo-opencode/src/cli/service-auth/signed-out-marker.ts",
   "packages/omo-senpi/src/components/memory/device-session/cli-account-operation.ts",
-  "packages/omo-senpi/src/components/omo-sdk/account/index.ts",
   "packages/omo-senpi/src/components/omo-sdk/account/sign-in.ts",
   "packages/team-core/src/team-state-store/lock-worker-lifetime.ts",
 ]

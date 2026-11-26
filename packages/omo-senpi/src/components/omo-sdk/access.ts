@@ -12,18 +12,27 @@ import {
   SignInError,
   serviceOrigin,
 } from "@oh-my-opencode/account-core"
+import type { DeviceServiceHandoff } from "@oh-my-opencode/account-core/session"
 import { launchCarriedPrivateTable } from "../memory/desktop-sync/launchClassification"
 import { DEFAULT_SERVICE_API } from "../memory/device-session/account-source"
-import { cliCredentialStore, openCliSession } from "../memory/device-session/cli-session"
+import { cliCredentialStore, cliSessionDeviceService, openCliSession } from "../memory/device-session/cli-session"
 import { ok, type OmoResult, refused } from "./result"
 
 export type SessionPort = Pick<Session, "accessToken" | "request">
-export type CredentialStorePort = Pick<CredentialStore, "read">
+/** What account.signOut and account.forget change: this device's session and its credential store. */
+export type AccountSessionPort = {
+  readonly session: Pick<Session, "logout" | "forget" | "update" | "discard">
+  readonly store: Pick<CredentialStore, "clear">
+  readonly deviceService?: Pick<DeviceServiceHandoff, "forget">
+}
+export type CredentialStorePort = Pick<CredentialStore, "read"> & Partial<Pick<CredentialStore, "storage">>
 type Env = Readonly<Record<string, string | undefined>>
 
 export type AccessPorts = {
   readonly session?: SessionPort
   readonly credentialStore?: CredentialStorePort
+  /** The session and store account.signOut and account.forget act on; absent, this device's CLI session. */
+  readonly accountSession?: AccountSessionPort
   /** Whether this engine was launched by the desktop app, which signs in on its own and never shares this store. */
   readonly desktopLaunch?: () => boolean
 }
@@ -38,19 +47,31 @@ export type AccountAccess = {
   /** Why no account call may run here at all (a closed SDK, a desktop launch); undefined when one may. */
   readonly blockedReason: () => OmoResult<never> | undefined
   readonly signedIn: <T>(read: (signedIn: SignedIn) => Promise<T>) => Promise<OmoResult<T>>
+  /** This device's credential store, the one every account call of this root reads. */
+  readonly store: () => CredentialStorePort
+  readonly session: () => SessionPort
+  readonly account: () => AccountSessionPort
   readonly close: () => void
 }
 
 const resolveOrigin = (api: string | undefined, env: Env): string =>
   serviceOrigin(api ?? env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
 
-const SIGN_IN = "sign this device in to OmO, then retry"
+export const SIGN_IN = "sign this device in to OmO, then retry"
 
 // Every message here is the SDK's own text: a service or store message can carry a credential, so none is passed on.
 export function failure<T>(error: unknown): OmoResult<T> {
   if (error instanceof KeychainLockedError)
     return refused("credential_store_locked", "the credential store is locked", "unlock the keychain, then retry")
-  if (error instanceof SecretServiceUnavailableError || error instanceof CredentialStoreError)
+  // The native keychain itself unavailable is its own outcome (omo account exits 8, not 9), so it keeps its reason.
+  if (error instanceof SecretServiceUnavailableError)
+    return refused(
+      "credential_store_unavailable",
+      "the system keychain is unavailable",
+      "make the system keychain available to this process, then retry",
+      { reason: "keychain_unavailable" },
+    )
+  if (error instanceof CredentialStoreError)
     return refused(
       "credential_store_unavailable",
       "the credential store could not be read",
@@ -102,10 +123,9 @@ export function createAccountAccess(options: {
   const desktopLaunch = options.ports.desktopLaunch ?? launchCarriedPrivateTable
   let cliStore: CredentialStore | undefined
   const openCliStore = (): CredentialStore => (cliStore ??= cliCredentialStore(origin))
-  let session = options.ports.session
-  const openStore = (): CredentialStorePort => options.ports.credentialStore ?? openCliStore()
-  const openSession = (): SessionPort =>
-    (session ??= openCliSession({
+  let cliSession: Session | undefined
+  const openCli = (): Session =>
+    (cliSession ??= openCliSession({
       origin,
       store: openCliStore(),
       env: options.env,
@@ -113,6 +133,14 @@ export function createAccountAccess(options: {
       signal: lifetime.signal,
       log: () => undefined,
     }))
+  const openStore = (): CredentialStorePort => options.ports.credentialStore ?? openCliStore()
+  const openSession = (): SessionPort => options.ports.session ?? openCli()
+  const openAccount = (): AccountSessionPort =>
+    options.ports.accountSession ?? {
+      session: openCli(),
+      store: openCliStore(),
+      deviceService: cliSessionDeviceService(() => undefined),
+    }
   const blockedReason = (): OmoResult<never> | undefined => {
     if (lifetime.signal.aborted)
       return refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
@@ -139,6 +167,9 @@ export function createAccountAccess(options: {
         return failure(error)
       }
     },
+    store: openStore,
+    session: openSession,
+    account: openAccount,
     close: () => lifetime.abort(),
   }
 }

@@ -2,6 +2,8 @@ import { userInfo } from "node:os"
 
 import { createAccountAccess } from "./access"
 import type { OmoSdk, OmoSdkOptions } from "./options"
+import { accountNamespace, rootCustodyLog } from "./root/account"
+import type { InProcessSignIn } from "./root/account-sign-in"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
 import { type CoreLoaders, LAUNCHER_NAMESPACES } from "./root/members"
@@ -9,7 +11,11 @@ import { shippedNamespaces } from "./root/shipped"
 import { threadsServing } from "./thread-assembly"
 
 /** What only the entry that ships the launcher library sets; never part of the public options (design 4.1). */
-export type OmoSdkAssembly = { readonly cores?: CoreLoaders }
+export type OmoSdkAssembly = {
+  readonly cores?: CoreLoaders
+  /** The sign-in run in this process with the launcher's own dependencies; absent, the shipped launcher child. */
+  readonly signIn?: InProcessSignIn
+}
 
 const processUid = (): number => process.getuid?.() ?? userInfo().uid
 
@@ -39,17 +45,28 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
   assertLauncherCores(cores)
   const principal = options.principal ?? { kind: "script", uid: options.uid ?? processUid() }
   const access = createAccountAccess({ ...(options.api === undefined ? {} : { api: options.api }), env, cwd, ports })
+  const custody = ports.custody ?? rootCustodyLog(principal)
   const shipped = shippedNamespaces({
     access,
+    custody,
     env,
     cwd,
     ...(options.home === undefined ? {} : { home: options.home }),
     ...(ports.signInProcess === undefined ? {} : { signInProcess: ports.signInProcess }),
     ...(ports.deviceServiceStatus === undefined ? {} : { deviceServiceStatus: ports.deviceServiceStatus }),
+    principal,
+    ...(assembly.signIn === undefined ? {} : { signIn: assembly.signIn }),
+  })
+  const account = accountNamespace({
+    access,
+    custody,
+    env,
+    cwd,
+    ...(ports.accountStore === undefined ? {} : { store: ports.accountStore }),
   })
   const threads = threadsServing(options, env, cwd, principal)
   const root = assembleRoot(
-    [shipped, threads],
+    [shipped, account, threads],
     cores,
     {
       env,

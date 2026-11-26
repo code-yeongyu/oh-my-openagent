@@ -71,9 +71,11 @@ export async function setUpRemoteAfterLogin(): Promise<void> {
  * The same setup for `omo account sign-in`, whose stdout carries JSON lines only: the setup's human lines go to stderr
  * and its outcome is returned for the `signed_in` event.
  */
-export async function setUpRemoteAfterSignIn(): Promise<"on" | "kept_off" | "not_on" | "background"> {
+export async function setUpRemoteAfterSignIn(
+  output: (line: string) => void = (line) => process.stderr.write(`${line}\n`),
+): Promise<"on" | "kept_off" | "not_on" | "background"> {
   if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return "not_on"
-  const dependencies = { ...remoteDependencies(), output: (line: string) => process.stderr.write(`${line}\n`) }
+  const dependencies = { ...remoteDependencies(), output }
   return runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }
 

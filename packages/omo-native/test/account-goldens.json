@@ -1,0 +1,1555 @@
+{
+  "native/closed/whoami/empty": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "Not signed in. Sign in from the OmO desktop app on this computer, or run omo login in a terminal on a computer without it.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/whoami/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as golden@example.com (Seeded CLI).\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/whoami/seeded-account-read-fails": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as Seeded CLI.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/whoami/api": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as golden@example.com (Seeded CLI).\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/whoami/operand": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/whoami/help": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Show the current OmO device sign-in.\n\n  omo whoami [--api <url>]\n\nThis runs while OmO accounts are closed.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/logout/empty": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/logout/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/logout/api": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/logout/operand": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/logout/help": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Sign out of OmO: revoke this machine's device and remove the stored credentials and device keys.\n\n  omo logout [--api <url>]\n\nThis runs while OmO accounts are closed. One machine is one device: on a computer that\nshares the OmO desktop app's sign-in, this signs the whole machine out.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/approve": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/device": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/no-browser": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/replace": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/double-dash": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/device-api": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/api": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/accounts": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/operand": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/help": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Sign in to OmO from this terminal with a device code.\n\nWhile OmO accounts are closed, omo login signs a computer in by device code: omo prints a\nverification URL with a user code and a matching code, a person approves on another device,\nand the credential is stored in the OS credential store.\n\n  omo login                 device-code sign-in (a computer without the OmO desktop app's sign-in)\n  omo login --device        force the device-code route\n  omo login --no-browser    the same, never opening a browser\n  omo login --replace       replace this computer's earlier device without asking\n  omo login --api <url>     OmO API origin (or OMO_SERVICE_API_URL)\n\nThe service's approval page decides who may sign in. A computer whose OmO desktop app or\nstored sign-in already has its device is refused instead of registering a second one.\nWhen the service says this computer already has a device, omo login offers to replace it\n(an interactive terminal asks, default No; a script passes --replace). The replacement is\napproved on the service's page, which then signs the earlier device out.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/denied": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\n",
+        "stderr": "Device sign-in was denied or expired. Run omo login again for a new code.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/expired": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\n",
+        "stderr": "Device sign-in was denied or expired. Run omo login again for a new code.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/machine-exists": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nThis computer already has an OmO device (Earlier CLI, id earlier-device). Replacing it with this sign-in.\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\n",
+        "stderr": "This OmO service can't replace a computer's earlier device yet. Remove that device on the Devices page of your OmO account, then run omo login again.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/unreachable": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "OmO accounts at <api> aren't available right now. Try again later.\n",
+        "requests": [
+          "GET /v1/health"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/closed/login/already-signed-in": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This computer is already signed in to OmO as Seeded CLI, and omo uses that device. Run omo logout first to sign in again.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/closed/login/account-read-fails": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO. The account could not be read; run omo whoami to see it.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/open/login/browser": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/session/exchange",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/open/login/browser-denied": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\n",
+        "stderr": "OmO accounts refused this request for your account. Check your account and its devices, then try again.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/session/exchange"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/open/login/no-browser": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/open/login/device": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/open/login/device-replace": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/open/login/api-accounts": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/session/exchange",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/open/login/already-signed-in": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This computer is already signed in to OmO as Seeded CLI, and omo uses that device. Run omo logout first to sign in again.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/open/whoami/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as golden@example.com (Seeded CLI).\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/open/logout/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/whoami/empty": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "Not signed in. Sign in from the OmO desktop app on this computer, or run omo login in a terminal on a computer without it.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/whoami/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as golden@example.com (Seeded CLI).\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/whoami/seeded-account-read-fails": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as Seeded CLI.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/whoami/api": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as golden@example.com (Seeded CLI).\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/whoami/operand": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/whoami/help": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Show the current OmO device sign-in.\n\n  omo whoami [--api <url>]\n\nThis runs while OmO accounts are closed.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/logout/empty": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/logout/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/logout/api": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/logout/operand": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/logout/help": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Sign out of OmO: revoke this machine's device and remove the stored credentials and device keys.\n\n  omo logout [--api <url>]\n\nThis runs while OmO accounts are closed. One machine is one device: on a computer that\nshares the OmO desktop app's sign-in, this signs the whole machine out.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/approve": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/device": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/no-browser": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/replace": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/double-dash": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/device-api": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/api": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/accounts": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/operand": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This form of omo login isn't available while OmO accounts are closed. Run plain omo login to sign in by device code (the route for a computer without the OmO desktop app's sign-in), or omo login --device.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/help": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Sign in to OmO from this terminal with a device code.\n\nWhile OmO accounts are closed, omo login signs a computer in by device code: omo prints a\nverification URL with a user code and a matching code, a person approves on another device,\nand the credential is stored in the OS credential store.\n\n  omo login                 device-code sign-in (a computer without the OmO desktop app's sign-in)\n  omo login --device        force the device-code route\n  omo login --no-browser    the same, never opening a browser\n  omo login --replace       replace this computer's earlier device without asking\n  omo login --api <url>     OmO API origin (or OMO_SERVICE_API_URL)\n\nThe service's approval page decides who may sign in. A computer whose OmO desktop app or\nstored sign-in already has its device is refused instead of registering a second one.\nWhen the service says this computer already has a device, omo login offers to replace it\n(an interactive terminal asks, default No; a script passes --replace). The replacement is\napproved on the service's page, which then signs the earlier device out.\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/denied": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\n",
+        "stderr": "Device sign-in was denied or expired. Run omo login again for a new code.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/expired": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\n",
+        "stderr": "Device sign-in was denied or expired. Run omo login again for a new code.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/machine-exists": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nThis computer already has an OmO device (Earlier CLI, id earlier-device). Replacing it with this sign-in.\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\n",
+        "stderr": "This OmO service can't replace a computer's earlier device yet. Remove that device on the Devices page of your OmO account, then run omo login again.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/unreachable": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "OmO accounts at <api> aren't available right now. Try again later.\n",
+        "requests": [
+          "GET /v1/health"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/closed/login/already-signed-in": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This computer is already signed in to OmO as Seeded CLI, and omo uses that device. Run omo logout first to sign in again.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "opencode/closed/login/account-read-fails": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO. The account could not be read; run omo whoami to see it.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/login/browser": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/session/exchange",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/login/browser-denied": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "OmO API: <api>\n",
+        "stderr": "OmO accounts refused this request for your account. Check your account and its devices, then try again.\n",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/session/exchange"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "opencode/open/login/no-browser": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/login/device": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/login/device-replace": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nOpen https://signin.omo.dev/device?code=BCDF-GHJK\nUser code: BCDF-GHJK\nMatching code: 482 913\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/login/api-accounts": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "OmO API: <api>\nSigned in to OmO as golden@example.com.\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/session/exchange",
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/login/already-signed-in": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "",
+        "stderr": "This computer is already signed in to OmO as Seeded CLI, and omo uses that device. Run omo logout first to sign in again.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/whoami/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed in to <api> as golden@example.com (Seeded CLI).\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/me"
+        ],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "opencode/open/logout/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/usage": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|sign-in [--stdin|--check]|retire-sync --account <id>|store status|enable|disable [--discard]\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/show/empty": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"signedIn\":false,\"storage\":\"keyring\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/show/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"signedIn\":true,\"device\":{\"id\":\"seeded-device\",\"name\":\"Seeded CLI\"},\"refreshState\":\"ok\",\"storage\":\"keyring\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/show/account": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"signedIn\":true,\"device\":{\"id\":\"seeded-device\",\"name\":\"Seeded CLI\"},\"refreshState\":\"ok\",\"sync\":\"not_joined\",\"storage\":\"keyring\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/show/account-missing": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account show: --account needs an account id\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/show/after-logout": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "Signed out of OmO. Stored credentials and device keys were removed.\n",
+        "stderr": "",
+        "requests": [
+          "DELETE /v1/devices/seeded-device"
+        ],
+        "storedDevices": []
+      },
+      {
+        "code": 0,
+        "stdout": "{\"signedIn\":false,\"storage\":\"keyring\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/check": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"event\":\"ready\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/approve": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"event\":\"code\",\"verificationUri\":\"https://signin.omo.dev/device?code=BCDF-GHJK\",\"userCode\":\"BCDF-GHJK\",\"matchingCode\":\"482 913\",\"expiresAt\":\"<time>\"}\n{\"event\":\"signed_in\",\"api\":\"<api>\",\"device\":{\"id\":\"golden-device\",\"name\":\"Golden CLI\"},\"deviceService\":\"not_on\"}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/account/sign-in/stdin": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"event\":\"code\",\"verificationUri\":\"https://signin.omo.dev/device?code=BCDF-GHJK\",\"userCode\":\"BCDF-GHJK\",\"matchingCode\":\"482 913\",\"expiresAt\":\"<time>\"}\n{\"event\":\"signed_in\",\"api\":\"<api>\",\"device\":{\"id\":\"golden-device\",\"name\":\"Golden CLI\"},\"deviceService\":\"not_on\"}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/account/sign-in/stdin-empty": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"event\":\"code\",\"verificationUri\":\"https://signin.omo.dev/device?code=BCDF-GHJK\",\"userCode\":\"BCDF-GHJK\",\"matchingCode\":\"482 913\",\"expiresAt\":\"<time>\"}\n{\"event\":\"signed_in\",\"api\":\"<api>\",\"device\":{\"id\":\"golden-device\",\"name\":\"Golden CLI\"},\"deviceService\":\"not_on\"}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": [
+          "golden-device"
+        ]
+      }
+    ]
+  },
+  "native/account/sign-in/stdin-invalid": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account sign-in: use sign-in, or sign-in --stdin with one JSON line {\"deviceName\"?: string, \"replace\"?: boolean}\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/unknown-flag": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account sign-in: use sign-in, or sign-in --stdin with one JSON line {\"deviceName\"?: string, \"replace\"?: boolean}\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/denied": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "{\"event\":\"code\",\"verificationUri\":\"https://signin.omo.dev/device?code=BCDF-GHJK\",\"userCode\":\"BCDF-GHJK\",\"matchingCode\":\"482 913\",\"expiresAt\":\"<time>\"}\n{\"event\":\"refused\",\"code\":\"approval_denied\",\"message\":\"the sign-in was denied\",\"next_action\":\"start a new sign-in if that was a mistake\"}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/expired": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "{\"event\":\"code\",\"verificationUri\":\"https://signin.omo.dev/device?code=BCDF-GHJK\",\"userCode\":\"BCDF-GHJK\",\"matchingCode\":\"482 913\",\"expiresAt\":\"<time>\"}\n{\"event\":\"refused\",\"code\":\"approval_expired\",\"message\":\"the code expired before it was approved\",\"next_action\":\"start a new sign-in\"}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/machine-exists": {
+    "all": [
+      {
+        "code": 3,
+        "stdout": "{\"event\":\"code\",\"verificationUri\":\"https://signin.omo.dev/device?code=BCDF-GHJK\",\"userCode\":\"BCDF-GHJK\",\"matchingCode\":\"482 913\",\"expiresAt\":\"<time>\"}\n{\"event\":\"refused\",\"code\":\"machine_exists\",\"message\":\"this machine already has a device on the account\",\"next_action\":\"sign in again with replace, or remove that device first\",\"details\":{\"deviceId\":\"earlier-device\",\"deviceName\":\"Earlier CLI\"}}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health",
+          "POST /v1/device/code",
+          "POST /v1/device/token"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/unreachable": {
+    "all": [
+      {
+        "code": 1,
+        "stdout": "{\"event\":\"refused\",\"code\":\"accounts_unreachable\",\"message\":\"OmO accounts could not be reached\",\"next_action\":\"check the connection, then retry\"}\n",
+        "stderr": "",
+        "requests": [
+          "GET /v1/health"
+        ],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/sign-in/already-signed-in": {
+    "all": [
+      {
+        "code": 3,
+        "stdout": "{\"event\":\"refused\",\"code\":\"already_signed_in\",\"message\":\"this machine already has an OmO sign-in\",\"next_action\":\"use the existing sign-in\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/forget/empty": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"forgotten\":true}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/forget/seeded": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"forgotten\":true}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/forget/this-device": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"forgotten\":true}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/forget/other-device": {
+    "all": [
+      {
+        "code": 3,
+        "stdout": "{\"forgotten\":false,\"device\":{\"id\":\"seeded-device\",\"name\":\"Seeded CLI\"}}\n",
+        "stderr": "omo account forget --device acts on this device only; sign out device other-device with omo account devices revoke other-device\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/forget/device-missing": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account forget: use forget or forget --device <id>\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/forget/unknown-flag": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account forget: use forget or forget --device <id>\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/store/status": {
+    "all": [
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"login\",\"state\":\"absent\",\"path\":\"<home>/Library/Application Support/OmO/credential-keychain\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/store/enable": {
+    "darwin": [
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"omo\",\"created\":true,\"moved\":\"none\",\"loginLeftover\":false}\n",
+        "stderr": "omo: OmO's own keychain keeps this Mac's sign-in readable while the login keychain is locked. Its key sits beside it with owner-only permissions, so other macOS users cannot read it, but anything running as you can, and a backup or disk image taken without FileVault exposes it. A restored Mac needs omo login again.\nomo: the OmO desktop app on this Mac must also be a version that knows OmO's own keychain. An older desktop app keeps using the login keychain and can store a second sign-in there while someone is signed in at the screen.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ],
+    "other": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/store/enable-helper-missing": {
+    "darwin": [
+      {
+        "code": 9,
+        "stdout": "",
+        "stderr": "omo account store: OmO's keychain helper is missing or failed its signature check. Reinstall omo.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ],
+    "other": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/store/disable-absent": {
+    "darwin": [
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"login\",\"moved\":\"none\",\"erased\":false}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": []
+      }
+    ],
+    "other": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/store/enable-then-disable": {
+    "darwin": [
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"omo\",\"created\":true,\"moved\":\"none\",\"loginLeftover\":false}\n",
+        "stderr": "omo: OmO's own keychain keeps this Mac's sign-in readable while the login keychain is locked. Its key sits beside it with owner-only permissions, so other macOS users cannot read it, but anything running as you can, and a backup or disk image taken without FileVault exposes it. A restored Mac needs omo login again.\nomo: the OmO desktop app on this Mac must also be a version that knows OmO's own keychain. An older desktop app keeps using the login keychain and can store a second sign-in there while someone is signed in at the screen.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      },
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"omo\",\"state\":\"active\",\"path\":\"<home>/Library/Application Support/OmO/credential-keychain\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      },
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"login\",\"moved\":\"none\",\"erased\":true}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ],
+    "other": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      },
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"login\",\"state\":\"absent\",\"path\":\"<home>/Library/Application Support/OmO/credential-keychain\"}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      },
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/store/enable-then-discard": {
+    "darwin": [
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"omo\",\"created\":true,\"moved\":\"none\",\"loginLeftover\":false}\n",
+        "stderr": "omo: OmO's own keychain keeps this Mac's sign-in readable while the login keychain is locked. Its key sits beside it with owner-only permissions, so other macOS users cannot read it, but anything running as you can, and a backup or disk image taken without FileVault exposes it. A restored Mac needs omo login again.\nomo: the OmO desktop app on this Mac must also be a version that knows OmO's own keychain. An older desktop app keeps using the login keychain and can store a second sign-in there while someone is signed in at the screen.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      },
+      {
+        "code": 0,
+        "stdout": "{\"store\":\"login\",\"moved\":\"none\",\"erased\":true}\n",
+        "stderr": "",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ],
+    "other": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      },
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "omo account store: OmO's own keychain exists on macOS only.\n",
+        "requests": [],
+        "storedDevices": [
+          "seeded-device"
+        ]
+      }
+    ]
+  },
+  "native/account/store/unknown": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "usage: omo account store status|enable|disable [--discard]\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  },
+  "native/account/store/status-extra": {
+    "all": [
+      {
+        "code": 2,
+        "stdout": "",
+        "stderr": "usage: omo account store status|enable|disable [--discard]\n",
+        "requests": [],
+        "storedDevices": []
+      }
+    ]
+  }
+}
