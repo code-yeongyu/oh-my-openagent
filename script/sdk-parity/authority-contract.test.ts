@@ -26,6 +26,7 @@ import {
   documentRowProblems,
   inventoryProblems,
   matrixProblems,
+  overlapProblems,
   refusalScenarioProblems,
   sectionFourRows,
   withoutAwaited,
@@ -124,6 +125,10 @@ describe("principals of slice P1a-s (#14949)", () => {
     const inventory = inventoryProblems(PRINCIPAL_MATRIX, REFUSALS, securityDesign, ids, CALL_ALIASES)
     expect(withoutAwaited(inventory, AWAITING_REVISION)).toEqual([])
     expect(refusalScenarioProblems(REFUSALS, BEHAVIOUR_CHANGES, files)).toEqual([])
+  })
+
+  test("#given two lines on one registry row #then they never disagree, allow against refuse, unless an input or root option tells them apart", () => {
+    expect(overlapProblems(PRINCIPAL_MATRIX)).toEqual([])
   })
 
   test("#given section 10 #then B1 to B6 are data and each scenario asserts what its evidence flag selects", () => {
