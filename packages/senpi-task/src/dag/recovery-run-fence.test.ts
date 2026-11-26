@@ -27,12 +27,13 @@ afterEach(() => {
 // Delta review 2 of #15135, finding 2: recovery reconciled only current node ids and could start a
 // scheduled node before any scheduler (and its run-wide stale-child fence) existed, beside a live
 // child of a node the amendment removed. Recovery now asks the same run-wide gate and fails closed.
-function fixtureWith(runner: ControlledRunner, destruction?: DestructionPort): E2eFixture {
+function fixtureWith(runner: ControlledRunner, destruction?: DestructionPort, resumeFence = true): E2eFixture {
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-recovery-fence-"))
   roots.push(root)
   return createE2eFixture({
     project: root,
     runner,
+    resumeFence,
     materializeSkills: identityMaterializer,
     ...(destruction === undefined ? {} : { destruction }),
   })
@@ -78,7 +79,9 @@ async function recoverAndReadC(fixture: E2eFixture, runner: ControlledRunner, ru
   return { first, nodeC: fixture.store.readCheckpoint<DagRunRecordV1>(runId)?.nodes.find((node) => node.id !== "B") }
 }
 
-async function settledRunAB(fixture: E2eFixture, runner: ControlledRunner, resumeAWhileActive: boolean) {
+// Stacked on #15133 a turn the fence allows while the run runs is followed by its node, so a live child
+// of the settled run is one no fence re-checked (a host-session child outliving its process).
+async function settledRunAB(fixture: E2eFixture, runner: ControlledRunner, resumeAAfterSettling: boolean) {
   const started = await fixture.start(definition("recovery-fence", [categoryNode("A"), categoryNode("B")]))
   const runId = started.snapshot.runId
   await runner.whenStarted(2)
@@ -87,16 +90,16 @@ async function settledRunAB(fixture: E2eFixture, runner: ControlledRunner, resum
     runId,
     (event) => event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
   )
-  if (resumeAWhileActive) await runner.selfResume("A")
   runner.settle("B", completed("B"))
   await fixture.wait(runId)
+  if (resumeAAfterSettling) await runner.selfResume("A")
   return runId
 }
 
 test("#11381 #given a recovery checkpoint with a removed node's live child whose stop stays pending #when the run recovers #then the scheduled new node fails closed and never starts", async () => {
   // given
   const runner = new ControlledRunner(undefined, { connectable: true })
-  const fixture = fixtureWith(runner)
+  const fixture = fixtureWith(runner, undefined, false)
   const runId = await settledRunAB(fixture, runner, true)
   runner.child("A").connection.lose()
   await amendedCheckpoint(fixture, runId)
