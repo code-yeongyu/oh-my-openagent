@@ -82,8 +82,9 @@
     "packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs": ["DAEMON_LAUNCH_SPEC_FILENAME", "daemonLaunchSpecDocument", "renderDaemonLaunchSpec", "resolveDaemonLaunchSpecOutput", "buildDaemonLaunchSpec", "checkDaemonLaunchSpecCurrent"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_NAME, THREAD_SDK_RELATIVE_PATH
     "packages/omo-senpi/plugin/scripts/build-extension.mjs": ["GATEWAY_STORE_WORKER_NAME", "THREAD_SDK_RELATIVE_PATH"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) buildInstallCli, checkInstallCliCurrent
-    "packages/omo-senpi/plugin/scripts/build-install.mjs": ["buildInstallCli", "checkInstallCliCurrent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildInstallCli (checkInstallCliCurrent is read by
+    // runtime-files.test.mjs since #15031)
+    "packages/omo-senpi/plugin/scripts/build-install.mjs": ["buildInstallCli"],
     // pre-existing at origin dev 4686e425b5: unused export(s) traceBundleInputs, INSTALL_LIFECYCLES
     "packages/omo-senpi/plugin/scripts/bundle-inputs.mjs": ["traceBundleInputs", "INSTALL_LIFECYCLES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) stageAstGrepMcpRuntime
