@@ -14,7 +14,14 @@ import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprint
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
 import { projectSnapshot } from "./run-snapshot"
-import { outstandingStopRefusal, withOutstandingStop, type DagOwnedTaskReader } from "./outstanding-stop"
+import {
+  drainOutstandingStop,
+  outstandingRunStop,
+  outstandingStopRefusal,
+  withOutstandingStop,
+  type DagOwnedTaskReader,
+  type DagRunStopper,
+} from "./outstanding-stop"
 import { readDagDirectory, type DagEventPage, type DagFileStore } from "./store"
 import { DAG_SETTINGS_DEFAULTS } from "./types"
 import type {
@@ -200,7 +207,7 @@ export type DagManagerOptions = {
   readonly materializeSkills?: DagMaterializeSkills
   readonly settings?: Partial<DagSettings>
   /** Task records of the run's children: snapshot and amend read a settled run's outstanding stop from them. */
-  readonly ownedTasks?: DagOwnedTaskReader
+  readonly ownedTasks?: DagRunStopper
 }
 
 export type DagHistoryParams = {
@@ -312,14 +319,23 @@ export function createDagManager(options: DagManagerOptions): DagManager {
         settings,
         ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
       }),
-    amend: async (params) =>
-      amendRun(params, {
+    amend: async (params) => {
+      const runId =
+        params.runId ??
+        (params.key === undefined ? undefined : store.readKey(params.parentSessionId, params.key)?.runId)
+      const target = runId === undefined ? null : store.readCheckpoint<DagRunRecordV1>(runId)
+      // Awaited only when the run owes a stop, so an amendment with nothing to drain applies synchronously.
+      if (target?.parentSessionId === params.parentSessionId && outstandingRunStop(options.ownedTasks, target)) {
+        await drainOutstandingStop(options.ownedTasks, target)
+      }
+      return amendRun(params, {
         store,
         now,
         settings,
         ...(options.ownedTasks === undefined ? {} : { ownedTasks: options.ownedTasks }),
         ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-      }),
+      })
+    },
     attach(runId, parentSessionId) {
       ownedRecord(runId, parentSessionId)
       return {

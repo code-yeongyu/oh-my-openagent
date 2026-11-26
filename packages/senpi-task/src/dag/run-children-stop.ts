@@ -37,7 +37,7 @@ export function liveRunChildren(
  * success. The obligation stays derivable from the store, so a later cancel finds the same children.
  */
 export async function stopRunChildren(
-  taskManager: TaskManager,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "cancelTask">,
   record: DagRunRecordV1,
   attached: ReadonlySet<string>,
   reason?: string,

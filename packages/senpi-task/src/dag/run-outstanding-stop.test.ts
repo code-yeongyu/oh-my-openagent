@@ -29,8 +29,6 @@ afterEach(() => {
 async function expectOwedStop(fixture: E2eFixture, runId: DagRunId, live: string) {
   expect(fixture.manager.snapshot(runId, parentSessionId).outstandingStop).toEqual({ liveTaskIds: [live] })
   expect((await fixture.wait(runId)).snapshot.outstandingStop).toEqual({ liveTaskIds: [live] })
-  const amended = definition("owed-stop", [categoryNode("A", [], { prompt: "do A-fixed" }), categoryNode("B")])
-  await expect(fixture.amend(amended, runId)).rejects.toMatchObject({ code: "run_still_active" })
   expect(() => fixture.retry(runId, ["B" as DagNodeId])).toThrow(live)
 }
 
@@ -56,7 +54,10 @@ test("#11381 #given a cancel that could not stop a child #when the run is read, 
   // when
   await expect(first.cancel(runId, "stop the run")).rejects.toThrow(live)
 
-  // then
+  // then - amend drains first and refuses because the child is unreachable; retry refuses outright
+  await expectOwedStop(first, runId, live)
+  const amended = definition("owed-stop", [categoryNode("A", [], { prompt: "do A-fixed" }), categoryNode("B")])
+  await expect(first.amend(amended, runId)).rejects.toMatchObject({ code: "run_still_active" })
   await expectOwedStop(first, runId, live)
   const restarted = createE2eFixture({
     project: root,

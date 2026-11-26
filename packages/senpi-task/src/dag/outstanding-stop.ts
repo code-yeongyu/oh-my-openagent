@@ -1,9 +1,10 @@
 import type { TaskManager } from "../manager/types"
 import type { DagRunRecordV1 } from "./manager"
-import { liveRunChildren } from "./run-children-stop"
+import { liveRunChildren, stopRunChildren } from "./run-children-stop"
 import { TERMINAL_DAG_RUN_STATUSES, type DagRunSnapshot } from "./types"
 
 export type DagOwnedTaskReader = Pick<TaskManager, "findOwnedTasks">
+export type DagRunStopper = Pick<TaskManager, "findOwnedTasks" | "cancelTask">
 export type DagOutstandingStop = NonNullable<DagRunSnapshot["outstandingStop"]>
 
 /**
@@ -38,4 +39,13 @@ export function outstandingStopRefusal(
   const outstanding = outstandingRunStop(tasks, record)
   if (outstanding === undefined) return undefined
   return `dag run "${record.runId}" is ${record.status} but its children ${outstanding.liveTaskIds.join(", ")} are still live; cancel the run again to finish stopping them`
+}
+
+/**
+ * Amendment finishes a settled run's owed stop before it changes anything: a drain that leaves a child
+ * live is not an error here, because the amendment's own check then refuses with run_still_active.
+ */
+export async function drainOutstandingStop(tasks: DagRunStopper | undefined, record: DagRunRecordV1): Promise<void> {
+  if (tasks === undefined) return
+  await stopRunChildren(tasks, record, new Set(), "the run is being amended")
 }
