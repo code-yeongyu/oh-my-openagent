@@ -68,6 +68,9 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
     return { reached: reachedPromise, release }
   }
   let recovering = false
+  // A turn the child started on its own: an abort that completes ends it with an outcome, the way a
+  // real session goes idle after its run is aborted.
+  let turnRunning = false
   let reconnect = (): void => undefined
   let reconnected = new Promise<void>((resolve) => (reconnect = resolve))
   const connection: ControlledConnection = {
@@ -85,6 +88,7 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
   const pending: ScriptedOutcome[] = []
   const waiters: Array<(outcome: ScriptedOutcome) => void> = []
   const settle = (value: ScriptedOutcome): void => {
+    turnRunning = false
     const waiter = waiters.shift()
     if (waiter === undefined) pending.push(value)
     else waiter(value)
@@ -104,6 +108,7 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
     connection,
     selfResume: () =>
       new Promise<void>((resolve) => {
+        turnRunning = true
         reopened = resolve
         for (const listener of [...selfResumedListeners]) listener()
       }),
@@ -126,9 +131,16 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
         stopped("aborted")
         const gate = stopGate
         stopGate = undefined
-        if (gate === undefined) return Promise.resolve()
+        const endTurn = (): void => {
+          if (turnRunning)
+            settle({ status: "error", killed: true, failure: { kind: "child-prompt-failed", message: "aborted" } })
+        }
+        if (gate === undefined) {
+          endTurn()
+          return Promise.resolve()
+        }
         gate.reached()
-        return gate.released
+        return gate.released.then(endTurn)
       },
       subscribe: () => () => undefined,
       waitForOutcome,

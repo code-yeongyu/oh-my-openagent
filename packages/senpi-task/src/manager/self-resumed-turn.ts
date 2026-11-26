@@ -20,7 +20,8 @@ export type SelfResumedTurnPorts = {
   ) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
   readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
   readonly ownerResumeFence?: OwnerResumeFence
-  readonly endRefusedRun: (taskId: string, handle: ManagedChildHandle, disposition: "retire" | "hold") => Promise<void>
+  readonly markRefusedStop: (taskId: string, handle: ManagedChildHandle, disposition: "retire" | "hold") => void
+  readonly stopRefusedRun: (taskId: string) => Promise<boolean>
 }
 
 function reopenable(
@@ -74,8 +75,11 @@ export async function reopenSelfResumedTurn(
     return { ...buildRevived(fresh, nowIso(ports.now)), resumed_run_epoch: epoch }
   })
   if (!reopened) {
+    // Marked before any await: from this step on the refused turn counts as live until its stop is
+    // confirmed, for every reader of the run's live children (#11381).
+    if (refusal !== undefined) ports.markRefusedStop(taskId, handle, refusal.disposition)
     if (reservation.ok) reservation.release()
-    if (refusal !== undefined) await refuseSelfResumedRun(ports, taskId, handle, epoch, refusal)
+    if (refusal !== undefined) await refuseSelfResumedRun(ports, taskId, epoch, refusal)
     return
   }
   ports.store.appendEvent(taskId, { type: "task_self_resumed", payload: { run_epoch: epoch } })
@@ -90,7 +94,6 @@ export async function reopenSelfResumedTurn(
 async function refuseSelfResumedRun(
   ports: SelfResumedTurnPorts,
   taskId: string,
-  handle: ManagedChildHandle,
   epoch: number,
   refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }>,
 ): Promise<void> {
@@ -105,5 +108,5 @@ async function refuseSelfResumedRun(
     reason,
     disposition,
   })
-  await ports.endRefusedRun(taskId, handle, disposition)
+  await ports.stopRefusedRun(taskId)
 }

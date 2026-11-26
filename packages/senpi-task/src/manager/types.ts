@@ -14,6 +14,7 @@ import type {
   TaskStatus,
 } from "../state"
 import type { DestructionPort, SendOutcome } from "../steering"
+import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
@@ -309,6 +310,8 @@ export type TaskManagerOptions = {
   // Asked about a DAG-owned record inside the same record mutation that would reopen its settled child
   // for a run the child started on its own (#11381); absent -> every such reopen proceeds.
   readonly ownerResumeFence?: OwnerResumeFence
+  // Budget for each step of stopping a refused self-started turn; injectable so a test owns the clock.
+  readonly teardownStepDeadline?: TeardownStepDeadline
   // Injected by the todo-17 wiring. Consulted at spawn so the residency cap (LRU eviction) gates a
   // new child; absent -> admission is skipped (pre-wiring/unit behaviour, no cap enforcement).
   readonly admit?: AdmitResident

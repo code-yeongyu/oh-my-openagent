@@ -2,7 +2,7 @@ import type { TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering/types"
 import type { DagRunRecordV1 } from "./manager"
-import { isLiveTask } from "./scheduler-context"
+import { isLiveOwnedTask } from "./scheduler-context"
 import type { DagRunId } from "./types"
 
 export class DagRunChildrenLiveError extends Error {
@@ -21,10 +21,12 @@ export class DagRunChildrenLiveError extends Error {
 
 /** Keyed by run, not by today's nodes: an amendment can remove a node whose child still runs. */
 export function liveRunChildren(
-  taskManager: Pick<TaskManager, "findOwnedTasks">,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending">,
   record: DagRunRecordV1,
 ): readonly TaskRecord[] {
-  return taskManager.findOwnedTasks({ kind: "dag", runId: record.runId }).filter(isLiveTask)
+  return taskManager
+    .findOwnedTasks({ kind: "dag", runId: record.runId })
+    .filter((task) => isLiveOwnedTask(taskManager, task))
 }
 
 /**
@@ -37,7 +39,7 @@ export function liveRunChildren(
  * success. The obligation stays derivable from the store, so a later cancel finds the same children.
  */
 export async function stopRunChildren(
-  taskManager: Pick<TaskManager, "findOwnedTasks" | "cancelTask">,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "cancelTask" | "selfResumeStopPending">,
   record: DagRunRecordV1,
   attached: ReadonlySet<string>,
   reason?: string,

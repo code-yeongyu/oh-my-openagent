@@ -3,8 +3,8 @@ import type { DagRunRecordV1 } from "./manager"
 import { liveRunChildren, stopRunChildren } from "./run-children-stop"
 import { TERMINAL_DAG_RUN_STATUSES, type DagRunSnapshot } from "./types"
 
-export type DagOwnedTaskReader = Pick<TaskManager, "findOwnedTasks">
-export type DagRunStopper = Pick<TaskManager, "findOwnedTasks" | "cancelTask">
+export type DagOwnedTaskReader = Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending">
+export type DagRunStopper = Pick<TaskManager, "findOwnedTasks" | "cancelTask" | "selfResumeStopPending">
 export type DagOutstandingStop = NonNullable<DagRunSnapshot["outstandingStop"]>
 
 /**

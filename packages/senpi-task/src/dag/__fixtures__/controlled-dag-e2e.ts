@@ -4,6 +4,7 @@ import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
 import { createTaskManager } from "../../manager/manager"
 import type { AdmitResident, ChildPlanner, ManagedRunner, TaskManager } from "../../manager/types"
+import type { TeardownStepDeadline } from "../../lifecycle/teardown-budget"
 import type { DestructionPort } from "../../steering"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
 import { ImmediateRunner } from "./controlled-runner"
@@ -96,6 +97,7 @@ export type E2eFixtureOptions = {
   readonly maxRunsPerSession?: number
   readonly scheduleRetry?: RetrySchedule
   readonly destruction?: DestructionPort
+  readonly teardownStepDeadline?: TeardownStepDeadline
   /** The DAG self-resume fence is wired like the runtime wires it; false drives a manager without it. */
   readonly resumeFence?: boolean
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
@@ -123,6 +125,8 @@ export type E2eFixture = {
   readonly amend: (input: DagDefinition, runId: DagRunId) => Promise<DagRunReentry>
   readonly send: (runId: DagRunId, nodeId: DagNodeId, message: string) => Promise<DagNodeSendResult>
   readonly cancel: (runId: DagRunId, reason?: string) => Promise<void>
+  /** Resolves when the task records its next event of this type. */
+  readonly whenTaskEvent: (taskId: string, type: string) => Promise<void>
 }
 
 export function createE2eFixture(options: E2eFixtureOptions & { readonly project: string }): E2eFixture {
@@ -138,7 +142,16 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
           : { dag: { max_runs_per_session: options.maxRunsPerSession } }),
       },
     })
-  const taskStore = options.taskStore ?? createTaskRecordStore(ownedTaskState(project))
+  const baseTaskStore = options.taskStore ?? createTaskRecordStore(ownedTaskState(project))
+  const eventWaiters = new Map<string, Array<() => void>>()
+  const taskStore: TaskRecordStore = {
+    ...baseTaskStore,
+    appendEvent: (taskId, event) => {
+      const written = baseTaskStore.appendEvent(taskId, event)
+      for (const wake of eventWaiters.get(`${taskId}:${event.type}`)?.splice(0) ?? []) wake()
+      return written
+    },
+  }
   const runner = options.runner ?? new ImmediateRunner()
   const taskManager = resultPersistingManager(
     createTaskManager({
@@ -152,6 +165,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       cwd: project,
       ...(options.admit === undefined ? {} : { admit: options.admit }),
       ...(options.destruction === undefined ? {} : { destruction: options.destruction }),
+      ...(options.teardownStepDeadline === undefined ? {} : { teardownStepDeadline: options.teardownStepDeadline }),
       ...(options.resumeFence === false
         ? {}
         : {
@@ -251,6 +265,11 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
     },
     send: (runId, nodeId, message) => nodeControls(runId).sendToNode(runId, nodeId, message),
     cancel: (runId, reason) => nodeControls(runId).cancel(runId, reason),
+    whenTaskEvent: (taskId, type) =>
+      new Promise<void>((resolve) => {
+        const key = `${taskId}:${type}`
+        eventWaiters.set(key, [...(eventWaiters.get(key) ?? []), resolve])
+      }),
   }
 
   function nodeControls(runId: DagRunId): DagScheduler {

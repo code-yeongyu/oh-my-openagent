@@ -2,7 +2,7 @@ import type { TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
 import type { DagRunRecordV1 } from "./manager"
 import { ownedClaimAge } from "./owned-attempt"
-import { isLiveTask } from "./scheduler-context"
+import { isLiveOwnedTask } from "./scheduler-context"
 import type { DagNode, DagNodeErrorCode } from "./types"
 
 export type RecoveredNodeTask =
@@ -29,7 +29,7 @@ export function resolveRecoveredNodeTask(
     retained === undefined || owned.some((task) => task.task_id === retained.task_id) ? owned : [...owned, retained]
   const current = claims.findLast((task) => ownedClaimAge(task, record) === "current")
   const stale = claims.filter((task) => ownedClaimAge(task, record) === "superseded")
-  const live = stale.filter(isLiveTask)
+  const live = stale.filter((task) => isLiveOwnedTask(taskManager, task))
   // Stale claims are stopped BEFORE a current one is returned, so reconciliation never attaches or
   // folds the current record beside one. Synchronous unless a stale child must be stopped: reconcile
   // hands live children to the scheduler without yielding, so a racing settle is never folded twice.
@@ -46,7 +46,7 @@ function afterStops(
   stale: readonly TaskRecord[],
   current: TaskRecord | undefined,
 ): RecoveredNodeTask {
-  const alive = stale.filter((task) => isLiveTask(taskManager.get(task.task_id)))
+  const alive = stale.filter((task) => isLiveOwnedTask(taskManager, taskManager.get(task.task_id)))
   if (alive.length > 0) {
     const ids = alive.map((task) => task.task_id).join(", ")
     return {

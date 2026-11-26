@@ -35,6 +35,8 @@ export type TaskManager = {
    * nodes an amendment removed included.
    */
   findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[]
+  /** A refused self-started turn of this task is not confirmed stopped yet: the task still counts as live. */
+  selfResumeStopPending?(taskId: string): boolean
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>

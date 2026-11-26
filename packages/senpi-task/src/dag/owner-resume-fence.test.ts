@@ -131,16 +131,20 @@ test("#11381 #given a completed run #when its current node's finished child resu
   expect((await fixture.wait(runId)).status).toBe("completed")
   const taskA = taskOf(fixture, runId, "A")
   const stop = runner.child("A").nextStop()
+  const confirmed = fixture.whenTaskEvent(taskA, "task_self_resume_stop_confirmed")
 
   // when
   void runner.selfResume("A")
 
-  // then
+  // then - the stop is owed until the runner confirms the turn ended
   expect(await stop).toBe("aborted")
+  await confirmed
   expect(fixture.taskStore.load(taskA)).toMatchObject({ status: "completed", residency_state: "resident" })
   expect((await fixture.wait(runId)).snapshot.outstandingStop).toBeUndefined()
   const again = runner.child("A").nextStop()
+  const confirmedAgain = fixture.whenTaskEvent(taskA, "task_self_resume_stop_confirmed")
   void runner.selfResume("A")
   expect(await again).toBe("aborted")
+  await confirmedAgain
   expect(fixture.taskStore.load(taskA)).toMatchObject({ status: "completed", residency_state: "resident" })
 })

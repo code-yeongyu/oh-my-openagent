@@ -104,7 +104,8 @@ import { createHeldSend } from "./held-send"
 import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
 import { defaultSignaller } from "../lifecycle/context"
-import { defaultTeardownStepDeadline, withinTeardownBudget } from "../lifecycle/teardown-budget"
+import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
+import { cancelBehindRefusedStop, RefusedStops, sendBehindRefusedStop } from "./refused-stops"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
 import { AdmissionBarrier, type ResumeCredential } from "../pause/admission-barrier"
@@ -259,6 +260,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #sendCounts = new Map<string, number>()
   readonly #stopsPending = new PendingStops()
   readonly #steering: SteeringEngine
+  readonly #refusedStops: RefusedStops
   readonly #isolation: IsolationWiring
   readonly #outcome: OutcomeTracker
   readonly #runPause: ReturnType<typeof createTaskRunPause>
@@ -360,6 +362,15 @@ class TaskManagerImpl implements TaskManager {
       now: this.#now,
     }
     this.#steering = createSteeringEngine(port)
+    this.#refusedStops = new RefusedStops({
+      store: options.store,
+      deadline: options.teardownStepDeadline ?? defaultTeardownStepDeadline,
+      load: (taskId) => this.#tryLoad(taskId) ?? undefined,
+      liveHandle: (taskId) => this.#live.get(taskId)?.handle,
+      ...(options.ownerResumeFence === undefined ? {} : { fence: options.ownerResumeFence }),
+      ...(options.destruction === undefined ? {} : { destruction: options.destruction }),
+      forget: (taskId) => this.forget(taskId, { path: "end" }),
+    })
     this.#isolation = createIsolationWiring({
       runtime: options.isolation,
       store: options.store,
@@ -782,6 +793,8 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
+    const behind = await sendBehindRefusedStop(this.#refusedStops, input.idOrName)
+    if (behind !== undefined) return behind
     const outcome = await this.#steering.sendToTask(input)
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
     return outcome
@@ -797,6 +810,12 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
+    const refused = await cancelBehindRefusedStop(
+      this.#refusedStops,
+      idOrName,
+      () => this.#tryLoad(idOrName)?.status ?? "completed",
+    )
+    if (refused !== undefined) return refused
     const outcome = await this.#steering.cancelTask(idOrName, reason, options)
     if (outcome.kind === "cancelled") {
       this.#removeCapacityWaiter(outcome.task_id)
@@ -1656,27 +1675,13 @@ class TaskManagerImpl implements TaskManager {
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
       trackOutcome: (taskId, handle, model, epoch) => this.#outcome.trackOutcome(taskId, handle, model, epoch),
       ...(this.#options.ownerResumeFence === undefined ? {} : { ownerResumeFence: this.#options.ownerResumeFence }),
-      endRefusedRun: (taskId, handle, disposition) => this.#endRefusedRun(taskId, handle, disposition),
+      markRefusedStop: (taskId, handle, disposition) => this.#refusedStops.mark(taskId, handle, disposition),
+      stopRefusedRun: (taskId) => this.#refusedStops.attempt(taskId),
     }
   }
 
-  // The owner refused a self-started run; the record stays settled either way. `retire` ends the child.
-  // `hold` aborts only the turn, through the same bounded abort a cancel or interrupt sends, and keeps the
-  // child resident and send-revivable; a rejected abort is recorded, never turned into a teardown.
-  async #endRefusedRun(taskId: string, handle: ManagedChildHandle, disposition: "retire" | "hold"): Promise<void> {
-    if (disposition === "hold") {
-      const target = { taskId, pid: handle.pid }
-      await withinTeardownBudget(defaultTeardownStepDeadline, target, "abort", () => handle.abort()).catch((error) => {
-        const reason = error instanceof Error ? error.message : String(error)
-        this.#options.store.appendEvent(taskId, { type: "task_self_resume_hold_failed", payload: { reason } })
-        log("senpi-task could not stop a held self-started run", { taskId, reason })
-      })
-      return
-    }
-    const destruction = this.#options.destruction
-    if (destruction !== undefined) return destruction.destroyResidentTask(taskId, "cancel")
-    this.forget(taskId, { path: "end" })
-    await discardManagedHandle(handle)
+  selfResumeStopPending(taskId: string): boolean {
+    return this.#refusedStops.pending(taskId)
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
