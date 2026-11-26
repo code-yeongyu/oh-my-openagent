@@ -26,13 +26,15 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Testing | `pytest` | unittest |
 | CLI | `typer` + `rich` | argparse, click, fire |
 
+The CI gate is one command: `ruff format --check . && ruff check . && basedpyright && pytest`. A project with no lint or type-check config gets the block from `pyproject-strict.md` before the first new module; a project that already runs its own (mypy, flake8) keeps them, and the code you add is still fully annotated.
+
 ### The iron list
 
 1. **Frozen by default** — `@dataclass(frozen=True, slots=True)`. Pydantic: `model_config = ConfigDict(frozen=True)`. Mutable only when mutation is the documented purpose.
-2. **NewType for distinct IDs** — `UserId = NewType("UserId", int)`. Never pass raw `int` where a branded type exists.
+2. **No naive primitive for a domain value** — a bare `str`, `int`, `float`, `dict`, `list`, or `tuple` in a signature must be what the value really is. IDs are `NewType` (`UserId = NewType("UserId", int)`); a closed set is `StrEnum` or `Literal[...]`; money is `Decimal`; an instant is a timezone-aware `datetime`, a span is `timedelta`; a filesystem location is `Path`.
 3. **`match` only for variants, `if` only for booleans** — **NEVER** use `if/elif/else` to discriminate on type (`isinstance`), enum value, or literal variant. `match/case` is mandatory for these — non-negotiable. **ALWAYS** end with `case unreachable: assert_never(unreachable)` — bare `case _: pass` and `case _: raise ValueError` are banned (they silently swallow new variants). `if/else` is fine only for boolean expressions, range checks, and predicate calls that aren't variant discrimination. See "Why `if/elif` on variants is banned" below for examples.
 4. **Protocol over ABC** — `typing.Protocol` for interfaces. ABC only when you need shared method implementation.
-5. **No raw dicts in signatures** — params and returns use `TypedDict`, `dataclass`, or Pydantic model. Internal scratch dicts are fine.
+5. **No raw dicts in signatures** — params and returns use `TypedDict`, `dataclass`, or Pydantic model. Internal scratch dicts are fine. Generics are always parameterized (`list[Order]`, `Callable[[Order], Money]`, never bare `list` or `Callable`); parameters accept the widest read-only shape (`Sequence`, `Mapping`, `Iterable` from `collections.abc`).
 6. **Parse, don't validate** — constructors produce typed objects or raise. Never pass unvalidated data deeper into the call stack.
 7. **Typed errors** — error types are dataclasses or exceptions with typed fields. Never `raise ValueError("something")` with a bare string. Use union returns when the caller is within 1-2 call levels and must handle the outcome (repository → service). Use exceptions when the error should propagate up many layers to a boundary handler (service → HTTP handler).
 8. **Final for constants** — module-level constants use `Final`. Mutable module globals are a code smell.
@@ -45,7 +47,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 
 ### Typing and safety
 
-- `basedpyright` in `typeCheckingMode = "all"`. Every public function has full annotations. Internal helpers: annotate return type; parameter types may be inferred.
+- `basedpyright` in `typeCheckingMode = "all"`. Every function, public or private, annotates every parameter and its return type; the config sets `reportMissingParameterType` and `reportMissingReturnType` to error.
 - `ruff` with `select = ["ALL"]`. Override specific rules per project in `pyproject.toml`, never globally disable the strict baseline.
 - Every new function must have a `docstring` unless its name + signature makes it completely obvious (e.g. `def full_name(first: str, last: str) -> str:`).
 - Use `X | Y` union syntax (PEP 604), never `Union[X, Y]` or `Optional[X]`.
