@@ -28,6 +28,7 @@ async function tempRoot(): Promise<string> {
 async function createFixtureTree(root: string): Promise<string> {
   const source = join(root, "source")
   await mkdir(join(source, "nested", "deeper"), { recursive: true })
+  await chmod(join(source, "nested", "deeper"), 0o750)
   await mkdir(join(source, "empty"))
   await mkdir(join(source, "private"))
   await chmod(join(source, "private"), 0o700)
@@ -87,24 +88,17 @@ describe("copyDirectoryTree", () => {
 
     // then
     const expected = snapshotTree(join(root, "by-cp", "out"))
-    expect(expected.map((entry) => entry.type).sort()).toEqual(
-      [
-        "dir",
-        "dir",
-        "dir",
-        "dir",
-        "dir",
-        "file",
-        "file",
-        "file",
-        "file",
-        "file",
-        "file",
-        "symlink",
-        "symlink",
-        "symlink",
-      ].sort(),
-    )
+    const kind = (path: string) => expected.find((entry) => entry.path === path)
+    expect(kind("empty")).toMatchObject({ type: "dir" })
+    expect(kind("nested/deeper")).toMatchObject({ type: "dir", mode: 0o750 })
+    expect(kind("private")).toMatchObject({ type: "dir", mode: 0o700 })
+    expect(kind(".hidden")).toMatchObject({ type: "file" })
+    expect(kind("run.sh")).toMatchObject({ type: "file", mode: 0o755 })
+    expect(kind("readonly.txt")).toMatchObject({ type: "file", mode: 0o444 })
+    expect(kind("link-to-file")).toMatchObject({ type: "symlink" })
+    expect(kind("link-to-dir")).toMatchObject({ type: "symlink" })
+    expect(kind("link-to-dir/deeper")).toBeUndefined()
+    expect(kind("dangling")).toMatchObject({ type: "symlink" })
     expect(snapshotTree(join(root, "by-walk", "out"))).toEqual(expected)
   })
 
@@ -134,6 +128,10 @@ describe("copyDirectoryTree", () => {
       await writeFile(join(target, ".hidden"), "stale\n")
       await writeFile(join(target, "extra.txt"), "kept\n")
       await symlink("elsewhere", join(target, "link-to-file"))
+      await writeFile(join(target, "readonly.txt"), "older read-only copy\n")
+      await chmod(join(target, "readonly.txt"), 0o444)
+      await writeFile(join(target, "run.sh"), "older private copy\n")
+      await chmod(join(target, "run.sh"), 0o600)
     }
 
     // when
@@ -143,7 +141,11 @@ describe("copyDirectoryTree", () => {
     // then
     const expected = snapshotTree(join(root, "by-cp"))
     expect(expected.find((entry) => entry.path === "extra.txt")).toBeDefined()
+    const overwritten = (path: string) => expected.find((entry) => entry.path === path)
+    expect(overwritten("run.sh")).toMatchObject({ type: "file", mode: 0o755 })
+    expect(overwritten("readonly.txt")).toMatchObject({ type: "file", mode: 0o444 })
     expect(snapshotTree(join(root, "by-walk"))).toEqual(expected)
+    expect(readFileSync(join(root, "by-walk", "readonly.txt"), "utf8")).toBe("read only\n")
   })
 
   test("#given a target path that is a file #when copied #then it is refused like cp refuses it", async () => {

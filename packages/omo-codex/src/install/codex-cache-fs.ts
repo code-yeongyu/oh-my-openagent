@@ -38,7 +38,7 @@ function copyDirectoryEntries(source: string, target: string, include: (sourcePa
     if (!include(sourcePath)) continue
     const targetPath = join(target, entry.name)
     if (entry.isDirectory()) copyDirectoryEntries(sourcePath, targetPath, include)
-    else if (entry.isFile()) copyFileSync(sourcePath, targetPath)
+    else if (entry.isFile()) copyFile(sourcePath, targetPath)
     else if (entry.isSymbolicLink()) copySymlink(sourcePath, targetPath)
     else throw new Error(`cannot copy ${sourcePath}: not a file, directory, or symlink`)
   }
@@ -52,6 +52,18 @@ function createDirectory(path: string): boolean {
     if (!isNodeErrorWithCode(error) || error.code !== "EEXIST") throw error
     if (!lstatSync(path).isDirectory()) throw new Error(`cannot copy a directory to non-directory ${path}`)
     return false
+  }
+}
+
+// cp overwrites an existing read-only file; copyFileSync cannot open one for writing, so replace it.
+function copyFile(sourcePath: string, targetPath: string): void {
+  try {
+    copyFileSync(sourcePath, targetPath)
+  } catch (error) {
+    if (!isNodeErrorWithCode(error) || (error.code !== "EACCES" && error.code !== "EPERM")) throw error
+    if (!lstatSync(targetPath).isFile()) throw error
+    unlinkSync(targetPath)
+    copyFileSync(sourcePath, targetPath)
   }
 }
 
