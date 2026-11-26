@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { readFileSync } from "node:fs"
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
 import { join } from "node:path"
@@ -8,6 +9,13 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
 import { checkExtensionCurrent } from "./build-extension.mjs"
+import {
+  difference,
+  normalizeModulePath,
+  STATIC_SET_DEFINITION,
+  STATIC_SET_PATH,
+  staticModuleSet,
+} from "./omo-sdk-static-set.mjs"
 import { createBuildFixture, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 
 // The runtimes the built extension ships beside omo.js: the gateway store worker sidecar and the
@@ -145,61 +153,79 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 const OMO_SDK_RUNTIME_BYTES = 933_161
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
-async function staticModules(entry) {
-  const built = await Bun.build({ entrypoints: [entry], target: "node", format: "esm", metafile: true })
-  if (!built.success) throw new Error(built.logs.map(String).join("\n"))
-  const inputs = built.metafile.inputs
-  const start = Object.keys(inputs).find((path) => path.endsWith("src/extension/omo-sdk.ts"))
-  const reached = new Set([start])
-  const queue = [start]
-  while (queue.length > 0)
-    for (const edge of inputs[queue.shift()]?.imports ?? [])
-      if (edge.kind !== "dynamic-import" && inputs[edge.path] !== undefined && !reached.has(edge.path)) {
-        reached.add(edge.path)
-        queue.push(edge.path)
-      }
-  const users = (library) =>
-    [...reached]
-      .filter((path) => !path.includes("node_modules"))
-      .filter((path) =>
-        inputs[path].imports.some((edge) => new RegExp(`node_modules/(.*/)?${library}/`).test(edge.path)),
-      )
-      .map((path) => path.replace(/^.*?packages\//, "packages/"))
-      .sort()
-  return { reached: [...reached], zod: users("zod"), typebox: users("typebox") }
-}
+// What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,
+// reached from the entry by static edges only, plus the node builtins a kept module imports, named the same in every
+// install layout. plugin/scripts/omo-sdk-static-set.mjs computes it; `bun <that file> --write` rewrites the list, and a
+// slice that changes the set edits the list in the same commit, where its reviewer sees it.
+const { definition: STATIC_SET_FILE_DEFINITION, modules: STATIC_SET } = JSON.parse(
+  readFileSync(STATIC_SET_PATH, "utf8"),
+)
 
 describe("the provisioned SDK root runtime's cold import (P1b decision)", () => {
-  test("#given the built runtime #then it is no larger than the decided ceiling, and the deferred modules are on no static import path", async () => {
-    const outputs = await sharedOutputs()
-    const bytes = Bun.file(outputs.omoSdkOutputPath).size
-    if (bytes > OMO_SDK_RUNTIME_BYTES)
-      throw new Error(
-        `the omo SDK runtime is ${bytes} bytes, over its ceiling of ${OMO_SDK_RUNTIME_BYTES}: growth reopens the P1b cold-import decision (#14950); split the thread core into its own runtime file first (the next SDK slice)`,
-      )
-    const statics = await staticModules(
-      join(fileURLToPath(new URL("../..", import.meta.url)), "src", "extension", "omo-sdk.ts"),
-    )
-    expect(statics.reached.filter((path) => DEFERRED.some((part) => path.includes(part)))).toEqual([])
-    // The static modules that import a schema library, exactly: a new one fails here by name.
-    expect({ zod: statics.zod, typebox: statics.typebox }).toEqual({
-      zod: [
-        "packages/omo-opencode/src/cli/service-auth/credential-owner.ts",
-        "packages/omo-opencode/src/cli/service-auth/devices.ts",
-        "packages/omo-opencode/src/cli/service-auth/keychain-helper/client.ts",
-        "packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities.ts",
-        "packages/omo-opencode/src/cli/service-auth/machine-reconcile.ts",
-        "packages/omo-opencode/src/cli/service-auth/protocol-request.ts",
-        "packages/omo-opencode/src/cli/service-auth/protocol.ts",
-        "packages/omo-opencode/src/cli/service-auth/refresh-attempt.ts",
-        "packages/omo-opencode/src/cli/service-auth/signed-out-marker.ts",
-        "packages/omo-senpi/src/components/memory/device-session/cli-account-operation.ts",
-        "packages/omo-senpi/src/components/omo-sdk/account/index.ts",
-        "packages/omo-senpi/src/components/omo-sdk/account/sign-in.ts",
-        "packages/team-core/src/team-state-store/lock-worker-lifetime.ts",
-      ],
-      typebox: ["packages/omo-senpi/src/components/omo-sdk/contract/principal.ts"],
+  test("#given the built runtime #then it is no larger than the decided ceiling", async () => {
+    const bytes = Bun.file((await sharedOutputs()).omoSdkOutputPath).size
+    expect(
+      bytes <= OMO_SDK_RUNTIME_BYTES ||
+        `the omo SDK runtime is ${bytes} bytes, over its ceiling of ${OMO_SDK_RUNTIME_BYTES}: growth reopens the P1b cold-import decision (#14950); split the thread core into its own runtime file first (the next SDK slice). A size is valid only in a tree with submodules initialised and a frozen install from the head's own bun.lock, built with the pinned bun.`,
+    ).toBe(true)
+  })
+
+  test("#given the runtime entry #then the modules that ship and run at import (kept bytes, static edges) are exactly the committed list", async () => {
+    const { set, schemaUsers } = await staticModuleSet()
+    expect(STATIC_SET_FILE_DEFINITION).toBe(STATIC_SET_DEFINITION)
+    expect({ ...difference(set, STATIC_SET), schemaLibraryImporters: schemaUsers }).toEqual({
+      added: [],
+      removed: [],
+      schemaLibraryImporters: schemaUsers,
     })
+  })
+
+  // Control: one static telemetry import added to the runtime entry is named by the comparison.
+  test("#given an entry that adds one static telemetry import to the runtime entry #then the comparison names the telemetry modules it adds", async () => {
+    const dir = await mkdtemp(
+      join(fileURLToPath(new URL("../..", import.meta.url)), "src", "extension", ".static-control-"),
+    )
+    perTestRoots.push(dir)
+    await writeFile(
+      join(dir, "entry.ts"),
+      `export * from "../omo-sdk"\nimport * as telemetry from "@oh-my-opencode/telemetry-core/otlp"\nexport const probe = Object.keys(telemetry)\n`,
+    )
+    const { set } = await staticModuleSet(join(dir, "entry.ts"))
+    const { added } = difference(set, STATIC_SET)
+    expect(added.filter((path) => path.startsWith("packages/telemetry-core/")).length).toBeGreaterThan(0)
+  })
+
+  test("#given the runtime entry #then the deferred modules are on no static import path", async () => {
+    const { reached } = await staticModuleSet()
+    expect(reached.filter((path) => DEFERRED.some((part) => path.includes(part)))).toEqual([])
+  })
+})
+
+describe("the static set's module names", () => {
+  test("#given one module reached through a node_modules link, a copied package and its real path #then all three have one name", async () => {
+    const root = await mkdtemp(join(tmpdir(), "static-set-names-"))
+    perTestRoots.push(root)
+    await mkdir(join(root, "packages", "core", "src"), { recursive: true })
+    await writeFile(join(root, "packages", "core", "package.json"), JSON.stringify({ name: "@fixture/core" }))
+    await writeFile(join(root, "packages", "core", "src", "a.ts"), "export const a = 1\n")
+    await mkdir(join(root, "node_modules", "@fixture"), { recursive: true })
+    await symlink(join(root, "packages", "core"), join(root, "node_modules", "@fixture", "core"))
+    await mkdir(join(root, "copy", "node_modules", "@fixture", "core", "src"), { recursive: true })
+    await writeFile(join(root, "copy", "node_modules", "@fixture", "core", "src", "a.ts"), "export const a = 1\n")
+    await mkdir(join(root, "node_modules", ".bun", "zod@4.6.7", "node_modules", "zod"), { recursive: true })
+    await writeFile(join(root, "node_modules", ".bun", "zod@4.6.7", "node_modules", "zod", "index.js"), "\n")
+    const options = { repoRoot: root, base: root }
+    expect([
+      normalizeModulePath("packages/core/src/a.ts", options),
+      normalizeModulePath("node_modules/@fixture/core/src/a.ts", options),
+      normalizeModulePath("copy/node_modules/@fixture/core/src/a.ts", options),
+      normalizeModulePath("node_modules/.bun/zod@4.6.7/node_modules/zod/index.js", options),
+    ]).toEqual([
+      "packages/core/src/a.ts",
+      "packages/core/src/a.ts",
+      "packages/core/src/a.ts",
+      "node_modules/zod/index.js",
+    ])
   })
 })
 
