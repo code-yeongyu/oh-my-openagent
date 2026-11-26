@@ -99,8 +99,8 @@ import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
 import { defaultSignaller } from "../lifecycle/context"
 import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
-import { cancelBehindRefusedStop, RefusedStops, sendBehindRefusedStop } from "./refused-stops"
-import { ownerSendRefusal } from "./explicit-send"
+import { cancelBehindRefusedStop, RefusedStops } from "./refused-stops"
+import { explicitSendChecks } from "./explicit-send"
 import { REDISPATCH_HOLDER_WAIT_MS, redispatchLockPath, redispatchRefusal } from "./redispatch-guard"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
@@ -766,15 +766,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
-    // One resolution of the address (steering's own), synchronous: every later step uses its task id.
-    const record = this.#steering.resolve(input.idOrName)
-    const taskId = record?.task_id ?? input.idOrName
-    const refused = ownerSendRefusal(this.#options.ownerResumeFence, record)
-    if (refused !== undefined) return refused
-    const waiting = sendBehindRefusedStop(this.#refusedStops, taskId)
-    const behind = waiting === undefined ? undefined : await waiting
-    if (behind !== undefined) return behind
-    const outcome = await this.#steering.sendToTask({ ...input, idOrName: taskId })
+    const checks = explicitSendChecks(this.#steering, this.#options.ownerResumeFence, this.#refusedStops, input)
+    const answer = checks.answer === undefined ? undefined : await checks.answer
+    if (answer !== undefined) return answer
+    const outcome = await this.#steering.sendToTask({ ...input, idOrName: checks.taskId })
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
     return outcome
   }
