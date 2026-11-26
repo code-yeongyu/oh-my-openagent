@@ -100,6 +100,8 @@ export type E2eFixtureOptions = {
   readonly teardownStepDeadline?: TeardownStepDeadline
   /** The DAG self-resume fence is wired like the runtime wires it; false drives a manager without it. */
   readonly resumeFence?: boolean
+  /** The fence's view of a cancellation in flight, for a scheduler the test built outside the fixture. */
+  readonly cancelling?: (runId: DagRunId) => boolean
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
   // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
   readonly store?: DagFileStore
@@ -170,9 +172,10 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
         ? {}
         : {
             ownerResumeFence: (record: TaskRecord) =>
-              createDagOwnerResumeFence({ store, cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false })(
-                record,
-              ),
+              createDagOwnerResumeFence({
+                store,
+                cancelling: options.cancelling ?? ((runId) => schedulers.get(runId)?.cancelling() ?? false),
+              })(record),
           }),
     }),
     store,
