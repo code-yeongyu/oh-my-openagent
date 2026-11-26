@@ -238,7 +238,8 @@ function createTrackedChildHandle(
     running = turn
   }
 
-  // The engine starts a resumed turn itself: observe it from its agent_start to its agent_end.
+  // The engine starts a resumed turn itself: observe it from its agent_start to its agent_end, and end
+  // it through the same async-work hold as a prompted turn (omo#10487).
   const watchEngineTurn = (): EngineTurnWatch => {
     const settled = Promise.withResolvers<RunnerOutcome>()
     let started = false
@@ -248,11 +249,14 @@ function createTrackedChildHandle(
         aborted = false
         turnActive = true
         resetObservation()
+        asyncWork.supersede(settled.promise)
         running = settled.promise
       } else if (event.type === "agent_end" && started) {
         unsubscribe()
         turnActive = false
-        settled.resolve(aborted ? { status: "cancelled" } : turnOutcome(session, observation, completion))
+        settled.resolve(
+          asyncWork.settle(aborted ? { status: "cancelled" } : turnOutcome(session, observation, completion)),
+        )
       }
     })
     return { outcome: settled.promise, cancel: unsubscribe }

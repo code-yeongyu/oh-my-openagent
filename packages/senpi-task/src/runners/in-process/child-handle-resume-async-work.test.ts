@@ -74,7 +74,12 @@ describe("an in-process child resumed by its run (omo#10487)", () => {
     const c = resumableChild()
     const runPause = c.handle.runPause
     if (runPause === undefined) throw new Error("expected native run pause")
-    const resumed = await runPause.resumeForRun({ parentSessionId: "parent", parentPauseSeq: 1, childSeqCutoff: 1 })
+    const resumed = await runPause.resumeForRun({
+      parentSessionId: "parent",
+      parentPauseSeq: 1,
+      resumeId: "resume-1",
+      childSeqCutoff: 1,
+    })
     if (!resumed.released || !("outcome" in resumed) || resumed.outcome === undefined)
       throw new Error("expected a resumed turn")
     let settled: RunnerOutcome | undefined
