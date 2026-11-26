@@ -11,7 +11,7 @@ import { describeModelChains, type ModelChainsReport } from "@oh-my-opencode/sen
 import { loadSenpiOmoConfig } from "../omo-senpi/src/components/config-resolution"
 import { describeModelProfile, type ModelProfileView } from "../omo-senpi/src/components/model-profile/describe"
 export { computerUseDoctorReport } from "./computer-use-doctor-runtime"
-export { configDoctorLines } from "./config-doctor-runtime"
+export { configDoctorFindings } from "./config-doctor-runtime"
 
 export type CategoryCoverageInput = {
   // The engine's available models: provider id and model id per entry.

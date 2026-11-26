@@ -14,6 +14,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { packageRoot, resolveSenpi } from "./package-paths.js"
+import { finding } from "./diagnostics-findings.js"
 
 export const COVERAGE_RUNTIME = join("plugin", "runtime", "category-coverage", "index.js")
 
@@ -146,13 +147,26 @@ function gapLine(gap) {
 }
 
 /** @param {CategoryCoverage} coverage */
-export function formatDoctorCoverageLines(coverage) {
+export function coverageFindings(coverage) {
+  const counts = { usable: coverage.usable, total: total(coverage) }
   if (coverage.unusable.length === 0)
-    return [`PASS task categories: all ${total(coverage)} usable with your connected providers`]
+    return [
+      finding(
+        "task-categories",
+        "ok",
+        `task categories: all ${total(coverage)} usable with your connected providers`,
+        counts,
+      ),
+    ]
   const usable = coverage.usable.length > 0 ? ` (${coverage.usable.join(", ")})` : ""
   return [
-    `WARN task categories: ${coverage.usable.length} of ${total(coverage)} usable with your connected providers${usable}`,
-    ...coverage.unusable.map((gap) => `WARN ${gapLine(gap)}`),
+    finding(
+      "task-categories",
+      "warn",
+      `task categories: ${coverage.usable.length} of ${total(coverage)} usable with your connected providers${usable}`,
+      counts,
+    ),
+    ...coverage.unusable.map((gap) => finding("task-categories", "warn", gapLine(gap), { gap })),
   ]
 }
 
@@ -175,9 +189,9 @@ export function coverageSummaryParts(coverage) {
  *   loadRuntime?: () => Promise<any>,
  * }} DoctorCoverageOptions
  * @param {DoctorCoverageOptions} options
- * @returns {Promise<string[]>}
+ * @returns {Promise<import("./diagnostics-contract").DiagnosticFinding[]>}
  */
-export async function doctorCoverageLines(options) {
+export async function doctorCoverageFindings(options) {
   try {
     // The runtime first: a payload without it fails fast, before the engine import.
     const runtime = await (options.loadRuntime ?? loadRuntime)()
@@ -189,7 +203,7 @@ export async function doctorCoverageLines(options) {
       env: options.env ?? process.env,
       loadRuntime: async () => runtime,
     })
-    return formatDoctorCoverageLines(coverage)
+    return coverageFindings(coverage)
   } catch {
     return []
   }

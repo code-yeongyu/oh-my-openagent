@@ -1,4 +1,6 @@
+import type { ModelChainsReport } from "../../../../../../senpi-task/src/model-chains/types"
 import type { WarmAnswer } from "../../../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
+import type { ModelProfileView } from "../../../model-profile/describe"
 import type { JsonObject } from "../../../remote/types"
 import type { ConfigStatus } from "../../config"
 
@@ -48,15 +50,31 @@ export type Finding = {
   readonly level: "ok" | "notice" | "warn" | "fail"
   readonly check: string
   readonly message: string
+  /** What the check found, as fields (paths, states, codes, counts); the command renders the message only. */
+  readonly details?: Readonly<Record<string, unknown>>
 }
-export type Diagnostics = { readonly findings: readonly Finding[] }
-export type FixReflectionLock = { readonly dry_run: boolean; readonly findings: readonly Finding[] }
+/** `failed` is the exit rule `omo doctor` applies: only an artifact, engine, launch-spec or computer-use failure. */
+export type Diagnostics = { readonly findings: readonly Finding[]; readonly failed: boolean }
+/** `omo doctor --models --json`'s view: the spawn resolvers' chains and the main session's lane, in their own types. */
+export type ModelChains = ModelChainsReport & {
+  readonly configProfile?: string
+  readonly modelProfile: ModelProfileView
+}
+/** One line of the sweep in print order: memory-core's own text verbatim, or a finding about the sweep. */
+export type FixEntry = { readonly kind: "sweep_text"; readonly text: string } | ({ readonly kind: "finding" } & Finding)
+export type FixReflectionLock = {
+  readonly dry_run: boolean
+  readonly entries: readonly FixEntry[]
+  readonly failed: boolean
+}
 export type ReapStaleEngines = {
   readonly engines: readonly {
     readonly pid: number
     readonly outcome: "reaped" | "refused" | "not_found"
     readonly reason?: string
   }[]
+  /** False when any named pid was refused, decided once in the core: the fact `omo doctor --reap`'s exit 1 carries. */
+  readonly complete: boolean
 }
 
 export type { SetupInventory, SetupPlan } from "../inputs/host"

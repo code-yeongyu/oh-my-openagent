@@ -17,7 +17,10 @@
           "args": {
             "command": "ps"
           },
-          "result": []
+          "result": {
+            "exitCode": 0,
+            "stdout": ""
+          }
         },
         {
           "port": "host",
@@ -92,11 +95,32 @@
       "input": {},
       "expect": [
         {
+          "port": "engine",
+          "op": "models.list"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.models/runtime-unavailable",
+      "row": "diagnostics.models",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "input": {},
+      "given": [
+        {
           "port": "fs",
-          "op": "read",
-          "args": {
-            "path": "/agent/models.json"
+          "state": {
+            "unreadable": [
+              "plugin/runtime/category-coverage/index.js"
+            ]
           }
+        }
+      ],
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list",
+          "count": 0
         }
       ]
     },
@@ -175,14 +199,10 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4242,
-              "ppid": 1,
-              "engine": true,
-              "interactive": true
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4242      1       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin\n"
+          }
         },
         {
           "port": "process",
@@ -211,7 +231,10 @@
           "args": {
             "command": "ps"
           },
-          "result": []
+          "result": {
+            "exitCode": 0,
+            "stdout": ""
+          }
         },
         {
           "port": "process",
@@ -237,14 +260,10 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4242,
-              "ppid": 1,
-              "engine": true,
-              "interactive": false
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4242      1       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin --mode rpc\n"
+          }
         },
         {
           "port": "process",
@@ -270,14 +289,40 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4242,
-              "ppid": 777,
-              "engine": true,
-              "interactive": true
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4242    777       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin\n"
+          }
+        },
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/two-pids-different-causes",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "pids": [
+          4242,
+          4343
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4343      1       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin --mode rpc\n"
+          }
         },
         {
           "port": "process",

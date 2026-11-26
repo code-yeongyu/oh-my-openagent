@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
+import { finding } from "./diagnostics-findings.js"
 
 /**
  * Where `omo daemon` reads its config. Its `task.*` keys (`host_engine_policy`, `host_idle_exit_ms`) come
@@ -86,10 +87,13 @@ function migrationAdvice({ key, value }) {
   return "move it to ~/.omo/omo.jsonc"
 }
 
-/** One doctor line per key the deprecated file supplied; none when the loader supplies them or cannot run. */
-export function daemonConfigDoctorLines(options) {
+/** One doctor finding per key the deprecated file supplied; none when the loader supplies them or cannot run. */
+export function daemonConfigFindings(options) {
   const { legacyPath, legacySources } = readDaemonConfig(options)
-  return legacySources.map(
-    (source) => `WARN task.${source.key}: read from deprecated ${legacyPath}; ${migrationAdvice(source)}`,
+  return legacySources.map((source) =>
+    finding("daemon", "warn", `task.${source.key}: read from deprecated ${legacyPath}; ${migrationAdvice(source)}`, {
+      key: `task.${source.key}`,
+      legacy_path: legacyPath,
+    }),
   )
 }

@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { finding } from "./bin/lib/diagnostics-findings.js"
+import type { DiagnosticFinding } from "./bin/lib/diagnostics-contract"
 
 /** The marker fields doctor reads: where the generation lives, which one it is, and whether OS roots made it. */
 export type EngineTrustDoctorMarker = {
@@ -11,14 +13,14 @@ export type EngineTrustDoctorMarker = {
 type DropFields = { file?: unknown; cause?: unknown; blockIndex?: unknown; narrowing?: unknown }
 
 /**
- * Design revision 11: a default-file drop is visible at the diagnostic level only, so every line is INFO.
+ * Design revision 11: a default-file drop is visible at the diagnostic level only, so every finding is a notice.
  * The last import-exec or ensure record of the adopted generation is the one that made it.
  */
-export function engineTrustDoctorLines(input: {
+export function engineTrustFindings(input: {
   readonly platform: NodeJS.Platform
   readonly marker: EngineTrustDoctorMarker | undefined
   readonly records: readonly unknown[]
-}): string[] {
+}): DiagnosticFinding[] {
   const { marker } = input
   if (marker === undefined) return []
   const made = input.records
@@ -38,13 +40,27 @@ export function engineTrustDoctorLines(input: {
   const drop = malformed.find((code) => code.file !== undefined)
   if (drop !== undefined) {
     return [
-      `INFO engine trust: default file ${String(drop.file)} dropped: ${String(drop.cause)}, block ${String(drop.blockIndex)}, narrowing=${String(drop.narrowing)}`,
+      finding(
+        "engine.trust",
+        "notice",
+        `engine trust: default file ${String(drop.file)} dropped: ${String(drop.cause)}, block ${String(drop.blockIndex)}, narrowing=${String(drop.narrowing)}`,
+        { state: "dropped", file: drop.file, cause: drop.cause, block: drop.blockIndex, narrowing: drop.narrowing },
+      ),
     ]
   }
   // Only a macOS generation built from OS roots read the default file; any other generation has no status to state.
   if (input.platform !== "darwin" || marker.automatic !== "os") return []
+  const defaultFile = malformed.length > 0 ? "unreadable" : "kept"
   return [
-    `INFO engine trust: generation ${marker.sha256.slice(0, 12)}, default-file: ${malformed.length > 0 ? "unreadable" : "kept"}`,
+    finding(
+      "engine.trust",
+      "notice",
+      `engine trust: generation ${marker.sha256.slice(0, 12)}, default-file: ${defaultFile}`,
+      {
+        generation: marker.sha256,
+        default_file: defaultFile,
+      },
+    ),
   ]
 }
 

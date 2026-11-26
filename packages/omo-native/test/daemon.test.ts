@@ -2,7 +2,11 @@ import { describe, expect, onTestFinished, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { daemonReportLines, runDaemonCommand } from "../bin/lib/daemon.js"
+import { daemonFindings, runDaemonCommand } from "../bin/lib/daemon.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The doctor's daemon section as `omo doctor` prints it.
+const daemonReportLines = (options: Parameters<typeof daemonFindings>[0]) => renderFindings(daemonFindings(options))
 
 /**
  * `omo daemon` is a thin wrapper: every decision about who serves the socket belongs to the

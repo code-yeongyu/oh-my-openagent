@@ -3,6 +3,8 @@
   "workspaces": {
     ".": {
       "entry": [
+        // the SDK parity gate's scenario drivers: conformance-run.ts imports every module of runs/ by path
+        "script/sdk-parity/runs/*.ts",
         "script/beta-follows-latest.mjs",
         "script/build-binaries.ts",
         "script/build-brand-logo.ts",
@@ -267,6 +269,8 @@
     "script/oxlint/testing.ts": ["default"],
     // pre-existing at origin dev 4686e425b5: unused export(s) combineFragments
     "script/package-log-blocks.ts": ["combineFragments"],
+    // scenario-driver entry: conformance-run.ts loadScenarioRuns reads each runs/ module's runs export by path
+    "script/sdk-parity/runs/diagnostics.ts": ["runs"],
     // pre-existing at origin dev 4686e425b5: unused export(s) main
     "script/preflight-trust.mjs": ["main"],
     // pre-existing at origin dev 4686e425b5: unused export(s) compareDirectories

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { canonicalAgentDir, runtimeHome } from "./agent-dir.js"
+import { finding } from "./diagnostics-findings.js"
 
 // Mirrors the engine's legacy-pi-edits check (senpi `src/legacy-pi-edits.ts`), which this package
 // cannot import synchronously: the same four files, the same `legacyPiAgentDir.copiedAt` record in
@@ -50,12 +51,16 @@ export function findPiConfigEdits({ agentDir, homeDir }) {
   return edits
 }
 
-export function formatPiConfigLines(agentDir, edits) {
+export function piConfigFindings(agentDir, edits) {
   return [
-    `INFO config dir: ${agentDir}`,
-    ...edits.map(
-      (edit) =>
-        `WARN You edited ${edit.piPath} after omo moved to ${agentDir}; omo reads ${edit.agentPath}. Copy your change there (or run: omo config import-pi ${edit.file}).`,
+    finding("config.directory", "notice", `config dir: ${agentDir}`, { path: agentDir }),
+    ...edits.map((edit) =>
+      finding(
+        "config.directory",
+        "warn",
+        `You edited ${edit.piPath} after omo moved to ${agentDir}; omo reads ${edit.agentPath}. Copy your change there (or run: omo config import-pi ${edit.file}).`,
+        { file: edit.file, pi_path: edit.piPath, agent_path: edit.agentPath },
+      ),
     ),
   ]
 }
@@ -65,11 +70,15 @@ export function piConfigReport(options = {}) {
   const agentDir = options.agentDir ?? canonicalAgentDir(env)
   const homeDir = options.homeDir ?? runtimeHome(env)
   try {
-    return formatPiConfigLines(agentDir, findPiConfigEdits({ agentDir, homeDir }))
+    return piConfigFindings(agentDir, findPiConfigEdits({ agentDir, homeDir }))
   } catch (error) {
+    const piAgentDir = join(homeDir, ".pi", "agent")
     return [
-      `INFO config dir: ${agentDir}`,
-      `WARN could not check ${join(homeDir, ".pi", "agent")} for config edits: ${error.message}`,
+      finding("config.directory", "notice", `config dir: ${agentDir}`, { path: agentDir }),
+      finding("config.directory", "warn", `could not check ${piAgentDir} for config edits: ${error.message}`, {
+        path: piAgentDir,
+        state: "unreadable",
+      }),
     ]
   }
 }

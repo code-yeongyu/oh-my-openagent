@@ -3,9 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { doctorConfigLines } from "../bin/lib/config-doctor.js"
+import { doctorConfigFindings } from "../bin/lib/config-doctor.js"
 import { runDoctor } from "../bin/lib/doctor.js"
-import { configDoctorLines } from "../config-doctor-runtime"
+import { configDoctorFindings } from "../config-doctor-runtime"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const doctorConfigLines = async (options?: Parameters<typeof doctorConfigFindings>[0]) =>
+  renderFindings(await doctorConfigFindings(options))
+const configDoctorLines = (input: Parameters<typeof configDoctorFindings>[0]) =>
+  renderFindings(configDoctorFindings(input))
 
 const roots: string[] = []
 
@@ -21,7 +28,7 @@ function homeWithUserConfig(document: string): string {
   return home
 }
 
-function captureDoctor(options: Record<string, unknown>): string {
+async function captureDoctor(options: Record<string, unknown>): Promise<string> {
   const originalLog = console.log
   const originalExitCode = process.exitCode
   const output: string[] = []
@@ -29,7 +36,12 @@ function captureDoctor(options: Record<string, unknown>): string {
     output.push(String(value))
   }
   try {
-    runDoctor({ harnesses: [] }, [], { list: () => [], fetchDistTags: () => null, daemonReport: () => [], ...options })
+    await runDoctor({ harnesses: [] }, [], {
+      list: () => [],
+      fetchDistTags: () => null,
+      daemonReport: () => [],
+      ...options,
+    })
     return output.join("\n")
   } finally {
     console.log = originalLog
@@ -70,7 +82,7 @@ describe("omo doctor config lines", () => {
     const lines = await doctorConfigLines({
       cwd: home,
       env: { HOME: home },
-      loadRuntime: async () => ({ configDoctorLines }),
+      loadRuntime: async () => ({ configDoctorFindings }),
     })
 
     expect(lines).toEqual(["WARN config: ~/.omo/omo.jsonc: agents.oracle.temperature ignored (invalid value)"])
@@ -86,8 +98,8 @@ describe("omo doctor config lines", () => {
     expect(lines).toEqual(["WARN config: diagnostics unavailable: missing bundle"])
   })
 
-  test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", () => {
-    const stdout = captureDoctor({
+  test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", async () => {
+    const stdout = await captureDoctor({
       configDiagnostics: ["WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"],
     })
 

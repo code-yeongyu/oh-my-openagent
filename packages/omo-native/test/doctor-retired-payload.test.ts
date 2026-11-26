@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { classifyRetiredPayloadEngines, formatRetiredPayloadLines, parseElapsedSeconds } from "../bin/lib/doctor.js"
+import {
+  classifyRetiredPayloadEngines,
+  retiredPayloadFindings,
+  parseElapsedSeconds,
+} from "../bin/lib/engine-processes.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 
 type Entry = {
   pid: number
@@ -107,14 +112,14 @@ describe("classifyRetiredPayloadEngines", () => {
   })
 })
 
-describe("formatRetiredPayloadLines", () => {
+describe("retiredPayloadFindings", () => {
   test("#given no retired engine #when formatted #then the report stays silent", () => {
-    expect(formatRetiredPayloadLines([])).toEqual([])
+    expect(renderFindings(retiredPayloadFindings([]))).toEqual([])
   })
 
   test("#given a retired engine #when formatted #then the pid is named with a restart instruction and no reap hint", () => {
     // when
-    const lines = formatRetiredPayloadLines([entry({ pid: 8532, elapsed: "1-05:12:00" })])
+    const lines = renderFindings(retiredPayloadFindings([entry({ pid: 8532, elapsed: "1-05:12:00" })]))
 
     // then
     expect(lines[0]).toContain("engine pid 8532")

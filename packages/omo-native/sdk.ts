@@ -3,6 +3,7 @@
 import { assembleOmoSdk, refuseCallerCores } from "../omo-senpi/src/components/omo-sdk/assembly.ts"
 import type { OmoSdk, OmoSdkOptions } from "../omo-senpi/src/components/omo-sdk/options.ts"
 import { installCore } from "./bin/lib/sdk-install.js"
+import { diagnosticsLoader } from "./diagnostics-loader"
 
 export type * from "../omo-senpi/src/components/omo-sdk/index.ts"
 
@@ -11,6 +12,7 @@ export function createOmoSdk(options: OmoSdkOptions = {}): OmoSdk {
   return assembleOmoSdk(options, {
     cores: {
       install: async () => installCore(),
+      diagnostics: diagnosticsLoader,
     },
   })
 }

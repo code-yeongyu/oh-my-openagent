@@ -1,7 +1,7 @@
 import type { AccountAccess } from "../access"
 import { createAccountApi, type SignInProcess } from "../account"
 import { launcherSignInProcess } from "../account/sign-in-process"
-import { createConfigApi } from "../config"
+import { type ConfigFileSystemPort, createConfigApi } from "../config"
 import type { CallOptions } from "../contract"
 import { createDeviceServiceApi, type DeviceServiceApi, type DeviceServiceStatusPort } from "../device-service"
 import { createDevicesApi } from "../devices"
@@ -37,6 +37,7 @@ export function shippedNamespaces(options: {
   readonly home?: string
   readonly signInProcess?: SignInProcess
   readonly deviceServiceStatus?: DeviceServiceStatusPort
+  readonly fileSystem?: ConfigFileSystemPort
 }): NamespaceServing {
   const account = createAccountApi(options.access, {
     process: options.signInProcess ?? launcherSignInProcess(options.env["OMO_BIN"]),
@@ -48,7 +49,11 @@ export function shippedNamespaces(options: {
     ...(options.home === undefined ? {} : { home: options.home }),
     ...(options.deviceServiceStatus === undefined ? {} : { status: options.deviceServiceStatus }),
   })
-  const config = createConfigApi({ cwd: options.cwd, env: options.env })
+  const config = createConfigApi({
+    cwd: options.cwd,
+    env: options.env,
+    ...(options.fileSystem === undefined ? {} : { fileSystem: options.fileSystem }),
+  })
   return {
     members: {
       "account.whoami": account.whoami,

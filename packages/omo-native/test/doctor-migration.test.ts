@@ -22,15 +22,18 @@ import {
 import { posixRuntimeWrapper } from "../../omo-codex/src/install/codex-cache-runtime-wrapper"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { updateTarget } from "../bin/lib/package-paths.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 
 const RESTORE = "bun add -g omo-ai@beta"
 // The repair installer is named on this package's own channel.
 const REPAIR = `bunx ${releaseChannel() === "beta" ? "oh-my-openagent@beta" : "oh-my-openagent"} install --platform=native`
 const MIGRATION_MODULE = join(import.meta.dir, "..", "bin", "lib", "doctor-migration.js")
 // Runs the report in a child so a read that blocks on a FIFO fails by timeout instead of hanging the suite.
+const FINDINGS_MODULE = join(import.meta.dir, "..", "bin", "lib", "diagnostics-findings.js")
 const CHILD_REPORT = `const { migrationReport } = await import(${JSON.stringify(MIGRATION_MODULE)})
+const { renderFindings } = await import(${JSON.stringify(FINDINGS_MODULE)})
 const env = { PATH: process.env.PROBE_PATH, BUN_INSTALL: process.env.PROBE_BUN }
-console.log(JSON.stringify(migrationReport({ env, homeDir: process.env.PROBE_HOME, platform: "linux" }, "restore")))`
+console.log(JSON.stringify(renderFindings(migrationReport({ env, homeDir: process.env.PROBE_HOME, platform: "linux" }, "restore"))))`
 const roots: string[] = []
 
 type Sandbox = { root: string; home: string; npmPrefix: string; npmBin: string; bunRoot: string; bunBin: string }
@@ -106,13 +109,15 @@ function bunxSidecar(target: string): Buffer {
 }
 
 function report(sandbox: Sandbox, pathDirs: string[], extraEnv: Record<string, string> = {}): string[] {
-  return migrationReport(
-    {
-      env: { PATH: pathDirs.join(delimiter), BUN_INSTALL: sandbox.bunRoot, ...extraEnv },
-      homeDir: sandbox.home,
-      platform: "linux",
-    },
-    RESTORE,
+  return renderFindings(
+    migrationReport(
+      {
+        env: { PATH: pathDirs.join(delimiter), BUN_INSTALL: sandbox.bunRoot, ...extraEnv },
+        homeDir: sandbox.home,
+        platform: "linux",
+      },
+      RESTORE,
+    ),
   )
 }
 
@@ -619,7 +624,7 @@ describe("omo doctor migration checks", () => {
   })
 
   describe("#given runDoctor with an injected migration environment", () => {
-    test("#then the migration lines follow the Update line", () => {
+    test("#then the migration lines follow the Update line", async () => {
       const sandbox = createSandbox()
       installNpmLegacy(sandbox)
       installBunNative(sandbox)
@@ -630,7 +635,7 @@ describe("omo doctor migration checks", () => {
         output.push(String(value))
       }
       try {
-        runDoctor({ harnesses: [] }, [], {
+        await runDoctor({ harnesses: [] }, [], {
           list: () => [],
           fetchDistTags: () => null,
           daemonReport: () => [],

@@ -6,20 +6,12 @@ import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { privateFdHandoff } from "./private-fds.js"
 import { launchClaimsMemorySyncAtBoot } from "./memory-sync-boot.js"
-import { doctorCoverageLines } from "./category-coverage.js"
 import { runDoctorModels } from "./model-chains.js"
-import { doctorComputerUseLines } from "./computer-use-doctor.js"
-import { doctorConfigLines } from "./config-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
-import { runDoctor } from "./doctor.js"
-import { reflectionLockFix, reflectionLockReport } from "./doctor-reflection-lock.js"
-import {
-  memoryRuntimeDiscardResolver,
-  memoryRuntimeMaxBytesResolver,
-  memoryRuntimeReport,
-} from "./doctor-memory-runtime.js"
+import { printDoctorFix, printDoctorReap, printDoctorReport } from "./doctor.js"
+import { engineHostCall, preparedSenpi } from "./engine-host-call.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -40,17 +32,6 @@ function engineVersion() {
   } catch {
     return "unknown"
   }
-}
-
-function preparedSenpi() {
-  preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
-  const senpi = resolveSenpi()
-  ensureEnginePrepared({
-    senpiRoot: senpi.packageRoot,
-    omoVersion: packageManifest().version,
-    reinstallCommand: updateTarget().command,
-  })
-  return senpi
 }
 
 // A memory-sync launch reaches the engine through this entry, which claims before senpi's CLI loads (#11997).
@@ -139,21 +120,6 @@ function setupSuggestionForLaunch() {
   return cached.suggestion === true
 }
 
-/**
- * One call into the engine's host CLI. It prints a single JSON line and exits, so the output is
- * captured rather than inherited - `omo daemon` has to read the engine's answer to turn it into
- * an exit code, and `spawnSync` is honest about a call that is expected to be this short.
- */
-export function engineHostCall(engineArgs, options) {
-  const senpi = preparedSenpi()
-  const result = spawnSync(process.execPath, [senpi.cliPath, ...engineArgs], {
-    encoding: "utf8",
-    env: senpiEnvironment(senpi.packageRoot, options.env),
-    windowsHide: true,
-  })
-  return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
-}
-
 export function rollbackMigrateCall(request) {
   const runtime = join(packageRoot, "plugin", "runtime", "rollback-migrate.js")
   const result = spawnSync(process.execPath, [runtime], {
@@ -225,44 +191,9 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
       return
     }
-    if (args[1] === "--fix") {
-      const extra = args.slice(2).filter((arg) => arg !== "--dry-run")
-      if (extra.length > 0) {
-        console.log(`FAIL unknown argument ${JSON.stringify(extra[0])}: omo doctor --fix [--dry-run]`)
-        process.exitCode = 1
-        return
-      }
-      const result = await reflectionLockFix({ dryRun: args.includes("--dry-run") })
-      console.log(result.lines.join("\n"))
-      process.exitCode = result.failed ? 1 : 0
-      return
-    }
-    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock, memoryRuntime] =
-      args[1] === "--reap"
-        ? [[], [], [], [], []]
-        : await Promise.all([
-            doctorCoverageLines({ agentDir: canonicalAgentDir() }),
-            doctorComputerUseLines(),
-            doctorConfigLines(),
-            reflectionLockReport(),
-            memoryRuntimeReport({
-              maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot: join(packageRoot, "plugin") }),
-              discardFor: memoryRuntimeDiscardResolver({ pluginRoot: join(packageRoot, "plugin") }),
-            }).then(
-              (report) => report.lines,
-              (error) => [
-                `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`,
-              ],
-            ),
-          ])
-    runDoctor(await detectHarnesses(), args.slice(1), {
-      daemonEngine: { run: engineHostCall },
-      categoryCoverage,
-      computerUse,
-      configDiagnostics,
-      reflectionLock,
-      memoryRuntime,
-    })
+    if (args[1] === "--fix") process.exitCode = await printDoctorFix(args.slice(2))
+    else if (args[1] === "--reap") process.exitCode = await printDoctorReap(args.slice(2))
+    else process.exitCode = await printDoctorReport()
     return
   }
   if (command === "setup") {

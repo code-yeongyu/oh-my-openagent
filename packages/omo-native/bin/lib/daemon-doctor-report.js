@@ -1,34 +1,41 @@
 import { DAEMON_EXIT } from "./daemon-args.js"
-import { daemonConfigDoctorLines } from "./daemon-config.js"
+import { daemonConfigFindings } from "./daemon-config.js"
 import { parseEngineLine, readAllEndpoints } from "./daemon-operations.js"
-import { formatDoctorLines } from "./daemon-status.js"
+import { endpointFindings } from "./daemon-status.js"
+import { finding } from "./diagnostics-findings.js"
 
 /**
- * The `omo doctor` view: one INFO line, never a FAIL - a machine without a daemon is healthy,
- * it just has nothing shared to report. Returned as lines so doctor can place it with the rest.
+ * The `omo doctor` view: INFO findings, never a FAIL - a machine without a daemon is healthy,
+ * it just has nothing shared to report.
  */
-export function daemonReportLines(options) {
-  const configLines = daemonConfigDoctorLines({
+export function daemonFindings(options) {
+  const config = daemonConfigFindings({
     pluginRoot: options.pluginRoot,
     agentDir: options.agentDir,
     env: options.env,
     cwd: options.cwd,
     loadRuntime: options.loadTaskConfig,
   })
-  return [...engineReportLines(options), ...configLines]
+  return [...engineFindings(options), ...config]
 }
 
-function engineReportLines({ engine, agentDir, env, platform }) {
-  if (platform === "win32") return ["INFO Daemon: unavailable on win32 (no unix socket to share)"]
-  const all = readAllEndpoints(engine, agentDir, env)
+const NOT_RUNNING = finding("daemon", "notice", "Daemon: not running", { state: "not_running" })
+const TOO_OLD = finding("daemon", "notice", "Hosts: engine too old to enumerate", { state: "engine_too_old" })
+
+function engineFindings({ engine, agentDir, env, platform, endpoints }) {
+  if (platform === "win32")
+    return [
+      finding("daemon", "notice", "Daemon: unavailable on win32 (no unix socket to share)", { state: "unsupported" }),
+    ]
+  const all = endpoints === undefined ? readAllEndpoints(engine, agentDir, env) : { kind: "all", endpoints }
   if (all.kind === "all") {
-    if (all.endpoints.length === 0) return ["INFO Daemon: not running"]
-    return formatDoctorLines(all.endpoints)
+    if (all.endpoints.length === 0) return [NOT_RUNNING]
+    return endpointFindings(all.endpoints)
   }
   const result = engine.run(["host", "status", "--json"], { env: { ...env, OMO_AGENT_DIR: agentDir } })
   const parsed = parseEngineLine(result.stdout ?? "")
   if (result.exitCode !== DAEMON_EXIT.ok || parsed === undefined) {
-    return ["INFO Daemon: not running", "INFO Hosts: engine too old to enumerate"]
+    return [NOT_RUNNING, TOO_OLD]
   }
   const sessions = parsed.sessions?.total ?? parsed.sessions?.length ?? 0
   const parts = [
@@ -38,5 +45,12 @@ function engineReportLines({ engine, agentDir, env, platform }) {
     `${sessions} session(s)`,
     `zombies ${parsed.zombies ?? 0}`,
   ].filter(Boolean)
-  return [`INFO Daemon: running ${parts.join(" · ")}`, "INFO Hosts: engine too old to enumerate"]
+  return [
+    finding("daemon", "notice", `Daemon: running ${parts.join(" · ")}`, {
+      state: "running",
+      pid: parsed.pid,
+      sessions,
+    }),
+    TOO_OLD,
+  ]
 }

@@ -22,7 +22,7 @@ export const HOST_CALLS = {
   "daemon.rollbackPrepare": valueCall<result.DaemonRollbackPrepare>()(input.DaemonRollbackPrepare),
   "daemon.shardPath": instantCall<result.DaemonShardPath>()(input.DaemonShardPath),
   "diagnostics.run": valueCall<result.Diagnostics>()(input.DiagnosticsRun),
-  "diagnostics.models": valueCall<result.Diagnostics>()(input.DiagnosticsModels),
+  "diagnostics.models": valueCall<result.ModelChains>()(input.DiagnosticsModels),
   "diagnostics.fixReflectionLock": valueCall<result.FixReflectionLock>()(input.DiagnosticsFixReflectionLock),
   "diagnostics.reapStaleEngines": valueCall<result.ReapStaleEngines>()(input.DiagnosticsReapStaleEngines),
   "install.setup.detect": valueCall<result.SetupInventory>()(input.InstallSetupDetect),

@@ -297,7 +297,7 @@ export async function runCompiledLauncher(
         args: args.slice(1),
         options: migration,
       })
-    } else runDoctor(inventory, [], { daemonEngine: engine })
+    } else await runDoctor(inventory, [], { daemonEngine: engine })
     return true
   }
   // The same consent-gated import as `bin/omo.js`, with its coverage row answered by this binary.

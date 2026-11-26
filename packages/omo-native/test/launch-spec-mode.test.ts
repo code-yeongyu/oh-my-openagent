@@ -5,7 +5,12 @@ import { join } from "node:path"
 import { readDaemonLaunchSpec } from "../../senpi-task/src/runners/rpc-host/launch-spec"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { preparePluginLaunchSpec } from "../bin/lib/engine-prepare.js"
-import { launchSpecDoctorLines, normalizeLaunchSpecMode } from "../bin/lib/launch-spec-mode.js"
+import { launchSpecFindings, normalizeLaunchSpecMode } from "../bin/lib/launch-spec-mode.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const launchSpecDoctorLines = (...args: Parameters<typeof launchSpecFindings>) =>
+  renderFindings(launchSpecFindings(...args))
 
 const SPEC = {
   spec_version: 1,
@@ -35,7 +40,9 @@ function pluginWithSpec(mode: number): { pluginRoot: string; specPath: string } 
 
 const modeOf = (path: string) => statSync(path).mode & 0o777
 
-function captureDoctor(options: Record<string, unknown>): { stdout: string; exitCode: typeof process.exitCode } {
+async function captureDoctor(
+  options: Record<string, unknown>,
+): Promise<{ stdout: string; exitCode: typeof process.exitCode }> {
   const output: string[] = []
   const originalLog = console.log
   const originalExitCode = process.exitCode
@@ -44,7 +51,12 @@ function captureDoctor(options: Record<string, unknown>): { stdout: string; exit
   }
   process.exitCode = undefined
   try {
-    runDoctor({ harnesses: [] }, [], { list: () => [], fetchDistTags: () => null, daemonReport: () => [], ...options })
+    await runDoctor({ harnesses: [] }, [], {
+      list: () => [],
+      fetchDistTags: () => null,
+      daemonReport: () => [],
+      ...options,
+    })
     return { stdout: output.join("\n"), exitCode: process.exitCode }
   } finally {
     console.log = originalLog
@@ -206,10 +218,10 @@ describe("omo doctor launch spec line (#9208)", () => {
     },
   )
 
-  posixOnly("#given a rejected spec #when omo doctor runs #then it prints the FAIL line and exits 1", () => {
+  posixOnly("#given a rejected spec #when omo doctor runs #then it prints the FAIL line and exits 1", async () => {
     const { pluginRoot, specPath } = pluginWithSpec(0o644)
 
-    const { stdout, exitCode } = captureDoctor({
+    const { stdout, exitCode } = await captureDoctor({
       pluginRoot,
       launchSpecIo: { stat: () => ({ isFile: () => true, mode: 0o100664, uid: process.getuid?.() ?? 0 }) },
     })

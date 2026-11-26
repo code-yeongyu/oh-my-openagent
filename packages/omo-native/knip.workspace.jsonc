@@ -67,8 +67,10 @@
     "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
     // pre-existing at origin dev 4686e425b5: unused export(s) aggregateEndpoints
     "packages/omo-native/bin/lib/daemon-status.js": ["aggregateEndpoints"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, formatMigrationLines, openCodeRoutingReport
-    "packages/omo-native/bin/lib/doctor-migration.js": ["omoInstallsOnPath", "findLegacyPackages", "findOpenCodeRegistrations", "formatMigrationLines", "openCodeRoutingReport"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, openCodeRoutingReport
+    "packages/omo-native/bin/lib/doctor-migration.js": ["omoInstallsOnPath", "findLegacyPackages", "findOpenCodeRegistrations", "openCodeRoutingReport"],
+    // the declaration of the sibling plain-JS diagnostics core, which the SDK root's loader resolves to (#14959)
+    "packages/omo-native/bin/lib/diagnostics.d.ts": ["run", "models", "fixReflectionLock", "reapStaleEngines"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PI_CONFIG_FILES
     "packages/omo-native/bin/lib/doctor-pi-config.js": ["PI_CONFIG_FILES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) installedDistTag

@@ -150,6 +150,7 @@ const PORT_NAMES = {
   now: true,
   deviceServiceStatus: true,
   signInProcess: true,
+  fileSystem: true,
 } as const satisfies Record<keyof OmoSdkPorts, true>
 
 function notFake(ports: OmoSdkPorts): string[] {
@@ -197,6 +198,17 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     },
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
+    // config.status's file-system port: healthy, no config file exists; faulting, every read throws holding a secret.
+    fileSystem: fault
+      ? {
+          existsSync: () => {
+            throw new Error(`port failed while holding ${CANARIES.providerKey}`)
+          },
+          readFileSync: () => {
+            throw new Error(`port failed while holding ${CANARIES.providerKey}`)
+          },
+        }
+      : { existsSync: () => false, readFileSync: () => "" },
     host: canaryHost(fault),
     // With ports faulting the gateway store faults too; healthy, it is a store the scan builds in its own scratch agent
     // dir, so its file is read column by column.
@@ -331,15 +343,12 @@ const EXPECTED_B8_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, 
 // Built, permitted calls that answer without touching a port, with every port faulting (observed; each with its reason).
 // Permitted, built calls that still answer without a port: GAPS, each with the slice that gives the call its port. The
 // list is closed and self-retiring: once the call touches a port, the exact-list check below fails until its entry is
-// removed. config.status reads the config files under the home directly; daemon.warm opens the daemon's socket directly.
+// removed. daemon.warm opens the daemon's socket directly.
 const PORT_GAPS: readonly {
   readonly call: RootCallKey
   readonly principals: readonly string[]
   readonly owner: string
-}[] = [
-  { call: "config.status", principals: ["script", "person", "session", "service"], owner: "C1b" },
-  { call: "daemon.warm", principals: ["script", "person"], owner: "C1a" },
-]
+}[] = [{ call: "daemon.warm", principals: ["script", "person"], owner: "C1a" }]
 const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
   ["script", "person", "session", "connector", "service"].map((kind) => [
     kind,

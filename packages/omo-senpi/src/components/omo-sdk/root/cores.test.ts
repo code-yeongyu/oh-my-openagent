@@ -16,7 +16,7 @@ describe("the root's launcher-side cores", () => {
         cores: {
           diagnostics: async (context) => {
             contexts.push(context)
-            return { run: async () => ({ kind: "ok", value: { findings: [] } }) }
+            return { run: async () => ({ kind: "ok", value: { findings: [], failed: false } }) }
           },
         },
       },
@@ -36,8 +36,16 @@ describe("the root's launcher-side cores", () => {
           diagnostics: async () => {
             loads += 1
             return {
-              run: async () => ({ kind: "ok", value: { findings: [] } }),
-              models: async () => ({ kind: "ok", value: { findings: [] } }),
+              run: async () => ({ kind: "ok", value: { findings: [], failed: false } }),
+              models: async () => ({
+                kind: "ok",
+                value: {
+                  excludeModels: [],
+                  categories: [],
+                  agents: [],
+                  modelProfile: { profile: "default", selection: "default", rungs: [] },
+                },
+              }),
             }
           },
         },
@@ -57,7 +65,7 @@ describe("the root's launcher-side cores", () => {
           diagnostics: async () => {
             loads += 1
             if (loads === 1) throw new Error("loader-secret-detail")
-            return { run: async () => ({ kind: "ok", value: { findings: [] } }) }
+            return { run: async () => ({ kind: "ok", value: { findings: [], failed: false } }) }
           },
         },
       },
@@ -78,7 +86,9 @@ describe("the root's launcher-side cores", () => {
           diagnostics: (() => {
             loads += 1
             if (loads === 1) throw new Error("sync-loader-detail")
-            return Promise.resolve({ run: async () => ({ kind: "ok" as const, value: { findings: [] } }) })
+            return Promise.resolve({
+              run: async () => ({ kind: "ok" as const, value: { findings: [], failed: false } }),
+            })
           }) as never,
         },
       },
@@ -95,7 +105,9 @@ describe("the root's launcher-side cores", () => {
       { env, cwd: tmpdir() },
       {
         cores: {
-          diagnostics: (() => ({ run: async () => ({ kind: "ok" as const, value: { findings: [] } }) })) as never,
+          diagnostics: (() => ({
+            run: async () => ({ kind: "ok" as const, value: { findings: [], failed: false } }),
+          })) as never,
         },
       },
     )

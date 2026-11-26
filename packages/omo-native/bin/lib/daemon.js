@@ -16,7 +16,7 @@ import { blockingPause, DAEMON_EXIT, readTimeoutSeconds } from "./daemon-args.js
 import { readDaemonConfig } from "./daemon-config.js"
 
 export { DAEMON_EXIT } from "./daemon-args.js"
-export { daemonReportLines } from "./daemon-doctor-report.js"
+export { daemonFindings } from "./daemon-doctor-report.js"
 
 /**
  * `omo daemon` - the operator's view of every engine host in one agent dir: the operator daemon on

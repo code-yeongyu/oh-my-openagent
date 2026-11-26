@@ -4,14 +4,18 @@ import { createHash, randomUUID } from "node:crypto"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
-import { formatComputerUseDoctorLines } from "../bin/lib/computer-use-doctor.js"
+import { computerUseFindings } from "../bin/lib/computer-use-doctor.js"
 import { computerUseDoctorReport, type ComputerUseDoctorReport } from "../computer-use-doctor-runtime"
 import type { EngineLauncher } from "../computer-use-engine-probe"
 import * as releaseSignature from "../../senpi-desktop-engine/src/release-signature"
 
 const PROBE_HANG_CEILING_MS = process.platform === "win32" ? 60_000 : 20_000
 import { describeEngineSource } from "../../omo-senpi/src/components/computer-use/engine-source"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const formatComputerUseDoctorLines = (report: Parameters<typeof computerUseFindings>[0]) =>
+  renderFindings(computerUseFindings(report))
 
 const roots: string[] = []
 

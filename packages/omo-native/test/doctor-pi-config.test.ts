@@ -3,7 +3,18 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, wri
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { findPiConfigEdits, formatPiConfigLines, piConfigReport } from "../bin/lib/doctor-pi-config.js"
+import {
+  findPiConfigEdits,
+  piConfigFindings,
+  piConfigReport as piConfigFindingsReport,
+} from "../bin/lib/doctor-pi-config.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const piConfigReport = (options: Parameters<typeof piConfigFindingsReport>[0]) =>
+  renderFindings(piConfigFindingsReport(options))
+const formatPiConfigLines = (agentDir: string, edits: Parameters<typeof piConfigFindings>[1]) =>
+  renderFindings(piConfigFindings(agentDir, edits))
 
 const roots: string[] = []
 

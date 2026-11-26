@@ -3,10 +3,14 @@ import { spawn } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
-import { formatComputerUseDoctorLines } from "../bin/lib/computer-use-doctor.js"
+import { computerUseFindings } from "../bin/lib/computer-use-doctor.js"
 import { computerUseDoctorReport } from "../computer-use-doctor-runtime"
 import type { EngineLauncher } from "../computer-use-engine-probe"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const formatComputerUseDoctorLines = (report: Parameters<typeof computerUseFindings>[0]) =>
+  renderFindings(computerUseFindings(report))
 
 const roots: string[] = []
 
