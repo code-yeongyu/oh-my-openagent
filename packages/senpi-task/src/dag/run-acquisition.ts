@@ -172,17 +172,33 @@ export function acquireDagRun<T extends LeasedRecord>(
     const decision = decideDagRun(fresh, request)
     if (decision.kind === "not_eligible") return { kind: "not_eligible", record: fresh }
     if (decision.kind === "held") return decision
-    let reservation = request.reservation
-    if (reservation === undefined && request.reservations !== undefined) {
-      reservation = request.reservations.reserve(runId, request.operation)
-      if (reservation === undefined)
-        return { kind: "busy", operation: request.reservations.inFlight(runId) ?? request.operation }
+    if (request.reservation !== undefined || request.reservations === undefined)
+      return writeLease(store, runId, fresh, request, request.reservation)
+    const own = request.reservations.reserve(runId, request.operation)
+    if (own === undefined) return { kind: "busy", operation: request.reservations.inFlight(runId) ?? request.operation }
+    // The caller only receives a reservation this function created once the lease is written; on any
+    // failure before that nobody else could release it, so it is released here. A caller-owned one
+    // (`request.reservation`) is never released here.
+    try {
+      return writeLease(store, runId, fresh, request, own)
+    } catch (error) {
+      own.release()
+      throw error
     }
-    const claimed = request.claim?.(fresh) ?? fresh
-    if (claimed === fresh && fresh.leaseHolderPid === request.probe.hostPid)
-      return { kind: "acquired", record: fresh, reservation }
-    const record = { ...claimed, leaseHolderPid: request.probe.hostPid }
-    store.writeCheckpoint(runId, record)
-    return { kind: "acquired", record, reservation }
   })
+}
+
+function writeLease<T extends LeasedRecord>(
+  store: Pick<DagFileStore, "writeCheckpoint">,
+  runId: DagRunId,
+  fresh: T,
+  request: DagRunAcquisitionRequest<T>,
+  reservation: DagRunReservation | undefined,
+): DagRunAcquisition<T> {
+  const claimed = request.claim?.(fresh) ?? fresh
+  if (claimed === fresh && fresh.leaseHolderPid === request.probe.hostPid)
+    return { kind: "acquired", record: fresh, reservation }
+  const record = { ...claimed, leaseHolderPid: request.probe.hostPid }
+  store.writeCheckpoint(runId, record)
+  return { kind: "acquired", record, reservation }
 }
