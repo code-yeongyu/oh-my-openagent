@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { ROOT_CALLS, type RootCallKey } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import { inputAccepts } from "../../packages/omo-senpi/src/components/omo-sdk/contract/validate"
 import { FORMAT_CHECKED } from "../../packages/omo-senpi/test-support/omo-sdk-sample-input"
-import { boundaryInput } from "./bytes-fixtures"
+import { answerFields, boundaryInput } from "./bytes-fixtures"
 
 // Every scenario input the table states must be an input the root's boundary accepts (its call's schema and the fields
 // the root checks beyond it), unless the scenario is about an invalid input. A placeholder the boundary refuses never
@@ -22,7 +22,7 @@ function refusedAtBoundary(scenario: Scenario): string | undefined {
   const problems: string[] = []
   const input = boundaryInput(scenario.input ?? {}, problems, scenario.id)
   if (problems.length > 0) return problems.join("; ")
-  if (!inputAccepts(key, input)) return "outside the call's schema"
+  if (!inputAccepts(key, input, answerFields(scenario.input ?? {}))) return "outside the call's schema"
   const fields = typeof input === "object" && input !== null ? Object.entries(input) : []
   const bad = fields.filter(
     ([field, value]) => FORMAT_CHECKED[field] !== undefined && !FORMAT_CHECKED[field].accepts(value),

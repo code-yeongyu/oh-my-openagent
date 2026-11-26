@@ -16,24 +16,14 @@
  * A key either file already has, in the harness block or the shared base, is never overwritten.
  */
 
-import {
-  chmodSync,
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { isDeepStrictEqual } from "node:util"
 import { timestamp } from "./auth-store.js"
 import { loadEngineModels } from "./engine-models.js"
 import { insertJsoncMember } from "./jsonc-edit.js"
 import { parseJsonc } from "./jsonc.js"
+import { REAL_SETUP_FS } from "./setup-fs.js"
 import { convertModelChoices, hasModelChoices, readModelChoices } from "./setup-opencode-models.js"
 
 function isPlainObject(value) {
@@ -125,10 +115,6 @@ function classify(item) {
   return item.members.every(([, value], index) => isDeepStrictEqual(existing[index], value)) ? "carried" : "kept"
 }
 
-function list(label, values) {
-  return `${label}: ${values.length > 0 ? values.join(", ") : "none"}`
-}
-
 function labels(plan, state) {
   return plan.items.filter((item) => item.state === state).map((item) => item.label)
 }
@@ -148,20 +134,20 @@ function planNotices(items, dropped) {
   return lines
 }
 
-export function modelChoicePlanLines(plan) {
+export function modelChoicePlanEntries(plan) {
   return [
-    list("planned-model-choices", labels(plan, "pending")),
-    list("model-choices-skipped-existing", labels(plan, "kept")),
-    list("model-choices-already-carried", labels(plan, "carried")),
-    `model-choices-not-carried: ${plan.dropped.length}`,
+    { key: "planned-model-choices", value: labels(plan, "pending") },
+    { key: "model-choices-skipped-existing", value: labels(plan, "kept") },
+    { key: "model-choices-already-carried", value: labels(plan, "carried") },
+    { key: "model-choices-not-carried", value: plan.dropped.length },
   ]
 }
 
-export function modelChoiceCounts(plan) {
+export function modelChoiceCountEntries(plan) {
   return [
-    list("model-choices-carried", plan.carried ?? []),
-    list("model-choices-skipped-existing", labels(plan, "kept")),
-    `model-choices-not-carried: ${plan.dropped.length}`,
+    { key: "model-choices-carried", value: plan.carried ?? [] },
+    { key: "model-choices-skipped-existing", value: labels(plan, "kept") },
+    { key: "model-choices-not-carried", value: plan.dropped.length },
   ]
 }
 
@@ -170,31 +156,31 @@ export function modelChoiceQuestion(plan) {
   return `Write ${plan.pending} model choice(s) into ${targets.join(" and ")}? [y/N] `
 }
 
-function writeText(target, text) {
-  mkdirSync(dirname(target.path), { recursive: true })
-  if (target.text !== undefined) copyFileSync(target.path, `${target.path}.bak-${timestamp()}`)
+function writeText(target, text, fs) {
+  fs.mkdir(dirname(target.path), { recursive: true })
+  if (target.text !== undefined) fs.copyFile(target.path, `${target.path}.bak-${timestamp()}`)
   // A config symlinked from a dotfiles checkout is written through the link, not replaced by a copy.
   const destination = target.text !== undefined ? realpathSync(target.path) : target.path
   const temporary = `${destination}.tmp-${process.pid}`
   try {
-    writeFileSync(temporary, text, { encoding: "utf8", mode: 0o600 })
+    fs.writeFile(temporary, text, { encoding: "utf8", mode: 0o600 })
     // The edited file keeps its own permissions: a 0600 config must not come back world-readable.
-    if (target.text !== undefined) chmodSync(temporary, statSync(destination).mode & 0o7777)
-    renameSync(temporary, destination)
+    if (target.text !== undefined) fs.chmod(temporary, fs.mode(destination))
+    fs.rename(temporary, destination)
   } finally {
-    if (existsSync(temporary)) unlinkSync(temporary)
+    fs.remove(temporary)
   }
 }
 
 // Every edit is an insertion into the file's own text (comments, order and formatting survive);
 // a file the edit cannot reproduce exactly is left untouched and reported.
-function writeTarget(target, items, report) {
+function writeTarget(target, items, report, fs) {
   try {
     let text = target.text ?? "{}\n"
     for (const item of items) {
       for (const [key, value] of item.members) text = insertJsoncMember(text, item.path, key, value)
     }
-    writeText(target, text)
+    writeText(target, text, fs)
     return items.map((item) => item.label)
   } catch (error) {
     report(
@@ -248,6 +234,7 @@ export async function planModelChoices(stage) {
  * engine route it to their own reply). */
 export function applyModelChoices(plan, options = {}) {
   const report = options.report ?? ((line) => process.stdout.write(`${line}\n`))
+  const fs = options.fs ?? REAL_SETUP_FS
   const pending = plan.items.filter((item) => item.state === "pending")
   const targets = [...new Set(pending.map((item) => item.target))]
   plan.carried = targets.flatMap((target) =>
@@ -255,6 +242,7 @@ export function applyModelChoices(plan, options = {}) {
       target,
       pending.filter((item) => item.target === target),
       report,
+      fs,
     ),
   )
 }

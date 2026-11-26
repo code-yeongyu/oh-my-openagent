@@ -6,6 +6,7 @@ import { maybeReexecUnderBun } from "./lib/bun-runtime.js"
 import { runAttachTui, runLauncher } from "./lib/launcher.js"
 import { removeLegacyServiceCredentials } from "./lib/legacy-service-credentials.js"
 import { runRemoteAttachLaunch } from "./lib/remote-attach-launch.js"
+import { reportFatal } from "./lib/fatal.js"
 import { runSetup } from "./lib/setup-import.js"
 
 try {
@@ -41,8 +42,7 @@ try {
         },
         runTui: runAttachTui,
         reportError: (error) => {
-          console.error(`omo: ${error.message}`)
-          process.exitCode = 1
+          process.exitCode = reportFatal(error)
         },
         exit: () => process.exit(),
       })
@@ -53,6 +53,5 @@ try {
     else await runLauncher()
   }
 } catch (error) {
-  console.error(`omo: ${error.message}`)
-  process.exitCode = 1
+  process.exitCode = reportFatal(error)
 }

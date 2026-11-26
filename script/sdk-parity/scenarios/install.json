@@ -12,7 +12,7 @@
           "port": "fs",
           "op": "read",
           "args": {
-            "path": "~/.config/opencode/opencode.json"
+            "path": "~/.local/share/opencode/auth.json"
           }
         },
         {
@@ -51,28 +51,17 @@
       "id": "install.setup.apply/all-consents-once",
       "row": "install.setup.apply",
       "kind": "effect",
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
       "input": {
-        "plan": {
-          "inventory": {
-            "harnesses": []
-          },
-          "stages": [
-            {
-              "id": "import-credentials",
-              "description": "import API credentials"
-            }
-          ]
-        },
+        "plan": "$answer:1",
         "consent": "all"
       },
       "expect": [
-        {
-          "port": "fs",
-          "op": "read",
-          "args": {
-            "path": "~/.config/opencode/opencode.json"
-          }
-        },
         {
           "port": "terminal",
           "op": "read",
@@ -82,15 +71,16 @@
           "port": "fs",
           "op": "write",
           "args": {
-            "path": "<agent-dir>/auth.json"
+            "path": "/agent/auth.json"
           }
         }
       ]
     },
     {
-      "id": "install.setup.apply/given-plan-applies-its-stages",
+      "id": "install.setup.apply/foreign-plan-refused",
       "row": "install.setup.apply",
-      "kind": "effect",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
       "input": {
         "consent": "all",
         "plan": {
@@ -99,8 +89,8 @@
           },
           "stages": [
             {
-              "id": "import-credentials",
-              "description": "import"
+              "id": "credentials",
+              "description": "import API credentials"
             }
           ]
         }
@@ -109,29 +99,16 @@
         {
           "port": "fs",
           "op": "read",
-          "args": {
-            "path": "~/.config/opencode/opencode.json"
-          },
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
           "count": 0
         },
         {
           "port": "terminal",
           "op": "read",
-          "count": 0
-        },
-        {
-          "port": "fs",
-          "op": "write",
-          "args": {
-            "path": "<agent-dir>/auth.json"
-          }
-        },
-        {
-          "port": "fs",
-          "op": "write",
-          "args": {
-            "path": "<agent-dir>/models.json"
-          },
           "count": 0
         }
       ]
@@ -160,38 +137,39 @@
       "id": "install.setup.apply/each-asks-per-stage",
       "row": "install.setup.apply",
       "kind": "effect",
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
       "input": {
-        "plan": {
-          "inventory": {
-            "harnesses": []
-          },
-          "stages": [
-            {
-              "id": "import-credentials",
-              "description": "import API credentials"
-            }
-          ]
-        },
-        "consent": "each"
+        "plan": "$answer:1",
+        "consent": "each",
+        "decide": "$callback"
+      },
+      "callbacks": {
+        "decide": [
+          {
+            "when": {
+              "id": "credentials"
+            },
+            "answer": "apply",
+            "effects_before": 0
+          }
+        ]
       },
       "expect": [
         {
-          "port": "fs",
-          "op": "read",
-          "args": {
-            "path": "~/.config/opencode/opencode.json"
-          }
-        },
-        {
           "port": "terminal",
           "op": "read",
-          "count": 2
+          "count": 0
         },
         {
           "port": "fs",
           "op": "write",
           "args": {
-            "path": "<agent-dir>/auth.json"
+            "path": "/agent/auth.json"
           }
         }
       ]
@@ -224,6 +202,15 @@
           "op": "read",
           "args": {
             "path": "<package>/package.json"
+          },
+          "count": 2
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
           }
         },
         {
@@ -253,6 +240,17 @@
         {
           "port": "process",
           "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          },
           "count": 0
         }
       ]
@@ -274,7 +272,27 @@
         {
           "port": "process",
           "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          },
           "count": 0
+        }
+      ],
+      "given": [
+        {
+          "port": "fs",
+          "state": {
+            "layout": "versioned",
+            "installed": "1.0.0"
+          }
         }
       ]
     },
@@ -1816,6 +1834,637 @@
         }
       ],
       "refusal": "unsupported"
+    },
+    {
+      "id": "install.setup.apply/each-without-decide-refused",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "refusal_details": {
+        "field": "decide"
+      },
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
+      "input": {
+        "plan": "$answer:1",
+        "consent": "each"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/scan-fault-internal-error",
+      "row": "install.setup.plan",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "coverage": "malformed"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/engine-missing",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "install_failed",
+      "refusal_details": {
+        "reason": "engine_missing"
+      },
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1"
+          }
+        },
+        {
+          "port": "fs",
+          "state": {
+            "installed": "1.0.1",
+            "engine": "missing"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/manager-not-started",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "install_failed",
+      "refusal_details": {
+        "reason": "manager_not_started"
+      },
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm": "missing"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.update/manager-failed",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "install_failed",
+      "refusal_details": {
+        "reason": "manager_failed",
+        "exit_status": 3
+      },
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm_exit": 3
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.update/not-moved",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "install_failed",
+      "refusal_details": {
+        "reason": "not_moved",
+        "after": "1.0.0",
+        "target": "1.0.1"
+      },
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm_exit": 0
+          }
+        },
+        {
+          "port": "fs",
+          "state": {
+            "installed": "1.0.0",
+            "installed_after": "1.0.0"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          },
+          "count": 2
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.update/file-held",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "install_failed",
+      "refusal_details": {
+        "reason": "file_held",
+        "restore": "not_needed",
+        "attempts": 3
+      },
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "platform": "win32",
+            "npm_held": "EBUSY"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          },
+          "count": 2
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          },
+          "count": 3
+        }
+      ]
+    },
+    {
+      "id": "install.update/versioned-no-bun",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "install_failed",
+      "refusal_details": {
+        "reason": "versioned",
+        "cause": "no_bun"
+      },
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "bun": "missing"
+          }
+        },
+        {
+          "port": "fs",
+          "state": {
+            "layout": "versioned"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.detect/sqlite-never-loads-caller-cancels",
+      "row": "install.setup.detect",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "sqlite": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.setup.detect/sqlite-never-loads-deadline-passes",
+      "row": "install.setup.detect",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "sqlite": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      },
+      "refusal_details": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "install.setup.plan/coverage-never-loads-caller-cancels",
+      "row": "install.setup.plan",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "coverage": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.setup.plan/coverage-never-loads-deadline-passes",
+      "row": "install.setup.plan",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "coverage": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      },
+      "refusal_details": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "install.setup.apply/decide-never-answers-caller-cancels",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
+      "input": {
+        "plan": "$answer:1",
+        "consent": "each",
+        "decide": "$callback"
+      },
+      "callbacks": {
+        "decide": [
+          {
+            "when": {
+              "id": "credentials"
+            },
+            "pending": true,
+            "effects_before": 0
+          }
+        ]
+      },
+      "refusal_details": {
+        "applied_stages": [],
+        "stopped_before": "credentials"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.setup.apply/decide-never-answers-deadline-passes",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
+      "input": {
+        "plan": "$answer:1",
+        "consent": "each",
+        "decide": "$callback"
+      },
+      "callbacks": {
+        "decide": [
+          {
+            "when": {
+              "id": "credentials"
+            },
+            "pending": true,
+            "effects_before": 0
+          }
+        ]
+      },
+      "refusal_details": {
+        "deadline_ms": 50,
+        "applied_stages": [],
+        "stopped_before": "credentials"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "install.update/manager-never-exits-caller-cancels",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm": "hang"
+          }
+        }
+      ],
+      "input": {},
+      "refusal_details": {
+        "stopped_in": "install"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.update/manager-never-exits-deadline-passes",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm": "hang"
+          }
+        }
+      ],
+      "input": {},
+      "refusal_details": {
+        "deadline_ms": 50,
+        "stopped_in": "install"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      }
     }
   ]
 }

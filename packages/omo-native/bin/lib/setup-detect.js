@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { REAL_SETUP_FS } from "./setup-fs.js"
 import { readRow, readRows } from "./sqlite-rows.js"
 
 export const KNOWN_AUTH_SCHEMA_VERSIONS = new Set([4, 7])
@@ -23,11 +24,13 @@ function harness(id, installed, providers = [], credentialTypes = [], modelHint 
   }
 }
 
-function readAuthJson(id, path) {
+function readAuthJson(id, path, read = REAL_SETUP_FS.read) {
   if (!existsSync(path)) return harness(id, false)
   const result = harness(id, true)
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8"))
+    const text = read(path)
+    if (text === undefined) throw new Error("the file is gone")
+    const parsed = JSON.parse(text)
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("expected an object")
     }
@@ -155,7 +158,7 @@ export async function detectHarnesses(options = {}) {
     detectedFilePaths(home, env)
   const senpi = readAuthJson("senpi", senpiAuthPath)
   readSenpiModels(senpiModelsPath, senpi)
-  const opencode = readAuthJson("opencode", opencodeAuthPath)
+  const opencode = readAuthJson("opencode", opencodeAuthPath, options.fs?.read)
   const ompModels = existsSync(ompModelsPath) ? "models.db: yes" : "models.db: no"
   const gjcModels = readGajaeModels(gjcConfigPath)
   let DatabaseSync

@@ -5,19 +5,10 @@
  * `planAssets` only reads; `applyAssets` is the one writer.
  */
 
-import {
-  copyFileSync,
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { packageRoot } from "./package-paths.js"
+import { REAL_SETUP_FS } from "./setup-fs.js"
 import { planOpencodeAssets } from "./setup-opencode-assets.js"
 
 // The plugin's bundled skills reach the engine through `resources_discover`, which senpi appends
@@ -67,59 +58,50 @@ function timestamp() {
   return new Date().toISOString().replace(/[-:]/g, "")
 }
 
-function writeMcp(path, target, added) {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-  if (target.bytes !== undefined) copyFileSync(path, `${path}.bak-${timestamp()}`)
+function writeMcp(path, target, added, fs) {
+  fs.mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  if (target.bytes !== undefined) fs.copyFile(path, `${path}.bak-${timestamp()}`)
   const next = { ...target.document, mcpServers: { ...(target.document.mcpServers ?? {}) } }
   for (const server of added) next.mcpServers[server.name] = server.config
   const temporary = `${path}.tmp-${process.pid}`
   try {
     // Server env and headers can carry tokens, so this file gets the same 0600 the auth store does.
-    writeFileSync(temporary, JSON.stringify(next, null, 2), { encoding: "utf8", mode: 0o600 })
-    renameSync(temporary, path)
+    fs.writeFile(temporary, JSON.stringify(next, null, 2), { encoding: "utf8", mode: 0o600 })
+    fs.rename(temporary, path)
   } finally {
-    if (existsSync(temporary)) unlinkSync(temporary)
+    fs.remove(temporary)
   }
 }
 
 /** The asset stage's one writer: the servers and skills `planAssets` classified as new. */
-export function applyAssets(plan) {
+export function applyAssets(plan, options = {}) {
+  const fs = options.fs ?? REAL_SETUP_FS
   const { result, paths } = plan
-  if (result.servers.added.length > 0) writeMcp(paths.mcp, result.target, result.servers.added)
+  if (result.servers.added.length > 0) writeMcp(paths.mcp, result.target, result.servers.added, fs)
   for (const skill of result.skills.added) {
     // classifyAssets already skipped every name that exists; force: false only keeps a directory
     // created between that check and this copy from being overwritten file by file.
-    cpSync(skill.source, join(paths.skills, skill.name), { recursive: true, force: false })
+    fs.copyTree(skill.source, join(paths.skills, skill.name))
   }
 }
 
-function list(label, ids) {
-  return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
-}
-
-export function assetPlanLines({ result }) {
+export function assetPlanEntries({ result }) {
   return [
-    list(
-      "planned-mcp",
-      result.servers.added.map((server) => server.name),
-    ),
-    list("mcp-skipped-existing", result.servers.skippedExisting),
-    list(
-      "planned-skills",
-      result.skills.added.map((skill) => skill.name),
-    ),
-    list("skills-skipped-existing", result.skills.skippedExisting),
-    list("skills-skipped-bundled", result.skills.skippedBundled),
+    { key: "planned-mcp", value: result.servers.added.map((server) => server.name) },
+    { key: "mcp-skipped-existing", value: result.servers.skippedExisting },
+    { key: "planned-skills", value: result.skills.added.map((skill) => skill.name) },
+    { key: "skills-skipped-existing", value: result.skills.skippedExisting },
+    { key: "skills-skipped-bundled", value: result.skills.skippedBundled },
   ]
 }
 
-export function assetCounts({ result }) {
+export function assetCountEntries({ result }) {
   return [
-    `mcp-imported: ${result.servers.added.length}`,
-    `mcp-skipped-existing: ${result.servers.skippedExisting.length}`,
-    `skills-imported: ${result.skills.added.length}`,
-    `skills-skipped-existing: ${result.skills.skippedExisting.length}`,
-    `skills-skipped-bundled: ${result.skills.skippedBundled.length}`,
+    { key: "mcp-imported", value: result.servers.added.length },
+    { key: "mcp-skipped-existing", value: result.servers.skippedExisting.length },
+    { key: "skills-imported", value: result.skills.added.length },
+    { key: "skills-skipped-existing", value: result.skills.skippedExisting.length },
+    { key: "skills-skipped-bundled", value: result.skills.skippedBundled.length },
   ]
 }
 

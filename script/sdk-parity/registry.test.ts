@@ -16,6 +16,7 @@ import {
 import { probeBase, registryBaseProblems, repoGit } from "./base-probe"
 import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { cellProblems } from "./cells"
+import { EDITION_GAPS } from "./edition-gaps"
 import { loadScenarioRuns, runEffectScenarios } from "./conformance-run"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
@@ -48,7 +49,8 @@ describe("SDK parity registry (#14947)", () => {
     const committed = section6Of(readFileSync(DESIGN_PATH, "utf8"))
     expect(firstDifferences(rendered, committed)).toEqual([])
     expect(rendered).toBe(committed)
-    expect(cellProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
+    const opencodeGaps = new Set(EDITION_GAPS.filter((gap) => gap.edition === "opencode").map((gap) => gap.row))
+    expect(cellProblems(readFileSync(TEMPLATE_PATH, "utf8"), files, opencodeGaps)).toEqual([])
     expect(mappingProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
   })
 

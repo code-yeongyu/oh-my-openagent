@@ -29,6 +29,10 @@ const HONOURED = new Set<string>([
   "deviceService.wake",
   "deviceService.setWake",
   "deviceService.bootstrap",
+  "install.setup.detect",
+  "install.setup.plan",
+  "install.setup.apply",
+  "install.update",
 ])
 
 export type Cancellation = "honoured" | "gap"

@@ -50,7 +50,64 @@ export type SetupPlans = { readonly [stage: string]: unknown }
 export type SetupApplyStage = {
   readonly id: SetupStageId
   readonly plan: SetupStagePlan
+  /** The consent question `omo setup --ask-each` shows for this stage's current plan. */
+  readonly question: (plan: SetupStagePlan) => string
 }
+
+type ListEntry<Key extends string> = { readonly key: Key; readonly value: readonly string[] }
+type CountEntry<Key extends string> = { readonly key: Key; readonly value: number }
+
+/** One line of `omo setup --dry-run`: what a stage's plan holds, by key. */
+export type SetupPlanEntry =
+  | ListEntry<
+      | "planned-add"
+      | "skipped-existing"
+      | "skipped-oauth"
+      | "skipped-unmapped"
+      | "planned-mcp"
+      | "mcp-skipped-existing"
+      | "planned-skills"
+      | "skills-skipped-existing"
+      | "skills-skipped-bundled"
+      | "planned-providers"
+      | "providers-skipped-existing"
+      | "planned-model-choices"
+      | "model-choices-skipped-existing"
+      | "model-choices-already-carried"
+    >
+  | CountEntry<"model-choices-not-carried">
+
+/** One line of the counts an apply reports, by key. */
+export type SetupCountEntry =
+  | CountEntry<
+      | "imported"
+      | "skipped-existing"
+      | "skipped-oauth"
+      | "skipped-unmapped"
+      | "mcp-imported"
+      | "mcp-skipped-existing"
+      | "skills-imported"
+      | "skills-skipped-existing"
+      | "skills-skipped-bundled"
+      | "provider-keys-imported"
+      | "providers-skipped-existing"
+      | "model-choices-not-carried"
+    >
+  | ListEntry<"providers-imported" | "model-choices-carried" | "model-choices-skipped-existing">
+
+export type SetupEntry = SetupPlanEntry | SetupCountEntry
+
+export function setupEntryText(entry: SetupEntry): string
+
+export type SetupStage = SetupApplyStage & {
+  readonly plan: SetupStagePlan | undefined
+  readonly present: boolean
+  readonly entries: (plan: SetupStagePlan) => SetupPlanEntry[]
+  readonly countEntries: (plan: SetupStagePlan) => SetupCountEntry[]
+}
+
+/** In apply order; a stage whose source failed has no plan and is never applied. */
+export function setupStages(plans: SetupPlans): SetupStage[]
 
 export function canonicalAgentDir(env?: Readonly<Record<string, string | undefined>>, home?: string): string
 
@@ -75,6 +132,10 @@ export type SetupApplyOptions = {
   readonly writeAuth?: (target: string, additions: readonly SetupAuthEntry[]) => Promise<void> | void
   /** Receives the apply's notice lines (the CLI prints them; an RPC caller collects them into its reply). */
   readonly report?: (line: string) => void
+  /** The file effects the stages make (setup-fs.js); the real file system when absent. */
+  readonly fs?: typeof import("./setup-fs.js").REAL_SETUP_FS
+  /** The calling install.setup.apply's signal: the model-choice replan ends on it, before any write. */
+  readonly signal?: AbortSignal
 }
 
 /** Refused by `applySetupStages` when `staleGuard` finds a target that changed since planning. */
@@ -92,6 +153,11 @@ export function staleSetupTargets(
 
 /** True when any of the given stages would write into a credential store. */
 export function authWritesPending(plans: SetupPlans, stageIds: Iterable<SetupStageId>): boolean
+
+/** Which stages an apply had written when \`error\` left it, and the stage that threw. */
+export function setupApplyFault(
+  error: unknown,
+): { readonly applied: readonly SetupStageId[]; readonly stage: SetupStageId } | undefined
 
 export function applySetupStages(
   plans: SetupPlans,

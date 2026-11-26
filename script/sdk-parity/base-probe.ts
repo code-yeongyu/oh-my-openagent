@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process"
 import { offenderGrowth } from "../remote-import-guard-adapter"
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
+import { EDITION_GAPS_PATH, type EditionGap, editionGapAdditionProblems } from "./edition-gaps"
 import { PORT_CONTEXT } from "./conformance-run"
 import { REPO_ROOT } from "./registry"
 import type { Row } from "./schema"
@@ -89,4 +90,25 @@ export function offenderBaseProblems(git: GitPort, head: OffenderRecord, ref: st
   if (!probe.readable) return { skipped: probe.reason }
   const recorded = showAt(git, probe.base, "script/remote-import-guard-adapter-offenders.json")
   return { problems: offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), head) }
+}
+
+/** A gap the merge base does not have fails unless this head clears its row (edition-gaps.ts). */
+export function editionGapBaseProblems(
+  git: GitPort,
+  head: readonly EditionGap[],
+  headUnresolved: ReadonlySet<string>,
+  ref: string = BASE_REF,
+): BaseCheck {
+  const probe = probeBase(git, ref)
+  if (!probe.readable) return { skipped: probe.reason }
+  const gaps = showAt(git, probe.base, EDITION_GAPS_PATH)
+  const unresolved = showAt(git, probe.base, UNRESOLVED_PATH)
+  return {
+    problems: editionGapAdditionProblems(
+      head,
+      gaps === undefined ? [] : (JSON.parse(gaps) as { entries: EditionGap[] }).entries,
+      new Set(unresolved === undefined ? [] : (JSON.parse(unresolved) as Baseline).entries.map((entry) => entry.id)),
+      headUnresolved,
+    ),
+  }
 }

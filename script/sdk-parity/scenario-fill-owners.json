@@ -1,4 +1,10 @@
 {
   "version": 1,
-  "rows": {}
+  "rows": {
+    "install.setup.apply": "C1c",
+    "install.setup.detect": "C1c",
+    "install.setup.plan": "C1c",
+    "install.update": "C1c",
+    "install.version": "C1c"
+  }
 }

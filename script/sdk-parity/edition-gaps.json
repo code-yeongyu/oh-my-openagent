@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "row": "install.update",
+      "edition": "compiled",
+      "reason": "the compiled binary's omo update runs compiledInstallUpdate, not the core the root's install loader binds (the npm launcher library's update), so the root cannot do in that edition what the command does",
+      "retires_with": "#15010",
+      "evidence": {
+        "entry": "packages/omo-native/compile-entry.ts",
+        "module": "packages/omo-native/compiled-update.ts",
+        "calls": "compiledInstallUpdate"
+      }
+    },
+    {
+      "row": "install.version",
+      "edition": "opencode",
+      "reason": "the OpenCode edition's version command and its -v/--version flags print that edition's own package version; it has no projection of install.version yet",
+      "retires_with": "#14963",
+      "evidence": {
+        "entry": "packages/omo-opencode/src/cli/index.ts",
+        "module": "packages/omo-opencode/src/cli/cli-program.ts",
+        "calls": "version"
+      }
+    }
+  ]
+}

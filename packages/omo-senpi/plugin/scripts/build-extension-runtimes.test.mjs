@@ -141,8 +141,11 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 
 // The provisioned SDK root runtime's cold-import decision (design lane and owner, P1b #14950): the call table, the thread
 // contracts and the thread core load on first use and the file may not grow. Raising the ceiling or adding a static path
-// reopens that decision; the split into a second runtime file is the next SDK slice's.
-const OMO_SDK_RUNTIME_BYTES = 933_161
+// reopens that decision; the split into a second runtime file is the next SDK slice's. Raised by the LEAD's ruling for
+// slice C1c (#14960) by the measured 670 bytes of install contract data (install_failed's closed reasons, install on the
+// cancelled and timeout codes, four honoured-cancellation calls, decide's callback shape); the static import set is
+// unchanged.
+const OMO_SDK_RUNTIME_BYTES = 933_831
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 async function staticModules(entry) {

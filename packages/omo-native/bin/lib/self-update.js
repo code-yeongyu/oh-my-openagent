@@ -1,34 +1,11 @@
-import { dirname, join } from "node:path"
-import { runChild } from "./child-process.js"
-import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
-import {
-  channelDistTagVersion,
-  channelPackageSpec,
-  packageManifest,
-  packageRoot,
-  readJson,
-  releaseChannel,
-  resolveSenpi,
-  updateTarget,
-} from "./package-paths.js"
+import { exitOf, INSTALL_UPDATE_EXITS, readInstalledVersion, update } from "./install-calls.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
-import { findHolders, heldTarget, isLockFailure, listWindowsProcesses, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
-import { findVersionedInstall, updateVersionedInstall, versionedUpdateTarget } from "./versioned-install.js"
+import { versionedUpdateLines } from "./versioned-install.js"
 
-export { isPrintOnlyUpdate }
+export { isPrintOnlyUpdate, readInstalledVersion }
 
 export function formatUpdateCommand(update) {
   return `omo is updated via ${update.manager}: ${update.command}`
-}
-
-export function readInstalledVersion() {
-  let engine = "unknown"
-  try {
-    engine = readJson(join(resolveSenpi().packageRoot, "package.json")).version
-  } catch {
-    // The product version is still reportable when the engine tree cannot be resolved.
-  }
-  return { omo: packageManifest().version, engine }
 }
 
 export function formatVersionChange(before, after) {
@@ -78,172 +55,116 @@ export function formatVersionChange(before, after) {
  * @returns {Promise<number>}
  */
 export async function runSelfUpdate(args, options = {}) {
-  const resolveUpdate =
-    options.resolveUpdate ??
-    ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
-  const fetchDistTags = options.fetchDistTags ?? fetchNpmDistTagsSync
   const log = options.log ?? ((line) => console.log(line))
   const error = options.error ?? ((line) => console.error(line))
-  const run = options.run ?? runChild
-  const readInstalled = options.readInstalled ?? readInstalledVersion
-  const env = options.env ?? process.env
-  const platform = options.platform ?? process.platform
-  const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
-
   const usage = updateUsageAnswer(args)
   if (usage !== undefined) {
     ;(usage.stream === "stderr" ? error : log)(usage.text)
     return usage.exitCode
   }
-
-  const before = readInstalled()
-  const channel = releaseChannel(before.omo)
-  const target = channelDistTagVersion(fetchDistTags(), before.omo)
-  const versioned = findVersionedInstall(options.root ?? packageRoot, platform)
-  if (versioned !== undefined && target === undefined) {
-    error(
-      `omo: could not confirm the ${channel} omo-ai version from the npm registry; ${versioned.versionsDir} installs exact versions only, so retry when the registry answers`,
-    )
-    return 1
-  }
-  const update = versioned === undefined ? resolveUpdate(target) : versionedUpdateTarget(versioned, target)
-
-  if (target === undefined) {
-    log(
-      `omo: could not confirm the ${channel} omo-ai version from the npm registry; installing the unpinned ${channelPackageSpec(before.omo)}`,
-    )
-  }
-  if (isPrintOnlyUpdate(args)) {
-    log(formatUpdateCommand(update))
-    return 0
-  }
-  if (target !== undefined && target === before.omo) {
-    // Already on the target, the update installs nothing, so a broken engine tree needs the reinstall named.
-    if (before.engine === "unknown") {
-      error(
-        `omo ${before.omo} is up to date, but its engine files are missing or incomplete; reinstall with: ${update.command}`,
-      )
-      return 1
-    }
-    log(`omo ${before.omo} is up to date (omo-ai@${channel} is ${target})`)
-    return 0
-  }
-  log(formatUpdateCommand(update))
-  if (versioned !== undefined) {
-    return updateVersionedInstall({ install: versioned, before: before.omo, target, run, env, platform, log, error })
-  }
-
-  const install = async (target) => {
-    const [command, ...argv] = target.argv
-    return run(command, argv, {
-      stdio: "inherit",
-      windowsHide: true,
-      env: { ...env, ...target.env },
-      captureStderr: platform === "win32",
-    })
-  }
-  const failed = (result) => Boolean(result.signal) || (result.status ?? 1) !== 0
-  const heldOnWindows = (result) => platform === "win32" && !result.signal && isLockFailure(result.stderr)
-
-  let result
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      result = await install(update)
-    } catch {
-      error(`omo: update failed; retry with: ${update.command}`)
-      return 1
-    }
-    if (!failed(result) || !heldOnWindows(result) || attempt >= LOCK_RETRY_DELAYS_MS.length) break
-    const delay = LOCK_RETRY_DELAYS_MS[attempt]
-    log(
-      `omo: ${heldTarget(result.stderr) ?? "a package file"} is held by another process; retrying in ${delay / 1000}s (attempt ${attempt + 2} of ${LOCK_RETRY_DELAYS_MS.length + 1})`,
-    )
-    await sleep(delay)
-  }
-
-  if (failed(result) && heldOnWindows(result)) {
-    await reportHeldInstall({
-      result,
-      before,
-      install,
-      resolveUpdate,
-      readInstalled,
-      error,
-      options,
-      attempts: LOCK_RETRY_DELAYS_MS.length + 1,
-    })
-    return 1
-  }
-  if (failed(result)) {
-    error(`omo: update failed; retry with: ${update.command}`)
-    return result.status ?? 1
-  }
-
-  const after = readInstalled()
-  if (target !== undefined && after.omo !== target) {
-    error(`omo is still ${after.omo}; ${target} is published`)
-    error(`omo: update failed; retry with: ${update.command}`)
-    return 1
-  }
-  log(formatVersionChange(before, after))
-  return 0
-}
-
-function readInstalledOrUndefined(readInstalled) {
-  try {
-    return readInstalled()
-  } catch {
-    return undefined
-  }
-}
-
-async function reportHeldInstall({ result, before, install, resolveUpdate, readInstalled, error, options, attempts }) {
-  const held = heldTarget(result.stderr)
-  const file = held ?? "a package file"
-  const listProcesses = options.listProcesses ?? listWindowsProcesses
-  const installDir = options.installDir ?? dirname(packageRoot)
-  const selfPids = options.selfPids ?? [process.pid, process.ppid]
-  const holders = findHolders(installDir, listProcesses(), selfPids, held)
-
-  error(
-    `omo: update stopped: Windows would not let the package manager replace ${file}; it was still held after ${attempts} attempts.`,
+  const { log: _log, error: _error, ...ports } = options
+  const answer = await update(
+    { dry_run: isPrintOnlyUpdate(args) },
+    { ...ports, onProgress: (event) => renderProgress(event, log, error) },
   )
-  if (holders.length > 0) {
-    error(`omo: held by ${holders.map((holder) => `${holder.name} (pid ${holder.pid})`).join(", ")}`)
-    const names = [...new Set(holders.map((holder) => holder.name))].join(", ")
-    error(`omo: Quit ${names} and run omo update again.`)
-  } else {
-    error(
-      "omo: No omo command-line process was found holding it. Another app (for example the OmO desktop app or an editor) or antivirus may be holding it: close it, or wait a minute, then run omo update again.",
-    )
+  if (answer.kind === "ok") {
+    const value = answer.value
+    if (value.state === "printed") log(formatUpdateCommand({ manager: value.manager, command: value.command_line }))
+    else if (value.state === "up_to_date")
+      log(`omo ${value.before.omo} is up to date (omo-ai@${value.channel} is ${value.version})`)
+    else if (value.versioned !== undefined) {
+      log(
+        `omo ${value.before.omo} -> ${value.version} (${value.versioned.final_dir}; ${value.versioned.kept} is kept for rollback)`,
+      )
+    } else log(formatVersionChange(value.before, value.after))
+    return 0
   }
+  for (const line of failureLines(answer.error)) error(line)
+  return exitOf(INSTALL_UPDATE_EXITS, answer.error)
+}
 
-  const now = readInstalledOrUndefined(readInstalled)
-  if (now?.omo === before.omo) {
-    error(`omo: omo ${before.omo} is still installed.`)
-    return
-  }
-  // Any readable omo is a working install, even when the pinned target is unknown (registry down): the
-  // manager can fail moving an old dependency after the new omo-ai is in place, and reinstalling over it
-  // would undo a working update and hit the same held file. Only an unreadable install is restored.
-  if (now !== undefined) {
-    error(
-      `omo: omo ${now.omo} is installed, but the package manager did not finish; run omo update again afterwards to complete it.`,
+function renderProgress(event, log, error) {
+  if (event.kind === "unpinned") {
+    log(
+      `omo: could not confirm the ${event.channel} omo-ai version from the npm registry; installing the unpinned ${event.spec}`,
     )
-    return
+  } else if (event.kind === "installing") log(formatUpdateCommand(event))
+  else if (event.kind === "retrying") {
+    log(
+      `omo: ${event.file ?? "a package file"} is held by another process; retrying in ${event.delay_ms / 1000}s (attempt ${event.attempt} of ${event.attempts})`,
+    )
+  } else if (event.kind === "held") {
+    error(
+      `omo: update stopped: Windows would not let the package manager replace ${event.file ?? "a package file"}; it was still held after ${event.attempts} attempts.`,
+    )
+    if (event.holders.length > 0) {
+      error(`omo: held by ${event.holders.map((holder) => `${holder.name} (pid ${holder.pid})`).join(", ")}`)
+      const names = [...new Set(event.holders.map((holder) => holder.name))].join(", ")
+      error(`omo: Quit ${names} and run omo update again.`)
+    } else {
+      error(
+        "omo: No omo command-line process was found holding it. Another app (for example the OmO desktop app or an editor) or antivirus may be holding it: close it, or wait a minute, then run omo update again.",
+      )
+    }
   }
-  const previous = resolveUpdate(before.omo)
-  let restored
-  try {
-    restored = await install(previous)
-  } catch {
-    restored = { status: 1, signal: null }
+}
+
+const VERSIONED_KIND = {
+  no_bun: "no_bun",
+  busy: "busy",
+  bun_install_failed: "install_failed",
+  wrong_version: "wrong_version",
+  path_still_old: "not_on_path",
+}
+
+function failureLines(failure) {
+  const details = failure.details ?? {}
+  const retry = `omo: update failed; retry with: ${details.command}`
+  switch (details.reason) {
+    case "registry_unconfirmed":
+      return [
+        `omo: could not confirm the ${details.channel} omo-ai version from the npm registry; ${details.versions_dir} installs exact versions only, so retry when the registry answers`,
+      ]
+    case "engine_missing":
+      return [
+        `omo ${details.before} is up to date, but its engine files are missing or incomplete; reinstall with: ${details.command}`,
+      ]
+    case "versioned": {
+      const lines = versionedUpdateLines(
+        {
+          kind: VERSIONED_KIND[details.cause],
+          finalDir: details.final_dir,
+          holder: details.holder,
+          reported: details.reported,
+          updated: details.updated,
+          onPath: details.on_path,
+          onPathReal: details.on_path_real,
+          seen: details.seen,
+          exitCode: details.exit_status,
+        },
+        {
+          install: { versionsDir: details.versions_dir, current: details.current, versionDir: details.version_dir },
+          before: details.before,
+          target: details.target,
+        },
+      )
+      return [...lines.log, ...lines.error]
+    }
+    case "not_moved":
+      return [`omo is still ${details.after}; ${details.target} is published`, retry]
+    case "file_held":
+      if (details.restore === "not_needed") {
+        return details.installed_now === details.before
+          ? [`omo: omo ${details.before} is still installed.`]
+          : [
+              `omo: omo ${details.installed_now} is installed, but the package manager did not finish; run omo update again afterwards to complete it.`,
+            ]
+      }
+      if (details.restore === "restored") return [`omo: restored omo ${details.before}.`]
+      return [
+        `omo: the previous omo ${details.before} could not be restored; ${details.holders.length > 0 ? "after quitting the holder" : "once the file is released"}, run: ${details.previous_command}`,
+      ]
+    default:
+      return [retry]
   }
-  const after = readInstalledOrUndefined(readInstalled)
-  if ((restored.status ?? 1) === 0 && !restored.signal && after?.omo === before.omo) {
-    error(`omo: restored omo ${before.omo}.`)
-    return
-  }
-  const when = holders.length > 0 ? "after quitting the holder" : "once the file is released"
-  error(`omo: the previous omo ${before.omo} could not be restored; ${when}, run: ${previous.command}`)
 }

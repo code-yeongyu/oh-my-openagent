@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { type GitPort, offenderBaseProblems, probeBase, registryBaseProblems } from "./base-probe"
 import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
+import { loadScenarioRuns, runEffectScenarios } from "./conformance-run"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 
 // The probe decides whether the base-tree checks run (design lane ruling on review 6064044043). Both directions are
@@ -12,12 +13,14 @@ import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 
 const file = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8")
 const unresolved = JSON.parse(file(UNRESOLVED_PATH)) as Baseline
+// The head's run evidence, as gate-cli and registry.test read it: a built row is judged on its scenarios' runs.
+const rows = allRows(loadDomainFiles())
 const head = {
-  rows: allRows(loadDomainFiles()),
+  rows,
   originalText: file(ORIGINAL_PATH),
   pinText: file(PIN_PATH),
   unresolved,
-  evidence: [],
+  evidence: await runEffectScenarios(rows, await loadScenarioRuns()),
 }
 
 // A checkout that has the base: merge-base answers it, its tree exists, and show answers the base's files.

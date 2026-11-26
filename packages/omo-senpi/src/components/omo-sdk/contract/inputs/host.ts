@@ -1,4 +1,7 @@
 import { type Static, Type } from "typebox"
+import { callback } from "../callback"
+
+import type { SetupPlan as SetupPlanResult } from "../results/host"
 
 import { LaunchSpec } from "./threads-authority"
 
@@ -125,11 +128,36 @@ const SetupPlanSchema = Type.Object({
 export type SetupPlan = Static<typeof SetupPlanSchema>
 export type SetupInventory = Static<typeof SetupInventorySchema>
 
+/** The stages `omo setup` plans, in apply order (omo-native bin/lib/setup-stream.js). */
+export type SetupStageId = "credentials" | "assets" | "providers" | "model-choices"
+
 export const InstallSetupApply = Type.Object({
-  plan: SetupPlanSchema,
+  // The value install.setup.plan answered, passed back as it is: its static type is that result.
+  plan: Type.Unsafe<SetupPlanResult>(SetupPlanSchema),
   consent: Type.Union([Type.Literal("all"), Type.Literal("each")], {
     description: "all: --yes, asked once; each: --ask-each, asked per stage.",
   }),
+  decide: Type.Optional(
+    callback<
+      (stage: {
+        readonly id: SetupStageId
+        readonly description: string
+      }) => "apply" | "skip" | Promise<"apply" | "skip">
+    >({
+      args: [
+        Type.Object({
+          id: Type.Union([
+            Type.Literal("credentials"),
+            Type.Literal("assets"),
+            Type.Literal("providers"),
+            Type.Literal("model-choices"),
+          ]),
+          description: Type.String(),
+        }),
+      ],
+      answer: Type.Union([Type.Literal("apply"), Type.Literal("skip")]),
+    }),
+  ),
 })
 export const InstallUpdate = Type.Object({ dry_run: Type.Optional(Type.Boolean()) })
 export const InstallVersion = None

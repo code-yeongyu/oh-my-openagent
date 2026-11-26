@@ -1,0 +1,249 @@
+import { lstatSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+
+import { installCore } from "../../../packages/omo-native/bin/lib/sdk-install.js"
+import { REAL_SETUP_FS } from "../../../packages/omo-native/bin/lib/setup-fs.js"
+import type { ScenarioRun } from "../conformance-run"
+import { type ScenarioFakes, scenarioSetup } from "../fakes/setup"
+import { loadScenarioTable } from "../scenario-table"
+
+// Slice C1c's drivers (#14960): the install namespace's calls on the real omo SDK root, its launcher-side core loaded
+// with ports over the scenario's recorder. The setup calls run on a fixture home the loader writes before the first
+// call (OpenCode's API key and config), read OpenCode's files and make every write through the setup file port; the
+// update call's package manager, dist-tag lookup and installed-version reads are recorded as the process spawns and
+// file reads they are. `given` states the fakes' answers: the published version, the installed one before and after,
+// how the package manager ends, the platform, a versioned layout and whether bun is there.
+
+const ROWS = [
+  "install.setup.detect",
+  "install.setup.plan",
+  "install.setup.apply",
+  "install.update",
+  "install.version",
+  "install.sdkRoot",
+] as const
+
+const OPENCODE_KEY = "sk-c1c-fixture-not-a-secret"
+
+// The framework's fakes name the home "~" and the agent dir "/agent" (fakes/process-fs.ts); these recorded paths do too.
+const named = (fakes: ScenarioFakes, path: string): string =>
+  path.startsWith(fakes.agentDir)
+    ? `/agent${path.slice(fakes.agentDir.length)}`
+    : path.startsWith(fakes.home)
+      ? `~${path.slice(fakes.home.length)}`
+      : path
+
+const exists = (path: string): boolean => {
+  try {
+    lstatSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// The real setup file port, every effect recorded as the write or removal it makes: a rename's destination, a copy's
+// target. A temporary file written and renamed into place is one write of its destination.
+function recordedSetupFs(fakes: ScenarioFakes) {
+  const record = (op: "read" | "write" | "remove", path: string) =>
+    fakes.recorder.record("fs", op, { path: named(fakes, path) })
+  return {
+    ...REAL_SETUP_FS,
+    read: (path: string) => {
+      record("read", path)
+      return REAL_SETUP_FS.read(path)
+    },
+    rename: (from: string, to: string) => {
+      record("write", to)
+      REAL_SETUP_FS.rename(from, to)
+    },
+    copyFile: (from: string, to: string, options?: { exclusive?: boolean }) => {
+      record("write", to)
+      REAL_SETUP_FS.copyFile(from, to, options)
+    },
+    copyTree: (from: string, to: string) => {
+      record("write", to)
+      REAL_SETUP_FS.copyTree(from, to)
+    },
+    remove: (path: string) => {
+      if (!exists(path)) return
+      record("remove", path)
+      REAL_SETUP_FS.remove(path)
+    },
+  }
+}
+
+function writeFile(path: string, text: string): void {
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, text)
+}
+
+// OpenCode with one API key (a pending credential) and a config file, under the scenario's home.
+function setupFixture(fakes: ScenarioFakes): void {
+  writeFile(
+    join(fakes.home, ".local", "share", "opencode", "auth.json"),
+    JSON.stringify({ google: { type: "api", key: OPENCODE_KEY } }),
+  )
+  writeFile(join(fakes.home, ".config", "opencode", "opencode.json"), JSON.stringify({ $schema: "opencode" }))
+}
+
+// A versioned install: <versions>/<version>/node_modules/omo-ai, with <versions>/current naming that version.
+function versionedLayout(fakes: ScenarioFakes, version: string): string {
+  const versions = join(fakes.home, ".omo", "versions")
+  const versionDir = join(versions, version)
+  const packageDir = join(versionDir, "node_modules", "omo-ai")
+  mkdirSync(packageDir, { recursive: true })
+  writeFile(join(versionDir, "package.json"), JSON.stringify({ dependencies: { "omo-ai": version } }))
+  symlinkSync(versionDir, join(versions, "current"))
+  return packageDir
+}
+
+// The fakes' virtual clock: timers fire, in time order, only once the call waits on something that never answers (a
+// hanging port, a pending callback), so a stop never races a real wait the call makes on the way there.
+function blockedClock() {
+  let now = 0
+  const due: { at: number; fire: () => void }[] = []
+  return {
+    after: (ms: number, fire: () => void) => {
+      const timer = { at: now + ms, fire }
+      due.push(timer)
+      return () => {
+        if (due.includes(timer)) due.splice(due.indexOf(timer), 1)
+      }
+    },
+    blocked: () => {
+      for (const timer of due.splice(0).toSorted((left, right) => left.at - right.at)) {
+        now = timer.at
+        timer.fire()
+      }
+    },
+  }
+}
+type Clock = ReturnType<typeof blockedClock>
+const never = (): Promise<never> => new Promise<never>(() => {})
+
+const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
+const number = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined)
+
+function updatePorts(fakes: ScenarioFakes, clock: Clock) {
+  const process = fakes.recorder.given("process")
+  const fs = fakes.recorder.given("fs")
+  const latest = text(process["registry_latest"])
+  const before = text(fs["installed"]) ?? "1.0.0"
+  const after = text(fs["installed_after"]) ?? latest ?? before
+  let ran = false
+  const readInstalled = () => {
+    fakes.recorder.record("fs", "read", { path: "<package>/package.json" })
+    return { omo: ran ? after : before, engine: fs["engine"] === "missing" ? "unknown" : "1" }
+  }
+  return {
+    env: { HOME: fakes.home, PATH: "" },
+    platform: text(process["platform"]) ?? "linux",
+    root: fs["layout"] === "versioned" ? versionedLayout(fakes, before) : join(fakes.home, "no-install"),
+    sleep: async () => {},
+    listProcesses: () => [],
+    readInstalled,
+    fetchDistTags: () => {
+      fakes.recorder.record("process", "spawn", { command: "node", script: "omo-ai/dist-tags" })
+      return latest === undefined ? null : { latest }
+    },
+    resolveUpdate: (version?: string) => {
+      const spec = version === undefined ? "omo-ai@latest" : `omo-ai@${version}`
+      return { manager: "npm", command: `npm install -g ${spec}`, argv: ["npm", "install", "-g", spec] }
+    },
+    after: clock.after,
+    run: async (command: string, argv: readonly string[], options?: Readonly<Record<string, unknown>>) => {
+      fakes.recorder.record("process", "spawn", { command, argv: [...argv] })
+      // A package manager that runs until the call stops it: like node's spawn, it rejects once its signal aborts.
+      if (process["npm"] === "hang") {
+        const signal = options?.["signal"] as AbortSignal
+        const ended = new Promise<never>((_resolve, reject) =>
+          signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
+        )
+        clock.blocked()
+        return ended
+      }
+      if (process["npm"] === "missing") throw new Error(`spawn ${command} ENOENT`)
+      if (text(process["npm_held"]) !== undefined)
+        return {
+          status: 1,
+          signal: null,
+          stderr: `npm error code ${process["npm_held"]}\nnpm error path C:\\omo\\omo.exe`,
+        }
+      ran = true
+      return { status: number(process["npm_exit"]) ?? 0, signal: null }
+    },
+  }
+}
+
+// The package's own manifest, read through the recorded port: an omo-ai/sdk export the root's path is taken from.
+function sdkRootPorts(fakes: ScenarioFakes) {
+  return {
+    packageDir: "/omo-ai",
+    fs: {
+      readFile: async () => {
+        fakes.recorder.record("fs", "read", { path: "<package>/package.json" })
+        return JSON.stringify({ exports: { "./sdk": { import: "./dist/sdk/index.js" } } })
+      },
+    },
+  }
+}
+
+function versionPorts(fakes: ScenarioFakes) {
+  return {
+    read: () => {
+      fakes.recorder.record("fs", "read", { path: "<package>/package.json" })
+      fakes.recorder.record("fs", "read", { path: "<senpi>/package.json" })
+      return { version: "1.0.0", engine: "2026.11.25" }
+    },
+  }
+}
+
+// The engine's model runtime the setup summary's coverage line reads: absent, unless the scenario gives a malformed one,
+// whose answer the summary cannot project (the setup plan's unexpected fault).
+function coverageRuntime(fakes: ScenarioFakes, clock: Clock): unknown {
+  if (fakes.recorder.given("engine")["coverage"] === "never") {
+    clock.blocked()
+    return never()
+  }
+  if (fakes.recorder.given("engine")["coverage"] !== "malformed") throw new Error("no coverage runtime in a scenario")
+  return { categoryCoverage: () => ({ usable: null, unusable: null }) }
+}
+
+function installCores(clock: Clock) {
+  return (fakes: ScenarioFakes) => ({
+    install: async (context: Parameters<typeof installCore>[0]) => {
+      setupFixture(fakes)
+      return installCore(context, {
+        update: updatePorts(fakes, clock),
+        version: versionPorts(fakes),
+        sdkRoot: sdkRootPorts(fakes),
+        setup: {
+          fs: recordedSetupFs(fakes),
+          after: clock.after,
+          loadCoverageRuntime: async () => coverageRuntime(fakes, clock),
+          ...(fakes.recorder.given("engine")["sqlite"] === "never"
+            ? {
+                loadSqlite: () => {
+                  clock.blocked()
+                  return never()
+                },
+              }
+            : {}),
+        },
+      })
+    },
+  })
+}
+
+// One clock per run, shared by the install core's ports and the runner's abort.
+export const runs: ScenarioRun[] = loadScenarioTable()
+  .flatMap((file) => file.scenarios)
+  .filter((scenario) => (ROWS as readonly string[]).includes(scenario.row))
+  .map((scenario) => ({
+    scenario,
+    setup: () => {
+      const clock = blockedClock()
+      return { ...scenarioSetup(scenario, { cores: installCores(clock) }), after: clock.after, blocked: clock.blocked }
+    },
+  }))

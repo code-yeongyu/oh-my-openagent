@@ -134,7 +134,7 @@ function total(coverage) {
 }
 
 // The category-unavailable notice's wording (omo-senpi components/task/category-unavailable-warning.ts).
-function gapLine(gap) {
+export function gapLine(gap) {
   if (gap.unlistedProviderModel !== undefined) {
     const gateway = gap.unlistedProviderModel.slice(0, gap.unlistedProviderModel.indexOf("/"))
     return `Category "${gap.name}" is unavailable: only ${gateway}, which its chain does not list, serves its models, and omo never bills a builtin category to an unlisted provider. Connect one of its providers (${gap.providers.join(", ")}) with /login <provider>, or opt in with categories.${gap.name}.model = "${gap.unlistedProviderModel}" in omo.json.`
@@ -157,12 +157,32 @@ export function formatDoctorCoverageLines(coverage) {
 }
 
 /** The setup summary's `categories` row parts. @param {CategoryCoverage} coverage */
-export function coverageSummaryParts(coverage) {
-  if (coverage.unusable.length === 0) return [`all ${total(coverage)} usable with these providers`]
-  const usable = coverage.usable.length > 0 ? ` (${coverage.usable.join(", ")})` : ""
+/**
+ * The setup summary's categories row as typed items: how many builtin categories these providers serve, then one item
+ * per category none of them serves.
+ * @param {CategoryCoverage} coverage
+ */
+export function coverageSummaryItems(coverage) {
+  const kind = "category"
+  if (coverage.unusable.length === 0)
+    return [{ class: "categories", kind, state: "all_usable", count: total(coverage) }]
   return [
-    `${coverage.usable.length} of ${total(coverage)} usable with these providers${usable}`,
-    ...coverage.unusable.map(gapLine),
+    {
+      class: "categories",
+      kind,
+      state: "usable",
+      count: coverage.usable.length,
+      total: total(coverage),
+      ids: coverage.usable,
+    },
+    ...coverage.unusable.map((gap) => ({
+      class: "categories",
+      kind,
+      state: "unavailable",
+      id: gap.name,
+      providers: gap.providers,
+      ...(gap.unlistedProviderModel === undefined ? {} : { unlisted_provider_model: gap.unlistedProviderModel }),
+    })),
   ]
 }
 

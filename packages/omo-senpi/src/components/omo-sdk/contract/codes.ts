@@ -8,6 +8,8 @@ type CodeEntry = {
   readonly namespaces: readonly Namespace[]
   readonly next_action: string
   readonly retires_with?: string
+  /** A code whose failures carry `details.reason` from a closed set lists it; a scenario's refusal_details names one. */
+  readonly reasons?: readonly string[]
 }
 
 export const OMO_CODE_REGISTRY = {
@@ -50,7 +52,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Name the thread: self is an address only a session can use.",
   },
   cancelled: {
-    namespaces: ["threads"],
+    namespaces: ["install", "threads"],
     next_action: "Call it again if it is still wanted.",
   },
   chain_count_limit: {
@@ -121,8 +123,21 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["threads"],
     next_action: "Read the target's current state before repeating; it may have run.",
   },
+  install_failed: {
+    namespaces: ["install"],
+    reasons: [
+      "engine_missing",
+      "manager_not_started",
+      "manager_failed",
+      "not_moved",
+      "file_held",
+      "versioned",
+      "binary_install",
+    ],
+    next_action: "Read details.reason, fix what it names, then call install.update again.",
+  },
   internal_error: {
-    namespaces: ["account", "devices", "threads"],
+    namespaces: ["account", "devices", "install", "threads"],
     next_action: "Retry; if it fails again, report it with the details.",
   },
   invalid_arguments: {
@@ -247,7 +262,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Pick a level from details.supported.",
   },
   timeout: {
-    namespaces: ["daemon"],
+    namespaces: ["daemon", "install"],
     next_action: "Retry the call; if it changes something, read the current state first.",
   },
   transport_expired: {

@@ -66,7 +66,7 @@ export const sliceContract: Contract = {
   registry: OMO_CODE_REGISTRY,
   heldCodes: {},
   sourceCodes: SOURCE_CODES,
-  accepts: (call, input) => inputAccepts(call, input),
+  accepts: (call, input, exempt) => inputAccepts(call, input, exempt),
   ahead: TYPED_AHEAD_INPUTS,
 }
 export const sliceInputContract: Contract = { ...sliceContract, calls: fullCalls }

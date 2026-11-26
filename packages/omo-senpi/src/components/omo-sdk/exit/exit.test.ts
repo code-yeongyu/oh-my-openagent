@@ -97,7 +97,7 @@ describe("the exit projection keyed by surface", () => {
 type Row = {
   readonly id: string
   readonly kind: string
-  readonly cli: readonly { readonly route: readonly string[] }[]
+  readonly cli: readonly { readonly route: readonly string[]; readonly edition: string }[]
 }
 const PARITY = join(import.meta.dir, "../../../../../../script/sdk-parity")
 const rows = readdirSync(join(PARITY, "rows"))
@@ -108,10 +108,24 @@ const unresolved = new Set(
     (entry) => entry.id,
   ),
 )
+// A CLI entry of an edition whose part of the row is an open edition gap (edition-gaps.json) is not served by the root
+// yet: that edition's own command still answers it, so it needs no surface until the gap's slice builds it.
+const gapped = new Set(
+  (
+    JSON.parse(readFileSync(join(PARITY, "edition-gaps.json"), "utf8")) as {
+      entries: { row: string; edition: string }[]
+    }
+  ).entries.map((gap) => `${gap.row} ${gap.edition}`),
+)
 const withoutSurface = (served: boolean) =>
   rows
     .filter((row) => row.kind === "capability" && unresolved.has(row.id) !== served)
-    .flatMap((row) => row.cli.map((entry) => entry.route.join(" ")).filter((route) => route !== ""))
+    .flatMap((row) =>
+      row.cli
+        .filter((entry) => !gapped.has(`${row.id} ${entry.edition}`))
+        .map((entry) => entry.route.join(" "))
+        .filter((route) => route !== ""),
+    )
     .filter((route) => SURFACE_EXITS[route] === undefined)
 
 test("#given the served rows #when their CLI entries are listed #then each has an exit surface (the unresolved ones are only reported)", () => {

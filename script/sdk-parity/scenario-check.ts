@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { namespaceOf, p1aRows, type Contract } from "./contract-check"
-import { boundaryInput } from "./bytes-fixtures"
+import { answerFields, boundaryInput } from "./bytes-fixtures"
 import type { Row } from "./schema"
 import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-table"
 
@@ -42,7 +42,12 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
   const at = `scenario ${scenario.id}`
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
-  const accepted = contract.accepts(row.sdk, boundaryInput(scenario.input, problems, at))
+  // A marked field's value is an earlier call's answer, supplied at run time: only that value is exempt; every other
+  // field is checked against the call's schema as usual.
+  const marked = answerFields(scenario.input)
+  const accepted =
+    contract.accepts(row.sdk, boundaryInput(scenario.input, problems, at), marked) &&
+    marked.every((field) => Object.hasOwn(row.input.properties, field))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
     if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)
@@ -51,7 +56,49 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
     problems.push(`${at}: an effect scenario names no refusal`)
   if (scenario.kind === "refusal" && scenario.refusal === undefined)
     problems.push(`${at}: a refusal scenario names its code`)
+  problems.push(...refusalDetailsProblems(at, scenario, contract))
+  problems.push(...callbackProblems(at, scenario))
+  problems.push(...callOptionProblems(at, scenario))
   return problems
+}
+
+// refusal_details is a subset of a refusal's failure details; where the code's registry entry lists closed reasons,
+// the reason it names is one of them.
+function refusalDetailsProblems(at: string, scenario: TableScenario, contract: Contract): string[] {
+  const details = scenario.refusal_details
+  if (details === undefined) return []
+  if (scenario.kind !== "refusal") return [`${at}: refusal_details belongs to a refusal`]
+  const reasons = contract.registry[scenario.refusal ?? ""]?.reasons
+  if (reasons === undefined) return []
+  const reason = details["reason"]
+  return typeof reason === "string" && reasons.includes(reason)
+    ? []
+    : [`${at}: refusal_details.reason must be one of ${scenario.refusal}'s reasons (${reasons.join(", ")})`]
+}
+
+// A callback's calls are not port operations: each entry names a callback input the scenario passes as "$callback",
+// matches its argument by a subset, and states how many effects the trace holds when it is called.
+function callbackProblems(at: string, scenario: TableScenario): string[] {
+  return Object.entries(scenario.callbacks ?? {}).flatMap(([name, entries]) => [
+    ...(scenario.input[name] === "$callback" ? [] : [`${at}: callbacks.${name} names no "$callback" input`]),
+    ...(entries.length === 0 ? [`${at}: callbacks.${name} lists no call`] : []),
+    ...entries.flatMap((entry, index) => [
+      ...(Number.isInteger(entry.effects_before) && entry.effects_before >= 0
+        ? []
+        : [`${at}: callbacks.${name}[${index}].effects_before is a whole number of effects`]),
+      ...(entry.pending === true && entry.answer !== undefined
+        ? [`${at}: callbacks.${name}[${index}] never answers, so it states no answer`]
+        : []),
+    ]),
+  ])
+}
+
+// call_options.deadline_ms is a whole number of virtual milliseconds the call is allowed.
+function callOptionProblems(at: string, scenario: TableScenario): string[] {
+  const deadline = scenario.call_options?.deadline_ms
+  return deadline === undefined || (Number.isInteger(deadline) && deadline >= 0)
+    ? []
+    : [`${at}: call_options.deadline_ms is a whole number of milliseconds`]
 }
 
 const without = (input: Readonly<Record<string, unknown>>, field: string): Record<string, unknown> =>
@@ -186,6 +233,7 @@ export function scenarioProblems(
         continue
       }
       problems.push(...scenarioShapeProblems(scenario, row, file.domain, contract))
+      problems.push(...beforeProblems(scenario, inScope, contract))
       for (const [field, value] of Object.entries((scenario.input ?? {}) as Readonly<Record<string, unknown>>))
         if (value === "$callback" && !Object.hasOwn(Object(row.input.properties[field]), "x-callback"))
           problems.push(
@@ -220,5 +268,30 @@ export function scenarioProblems(
     if (row === undefined || contract.calls[row.sdk]?.properties[key.slice(cut + 1)] === undefined)
       problems.push(`inert ${key}: names no input of a P1a row`)
   }
+  return problems
+}
+
+// `$answer:<n>` names the answer of the scenario's n-th before-call; the runner substitutes it before the call, so the
+// table check only requires each marked field to be one the call takes. It is a general form, not an install case.
+const MARKER = /^\$answer:([1-9][0-9]*)$/
+
+function beforeProblems(scenario: TableScenario, rows: ReadonlyMap<string, Row>, contract: Contract): string[] {
+  const at = `scenario ${scenario.id}`
+  const before = scenario.before ?? []
+  const problems: string[] = []
+  for (const [index, call] of before.entries()) {
+    const row = rows.get(call.row)
+    if (row === undefined) problems.push(`${at}: before[${index}] names ${call.row}, which is not a P1a row`)
+    else if (namespaceOf(row.sdk) !== namespaceOf(scenario.row))
+      problems.push(`${at}: before[${index}] calls ${call.row}, outside the scenario's namespace`)
+    else if (answerFields(call.input).length > 0 || !contract.accepts(row.sdk, call.input))
+      problems.push(`${at}: before[${index}]'s input is not one ${row.sdk}'s schema accepts`)
+  }
+  for (const input of [scenario.input, ...(scenario.then ?? []).map((step) => step.input)])
+    for (const field of answerFields(input)) {
+      const n = Number(MARKER.exec(String(input[field]))?.[1])
+      if (n > before.length)
+        problems.push(`${at}: ${field} names $answer:${n}, but the scenario has ${before.length} before-call(s)`)
+    }
   return problems
 }

@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import {
   categoryCoverage,
-  coverageSummaryParts,
+  coverageSummaryItems,
   doctorCoverageLines,
   engineAvailableModels,
   formatDoctorCoverageLines,
@@ -281,7 +281,7 @@ describe("coverage rendering shape", () => {
     test("#when rendered for doctor and setup #then each is one line", () => {
       const coverage = { usable: ["quick", "writing"], unusable: [] }
       expect(formatDoctorCoverageLines(coverage)).toHaveLength(1)
-      expect(coverageSummaryParts(coverage)).toHaveLength(1)
+      expect(coverageSummaryItems(coverage)).toHaveLength(1)
     })
   })
 
@@ -295,7 +295,7 @@ describe("coverage rendering shape", () => {
         ],
       }
       expect(formatDoctorCoverageLines(coverage)).toHaveLength(3)
-      expect(coverageSummaryParts(coverage)).toHaveLength(3)
+      expect(coverageSummaryItems(coverage)).toHaveLength(3)
       expect(summaryRowLabels(coverage)).toContain("categories")
     })
   })

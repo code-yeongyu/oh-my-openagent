@@ -32,7 +32,34 @@ export type Fault = {
   readonly occurrence?: number
 }
 
-export type ScenarioStep = {
+/**
+ * One call of a caller-supplied callback, in order (design lane ruling, slice C1c): \`when\` is a subset of the
+ * callback's argument, \`answer\` what it returns (absent for a callback that only receives), and \`effects_before\`
+ * the number of EFFECT operations the trace holds when it is called, which pins "asked before that write".
+ */
+export type CallbackEntry = {
+  readonly when: Readonly<Record<string, unknown>>
+  readonly answer?: unknown
+  readonly effects_before: number
+  /** The callback never answers: the call waits on it until its signal or deadline stops it. */
+  readonly pending?: true
+}
+
+/**
+ * A call made before the scenario's own, on the same fixture (design lane ruling, slice C1c): a row of the scenario's
+ * namespace and an input its schema accepts. Its answer is \`$answer:<n>\` (1-based) in the scenario's inputs; its port
+ * calls are the run's setup, outside the expected trace, and it may make an effect only with \`allow_effects\`.
+ */
+export type BeforeCall = {
+  readonly row: string
+  readonly input: Readonly<Record<string, unknown>>
+  readonly allow_effects?: true
+}
+
+/** Shared by a scenario and each of its steps: the subset of the failure's details a refusal states. */
+type RefusalDetails = { readonly refusal_details?: Readonly<Record<string, unknown>> }
+
+export type ScenarioStep = RefusalDetails & {
   readonly input: Readonly<Record<string, unknown>>
   readonly kind: "effect" | "refusal"
   readonly refusal?: string
@@ -44,7 +71,12 @@ export type ScenarioStep = {
   readonly fault?: Fault
 }
 
-export type TableScenario = {
+export type TableScenario = RefusalDetails & {
+  readonly before?: readonly BeforeCall[]
+  /** The call's wait options beside its signal (design 4.4): deadline_ms, measured on the fakes' virtual clock. */
+  readonly call_options?: { readonly deadline_ms: number }
+  /** Each callback input the scenario passes as "$callback", built by the runner from its ordered calls. */
+  readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
   /** `<row id>/<slug>`: stable, never reused for another behaviour. */
   readonly id: string
   readonly row: string

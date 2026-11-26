@@ -338,7 +338,7 @@
       "id": "install.setup.apply",
       "kind": "capability",
       "sdk": "install.setup.apply",
-      "today": "no",
+      "today": "yes",
       "slices": [
         "C1c"
       ],
@@ -439,6 +439,56 @@
                 "const": "each"
               }
             ]
+          },
+          "decide": {
+            "x-callback": {
+              "args": [
+                {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "description"
+                  ],
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "credentials"
+                        },
+                        {
+                          "type": "string",
+                          "const": "assets"
+                        },
+                        {
+                          "type": "string",
+                          "const": "providers"
+                        },
+                        {
+                          "type": "string",
+                          "const": "model-choices"
+                        }
+                      ]
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "answer": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "apply"
+                  },
+                  {
+                    "type": "string",
+                    "const": "skip"
+                  }
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -468,8 +518,18 @@
       },
       "projection": {},
       "scenarios": {
-        "effect": [],
-        "refusal": []
+        "effect": [
+          "install.setup.apply/all-consents-once",
+          "install.setup.apply/each-asks-per-stage"
+        ],
+        "refusal": [
+          "install.setup.apply/foreign-plan-refused",
+          "install.setup.apply/plan-not-a-setup-plan",
+          "install.setup.apply/unknown-consent",
+          "install.setup.apply/each-without-decide-refused",
+          "install.setup.apply/decide-never-answers-caller-cancels",
+          "install.setup.apply/decide-never-answers-deadline-passes"
+        ]
       },
       "modules": [],
       "note": "With neither flag the command asks once and, when accepted, applies every stage: that is consent all, the prompt being the adapter's rendering; --yes is the same call with the prompt answered. A declined prompt makes no call."
@@ -478,7 +538,7 @@
       "id": "install.setup.detect",
       "kind": "capability",
       "sdk": "install.setup.detect",
-      "today": "no",
+      "today": "yes",
       "slices": [
         "C1c"
       ],
@@ -495,16 +555,22 @@
       },
       "projection": {},
       "scenarios": {
-        "effect": [],
-        "refusal": []
+        "effect": [
+          "install.setup.detect/scans-without-writing"
+        ],
+        "refusal": [
+          "install.setup.detect/sqlite-never-loads-caller-cancels",
+          "install.setup.detect/sqlite-never-loads-deadline-passes"
+        ]
       },
-      "modules": []
+      "modules": [],
+      "note": "Reads through the setup file port are OpenCode's auth.json (detect) and its config files (the asset scan); the expected trace says these reads happen, never that only these reads happen: every other setup read is still direct (#15018). It writes nothing: a guard test makes every write through the port throw."
     },
     {
       "id": "install.setup.plan",
       "kind": "capability",
       "sdk": "install.setup.plan",
-      "today": "no",
+      "today": "yes",
       "slices": [
         "C1c"
       ],
@@ -533,16 +599,23 @@
       },
       "projection": {},
       "scenarios": {
-        "effect": [],
-        "refusal": []
+        "effect": [
+          "install.setup.plan/plans-without-writing"
+        ],
+        "refusal": [
+          "install.setup.plan/scan-fault-internal-error",
+          "install.setup.plan/coverage-never-loads-caller-cancels",
+          "install.setup.plan/coverage-never-loads-deadline-passes"
+        ]
       },
-      "modules": []
+      "modules": [],
+      "note": "Reads through the setup file port are OpenCode's auth.json (detect) and its config files (the asset scan); the expected trace says these reads happen, never that only these reads happen: every other setup read is still direct (#15018). It writes nothing: a guard test makes every write through the port throw."
     },
     {
       "id": "install.update",
       "kind": "capability",
       "sdk": "install.update",
-      "today": "no",
+      "today": "yes",
       "slices": [
         "C1c"
       ],
@@ -585,16 +658,31 @@
       },
       "projection": {},
       "scenarios": {
-        "effect": [],
-        "refusal": []
+        "effect": [
+          "install.update/installs-channel-target",
+          "install.update/dry-run-prints-only"
+        ],
+        "refusal": [
+          "install.update/registry-unconfirmed-versioned",
+          "install.update/dry-run-not-boolean",
+          "install.update/engine-missing",
+          "install.update/manager-not-started",
+          "install.update/manager-failed",
+          "install.update/not-moved",
+          "install.update/file-held",
+          "install.update/versioned-no-bun",
+          "install.update/manager-never-exits-caller-cancels",
+          "install.update/manager-never-exits-deadline-passes"
+        ]
       },
-      "modules": []
+      "modules": [],
+      "note": "The dist-tag lookup is a registry READ carried by a process: the core spawns node with a fetch script for the omo-ai dist-tags URL; no install happens there. The compiled edition's omo update runs compiledInstallUpdate, not the core the root binds (edition-gaps.json, #15010)."
     },
     {
       "id": "install.version",
       "kind": "capability",
       "sdk": "install.version",
-      "today": "no",
+      "today": "yes",
       "slices": [
         "C1c",
         "OC1a"
@@ -644,7 +732,9 @@
       },
       "projection": {},
       "scenarios": {
-        "effect": [],
+        "effect": [
+          "install.version/reads-omo-and-engine-versions"
+        ],
         "refusal": []
       },
       "modules": []
@@ -719,7 +809,7 @@
         "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent: \"all\" \\| \"each\" })`: `--yes` and the command with neither flag are both `all`, the second with the adapter rendering one confirmation whose refusal makes no call (`N/bin/lib/setup-import.js:72-96`); `--ask-each` is `each`",
         "`omo setup [--yes] [--ask-each] [--dry-run]`",
         "none",
-        "**no**",
+        "**yes**",
         "Tool omitted: plan, consent, write is a person's flow",
         "C1c"
       ]
@@ -734,7 +824,7 @@
         "`install.update({ dry_run? })`. Flags it does not know are a usage refusal today (`--all`, `--force` alone), and stay one",
         "`omo update [--dry-run \\| --print] [--self]`, and the `self`, `senpi`, `omo` targets (`N/bin/lib/update-args.js:23-52`)",
         "none",
-        "**no**",
+        "**yes**",
         "Tool omitted: replaces the binary the session runs on",
         "C1c"
       ]
@@ -743,12 +833,26 @@
       "table": "6.7",
       "position": 16,
       "ids": [
-        "install.version",
+        "install.version"
+      ],
+      "cells": [
+        "`install.version()`",
+        "`omo --version`, `-v`",
+        "none",
+        "**yes**",
+        "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment",
+        "C1c"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 17,
+      "ids": [
         "install.sdkRoot"
       ],
       "cells": [
-        "`install.version()`, `install.sdkRoot()`",
-        "`omo --version`, `-v`; `omo sdk root` (new)",
+        "`install.sdkRoot()`",
+        "`omo sdk root` (new)",
         "none",
         "**no**",
         "Tool omitted: `OMO_SDK_ROOT` is already in a session's environment",

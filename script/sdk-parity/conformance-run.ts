@@ -2,8 +2,8 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
 import { PORT_EFFECTS } from "../../packages/omo-senpi/src/components/omo-sdk/contract/ports"
-import type { ConformanceContext, EffectEvidence } from "./conformance"
-import type { ObservedCall, TableScenario } from "./expectation"
+import type { CallbackCall, ConformanceContext, EffectEvidence, SetupCall } from "./conformance"
+import { type CallbackEntry, isSubsetOf, type ObservedCall, type TableScenario } from "./expectation"
 import { normalizer } from "./normalize"
 import type { Row } from "./schema"
 
@@ -22,6 +22,8 @@ export type ScenarioSetup = {
   readonly calls: () => readonly ObservedCall[]
   /** The fakes' virtual clock: runs `fire` once `ms` of virtual time has passed. Needed only by an aborting scenario. */
   readonly after?: (ms: number, fire: () => void) => void
+  /** Tells the fakes' clock the call now waits on something that never answers, so what is due fires. */
+  readonly blocked?: () => void
   /** The fixture's own directory, fresh per setup: replaced by a fixed name when two runs' answers are compared. */
   readonly sandbox?: string
 }
@@ -108,6 +110,50 @@ function refusalOf(answer: unknown): { readonly code?: string; readonly source?:
   return typeof code === "string" ? { code, source: "value" } : {}
 }
 
+// A "$callback" input the scenario lists under callbacks becomes a function that answers its entries in order: a call
+// consumes the first remaining entry its argument matches, and records which (or none) and how far the trace had got.
+function withCallbacks(
+  input: Readonly<Record<string, unknown>>,
+  callbacks: Readonly<Record<string, readonly CallbackEntry[]>> | undefined,
+  record: CallbackCall[],
+  observed: () => number,
+  blocked: (() => void) | undefined,
+): Readonly<Record<string, unknown>> {
+  if (callbacks === undefined) return input
+  const built = { ...input }
+  for (const [name, entries] of Object.entries(callbacks)) {
+    const used = new Set<number>()
+    built[name] = (argument: unknown) => {
+      const entry = entries.findIndex((candidate, index) => !used.has(index) && isSubsetOf(candidate.when, argument))
+      record.push({ name, argument, entry, observedBefore: observed() })
+      if (entry < 0) return undefined
+      used.add(entry)
+      if (entries[entry]?.pending !== true) return entries[entry]?.answer
+      blocked?.()
+      return new Promise(() => {})
+    }
+  }
+  return built
+}
+
+// Each `$answer:<n>` becomes the value the n-th before-call answered; one whose before-call failed is named instead.
+function withAnswers(
+  input: Readonly<Record<string, unknown>>,
+  answers: readonly unknown[],
+  failed: string[],
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(input).map(([field, value]) => {
+      const n = typeof value === "string" ? /^\$answer:([1-9][0-9]*)$/.exec(value)?.[1] : undefined
+      if (n === undefined) return [field, value]
+      const answer = answers[Number(n) - 1]
+      if (field_(answer, "kind") !== "ok") failed.push(String(value))
+      return [field, field_(answer, "value")]
+    }),
+  )
+}
+const field_ = (value: unknown, key: string): unknown => Reflect.get(Object(value), key)
+
 type Call = {
   readonly input: Readonly<Record<string, unknown>>
   readonly refusal_from?: "root" | "value"
@@ -118,6 +164,7 @@ async function invoke(
   member: unknown,
   call: Call,
   signal: AbortSignal,
+  callOptions: TableScenario["call_options"] = undefined,
 ): Promise<{
   readonly code?: string
   readonly codeSource?: "root" | "value"
@@ -126,7 +173,10 @@ async function invoke(
 }> {
   try {
     const settled = await settle(
-      Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [call.input, { signal }]),
+      Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [
+        call.input,
+        { signal, ...callOptions },
+      ]),
     )
     if ("broken" in settled) return { threw: settled.broken }
     const { code, source } = refusalOf(settled.answer)
@@ -186,7 +236,7 @@ async function runOnce(
   { scenario, setup }: ScenarioRun,
 ): Promise<{ readonly records: EffectEvidence[]; readonly answers: readonly string[] }> {
   const row = rows.find((candidate) => candidate.id === scenario.row)
-  const { root, calls, after, sandbox } = setup()
+  const { root, calls, after, sandbox, blocked } = setup()
   const invoked: string[] = []
   const memberOf = (): unknown => {
     let member: unknown = forwarding(root, [], invoked)
@@ -195,12 +245,44 @@ async function runOnce(
   }
   const controller = new AbortController()
   if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller.abort())
+  const setupCalls: SetupCall[] = []
+  const priorAnswers: unknown[] = []
+  for (const call of scenario.before ?? []) {
+    const seen = calls().length
+    let member: unknown = forwarding(root, [], [])
+    for (const key of (rows.find((candidate) => candidate.id === call.row)?.sdk ?? "").split("."))
+      member = Reflect.get(Object(member), key)
+    const result = await invoke(member, { input: call.input, kind: "effect" }, controller.signal)
+    priorAnswers.push(result.answered)
+    setupCalls.push({
+      row: call.row,
+      input: call.input,
+      observed: calls().slice(seen),
+      ...(result.answered === undefined ? {} : { answered: result.answered }),
+      allowEffects: call.allow_effects === true,
+    })
+  }
   const sequence = [scenario, ...(scenario.then ?? [])]
   const records: EffectEvidence[] = []
   for (const [index, step] of sequence.entries()) {
     const seen = calls().length
     const before = invoked.length
-    const result = await invoke(memberOf(), step, controller.signal)
+    const callbackCalls: CallbackCall[] = []
+    const callbacks = index === 0 ? scenario.callbacks : undefined
+    const failedMarkers: string[] = []
+    const input = withCallbacks(
+      withAnswers(step.input, priorAnswers, failedMarkers),
+      callbacks,
+      callbackCalls,
+      () => calls().length - seen,
+      blocked,
+    )
+    const result = await invoke(
+      memberOf(),
+      { ...step, input },
+      controller.signal,
+      index === 0 ? scenario.call_options : undefined,
+    )
     records.push({
       scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
       row: scenario.row,
@@ -215,6 +297,10 @@ async function runOnce(
       ...(step.refusal === undefined ? {} : { refusal: step.refusal }),
       ...(step.refusal_from === undefined ? {} : { refusalFrom: step.refusal_from }),
       ...(step.answer === undefined ? {} : { answer: step.answer }),
+      ...(step.refusal_details === undefined ? {} : { refusalDetails: step.refusal_details }),
+      ...(callbacks === undefined ? {} : { callbacks, callbackCalls }),
+      ...(index === 0 && setupCalls.length > 0 ? { beforeCalls: setupCalls } : {}),
+      ...(failedMarkers.length > 0 ? { failedMarkers } : {}),
       ...result,
     })
   }

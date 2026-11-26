@@ -6,6 +6,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
+import { REAL_SETUP_FS } from "./setup-fs.js"
 import { parseJsonc } from "./jsonc.js"
 
 // `interpolateString` in the engine's mcp config rejects any string value that looks like command
@@ -60,13 +61,15 @@ function mergeDeep(base, overlay) {
 
 // Every existing file of `files` that parses to an object, in order. `label` names what a file
 // that cannot be read costs, in its notice.
-function readDocuments(files, label, notices) {
+function readDocuments(files, label, notices, read) {
   const documents = []
   for (const path of files) {
     if (!existsSync(path)) continue
     let parsed
     try {
-      parsed = parseJsonc(readFileSync(path, "utf8"))
+      const text = read(path)
+      if (text === undefined) throw new Error("the file is gone")
+      parsed = parseJsonc(text)
     } catch (error) {
       notices.push(`WARN opencode: could not parse ${path}: ${error.message}; its ${label} were not imported`)
       continue
@@ -81,17 +84,17 @@ function readDocuments(files, label, notices) {
 }
 
 /** One top-level object section (`mcp`, `provider`) of the merged OpenCode config. */
-export function readOpencodeSection(files, section, label, notices) {
+export function readOpencodeSection(files, section, label, notices, read = REAL_SETUP_FS.read) {
   let declared = {}
-  for (const parsed of readDocuments(files, label, notices)) {
+  for (const parsed of readDocuments(files, label, notices, read)) {
     if (isPlainObject(parsed[section])) declared = mergeDeep(declared, parsed[section])
   }
   return declared
 }
 
 /** Every file of `files` deep-merged in order, later keys winning. */
-export function readOpencodeConfig(files, label, notices) {
-  return readDocuments(files, label, notices).reduce(mergeDeep, {})
+export function readOpencodeConfig(files, label, notices, read = REAL_SETUP_FS.read) {
+  return readDocuments(files, label, notices, read).reduce(mergeDeep, {})
 }
 
 // OpenCode substitutes `{env:NAME}`; the engine substitutes `${NAME}`. Same intent, same value.
@@ -246,7 +249,9 @@ export function planOpencodeAssets(options = {}) {
   const notices = []
   const mcpServers = []
   const refusedServers = []
-  for (const [name, entry] of Object.entries(readOpencodeSection(sources.files, "mcp", "mcp servers", notices))) {
+  for (const [name, entry] of Object.entries(
+    readOpencodeSection(sources.files, "mcp", "mcp servers", notices, options.fs?.read),
+  )) {
     const converted = convertServer(name, entry, notices, refusedServers)
     if (converted) mcpServers.push({ name, config: converted })
   }

@@ -179,33 +179,26 @@ export async function planCredentials(runtime, target, customProviderIds) {
  */
 export function applyCredentials(plan, options = {}) {
   if (options.writeAuth !== undefined) return options.writeAuth(plan.target, plan.result.additions)
-  writeAuthStore(plan.target, plan.current, plan.result.additions)
+  writeAuthStore(plan.target, plan.current, plan.result.additions, options.fs)
 }
 
-function list(label, ids) {
-  return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
-}
-
-export function credentialPlanLines(plan) {
+export function credentialPlanEntries(plan) {
   if (plan.malformed) return []
   return [
-    list(
-      "planned-add",
-      plan.result.additions.map((item) => item.provider),
-    ),
-    list("skipped-existing", plan.result.skippedExisting),
-    list("skipped-oauth", plan.result.skippedOauth),
-    list("skipped-unmapped", plan.result.skippedUnmapped),
+    { key: "planned-add", value: plan.result.additions.map((item) => item.provider) },
+    { key: "skipped-existing", value: plan.result.skippedExisting },
+    { key: "skipped-oauth", value: plan.result.skippedOauth },
+    { key: "skipped-unmapped", value: plan.result.skippedUnmapped },
   ]
 }
 
-export function credentialCounts(plan) {
+export function credentialCountEntries(plan) {
   if (plan.malformed) return []
   return [
-    `imported: ${plan.result.additions.length}`,
-    `skipped-existing: ${plan.result.skippedExisting.length}`,
-    `skipped-oauth: ${plan.result.skippedOauth.length}`,
-    `skipped-unmapped: ${plan.result.skippedUnmapped.length}`,
+    { key: "imported", value: plan.result.additions.length },
+    { key: "skipped-existing", value: plan.result.skippedExisting.length },
+    { key: "skipped-oauth", value: plan.result.skippedOauth.length },
+    { key: "skipped-unmapped", value: plan.result.skippedUnmapped.length },
   ]
 }
 

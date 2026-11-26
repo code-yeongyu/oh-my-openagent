@@ -13,30 +13,31 @@ import { join, resolve } from "node:path"
 import { detectHarnesses } from "./setup-detect.js"
 import {
   applyCredentials,
-  credentialCounts,
-  credentialPlanLines,
+  credentialCountEntries,
+  credentialPlanEntries,
   credentialQuestion,
   opencodeOauthProviders,
   planCredentials,
 } from "./setup-credentials.js"
-import { applyAssets, assetCounts, assetPlanLines, assetQuestion, planAssets } from "./setup-assets-import.js"
+import { applyAssets, assetCountEntries, assetPlanEntries, assetQuestion, planAssets } from "./setup-assets-import.js"
 import { planOpencodeProviders } from "./setup-opencode-providers.js"
 import { withCommandCodeProvider } from "./setup-commandcode.js"
 import {
   applyProviders,
   planProviders,
-  providerCounts,
-  providerPlanLines,
+  providerCountEntries,
+  providerPlanEntries,
   providerQuestion,
 } from "./setup-providers-import.js"
 import {
   applyModelChoices,
-  modelChoiceCounts,
-  modelChoicePlanLines,
+  modelChoiceCountEntries,
+  modelChoicePlanEntries,
   modelChoiceQuestion,
   planModelChoices,
 } from "./setup-model-choices-import.js"
 import { setupStageItems } from "./setup-stream-items.js"
+import { untilAborted } from "./install-abort.js"
 
 export { canonicalAgentDir } from "./agent-dir.js"
 
@@ -127,6 +128,16 @@ export async function collectSetupPlans(stream) {
 }
 
 /**
+ * One line of \`omo setup --dry-run\` or of the counts after an apply, from its typed entry: a list of ids (\`none\` when
+ * empty) or a number.
+ * @param {{ key: string, value: number | readonly string[] }} entry
+ */
+export function setupEntryText(entry) {
+  if (typeof entry.value === "number") return `${entry.key}: ${entry.value}`
+  return `${entry.key}: ${entry.value.length > 0 ? entry.value.join(", ") : "none"}`
+}
+
+/**
  * In apply order: the model-choice stage runs last because a default model or category may name a
  * custom provider the stage before it carries. `present` stages report counts after the run. A
  * stage whose source failed has no plan and is never applied.
@@ -137,8 +148,8 @@ export function setupStages(plans) {
       id: "credentials",
       plan: plans.credentials,
       present: plans.credentials !== undefined && !plans.credentials.malformed,
-      lines: credentialPlanLines,
-      counts: credentialCounts,
+      entries: credentialPlanEntries,
+      countEntries: credentialCountEntries,
       question: credentialQuestion,
       apply: (plan, options) => applyCredentials(plan, options),
     },
@@ -146,17 +157,17 @@ export function setupStages(plans) {
       id: "assets",
       plan: plans.assets,
       present: plans.assets?.present === true,
-      lines: assetPlanLines,
-      counts: assetCounts,
+      entries: assetPlanEntries,
+      countEntries: assetCountEntries,
       question: assetQuestion,
-      apply: (plan) => applyAssets(plan),
+      apply: (plan, options) => applyAssets(plan, options),
     },
     {
       id: "providers",
       plan: plans.providers,
       present: plans.providers?.present === true,
-      lines: providerPlanLines,
-      counts: providerCounts,
+      entries: providerPlanEntries,
+      countEntries: providerCountEntries,
       question: providerQuestion,
       apply: (plan, options) => applyProviders(plan, options),
     },
@@ -164,8 +175,8 @@ export function setupStages(plans) {
       id: "model-choices",
       plan: plans.modelChoices,
       present: plans.modelChoices?.present === true,
-      lines: modelChoicePlanLines,
-      counts: modelChoiceCounts,
+      entries: modelChoicePlanEntries,
+      countEntries: modelChoiceCountEntries,
       question: modelChoiceQuestion,
       apply: (plan, options) => applyModelChoices(plan, options),
     },
@@ -285,33 +296,50 @@ export function authWritesPending(plans, stageIds) {
  * and `options.staleGuard`, re-checked right before each write, refuses a stage whose target
  * changed since planning by throwing `SetupStaleError`.
  */
+// The stages an apply had written and the stage it faulted in, per thrown error, kept beside the error rather than on
+// it: the error a command prints stays exactly what the stage threw.
+const APPLY_FAULTS = new WeakMap()
+
+/** Which stages \`applySetupStages\` had applied when \`error\` left it, and the stage that threw; undefined otherwise. */
+export function setupApplyFault(error) {
+  return typeof error === "object" && error !== null ? APPLY_FAULTS.get(error) : undefined
+}
+
 export async function applySetupStages(plans, confirm, report = () => {}, options = {}) {
   const applied = new Set()
   // Files this apply already rewrote: a later stage's stale check must not mistake them for a
   // user's change (the credentials stage and the provider keys share auth.json; #10496 review).
   const written = new Set()
   for (const stage of setupStages(plans)) {
-    if (
-      stage.id === "model-choices" &&
-      stage.plan !== undefined &&
-      plans.planChoices !== undefined &&
-      (plans.providers?.pending ?? 0) > 0 &&
-      !applied.has("providers")
-    ) {
-      const shown = new Set(plans.modelChoices.notices)
-      plans.modelChoices = await plans.planChoices([])
-      stage.plan = plans.modelChoices
-      for (const notice of plans.modelChoices.notices) if (!shown.has(notice)) report(notice)
+    try {
+      if (
+        stage.id === "model-choices" &&
+        stage.plan !== undefined &&
+        plans.planChoices !== undefined &&
+        (plans.providers?.pending ?? 0) > 0 &&
+        !applied.has("providers")
+      ) {
+        const shown = new Set(plans.modelChoices.notices)
+        // The replan is a wait inside the apply: with the call's signal (options.signal) it ends on it, before any write.
+        const replan = plans.planChoices([])
+        plans.modelChoices = await (options.signal === undefined ? replan : untilAborted(replan, options.signal))
+        stage.plan = plans.modelChoices
+        for (const notice of plans.modelChoices.notices) if (!shown.has(notice)) report(notice)
+      }
+      if (stage.plan === undefined || stage.plan.pending === 0) continue
+      if (!(await confirm(stage))) continue
+      if (options.staleGuard !== undefined) {
+        const stale = options.staleGuard(stage.id, written)
+        if (stale !== undefined && stale.length > 0) throw new SetupStaleError(stale, [...applied])
+      }
+      await stage.apply(stage.plan, { ...options, report })
+      applied.add(stage.id)
+      for (const path of stageWrittenPaths(plans, stage.id)) written.add(resolve(path))
+    } catch (error) {
+      if (typeof error === "object" && error !== null && !APPLY_FAULTS.has(error))
+        APPLY_FAULTS.set(error, { applied: [...applied], stage: stage.id })
+      throw error
     }
-    if (stage.plan === undefined || stage.plan.pending === 0) continue
-    if (!(await confirm(stage))) continue
-    if (options.staleGuard !== undefined) {
-      const stale = options.staleGuard(stage.id, written)
-      if (stale !== undefined && stale.length > 0) throw new SetupStaleError(stale, [...applied])
-    }
-    await stage.apply(stage.plan, { ...options, report })
-    applied.add(stage.id)
-    for (const path of stageWrittenPaths(plans, stage.id)) written.add(resolve(path))
   }
   return applied
 }

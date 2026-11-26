@@ -33,10 +33,15 @@ export type Contract = {
   readonly ports: Readonly<Record<string, readonly string[]>>
   readonly sections: readonly string[]
   readonly rootOptions: readonly string[]
-  readonly registry: Readonly<Record<string, { readonly namespaces: readonly string[]; readonly next_action: string }>>
+  readonly registry: Readonly<
+    Record<
+      string,
+      { readonly namespaces: readonly string[]; readonly next_action: string; readonly reasons?: readonly string[] }
+    >
+  >
   readonly heldCodes: Readonly<Record<string, HeldReason>>
   readonly sourceCodes: readonly string[]
-  readonly accepts: (call: string, input: unknown) => boolean
+  readonly accepts: (call: string, input: unknown, exempt?: readonly string[]) => boolean
   /** Inputs the root types ahead of a row's descriptor until the slice that serves the call adds them. */
   readonly ahead?: readonly { readonly row: string; readonly field: string }[]
 }

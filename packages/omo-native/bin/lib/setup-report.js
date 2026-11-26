@@ -24,7 +24,3 @@ export function formatSetupReport(inventory) {
   }
   return `${lines.join("\n")}\n`
 }
-
-export function printSetupReport(inventory) {
-  process.stdout.write(formatSetupReport(inventory))
-}

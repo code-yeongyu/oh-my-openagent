@@ -53,3 +53,16 @@ export function boundaryInput(value: unknown, problems: string[], at: string): u
   }
   return marked(value)
 }
+
+const ANSWER_MARKER = /^\$answer:[1-9][0-9]*$/
+
+/**
+ * The top-level fields of a scenario's input that hold "$answer:<n>": the n-th before-call's answer, supplied when the
+ * scenario runs. JSON cannot state that value, so both input checks exempt exactly these fields and check the rest.
+ */
+export const answerFields = (input: unknown): string[] =>
+  typeof input === "object" && input !== null
+    ? Object.entries(input)
+        .filter(([, value]) => typeof value === "string" && ANSWER_MARKER.test(value))
+        .map(([field]) => field)
+    : []

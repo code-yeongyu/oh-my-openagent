@@ -15,6 +15,7 @@ export type OmoErrorCode =
   | "machine_exists"
   | "accounts_unreachable"
   | "internal_error"
+  | "install_failed"
 
 export type OmoError = {
   readonly code: OmoErrorCode
