@@ -822,7 +822,7 @@ describe("DAG retry, amend, and revive end to end", () => {
   test("#11381 #given an amended node's old child that resumed after the new attempt's task exists #when the run is cancelled #then the old child is cancelled too", async () => {
     // given
     const runner = new ControlledRunner()
-    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer })
+    const fixture = e2eFixture({ resumeFence: false, runner, materializeSkills: identityMaterializer })
     const started = await fixture.start(
       definition("cancel-older-attempt", [categoryNode("A"), categoryNode("B", ["A"])]),
     )
@@ -857,7 +857,7 @@ describe("DAG retry, amend, and revive end to end", () => {
   test("#11381 #given an amended node's old child that resumed after the new attempt's task settled #when the node is amended again #then the old child is cancelled before the next attempt attaches", async () => {
     // given
     const runner = new ControlledRunner()
-    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer })
+    const fixture = e2eFixture({ resumeFence: false, runner, materializeSkills: identityMaterializer })
     const started = await fixture.start(
       definition("amend-older-attempt", [categoryNode("A"), categoryNode("B", ["A"])]),
     )
@@ -909,7 +909,12 @@ describe("DAG retry, amend, and revive end to end", () => {
     // given
     const clock = new RetryClock()
     const runner = new ControlledRunner()
-    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer, scheduleRetry: clock.schedule })
+    const fixture = e2eFixture({
+      resumeFence: false,
+      runner,
+      materializeSkills: identityMaterializer,
+      scheduleRetry: clock.schedule,
+    })
     const started = await fixture.start(definition("infra-retry-stale-child", [categoryNode("A")]))
     const runId = started.snapshot.runId
     await runner.whenStarted(1)

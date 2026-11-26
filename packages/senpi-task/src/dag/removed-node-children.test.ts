@@ -21,7 +21,12 @@ async function settledRunWithNodeA() {
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-removed-node-"))
   roots.push(root)
   const runner = new ControlledRunner()
-  const fixture = createE2eFixture({ project: root, runner, materializeSkills: identityMaterializer })
+  const fixture = createE2eFixture({
+    project: root,
+    runner,
+    materializeSkills: identityMaterializer,
+    resumeFence: false,
+  })
   const started = await fixture.start(definition("removed-node", [categoryNode("A"), categoryNode("B")]))
   const runId = started.snapshot.runId
   await runner.whenStarted(2)

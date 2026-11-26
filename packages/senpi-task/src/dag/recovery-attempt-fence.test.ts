@@ -29,7 +29,12 @@ async function crashedBetweenRetryAndStart(selfResumed: boolean) {
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-recovery-fence-"))
   roots.push(root)
   const runner = new ControlledRunner()
-  const fixture: E2eFixture = createE2eFixture({ project: root, runner, materializeSkills: identityMaterializer })
+  const fixture: E2eFixture = createE2eFixture({
+    project: root,
+    runner,
+    materializeSkills: identityMaterializer,
+    resumeFence: false,
+  })
   const started = await fixture.start(definition("recovery-attempt-fence", [categoryNode("A")]))
   const runId: DagRunId = started.snapshot.runId
   await runner.whenStarted(1)

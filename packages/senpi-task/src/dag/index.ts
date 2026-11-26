@@ -123,6 +123,7 @@ export type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "./owner"
 
 export { createDagRecovery } from "./recovery"
 export { DagRunChildrenLiveError, stopSettledRunChildren } from "./run-children-stop"
+export { createDagOwnerResumeFence } from "./owner-resume-fence"
 export type { DagRecovery, DagRecoveryOptions, DagRecoveryOutcome, InstalledDagRun } from "./recovery"
 export { createDagLeaseWatch, DAG_LEASE_WATCH_INTERVAL_MS } from "./recovery-lease-watch"
 export type {

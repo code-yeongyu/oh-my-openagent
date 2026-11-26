@@ -12,7 +12,9 @@ import type { DagDefinition, DagNodeInput } from "../graph"
 import { createDagWaitSurface, type DagRunResult } from "../handle"
 import type { RetrySchedule } from "../infrastructure-retry"
 import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartResult } from "../manager"
+import { createDagOwnerResumeFence } from "../owner-resume-fence"
 import { persistDagNodeResult } from "../results"
+import type { TaskRecord } from "../../state"
 import {
   createDagScheduler,
   reenterDagRun,
@@ -94,6 +96,8 @@ export type E2eFixtureOptions = {
   readonly maxRunsPerSession?: number
   readonly scheduleRetry?: RetrySchedule
   readonly destruction?: DestructionPort
+  /** The DAG self-resume fence is wired like the runtime wires it; false drives a manager without it. */
+  readonly resumeFence?: boolean
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
   // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
   readonly store?: DagFileStore
@@ -148,6 +152,14 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       cwd: project,
       ...(options.admit === undefined ? {} : { admit: options.admit }),
       ...(options.destruction === undefined ? {} : { destruction: options.destruction }),
+      ...(options.resumeFence === false
+        ? {}
+        : {
+            ownerResumeFence: (record: TaskRecord) =>
+              createDagOwnerResumeFence({ store, cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false })(
+                record,
+              ),
+          }),
     }),
     store,
   )

@@ -9,6 +9,7 @@ import {
 } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
+  createDagOwnerResumeFence,
   createDagLeaseWatch,
   createDagManager,
   createDagRecovery,
@@ -215,6 +216,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const stopObservingSchedulers = observeDagSchedulers(taskManager, (scheduler) => {
     scheduler.subscribe(publishSchedulerEvent)
   })
+  const stopFencingResumes = deps.engine.registerOwnerResumeFence(
+    createDagOwnerResumeFence({ store, cancelling: (runId) => schedulers.get(runId)?.scheduler.cancelling() ?? false }),
+  )
 
   const controller = (
     runId: DagRunId,
@@ -718,6 +722,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     dispose() {
       unregisterPauseSource?.()
       stopObservingSchedulers()
+      stopFencingResumes()
       cancelLeaseWatches()
       bridge.dispose()
       activeSessionId = undefined

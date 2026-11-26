@@ -30,6 +30,7 @@ test("#11381 #given an older attempt's child that resumed after the sweep behind
   const runner = new ControlledRunner()
   const fixture = createE2eFixture({
     project: project(),
+    resumeFence: false,
     runner,
     materializeSkills: identityMaterializer,
     scheduleRetry: clock.schedule,

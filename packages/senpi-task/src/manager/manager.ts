@@ -33,6 +33,7 @@ import type {
   TaskRunStats,
 } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
+import { ownedClaims, ownedStartResult } from "./owned-claims"
 import { createSteeringEngine } from "../steering"
 import type {
   CancelOptions,
@@ -524,7 +525,7 @@ class TaskManagerImpl implements TaskManager {
 
     return withTaskRecordLockAsync(lockPath, async () => {
       spec.admission?.assertOpen()
-      const raced = this.#ownedResult(owner)
+      const raced = ownedStartResult(this.findOwnedTasks(owner), owner)
       if (raced !== undefined) return raced
       const result = await withResidentStart(
         this.#options,
@@ -544,41 +545,7 @@ class TaskManagerImpl implements TaskManager {
   }
 
   findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
-    return this.#options.store
-      .list()
-      .records.filter(
-        (record) =>
-          record.owner?.kind === owner.kind &&
-          record.owner.runId === owner.runId &&
-          (owner.nodeId === undefined || record.owner.nodeId === owner.nodeId),
-      )
-  }
-
-  #ownedResult(owner: DagTaskOwner): OwnedStartResult | undefined {
-    const records = this.findOwnedTasks(owner)
-    const record = records.at(-1)
-    if (record === undefined) return undefined
-    if (record.owner?.fingerprint !== owner.fingerprint) {
-      // A settled newest claim is a retry and ownership moves to a fresh task, unless ANY claim is
-      // still live: an older attempt's child can resume on its own behind a newer one (#11381).
-      const live = records.findLast((claim) => !isTerminalRecord(claim))
-      if (live === undefined) return undefined
-      // Which live claim this is - same attempt, earlier, or newer - the DAG layer decides (#11381).
-      return {
-        kind: "owner_conflict",
-        task_id: live.task_id,
-        existing_fingerprint: live.owner?.fingerprint ?? "",
-        requested_fingerprint: owner.fingerprint,
-      }
-    }
-    return {
-      kind: "started",
-      reused: true,
-      task_id: record.task_id,
-      status: record.status,
-      name: record.name ?? record.task_id,
-      ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
-    }
+    return ownedClaims(this.#options.store.list().records, owner)
   }
 
   async #startResolved(
@@ -1687,7 +1654,17 @@ class TaskManagerImpl implements TaskManager {
       waitForTerminal: (taskId) => this.waitFor(taskId),
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
       trackOutcome: (taskId, handle, model, epoch) => this.#outcome.trackOutcome(taskId, handle, model, epoch),
+      ...(this.#options.ownerResumeFence === undefined ? {} : { ownerResumeFence: this.#options.ownerResumeFence }),
+      endRefusedRun: (taskId, handle) => this.#endRefusedRun(taskId, handle),
     }
+  }
+
+  // The owner refused a self-started run: the record stays settled, so nothing may keep running.
+  async #endRefusedRun(taskId: string, handle: ManagedChildHandle): Promise<void> {
+    const destruction = this.#options.destruction
+    if (destruction !== undefined) return destruction.destroyResidentTask(taskId, "cancel")
+    this.forget(taskId, { path: "end" })
+    await discardManagedHandle(handle)
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {

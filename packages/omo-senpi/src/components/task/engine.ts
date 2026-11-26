@@ -16,6 +16,7 @@ import {
   type AgentDefinition,
   type ChildPlanner,
   type CompletionNotifier,
+  type OwnerResumeFence,
   type PersistedTaskEvent,
   type ResolveAncestry,
   type SessionAncestry,
@@ -102,6 +103,8 @@ export interface TaskEngine {
   // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
   // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
   onStoreMutation(listener: (change: StoreMutation) => void): () => void
+  /** The DAG runtime registers its self-resume fence here once it is built over this manager (#11381). */
+  registerOwnerResumeFence(fence: OwnerResumeFence): () => void
 }
 
 export interface ComposeTaskEngineDeps {
@@ -267,7 +270,9 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     getOmoConfig,
     settings,
   })
+  let ownerResumeFence: OwnerResumeFence | undefined
   const manager = createTaskManager({
+    ownerResumeFence: (record) => ownerResumeFence?.(record) ?? { kind: "allow" },
     onChildLiveness: (record, status) => {
       if (record.parent_session_id === runtime.sessionId())
         notifyHostLiveness(deps.pi, deps.coordinator, record, status, () => runtime.parentState().kind === "streaming")
@@ -361,5 +366,11 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     }),
     appendTaskEvent,
     onStoreMutation: storeChain.onMutation,
+    registerOwnerResumeFence: (fence) => {
+      ownerResumeFence = fence
+      return () => {
+        if (ownerResumeFence === fence) ownerResumeFence = undefined
+      }
+    },
   }
 }

@@ -38,6 +38,8 @@ export type ControlledHandle = {
   readonly selfResume: () => Promise<void>
   /** How often the manager aborted and disposed this child. */
   readonly stops: { aborted: number; disposed: number }
+  /** Holds the next abort pending: `reached` resolves when it is sent, `release` lets it finish. */
+  readonly holdStops: () => { readonly reached: Promise<void>; readonly release: () => void }
   readonly connection: ControlledConnection
 }
 
@@ -49,6 +51,15 @@ export type ControlledConnection = {
 
 export function controlledHandle(taskId: string, connectable = false): ControlledHandle {
   const stops = { aborted: 0, disposed: 0 }
+  let stopGate: { readonly reached: () => void; readonly released: Promise<void> } | undefined
+  const holdStops = (): { readonly reached: Promise<void>; readonly release: () => void } => {
+    let release = (): void => undefined
+    let reached = (): void => undefined
+    const released = new Promise<void>((resolve) => (release = resolve))
+    const reachedPromise = new Promise<void>((resolve) => (reached = resolve))
+    stopGate = { reached, released }
+    return { reached: reachedPromise, release }
+  }
   let recovering = false
   let reconnect = (): void => undefined
   let reconnected = new Promise<void>((resolve) => (reconnect = resolve))
@@ -81,6 +92,7 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
   return {
     settle,
     stops,
+    holdStops,
     connection,
     selfResume: () =>
       new Promise<void>((resolve) => {
@@ -103,7 +115,11 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
       followUp: () => Promise.resolve(),
       abort: () => {
         stops.aborted += 1
-        return Promise.resolve()
+        const gate = stopGate
+        stopGate = undefined
+        if (gate === undefined) return Promise.resolve()
+        gate.reached()
+        return gate.released
       },
       subscribe: () => () => undefined,
       waitForOutcome,

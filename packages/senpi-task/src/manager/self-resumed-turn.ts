@@ -4,6 +4,7 @@ import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { buildRevived } from "../steering/engine-policy"
 import type { ManagedChildHandle } from "./child-handle"
+import type { OwnerResumeFence } from "./types"
 import { publishHostTaskStatus } from "./host-task-status"
 import { nowIso } from "./manager-helpers"
 
@@ -18,6 +19,8 @@ export type SelfResumedTurnPorts = {
     taskId: string,
   ) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
   readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
+  readonly ownerResumeFence?: OwnerResumeFence
+  readonly endRefusedRun: (taskId: string, handle: ManagedChildHandle) => Promise<void>
 }
 
 function reopenable(
@@ -57,13 +60,22 @@ export async function reopenSelfResumedTurn(
   const epoch = nextRunEpoch(settled)
   const reservation = ports.reserveForRevive(taskId)
   let reopened = false
+  let refusal: string | undefined
   ports.store.mutate(taskId, (fresh) => {
     if (!reopenable(fresh, handle, ports) || nextRunEpoch(fresh) !== epoch) return fresh
+    // The owner answers in the same synchronous step as the reopen: whatever it journaled before is
+    // seen here, and whatever it does after sees a running record (#11381).
+    const verdict = fresh.owner?.kind === "dag" ? ports.ownerResumeFence?.(fresh) : undefined
+    if (verdict?.kind === "refuse") {
+      refusal = verdict.reason
+      return fresh
+    }
     reopened = true
     return { ...buildRevived(fresh, nowIso(ports.now)), resumed_run_epoch: epoch }
   })
   if (!reopened) {
     if (reservation.ok) reservation.release()
+    if (refusal !== undefined) await refuseSelfResumedRun(ports, taskId, handle, epoch, refusal)
     return
   }
   ports.store.appendEvent(taskId, { type: "task_self_resumed", payload: { run_epoch: epoch } })
@@ -73,4 +85,16 @@ export async function reopenSelfResumedTurn(
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)
   log("senpi-task child resumed on its own after its turn settled", { taskId, runEpoch: epoch })
+}
+
+async function refuseSelfResumedRun(
+  ports: SelfResumedTurnPorts,
+  taskId: string,
+  handle: ManagedChildHandle,
+  epoch: number,
+  reason: string,
+): Promise<void> {
+  ports.store.appendEvent(taskId, { type: "task_self_resume_refused", payload: { run_epoch: epoch, reason } })
+  log("senpi-task refused a run a settled DAG child started on its own", { taskId, runEpoch: epoch, reason })
+  await ports.endRefusedRun(taskId, handle)
 }
