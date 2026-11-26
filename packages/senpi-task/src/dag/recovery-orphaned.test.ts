@@ -198,6 +198,17 @@ class HoldingTaskManager implements TaskManager {
     )?.record
   }
 
+  findOwnedTasks(ownerKey: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): readonly TaskRecord[] {
+    return [...this.#tasks.values()]
+      .map(({ record }) => record)
+      .filter(
+        (record) =>
+          record.owner?.kind === ownerKey.kind &&
+          record.owner.runId === ownerKey.runId &&
+          record.owner.nodeId === ownerKey.nodeId,
+      )
+  }
+
   get(taskId: string): TaskRecord | undefined {
     return this.#tasks.get(taskId)?.record
   }

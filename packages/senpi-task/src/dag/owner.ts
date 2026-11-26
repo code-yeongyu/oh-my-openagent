@@ -13,6 +13,12 @@ export type DagTaskOwner = {
   readonly runId: DagRunId
   readonly nodeId: DagNodeId
   readonly fingerprint: string
+  /**
+   * The node's execAttempt the task was created for (absent on records written before #11381, read
+   * as 0 like the fingerprint's own legacy encoding). Adoption of a live task is bound to it: a task
+   * of an earlier attempt belongs to a replaced definition and is disposed, never attached.
+   */
+  readonly execAttempt?: number
 }
 
 export type DagTaskOwnerKey = Pick<DagTaskOwner, "kind" | "runId" | "nodeId">
@@ -35,7 +41,7 @@ export type OwnedStartResult =
   | ReusedOwnedStart
   | Exclude<StartResult, { readonly kind: "started" }>
   | {
-      readonly kind: "owner_conflict"
+      readonly kind: "owner_conflict" | "owner_superseded"
       readonly task_id: string
       readonly existing_fingerprint: string
       readonly requested_fingerprint: string
