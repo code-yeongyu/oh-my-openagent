@@ -1076,7 +1076,7 @@ export function createRemoteThreadFixture() {
        */
       forks?: boolean
       /**
-       * #14623 review round 2: the store commits this receipt admission (1-based, every key counted) and then its worker
+       * #14623 review round 2: the store commits this receipt admission (1-based, every key counted, lookups not) and then its worker
        * exits before the reply reaches the tool, which sees the call fail as the store's.
        */
       loseAdmissionReply?: number
@@ -1263,6 +1263,8 @@ export function createRemoteThreadFixture() {
         property === "toolReceiptBegin" && extra.loseAdmissionReply !== undefined
           ? async (request: Parameters<GatewayStore["toolReceiptBegin"]>[0]) => {
               const admission = await target.toolReceiptBegin(request)
+              // A lookup (#13426 `inspect`) reserves nothing, so only admissions count.
+              if (request.inspect === true) return admission
               admissions++
               if (admissions === extra.loseAdmissionReply) throw new Error("the gateway store worker exited (1)")
               return admission
