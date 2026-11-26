@@ -214,6 +214,13 @@ describe("thread SDK: options are checked at the boundary", () => {
 })
 
 describe("thread SDK: sessions", () => {
+  test("SDK read rejects a malformed cursor before requesting the host view", async () => {
+    const { sdk, views } = fixture({ noHostAnswering: true })
+    const result = await sdk.read({ thread: "dur-host", cursor: "!" })
+    expect(views).toEqual([])
+    expect(result).toMatchObject({ kind: "error", error: { code: "cursor_invalid" } })
+  })
+
   test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
     const listed = await sdk.list({})
@@ -799,7 +806,7 @@ describe("thread SDK: session controls (#13413)", () => {
     ])
   })
 
-  test("#given this device's host #when a script creates a thread with a first prompt that no drain takes #then the thread opens, the prompt is the script's own row, and the create fails prompt_not_started", async () => {
+  test("#given this device's host never registers the new session with the gateway #when a script creates a thread with a first prompt #then the prompt is the script's own row, taken back, and the create fails host_unavailable (#14648)", async () => {
     const { calls, controls, openSession } = controlled()
     // The host lists the session it opened, as a real one does once open_session answers.
     let listed: ThreadHostSession[] = []
@@ -821,7 +828,10 @@ describe("thread SDK: session controls (#13413)", () => {
     const created = await sdk.create({ prompt: "start the nightly build", idempotency_key: "nightly-1" })
     expect(created).toMatchObject({
       kind: "error",
-      error: { code: "prompt_not_started", details: { thread: "dur-new", delivery_id: expect.any(String) } },
+      error: {
+        code: "host_unavailable",
+        details: { reason: "control_endpoint_unregistered", thread: "dur-new", delivery_id: expect.any(String) },
+      },
     })
     expect(calls.filter(([what]) => what === "openSession")).toHaveLength(1)
     const rows = await store.list({ target_durable_id: "dur-new" })
@@ -831,8 +841,11 @@ describe("thread SDK: session controls (#13413)", () => {
         authority: row.envelope.authority,
         body: row.body,
         mode: row.mode_requested,
+        state: row.state,
       })),
-    ).toEqual([{ sender: "cli:501", authority: "creator", body: "start the nightly build", mode: "auto" }])
+    ).toEqual([
+      { sender: "cli:501", authority: "creator", body: "start the nightly build", mode: "auto", state: "refused" },
+    ])
   })
 
   test("#given a script with no session of its own #when it addresses self #then every control verb answers caller_context_missing and nothing runs", async () => {

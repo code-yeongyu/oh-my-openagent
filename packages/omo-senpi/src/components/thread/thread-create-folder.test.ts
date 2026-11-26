@@ -33,6 +33,7 @@ describe("thread_create: the folder a new thread starts in", () => {
       {
         cwd: join(callerFolder, "packages"),
         name: "thread-create-folder-15",
+        refuseApprovals: true,
         durableSessionId: expect.any(String),
       },
     ])

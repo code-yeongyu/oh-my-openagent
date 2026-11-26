@@ -14,10 +14,13 @@
  *      or absent-of-entries file. That reads as an EMPTY transcript, never an
  *      error; only a genuinely missing file is `not_found`.
  *
- * Everything is bounded and synchronous: the file is read line by line in
- * fixed-size chunks the way the host's own loader reads it, entries are
- * encoded until the byte budget is spent, and the caller receives ONE payload
- * plus an opaque cursor. Nothing streams into the caller.
+ * Everything is bounded and synchronous: a tail read (and the pages of its
+ * window) reads the file backward from its end in fixed-size chunks and stops
+ * once it holds the window, so its cost follows the window and never the file
+ * (a seat transcript reaches hundreds of MB, #14418). Tail windows scan at most
+ * 1 MiB, chosen before opening the file; status only stats it. Recovery cursors scan forward one bounded window per call. Legacy forward pages
+ * retain the whole-file loader. Entries are encoded until the byte budget is spent, and the caller
+ * receives ONE payload plus an opaque cursor. Nothing streams into the caller.
  *
  * Failures are data (authoring rules R6/R7): every error branch is
  * `{ kind: "error", error: { code, message, next_action } }` with a
@@ -25,22 +28,40 @@
  * this module throws for an expected failure.
  */
 
-import { closeSync, openSync, readSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { closeSync, openSync, readSync, statSync, type Stats } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
+import {
+  decodeTranscriptCursor,
+  encodeTranscriptCursor,
+  THREAD_TAIL_MAX_ITEMS,
+  type TranscriptCursor,
+} from "../../../../omo-native/bin/lib/thread-read-cursor.js"
 import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
+import { fileRevision, parseLine, readFileWindow, readRange, readRecoveryPage } from "./reader-file-window"
 import { takeWithinBudget } from "./read-budget"
+
+export { decodeTranscriptCursor }
 
 /** Default number of trailing entries a tail read returns. */
 export const THREAD_TAIL_DEFAULT_ITEMS = 60
 /** Hard ceiling on a tail request; a larger `tail_items` is invalid_arguments. */
-export const THREAD_TAIL_MAX_ITEMS = 200
+export { THREAD_TAIL_MAX_ITEMS }
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
 /** A raw JSONL entry object, handed back unmodified. */
 export type ThreadTranscriptEntry = { readonly [key: string]: JsonValue }
+
+/** The message a public file read can render, or undefined for session bookkeeping. */
+function sessionMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry | undefined {
+  const message = entry.message
+  if (entry.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message))
+    return undefined
+  return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? message : undefined
+}
 
 export type ThreadReadMode = "status" | "tail" | "page"
 
@@ -81,8 +102,11 @@ export type ThreadTranscriptReadOk = {
   readonly source_incomplete: boolean
   readonly mode: ThreadReadMode
   readonly items: readonly ThreadTranscriptEntry[]
-  /** Entries the source holds in total, independent of the returned slice. */
-  readonly total_items: number
+  /**
+   * Entries the source holds in total, independent of the returned slice; null when a tail read of the session file
+   * stopped before the file's start, or status did not load the entries.
+   */
+  readonly total_items: number | null
   readonly truncated: boolean
   readonly next_cursor: string | null
   /** UTF-8 bytes of the returned items as encoded against the budget. */
@@ -97,8 +121,7 @@ export type ThreadTranscriptReadResult =
   ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 const READ_CHUNK_BYTES = 65536
-const CURSOR_VERSION = "t1"
-const OLDER_CURSOR_VERSION = "t1o"
+const NEWLINE = 0x0a
 
 function fail(code: ThreadErrorCode, message: string, nextAction: string): ThreadTranscriptReadResult {
   return { kind: "error", error: threadToolFailure(code, message, nextAction) }
@@ -124,9 +147,8 @@ type LoadedSource = {
  * because the content revision a cursor binds to must span every entry for
  * staleness detection to be exact.
  *
- * A line that is not a JSON object - malformed syntax, a bare scalar, or a
- * run of non-UTF8 bytes decoded to replacement characters - is skipped and
- * counted rather than aborting the read, mirroring the host's loader.
+ * A line that is not a JSON object is skipped and counted rather than aborting
+ * the read, mirroring the host's loader.
  */
 function loadJsonlFile(path: string): LoadedSource | "missing" {
   let descriptor: number | undefined
@@ -142,20 +164,9 @@ function loadJsonlFile(path: string): LoadedSource | "missing" {
     const decoder = new StringDecoder("utf8")
     const buffer = Buffer.allocUnsafe(READ_CHUNK_BYTES)
     const takeLine = (line: string): void => {
-      const trimmed = line.trim()
-      if (trimmed.length === 0) return
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(trimmed)
-      } catch {
-        skippedLines += 1
-        return
-      }
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        skippedLines += 1
-        return
-      }
-      entries.push(parsed as ThreadTranscriptEntry)
+      const entry = parseLine(line)
+      if (entry === "skipped") skippedLines += 1
+      else if (entry !== "blank") entries.push(entry)
     }
 
     while (true) {
@@ -182,17 +193,79 @@ function loadJsonlFile(path: string): LoadedSource | "missing" {
   }
 }
 
+type LoadedTail = LoadedSource & {
+  readonly snapshot: Stats
+  /** The file's size when it was read: every append, truncation or rewrite of another length changes it. */
+  readonly size: number
+  /** File identity and the exact lines examined, including skipped lines. */
+  readonly hash: string
+  /** Whether the read reached the file's first line, so `entries` is the whole transcript. */
+  readonly whole: boolean
+}
+
+/**
+ * The file's last `count` entries, read backward from its end in fixed-size chunks (#14418): the bytes read and the
+ * entries parsed follow the window, never the file, so an 840 MB transcript answers like a small one. Lines are split
+ * on the newline byte, which never occurs inside a UTF-8 sequence, and each is decoded on its own; a line longer than a
+ * chunk is assembled once from its chunks, up to the 1 MiB scan ceiling. An incomplete line at that ceiling is omitted.
+ * Only the bytes present when the read starts are read, so an append racing
+ * the read is the next read's.
+ */
+function loadJsonlTail(
+  path: string,
+  count: number,
+  project: (entry: ThreadTranscriptEntry) => ThreadTranscriptEntry | undefined,
+): LoadedTail | "missing" | "changed" {
+  return readFileWindow(path, "tail", (descriptor, snapshot, floor, size) => {
+    const hash = createHash("sha256").update(`${snapshot.dev}:${snapshot.ino}:`)
+    const newestFirst: ThreadTranscriptEntry[] = []
+    let skippedLines = 0
+    const take = (line: Buffer): void => {
+      hash.update(line).update("\n")
+      const entry = parseLine(line.toString("utf8"))
+      if (entry === "skipped") skippedLines += 1
+      else if (entry !== "blank") {
+        // The window counts the entries the read's view keeps (#14422); every examined line is still in the hash.
+        const kept = project(entry)
+        if (kept !== undefined) newestFirst.push(kept)
+      }
+    }
+    // The bytes after the newest newline found so far that belong to a line whose start is not read yet, oldest first.
+    let pending: Buffer[] = []
+    let position = size
+    while (newestFirst.length < count && position > floor) {
+      const length = Math.min(READ_CHUNK_BYTES, position - floor)
+      position -= length
+      const chunk = readRange(descriptor, position, length)
+      let end = length
+      while (end > 0 && newestFirst.length < count) {
+        const newline = chunk.lastIndexOf(NEWLINE, end - 1)
+        if (newline === -1) break
+        take(Buffer.concat([chunk.subarray(newline + 1, end), ...pending]))
+        pending = []
+        end = newline
+      }
+      pending = [chunk.subarray(0, end), ...pending]
+    }
+    const whole = position === 0 && newestFirst.length < count
+    if (whole) take(Buffer.concat(pending))
+    return {
+      entries: newestFirst.reverse(),
+      skippedLines,
+      size,
+      whole,
+      hash: hash.digest("hex"),
+      snapshot,
+    }
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Revision + cursor
 // ---------------------------------------------------------------------------
 
-/**
- * Content revision a cursor is bound to: the entry count plus a cheap hash of
- * every entry's identity. An append changes the count, a rewrite changes an
- * entry identity, and a truncation changes both - each invalidates the cursor
- * instead of silently re-slicing a different transcript.
- */
-function revisionOf(entries: readonly ThreadTranscriptEntry[]): string {
+/** A cheap hash of every entry's identity. */
+function identityHash(entries: readonly ThreadTranscriptEntry[]): string {
   let hash = 2166136261
   for (const entry of entries) {
     const identity = `${String(entry.id ?? "")}|${String(entry.timestamp ?? "")}`
@@ -201,53 +274,42 @@ function revisionOf(entries: readonly ThreadTranscriptEntry[]): string {
       hash = Math.imul(hash, 16777619)
     }
   }
-  return `${entries.length}.${(hash >>> 0).toString(36)}`
+  return (hash >>> 0).toString(36)
 }
 
 /**
- * `forward` continues after `offset` (page mode); `older` pages the entries of a tail window before `before`, down to
- * the window's first entry `floor` (the cursor a tail read issues, #14173).
+ * Content revision a cursor is bound to: the entry count plus the hash of
+ * every entry's identity. An append changes the count, a rewrite changes an
+ * entry identity, and a truncation changes both - each invalidates the cursor
+ * instead of silently re-slicing a different transcript.
  */
-type Cursor =
-  | { readonly direction: "forward"; readonly revision: string; readonly offset: number }
-  | { readonly direction: "older"; readonly revision: string; readonly before: number; readonly floor: number }
-
-function encodeCursor(cursor: Cursor): string {
-  const text =
-    cursor.direction === "forward"
-      ? `${CURSOR_VERSION}:${cursor.revision}:${cursor.offset}`
-      : `${OLDER_CURSOR_VERSION}:${cursor.revision}:${cursor.before}:${cursor.floor}`
-  return Buffer.from(text, "utf8").toString("base64url")
+function revisionOf(entries: readonly ThreadTranscriptEntry[]): string {
+  return `${entries.length}.${identityHash(entries)}`
 }
 
-function decodeCursor(raw: string): Cursor | null {
-  if (typeof raw !== "string" || raw.length === 0) return null
-  let decoded: string
-  try {
-    decoded = Buffer.from(raw, "base64url").toString("utf8")
-  } catch {
-    return null
+/**
+ * The revision binds the file size and identity to every examined line in the bounded window. Content, parent links
+ * and malformed lines participate, so unchanged entry ids cannot hide a rewrite. Same-length edits outside the window
+ * leave the cursor valid.
+ */
+function tailRevisionOf(tail: LoadedTail): string {
+  return `${tail.size}.${tail.hash}`
+}
+
+export function invalidReadCursor() {
+  return {
+    kind: "error" as const,
+    error: threadToolFailure(
+      "cursor_invalid",
+      "The cursor is not a cursor this reader issued.",
+      "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list (tool.thread_list() in an eval cell) to confirm the thread address.",
+    ),
   }
-  const [version, revision = "", ...positions] = decoded.split(":")
-  if (!/^\d+\.[0-9a-z]+(?:\.m)?$/.test(revision)) return null
-  const offsets = positions.map(Number)
-  if (offsets.some((offset) => !Number.isSafeInteger(offset) || offset < 0)) return null
-  const [first = 0, second = 0] = offsets
-  if (version === CURSOR_VERSION && offsets.length === 1) return { direction: "forward", revision, offset: first }
-  if (version === OLDER_CURSOR_VERSION && offsets.length === 2 && second <= first)
-    return { direction: "older", revision, before: first, floor: second }
-  return null
 }
 
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
-
-function durableMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry[] {
-  const message = entry.message
-  if (entry.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
-  return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
-}
 
 /**
  * Read one bounded slice of a session transcript.
@@ -305,17 +367,136 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
   const maxBytes = opts.max_bytes ?? THREAD_READ_DEFAULT_BYTES
   const tailItems = opts.tail_items ?? THREAD_TAIL_DEFAULT_ITEMS
 
-  let cursor: Cursor | null = null
+  let cursor: TranscriptCursor | null = null
   if (opts.cursor !== undefined) {
-    cursor = decodeCursor(opts.cursor)
+    cursor = decodeTranscriptCursor(opts.cursor)
     if (cursor === null) {
-      return fail(
-        "cursor_invalid",
-        "The cursor is not a cursor this reader issued.",
-        "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list (tool.thread_list() in an eval cell) to confirm the thread address.",
-      )
+      return invalidReadCursor()
     }
   }
+
+  // A tool read pages visible messages (#14422): its window and budget count message payloads only, and its cursors
+  // carry `.m`, so a raw-entry cursor never resumes a message window (or the reverse). Both views still invalidate on
+  // any change to the file, bookkeeping included.
+  const messageView = source.kind === "jsonl" && source.view === "messages"
+  const viewed = (entries: readonly ThreadTranscriptEntry[]): ThreadTranscriptEntry[] =>
+    messageView
+      ? entries.flatMap((entry): ThreadTranscriptEntry[] => {
+          const message = sessionMessage(entry)
+          return message === undefined ? [] : [message]
+        })
+      : [...entries]
+  const viewRevision = (revision: string): string => revision + (messageView ? ".m" : "")
+
+  const stale = (): ThreadTranscriptReadResult =>
+    fail(
+      "cursor_stale",
+      "The transcript changed after this cursor was issued, so its position no longer names the same entries.",
+      "Re-read the thread without a cursor to restart from a current revision.",
+    )
+  const missing = (path: string): ThreadTranscriptReadResult =>
+    fail(
+      "not_found",
+      `No session transcript exists at ${path}.`,
+      "Call thread_list (tool.thread_list() in an eval cell) to get a current thread value, then read that thread instead.",
+    )
+
+  // Status must never open a transcript, even when a cursor is supplied.
+  if (mode === "status") {
+    let totalItems: number | null = null
+    if (source.kind === "jsonl") {
+      try {
+        const metadata = statSync(source.path)
+        if (!metadata.isFile()) return missing(source.path)
+        if (metadata.size === 0) totalItems = 0
+      } catch {
+        return missing(source.path)
+      }
+    }
+    return {
+      kind: "ok",
+      source: source.kind === "jsonl" ? "session_jsonl" : "live_host",
+      source_incomplete: source.kind === "jsonl" && source.live_host_present !== true,
+      mode,
+      items: [],
+      total_items: totalItems,
+      truncated: false,
+      next_cursor: null,
+      encoded_bytes: 0,
+      max_bytes: maxBytes,
+      skipped_lines: 0,
+    }
+  }
+
+  if (cursor?.direction === "file_scan") {
+    if (source.kind !== "jsonl") return stale()
+    const page = readRecoveryPage(source.path, cursor, tailItems, maxBytes)
+    if (page === "missing") return missing(source.path)
+    if (page === "changed") return stale()
+    return {
+      kind: "ok",
+      source: "session_jsonl",
+      source_incomplete: source.live_host_present !== true,
+      mode,
+      items: viewed(page.items),
+      total_items: null,
+      truncated: page.next !== null,
+      next_cursor: page.next === null ? null : encodeTranscriptCursor(page.next),
+      encoded_bytes: page.encodedBytes,
+      max_bytes: maxBytes,
+      skipped_lines: page.skippedLines,
+    }
+  }
+
+  // A session file's tail window, or a page of one, reads only the window from the file's end (#14418).
+  const fileTail = cursor?.direction === "file_tail" ? cursor : undefined
+  if (source.kind === "jsonl" && (mode === "tail" || fileTail !== undefined)) {
+    const count = fileTail?.count ?? tailItems
+    const tail = loadJsonlTail(source.path, count, messageView ? sessionMessage : (entry) => entry)
+    if (tail === "missing") return missing(source.path)
+    if (tail === "changed") return stale()
+    const revision = viewRevision(tailRevisionOf(tail))
+    if (fileTail !== undefined && (fileTail.revision !== revision || fileTail.before > tail.entries.length))
+      return stale()
+    if (
+      tail.size > THREAD_READ_MAX_BYTES &&
+      !(messageView ? tail.entries.length > 0 : tail.entries.some((entry) => sessionMessage(entry) !== undefined))
+    )
+      return {
+        kind: "error",
+        error: threadToolFailure(
+          "message_too_large",
+          "No complete transcript message was found in the 1 MiB tail scan window.",
+          "In an eval cell, call tool.thread_read({ thread: thread, cursor: error.details.next_cursor }) with the same thread, then follow next_cursor until absent.",
+          {
+            next_cursor: encodeTranscriptCursor({
+              direction: "file_scan",
+              revision: fileRevision(tail.snapshot),
+              offset: 0,
+              skip: false,
+            }),
+          },
+        ),
+      }
+    const end = fileTail?.before ?? tail.entries.length
+    const { selected, encodedBytes } = takeWithinBudget(tail.entries.slice(0, end), maxBytes, "end")
+    const start = end - selected.length
+    return {
+      kind: "ok",
+      source: "session_jsonl",
+      source_incomplete: source.live_host_present !== true,
+      mode,
+      items: selected,
+      total_items: tail.whole ? tail.entries.length : null,
+      truncated: start > 0,
+      next_cursor:
+        start > 0 ? encodeTranscriptCursor({ direction: "file_tail", revision, before: start, count }) : null,
+      encoded_bytes: encodedBytes,
+      max_bytes: maxBytes,
+      skipped_lines: tail.skippedLines,
+    }
+  }
+  if (fileTail !== undefined) return stale()
 
   let loaded: LoadedSource
   let readSourceKind: ThreadReadSource
@@ -329,30 +510,15 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     readSourceKind = "session_jsonl"
     sourceIncomplete = source.live_host_present !== true
     const file = loadJsonlFile(source.path)
-    if (file === "missing") {
-      return fail(
-        "not_found",
-        `No session transcript exists at ${source.path}.`,
-        "Call thread_list (tool.thread_list() in an eval cell) to get a current thread value, then read that thread instead.",
-      )
-    }
+    if (file === "missing") return missing(source.path)
     loaded = file
   }
 
-  const messageView = source.kind === "jsonl" && source.view === "messages"
-  // Positions in a visible-message window cannot resume an old raw-entry cursor (or vice versa).
-  // Both views still invalidate on changes to the full file, including bookkeeping.
-  const revision = revisionOf(loaded.entries) + (messageView ? ".m" : "")
+  const revision = viewRevision(revisionOf(loaded.entries))
 
-  if (cursor !== null && cursor.revision !== revision) {
-    return fail(
-      "cursor_stale",
-      "The transcript changed after this cursor was issued, so its position no longer names the same entries.",
-      "Re-read the thread without a cursor to restart from a current revision.",
-    )
-  }
+  if (cursor !== null && cursor.revision !== revision) return stale()
 
-  const entries = messageView ? loaded.entries.flatMap(durableMessage) : loaded.entries
+  const entries = viewed(loaded.entries)
   const base: Omit<ThreadTranscriptReadOk, "items" | "truncated" | "next_cursor" | "encoded_bytes"> = {
     kind: "ok",
     source: readSourceKind,
@@ -361,10 +527,6 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     total_items: entries.length,
     max_bytes: maxBytes,
     skipped_lines: loaded.skippedLines,
-  }
-
-  if (mode === "status") {
-    return { ...base, items: [], truncated: false, next_cursor: null, encoded_bytes: 0 }
   }
 
   const older = mode === "page" && cursor?.direction === "older" ? cursor : undefined
@@ -377,7 +539,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       ...base,
       items: selected,
       truncated,
-      next_cursor: truncated ? encodeCursor({ direction: "forward", revision, offset: nextOffset }) : null,
+      next_cursor: truncated ? encodeTranscriptCursor({ direction: "forward", revision, offset: nextOffset }) : null,
       encoded_bytes: encodedBytes,
     }
   }
@@ -393,7 +555,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     ...base,
     items: selected,
     truncated,
-    next_cursor: truncated ? encodeCursor({ direction: "older", revision, before: start, floor }) : null,
+    next_cursor: truncated ? encodeTranscriptCursor({ direction: "older", revision, before: start, floor }) : null,
     encoded_bytes: encodedBytes,
   }
 }

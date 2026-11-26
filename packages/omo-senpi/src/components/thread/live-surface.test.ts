@@ -313,21 +313,22 @@ describe("live thread frame decoding", () => {
 })
 
 describe("live thread create with initial skills", () => {
-  test("#given initial skills #when a session is opened #then they ride on the open_session context and never as a wire field", async () => {
+  test("#given initial skills and refuseApprovals #when a session is opened #then both ride on the open_session context and never as wire fields (#14649)", async () => {
     await withRpc(
       (frame) =>
         frame.type === "open_session"
           ? { success: true, data: { sessionId: "rpc-new", state: { sessionId: "rpc-new", cwd: "/w" } } }
           : { success: true, data: { sessions: [] } },
       async (surface, frames) => {
-        await surface.openSession({ cwd: "/w", initialSkills: ["gateway-lead"] })
+        await surface.openSession({ cwd: "/w", initialSkills: ["gateway-lead"], refuseApprovals: true })
         const open = frames.find((frame) => frame.type === "open_session")
         expect(open).toMatchObject({
           cwd: "/w",
           retain_on_disconnect: true,
-          context: { initial_skills: JSON.stringify(["gateway-lead"]) },
+          context: { initial_skills: JSON.stringify(["gateway-lead"]), approvals: "refuse" },
         })
         expect(open).not.toHaveProperty("initialSkills")
+        expect(open).not.toHaveProperty("refuseApprovals")
       },
     )
   })

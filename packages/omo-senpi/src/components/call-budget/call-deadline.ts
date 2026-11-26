@@ -12,16 +12,85 @@ export const TOOL_CALL_BUDGET_MS = 50_000
  */
 export const READ_RESERVE_MS = 15_000
 
-const scope = new AsyncLocalStorage<number>()
+// omo#13426: the tool call's abort signal rides with its deadline, so a cancelled call leaves nothing to wait for.
+type CallScope = {
+  readonly deadline: number | undefined
+  signal: AbortSignal | undefined
+  readonly admit?: () => Promise<void>
+  readonly onDispatch?: () => void
+}
 
-/** Runs `call` with every remote command inside it bounded by `deadlineMs` (epoch ms). */
-export const withCallDeadline = <T>(deadlineMs: number, call: () => Promise<T>): Promise<T> =>
-  scope.run(deadlineMs, call)
+// The tools and their lazy thread-client sidecar can carry separate copies of this module.
+const key = Symbol.for("omo.thread.call-scope")
+const shared = globalThis as typeof globalThis & { [key]?: AsyncLocalStorage<CallScope> }
+const scope = (shared[key] ??= new AsyncLocalStorage<CallScope>())
+
+/**
+ * Runs `call` with every remote command inside it bounded by `deadlineMs` (epoch ms) and, when `signal` is given, by
+ * that signal: once it aborts, every wait left in the call is zero.
+ */
+export const withCallDeadline = <T>(
+  deadlineMs: number,
+  call: () => Promise<T>,
+  signal?: AbortSignal,
+  onDispatch?: () => void,
+  admit?: () => Promise<void>,
+): Promise<T> => scope.run({ deadline: deadlineMs, signal, onDispatch, admit }, call)
+
+/** A nested relay receipt observes the same first write as the enclosing tool, never the start of preparation. */
+export function observeCallDispatch<T>(sent: () => void, run: () => Promise<T>): Promise<T> {
+  const parent = scope.getStore()
+  return scope.run(
+    {
+      ...parent,
+      deadline: parent?.deadline,
+      signal: parent?.signal,
+      onDispatch: () => {
+        parent?.onDispatch?.()
+        sent()
+      },
+    },
+    run,
+  )
+}
+
+/** Admit only once the write is ready. The final abort check and the write start share one stack. */
+export async function dispatchCall<T>(write: () => Promise<T>): Promise<T> {
+  const current = scope.getStore()
+  if (current?.admit !== undefined) await current.admit()
+  current?.onDispatch?.()
+  return write()
+}
+
+// An injected port with no preparation starts its mutation on entry. Adapters that prepare their own
+// transport instead call dispatchCall at the wire, including through the lazy client sidecar.
+const prepares = Symbol.for("omo.thread.prepares-mutation")
+export const preparesMutation = <F extends (...args: never[]) => unknown>(fn: F): F =>
+  Object.assign(fn, { [prepares]: true })
+export function callMutation<A extends unknown[], T>(fn: (...args: A) => Promise<T>, ...args: A): Promise<T> {
+  return prepares in fn ? fn(...args) : dispatchCall(() => fn(...args))
+}
+
+/** An acknowledged open owns its remaining work and receipt, still under the original deadline. */
+export function retainOpenOutcome(): void {
+  const current = scope.getStore()
+  if (current?.onDispatch !== undefined) current.signal = undefined
+}
+
+/** The enclosing tool call's abort signal (none outside a call, or for a call that took none). */
+export const callSignal = (): AbortSignal | undefined => scope.getStore()?.signal
+
+/** What is left of the enclosing call's budget: none once its signal aborted (no enclosing call: undefined). */
+function remainingMs(now: number): number | undefined {
+  const current = scope.getStore()
+  if (current?.deadline === undefined) return undefined
+  return current.signal?.aborted === true ? 0 : current.deadline - now
+}
 
 /** The wait a remote command may take: `bound`, cut to what is left of the enclosing call's deadline (none: `bound`). */
 export function commandWaitMs(bound: number, now: number = Date.now()): number {
-  const deadline = scope.getStore()
-  return deadline === undefined ? bound : Math.min(bound, deadline - now)
+  const left = remainingMs(now)
+  return left === undefined ? bound : Math.min(bound, left)
 }
 
 /** A wait inside a call: `requested`, cut so that `reserve` of the call's budget is left for what follows (none: as asked). */
@@ -30,27 +99,55 @@ export function waitWithinCallBudget(
   reserve: number = READ_RESERVE_MS,
   now: number = Date.now(),
 ): number {
-  const deadline = scope.getStore()
-  return deadline === undefined ? requested : Math.max(0, Math.min(requested, deadline - now - reserve))
+  const left = remainingMs(now)
+  return left === undefined ? requested : Math.max(0, Math.min(requested, left - reserve))
 }
 
 /** Runs `work` outside any call's budget: a background task a call queued (a held re-send) outlives that call. */
 export const outsideCallDeadline = <T>(work: () => T): T => scope.exit(work)
 
-/** `work`, or undefined once the enclosing call's budget runs out first (no enclosing call: `work` as it is). */
+/**
+ * `work`, or undefined once the enclosing call's budget runs out or its signal aborts first (no enclosing call: `work`
+ * as it is).
+ */
 export function withinCallBudget<T>(work: Promise<T>, now: number = Date.now()): Promise<T | undefined> {
-  const deadline = scope.getStore()
-  if (deadline === undefined) return work
+  const left = remainingMs(now)
+  if (left === undefined) return work
+  const signal = scope.getStore()?.signal
   return new Promise<T | undefined>((resolve, reject) => {
-    const timer = setTimeout(() => resolve(undefined), Math.max(0, deadline - now))
+    const onAbort = () => settle(() => resolve(undefined))
+    const timer = setTimeout(onAbort, Math.max(0, left))
     timer.unref?.()
+    const settle = (done: () => void) => {
+      clearTimeout(timer)
+      signal?.removeEventListener("abort", onAbort)
+      done()
+    }
+    signal?.addEventListener("abort", onAbort, { once: true })
+    work.then(
+      (value) => settle(() => resolve(value)),
+      (error: unknown) => settle(() => reject(error)),
+    )
+  })
+}
+
+/**
+ * `work`'s value, or undefined as soon as `signal` aborts (at once when it already has). The work itself is not stopped
+ * here: its remote waits read the same signal through the call scope and end on their own; a late rejection is dropped.
+ */
+export function unlessAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<{ readonly value: T } | undefined> {
+  work.catch(() => undefined)
+  if (signal.aborted) return Promise.resolve(undefined)
+  return new Promise((resolve, reject) => {
+    const onAbort = () => resolve(undefined)
+    signal.addEventListener("abort", onAbort, { once: true })
     work.then(
       (value) => {
-        clearTimeout(timer)
-        resolve(value)
+        signal.removeEventListener("abort", onAbort)
+        resolve({ value })
       },
       (error: unknown) => {
-        clearTimeout(timer)
+        signal.removeEventListener("abort", onAbort)
         reject(error)
       },
     )

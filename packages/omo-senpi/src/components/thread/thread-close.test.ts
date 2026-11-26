@@ -173,6 +173,32 @@ describe("thread_close: close a thread on this device or on another one", () => 
     expect(closed).toEqual([])
   })
 
+  test("#given a thread with no live owner whose messages this device's gateway holds for its wake #when thread_close names it, plain then forced #then the plain close names them and drops nothing, the forced one drops them and lists them (#14648)", async () => {
+    const a = account()
+    const { run, closed, store } = surface(a.remote, { diskSessions: ["dur-saved"] })
+    for (const message of ["first", "second"])
+      expect(await run("thread_send", { thread: "dur-saved", message })).toMatchObject({ kind: "ok" })
+    const held = (await store.list({ target_durable_id: "dur-saved" })).map((row) => row.delivery_id)
+    expect(held).toHaveLength(2)
+    expect(await run("thread_close", { thread: "dur-saved" })).toMatchObject({
+      kind: "error",
+      error: { code: "turn_active", details: { pending_deliveries: held, retry_with: { force: true } } },
+    })
+    expect((await store.list({ target_durable_id: "dur-saved" })).map((row) => row.state)).toEqual(["queued", "queued"])
+    expect(await run("thread_close", { thread: "dur-saved", force: true })).toEqual({
+      kind: "ok",
+      thread: "dur-saved",
+      closed: false,
+      reason: "not_live",
+      dropped_deliveries: held,
+    })
+    expect((await store.list({ target_durable_id: "dur-saved" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "target_closed"],
+      ["refused", "target_closed"],
+    ])
+    expect(closed).toEqual([])
+  })
+
   test("#given a thread held by an interactive terminal #when thread_close names it #then it is refused unsupported and the terminal keeps it", async () => {
     const terminal: ThreadHostSession = {
       sessionId: "route-tui",

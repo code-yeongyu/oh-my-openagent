@@ -1,3 +1,4 @@
+import { preparesMutation, callMutation } from "../../call-budget/call-deadline"
 import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
 import type { RemoteFailure, RemoteSender } from "../types"
@@ -137,11 +138,14 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
         ? { rows: await loaded.sessions(filter), incomplete: [] }
         : await loaded.listing(filter)
     },
-    endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
+    endpointCommand: preparesMutation(
+      async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
+    ),
     endpointKeys: async (device) => (await (await load()).endpointKeys?.(device)) ?? { keys: [] },
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
-    sessionCommand: async (device, sessionId, rpc, options) =>
-      await (await load()).sessionCommand(device, sessionId, rpc, options),
+    sessionCommand: preparesMutation(
+      async (device, sessionId, rpc, options) => await (await load()).sessionCommand(device, sessionId, rpc, options),
+    ),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
     watch: async (device, sessionId, handlers, watchOptions) =>
       await (await load()).watch(device, sessionId, handlers, watchOptions),
@@ -152,8 +156,10 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
       const port = await load()
       return port.lookupAlone === undefined ? undefined : await port.lookupAlone(device, durableId, waitMs)
     },
-    wake: async (device, durableId, rpc) =>
-      (await (await load()).wake?.(device, durableId, rpc)) ?? { kind: "unavailable" },
+    wake: preparesMutation(
+      async (device, durableId, rpc) =>
+        (await (await load()).wake?.(device, durableId, rpc)) ?? { kind: "unavailable" },
+    ),
     canWake: async () => (await (await load()).canWake?.()) === true,
     receipt: async (device, durableId, deliveryId) =>
       (await (await load()).receipt?.(device, durableId, deliveryId)) ?? { kind: "unavailable" },
@@ -191,8 +197,8 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     return await use(loaded)
   }
   const aliases: AliasRegistry = {
-    claim: async (input) => await withRegistry((loaded) => loaded.claim(input)),
-    rename: async (input) => await withRegistry((loaded) => loaded.rename(input)),
+    claim: preparesMutation(async (input) => await withRegistry((loaded) => callMutation(loaded.claim, input))),
+    rename: preparesMutation(async (input) => await withRegistry((loaded) => callMutation(loaded.rename, input))),
     release: async (input) => await withRegistry((loaded) => loaded.release(input)),
     resolve: async (alias) => await withRegistry((loaded) => loaded.resolve(alias)),
     aliasesOf: async (sessionIds) => await withRegistry((loaded) => loaded.aliasesOf(sessionIds)),

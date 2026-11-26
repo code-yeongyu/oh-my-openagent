@@ -114,6 +114,7 @@ export type ThreadHost = {
     readonly name?: string
     readonly forkFrom?: string
     readonly initialSkills?: readonly string[]
+    readonly refuseApprovals?: boolean
     readonly permissionPreset?: string
     /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
     readonly provider?: string
@@ -277,6 +278,11 @@ export type ThreadCloseOptions = {
   readonly force?: boolean
   readonly graceful?: boolean
   readonly wait_ms?: number
+  /**
+   * #14648: `false` ends the session without recording a close on request (no `effectId`), so the wake sweep does not
+   * settle what was queued for it before: a create rolling back a session it opened, never a close a caller asked for.
+   */
+  readonly record?: false
 }
 
 /** What a graceful close waited for and stopped (senpi `unload_session { graceful }` `graceful` and `dropped`). */

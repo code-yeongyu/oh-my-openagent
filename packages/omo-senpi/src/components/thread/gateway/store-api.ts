@@ -95,7 +95,12 @@ export type GatewayStore = ExtensionFacade & {
   readonly stats: () => Promise<GatewayStoreStats>
   readonly legacyMigrated: () => Promise<number>
   readonly toolReceiptBegin: (
-    request: ReceiptScope & { readonly now: number; readonly args_hash: string; readonly retry_uncertain?: boolean },
+    request: ReceiptScope & {
+      readonly now: number
+      readonly args_hash: string
+      readonly retry_uncertain?: boolean
+      readonly inspect?: boolean
+    },
   ) => Promise<ToolReceiptBegin>
   readonly toolReceiptSettle: (
     request: ReceiptScope & { readonly now: number } & ({ readonly result: unknown } | { readonly error_note: string }),

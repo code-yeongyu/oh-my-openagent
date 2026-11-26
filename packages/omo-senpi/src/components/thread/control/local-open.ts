@@ -1,9 +1,21 @@
+import { callMutation } from "../../call-budget/call-deadline"
 import type { ThreadHost } from "../tools/ports"
 import { folderFailure } from "../worktree/failures"
 import { forkRefusal, modelRefusal } from "./open-reply"
 import { discardWorktree } from "../worktree/discard-worktree"
 import { checkFolder, createThreadWorktree, runGit } from "../worktree/thread-worktree"
+import type { ThreadDataError } from "../contracts"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
 import { openedThread, type SessionOpenOutcome, type SessionOpenRequest } from "./session-host"
+
+/** #14648: removes the worktree and branch an open on this device made, after the session in it ended. */
+export async function discardOpenedWorktree(
+  worktree: ThreadWorktree,
+  worktreeRoot: () => string,
+): Promise<ThreadDataError | undefined> {
+  const { repository, path, branch } = worktree
+  return await discardWorktree({ repository, path, branch, root: worktreeRoot(), git: runGit })
+}
 
 /**
  * The open of a thread on this device: the folder it names is checked and, when asked, the worktree is created in it.
@@ -28,7 +40,7 @@ export async function openLocally(
   }
   if (worktree === undefined) {
     try {
-      return { kind: "ok", thread: openedThread(await host.openSession(request)) }
+      return { kind: "ok", thread: openedThread(await callMutation(host.openSession, request)) }
     } catch (error) {
       const refused = unrunnable(error)
       if (refused === undefined) throw error
