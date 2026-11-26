@@ -39,18 +39,19 @@ export function createTurnTracking(input: TurnTrackingInput): TurnTracking {
         }),
     wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
     pendingAsyncWork: asyncWork.pending,
+    answerWork: asyncWork.answerWork,
   })
   return {
     settlement,
     observe: (event) => {
+      // Goal/monitor wake records ride the SAME stream as agent events: a raw `extension_event`
+      // reaches this funnel on both runners; a record naming nothing tracked is ignored. The ledger
+      // takes it first, so the pending-work window samples the ledger it just updated.
+      const extension = (event as { readonly type?: string }).type === "extension_event"
+      if (extension) wakeSources.observe(event)
       asyncWork.observe(event)
       settlement.observe(event)
-      // Goal/monitor wake records ride the SAME stream as agent events: a raw `extension_event`
-      // reaches this funnel on both runners; a record naming nothing tracked is ignored.
-      if ((event as { readonly type?: string }).type === "extension_event") {
-        wakeSources.observe(event)
-        settlement.reconfirmHeld()
-      }
+      if (extension) settlement.reconfirmHeld()
     },
     observeState: asyncWork.observeState,
     resetTurn: wakeSources.resetTurn,

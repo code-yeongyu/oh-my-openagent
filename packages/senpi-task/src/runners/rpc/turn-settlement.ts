@@ -62,6 +62,9 @@ export type TurnSettlementInput = {
   // interim note - or the same way if it stops progressing for `asyncWorkStaleLimitMs`. Absent: a
   // completed outcome settles on `agent_idle`.
   readonly pendingAsyncWork?: () => PendingAsyncWork | undefined
+  // The work the held answer was given against (its evidence window, turn-async-work.ts): what decides
+  // whether that answer is held at idle or ends as the abandoned work. Absent: the current snapshot.
+  readonly answerWork?: () => PendingAsyncWork | undefined
   readonly asyncWorkStaleLimitMs?: number
   // Teardown detached/tore down the handle while a probe was in flight: that flight must never
   // report the held error as failed - the exit path owns the outcome from here (senpi#3262 review).
@@ -132,6 +135,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
   const maxUnreadableProbes = input.maxUnreadableProbes ?? 3
   const probe = input.probe
+  const answerWork = (): PendingAsyncWork | undefined => (input.answerWork ?? input.pendingAsyncWork)?.()
   const asyncWork =
     input.pendingAsyncWork === undefined || probe === undefined || input.settleConfirmMs === undefined
       ? undefined
@@ -223,7 +227,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     if (asyncWork?.holding() === true) return
     clearConfirmation()
     const outcome = held
-    const work = outcome?.status === "completed" ? (input.pendingAsyncWork?.() ?? durableWork) : undefined
+    const work = outcome?.status === "completed" ? (answerWork() ?? durableWork) : undefined
     if (asyncWork !== undefined && outcome?.status === "completed" && work !== undefined) {
       asyncWork.begin(outcome, work)
       return
@@ -266,7 +270,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
       // A held turn, or a completed answer whose agent_idle never came while the engine already
       // reported the child's own work pending: the turn ends now, so that work decides (omo#10487).
       if (asyncWork?.holding() === true) return end === "terminated" ? { status: "cancelled" } : asyncWork.abandoned()
-      const work = held?.status === "completed" ? input.pendingAsyncWork?.() : undefined
+      const work = held?.status === "completed" ? answerWork() : undefined
       if (held?.status !== "completed" || work === undefined) return held
       return end === "terminated" ? { status: "cancelled" } : finishedTurnOutcome(held.finalResponse, work)
     },
