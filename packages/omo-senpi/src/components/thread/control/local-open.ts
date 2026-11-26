@@ -1,3 +1,4 @@
+import { callMutation } from "../../call-budget/call-deadline"
 import type { ThreadHost } from "../tools/ports"
 import { folderFailure } from "../worktree/failures"
 import { forkRefusal, modelRefusal } from "./open-reply"
@@ -28,7 +29,7 @@ export async function openLocally(
   }
   if (worktree === undefined) {
     try {
-      return { kind: "ok", thread: openedThread(await host.openSession(request)) }
+      return { kind: "ok", thread: openedThread(await callMutation(host.openSession, request)) }
     } catch (error) {
       const refused = unrunnable(error)
       if (refused === undefined) throw error

@@ -21,7 +21,7 @@ import type {
   RemoteSessionsPort,
 } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
-import { commandWaitMs, withinCallBudget } from "../../call-budget/call-deadline"
+import { dispatchCall, preparesMutation, commandWaitMs, withinCallBudget } from "../../call-budget/call-deadline"
 import { createListingRound } from "./listing-round"
 import { createLookupGate, type LookupStart } from "./lookup-gate"
 
@@ -219,6 +219,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // No connection means nothing was sent, as when the attach path cannot attach. A refusal before sending (the core
     // marks it NotSentError; a service older than #393 part B answers the `{session}` target `unsupported`) ran nothing,
     // so the record goes the attach way instead. Anything else may have run on the other device and is never resent.
+    const send = <T>(write: () => Promise<T>) =>
+      String(rpc["type"]).startsWith("get_") ? write() : dispatchCall(write)
     // #14358 review M2: the retry goes the attach way only; a direct probe is never sent twice.
     if (!reattached && commandOptions?.direct === true) {
       let connected: DeviceService
@@ -231,7 +233,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const waitMs = commandWaitMs(SEND_WAIT_MS)
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        const direct = outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
+        const direct = outcomeOf(await send(() => connected.sessionCommand(device, sessionId, record, { waitMs })))
         if (!attachRequired(direct)) return direct
       } catch (error) {
         if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
@@ -274,7 +276,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const waitMs = commandWaitMs(readOnly ? READ_WAIT_MS : SEND_WAIT_MS)
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
+        const outcome = outcomeOf(await send(() => attached.command(record, { ...marked, waitMs })))
         if (!reattached && attachRequired(outcome)) {
           pool.evict(device, sessionId)
           held.release()
@@ -394,6 +396,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       const connected = dialed.conn
+      const boundary = record["type"] === "open_session" ? { dispatch: dispatchCall } : {}
       // The device's engine endpoint key, kept from the last command toward it, spares each later one its session.endpoints
       // round trip. A key the device no longer lists (its host restarted) is refused before anything runs, as an
       // `unsupported` error response from this device's service or a `route_unlisted` refusal from the device's; only
@@ -406,7 +409,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
         let sent: EndpointCommandResult
         try {
-          sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint, waitMs })
+          sent = await connected.endpointCommand(device, record, { ...endpointOptions, ...boundary, endpoint, waitMs })
         } catch (error) {
           if (endpoint !== undefined && unlistedEndpointError(error)) return UNLISTED_ENDPOINT
           throw error
@@ -426,6 +429,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
           return outcomeOf(
             await connected.endpointCommand(device, record, {
               ...endpointOptions,
+              ...boundary,
               endpoint: named,
               waitMs: endpointOptions?.waitMs ?? commandWaitMs(SEND_WAIT_MS),
             }),
@@ -515,7 +519,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const waitMs = commandWaitMs(SEND_WAIT_MS)
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.wakeCommand(device, durableId, record, { waitMs }))
+        return outcomeOf(await dispatchCall(() => connected.wakeCommand(device, durableId, record, { waitMs })))
       } catch (error) {
         if (error instanceof NotSentError) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
@@ -585,13 +589,14 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   // A create, open, fork, wake, locate or session command that is not a read changes what devices list.
   return {
     ...port,
-    endpointCommand: round.fenced(port.endpointCommand),
+    endpointCommand: preparesMutation(round.fenced(port.endpointCommand)),
     locate: round.fenced(port.locate),
-    wake: round.fenced(port.wake),
-    sessionCommand: (device, sessionId, rpc, commandOptions) =>
+    wake: preparesMutation(round.fenced(port.wake)),
+    sessionCommand: preparesMutation((device, sessionId, rpc, commandOptions) =>
       READ_ONLY_RECORDS.has(String(rpc["type"]))
         ? sessionCommand(device, sessionId, rpc, commandOptions)
         : round.fenced(sessionCommand)(device, sessionId, rpc, commandOptions),
+    ),
   }
 }
 

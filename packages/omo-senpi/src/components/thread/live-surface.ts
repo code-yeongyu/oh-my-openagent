@@ -1,3 +1,4 @@
+import { dispatchCall, preparesMutation } from "../call-budget/call-deadline"
 import { createConnection, type Socket } from "node:net"
 import { holderVersion } from "./tools/thread-state"
 import { existsSync, readFileSync } from "node:fs"
@@ -144,7 +145,11 @@ export async function requestFrame(
     socketPath,
     { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS, readCommand: command.type },
     async (request) => {
-      if (options.rpcHost !== true) return await request(command)
+      const send = () =>
+        typeof command.type === "string" && (command.type.startsWith("get_") || command.type === "list_sessions")
+          ? request(command)
+          : dispatchCall(() => request(command))
+      if (options.rpcHost !== true) return await send()
       const protocolRequest = command.type === "get_protocol_info" ? command : undefined
       const info =
         options.secret === undefined
@@ -162,7 +167,7 @@ export async function requestFrame(
         capabilities,
         options.durableSessionId,
         async () => {
-          const result = await request(command)
+          const result = await send()
           if (command.type === "open_session" && result.success === true && options.openedName?.trim()) {
             const opened = dataRecord(result, "open_session")
             dataRecord(
@@ -817,16 +822,19 @@ export function createLiveThreadSurface(
     getState: (sessionId, durableId) => send("get_state", { sessionId }, durableId),
     watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
-    interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
-    setSessionName: async (sessionId, name, durableId) => {
+    interrupt: preparesMutation((sessionId, request, durableId) =>
+      send("interrupt", { sessionId, ...request }, durableId),
+    ),
+    setSessionName: preparesMutation(async (sessionId, name, durableId) => {
       await send("set_session_name", { sessionId, name }, durableId)
-    },
-    setSessionArchived: async (sessionId, archived, durableId) => {
+    }),
+    setSessionArchived: preparesMutation(async (sessionId, archived, durableId) => {
       await send("set_session_archived", { sessionId, archived }, durableId)
-    },
+    }),
     // `scope: "session"` switches only this session; without it the engine persists the device's default model.
-    setModel: (sessionId, provider, modelId, durableId) =>
+    setModel: preparesMutation((sessionId, provider, modelId, durableId) =>
       send("set_model", { sessionId, provider, modelId, scope: "session" }, durableId),
+    ),
     getAvailableModels: async (sessionId) => {
       const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>(
         "get_available_models",
@@ -834,9 +842,9 @@ export function createLiveThreadSurface(
       )
       return models.map(({ provider, id, name }) => ({ provider, id, ...(name === undefined ? {} : { name }) }))
     },
-    setThinkingLevel: async (sessionId, level, scope, durableId) => {
+    setThinkingLevel: preparesMutation(async (sessionId, level, scope, durableId) => {
       await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }, durableId)
-    },
+    }),
     getAvailableThinkingLevels: async (sessionId) =>
       (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
     wake: async (sessionId, deliveryIds, durableId) =>
@@ -847,7 +855,7 @@ export function createLiveThreadSurface(
       ),
     // Every rung of the ladder is sent attached (`durableId`), the `get_state` probe included although the host exempts
     // that read from its gate: the probe's attach itself answers whether the engine still holds the session.
-    closeSession: (sessionId, durableId, options) =>
+    closeSession: preparesMutation((sessionId, durableId, options) =>
       closeLadder(
         sessionId,
         async ({ type, ...data }, record) => {
@@ -887,6 +895,7 @@ export function createLiveThreadSurface(
         },
         options,
       ),
+    ),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -1018,7 +1027,7 @@ export function createLiveThreadSurface(
      * one was asked for, then read the session list back and merge the entry the host now reports.
      * A created thread lives on the legacy endpoint, so its reply names that socket.
      */
-    openSession: async (params) => {
+    openSession: preparesMutation(async (params) => {
       // `retain_on_disconnect` (host capability of the same name, wire default false) makes the
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
@@ -1046,7 +1055,7 @@ export function createLiveThreadSurface(
       const { sessions } = await call<{ sessions: readonly ThreadHostSession[] }>("list_sessions", OBSERVE)
       const listed = sessions.find((session) => session.sessionId === routingId)
       return { ...result.state, ...(listed ?? {}), sessionId: routingId, socket: legacy, endpoint_kind: "rpc_host" }
-    },
+    }),
     ...sessionMethods(undefined, call),
   }
 }

@@ -294,6 +294,8 @@ export type DeviceService = {
  * session.locate round trip toward a host that names it (decision 0018 amendment 2026-11-06, relay daemon #698).
  */
 export type EndpointCommandOptions = {
+  /** Starts the write after endpoint discovery. A caller can admit or cancel it without a lookup-to-send race. */
+  readonly dispatch?: <T>(write: () => Promise<T>) => Promise<T>
   readonly locate?: boolean
   /** The endpoint key an earlier command's result named: sent to as is, so no `session.endpoints` lookup runs. */
   readonly endpoint?: string
@@ -483,10 +485,9 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       const waitMs = options?.waitMs === undefined ? undefined : options.waitMs - (timers.now() - started)
       if (waitMs !== undefined && waitMs <= 0)
         throw new NotSentError("request_timeout", "the wait ran out during the endpoint lookup; nothing was sent")
-      return {
-        ...(await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers, waitMs)),
-        endpoint,
-      }
+      const target = endpoint
+      const write = () => sendToEndpoint(client, device, target, rpc, options?.locate === true, timers, waitMs)
+      return { ...(await (options?.dispatch === undefined ? write() : options.dispatch(write))), endpoint }
     },
     sessionCommand: (device, key, rpc, options) =>
       followDelegatedCommand(

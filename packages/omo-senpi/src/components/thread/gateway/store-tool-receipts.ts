@@ -25,12 +25,13 @@ type StoredReceipt = {
   readonly owner_instance: string
   readonly result: string | null
   readonly error_note: string | null
+  readonly expires_at: number
 }
 
 function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): StoredReceipt | undefined {
   const found = ctx.sql.one(
-    ["args_hash", "status", "owner_instance", "result", "error_note"],
-    "SELECT args_hash, status, owner_instance, result, error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+    ["args_hash", "status", "owner_instance", "result", "error_note", "expires_at"],
+    "SELECT args_hash, status, owner_instance, result, error_note, expires_at FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
     [key.principal, key.operation, key.idempotency_key],
   )
   if (found === undefined) return undefined
@@ -40,6 +41,7 @@ function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): S
     owner_instance: String(found.owner_instance),
     result: nullableString(found.result),
     error_note: nullableString(found.error_note),
+    expires_at: Number(found.expires_at),
   }
 }
 
@@ -68,11 +70,21 @@ export type ToolReceiptBegin =
  * under its own instance in the same transaction (`retry`), so one retry runs at a time and an overlapping one is
  * `in_progress`; its success settles the receipt as completed, and its failure settles it uncertain again. The first
  * cause (`error_note`) is kept through every later settle or takeover.
+ *
+ * `inspect` (#13426) only reads: a key nothing holds (or whose receipt expired) is `accepted` without a reservation, and
+ * a held one answers what the admission would, writing nothing, so a call cancelled before its first write leaves no
+ * receipt behind. The admission itself runs later, at the call's first mutation.
  */
 export async function toolReceiptBegin(
   ctx: StoreContext,
-  request: ReceiptKey & { readonly now: number; readonly retry_uncertain?: boolean },
+  request: ReceiptKey & { readonly now: number; readonly retry_uncertain?: boolean; readonly inspect?: boolean },
 ): Promise<ToolReceiptBegin> {
+  if (request.inspect === true) {
+    const receipt = selectReceipt(ctx, request)
+    return receipt === undefined || receipt.expires_at <= request.now
+      ? { kind: "accepted" }
+      : priorToolReceipt(ctx, request, receipt)
+  }
   return await transaction(ctx, "tool_receipt_begin", (): ToolReceiptBegin => {
     const cleared = deleteExpiredReceipt(ctx, request, request.now)
     const admission = admitToolReceipt(ctx, request)
@@ -104,13 +116,8 @@ function admitToolReceipt(
     )
     return { kind: "accepted" }
   }
-  if (receipt.args_hash !== request.args_hash) return { kind: "conflict" }
-  if (receipt.status === "completed")
-    return { kind: "replay", result: receipt.result === null ? null : JSON.parse(receipt.result) }
-  if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id)
-    return receipt.error_note === null
-      ? { kind: "in_progress" }
-      : { kind: "in_progress", recovery: { error_note: receipt.error_note } }
+  const prior = priorToolReceipt(ctx, request, receipt)
+  if (prior.kind !== "uncertain") return prior
   if (receipt.status === "prepared") {
     write(
       ctx,
@@ -137,6 +144,24 @@ function admitToolReceipt(
     [ctx.config.instance_id, request.now, request.principal, request.operation, request.idempotency_key],
   )
   return { kind: "retry", error_note: errorNote }
+}
+
+/** What a held receipt answers a call under its key, before anything is written: the admission's and the lookup's. */
+function priorToolReceipt(ctx: StoreContext, request: ReceiptKey, receipt: StoredReceipt): ToolReceiptBegin {
+  if (receipt.args_hash !== request.args_hash) return { kind: "conflict" }
+  if (receipt.status === "completed")
+    return { kind: "replay", result: receipt.result === null ? null : JSON.parse(receipt.result) }
+  if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id)
+    return receipt.error_note === null
+      ? { kind: "in_progress" }
+      : { kind: "in_progress", recovery: { error_note: receipt.error_note } }
+  return {
+    kind: "uncertain",
+    error_note:
+      receipt.status === "prepared"
+        ? (receipt.error_note ?? "the process that began this call ended before recording its outcome")
+        : receipt.error_note,
+  }
 }
 
 export async function toolReceiptSettle(

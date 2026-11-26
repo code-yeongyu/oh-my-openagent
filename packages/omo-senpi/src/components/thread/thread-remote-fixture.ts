@@ -1063,6 +1063,10 @@ export function createRemoteThreadFixture() {
        * exits before the reply reaches the tool, which sees the call fail as the store's.
        */
       loseAdmissionReply?: number
+      /** #13426: called as this device's endpoints are listed, before `listingGate` is awaited. */
+      onListing?: () => void
+      /** #13426: this device's listing answers only once this settles (a call still building its view). */
+      listingGate?: Promise<void>
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -1147,6 +1151,8 @@ export function createRemoteThreadFixture() {
       ...(extra.forks === true ? { capabilities: async () => ["open_session_fork"] } : {}),
       listSessions: async () => {
         localListings += 1
+        extra.onListing?.()
+        if (extra.listingGate !== undefined) await extra.listingGate
         if (listFails) {
           listFails = false
           throw new Error("thread RPC connection closed before the response arrived")
@@ -1275,11 +1281,11 @@ export function createRemoteThreadFixture() {
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)
-    const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
+    const run = async (name: ThreadToolName, args: unknown, signal?: AbortSignal): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (
-        await tool.execute(`call-${Math.random()}`, args, undefined, undefined, {
+        await tool.execute(`call-${Math.random()}`, args, signal, undefined, {
           sessionManager: { getSessionId: () => caller },
         } as never)
       ).details.result as ThreadToolResult
@@ -1295,6 +1301,7 @@ export function createRemoteThreadFixture() {
       /** What a `monitor({type: "rpc", target})` call by the caller arms on this surface (#14294). */
       monitorTarget: async (target: string) => await resolveMonitorTarget(target, caller),
       permission,
+      host,
       openSession,
       setSessionName,
       store,

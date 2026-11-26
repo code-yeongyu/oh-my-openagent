@@ -127,7 +127,7 @@ async function releaseAttachment(request: RpcRequest, command: RpcObject): Promi
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error)
   }
-  log(`thread rpc: release_attachment for ${String(sessionId)} failed after the mutation took effect: ${failure}`)
+  log(`thread rpc: release_attachment for ${String(sessionId)} failed: ${failure}`)
 }
 
 /**
@@ -167,7 +167,9 @@ export async function fencedCommand(
       ...(refusal.errorData === undefined ? {} : { errorData: refusal.errorData }),
     }
   }
-  const result = await send()
-  if (capabilities.has("release_attachment")) await releaseAttachment(request, command)
-  return result
+  try {
+    return await send()
+  } finally {
+    if (capabilities.has("release_attachment")) await releaseAttachment(request, command)
+  }
 }

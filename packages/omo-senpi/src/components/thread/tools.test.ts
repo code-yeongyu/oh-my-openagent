@@ -1045,6 +1045,7 @@ describe("tool receipts the store could not settle", () => {
     const store: GatewayStore = {
       ...real,
       toolReceiptBegin: async (request) => {
+        if (request.inspect) return await real.toolReceiptBegin(request)
         const failure = failures.shift()
         if (failure !== undefined) throw failure
         return await real.toolReceiptBegin(request)
@@ -1070,7 +1071,7 @@ describe("tool receipts the store could not settle", () => {
       ...real,
       toolReceiptBegin: async (request) => {
         const admission = await real.toolReceiptBegin(request)
-        if (!dropReply) return admission
+        if (request.inspect || !dropReply) return admission
         // The worker committed the prepared receipt, then exited before its reply reached the caller.
         dropReply = false
         throw new Error("the gateway store worker exited (1)")
@@ -1110,8 +1111,10 @@ describe("tool receipts the store could not settle", () => {
       ...real,
       toolReceiptBegin: async (request) => {
         const mode = admissions.mode
+        if (request.inspect && mode !== "held") return await real.toolReceiptBegin(request)
         if (mode === "fail") throw new Error("the gateway store worker exited (1)")
         const admission = await real.toolReceiptBegin(request)
+        if (request.inspect && admission.kind === "accepted") return admission
         if (mode === "held") {
           const { promise, resolve } = Promise.withResolvers<void>()
           held.push(resolve)
@@ -1127,25 +1130,31 @@ describe("tool receipts the store could not settle", () => {
       { registerTool: (tool) => tools.push(tool) },
       { ...f, store, now: () => clock.now, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() },
     )
-    const rename = async (key: string): Promise<ThreadToolResult> => {
-      const tool = tools.find((candidate) => candidate.name === "thread_rename") as {
+    const run = async (key: string, name: "thread_rename" | "thread_list"): Promise<ThreadToolResult> => {
+      const tool = tools.find((candidate) => candidate.name === name) as {
         execute: (...args: unknown[]) => Promise<{ details: { result: ThreadToolResult } }>
       }
       return (
         await tool.execute(
           `call-${key}`,
-          { thread: "dur-peer", name: "Renamed", idempotency_key: key },
+          name === "thread_list"
+            ? { idempotency_key: key }
+            : { thread: "dur-peer", name: "Renamed", idempotency_key: key },
           undefined,
           undefined,
           { sessionManager: { getSessionId: () => "caller" } },
         )
       ).details.result
     }
-    /** `count` calls whose admissions fail without a reply and without a receipt. */
+    const rename = (key: string) => run(key, "thread_rename")
+    /** Recovery slots are shared across operations. Fill them with failed list admissions, without 4,096 host lookups. */
     const failMany = async (prefix: string, count: number) => {
       admissions.mode = "fail"
       for (let index = 0; index < count; index++)
-        expect(await rename(`${prefix}-${index}`)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+        expect(await run(`${prefix}-${index}`, "thread_list")).toMatchObject({
+          kind: "error",
+          error: { code: "internal_error" },
+        })
       admissions.mode = "real"
     }
     return { admissions, rename, failMany, whenHeld, releaseHeld, dispose: surface.dispose }
@@ -1263,6 +1272,7 @@ describe("tool receipts the store could not settle", () => {
       ...real,
       toolReceiptBegin: async (request) => {
         const admission = await real.toolReceiptBegin(request)
+        if (request.inspect && admission.kind === "accepted") return admission
         // The second invocation's admission (in_progress, nothing written) never reaches it.
         if (++begins === 2) throw new Error("the gateway store worker exited (1)")
         return admission
