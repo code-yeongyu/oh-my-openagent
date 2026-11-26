@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import ts from "@typescript/typescript6"
 import { AMBIENT, BINDING_KINDS, NEVER_SHADOWS } from "./no-raw-tls-client-bindings"
+import { RUNTIME_GLOBALS } from "./no-raw-tls-client"
 import { findRawTlsClients } from "./no-raw-tls-client-scan"
 
 // Security contract (#15071): every declaration kind is classified, and no classification hides a client call that
@@ -165,6 +166,8 @@ const RECEIVERS = [
   { binding: "Bun", setup: "", call: "Bun.connect(o);" },
   { binding: "t", setup: "var t = globalThis.Bun;", call: "t.connect(o);" },
   { binding: "globalThis", setup: "", call: "globalThis.Bun.connect(o);" },
+  { binding: "global", setup: "", call: "global.Bun.connect(o);" },
+  { binding: "self", setup: "", call: "self.Bun.connect(o);" },
 ] as const
 
 function programs(form: Form | Program, receiver: (typeof RECEIVERS)[number]): string[] {
@@ -188,12 +191,13 @@ function reaches(js: string, module: boolean): boolean | undefined {
   let run: (...args: unknown[]) => void
   try {
     const body = module ? `(function () {\n${js}\n})()` : js
-    run = new Function("globalThis", "Bun", "o", "require", "exports", "module", body) as typeof run
+    run = new Function("globalThis", "global", "self", "Bun", "o", "require", "exports", "module", body) as typeof run
   } catch {
     return undefined
   }
   try {
-    run({ Bun: client }, client, {}, () => safe, {}, { exports: {} })
+    const globalObject = { Bun: client }
+    run(globalObject, globalObject, globalObject, client, {}, () => safe, {}, { exports: {} })
   } catch {}
   return calls > 0
 }
@@ -248,6 +252,11 @@ describe("declaration kinds and the runtime bindings they create (#15071)", () =
     expect(unclassified.map((kind) => ts.SyntaxKind[kind])).toEqual([])
     expect(outside.map((kind) => ts.SyntaxKind[kind])).toEqual([])
     for (const reason of NEVER_SHADOWS.values()) expect(reason.length).toBeGreaterThan(0)
+  })
+
+  test("every runtime global the scanner knows has a receiver in the generated programs", () => {
+    const receivers = new Set<string>(RECEIVERS.map((receiver) => receiver.binding))
+    expect([...RUNTIME_GLOBALS].filter((name) => !receivers.has(name))).toEqual([])
   })
 
   test("every row and condition branch of the table has generated forms", () => {

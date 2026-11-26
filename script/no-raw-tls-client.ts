@@ -12,8 +12,10 @@ const CLIENTS: Record<string, readonly string[]> = {
   http2: ["connect"],
   Bun: ["connect"],
 }
-// Of the roots above, the ones that are real globals at runtime: an unbound tls/https/http2 name throws, Bun does not.
-const RUNTIME_GLOBALS: ReadonlySet<string> = new Set(["Bun", "globalThis"])
+// The global object and the names Bun gives it (`window` is not defined in Bun).
+const GLOBAL_OBJECT_NAMES = ["globalThis", "global", "self"]
+// Of the roots, the ones that are real globals at runtime: an unbound tls/https/http2 name throws, Bun does not.
+export const RUNTIME_GLOBALS: ReadonlySet<string> = new Set(["Bun", ...GLOBAL_OBJECT_NAMES])
 
 function parse(content: string, file: string): ts.SourceFile {
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true)
@@ -110,9 +112,10 @@ export function normalizeCallText(text: string): string {
 export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHit[] {
   const source = parse(content, file),
     list = allNodes(source)
-  const globals = new Map<string, Binding>(
-    [...Object.keys(CLIENTS), "globalThis"].map((module) => [module, { module }]),
-  )
+  const globals = new Map<string, Binding>([
+    ...Object.keys(CLIENTS).map((module) => [module, { module }] as const),
+    ...GLOBAL_OBJECT_NAMES.map((name) => [name, { module: "globalThis" }] as const),
+  ])
   const bindings = createBindingScopes(list, globals, RUNTIME_GLOBALS)
   const builtinNames = new Set<string>()
   const requireFactories = new Set<string>()
