@@ -2076,9 +2076,9 @@ describe("DAG scheduler node controls", () => {
     manager.seed("one-shot", "completed", "task-one-shot")
     manager.seed("denied", "completed", "task-denied")
     manager.seed("detached", "completed", "task-detached")
-
     // when
     const queued = await scheduler.sendToNode(runId, "queued" as DagNodeId, "queued message")
+    manager.complete("queued") // a settled run owes no stop once its last live child settles (#11381)
     const outcomes: Record<string, string> = {}
     for (const nodeId of ["one-shot", "denied", "detached", "never-ran", "ghost", "absent"]) {
       try {

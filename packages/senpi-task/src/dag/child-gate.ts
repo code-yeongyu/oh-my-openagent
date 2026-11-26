@@ -31,14 +31,28 @@ export function staleLiveRefusal(stale: readonly StaleLiveChild[]): string | und
   return `task ${ids} of a superseded attempt or removed node is still live and could not be stopped`
 }
 
-/** Rules 1-3 for a point that starts or revives `task` (or a fresh child when it is undefined). */
-export function childStartRefusal(tasks: DagRunStopper, record: DagRunRecordV1, task?: TaskRecord): string | undefined {
-  const owed = outstandingStopRefusal(tasks, record)
-  if (owed !== undefined) return owed
-  const stale = staleLiveRefusal(staleLiveChildren(tasks, record))
-  if (stale !== undefined) return stale
+export type ChildGateRefusal = {
+  readonly rule: "stop_owed" | "stale_live" | "not_current"
+  readonly message: string
+}
+
+/**
+ * Rules 1-3 for a point that starts or revives `task` (or a fresh child when it is undefined). The task
+ * in hand is left out of rules 1-2: acting on that very child starts nothing beside it, and its own
+ * unconfirmed stop is the manager's to await before it is revived.
+ */
+export function childStartRefusal(
+  tasks: DagRunStopper,
+  record: DagRunRecordV1,
+  task?: TaskRecord,
+): ChildGateRefusal | undefined {
+  const owed = outstandingStopRefusal(tasks, record, task?.task_id)
+  if (owed !== undefined) return { rule: "stop_owed", message: owed }
+  const stale = staleLiveRefusal(staleLiveChildren(tasks, record).filter(({ taskId }) => taskId !== task?.task_id))
+  if (stale !== undefined) return { rule: "stale_live", message: stale }
   if (task === undefined || ownedClaimAge(task, record) === "current") return undefined
-  return `task ${task.task_id} belongs to an earlier attempt of DAG node "${task.owner?.nodeId}", not its current one`
+  const message = `task ${task.task_id} belongs to an earlier attempt of DAG node "${task.owner?.nodeId}", not its current one`
+  return { rule: "not_current", message }
 }
 
 /**

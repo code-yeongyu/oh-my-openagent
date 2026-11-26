@@ -31,14 +31,18 @@ export function withOutstandingStop(
   return outstandingStop === undefined ? snapshot : { ...snapshot, outstandingStop }
 }
 
-/** Why a settled run with an outstanding stop refuses re-entry, or undefined when it does not owe one. */
+/**
+ * Why a settled run with an outstanding stop refuses re-entry, or undefined when it does not owe one.
+ * `except` leaves out the task a verb acts on itself: a send to that very child starts nothing beside it.
+ */
 export function outstandingStopRefusal(
   tasks: DagOwnedTaskReader | undefined,
   record: DagRunRecordV1,
+  except?: string,
 ): string | undefined {
-  const outstanding = outstandingRunStop(tasks, record)
-  if (outstanding === undefined) return undefined
-  return `dag run "${record.runId}" is ${record.status} but its children ${outstanding.liveTaskIds.join(", ")} are still live; cancel the run again to finish stopping them`
+  const live = outstandingRunStop(tasks, record)?.liveTaskIds.filter((taskId) => taskId !== except) ?? []
+  if (live.length === 0) return undefined
+  return `dag run "${record.runId}" is ${record.status} but its children ${live.join(", ")} are still live; cancel the run again to finish stopping them`
 }
 
 /**
