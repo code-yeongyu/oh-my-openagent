@@ -2667,6 +2667,83 @@
       "target": "this_device"
     },
     {
+      "id": "threads.create/prompt-object-plain",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": {
+          "message": "hello",
+          "delivery": "follow_up"
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "follow_up"
+          }
+        },
+        {
+          "port": "host",
+          "op": "follow_up"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/prompt-object-attachments",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": {
+          "message": "hello",
+          "delivery": "follow_up",
+          "attachments": [
+            {
+              "path": "/w/a.png"
+            }
+          ]
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/w/a.png"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "follow_up",
+            "attachments": 1
+          }
+        },
+        {
+          "port": "host",
+          "op": "follow_up"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.create/delivery",
       "row": "threads.create",
       "kind": "effect",

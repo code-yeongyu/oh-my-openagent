@@ -60,6 +60,9 @@ export function hostPort(
       )
   }
   const durableOf = (routing: string, durable?: string): string => durable ?? routing.replace(/^rpc-/, "")
+  // The threads an open made (host.open_session {cwd, name?}; a cwd that is the caller's is named "caller"): each is listed
+  // from then on, under the id the create asked for, so its first prompt reaches it as any listed thread's does.
+  const opened: ThreadHostSession[] = []
   const listView: NonNullable<ThreadHost["listView"]> = async (request = {}) => {
     const { result } = recorder.record("host", "list_sessions", { ...request })
     writeSessionFiles()
@@ -72,6 +75,7 @@ export function hostPort(
     const sessions = [
       ...HOST_THREADS.filter((thread) => !ended.includes(thread)).map((thread) => session(thread, `lane ${thread}`)),
       ...names.map((name, index) => session(`other-${index}`, name)),
+      ...opened,
     ]
     const host = {
       socket: HOST_SOCKET,
@@ -85,7 +89,17 @@ export function hostPort(
     socket: HOST_SOCKET,
     listSessions: async () => (await listView()).sessions,
     listView,
-    openSession: unused("openSession"),
+    openSession: async (request) => {
+      const cwd = request.cwd ?? where.cwd
+      recorder.record("host", "open_session", {
+        cwd: cwd === where.cwd ? "caller" : cwd,
+        ...(request.name === undefined ? {} : { name: request.name }),
+      })
+      const thread = request.durableSessionId ?? `t-opened-${opened.length + 1}`
+      const made = { ...session(thread, request.name ?? ""), cwd }
+      opened.push(made)
+      return made
+    },
     getMessages: async (sessionId) => {
       recorder.record("host", "get_messages", { thread: durableOf(sessionId) })
       return []

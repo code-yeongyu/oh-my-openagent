@@ -33,9 +33,9 @@
     },
     {
       "id": "threads.send/attachments",
-      "differs": "attachments is not acted on, so the call answers not_implemented (omo-sdk/root/threads.ts unbuilt).",
+      "differs": "No leg carries an attachment yet (the gateway delivery on this device and the relay record to another device have no field for one), so the root refuses the send unsupported before any effect instead of reading and delivering it (omo-sdk/root/threads.ts attachmentsRefused).",
       "owner": "T1b",
-      "retires_with": "T1b"
+      "retires_with": "an attachment field on the gateway delivery and the relay record (unscheduled)"
     },
     {
       "id": "threads.send/author-refuses-session",
@@ -183,9 +183,9 @@
     },
     {
       "id": "threads.send/summary",
-      "differs": "summary is not acted on, so the call answers not_implemented (omo-sdk/root/threads.ts unbuilt).",
+      "differs": "summary has no carrier: the gateway delivery row, the relay record and the engine's prompt and admit records have no field for it, and thread_send accepts it and drops it, so the root answers not_implemented rather than drop it (omo-sdk/root/threads.ts unbuilt).",
       "owner": "T1b",
-      "retires_with": "T1b"
+      "retires_with": "a summary field on the gateway delivery and the relay record (unscheduled)"
     },
     {
       "id": "threads.send/too-large",

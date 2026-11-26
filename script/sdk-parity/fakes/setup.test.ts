@@ -219,3 +219,81 @@ describe("the fake store's receipt book reaches the root's answer (T1b)", () => 
     expect(setup.calls().filter((call) => call.op === "rename_session")).toHaveLength(1)
   })
 })
+
+describe("the root's extended send and create inputs over the fakes (T1b)", () => {
+  type Threads = {
+    readonly send: (input: unknown) => Promise<unknown>
+    readonly create: (input: unknown) => Promise<unknown>
+  }
+  const tableScenario = (id: string): TableScenario => {
+    const found = table.flatMap((file) => file.scenarios).find((scenario) => scenario.id === id)
+    if (found === undefined) throw new Error(`no scenario ${id}`)
+    return found
+  }
+  const rootOf = (id: string) => {
+    const setup = scenarioSetup(tableScenario(id))
+    return { threads: (setup.root as { readonly threads: Threads }).threads, ops: () => setup.calls().map((c) => c.op) }
+  }
+
+  test.each([
+    ["a thread on this device", "t-1", { path: "/w/a.png" }],
+    ["a thread on another device", "studio/t-2", { bytes: new Uint8Array([104, 105]), name: "a.txt" }],
+  ] as const)(
+    "#given attachments on a send to %s #then it is refused unsupported and nothing is read or delivered",
+    async (_where, thread, attachment) => {
+      const { threads, ops } = rootOf("threads.send/attachments")
+      const answer = await threads.send({ thread, message: "status?", attachments: [attachment] })
+      expect(answer).toMatchObject({
+        kind: "error",
+        error: { code: "unsupported", details: { field: "attachments", count: 1 } },
+      })
+      expect(ops()).toEqual([])
+    },
+  )
+
+  test("#given a create with an object prompt and a key #when it is repeated #then one thread gets one delivery of that prompt", async () => {
+    const { threads, ops } = rootOf("threads.create/prompt-object-plain")
+    const input = { prompt: { message: "hello", delivery: "follow_up" }, idempotency_key: "k-first" }
+    const first = await threads.create(input)
+    expect(first).toMatchObject({ kind: "ok" })
+    expect(await threads.create(input)).toEqual({ ...(first as object), deduplicated: true })
+    expect(ops().filter((op) => op === "open_session")).toHaveLength(1)
+    expect(ops().filter((op) => op === "insert_delivery")).toHaveLength(1)
+    expect(ops().filter((op) => op === "follow_up")).toHaveLength(1)
+  })
+
+  test("#given an object prompt that names its turn #then the delivery carries it, and a repeat naming another turn conflicts", async () => {
+    const setup = scenarioSetup(tableScenario("threads.create/prompt-object-plain"))
+    const { threads } = setup.root as { readonly threads: Threads }
+    const create = (turn: string) =>
+      threads.create({
+        prompt: { message: "hello", delivery: "follow_up", expected_turn_id: turn },
+        idempotency_key: "k-turn",
+      })
+    expect(await create("3")).toMatchObject({ kind: "ok" })
+    const inserted = setup.calls().filter((call) => call.op === "insert_delivery")
+    expect(inserted.map((call) => call.args)).toEqual([expect.objectContaining({ expected_turn_id: "3" })])
+    expect(await create("4")).toMatchObject({ kind: "error", error: { code: "idempotency_conflict" } })
+  })
+
+  test.each([
+    ["summary", { summary: "hi" }, "not_implemented"],
+    ["author", { author: { platform_user_id: "u-1", display: "Una" } }, "not_implemented"],
+    ["attachments", { attachments: [{ path: "/w/a.png" }] }, "unsupported"],
+  ] as const)(
+    "#given an object prompt with %s #then the create answers %s and opens no thread",
+    async (_field, extra, code) => {
+      const { threads, ops } = rootOf("threads.create/prompt-object")
+      const answer = await threads.create({ prompt: { message: "hello", ...extra } })
+      expect(answer).toMatchObject({ kind: "error", error: { code } })
+      expect(ops().filter((op) => op === "open_session")).toEqual([])
+    },
+  )
+
+  test("#given the create's delivery and its prompt's delivery differ #then it is refused before any open", async () => {
+    const { threads, ops } = rootOf("threads.create/prompt-object")
+    const answer = await threads.create({ delivery: "steer", prompt: { message: "hello", delivery: "follow_up" } })
+    expect(answer).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(ops()).toEqual([])
+  })
+})
