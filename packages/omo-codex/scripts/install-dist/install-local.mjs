@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:d9d812ac9e12c511a330a92f5c1e901f4891e1b35e21222c632b66fb924dd4ff:0e4808a40a0c199cc8774634bea47517bd0eb227242f6fd1182a279d56c278d5
+// omo-codex-install:62a5398ce7bf11b5c5d686d1693f515354c2af888955acc15bb6a378f5be6b65:bd4324d571038485e19ac097102df63bd1c81979ae7d6cea7f3945f6a82bf90a
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -6836,9 +6836,33 @@ function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism
     global_concurrency: record2["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2)
   });
 }
-var DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited", ResidencyMaxChildrenInputSchema, OmoTaskWaitSchema, OmoTaskTeamSettingsSchema, OmoTaskWarningsSchema, IsolationBackendKindSchema, OmoTaskIsolationSchema, isolationDefaults, OmoTaskIsolationLayerSchema, OmoTaskDagSettingsSchema, OmoTaskSettingsSchema, OmoTaskDagSettingsLayerSchema, OmoTaskWaitLayerSchema, OmoTaskTeamSettingsLayerSchema, OmoTaskWarningsLayerSchema, OmoTaskSettingsLayerSchema;
+var DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited", NicknameSetId, NicknameSetMap, Nickname, TaskNicknamesLayerSchema, TaskNicknamesSchema, ResidencyMaxChildrenInputSchema, OmoTaskWaitSchema, OmoTaskTeamSettingsSchema, OmoTaskWarningsSchema, IsolationBackendKindSchema, OmoTaskIsolationSchema, isolationDefaults, OmoTaskIsolationLayerSchema, OmoTaskDagSettingsSchema, OmoTaskSettingsSchema, OmoTaskDagSettingsLayerSchema, OmoTaskWaitLayerSchema, OmoTaskTeamSettingsLayerSchema, OmoTaskWarningsLayerSchema, OmoTaskSettingsLayerSchema;
 var init_task = __esm(() => {
   init_zod();
+  NicknameSetId = string2().min(1);
+  NicknameSetMap = record(string2(), NicknameSetId);
+  Nickname = string2().trim().min(1).max(32).regex(/^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+$/u);
+  TaskNicknamesLayerSchema = object({
+    sets: record(NicknameSetId, array(Nickname).min(1)).optional(),
+    models: NicknameSetMap.optional(),
+    agents: NicknameSetMap.optional(),
+    categories: NicknameSetMap.optional(),
+    default: NicknameSetId.optional(),
+    occurrence_style: _enum(["#", "roman", "full", "arabic"]).optional()
+  }).strict();
+  TaskNicknamesSchema = TaskNicknamesLayerSchema.superRefine((config, ctx) => {
+    const check = (key, path) => {
+      if (config.sets !== undefined && Object.hasOwn(config.sets, key))
+        return;
+      ctx.addIssue({ code: "custom", path, message: `Unknown task nickname set "${key}"` });
+    };
+    for (const group of ["models", "agents", "categories"]) {
+      for (const [key, set] of Object.entries(config[group] ?? {}))
+        check(set, [group, key]);
+    }
+    if (config.default !== undefined)
+      check(config.default, ["default"]);
+  });
   ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
   OmoTaskWaitSchema = object({
     min_ms: number2().int().positive().default(5000),
@@ -6899,6 +6923,7 @@ var init_task = __esm(() => {
     global_concurrency: number2().int().nonnegative().default(8),
     provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
     model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+    nicknames: TaskNicknamesSchema.optional(),
     max_depth: number2().int().nonnegative().default(1),
     residency_max_children: ResidencyMaxChildrenInputSchema.default(DEFAULT_RESIDENCY_MAX_CHILDREN),
     resident_idle_timeout_ms: number2().int().positive().max(Number.MAX_SAFE_INTEGER).default(900000),
@@ -6949,6 +6974,7 @@ var init_task = __esm(() => {
     global_concurrency: number2().int().nonnegative().optional(),
     provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
     model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+    nicknames: TaskNicknamesLayerSchema.optional(),
     max_depth: number2().int().nonnegative().optional(),
     residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
     resident_idle_timeout_ms: number2().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
