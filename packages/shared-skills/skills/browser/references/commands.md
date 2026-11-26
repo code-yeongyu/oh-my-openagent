@@ -40,13 +40,14 @@ await session.fill("#q", "hello", { clearBefore: true, context: await sync() })
   `scrollTo`, `wheel`, `evaluate` (and so `bskSnapshot`), `tabClose`, `resize`, `emulate`,
   `observe({ probeHover: true })`, `screenshot({ fullPage: true })`.
 - **Not gated:** `observe`, `snapshot`, `getHtml`, `screenshot()`, `console`, `network`,
-  `waitForNavigation`, the tab list/borrow/return calls, `requestHelp`.
+  `waitForNavigation`, `tabList`, `tabCreate`, `tabSelect`, `tabBorrow`, `tabReturn`, `requestHelp`.
 - `dependsOn: ["@e2", ...]` narrows the check to the observed regions your decision used.
-- A gated action accepts only its own options plus `{ context, dependsOn }`; any other key
-  (`contextId`, a stray option copied from another method) throws a `TypeError` before anything is
-  sent. Two exceptions: `bskSnapshot` and `screenshot({ fullPage: true })` pass unknown keys
-  through instead of throwing, so a misspelt `contextId` there sends no context and the daemon
-  refuses the call with `cooperation_sync_required`.
+- A method that reads or acts on a tab accepts only its own options (plus `{ context, dependsOn }`);
+  any other key (`contextId`, an option copied from another method) throws a `TypeError` before
+  anything is sent, plain `observe()` included. Two calls do not throw:
+  `screenshot({ fullPage: true })` drops an unknown key and `bskSnapshot` passes it on as a
+  snapshot option, so a misspelt `contextId` there sends no context and the daemon refuses the
+  call with `cooperation_sync_required`.
 - Never replay a refused action blindly: the page may have changed under the person's hands.
 
 ## Targets
@@ -76,7 +77,7 @@ neighbouring row.
 
 ## Acting
 
-Every call here is gated: add `context` (from `cooperate("sync")`) to its options object, as in
+Every call here except `waitForNavigation()` is gated: add `context` (from `cooperate("sync")`) to its options object, as in
 `session.click(target, { context })`, `session.resize(width, height, { context })`,
 `session.tabClose(id, { context })`.
 
@@ -92,6 +93,10 @@ Every call here is gated: add `context` (from `cooperate("sync")`) to its option
 | Focus / blur | `session.focus(target)` / `session.blur(target)` |
 | Navigate | `session.navigate(url, { waitUntil: "load" \| "domcontentloaded" \| "networkidle" \| "commit", timeoutMs })`, `back()`, `forward()`, `reload({ hard })`, `waitForNavigation()` |
 | Window | `session.resize(width, height)`, `session.emulate({ overrides: { width, mobile } })` |
+
+Waiting is never a fixed delay: `navigate(url, { waitUntil: "networkidle" })` for a page that renders
+after load, `waitForNavigation()` after an action that navigates, and for a later state
+`evaluate("new Promise((done) => { /* resolve when the state holds */ })", { awaitPromise: true, timeoutMs, context })`.
 
 Traps:
 
@@ -119,9 +124,13 @@ Never invent tab ids and never repeat a denied borrow.
 ## Humans
 
 ```js
-const { outcome } = await session.requestHelp({ prompt, title, targets: ["@e4"], completionCriteria, timeoutMs })
+await tool.monitor({ description: "help finished", path: flag, event: "create" })   // subscribe first
+globalThis.help = session.requestHelp({ prompt, title, targets: ["@e4"], completionCriteria, timeoutMs })
+  .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))
 // outcome: "completed" | "continued" | "cancelled" | "timed_out" | "navigated" | "disabled"
 ```
+
+Never `await` it in an eval cell: a person takes longer than a cell (SKILL.md rule 2).
 
 ## Errors
 
