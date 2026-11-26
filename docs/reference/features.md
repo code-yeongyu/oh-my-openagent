@@ -464,7 +464,7 @@ Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git`, 
 
 | Skill set              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **git**                | commit, push, rebase, worktree, "who wrote", "when was X added" | Local git from eval cells: a small `Bun.$` helper so a failed step stops the cell, staging only named paths, worktrees, base sync, push preconditions, and history search. Hands the pushed head SHA to the `github` skill. `git-master` still resolves as an alias. |
+| **git**                | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced). Formerly `git-master`, which still resolves as an alias. |
 | **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
 | **visual-qa**          | Browser rendering and screenshot evidence               | omowright from js eval: the owned engine for renders on a task-owned profile, the attached engine for pages that need the user's login. |
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
@@ -477,15 +477,24 @@ Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git`, 
 
 #### git Core Principles
 
-- One commit per change that could be reverted alone, in the message style the repository's log already uses.
-- Stage the paths you name; `git add -A` only in a worktree whose every change is yours.
-- Never push while a merge or rebase is in progress, and push only a head whose checks ran on it.
+**Multiple Commits by Default**:
+
+```
+3+ files -> MUST be 2+ commits
+5+ files -> MUST be 3+ commits
+10+ files -> MUST be 5+ commits
+```
+
+**Automatic Style Detection**:
+
+- Analyzes last 30 commits for language (Korean/English) and style (semantic/plain/short)
+- Matches your repo's commit conventions automatically
 
 **Usage**:
 
 ```
 /git commit these changes
-/git sync this branch with dev and push
+/git rebase onto main
 /git who wrote this authentication code?
 ```
 

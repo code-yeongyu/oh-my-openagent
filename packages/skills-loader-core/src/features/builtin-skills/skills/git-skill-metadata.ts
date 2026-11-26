@@ -3,7 +3,7 @@ import { resolveSkillAlias } from "../../opencode-skill-loader/skill-name-aliase
 export const GIT_SKILL_NAME = "git"
 
 export const GIT_SKILL_DESCRIPTION =
-  "Local git from eval cells: commit, push, worktree, base sync, rebase/squash/fixup, and history search (blame, bisect, log -S, reflog). Load before a task's first commit, push or worktree, or pass load_skills=['git'] to the task that commits. GitHub PRs, checks and merges: `github` skill. Triggers: 'commit', 'push', 'rebase', 'worktree', 'who wrote', 'when was X added'."
+  "MUST USE for ANY git operations. Atomic commits, rebase/squash, history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with task(category='quick', load_skills=['git'], ...) to save context. Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'."
 
 export function isGitSkillName(name: string): boolean {
   return resolveSkillAlias(name.toLowerCase()) === GIT_SKILL_NAME

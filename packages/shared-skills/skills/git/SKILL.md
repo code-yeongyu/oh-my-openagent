@@ -7,13 +7,13 @@ description: "Local git from eval cells: commit, push, worktree, base sync, reba
 
 Load this skill with the read tool, `tool.read({ path })` inside a cell, or `load_skills`, because those paths apply the user's git settings and the bare prelude `read(path)` does not.
 
-Local git: state, commits, worktrees, base sync, history rewrite, push, history questions. Anything on GitHub itself (pull requests, checks, issues, merging) is the `github` skill; hand it the head SHA you pushed.
+Local git: state, commits, worktrees, base sync, history rewrite, push, history questions. Anything on GitHub itself (pull requests, checks, issues, merging) is the `github` skill where the harness has one; hand it the head SHA you pushed.
 
 Commit, push, rebase, reset, stash or delete only when the user asked for it or a workflow they started requires it (ulw-loop commits each verified unit; a PR workflow pushes its branch). An investigative ask ends with findings.
 
 ## Running git from an eval cell
 
-git stays the CLI you already know. The cell adds what a shell line lacks: a failure that stops the cell, reads that run together, and values that reach the next call.
+git stays the CLI you already know. The cell adds what a shell line lacks: a failure that stops the cell, reads that run together, and values that reach the next call. On a harness without a js cell the same rules hold for plain shell lines: `git -C <repo>` on every call, `set -e` or `&&` between dependent steps.
 
 ```js
 const git = (repo, ...args) => Bun.$`git -C ${repo} ${args}`.quiet().text() // repo is an absolute path; a non-zero exit throws
@@ -55,7 +55,7 @@ const [state, head] = await Promise.all([git(R, "status", "--short", "--branch")
 - Never rewrite `main`, `master`, `dev` or a release branch. On your own pushed branch use `--force-with-lease`, never `--force`.
 - Fixups: `git commit --fixup=<hash>`, then `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <base>`. A rebase gone wrong: `git rebase --abort` first, reflog after.
 - `reset --hard` and `clean` destroy uncommitted work: run them only in a tree whose `status` you just read.
-- After a push, read the head back and hand it on in the same cell: `const sha = (await git(R, "ls-remote", "origin", `refs/heads/${branch}`)).slice(0, 40)`, then the `github` skill's `pr.wait({ repo, number, headSha: sha })` and `pr.merge({ matchHeadSha: sha })`. Never poll with `sleep`.
+- After a push, read the head back and hand it on in the same cell: `const sha = (await git(R, "ls-remote", "origin", `refs/heads/${branch}`)).slice(0, 40)`, then, where the `github` skill is available, its `pr.wait({ repo, number, headSha: sha })` and `pr.merge({ matchHeadSha: sha })`. Never poll with `sleep`.
 
 ## History questions
 

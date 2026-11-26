@@ -96,7 +96,7 @@ describe("Senpi compatibility test script", () => {
         "coding-agent-sessions",
         "debugging",
         "frontend",
-        "git-master",
+        "git",
         "init-deep",
         "lsp-setup",
         "programming",

@@ -16,7 +16,8 @@ builtin-skills/
 ├── skills.ts             # createBuiltinSkills() factory + resolveActiveBuiltinSkills()
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
-│   ├── git.ts                         # Loads the shared git SKILL.md
+│   ├── git.ts                         # OpenCode's own git skill template from git-master-sections/ (kept as it was; the shared skills/git/SKILL.md is the native and Codex body)
+│   ├── git-master-sections/           # Prompt sub-sections (history-search, rebase, atomic-planning…)
 │   ├── git-skill-metadata.ts          # GIT_SKILL_NAME, description, isGitSkillName (alias-aware)
 │   ├── playwright.ts                  # Facade over browser provider variants
 │   ├── playwright-mcp-skill.ts        # createPlaywrightSkill() factory (mcp_args)
@@ -43,7 +44,7 @@ Selected skills; the provider registry is defined in `skills.ts`.
 
 | Skill | MCP | Notes |
 |-------|-----|-------|
-| `git` | — | Shared `skills/git/SKILL.md`: local git from eval cells, worktrees, base sync, push, history search; `git-master` resolves as an alias (`skill-name-aliases.ts`) |
+| `git` | — | Section-based template: atomic commits, rebase, history search; `git-master` resolves as an alias (`skill-name-aliases.ts`) |
 | `playwright` | `@playwright/mcp` | Browser automation via MCP |
 | `playwright-cli` | — | Browser automation via shell CLI (no MCP) |
 | `dev-browser` | — | Persistent page state browser for dev work |
