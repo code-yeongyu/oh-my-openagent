@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { connectDeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import { mkdtempSync, rmSync } from "node:fs"
 import type { Socket } from "node:net"
@@ -170,6 +170,39 @@ describe("sessions.open", () => {
     expect(again.thread).toBe(opened.thread)
     expect(sent("open_session")).toHaveLength(1)
     expect(sent("prompt")).toHaveLength(1)
+  })
+
+  test("#given an open whose first prompt held the session's attach #when the client closes #then no attach idle timer outlives it (#14091)", async () => {
+    // given
+    const armed = new Set<unknown>()
+    const realSetTimeout = globalThis.setTimeout
+    const realClearTimeout = globalThis.clearTimeout
+    const setSpy = spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, ms?: number) => {
+      const timer = realSetTimeout(callback, ms)
+      if (ms === 600_000) armed.add(timer)
+      return timer
+    }) as typeof setTimeout)
+    const clearSpy = spyOn(globalThis, "clearTimeout").mockImplementation((timer) => {
+      armed.delete(timer)
+      Reflect.apply(realClearTimeout, globalThis, [timer])
+    })
+    try {
+      const { owner } = await onWorld()
+      const client = clientOn(owner.stateDir, fakeClock())
+      await valueOf(
+        client.sessions.open({ device: PEER, workspace: "/work", first: { text: "start" }, idempotency_key: "open-1" }),
+      )
+      expect(armed.size).toBe(1)
+
+      // when
+      client.close()
+
+      // then
+      expect(armed.size).toBe(0)
+    } finally {
+      setSpy.mockRestore()
+      clearSpy.mockRestore()
+    }
   })
 
   test("#given a model that is not provider/id #when sessions.open runs #then invalid_arguments and nothing is sent", async () => {

@@ -1,0 +1,130 @@
+{
+  "domain": "config",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "config.status/host-read-refuses-connector",
+      "row": "config.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.migrate/opencode-change-refuses-connector",
+      "row": "config.migrate",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.migrate/opencode-change-refuses-session",
+      "row": "config.migrate",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.migrate/opencode-change-refuses-service",
+      "row": "config.migrate",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/opencode-change-refuses-connector",
+      "row": "config.modelCapabilities.refresh",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/opencode-change-refuses-session",
+      "row": "config.modelCapabilities.refresh",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/opencode-change-refuses-service",
+      "row": "config.modelCapabilities.refresh",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

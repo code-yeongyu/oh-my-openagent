@@ -267,12 +267,15 @@ export type OutcomeRecord =
       readonly admission_kind: string
       readonly turn_epoch: number
       readonly wait_kind?: "approval"
+      /** The lane the admission actually took, when it differs from the one claimed (decided again at admission). */
+      readonly mode_effective?: EffectiveLane
     }
   | {
       readonly kind: "applied"
       readonly admission_kind: string
       readonly turn_epoch: number
       readonly wait_kind?: "approval"
+      readonly mode_effective?: EffectiveLane
     }
   | { readonly kind: "requeue" }
   | { readonly kind: "refused"; readonly reason: RefusalReason }

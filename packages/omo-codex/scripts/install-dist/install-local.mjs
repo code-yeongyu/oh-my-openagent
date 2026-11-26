@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:044bebd2ed06b2346c54be2ab1cf506cf728504aa9bc13b5fe37209c9f435aa4:3ad1d478f346724d6693dfc0efb4983041585ae655cd5420a8c9fc372e39c30b
+// omo-codex-install:d520b4381f043adcbf6b5f434aac19d9dff26e7ea49e4b877b7a7b1129ebb42d:3a181286e59c69174578fbc129d7c7c506f4b01c5652808459635fafffe76eb4
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -7241,7 +7241,7 @@ var init_config = __esm(() => {
 
 // packages/omo-config-core/src/schema/legacy-category-names.ts
 function canonicalCategoryName(name) {
-  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] : name;
+  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] ?? name : name;
 }
 function isRecord7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -7300,7 +7300,7 @@ var init_legacy_category_names = __esm(() => {
 
 // packages/omo-config-core/src/schema/legacy-harness-names.ts
 function canonicalHarnessName(name) {
-  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] : name;
+  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] ?? name : name;
 }
 function harnessBlockKey(harness) {
   return `[${harness}]`;
@@ -19243,7 +19243,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.83",
+    version: "5.1.84",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",

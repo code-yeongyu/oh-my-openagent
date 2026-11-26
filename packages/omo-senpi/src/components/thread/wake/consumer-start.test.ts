@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
@@ -10,6 +10,7 @@ import type { IntakeRequest } from "../gateway/types"
 import type { GatewayStore } from "../gateway/store"
 import { startDeliveryConsumer } from "./consumer-start"
 import { writeSessionFile } from "./testing/fake-wake-host"
+import { shortTempDir } from "../../../../test-support/short-tmp"
 
 // The consumer start's contracts: it is acknowledged as serving before its startup pending sweep (that sweep reads
 // `session_wake.same_device` for each swept session's OWN cwd, #13455's LOW with #13456's LOW 3), a start that fails
@@ -153,8 +154,8 @@ describe("startDeliveryConsumer", () => {
 
   test("#given two local sessions whose projects disagree about same_device #when the consumer starts and sweeps their rows #then only the session whose own project allows it is woken", async () => {
     const h = (harness = createGatewayHarness())
-    const dirOn = mkdtempSync("/tmp/omo-wake-sweep-on-")
-    const dirOff = mkdtempSync("/tmp/omo-wake-sweep-off-")
+    const dirOn = shortTempDir("omo-wake-sweep-on-")
+    const dirOff = shortTempDir("omo-wake-sweep-off-")
     tempDirs.push(dirOn, dirOff)
     writeSessionFile(join(h.agentDir, "sessions"), "t-on", { cwd: dirOn })
     writeSessionFile(join(h.agentDir, "sessions"), "t-off", { cwd: dirOff })
