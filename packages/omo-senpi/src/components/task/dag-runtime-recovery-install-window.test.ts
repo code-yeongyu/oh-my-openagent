@@ -19,6 +19,7 @@ import { createDagRuntime } from "./dag-runtime"
 import {
   dagNode,
   FOREIGN_HOST_PID,
+  gateStartOwned,
   ManualTimers,
   recoveryEngine,
   ScriptedRunner,
@@ -32,14 +33,6 @@ afterEach(() => {
 })
 
 const quietLogger = { info: () => undefined, warn: () => undefined, error: () => undefined }
-
-function deferred<T = undefined>() {
-  let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 
 type NodeStates = Readonly<Record<string, Partial<DagRunRecordV1["nodes"][number]>>>
 
@@ -65,25 +58,11 @@ async function successorSession(name: string, runs: Readonly<Record<string, Node
     runIds.set(key, runId)
   }
 
-  // The admission of each gated run's first child waits until the test lets it through.
-  const gate = deferred()
-  const entered = deferred()
-  const gated = new Set<DagRunId>()
-  const startOwned: string[] = []
+  const gated = new Set<string>()
   const pi = new FakeExtensionAPI()
   const runner = new ScriptedRunner()
   const engine = recoveryEngine(cwd, sessionId, pi, runner)
-  const original = engine.manager.startOwned.bind(engine.manager)
-  Object.assign(engine.manager, {
-    startOwned: async (...args: Parameters<typeof original>) => {
-      startOwned.push(`${args[1].runId}:${String(args[1].nodeId)}`)
-      if (gated.has(args[1].runId)) {
-        entered.resolve(undefined)
-        await gate.promise
-      }
-      return original(...args)
-    },
-  })
+  const admission = gateStartOwned(engine, (owner) => gated.has(owner.runId))
   const timers = new ManualTimers()
   const runtime = createDagRuntime({
     pi,
@@ -105,13 +84,13 @@ async function successorSession(name: string, runs: Readonly<Record<string, Node
     runtime,
     runner,
     timers,
-    startOwned,
+    startOwned: admission.calls,
     runId,
     eventTypes,
     status,
     gate: (key: string) => gated.add(runId(key)),
-    entered: entered.promise,
-    release: () => gate.resolve(undefined),
+    entered: admission.entered,
+    release: admission.release,
   }
 }
 

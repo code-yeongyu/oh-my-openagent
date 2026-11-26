@@ -21,7 +21,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
-import { liveChildOwner, liveForeignHolder, ownerKey } from "./run-lease"
+import { liveChildOwner, liveForeignHolder, ownerKey, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
@@ -319,7 +319,7 @@ async function installResumedRun(context: RecoveryContext, claimed: RecoverableR
     journal: (record, errors, results) => recoveryJournal(context, record, errors, results),
     reconcile: (journal, outputs, errors, results, tasks) =>
       reconcileNodes(context, journal, outputs, errors, results, tasks),
-    release: () => releaseLease(context, claimed.runId),
+    release: () => releaseDagRunLease(context.store, claimed.runId, context.hostPid),
   })
 }
 
@@ -624,15 +624,6 @@ function failNode(
   pendingErrors.set(nodeId, { code, message, nodeId, at: new Date(now()).toISOString() })
   transition(journal, nodeId, "failed", pendingErrors)
   pendingErrors.delete(nodeId)
-}
-
-function releaseLease(context: RecoveryContext, runId: DagRunId): void {
-  context.store.withRunLock(runId, () => {
-    const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
-    if (fresh === null || fresh.leaseHolderPid !== context.hostPid) return
-    const { leaseHolderPid: _leaseHolderPid, previousLeaseHolderPid: _previousLeaseHolderPid, ...released } = fresh
-    context.store.writeCheckpoint(runId, released)
-  })
 }
 
 function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {

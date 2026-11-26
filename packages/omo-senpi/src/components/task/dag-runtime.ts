@@ -213,6 +213,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     coreManager,
     schedulerOptions,
     logger: deps.logger,
+    ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
   })
 
   const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)

@@ -51,6 +51,28 @@ export function recoveryEngine(
   return engine
 }
 
+/**
+ * Holds the admission of every child whose owner `gated` names until `release`: the window between a
+ * scheduler taking a run and its first child attaching, made observable.
+ */
+export function gateStartOwned(engine: TaskEngine, gated: (owner: { readonly runId: string }) => boolean) {
+  const gate = deferred<undefined>()
+  const entered = deferred<undefined>()
+  const calls: string[] = []
+  const original = engine.manager.startOwned.bind(engine.manager)
+  Object.assign(engine.manager, {
+    startOwned: async (...args: Parameters<typeof original>) => {
+      calls.push(`${args[1].runId}:${String(args[1].nodeId)}`)
+      if (gated(args[1])) {
+        entered.resolve(undefined)
+        await gate.promise
+      }
+      return original(...args)
+    },
+  })
+  return { calls, entered: entered.promise, release: () => gate.resolve(undefined) }
+}
+
 export function within<T>(promise: Promise<T>, step: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const bound = new Promise<never>((_resolve, reject) => {

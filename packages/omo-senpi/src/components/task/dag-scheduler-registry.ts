@@ -9,6 +9,8 @@ import type {
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { ComponentLogger } from "../../extension/types"
+import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
+import { releaseDagRunLease, takeDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
 
 export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
@@ -17,6 +19,8 @@ export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promi
  * The schedulers this runtime runs, one per run. A run is scheduled here only when this runtime
  * already holds it or it is still `pending`: a `running` run nobody here holds belongs to whichever
  * process its lease names, and only recovery may decide (by that lease) to take it over (#15125).
+ * Every scheduler run here holds the run's durable lease from before its first admission until it
+ * settles or is retired, the way a recovered run holds the lease its claim wrote.
  */
 export function createDagSchedulerRegistry(ports: {
   readonly schedulers: Map<DagRunId, OwnedScheduler>
@@ -24,8 +28,10 @@ export function createDagSchedulerRegistry(ports: {
   readonly coreManager: DagManager
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
   readonly logger: ComponentLogger
+  readonly isProcessAlive?: (pid: number) => boolean
 }) {
-  const { schedulers, coreManager, schedulerOptions, logger } = ports
+  const { schedulers, store, coreManager, schedulerOptions, logger } = ports
+  const lease = { hostPid: process.pid, isProcessAlive: ports.isProcessAlive ?? defaultSignaller.isAlive }
 
   const controller = (runId: DagRunId, parentSessionId: string): OwnedScheduler => {
     const existing = schedulers.get(runId)
@@ -43,7 +49,9 @@ export function createDagSchedulerRegistry(ports: {
         return record
       })
       .finally(() => {
-        if (schedulers.get(runId) === owned) schedulers.delete(runId)
+        if (schedulers.get(runId) !== owned) return
+        schedulers.delete(runId)
+        releaseDagRunLease(store, runId, lease.hostPid)
       })
     owned.running = running
     void running.catch((error: unknown) => {
@@ -61,6 +69,7 @@ export function createDagSchedulerRegistry(ports: {
     const record = coreManager.record(runId, parentSessionId)
     if (held === undefined && record.status === "running") return false
     if (record.status !== "pending" && record.status !== "running") return true
+    if (takeDagRunLease(store, runId, lease) === undefined) return true
     const owned = held ?? controller(runId, parentSessionId)
     track(runId, owned, owned.scheduler.run())
     return true
@@ -74,13 +83,14 @@ export function createDagSchedulerRegistry(ports: {
   const adoptReentry = (runId: DagRunId, reentry: DagRunReentry): void => {
     const owned: OwnedScheduler = { scheduler: reentry.scheduler }
     schedulers.set(runId, owned)
+    takeDagRunLease(store, runId, lease)
     track(runId, owned, reentry.run)
   }
 
   // A run recovery installed keeps running in its own scheduler: register it like any re-entry so
   // `ensureScheduled` and `isRunHeldInProcess` see it instead of starting a second scheduler.
   const adoptInstalled = (installed: InstalledDagRun): void => {
-    const record = ports.store.readCheckpoint<DagRunRecordV1>(installed.runId)
+    const record = store.readCheckpoint<DagRunRecordV1>(installed.runId)
     if (record === null) throw new Error("installed DAG checkpoint is missing")
     adoptReentry(installed.runId, {
       scheduler: installed.scheduler,
