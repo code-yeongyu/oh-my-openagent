@@ -9,6 +9,7 @@ const GUARD_EXCLUDED_DIRS = ["script/fixtures/"]
 type GitResult = { readonly ok: boolean; readonly out: string; readonly err: string }
 
 function git(root: string, args: readonly string[]): GitResult {
+  if (root.length === 0) throw new Error(`git ${args.join(" ")}: no repository root`)
   const result = Bun.spawnSync(["git", "-c", "core.hooksPath=/dev/null", "-c", "core.quotePath=false", ...args], {
     cwd: root,
     stdout: "pipe",
@@ -17,12 +18,18 @@ function git(root: string, args: readonly string[]): GitResult {
   return { ok: result.exitCode === 0, out: result.stdout.toString(), err: result.stderr.toString().trim() }
 }
 
+function gitOut(root: string, args: readonly string[]): string {
+  const result = git(root, args)
+  if (!result.ok) throw new Error(`git ${args.join(" ")}: ${result.err}`)
+  return result.out
+}
+
 function lines(text: string): string[] {
   return text.split("\n").filter((line) => line.length > 0)
 }
 
 export function deriveBundleGuards(root: string): string[] {
-  const tracked = lines(git(root, ["ls-files", "-z", "--", "script/"]).out.replaceAll("\0", "\n"))
+  const tracked = lines(gitOut(root, ["ls-files", "-z", "--", "script/"]).replaceAll("\0", "\n"))
   return tracked
     .filter((path) => path.endsWith(".test.ts"))
     .filter((path) => !GUARD_EXCLUDED_DIRS.some((dir) => path.startsWith(dir)))
@@ -31,8 +38,10 @@ export function deriveBundleGuards(root: string): string[] {
 }
 
 function bundleInputsAt(root: string, rev: string): Set<string> {
-  const shown = git(root, ["show", `${rev}:${BUNDLE_INPUTS}`])
-  if (!shown.ok) return new Set()
+  gitOut(root, ["rev-parse", "--verify", "--end-of-options", `${rev}^{commit}`])
+  const listed = gitOut(root, ["ls-tree", "--name-only", rev, "--", BUNDLE_INPUTS])
+  if (listed.trim().length === 0) return new Set()
+  const shown = { out: gitOut(root, ["show", `${rev}:${BUNDLE_INPUTS}`]) }
   const parsed: unknown = JSON.parse(shown.out)
   if (typeof parsed !== "object" || parsed === null || !("files" in parsed) || !Array.isArray(parsed.files)) {
     throw new Error(`${BUNDLE_INPUTS} at ${rev} has no files list`)
@@ -41,10 +50,9 @@ function bundleInputsAt(root: string, rev: string): Set<string> {
 }
 
 function bundlePathsTouched(root: string, base: string, head: string): string[] {
-  const diff = git(root, ["diff", "--no-renames", "--name-only", `${base}...${head}`])
-  if (!diff.ok) throw new Error(`git diff ${base}...${head}: ${diff.err}`)
   const inputs = new Set([...bundleInputsAt(root, base), ...bundleInputsAt(root, head)])
-  return lines(diff.out).filter((path) => inputs.has(path) || SHIPPED_PATH.test(path))
+  const diff = gitOut(root, ["diff", "--no-renames", "--name-only", `${base}...${head}`])
+  return lines(diff).filter((path) => inputs.has(path) || SHIPPED_PATH.test(path))
 }
 
 function sandboxedEnv(home: string): Record<string, string | undefined> {
@@ -58,7 +66,7 @@ function sandboxedEnv(home: string): Record<string, string | undefined> {
 }
 
 function trackedChanges(root: string): string[] {
-  return lines(git(root, ["status", "--porcelain", "--untracked-files=no"]).out).map((line) => line.slice(3))
+  return lines(gitOut(root, ["status", "--porcelain", "--untracked-files=no"])).map((line) => line.slice(3))
 }
 
 function failingTests(output: string): string[] {
@@ -84,8 +92,8 @@ function runBundleGuards(root: string, base: string, head: string): Verdict {
       lines: [`BUNDLE_GUARDS_NOT_APPLICABLE ${base}...${head} touches no bundle input or generated path`],
     }
   }
-  const headSha = git(root, ["rev-parse", "--verify", `${head}^{commit}`]).out.trim()
-  const checkedOut = git(root, ["rev-parse", "HEAD"]).out.trim()
+  const headSha = gitOut(root, ["rev-parse", "--verify", "--end-of-options", `${head}^{commit}`]).trim()
+  const checkedOut = gitOut(root, ["rev-parse", "HEAD"]).trim()
   const dirty = trackedChanges(root)
   if (headSha !== checkedOut || dirty.length > 0) {
     const why =
@@ -102,15 +110,19 @@ function runBundleGuards(root: string, base: string, head: string): Verdict {
   }
   const guards = deriveBundleGuards(root)
   const header = `BUNDLE_GUARDS head=${headSha} touched=${touched.length} guards=${guards.length}`
-  if (guards.length === 0) return { exitCode: 0, lines: [header, "BUNDLE_GUARDS_OK no guard reads a shipped path"] }
-  const home = mkdtempSync(join(tmpdir(), "bundle-guards-home-"))
-  const run = Bun.spawnSync([process.execPath, "test", ...guards.map((guard) => `./${guard}`)], {
-    cwd: root,
-    env: sandboxedEnv(home),
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-  rmSync(home, { recursive: true, force: true })
+  if (guards.length === 0)
+    return {
+      exitCode: 1,
+      lines: [header, "BUNDLE_GUARDS_EMPTY no script test reads a shipped path; nothing checked this bundle change"],
+    }
+  const run = withScratchHome((home) =>
+    Bun.spawnSync([process.execPath, "test", ...guards.map((guard) => `./${guard}`)], {
+      cwd: root,
+      env: sandboxedEnv(home),
+      stdout: "pipe",
+      stderr: "pipe",
+    }),
+  )
   const output = `${run.stdout.toString()}${run.stderr.toString()}`
   if (run.exitCode === 0) return { exitCode: 0, lines: [header, `BUNDLE_GUARDS_OK ${guards.join(" ")}`] }
   const failures = failingTests(output)
@@ -145,12 +157,21 @@ if (import.meta.main) {
     process.exit(2)
   }
   try {
-    const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).out.trim()
+    const root = gitOut(process.cwd(), ["rev-parse", "--show-toplevel"]).trim()
     const verdict = runBundleGuards(root, args.base, args.head)
     for (const line of verdict.lines) (verdict.exitCode === 0 ? console.log : console.error)(line)
     process.exitCode = verdict.exitCode
   } catch (error) {
     console.error(`BUNDLE_GUARDS_ERROR ${error instanceof Error ? error.message : String(error)}`)
     process.exitCode = 1
+  }
+}
+
+export function withScratchHome<T>(work: (home: string) => T): T {
+  const home = mkdtempSync(join(tmpdir(), "bundle-guards-home-"))
+  try {
+    return work(home)
+  } finally {
+    rmSync(home, { recursive: true, force: true })
   }
 }

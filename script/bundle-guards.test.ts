@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { deriveBundleGuards } from "./bundle-guards"
+import { deriveBundleGuards, withScratchHome } from "./bundle-guards"
 
 const cli = fileURLToPath(new URL("./bundle-guards.ts", import.meta.url))
 const bundlePath = "packages/omo-senpi/plugin/extensions/omo.js"
@@ -68,8 +68,9 @@ function runGate(
   root: string,
   base: string,
   env: Record<string, string | undefined> = process.env,
+  head = "HEAD",
 ): { exitCode: number; output: string } {
-  const result = Bun.spawnSync([process.execPath, cli, "--base", base], {
+  const result = Bun.spawnSync([process.execPath, cli, "--base", base, "--head", head], {
     cwd: root,
     env,
     stdout: "pipe",
@@ -165,6 +166,59 @@ describe("bundle guard push gate (#15072)", () => {
     // then
     expect(exitCode).toBe(0)
     expect(existsSync(join(callerHome, "touched"))).toBe(false)
+  })
+
+  test("#given a directory that is not a git repository #when the guard set is derived #then it fails naming git, never an empty set", () => {
+    // given
+    const notARepo = mkdtempSync(join(tmpdir(), "bundle-guards-norepo-"))
+    fixtures.push(notARepo)
+
+    // when / then
+    expect(() => deriveBundleGuards(notARepo)).toThrow(/git ls-files/)
+  })
+
+  test("#given a head ref that does not exist #when the gate runs #then it fails naming the ref", () => {
+    // given
+    const { root, base } = fixtureRepo()
+
+    // when
+    const { exitCode, output } = runGate(root, base, process.env, "no-such-ref")
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(output).toContain("BUNDLE_GUARDS_ERROR")
+    expect(output).toContain("no-such-ref")
+  })
+
+  test("#given a bundle push but no script test reads a shipped path #when the gate runs #then it refuses instead of reporting green", () => {
+    // given
+    const { root, base } = fixtureRepo()
+    git(root, "rm", "-q", "script/omo-bundle-fresh.test.ts")
+    commit(root, { [bundlePath]: "// regenerated\n" }, "regenerate with no guard left")
+
+    // when
+    const { exitCode, output } = runGate(root, base)
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(output).toContain("BUNDLE_GUARDS_EMPTY")
+  })
+
+  test("#given work in the scratch home that throws #when it unwinds #then the scratch home is removed", () => {
+    // given
+    let seen = ""
+
+    // when
+    const unwind = () =>
+      withScratchHome((home) => {
+        seen = home
+        throw new Error("guard run blew up")
+      })
+
+    // then
+    expect(unwind).toThrow("guard run blew up")
+    expect(seen.length).toBeGreaterThan(0)
+    expect(existsSync(seen)).toBe(false)
   })
 
   test("#given a new script test that reads a bundle path #when the set is derived #then it joins without a list edit, and a test that reads none stays out", () => {
