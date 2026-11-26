@@ -10,6 +10,7 @@ import type { DeliveryTarget, DeliveryOutcome } from "./gateway/transport"
 import { REFUSAL_CODES } from "./gateway/result"
 import { senderClass, type DeliveryAuthority, type GatewaySender } from "./gateway/types"
 import { keyedMessageId } from "./remote/client-message-id"
+import { held } from "./remote/held-answers"
 import { addressBook, hostView, sendBookFor } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { consumedSendersOf } from "./tools/reply-permission"
@@ -143,7 +144,8 @@ export async function sendToTarget(
     // A person's prompt to another device is named by a client message id, the delivery_id its answer carries. It is
     // derived from the caller and the key (#15011), as the remote module's own sends derive it, so a repeat under the key
     // from any process carries the id the holder admitted once (senpi admits one prompt per client message id).
-    ...(sender.kind === "person" && target.kind === "remote"
+    // Held (held-answers.ts sdk-send-delivery-id): no id, so no delivery_id in the answer, as dev answers it, until T1b.
+    ...(!held("sdk-send-delivery-id") && sender.kind === "person" && target.kind === "remote"
       ? {
           client_message_id: keyedMessageId(
             { device: target.row.device, session: target.row.session_id, durable: target.row.durable_id },

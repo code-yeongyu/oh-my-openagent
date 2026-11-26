@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto"
 import { keyedMessageId } from "./client-message-id"
+import { held } from "./held-answers"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"
@@ -394,10 +396,14 @@ export function createRelayTransport(
     // reaches the receiving engine under the id it already admitted. A chain this delivery starts is rooted at that id,
     // so the same message under the same key renders the same record: past the sender's receipt horizon the holder
     // answers it as a repeat, and only a different message is the conflict (ruling B9: a send key names one message).
-    const delivery_id = keyedMessageId(thread, senderClass(delivery.sender), delivery.idempotency_key)
+    // Held (held-answers.ts send-derived-id-remote): dev's random delivery id and chain root until T1b clears threads.send.
+    const derived = !held("send-derived-id-remote")
+    const delivery_id = derived
+      ? keyedMessageId(thread, senderClass(delivery.sender), delivery.idempotency_key)
+      : randomUUID()
     return {
       delivery_id,
-      root_id: prior?.root_id ?? `root-${delivery_id}`,
+      root_id: prior?.root_id ?? `root-${derived ? delivery_id : randomUUID()}`,
       hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1,
     }
   }

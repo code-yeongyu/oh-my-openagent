@@ -4,7 +4,7 @@ import type { TableScenario } from "../../../../../../script/sdk-parity/expectat
 import { scenarioSetup } from "../../../../../../script/sdk-parity/fakes/setup"
 import { THREAD_SUMMARY_MAX_LENGTH } from "../../thread/contracts/fields"
 import { PRINCIPAL_MATRIX } from "../contract"
-import { listProjectedCandidates, mayReadThreads } from "./refusal-candidates"
+import { listProjectedCandidates, mayReadThreads, projectedCandidates } from "./refusal-candidates"
 
 // The owner's ruling B2: a resolution call's refusal candidates carry the caller's own threads.list fields for the same
 // rows plus the preview of a row it may read, and no candidate is a row the caller's list would not return.
@@ -146,6 +146,23 @@ describe("the projection itself", () => {
 })
 
 describe("whether a caller may read is checked against the read line of the matrix, not assumed from the list line", () => {
+  test("#given a principal whose read cell refuses (unreachable through shipped calls at this head: every principal that reaches the projection may read) #when the use site projects its refusal #then an unreadable row carries no preview", async () => {
+    const failure = {
+      kind: "error",
+      error: {
+        code: "ambiguous_target",
+        message: "m",
+        next_action: "n",
+        details: { candidates: [{ thread: "t-1", name: "lane", preview: "last words" }] },
+      },
+    } as const
+    const rows = [{ thread: "t-1", name: "lane", state: "idle" }]
+    const reads = await projectedCandidates(failure, "script", async () => rows)
+    const refused = await projectedCandidates(failure, "connector", async () => rows)
+    expect(candidatesOf(reads)).toEqual([{ ...rows[0], preview: "last words" }])
+    expect(candidatesOf(refused)).toEqual([{ ...rows[0] }])
+  })
+
   test("#given each principal kind #when asked #then it answers the cell of the line governing threads.read", () => {
     const readLine = PRINCIPAL_MATRIX.find((line) => line.rows.includes("threads.read") && line.input === undefined)
     for (const kind of ["person", "script", "session", "connector", "service"] as const)

@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto"
  * idempotency key gets the same id each time, so a replayed receipt names the prompt that was sent; any other send a
  * fresh one.
  */
-function clientMessageIdOf(caller: string, idempotencyKey: string | undefined): string {
+export function clientMessageIdOf(caller: string, idempotencyKey: string | undefined): string {
   if (idempotencyKey === undefined) return randomUUID()
   const hex = createHash("sha256").update(`${caller}\u0000${idempotencyKey}`).digest("hex")
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`

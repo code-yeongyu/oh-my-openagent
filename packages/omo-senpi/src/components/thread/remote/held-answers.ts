@@ -4,6 +4,17 @@
 // with the row's before/after scenario and its SDK-Parity-Changed line. An entry no parity row names carries `retiredWith`,
 // the export its slice removes. The list only shrinks (held-answers.test.ts).
 export const HELD_ANSWERS = {
+  "send-derived-id-remote": {
+    keeps:
+      "a keyed send to another device is named by a random delivery id (relay) or the caller-derived id (remote module), as dev names it",
+    rows: ["threads.send"],
+    slice: "T1b (with this device's leg, one declared change on both legs)",
+  },
+  "sdk-send-delivery-id": {
+    keeps: "ThreadSdk.send to another device answers no delivery_id, as dev answers it",
+    rows: ["threads.send"],
+    slice: "T1b",
+  },
   "remote-verbs-ended-row": {
     keeps: "omo remote model, interrupt and close act on a session its device lists as ended",
     rows: ["threads.setModel", "threads.interrupt", "threads.close"],

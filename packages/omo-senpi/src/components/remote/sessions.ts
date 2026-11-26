@@ -27,7 +27,8 @@ import { createDeviceServiceSessions } from "./port/device-service"
 import { idShaped } from "@oh-my-opencode/thread-address-core"
 import { budget, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import { keyedMessageId, type KeyedThread } from "../thread/remote/client-message-id"
+import { clientMessageIdOf, keyedMessageId, type KeyedThread } from "../thread/remote/client-message-id"
+import { held } from "../thread/remote/held-answers"
 import type { LocalSessions } from "./local-sessions"
 import { sessionDetail } from "./session-detail"
 import type {
@@ -367,7 +368,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           thread,
           device,
           request,
-          keyedMessageId(keyedThreadOf(target), "first_party", request.idempotency_key),
+          held("send-derived-id-remote")
+            ? clientMessageIdOf(caller, request.idempotency_key)
+            : keyedMessageId(keyedThreadOf(target), "first_party", request.idempotency_key),
         ),
       )
     const key = request.idempotency_key
@@ -514,7 +517,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       // answers it carries it too. The relay's steer record carries none, so a steer names none.
       const clientMessageId =
         from.sender.kind === "person" && mode !== "steer"
-          ? keyedMessageId(keyedThreadOf(target), senderClass(from.sender), request.idempotency_key)
+          ? held("send-derived-id-remote")
+            ? clientMessageIdOf(from.caller, request.idempotency_key)
+            : keyedMessageId(keyedThreadOf(target), senderClass(from.sender), request.idempotency_key)
           : undefined
       const sent = await legOf(svc).relay.deliver({
         sender: from.sender,

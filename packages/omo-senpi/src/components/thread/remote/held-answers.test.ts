@@ -7,6 +7,8 @@ import { HELD_ANSWERS } from "./held-answers"
 // The held-answers list is closed and only shrinks (design lane ruling on T1a): the sites it held when T1a added it, each
 // with the parity rows whose clearing releases it. An entry may leave only in the commit that clears its rows.
 const CEILING = {
+  "send-derived-id-remote": ["threads.send"],
+  "sdk-send-delivery-id": ["threads.send"],
   "remote-verbs-ended-row": ["threads.setModel", "threads.interrupt", "threads.close"],
   "handoff-exact-ambiguity": ["threads.handoff"],
   "remote-resolve-self": [],
@@ -68,6 +70,17 @@ describe("the held-answers list (design lane ruling on T1a)", () => {
     expect(retirementProblems(HELD_ANSWERS, exportedIn)).toEqual([])
   })
 
+  test("#given the list #then it holds exactly the six sites T1a closed, so adding or removing any entry fails here", () => {
+    expect(Object.keys(HELD_ANSWERS).toSorted()).toEqual([
+      "handoff-exact-ambiguity",
+      "remote-resolve-self",
+      "remote-resolve-slash",
+      "remote-verbs-ended-row",
+      "sdk-send-delivery-id",
+      "send-derived-id-remote",
+    ])
+  })
+
   test("#given an entry whose export is gone, and one with neither rows nor an export #when checked #then each is named", () => {
     const gone = { rows: [], retiredWith: { file: "x.ts", symbol: "gone" } }
     expect(retirementProblems({ "site-a": gone, "site-b": { rows: [] } }, () => false)).toEqual([
@@ -81,7 +94,7 @@ describe("the held-answers list (design lane ruling on T1a)", () => {
   })
 
   test("#given a list that grew, one that shrank early and one that outlived its rows #when compared #then each is named", () => {
-    const unresolved = new Set(["threads.setModel", "threads.interrupt", "threads.close"])
+    const unresolved = new Set(["threads.send", "threads.setModel", "threads.interrupt", "threads.close"])
     const { "remote-verbs-ended-row": _verbs, ...withoutVerbs } = HELD_ANSWERS
     expect(listProblems({ ...HELD_ANSWERS, "new-site": { rows: [] } }, unresolved)).toEqual([
       "handoff-exact-ambiguity: its rows are cleared; the entry no longer applies",
