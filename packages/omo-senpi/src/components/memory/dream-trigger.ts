@@ -32,7 +32,7 @@ export interface DreamTriggerSession {
   readonly identity: string
   readonly identityPaths: MemoryIdentityPaths
   readonly getJournal: (conversationId: string) => Promise<Pick<TranscriptJournal, "captureReflectionSnapshot">>
-  readonly store: Pick<ReflectionReservationStore, "tryReserve">
+  readonly store: Pick<ReflectionReservationStore, "tryReserve" | "readState">
   readonly launch: (run: ReservedRun) => void
 }
 
@@ -54,7 +54,8 @@ const defaultScheduler: DreamTriggerScheduler = {
   },
 }
 
-export type DreamFireRejection = DreamGateRejection | "no_unreflected_content" | "no_session" | "aborted" | "parked"
+export type DreamFireRejection =
+  DreamGateRejection | "no_unreflected_content" | "no_session" | "aborted" | "parked" | "run_in_flight"
 
 export type DreamFireOutcome =
   | { readonly fired: true; readonly runId: string; readonly status: "active" | "pending" }

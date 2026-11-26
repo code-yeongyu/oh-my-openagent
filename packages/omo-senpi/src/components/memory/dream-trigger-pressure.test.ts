@@ -20,6 +20,7 @@ describe("pressure dream origin", () => {
     const f = await fixture({
       conversationText: null,
       reservationStore: {
+        readState: async () => ({}),
         tryReserve: async (request) => {
           reservations.push(request)
           return { status: "active", run }

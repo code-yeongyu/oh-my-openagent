@@ -78,6 +78,8 @@ For each learning that survived Phase 2, make surgical, well-placed changes.
 
 **Placement**: route each learning to the appropriate tier in the memory filesystem. Keep `system/` files concise and move verbose content to external memory.
 
+**System token budget**: `$SYSTEM_TOKENS_PATH` holds the committed `system/` estimate (`{ "totalTokens": <n>, "files": [...] }`, largest first), `$SYSTEM_TOKEN_TARGET` the line `system/` must stay under, and `$SYSTEM_TOKEN_BUDGET` the alarm above it. Read the estimate before writing to `system/`. Below the target, a `system/` addition may not carry the estimate to or past it. At or above the target, this run must not grow `system/`: put new detail in `reference/` with a `[[path]]` pointer from the `system/` line that needs it, and pay for any line that truly belongs in every turn by moving stale dated detail from the same file to `reference/` in the same commit. Never drop a standing rule or the user's own words to make room. A run that grows `system/` and leaves it at or above the target is recorded as `budget_not_met` and starts a trimming dream.
+
 **Integration**: if an existing file already covers this topic, update it. Only create a new file when the topic is genuinely distinct and has no natural home in existing files. Fragmentation makes memory harder to navigate.
 
 **Identity preservation**: persona and behavioral files are load-bearing. Edit them surgically: append, modify specific entries, adjust wording. Never rewrite them wholesale or silently overwrite established identity.

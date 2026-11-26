@@ -70,7 +70,7 @@ This is the dream's core duty: make memory smaller, better placed, and less redu
 
 ### System Token Budget Contract
 
-Read `$SYSTEM_TOKENS_PATH` before consolidating. When its `totalTokens` is greater than or equal to `$SYSTEM_TOKEN_BUDGET`, this run MUST bring committed `system/` below `$SYSTEM_TOKEN_TARGET` before finishing. Trim or demote the largest files first. Move verbose detail to `reference/` and leave accurate `[[path]]` cross-references at the former point of use.
+Read `$SYSTEM_TOKENS_PATH` before consolidating. When its `totalTokens` is greater than or equal to `$SYSTEM_TOKEN_TARGET`, this run MUST bring committed `system/` below `$SYSTEM_TOKEN_TARGET` before finishing, whatever started the run. `$SYSTEM_TOKEN_BUDGET` is the alarm the person sees; the target is the line you hold. Finishing at or above the target, with or without a commit, is recorded as `budget_not_met`. Trim or demote the largest files first. Move verbose detail to `reference/` and leave accurate `[[path]]` cross-references at the former point of use.
 
 `system/self-aware.md` is the first block to trim: move stale entries to `reference/self/ARCHIVE.md`. Never destroy persona, identity, or boundaries content to meet the target, and never delete content the user asked to keep. Preserve load-bearing meaning through surgical compression or demotion. The final report MUST state what moved or was trimmed and the resulting committed `system/` token estimate.
 

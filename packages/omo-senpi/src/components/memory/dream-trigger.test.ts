@@ -85,15 +85,22 @@ describe("evaluateDreamGates", () => {
     expect(decision).toEqual({ allowed: true })
   })
 
-  test("#given the last dream exactly min_hours_between ago #when pressure evaluates #then spacing rejects without probing volume", async () => {
-    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 24 * 3_600_000, unreflectedBytes: 0 })
+  test("#given an idle dream two hours ago, inside min_hours_between #when pressure evaluates #then the idle spacing does not hold it back (#15054)", async () => {
+    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 2 * 3_600_000, unreflectedBytes: 0 })
+    const decision = await evaluateDreamGates("pressure", triggerSettings(), probe)
+    expect(decision).toEqual({ allowed: true })
+    expect(calls).toEqual({ lastDreamAt: 1, unreflectedBytes: 0 })
+  })
+
+  test("#given the last dream exactly one hour ago #when pressure evaluates #then its own spacing rejects without probing volume", async () => {
+    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 3_600_000, unreflectedBytes: 0 })
     const decision = await evaluateDreamGates("pressure", triggerSettings(), probe)
     expect(decision).toEqual({ allowed: false, rejection: "too_soon" })
     expect(calls).toEqual({ lastDreamAt: 1, unreflectedBytes: 0 })
   })
 
-  test("#given pressure is past dream spacing #when unreflected volume is zero #then it is allowed without probing volume", async () => {
-    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 24 * 3_600_000 - 1, unreflectedBytes: 0 })
+  test("#given pressure is past its spacing #when unreflected volume is zero #then it is allowed without probing volume", async () => {
+    const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS - 3_600_000 - 1, unreflectedBytes: 0 })
     const decision = await evaluateDreamGates("pressure", triggerSettings(), probe)
     expect(decision).toEqual({ allowed: true })
     expect(calls).toEqual({ lastDreamAt: 1, unreflectedBytes: 0 })

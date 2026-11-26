@@ -44,12 +44,16 @@ describe("dream token budget completion validation", () => {
     })
   })
 
-  it("#given a non-pressure dream above target #when validated #then the estimate is reported without failing", () => {
-    expect(validateDreamTokenBudget({ origin: "manual", totalTokens: 120, targetTokens: 80 })).toEqual({
-      status: "valid",
+  it("#given an idle or manual dream that ends at or above target #when validated #then budget_not_met is recorded for its origin (#15054)", () => {
+    expect(validateDreamTokenBudget({ origin: "idle", totalTokens: 120, targetTokens: 80 })).toEqual({
+      status: "budget_not_met",
       totalTokens: 120,
       targetTokens: 80,
+      detail: "Committed system/ estimate is 120 tokens; idle dream target is below 80 tokens",
     })
+    expect(validateDreamTokenBudget({ origin: "manual", totalTokens: 80, targetTokens: 80 }).status).toBe(
+      "budget_not_met",
+    )
   })
 })
 

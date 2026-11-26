@@ -70,3 +70,15 @@ test("#given a reflection run #when it starts #then audit input is absent", asyn
   expect(prepared.env.AUDIT_PATH).toBeUndefined()
   expect(existsSync(join(prepared.paths.sessionDir, "audit.json"))).toBe(false)
 })
+
+test("#given a reflection run #when it starts #then it carries the system token estimate, budget and target the finalization checks (#15054)", async () => {
+  const { prepared } = await payload(false)
+  const path = prepared.env.SYSTEM_TOKENS_PATH
+  if (!path) throw new Error("reflection system token input missing")
+  const estimate = JSON.parse(await readFile(path, "utf8"))
+  expect(estimate.files.map((file: { path: string }) => file.path)).toEqual(["system/persona.md"])
+  expect(estimate.totalTokens).toBeGreaterThan(0)
+  expect(prepared.env.SYSTEM_TOKEN_BUDGET).toBe("30000")
+  expect(prepared.env.SYSTEM_TOKEN_TARGET).toBe("24000")
+  expect(prepared).toMatchObject({ kind: "reflection", systemTokenBudget: 30000, systemTokenTarget: 24000 })
+})

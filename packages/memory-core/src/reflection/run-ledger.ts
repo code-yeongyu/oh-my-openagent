@@ -99,16 +99,14 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   if (value.targetDoc !== undefined && (kind !== "dream" || typeof value.targetDoc !== "string")) {
     throw new Error("Invalid dream target document")
   }
+  // Reflections carry the budget too (#15054), so finalization can check what they did to system/.
   for (const field of ["systemTokenBudget", "systemTokenTarget"] as const) {
-    if (
-      value[field] !== undefined &&
-      (kind !== "dream" || !Number.isInteger(value[field]) || Number(value[field]) <= 0)
-    ) {
-      throw new Error(`Invalid dream ${field}`)
+    if (value[field] !== undefined && (!Number.isInteger(value[field]) || Number(value[field]) <= 0)) {
+      throw new Error(`Invalid ${field}`)
     }
   }
   if ((value.systemTokenBudget === undefined) !== (value.systemTokenTarget === undefined)) {
-    throw new Error("Dream token budget metadata is incomplete")
+    throw new Error("Token budget metadata is incomplete")
   }
   if (
     !optionalPid(value.pid) ||

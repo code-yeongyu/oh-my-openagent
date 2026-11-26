@@ -215,7 +215,9 @@ const detachedRows: readonly Row[] = [
     name: "a pressure dream request, which runs detached from its caller",
     async start(held, work) {
       const { step, finished } = gatedStep(held)
-      createPressureDreamAdmission({ request: step, work }).deferOrRequest("session-pressure", true)
+      createPressureDreamAdmission({ request: step, reached: async () => true, work }).checkAfterSettle(
+        "session-pressure",
+      )
       return { settle: () => work.settled(), finished }
     },
   },
@@ -228,7 +230,10 @@ const detachedRows: readonly Row[] = [
       }
       const f = await dreamFixture({
         work,
-        reservationStore: { tryReserve: async () => (await gatedStep(held).step(), { status: "active", run }) },
+        reservationStore: {
+          readState: async () => ({}),
+          tryReserve: async () => (await gatedStep(held).step(), { status: "active", run }),
+        },
       })
       await f.pi.dispatch("agent_settled", { type: "agent_settled" }, f.eventCtx)
       f.scheduler.latest().fire()
