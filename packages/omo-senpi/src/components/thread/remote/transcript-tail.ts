@@ -1,4 +1,4 @@
-import type { ContextTail } from "../paged-reader"
+import { type ContextTail, type EntryPageRead, selectEntryPage } from "../paged-reader"
 import { contextTail } from "./context-tail"
 import { replyData } from "./remote-ops"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort, SessionProjector } from "./ports"
@@ -162,4 +162,16 @@ export async function readContextTail(
     entries = [...older.entries, ...entries]
     complete = !older.more || older.entries.length === 0
   }
+}
+
+/** One bounded page of a session's tail (`readContextTail`, then the read's window or `after`); a tail it could not read is answered as it is. */
+export async function readTailPage(
+  port: EntryPagesPort,
+  device: string,
+  sessionId: string,
+  project: SessionProjector,
+  read: Parameters<typeof selectEntryPage>[1],
+): Promise<EntryPageRead | Exclude<ContextTailRead, { readonly kind: "ok" }>> {
+  const tail = await readContextTail(port, device, sessionId, project)
+  return tail.kind === "ok" ? selectEntryPage(tail.tail, read) : tail
 }

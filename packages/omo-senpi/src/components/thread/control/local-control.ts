@@ -1,6 +1,7 @@
-import { selectEntryPage } from "../paged-reader"
+// The tail reader ships in the thread client sidecar (lazy-ops), as the relay control's does: omo.js carries none of it.
+import { readTailPage } from "../remote/lazy-ops"
 import type { JsonObject } from "../remote/ports"
-import { readContextTail, type EntryPagesPort } from "../remote/transcript-tail"
+import type { EntryPagesPort } from "../remote/transcript-tail"
 import { threadLink } from "../thread-link"
 import { routingId, sessionPort, summary } from "../tools/internals"
 import { threadRow } from "../tools/thread-row"
@@ -109,9 +110,9 @@ export function createLocalControl(
           readEntryPage: async (read: Parameters<NonNullable<SessionControl["readEntryPage"]>>[0]) => {
             const project = await options.remote?.loadProjector?.().catch(() => undefined)
             if (project === undefined || port.getEntries === undefined) return { kind: "unsupported" as const }
-            const tail = await readContextTail(entryPagesOf(port, port.getEntries), THIS_DEVICE, routing, project)
-            if (tail.kind !== "ok") return { kind: "unsupported" as const }
-            return selectEntryPage(tail.tail, read)
+            const page = await readTailPage(entryPagesOf(port, port.getEntries), THIS_DEVICE, routing, project, read)
+            // This device's engine refusing a page takes the whole transcript for this read (get_messages).
+            return page.kind === "failed" ? { kind: "unsupported" as const } : page
           },
         }),
     waitSettled: async (timeoutMs, signal) => {

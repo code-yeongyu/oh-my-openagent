@@ -1,6 +1,8 @@
 import { Type } from "typebox"
 
-import { THREAD_MESSAGE_MAX_BYTES } from "../../../thread/contracts"
+// From the field module, not the contracts index: the index carries the tool parser and the refusal registry, which the
+// root loads only with the thread core (P1b cold-import decision).
+import { THREAD_MESSAGE_MAX_BYTES } from "../../../thread/contracts/fields"
 import {
   ThreadCreateParams,
   ThreadHandoffParams,

@@ -1061,6 +1061,8 @@ export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
 export { reopenParkedRow } from "./remote/reopen-parked"
+export { readTailPage } from "./remote/transcript-tail"
+export { sendThread, sendToTarget, viewForSend } from "./sdk-send"
 export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"

@@ -5,8 +5,7 @@ import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { relayAddressEntry } from "../remote/address-book"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
-import { readContextTail } from "../remote/transcript-tail"
-import { selectEntryPage } from "../paged-reader"
+import { readTailPage } from "../remote/transcript-tail"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { REMOTE_GRACEFUL_MAX_WAIT_MS } from "../contracts/fields"
@@ -164,10 +163,8 @@ export function createRelayControl(
     readEntryPage: async (read) => {
       const project = await remote.loadProjector?.().catch(() => undefined)
       if (project === undefined) return { kind: "unsupported" }
-      const tail = await readContextTail(remote.sessions, device, sessionId, project)
-      if (tail.kind === "unsupported") return tail
-      if (tail.kind === "failed") return outcomeFailure(tail.outcome, device)
-      return selectEntryPage(tail.tail, read)
+      const page = await readTailPage(remote.sessions, device, sessionId, project, read)
+      return page.kind === "failed" ? outcomeFailure(page.outcome, device) : page
     },
     waitSettled: (timeoutMs, signal) =>
       waitForTurnEnd(
