@@ -2,7 +2,15 @@ import { randomUUID } from "node:crypto"
 
 import type { JsonObject } from "../remote/ports"
 import { waitWithinCallBudget } from "../../call-budget/call-deadline"
-import type { ThreadCloseAnswer, ThreadCloseGraceful, ThreadCloseOptions, ThreadCloseOutcome } from "../tools/ports"
+import type {
+  ThreadCloseAnswer,
+  ThreadCloseGraceful,
+  ThreadCloseOptions,
+  ThreadCloseOutcome,
+  ThreadUnloadAnswer,
+  ThreadUnloadOptions,
+} from "../tools/ports"
+import type { ThreadToolFailure } from "../errors"
 import { refusal } from "../refusal-texts"
 import { refuseWith } from "./port"
 
@@ -32,6 +40,9 @@ export const SESSION_GONE: ReadonlySet<string> = new Set([
   "not_attached",
 ])
 
+/** senpi `unload_session` (senpi#3225): the record every close ends with, and the SDK's unload on its own. */
+const UNLOAD_SESSION = "unload_session"
+
 /** senpi#7006 (senpi#7004): the engine takes `unload_session { deliveries: "refuse" }` and names the unwritten deliveries it refuses on. */
 const UNLOAD_REFUSE_DELIVERIES = "unload_refuse_deliveries"
 
@@ -42,9 +53,10 @@ const UNLOAD_GRACEFUL = "unload_graceful"
 const GRACEFUL_WAIT_MS = 30_000
 const GRACEFUL_ANSWER_RESERVE_MS = 10_000
 
-const UNLOAD = { type: "unload_session", force: true, children: "detach" } as const
+const UNLOAD = { type: UNLOAD_SESSION, force: true, children: "detach" } as const
 
 const closeEffectId = (): string => `omo-thread-close:${randomUUID()}`
+const unloadEffectId = (): string => `omo-thread-unload:${randomUUID()}`
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
@@ -53,6 +65,12 @@ const deliveriesOf = (value: unknown): string[] | undefined =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? strings((value as JsonObject)["deliveries"])
     : undefined
+
+/** The queued user messages an unload took out of the session (senpi `dropped.user_messages`). */
+const userMessagesOf = (value: unknown): string[] =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? strings((value as JsonObject)["user_messages"])
+    : []
 
 /**
  * The one close ladder (#12879 audit 2), on this device's host and on another device alike. `unload_session` with force
@@ -219,27 +237,99 @@ async function gracefulClose(
 function gracefulOf(data: JsonObject): ThreadCloseGraceful {
   const graceful = data["graceful"]
   const facts = typeof graceful === "object" && graceful !== null && !Array.isArray(graceful) ? graceful : {}
-  const dropped = data["dropped"]
   const stopped = "stopped" in facts ? facts.stopped : undefined
   return {
     turn: "turn" in facts && typeof facts.turn === "number" ? facts.turn : 0,
     waited_ms: "waited_ms" in facts && typeof facts.waited_ms === "number" ? facts.waited_ms : 0,
     stopped_wake_sources:
       typeof stopped === "object" && stopped !== null && "wake_sources" in stopped ? strings(stopped.wake_sources) : [],
-    returned_user_messages:
-      typeof dropped === "object" && dropped !== null && "user_messages" in dropped
-        ? strings(dropped.user_messages)
-        : [],
+    returned_user_messages: userMessagesOf(data["dropped"]),
+  }
+}
+
+/**
+ * The SDK's `threads.unload` (omo#14943 T1b): ONE `unload_session` carrying the caller's own choices, on this device's
+ * host and on another device alike, never the close ladder's escalation. The session leaves its host and stays
+ * resumable from its file; its queued input stays for the reopen unless `clear_queue`. An engine that does not advertise
+ * `unload_session` is refused before anything is sent. The answer names what the unload dropped: the deliveries the
+ * engine handed back unwritten and the user messages it took out of the queue. An engine that no longer holds the
+ * session is `not_found`; every engine refusal is typed by the blocker it names, with the option that gets past it.
+ */
+export async function unloadOver(
+  sessionId: string,
+  thread: string,
+  send: LadderSend,
+  options: ThreadUnloadOptions = {},
+): Promise<ThreadUnloadAnswer> {
+  const notHeld = (reason: string) =>
+    refuseWith(refusal("control.unload_not_held", { thread, reason }, { command: UNLOAD_SESSION, reason }))
+  // Another device's holder answers the probe for a session it no longer holds as it would the unload.
+  const info = await protocolInfo(sessionId, send)
+  if (info?.kind === "gone") throw notHeld(info.reason)
+  if (info === undefined || !strings(info.data["capabilities"]).includes(UNLOAD_SESSION))
+    throw refuseWith(
+      refusal("control.unload_unsupported", { thread }, { command: UNLOAD_SESSION, capability: UNLOAD_SESSION }),
+    )
+  const answered = await send({
+    type: UNLOAD_SESSION,
+    sessionId,
+    effectId: unloadEffectId(),
+    ...(options.interrupt === true ? { interrupt: true } : {}),
+    ...(options.force === true ? { force: true } : {}),
+    ...(options.clear_queue === true ? { clearQueue: true } : {}),
+    ...(options.children === undefined ? {} : { children: options.children }),
+  })
+  if (answered.kind === "gone") throw notHeld(answered.reason)
+  const { data } = answered
+  const dropped_deliveries = deliveriesOf(data["dropped"]) ?? []
+  const dropped_user_messages = userMessagesOf(data["dropped"])
+  if (data["outcome"] === "unloaded") return { outcome: "unloaded", dropped_deliveries, dropped_user_messages }
+  if (data["reason"] === "session_closing") return { outcome: "not_live", dropped_deliveries, dropped_user_messages }
+  throw refuseWith(unloadRefusal(thread, data, dropped_deliveries))
+}
+
+function unloadRefusal(thread: string, data: JsonObject, dropped: readonly string[]): ThreadToolFailure {
+  const reason = data["reason"]
+  const detail = data["detail"]
+  const pending = deliveriesOf(data["pending"])
+  const details = {
+    command: UNLOAD_SESSION,
+    reason,
+    ...(typeof detail === "string" ? { detail } : {}),
+    ...(pending === undefined || pending.length === 0 ? {} : { pending_deliveries: pending }),
+    // Deliveries an interrupt handed back before a later blocker refused the unload are gone from the session either way.
+    ...(dropped.length === 0 ? {} : { dropped_deliveries: dropped }),
+  }
+  const slots = { thread, state: describe(data) }
+  switch (reason) {
+    case "turn_active":
+    case "work_pending":
+      return refusal("control.unload_working", slots, { ...details, retry_with: { interrupt: true } })
+    case "children_live":
+      return refusal("control.unload_children", slots, { ...details, retry_with: { children: "detach" } })
+    case "extension_work":
+      return refusal("control.unload_extension_work", slots, { ...details, retry_with: { force: true } })
+    case "attached":
+      return refusal("control.unload_attached", slots, { ...details, retry_with: { force: true } })
+    case "host_draining":
+      return refusal("control.unload_host_draining", { thread }, details)
+    default:
+      return refusal("control.unload_refused", slots, details)
   }
 }
 
 /** Whether the session's engine advertises `capability`; anything it cannot answer counts as an older engine. */
 async function advertises(sessionId: string, send: LadderSend, capability: string): Promise<boolean> {
+  const info = await protocolInfo(sessionId, send)
+  return info?.kind === "ok" && strings(info.data["capabilities"]).includes(capability)
+}
+
+/** The engine's `get_protocol_info` (an observing read); undefined when it cannot answer it (an older engine). */
+async function protocolInfo(sessionId: string, send: LadderSend): Promise<RecordAnswer | undefined> {
   try {
-    const info = await send({ type: "get_protocol_info", sessionId, observe: true })
-    return info.kind === "ok" && strings(info.data["capabilities"]).includes(capability)
+    return await send({ type: "get_protocol_info", sessionId, observe: true })
   } catch {
-    return false
+    return undefined
   }
 }
 

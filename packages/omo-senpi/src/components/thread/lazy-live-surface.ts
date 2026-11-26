@@ -87,6 +87,11 @@ export function createLazyLiveThreadSurface(
         if (port.closeSession === undefined) throw new Error("unsupported:close_session")
         return await port.closeSession(sessionId, durableId, options)
       },
+      unloadSession: async (sessionId, durableId, options) => {
+        const port = await target()
+        if (port.unloadSession === undefined) throw new Error("unsupported:unload_session")
+        return await port.unloadSession(sessionId, durableId, options)
+      },
       watchSession: async (sessionId, handlers, durableId) => {
         const port = await target()
         if (port.watchSession === undefined) throw new Error("unsupported:subscribe_sessions")

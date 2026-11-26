@@ -27,6 +27,7 @@ import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./to
 import type { ThreadCloseOptions, ThreadCloseOutcome } from "./tools/ports"
 import type { SessionWatchHandlers } from "./control/wait-settled"
 import { createMonitorTargetResolver } from "./tools/monitor-target"
+import { unloadOver } from "./control/close-ladder"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
@@ -224,6 +225,8 @@ export function createRemoteThreadFixture() {
       otherHolders?: number
       unwritten?: boolean
       unloadReason?: string
+      /** The queued user messages b's engine takes out of the session's queue on an unload (senpi `dropped.user_messages`). */
+      unloadUserMessages?: readonly string[]
       /** b's engine is running a turn (omo#14234): an unload without interrupt is refused turn_active. */
       busy?: boolean
       /** Deliveries b's engine admitted and has not written; an interrupting unload hands them back. */
@@ -506,7 +509,16 @@ export function createRemoteThreadFixture() {
         return ok({
           outcome: "unloaded",
           sessionPath: B_FILE,
-          ...(dropped.length > 0 ? { dropped: { deliveries: dropped } } : {}),
+          ...(dropped.length > 0 || options.unloadUserMessages !== undefined
+            ? {
+                dropped: {
+                  deliveries: dropped,
+                  ...(options.unloadUserMessages === undefined
+                    ? {}
+                    : { user_messages: [...options.unloadUserMessages] }),
+                },
+              }
+            : {}),
           ...(typeof effectId === "string"
             ? {
                 effectId,
@@ -1006,6 +1018,11 @@ export function createRemoteThreadFixture() {
       closeOutcome?: ThreadCloseOutcome
       /** The deliveries this device's host hands back unread when it closes (omo#14234). */
       closeDropped?: readonly string[]
+      /**
+       * How this device's engine meets `unload_session` (the SDK's `threads.unload`): the capabilities it advertises
+       * (default `unload_session`), its reply to the unload (default unloaded), or `gone`: it no longer holds the session.
+       */
+      unload?: { readonly capabilities?: readonly string[]; readonly reply?: JsonObject; readonly gone?: string }
       /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
       archive?: "absent" | "refused"
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
@@ -1101,6 +1118,8 @@ export function createRemoteThreadFixture() {
     const closed: Array<readonly [string, string | undefined]> = []
     const forcedCloses: string[] = []
     const closeRequests: ThreadCloseOptions[] = []
+    // The unload_session records this device's engine received.
+    const unloads: JsonObject[] = []
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (sessionId: string, name: string) => {
@@ -1159,6 +1178,19 @@ export function createRemoteThreadFixture() {
         closeRequests.push(options ?? {})
         return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
       },
+      unloadSession: (sessionId, durableId, options) =>
+        unloadOver(
+          sessionId,
+          durableId ?? sessionId,
+          async (rpc) => {
+            if (rpc["type"] === "get_protocol_info")
+              return { kind: "ok", data: { capabilities: [...(extra.unload?.capabilities ?? ["unload_session"])] } }
+            unloads.push(rpc)
+            if (extra.unload?.gone !== undefined) return { kind: "gone", reason: extra.unload.gone }
+            return { kind: "ok", data: extra.unload?.reply ?? { outcome: "unloaded" } }
+          },
+          options,
+        ),
       ...(extra.archive === "absent" ? {} : { setSessionArchived }),
       watchSession: async (_sessionId, handlers) => {
         watchers.add(handlers)
@@ -1298,6 +1330,7 @@ export function createRemoteThreadFixture() {
       closed,
       forcedCloses,
       closeRequests,
+      unloads,
       archived,
       interrupts,
       agentDir,

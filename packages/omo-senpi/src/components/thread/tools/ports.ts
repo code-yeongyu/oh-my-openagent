@@ -79,6 +79,7 @@ export type ThreadSessionPort = Pick<
   | "wake"
   | "releaseSession"
   | "closeSession"
+  | "unloadSession"
   | "watchSession"
 >
 
@@ -190,6 +191,12 @@ export type ThreadHost = {
     durable_session_id?: string,
     options?: ThreadCloseOptions,
   ) => Promise<ThreadCloseAnswer>
+  /** senpi `unload_session` (`close-ladder.ts` `unloadOver`): the session leaves its host and stays resumable; hosts only. */
+  readonly unloadSession?: (
+    sessionId: string,
+    durable_session_id?: string,
+    options?: ThreadUnloadOptions,
+  ) => Promise<ThreadUnloadAnswer>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -298,4 +305,26 @@ export type ThreadCloseAnswer = {
   readonly outcome: ThreadCloseOutcome
   readonly dropped_deliveries: readonly string[]
   readonly graceful?: ThreadCloseGraceful
+}
+
+/**
+ * The SDK's `threads.unload` (senpi `unload_session`): `interrupt` stops the running turn first, `force` unloads past
+ * other clients and published extension work, `clear_queue` drops the queued input instead of keeping it for the
+ * reopen, `children: "detach"` leaves the session's child tasks running (the engine refuses otherwise).
+ */
+export type ThreadUnloadOptions = {
+  readonly interrupt?: boolean
+  readonly force?: boolean
+  readonly clear_queue?: boolean
+  readonly children?: "refuse" | "detach"
+}
+
+/**
+ * An unload's outcome (`not_live`: the session was already closing) and what it dropped: the deliveries handed back
+ * unwritten and the user messages taken out of its queue (senpi `dropped.deliveries`, `dropped.user_messages`).
+ */
+export type ThreadUnloadAnswer = {
+  readonly outcome: "unloaded" | "not_live"
+  readonly dropped_deliveries: readonly string[]
+  readonly dropped_user_messages: readonly string[]
 }

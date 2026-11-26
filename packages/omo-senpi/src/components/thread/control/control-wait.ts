@@ -63,6 +63,7 @@ export function waitedControl(control: SessionControl, wait: ControlWait): Sessi
     visible: () => wait.read(() => control.visible()),
     interrupt: (turnId) => wait.write(() => control.interrupt(turnId)),
     close: (options) => wait.write(() => control.close(options)),
+    unload: (options) => wait.write(() => control.unload(options)),
     setName: (name) => wait.write(() => control.setName(name)),
     getAvailableModels: (options) => wait.read(() => control.getAvailableModels(options)),
     getModelState: () => wait.read(() => control.getModelState()),

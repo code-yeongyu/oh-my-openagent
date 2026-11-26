@@ -42,6 +42,11 @@ export function createLocalControl(
         throw refuseWith(refusal("control.close_not_accepted", { thread: threadId }, { command: "close_session" }))
       return await port.closeSession(routing, threadId, closeOptions)
     },
+    unload: async (unloadOptions) => {
+      if (port.unloadSession === undefined)
+        throw refuseWith(refusal("control.unload_unsupported", { thread: threadId }, { command: "unload_session" }))
+      return await port.unloadSession(routing, threadId, unloadOptions)
+    },
     setName: (name) => port.setSessionName(routing, name, threadId),
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),
     getModelState: async () => sessionModelState(await port.getState(routing, threadId)),
