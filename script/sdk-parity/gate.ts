@@ -96,6 +96,16 @@ export function candidateDigest(head: string, ids: readonly string[]): string {
 export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
+// An alias scenario is exempt from the base/head comparison only when the base rows lack what it exercises: its alias,
+// or for the field-only scenario, a branch reading the field. A scenario exercising what the base has is compared.
+function aliasNewOnHead(scenario: Scenario & { surface: "tool" }, baseRows: ReadonlyMap<string, Row>): boolean {
+  const mark = scenario.alias
+  if (mark?.field === undefined) return false
+  const entries = (baseRows.get(mark.row)?.tool ?? []).filter((entry) => entry.name === scenario.tool)
+  if (mark.name !== undefined) return !entries.some((entry) => entry.aliases?.[mark.name as string] !== undefined)
+  return !entries.some((entry) => entry.reads.includes(mark.field as string))
+}
+
 // A row answers for the fields its tool branch reads or is chosen by; a tool field no branch reads is toolProblems' to
 // refuse, so another branch's new field does not change this row.
 function branchSchema(
@@ -103,6 +113,7 @@ function branchSchema(
   fields: ReadonlySet<string>,
 ): DiscoveredTool["parameters"] {
   return {
+    ...parameters,
     properties: Object.fromEntries(Object.entries(parameters.properties ?? {}).filter(([name]) => fields.has(name))),
     required: (parameters.required ?? []).filter((name) => fields.has(name)),
   }
@@ -182,7 +193,7 @@ export function gateReport(input: GateInput): GateReport {
     }
     if (
       scenario.surface === "tool" &&
-      scenario.alias !== undefined &&
+      aliasNewOnHead(scenario, baseRows) &&
       aheadOf.get(scenario.capability)?.aliases === true
     )
       continue

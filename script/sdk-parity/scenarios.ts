@@ -23,7 +23,13 @@ export type ToolScenario = {
   readonly args: Readonly<Record<string, unknown>>
   // Generated from a row's declared aliases (#15073): `twin` names the scenario with the field itself, which this one
   // must answer exactly like; `conflict` marks the alias given with its field and a different value, which is refused.
-  readonly alias?: { readonly row: string; readonly twin?: string; readonly conflict?: boolean }
+  readonly alias?: {
+    readonly row: string
+    readonly field?: string
+    readonly name?: string
+    readonly twin?: string
+    readonly conflict?: boolean
+  }
 }
 
 // The loop's brief parser, driven directly: the flags it accepts and ignores must keep their value out of the brief
@@ -94,11 +100,14 @@ function aliasScenarios(rows: readonly Row[]): ToolScenario[] {
         const args = ALIAS_BASE_ARGS[entry.name] ?? {}
         const [value, other] = values
         out.push(
-          { ...tool(`${id}-field`, row.id, entry.name, { ...args, [field]: value }), alias: { row: row.id } },
-          { ...tool(id, row.id, entry.name, { ...args, [alias]: value }), alias: { row: row.id, twin: `${id}-field` } },
+          { ...tool(`${id}-field`, row.id, entry.name, { ...args, [field]: value }), alias: { row: row.id, field } },
+          {
+            ...tool(id, row.id, entry.name, { ...args, [alias]: value }),
+            alias: { row: row.id, field, name: alias, twin: `${id}-field` },
+          },
           {
             ...tool(`${id}-conflict`, row.id, entry.name, { ...args, [alias]: value, [field]: other }),
-            alias: { row: row.id, conflict: true },
+            alias: { row: row.id, field, name: alias, conflict: true },
           },
         )
       }

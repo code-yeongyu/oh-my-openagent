@@ -41,9 +41,13 @@ function widens(before: FieldSchema, after: FieldSchema, path: string): string[]
 
 export function toolSchemaAheadProblems(before: Params, after: Params, ahead: ToolAhead, tool: string): string[] {
   const problems: string[] = []
-  for (const key of ahead.widened ?? [])
-    if (before.properties?.[key] !== undefined && after.properties?.[key] === undefined)
-      problems.push(`${tool}.${key}: removed`)
+  const { properties: _p, required: _r, ...beforeRest } = before as Record<string, unknown>
+  const { properties: _q, required: _s, ...afterRest } = after as Record<string, unknown>
+  problems.push(...schemaDifferences(beforeRest, afterRest, tool))
+  for (const key of ahead.widened ?? []) {
+    if (before.properties?.[key] === undefined) problems.push(`${tool}.${key}: widened but not on the base`)
+    else if (after.properties?.[key] === undefined) problems.push(`${tool}.${key}: removed`)
+  }
   if (sorted(before.required) !== sorted(after.required)) problems.push(`${tool}: required changed`)
   const [a, b] = [before.properties ?? {}, after.properties ?? {}]
   for (const key of Object.keys(a)) {
@@ -79,8 +83,6 @@ export function descriptorAheadProblems(before: Row, after: Row, ahead: ToolAhea
       problems.push(`${at}: listed field ${name} already exists on the base and no branch newly reads it`)
   for (const name of listed)
     if (after.input.required.includes(name)) problems.push(`${at}: listed field ${name} is required`)
-  for (const name of ahead.widened ?? [])
-    if (before.input.properties[name] === undefined) problems.push(`${at}: widened field ${name} is not on the base`)
   for (const old of before.tool) {
     const next = after.tool.find((entry) => entry.name === old.name && entry.branch === old.branch)
     if (next === undefined) {
