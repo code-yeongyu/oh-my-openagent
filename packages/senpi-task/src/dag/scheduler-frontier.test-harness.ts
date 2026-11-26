@@ -345,6 +345,22 @@ export function whenNodeState(
   })
 }
 
+// Tracks a promise's outcome as text, and whether it has settled yet, without awaiting it.
+export function settlement(running: Promise<unknown>) {
+  const state = { settled: false }
+  const outcome = running.then(
+    () => "completed",
+    (error: unknown) => `rejected: ${error instanceof Error ? error.message : String(error)}`,
+  )
+  void outcome.then(() => {
+    state.settled = true
+  })
+  return { state, outcome }
+}
+
+// Every microtask a step queues has run by the next macrotask.
+export const drainMicrotasks = (): Promise<void> => new Promise<void>((resolve) => setImmediate(resolve))
+
 // The bounded wait every case races its signal against: it rejects naming what never happened.
 export function timeout(label: string): Promise<never> {
   return new Promise<never>((_resolve, reject) => {

@@ -11,9 +11,11 @@ import {
   cleanupTempProjects,
   deferred,
   definition,
+  drainMicrotasks,
   FrontierFakeManager,
   frontierFixture,
   node,
+  settlement,
   timeout,
   whenNodeState,
   type FakeOptions,
@@ -42,21 +44,6 @@ class FaultyAttachManager extends FrontierFakeManager {
     return super.waitFor(taskId)
   }
 }
-
-function settlement(running: Promise<unknown>) {
-  const state = { settled: false }
-  const outcome = running.then(
-    () => "completed",
-    (error: unknown) => `rejected: ${error instanceof Error ? error.message : String(error)}`,
-  )
-  void outcome.then(() => {
-    state.settled = true
-  })
-  return { state, outcome }
-}
-
-// Every microtask the failure path queues has run by the next macrotask.
-const drainMicrotasks = (): Promise<void> => new Promise<void>((resolve) => setImmediate(resolve))
 
 describe("DAG admission batch keeps its lifetime through processing errors (#10057 review finding 1)", () => {
   test("#given a sibling start still in flight #when attaching another started node fails #then the run waits for the sibling, writes nothing for it, and rejects with the attachment error", async () => {
