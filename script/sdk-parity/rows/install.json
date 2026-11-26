@@ -11,9 +11,23 @@
       ],
       "input": {
         "properties": {
-          "platform": {},
-          "codex_home": {},
-          "project": {}
+          "platform": {
+            "enum": [
+              "opencode",
+              "codex",
+              "both",
+              "native",
+              "native-dev"
+            ]
+          },
+          "codex_home": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -71,7 +85,10 @@
       ],
       "input": {
         "properties": {
-          "directory": {}
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -327,11 +344,100 @@
       ],
       "input": {
         "properties": {
-          "plan": {},
+          "plan": {
+            "type": "object",
+            "required": [
+              "inventory",
+              "stages"
+            ],
+            "properties": {
+              "inventory": {
+                "type": "object",
+                "required": [
+                  "harnesses"
+                ],
+                "properties": {
+                  "harnesses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installed",
+                        "providers",
+                        "credentialTypes",
+                        "modelHint",
+                        "notices",
+                        "importableCount"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        },
+                        "providers": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "credentialTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "modelHint": {
+                          "type": "string"
+                        },
+                        "notices": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "importableCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "description"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "consent": {
-            "enum": [
-              "all",
-              "each"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "all"
+              },
+              {
+                "type": "string",
+                "const": "each"
+              }
             ]
           }
         },
