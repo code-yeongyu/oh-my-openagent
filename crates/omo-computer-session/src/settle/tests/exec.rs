@@ -92,8 +92,8 @@ fn busy_refusal_carries_indicator_waited_and_retry_after() {
     }));
     let refused = rig.click().expect_err("a busy target is not sent to");
     assert_eq!(
-        refused.busy,
-        Some(BusyDetail {
+        refused.busy.as_deref(),
+        Some(&BusyDetail {
             indicator: BusyIndicator::Spinner,
             waited_ms: 1_000,
             retry_after_ms: 1_000,

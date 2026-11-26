@@ -22,11 +22,16 @@ const ALLOWED = new Set([
   // The alias port (AliasRegistry and its result types): a leaf that imports nothing; ports.ts re-exports it.
   "packages/omo-senpi/src/components/thread/remote/alias-port.ts",
   "packages/omo-senpi/src/components/thread/remote/ports.ts",
+  // The address grammar seams.ts parses with (#14305): a leaf that imports nothing, held by thread-address-core's own
+  // self-contained.test.ts.
+  "packages/thread-address-core/src/parse.ts",
   `${DSC}/src/account-state.ts`,
   // The local API wire vocabulary outside local-api/ (guard G1 S1): re-exports of the leaf files below, nothing else.
   `${DSC}/src/wire.ts`,
   `${DSC}/src/local-api/errors.ts`,
   `${DSC}/src/local-api/vocabulary.ts`,
+  // The policy vocabulary vocabulary.ts re-exports since relay-daemon 88e58154: a leaf that imports nothing.
+  `${DSC}/src/local-api/policy.ts`,
 ])
 const LEAF_PROTOCOL = new RegExp(`^${DSC}/src/local-api/protocol(?:-[a-z]+)?\\.ts$`)
 const allowed = (file: string) => ALLOWED.has(file) || LEAF_PROTOCOL.test(file)

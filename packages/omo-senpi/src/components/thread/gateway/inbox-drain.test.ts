@@ -323,9 +323,13 @@ describe("session inbox drain through the control endpoint registrant", () => {
     await b.control.settled()
 
     // then
-    expect(b.runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(ids)
-    // The first delivery starts the turn; the default lane steers the next two into it (gateway/decision.ts).
-    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start", "steer", "steer"])
+    // The next two join the first one's start: queued for its first steering poll, then the first starts the turn.
+    const [first, second, third] = ids
+    expect(b.runtime.enqueueCalls).toEqual([
+      { lane: "steer", delivery_id: second },
+      { lane: "steer", delivery_id: third },
+      { lane: "start", delivery_id: first },
+    ])
     expect(tokensOnDisk(w.sessionPath)).toEqual(ids)
     expect(await Promise.all(ids.map((id) => stateOf(w.senderStore, id)))).toEqual(["applied", "applied", "applied"])
     expect(b.control.persisted).toBe(1)

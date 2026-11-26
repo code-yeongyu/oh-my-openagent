@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "This documentation is in English.",
     "mobileHeader": "OmO Docs",
     "searchPlaceholder": "Search docs...",
     "searchLabel": "Filter documentation sections",
@@ -545,7 +546,6 @@
       "accent": "But it's an agent.",
       "sub": "Turn your tokens into results that matter: research across ten thousand sources, a deck people actually get, backends, frontends and code.",
       "start": "Get started",
-      "beta": "Get the desktop beta",
       "download": "Download the desktop app",
       "makers": "From <team>Sisyphus Labs</team>, the people who made <dori>Dori</dori> and <term>doriterm</term>."
     },

@@ -20,6 +20,11 @@
         "test/account-linux-no-gdbus.fixture.ts",
         "test/bun-bin-shim.fixture.ts",
         "test/bun-bin-shim.test-support.ts",
+        "test/daemon-real-engine-support.ts",
+        "test/daemon-test-runner.ts",
+        // the process-tree CPU reader daemon-test-runner.ts samples with (omo#14780): a test-support module, so knip's test
+        // plugin lists it as an exports-unchecked entry and its exports would go unchecked without this row
+        "test/process-tree-cpu.ts",
         "test/daemon-test-support.ts",
         "test/keychain-helper.test-support.ts",
         "test/fixtures/compiled-setup/entry.ts",

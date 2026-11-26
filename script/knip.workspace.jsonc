@@ -24,6 +24,7 @@
         "script/check-temp-leak-report-only.mjs",
         "script/ci-fast-path.mjs",
         "script/ci-leg-tests-guard.mjs",
+        "script/ci-shard-coverage.ts",
         "script/desktop-engine-ci-proof.ts",
         "script/desktop-engine-release.ts",
         "script/engine-trust-helper-smoke.ts",
@@ -34,6 +35,9 @@
         "script/keychain-helper-release.ts",
         "script/lint-ratchet.ts",
         "script/oxlint/biome-ports.ts",
+        // loaded by oxlint as a jsPlugin from script/lint-ratchet.oxlintrc.json by path, not imported; its two
+        // rule modules are its static imports and stay reachable (and flaggable) through this entry (#14208)
+        "script/oxlint/testing.ts",
         "script/patch-node-require-shim.ts",
         "script/preflight-trust.mjs",
         "script/print-release-notes.ts",
@@ -44,6 +48,8 @@
         "script/qa/computer/conformance/fixtures/web/page.js",
         "script/qa/computer/conformance/report.ts",
         "script/qa/computer/conformance/run.ts",
+        // run by path as the computer-use v3 Linux QA driver (row 47)
+        "script/qa/computer/linux.ts",
         "script/qa/computer/pool/macos-vm.ts",
         "script/qa/computer/pool/windows-full.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
@@ -63,6 +69,8 @@
         "script/release-announce.ts",
         "script/release-desktop-engine-target.ts",
         "script/release-latest-flag.ts",
+        "script/release-stamp-strict.mjs",
+        "script/release-state-paths.mjs",
         "script/release-version.mjs",
         "script/remove-stale-self-package-tests.ts",
         "script/senpi-worker-compile.ts",
@@ -254,6 +262,8 @@
     "script/oxlint/biome-parity.ts": ["parityDir"],
     // pre-existing at origin dev 4686e425b5: unused export(s) default
     "script/oxlint/biome-ports.ts": ["default"],
+    // jsPlugin entry: the oxlint loader reads its default export (the plugin object) by path (#14208)
+    "script/oxlint/testing.ts": ["default"],
     // pre-existing at origin dev 4686e425b5: unused export(s) combineFragments
     "script/package-log-blocks.ts": ["combineFragments"],
     // pre-existing at origin dev 4686e425b5: unused export(s) main

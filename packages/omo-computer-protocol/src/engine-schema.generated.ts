@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "659aa9c9a735ee5c2b4cc17ed150f9ccbb7c1fe8570ca5b94db1762d2cc8bec1" as const
+export const SCHEMA_SHA256 = "b1e294f921009a741e7503e5ed45e5056d0025a3c8f82eac712c3fca02a68fd2" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -401,6 +401,9 @@ export type ActionReport = {
 	settle?: ObservationSettle | null
 	evidence: Evidence[]
 	observation: UntrustedText
+	paused?: Pause[]
+	session?: SessionState | null
+	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -862,6 +865,8 @@ export type Frame = {
 	cursor: CursorMode
 	path?: string | null
 	artifact?: FrameArtifact | null
+	occludersVisible?: boolean | null
+	nextCall?: string | null
 	session: SessionState
 	observation: UntrustedText
 }
@@ -1212,6 +1217,13 @@ export type PasteParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type Pause = {
+	reason: PauseReason
+	ms: number
+}
+
+export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
+
 export type PermissionReport = {
 	state: PermissionState
 	settingsUrl?: string | null
@@ -1497,6 +1509,15 @@ export type SurfacePredicate = {
 }
 
 export type SurfaceState = "appeared" | "gone"
+
+export type TargetLiveness = {
+	state: TargetState
+	pid: number
+	exitCode?: number | null
+	signal?: number | null
+}
+
+export type TargetState = "exited" | "unresponsive"
 
 export type TextRange = {
 	start: number

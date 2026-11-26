@@ -221,6 +221,19 @@
               "evidence": [],
               "observation": {
                 "untrustedText": true
+              },
+              "session": {
+                "screenLocked": "unknown",
+                "displayAsleep": "unknown",
+                "userActive": {
+                  "active": "unknown",
+                  "lastInputAgeMs": null
+                },
+                "secureInputActive": "unknown",
+                "sessionActive": "unknown",
+                "screensaverActive": "unknown",
+                "pauseReasons": [],
+                "sampledAt": 0
               }
             }
           },

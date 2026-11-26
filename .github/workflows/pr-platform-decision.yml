@@ -28,13 +28,15 @@ jobs:
     outputs:
       full_matrix: ${{ steps.decide.outputs.full_matrix }}
     steps:
-      # Only the classifier and the summary helper are needed: a sparse depth-1 checkout on every event, so no path
-      # runs a repository script in an empty workspace and no pull request pays for a full clone.
+      # Only the classifier, its relative imports and the summary helper are needed: a sparse depth-1 checkout on every
+      # event, so no path runs a repository script in an empty workspace and no pull request pays for a full clone.
+      # script/workflow-sparse-checkout-imports.test.ts fails when a listed script imports a file this list lacks.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
           sparse-checkout: |
             script/ci-fast-path.mjs
+            script/release-state-paths.mjs
             .github/scripts/write-job-summary.sh
           sparse-checkout-cone-mode: false
 

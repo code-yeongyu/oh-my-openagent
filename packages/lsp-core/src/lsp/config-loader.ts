@@ -21,6 +21,13 @@ type ConfigSource = "project" | "user"
 
 export interface ServerWithSource extends ResolvedServer {
   source: "project" | "user" | "builtin"
+  /**
+   * True when no config file named `command`, so it is the builtin default. A configured command
+   * stays false even when it is textually equal to the default.
+   */
+  inheritsBuiltinCommand: boolean
+  /** The `initialization` a config file supplied, without the builtin option set merged in. */
+  configuredInitialization?: Record<string, unknown>
 }
 
 export function getConfigPaths(): { project: string; user: string } {
@@ -106,6 +113,7 @@ export function getMergedServers(): ServerWithSource[] {
       extensions: config.extensions,
       priority: -100,
       source: "builtin",
+      inheritsBuiltinCommand: true,
       ...(config.initialization === undefined ? {} : { initialization: config.initialization }),
     })
   }
@@ -133,7 +141,9 @@ function createServerFromEntry(id: string, entry: LspEntry, source: ConfigSource
       extensions: entry.extensions ?? builtin.extensions,
       priority: entry.priority ?? 0,
       source,
+      inheritsBuiltinCommand: true,
     })
+    if (entry.initialization !== undefined) server.configuredInitialization = entry.initialization
     const initialization = mergeInitialization(builtin.initialization, entry.initialization)
     if (initialization !== undefined) {
       server.initialization = initialization
@@ -148,6 +158,7 @@ function createServerFromEntry(id: string, entry: LspEntry, source: ConfigSource
       extensions: entry.extensions,
       priority: entry.priority ?? 0,
       source,
+      inheritsBuiltinCommand: false,
     })
     applyOptionalServerFields(server, entry)
     return server
@@ -160,6 +171,7 @@ function createServerFromEntry(id: string, entry: LspEntry, source: ConfigSource
     extensions: entry.extensions ?? builtin.extensions,
     priority: entry.priority ?? 0,
     source,
+    inheritsBuiltinCommand: entry.command === undefined,
   })
   applyOptionalServerFields(server, entry)
   const builtinInitialization = entry.command === undefined ? builtin.initialization : undefined
@@ -185,6 +197,7 @@ function createServer(input: {
   readonly extensions: string[]
   readonly priority: number
   readonly source: ConfigSource
+  readonly inheritsBuiltinCommand: boolean
   readonly env?: Record<string, string>
   readonly initialization?: Record<string, unknown>
 }): ServerWithSource {
@@ -194,6 +207,7 @@ function createServer(input: {
     extensions: input.extensions,
     priority: input.priority,
     source: input.source,
+    inheritsBuiltinCommand: input.inheritsBuiltinCommand,
   }
   if (input.env !== undefined) {
     server.env = input.env
@@ -210,6 +224,7 @@ function applyOptionalServerFields(server: ServerWithSource, entry: LspEntry): v
   }
   if (entry.initialization !== undefined) {
     server.initialization = entry.initialization
+    server.configuredInitialization = entry.initialization
   }
 }
 

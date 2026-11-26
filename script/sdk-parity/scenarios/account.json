@@ -1,0 +1,705 @@
+{
+  "domain": "account",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "account.whoami/signed-in-reads-me",
+      "row": "account.whoami",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "me"
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/signed-out",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "signed_out",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/session-ended",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "session_ended",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 1,
+          "result": {
+            "error": {
+              "status": 401
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/desktop-launch",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "desktop_sign_in",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/keychain-locked",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "credential_store_locked",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "keychain_locked"
+          }
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/store-unreadable",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "credential_store_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "store_unavailable"
+          }
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/service-unreachable",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "service_unreachable",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 1,
+          "result": {
+            "error": "request_failed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/service-refused",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "service_refused",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 1,
+          "result": {
+            "error": {
+              "status": 500
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.show/reads-store-only",
+      "row": "account.show",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<memory-root>/sync-pin/trust-anchor"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.show/account-reads-sync-pin",
+      "row": "account.show",
+      "kind": "effect",
+      "input": {
+        "account": "acct-1"
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<memory-root>/sync-pin/trust-anchor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.show/keychain-locked",
+      "row": "account.show",
+      "kind": "refusal",
+      "refusal": "credential_store_locked",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "keychain_locked"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.show/store-unavailable",
+      "row": "account.show",
+      "kind": "refusal",
+      "refusal": "credential_store_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "store_unavailable"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.show/empty-account",
+      "row": "account.show",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "account": ""
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signInCheck/touches-nothing",
+      "row": "account.signInCheck",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "value": {
+          "ready": true
+        }
+      }
+    },
+    {
+      "id": "account.signOut/revokes-and-clears",
+      "row": "account.signOut",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "sign_out"
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear"
+        }
+      ]
+    },
+    {
+      "id": "account.signOut/nothing-stored-clears-locally",
+      "row": "account.signOut",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "session",
+          "op": "sign_out",
+          "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear"
+        }
+      ]
+    },
+    {
+      "id": "account.signOut/keychain-locked",
+      "row": "account.signOut",
+      "kind": "refusal",
+      "refusal": "credential_store_locked",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "keychain_locked"
+          }
+        },
+        {
+          "port": "session",
+          "op": "sign_out",
+          "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/clears-this-device",
+      "row": "account.forget",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear"
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/unreadable-credential-still-cleared",
+      "row": "account.forget",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "invalid_credential"
+          }
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear"
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/named-this-device-clears",
+      "row": "account.forget",
+      "kind": "effect",
+      "input": {
+        "device": "dev-1"
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear"
+        },
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/another-device",
+      "row": "account.forget",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "device": "dev-2"
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/named-device-unreadable-credential",
+      "row": "account.forget",
+      "kind": "refusal",
+      "refusal": "credential_store_unavailable",
+      "input": {
+        "device": "dev-1"
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "error": "invalid_credential"
+          }
+        },
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/empty-device",
+      "row": "account.forget",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "device": ""
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.status/reads-store-state",
+      "row": "account.store.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.status"
+        },
+        {
+          "port": "credentialStore",
+          "op": "store.enable",
+          "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.enable/switches-to-omo-keychain",
+      "row": "account.store.enable",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.enable"
+        }
+      ]
+    },
+    {
+      "id": "account.store.enable/not-macos",
+      "row": "account.store.enable",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.enable/helper-unavailable",
+      "row": "account.store.enable",
+      "kind": "refusal",
+      "refusal": "credential_store_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/keeps-the-omo-keychain",
+      "row": "account.store.disable",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "args": {
+            "discard": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/discard-erases-the-omo-keychain",
+      "row": "account.store.disable",
+      "kind": "effect",
+      "input": {
+        "discard": true
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "args": {
+            "discard": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/not-macos",
+      "row": "account.store.disable",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/helper-unavailable",
+      "row": "account.store.disable",
+      "kind": "refusal",
+      "refusal": "credential_store_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/after-close",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "input": {},
+      "given": [
+        {
+          "port": "session",
+          "state": {
+            "closed": true
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

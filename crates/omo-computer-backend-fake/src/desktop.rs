@@ -6,6 +6,7 @@ use omo_computer_core::backend::{
     Presence, Route, StopListener, TaggedInput, Target, WindowFilter, WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
+use omo_computer_core::intervention::{InterventionSource, TextDelivery};
 use omo_computer_core::results::DisplayInfo;
 
 use crate::backend::FakeBackend;
@@ -53,6 +54,20 @@ impl Backend for FakeBackend {
 
     fn presence(&mut self) -> Option<Box<dyn Presence>> {
         self.scripted_presence()
+    }
+
+    fn intervention(&self) -> Option<&dyn InterventionSource> {
+        Some(self)
+    }
+
+    fn post_text(
+        &mut self,
+        text: &str,
+        route: Route,
+        tag: u64,
+        interrupt: &mut dyn FnMut(&mut dyn Backend) -> bool,
+    ) -> TextDelivery {
+        self.type_interruptible(text, route, tag, interrupt)
     }
 
     fn ax_reader(&mut self) -> Option<&mut dyn omo_computer_core::ax::AxReader> {

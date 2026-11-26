@@ -23,7 +23,7 @@ import {
   type ReflectionLiveSession,
 } from "./worker"
 import { describeReflectionLauncher } from "./worker/launcher-identity"
-import { readUi } from "./wiring-context"
+import { guardedStatus, readUi } from "./wiring-context"
 import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
@@ -111,6 +111,9 @@ export function createMemoryReflectionLiveWiring(
     const ui = readUi(lastEventCtx.current)
     footerLive.syncActive(activeSession.current, ui)
     await footerLive.refresh(activeSession.current, ui)
+    // syncActive started the footer restore that replaces the spinner; a refresh that finds the fingerprint already
+    // recorded returns early, so the completion is delivered only once that restore has landed too.
+    await footerLive.settled()
     await rpcBridge.current?.sync()
   }
 
@@ -177,11 +180,7 @@ export function createMemoryReflectionLiveWiring(
           sessionId,
           ui === undefined
             ? undefined
-            : {
-                setStatus(key, text) {
-                  if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
-                },
-              },
+            : guardedStatus(ui, () => !signal?.aborted && options.sessions.get(sessionId)?.context === identity),
         ),
       )
       await rpcBridge.current?.sync(signal)

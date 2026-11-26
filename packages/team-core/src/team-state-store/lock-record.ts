@@ -68,6 +68,18 @@ function parseLockOwner(content: string): LockOwner | null {
   }
 }
 
+/** Who a lock record names: the owning pid and when that owner took (or was handed) it. */
+export type LockHolder = {
+  readonly ownerPid: number
+  readonly acquiredAtEpochMs: number
+}
+
+/** The holder a record names, or null for a torn or unparseable record. */
+export function parseLockHolder(content: string): LockHolder | null {
+  const owner = parseLockOwner(content)
+  return owner === null ? null : { ownerPid: owner.ownerPid, acquiredAtEpochMs: owner.acquiredAtEpochMs }
+}
+
 /** Returns null when the lock file is absent or unreadable; an unreadable lock is never stale. */
 export async function readLockRecord(lockPath: string): Promise<ObservedLockRecord | null> {
   try {

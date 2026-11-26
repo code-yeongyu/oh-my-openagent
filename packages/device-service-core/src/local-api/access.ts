@@ -1,20 +1,22 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/access.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/access.ts
 import { randomBytes } from "node:crypto";
 import {
   chmodSync,
   closeSync,
   lstatSync,
+  mkdirSync,
   openSync,
   readFileSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
-import { LocalApiError } from "./errors.ts";
+import { dirname, join } from "node:path";
+import { LocalApiError, type InsecureStateCause } from "./errors.ts";
 import { decodedBytes, mintId } from "./proof.ts";
 
-export { applyExactDacl, verifyExactDacl, windowsSecureFile } from "./dacl.ts";
+export { applyExactDacl, verifyExactDacl } from "./dacl.ts";
+export { windowsSecureFile } from "./secure-windows.ts";
 export { clientProof, mintId, mintNonce, NONCE_BYTES, proofMatches, serverProof } from "./proof.ts";
 
 // The access contract (docs/local-api.md "Access"): a private state dir, and a 32-byte per-boot token in
@@ -24,12 +26,35 @@ export const TOKEN_BYTES = 32;
 export const SOCKET_FILE = "service.sock";
 
 // Applies and verifies the platform protection of one state dir entry; throws insecure_state_dir when it cannot.
-export type SecureFile = (path: string, kind: "dir" | "file" | "socket") => Promise<void>;
+// `origin` is "created" only for an entry this caller just created itself (mkdir made it, an exclusive create, its own
+// listen); any other entry may have been planted, so Windows proves it plain and the user's before applying anything.
+export type SecureOrigin = "created" | "existing";
+export type SecureFile = (
+  path: string,
+  kind: "dir" | "file" | "socket",
+  origin: SecureOrigin,
+) => Promise<void>;
+
+// A mkdir that says whether THIS call made the dir. A recursive mkdir also succeeds on a leaf another account made
+// between its steps, so the leaf is made on its own and only its own success counts as created.
+export const makeDir = (path: string): SecureOrigin => {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  try {
+    mkdirSync(path, { mode: 0o700 });
+    return "created";
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST")
+      return "existing";
+    throw error;
+  }
+};
 
 const base64url = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64url");
 
-const insecure = (detail: string): never => {
-  throw new LocalApiError("insecure_state_dir", detail);
+const insecure = (detail: string, cause?: InsecureStateCause): never => {
+  throw new LocalApiError("insecure_state_dir", detail, {
+    ...(cause === undefined ? {} : { insecure_cause: cause }),
+  });
 };
 
 // The endpoint both proofs are bound to: `tcp:<port>` for the Windows loopback listener (the owner's listening port;
@@ -44,9 +69,12 @@ const isMissing = (error: unknown): boolean =>
   "code" in error &&
   (error.code === "ENOENT" || error.code === "ENOTDIR");
 
-const currentUid = (): number => process.getuid?.() ?? insecure("this platform has no uid");
+const currentUid = (): number =>
+  process.getuid?.() ?? insecure("this platform has no uid", "unreadable");
 
-// POSIX: the entry exists as itself (lstat: a symlink fails), belongs to this uid and has no group or world bits.
+// POSIX: the entry exists as itself (lstat: a symlink fails), belongs to this uid and has no group or world bits. The
+// causes are Windows' (#1371): a symlink or other non-plain entry is `reparse`, another uid `owner_other`, and group
+// or world bits (the exact protection not holding) `dacl_not_exact`.
 const privateEntry = (
   path: string,
   kind: "dir" | "file" | "socket",
@@ -57,14 +85,15 @@ const privateEntry = (
   try {
     stat = lstatSync(path);
   } catch (error) {
-    if (isMissing(error)) return insecure(`the ${kind} is missing`);
+    if (isMissing(error)) return insecure(`the ${kind} is missing`, "unreadable");
     throw error;
   }
   const isKind =
     kind === "dir" ? stat.isDirectory() : kind === "socket" ? stat.isSocket() : stat.isFile();
-  if (!isKind) insecure(`the ${kind} is not a plain ${kind}`);
-  if (stat.uid !== uid) insecure(`the ${kind} belongs to another user`);
-  if (checkMode && (stat.mode & 0o077) !== 0) insecure(`the ${kind} is open to group or others`);
+  if (!isKind) insecure(`the ${kind} is not a plain ${kind}`, "reparse");
+  if (stat.uid !== uid) insecure(`the ${kind} belongs to another user`, "owner_other");
+  if (checkMode && (stat.mode & 0o077) !== 0)
+    insecure(`the ${kind} is open to group or others`, "dacl_not_exact");
 };
 
 export const checkPosixAccess = (stateDir: string): void => {
@@ -109,7 +138,7 @@ export const writeSecretFile = async (
   const temp = `${path}.${mintId()}.tmp`;
   closeSync(openSync(temp, "wx", 0o600));
   try {
-    await secure(temp, "file");
+    await secure(temp, "file", "created");
     writeFileSync(temp, content);
     renameSync(temp, path);
   } catch (error) {
@@ -119,7 +148,7 @@ export const writeSecretFile = async (
 };
 
 export const writeToken = async (stateDir: string, secure: SecureFile): Promise<Uint8Array> => {
-  await secure(stateDir, "dir");
+  await secure(stateDir, "dir", "existing");
   const token = new Uint8Array(randomBytes(TOKEN_BYTES));
   await writeSecretFile(join(stateDir, TOKEN_FILE), base64url(token), secure);
   return token;

@@ -9,6 +9,7 @@ import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
 import { createSteeringEngine } from "../engine"
 import type { DestructionCause, DestructionPort, SteeringEngine, SteeringPort } from "../types"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -116,7 +117,7 @@ export type SteeringHarness = {
 }
 
 export function makeHarness(): SteeringHarness {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const live = new Map<string, ManagedChildHandle>()
   const destruction = makeFakeDestruction()
   const reviveCalls: string[] = []

@@ -1,9 +1,15 @@
 //! What a capture shows and where it lands: `displays()` stays complete, the crosshair and
 //! the pointer are drawn where they belong, and artifact frames stay under the session's root.
 
-use omo_computer_backend_fake::{Persona, CROSSHAIR_GRAY, POINTER_GRAY};
+use omo_computer_backend_fake::{FakeBackend, Persona, CROSSHAIR_GRAY, POINTER_GRAY};
+use omo_computer_core::backend::{
+    Backend, BackendResult, CaptureOptions, Delivered, EpochSource, FrameBytes, PermissionProbe,
+    Presence, Route, StopListener, TaggedInput, Target, WindowFilter, WindowList,
+};
+use omo_computer_core::capabilities::{Capabilities, CaptureRoute};
 use omo_computer_core::observation::CursorMode;
 use omo_computer_core::params::Point;
+use omo_computer_core::results::DisplayInfo;
 use serde_json::json;
 
 use super::helpers::{click, count, fake, frame, moves_to, opened, params, pixel, session, WINDOW};
@@ -160,4 +166,56 @@ fn artifact_frames_never_leave_the_sessions_own_root() {
         .expect_err("no root: nowhere to write");
     assert_eq!(refusal.code.wire(), "CaptureFailed");
     assert!(sink.is_empty());
+}
+
+/// A wrapper that stamps the capture annotations row 47's backends report onto the fake's
+/// frames, so the session's read of them is proven without the fake growing behaviour it
+/// must not have (the fake reports no annotations).
+struct Annotated(FakeBackend);
+
+impl Backend for Annotated {
+    fn capabilities(&self) -> Capabilities {
+        self.0.capabilities()
+    }
+    fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
+        self.0.windows(filter)
+    }
+    fn displays(&mut self) -> BackendResult<Vec<DisplayInfo>> {
+        self.0.displays()
+    }
+    fn capture(&mut self, target: &Target, options: &CaptureOptions) -> BackendResult<FrameBytes> {
+        let mut bytes = self.0.capture(target, options)?;
+        bytes.route = Some(CaptureRoute::Composite);
+        bytes.occluders_visible = Some(false);
+        bytes.cursor = Some(CursorMode::Engine);
+        Ok(bytes)
+    }
+    fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
+        self.0.post_input(input, route)
+    }
+    fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
+        self.0.stop_listener()
+    }
+    fn probe_permissions(&self) -> PermissionProbe {
+        self.0.probe_permissions()
+    }
+    fn epoch_source(&mut self) -> Box<dyn EpochSource> {
+        self.0.epoch_source()
+    }
+    fn presence(&mut self) -> Option<Box<dyn Presence>> {
+        self.0.presence()
+    }
+}
+
+#[test]
+fn backend_capture_annotations_are_read_into_the_frame() {
+    let (backend, sink) = fake(&json!({}));
+    let mut session = Session::new(Box::new(Annotated(backend)));
+    session.open(params(json!({}))).expect("open");
+    session.stop_path_start(params(json!({})));
+    let captured = session.capture_frame("101", false, None).expect("a frame");
+    assert_eq!(captured.route, Some(CaptureRoute::Composite));
+    assert_eq!(captured.occluders_visible, Some(false));
+    assert_eq!(captured.cursor, CursorMode::Engine, "the backend's own report wins over the call flag");
+    assert!(sink.is_empty(), "a read sends nothing");
 }

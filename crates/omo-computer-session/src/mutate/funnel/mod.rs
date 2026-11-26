@@ -1,25 +1,44 @@
 //! `Session::mutate`: the stages in order. No OS call precedes the marker write, and no stage
 //! retries.
 
-use omo_computer_core::error::Reason;
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::{Refusal, TaggedInput};
-use omo_computer_core::env::FAKE_BACKEND;
-use omo_computer_core::report::Disposition;
+use omo_computer_core::backend::Delivered;
+use omo_computer_core::error::Reason;
+use omo_computer_core::intervention::BackendClock;
+use omo_computer_core::params::ReportMode;
 use omo_computer_core::results::ExecReply;
 use serde_json::json;
 
 mod binding;
+mod delivered;
+mod last_pass;
+mod lock;
 mod readmit;
 mod refusal;
 
 use super::record::{target_id, Record};
 use super::recovery::Verdict;
 use super::report::{self, Sent};
-use super::{Mutation, Refused, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
+use super::{Mutation, Refused, Stamps, MARKER_UNAVAILABLE, TRANSACTION_FAILED};
 use crate::budget::PermitKind;
+use crate::intervention::{Ended, MidSend, Stop};
+use crate::session_state::sample;
 use crate::{Session, NOT_OPEN};
+
+/// Row 22's admission outcome and per-call settings, and row 21's audit binding, carried into
+/// the send stages.
+struct Held {
+    admission: crate::intervention::Admission,
+    policy: omo_computer_core::settings::Intervention,
+    object: bool,
+    hold_limits: crate::intervention::HoldLimits,
+    target: Option<String>,
+    binding: Option<(bool, Option<Vec<u8>>)>,
+    /// The call's pause ceiling in object mode; the takeover hold is checked again under it
+    /// right before delivery (review M2 of #13355).
+    pausing: Option<u64>,
+}
 
 impl Session {
     /// Runs one mutating call through the funnel.
@@ -28,10 +47,17 @@ impl Session {
     /// The gate's, the marker's or the backend's refusal; nothing is sent on any refusal
     /// produced before the send.
     pub(crate) fn mutate(&mut self, mutation: Mutation<'_>) -> Result<ExecReply, Refused> {
-        let (report_mode, tag) = {
+        let (report_mode, tag, policy, ceiling) = {
             let opened = self.opened.as_ref().ok_or(NOT_OPEN)?;
-            (opened.report_mode, opened.tag)
+            (
+                opened.report_mode,
+                opened.tag,
+                opened.settings.policy,
+                opened.settings.pause_ceiling_ms,
+            )
         };
+        let object = report_mode == ReportMode::Object;
+        let hold_limits = self.hold_limits();
         self.funnel.audit().admit()?;
         let call_id = mutation.call_id.clone().unwrap_or_else(mint_call_id);
         let target = target_id(&mutation.call.target);
@@ -39,21 +65,42 @@ impl Session {
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
         self.reconcile_stop();
         let mut epoch = self.guard.supervisor().stop_epoch();
-        let call = (mutation.method, &mutation.call.target, mutation.route.clone());
+        let call = (
+            mutation.method,
+            &mutation.call.target,
+            mutation.route.clone(),
+        );
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
-        if let Err(refused) =
-            self.guard
-                .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
-        {
-            let (stage, out) = readmit::gate_refused(refused, &plan);
-            return Err(self.refuse(record, Some(stage), out));
-        }
+        let pausing = object.then_some(ceiling);
+        let admission =
+            match self.admit_call(&mutation.call, mutation.route.clone(), plan.stages, pausing) {
+                Ok(admission) => admission,
+                Err(blocked) => {
+                    let detail = match blocked.stage.as_str() {
+                        "Consent" => plan.consent_detail.clone(),
+                        "Lease" => plan.lease_detail.clone(),
+                        _ => None,
+                    };
+                    let mut refused = self.stamp(*blocked.refused, object);
+                    refused.detail = detail.map(Box::new);
+                    return Err(self.refuse(record, Some(blocked.stage), refused));
+                }
+            };
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
-        let waited_ms = match self.busy_before_send(target) {
+        // Review L5 of #13355: a null-mode call behaves as v1 and never waits on a busy target.
+        let busy = if object {
+            self.busy_before_send(target)
+        } else {
+            Ok(0)
+        };
+        let waited_ms = match busy {
             Ok(waited_ms) => waited_ms,
-            Err(busy) => return Err(self.refuse(record, Some("Busy".to_owned()), busy)),
+            Err(busy) => {
+                let busy = self.stamp(busy, object);
+                return Err(self.refuse(record, Some("Busy".to_owned()), busy));
+            }
         };
         // The busy wait let time pass after the gate: a stop, a lock or a lost permission
         // during it must still refuse, so a wait that took time is admitted again before
@@ -66,15 +113,28 @@ impl Session {
                 Ok(fresh) => (plan, epoch) = fresh,
                 Err(refused) => {
                     let (stage, out) = *refused;
+                    let out = self.stamp(out, object);
                     return Err(self.refuse(record, Some(stage), out));
                 }
             }
         }
-        if let Err(out) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
+        if let Err(out) = self
+            .funnel
+            .control
+            .commit(self.backend.as_mut(), &plan, epoch)
+        {
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
-        let binding = plan.audit_binding.clone();
-        let result = self.admitted(mutation, record, (call_id, report_mode, tag), binding);
+        let held = Held {
+            admission,
+            policy,
+            object,
+            hold_limits,
+            target: target.map(str::to_owned),
+            binding: plan.audit_binding.clone(),
+            pausing,
+        };
+        let result = self.admitted(mutation, record, (call_id, report_mode, tag), held);
         self.funnel.control.reported(&plan);
         result
     }
@@ -85,9 +145,18 @@ impl Session {
         mutation: Mutation<'_>,
         mut record: Record,
         (call_id, report_mode, tag): (String, omo_computer_core::params::ReportMode, u64),
-        binding: Option<(bool, Option<Vec<u8>>)>,
+        held: Held,
     ) -> Result<ExecReply, Refused> {
-        let target = target_id(&mutation.call.target);
+        let Held {
+            mut admission,
+            policy,
+            object,
+            hold_limits,
+            target,
+            binding,
+            pausing,
+        } = held;
+        let target = target.as_deref();
         let identity_unavailable = binding::bind_audit(&mut record, binding.as_ref());
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
@@ -106,140 +175,100 @@ impl Session {
             }
             Ok(Verdict::Proceed) => {}
         }
-        let lock = match self.interaction_lock() {
+        // Time passes between the first gate and here (the busy wait, another holder of the
+        // interaction lock, a takeover wait): the last pass runs the gate again under the lock,
+        // after every wait, and nothing is SENT before it. (The exec permit and the marker
+        // recovery come earlier; they send nothing.)
+        let lock = match self.last_pass(&mutation, &mut admission, pausing, object) {
             Ok(lock) => lock,
-            Err(error) => {
-                self.funnel
-                    .warn(format!("interaction lock not taken: {error}"));
-                return Err(self.refuse(
-                    record,
-                    Some("Lock".to_owned()),
-                    TRANSACTION_FAILED.into(),
-                ));
+            Err(refused) => {
+                let (stage, out) = *refused;
+                return Err(self.refuse(record, Some(stage), out));
             }
         };
-        // Time passes between the first gate and here (the busy wait, another holder of the
-        // interaction lock): on every path the gate runs again once the lock is held, and
-        // nothing is SENT before it. (The exec permit and the marker recovery come earlier;
-        // they send nothing.) A refusal drops the lock with nothing sent.
-        // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
-        // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
-        // change while another holder kept the lock refuses here too.
-        if let Err(refused) = self.readmit(&mutation) {
-            let (stage, out) = *refused;
-            drop(lock);
-            return Err(self.refuse(record, Some(stage), out));
-        }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
         }
-        let of = u32::try_from(mutation.events.len()).unwrap_or(u32::MAX);
-        let (count, failure) = self.send(mutation.events, mutation.route.clone(), tag);
+        let watch = admission
+            .pid
+            .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
+        let outcome =
+            self.send_watched(mutation.events, mutation.route.clone(), tag, watch, target);
         drop(lock);
+        let (count, of) = (outcome.count, outcome.of);
+        if count > 0 {
+            if let Some(now) = self.backend.clock().map(BackendClock::now_ms) {
+                self.display_awake.exec(now, hold_limits);
+            }
+        }
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
             self.frames.consume(target, frame_id);
         }
-        let settled = (failure.is_none() && count > 0)
+        // A null-mode call behaves as today until the cutover: it never waits to settle (R70ci).
+        let settled = (object && outcome.stop.is_none() && count > 0)
             .then(|| self.settle_after_send(target))
             .flatten();
         let read_back = report::read_back(report::settle(settled.as_ref()));
-        match failure {
-            Some(refusal) if count == 0 => {
+        let paused = if object { admission.paused } else { Vec::new() };
+        let session = object.then(|| sample(self.backend.as_ref()));
+        match outcome.stop {
+            Some(Stop::Refused(refusal)) if count == 0 => {
                 let issuer = record.marker.binding.issuer.clone();
                 let scope = record.marker.binding.scope.clone();
                 if let Err(error) = self.funnel.markers.clear(&issuer, &scope) {
                     self.funnel
                         .warn(format!("marker not cleared after a refused send: {error}"));
                 }
-                Err(self.refuse(record, None, refusal.into()))
+                let refused = Refused::from(refusal).with_paused(paused);
+                let refused = self.stamp(refused, object);
+                Err(self.refuse(record, None, refused))
             }
-            Some(refusal) => {
+            Some(stop) => {
+                let ended = Ended::of(stop, count);
                 record.sent(
                     count,
                     of,
-                    Disposition::UNCERTAIN_UNSAFE,
+                    ended.disposition,
                     "unverifiable",
-                    Some(&refusal),
+                    Some(&ended.refusal),
                 );
-                let stored =
-                    json!({ "error": { "code": refusal.code.wire(), "reason": refusal.reason.map(Reason::wire) } });
+                let code = ended.refusal.code.wire();
+                let reason = ended.refusal.reason.map(Reason::wire);
+                let stored = json!({ "error": { "code": code, "reason": reason } });
                 self.store_receipt(&mut record, stored);
                 let warning = self.append_or_warn(record.event);
                 Err(Refused {
-                    refusal,
                     call_id: Some(call_id),
-                    receipt: None,
-                    interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
-                    detail: None,
-                    busy: None,
+                    interrupted: ended.interrupted,
+                    stamps: Box::new(Stamps {
+                        delivered: object.then_some(Delivered { count, of }),
+                        paused,
+                        session,
+                        target: ended.target,
+                    }),
                     warning,
+                    ..Refused::from(ended.refusal)
                 })
             }
             None => {
-                record.sent(
-                    count,
-                    of,
-                    Disposition::DELIVERED_UNVERIFIED,
-                    "unverifiable",
-                    None,
-                );
-                let appended = self.funnel.audit().append(record.event.clone());
-                if let Err(error) = &appended {
-                    self.funnel.warn(format!("audit line not written: {error}"));
-                }
                 let sent = Sent {
-                    route: mutation.route.clone(),
+                    route: mutation.route,
                     count,
                     of,
                     effect: read_back.effect,
-                    user_moved_on: self.funnel.control.presence.take_ended().is_some(),
-                    // A lost audit line outranks the binding note: one warning slot, integrity first.
-                    warning: appended.is_err().then(|| "write_failed".to_owned()).or_else(|| {
-                        identity_unavailable.then(|| crate::consent::IDENTITY_UNAVAILABLE.to_owned())
-                    }),
+                    user_moved_on: false,
+                    warning: None,
                     settle: settled.as_ref().map(crate::settle::Settled::wire),
-                    audit_id: appended.ok(),
+                    audit_id: None,
+                    paused,
+                    session,
+                    target: None,
                 };
-                let reply =
-                    report::reply(report_mode, mutation.method, sent).unwrap_or_else(|rejection| {
-                        eprintln!("omo-computer-engine: action report rejected: {rejection:?}");
-                        ExecReply(None)
-                    });
-                let receipt = self.funnel.receipt_of(&reply);
-                self.store_receipt(&mut record, receipt);
-                Ok(reply)
+                let reply = (report_mode, mutation.method);
+                Ok(self.reply_delivered(record, reply, sent, identity_unavailable))
             }
         }
-    }
-
-    /// The interaction lock for this exec. A session with no RUNTIME root has none; only the
-    /// fake acts without it, and any other backend is refused (A-IS-65 L10(b)).
-    fn interaction_lock(&self) -> std::io::Result<Option<crate::lock::LockGuard>> {
-        match self.funnel.lock.as_ref() {
-            Some(lock) => lock.acquire().map(Some),
-            None if self.backend.capabilities().backend == FAKE_BACKEND => Ok(None),
-            None => Err(std::io::Error::other(
-                "no runtime root: a real backend acts only under the interaction lock",
-            )),
-        }
-    }
-
-    /// The one side-effect sink: every event in order, stopping at the first refusal.
-    fn send(
-        &mut self,
-        events: Vec<omo_computer_core::backend::InputEvent>,
-        route: omo_computer_core::backend::Route,
-        tag: u64,
-    ) -> (u32, Option<Refusal>) {
-        let mut count = 0;
-        for event in events {
-            match self.backend.post_input(&TaggedInput { event, tag }, route.clone()) {
-                Ok(_) => count += 1,
-                Err(refusal) => return (count, Some(refusal)),
-            }
-        }
-        (count, None)
     }
 }
 
