@@ -13,7 +13,11 @@ import {
 } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
-import { liveRunChildren, stopRunChildren } from "../../../../senpi-task/src/dag/run-children-stop"
+import {
+  DagRunChildrenLiveError,
+  liveRunChildren,
+  stopRunChildren,
+} from "../../../../senpi-task/src/dag/run-children-stop"
 import type { ComponentLogger } from "../../extension/types"
 
 /**
@@ -26,8 +30,10 @@ import type { ComponentLogger } from "../../extension/types"
  * drain (`stopRunChildren`, #11381; two schedulers in a row could not follow them), each active node
  * whose children all stopped fails with the real error, and the run is paused `scheduler_failed` (the
  * pause write drops the lease). A node whose child did not stop is not failed as if it had: it stays
- * active and the survivors are logged, so a later cancel or recovery follows that live child. The park leaves no active node, so the bound is durable: a later
- * automatic recovery re-admits nothing and settles the run `failed`; only retry or amend runs it again.
+ * active and the survivors are logged, so a later cancel or recovery follows that live child; the bound
+ * on repeated hand-offs is then this process's failure count. When every child stopped, the park leaves
+ * no active node, so a later automatic recovery re-admits nothing and settles the run `failed`; only
+ * retry or amend runs it again.
  */
 export function createSchedulerFailureHandler(ports: {
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
@@ -71,10 +77,15 @@ export function createSchedulerFailureHandler(ports: {
         )
       journal.append(dagRunPausedEvent({ reason: DAG_SCHEDULER_FAILED_PAUSE_REASON }))
       ports.logger.warn("omo-senpi dag run parked after its scheduler failed again", { runId, error })
-      if (failure !== undefined)
+      if (surviving.length > 0)
         ports.logger.error("omo-senpi dag run parked with children that did not stop; their nodes stay active", {
           runId,
           survivors: surviving.map((task) => task.task_id),
+        })
+      if (failure !== undefined && !(failure instanceof DagRunChildrenLiveError))
+        ports.logger.error("omo-senpi dag run park: stopping the run's children was rejected", {
+          runId,
+          reason: failure instanceof Error ? failure.message : String(failure),
         })
     } finally {
       acquired.reservation?.release()

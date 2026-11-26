@@ -16,14 +16,28 @@ afterEach(() => {
 // The second-failure park is one more road that ends a run's children (#15125 under #11381): it stops
 // them through the one run-wide drain, so a child the run owns that no node's current claim names is
 // stopped too, and a node whose child does not stop is never journaled failed as if it had.
-async function runLeftRunningByAFailedScheduler(options: { readonly connectable?: boolean } = {}) {
+async function runLeftRunningByAFailedScheduler(
+  options: { readonly connectable?: boolean; readonly cancelRejectsAfterStopping?: boolean } = {},
+) {
   const run = await unscheduledRun(roots, ["A", "X"], options)
+  const errors: string[] = []
+  const taskManager = new Proxy(run.options.taskManager, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property, target)
+      if (property !== "cancelTask" || options.cancelRejectsAfterStopping !== true || typeof value !== "function")
+        return typeof value === "function" ? value.bind(target) : value
+      return async (...args: unknown[]) => {
+        await value.apply(target, args)
+        throw new Error("the cancel's reply was lost")
+      }
+    },
+  })
   run.write("running", { A: { state: "running", taskId: run.taskOf("A") } }, { leaseHolderPid: DEAD_HOST })
   const handler = createSchedulerFailureHandler({
-    schedulerOptions: run.options,
+    schedulerOptions: { ...run.options, taskManager },
     reservations: run.reservations,
     probe: { taskManager: run.fixture.taskManager, hostPid: THIS_HOST, isProcessAlive: run.options.isProcessAlive },
-    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+    logger: { info: () => undefined, warn: () => undefined, error: (message: string) => void errors.push(message) },
     holdsRun: () => false,
     recover: async () => undefined,
   })
@@ -33,7 +47,7 @@ async function runLeftRunningByAFailedScheduler(options: { readonly connectable?
   }
   const taskStatus = (id: string) => run.fixture.taskStore.load(run.taskOf(id))?.status
   const lastEvent = () => run.fixture.store.readEvents(run.runId, 0, { limit: 50 }).events.at(-1)
-  return { run, failTwice, taskStatus, lastEvent }
+  return { run, failTwice, taskStatus, lastEvent, errors }
 }
 
 describe("the second scheduler failure parks the run through the one drain", () => {
@@ -66,5 +80,20 @@ describe("the second scheduler failure parks the run through the one drain", () 
     expect(run.read()).toMatchObject({ status: "paused" })
     expect(run.read()?.leaseHolderPid).toBeUndefined()
     expect(lastEvent()).toMatchObject({ type: "dag.run.paused", reason: DAG_SCHEDULER_FAILED_PAUSE_REASON })
+  })
+
+  test("#given children whose stops land but whose cancel calls reject #when the scheduler fails a second time #then their nodes are failed, the rejection is reported, and no survivor is", async () => {
+    // given
+    const { run, failTwice, taskStatus, errors } = await runLeftRunningByAFailedScheduler({
+      cancelRejectsAfterStopping: true,
+    })
+
+    // when
+    await failTwice()
+
+    // then
+    expect(taskStatus("A")).toBe("cancelled")
+    expect(run.read()?.nodes.map((node) => node.state)).toEqual(["failed"])
+    expect(errors).toEqual(["omo-senpi dag run park: stopping the run's children was rejected"])
   })
 })
