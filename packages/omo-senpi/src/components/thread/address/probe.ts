@@ -11,6 +11,7 @@ import {
 import { remoteReady } from "../remote/remote-ops"
 import { accountDevices, type Ready } from "./account"
 import { asRefusal, refusal, toolRefusal, type ThreadRefusal } from "./refusals"
+import { askSilentAlone } from "./solo-retry"
 import type { Found } from "./types"
 
 const named = (devices: readonly RemoteDevice[] | undefined, id: string) => ({
@@ -21,6 +22,8 @@ const named = (devices: readonly RemoteDevice[] | undefined, id: string) => ({
 /**
  * omo#13037 A4.3.3: a thread id this device and the account listing both miss is looked up with one single-probe query
  * to each ONLINE device other than this one, in parallel (the client waits up to 3,500 ms for each locate reply).
+ * When no device found it, each device that stayed silent is asked again alone, one at a time, as `<device>/<thread>`
+ * asks it: probes in flight together can hold a device past the cap that answers in time alone (#14748, solo-retry.ts).
  * One holder: its ended row. Several: ambiguous_target. None and a device stayed silent: device_unanswered. None, every device answered:
  * not_found. Undefined when this device's service makes no single probe: the caller answers as before.
  */
@@ -40,9 +43,12 @@ export async function probeAcross(
     return undefined
   }
   const asked = devices.filter((device) => device.online && device.device !== here)
-  const answers = await Promise.all(
+  const together = await Promise.all(
     asked.map(async (device) => ({ device: device.device, answer: await probe(device.device, thread) })),
   )
+  const answers = together.some(({ answer }) => answer.kind === "found")
+    ? together
+    : await askSilentAlone(remote.sessions, thread, together)
   if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
   // Found over silent, by choice: a device that hangs must not block a thread another device can take (A4.3.5).
   const holders = answers.flatMap(({ device, answer }) =>

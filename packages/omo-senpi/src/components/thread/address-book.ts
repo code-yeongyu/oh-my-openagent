@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs"
-import { basename, join, resolve } from "node:path"
+import { basename, join, resolve, sep } from "node:path"
 
 import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
@@ -437,10 +437,19 @@ export function findDiskSessions(
     prefixes === undefined
       ? projectDirs
       : projectDirs.filter((dir) => prefixes.some((prefix) => dir.startsWith(prefix)))
+  // The directory name maps both `/` and `-` to `-`, so `<root>-tmp` shares `<root>`'s prefix (#14893): the header's cwd decides.
+  const roots = prefixes === undefined ? undefined : (opts.workspaceRoots ?? []).map((root) => resolve(root))
+  const inScope = (cwd: string): boolean =>
+    roots === undefined || roots.some((root) => cwd === root || cwd.startsWith(root.endsWith(sep) ? root : root + sep))
   return readable.flatMap((dir) =>
     filesOf(dir).flatMap((name) => {
       const session = diskSessionFromFacts(join(sessionsDir, dir, name))
-      return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
+      return session !== null &&
+        session.name !== null &&
+        normalizeThreadName(session.name) === wanted &&
+        inScope(resolve(session.cwd))
+        ? [session]
+        : []
     }),
   )
 }

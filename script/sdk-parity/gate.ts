@@ -1,4 +1,5 @@
 import { type BaselineEntry, sha256 } from "./baseline"
+import { type Goldens, type PresentationRow, presentationProblems, presentationRowProblems } from "./presentation"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
@@ -24,6 +25,13 @@ export type GateInput = {
   readonly changedFiles: readonly string[]
   readonly body: string
   readonly headSha: string
+  // presentation.json at the merge base (undefined when it has none) and at the head; only the rows the pull request
+  // adds take part, so a row already on the base neither clears nor fails a later pull request.
+  readonly presentation: {
+    readonly base: readonly PresentationRow[] | undefined
+    readonly head: readonly PresentationRow[]
+  }
+  readonly goldens: Goldens
 }
 
 export type GateReport = {
@@ -32,6 +40,8 @@ export type GateReport = {
   readonly liveSchema: readonly string[]
   /** Rows the body declares changed on purpose (SDK-Parity-Changed): each has left unresolved.json with its evidence. */
   readonly changed: readonly string[]
+  readonly presentation: readonly string[]
+  readonly presentationRows: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -79,11 +89,15 @@ export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
 export function gateReport(input: GateInput): GateReport {
-  const failures: string[] = []
+  const baseRowsText = new Set((input.presentation.base ?? []).map((row) => JSON.stringify(row)))
+  const added = input.presentation.head.filter((row) => !baseRowsText.has(JSON.stringify(row)))
+  const failures: string[] = [...presentationRowProblems(added, input.scenarios)]
   const unresolved = new Set(input.head.unresolved.map((entry) => entry.id))
   const initialization = input.base.rows === undefined
   const baseRows = new Map((input.base.rows ?? []).map((row) => [row.id, row]))
   const flagged = new Set<string>()
+  const presentation: string[] = []
+  const presentationRows: string[] = []
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
@@ -117,8 +131,19 @@ export function gateReport(input: GateInput): GateReport {
     // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
     if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
+      const matched = new Set<string>()
+      const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
+      if (notPresentation.length === 0) {
+        presentation.push(scenario.id)
+        presentationRows.push(`${scenario.id}#presentation=${[...matched].toSorted().join("+")}`)
+        continue
+      }
+      const why =
+        "usage" in scenario && scenario.usage !== undefined
+          ? `; it is not presentation-only: ${notPresentation.join("; ")}`
+          : ""
       failures.push(
-        `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}`,
+        `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}${why}`,
       )
       flagged.add(scenario.capability)
     }
@@ -170,11 +195,16 @@ export function gateReport(input: GateInput): GateReport {
     candidates,
     liveSchema,
     changed: changedRows,
+    presentation: presentation.toSorted(),
+    presentationRows: presentationRows.toSorted(),
     head: input.headSha,
+    // Digest input order (design lane ruling): candidates, live-schema, declared changes, presentation rows; the reviewer's
+    // id list (reviewed()) prints the same four groups in the same order.
     digest: candidateDigest(input.headSha, [
       ...candidates,
       ...liveSchema.map((id) => `${id}#live-schema`),
       ...changedRows.map((id) => `${id}#changed`),
+      ...presentationRows,
     ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
@@ -197,11 +227,13 @@ export function goldenProblems(
     )
 }
 
-// The ids a reviewer's line covers: the candidates and the built rows marked for the live-schema check.
+// The ids a reviewer's line covers: the candidates, the built rows marked for the live-schema check and the scenarios
+// passed as presentation-only.
 const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
   ...report.changed.map((id) => `${id}#changed`),
+  ...report.presentationRows,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -224,6 +256,11 @@ export function renderReport(report: GateReport): string {
   if (report.changed.length > 0)
     lines.push(
       `DECLARED CHANGE: ${report.changed.join(", ")}: rows the body declares changed on purpose; the reviewer confirms each change is the one intended before CLEAR.`,
+      "",
+    )
+  if (report.presentation.length > 0)
+    lines.push(
+      `PRESENTATION ONLY: ${report.presentationRows.map((entry) => entry.replace("#presentation=", " (row ") + ")").join(", ")}: the usage text of an existing verb changed with the exit code, the structure and every other line equal, as named in script/sdk-parity/presentation.json; the reviewer confirms the change is wording, not a capability, before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

@@ -8,6 +8,7 @@ import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayServices } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "../tools/ports"
+import { lazySameDeviceWake } from "../wake/lazy-same-device-wake"
 
 export type ThreadCoreOptions = {
   readonly agentDir: string
@@ -69,6 +70,14 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     callerSessionId: () => UNKNOWN_CALLER,
     callerWorkspaceRoot: () => options.cwd,
     now,
+    sameDeviceWake: lazySameDeviceWake({
+      options: {},
+      store,
+      agentDir: () => options.agentDir,
+      sessionsDirectory: () => join(options.agentDir, "sessions"),
+      cwd: () => options.cwd,
+      warn: (line) => process.stderr.write(`${line}\n`),
+    }),
   }
   const view = () => hostView(surface)
   const { pipeline } = createGatewayServices(

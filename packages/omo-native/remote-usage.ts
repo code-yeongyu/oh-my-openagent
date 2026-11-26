@@ -50,7 +50,7 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["send"],
-    text: `  send <session> <text> [--steer|--follow-up] [--no-wait]
+    text: `  send <session> <text|-> [--steer|--follow-up] [--no-wait]
                                            send a message and print the answer as it arrives (--steer: into the
                                            running turn; --no-wait: return once the session took it).
                                            Use the thread value from open --json, or <device>/<session>.`,
