@@ -2009,9 +2009,11 @@ dependencies = [
 name = "omo-computer-backend-x11"
 version = "0.0.0"
 dependencies = [
+ "image",
  "omo-computer-backend-atspi",
  "omo-computer-core",
  "omo-computer-safety",
+ "x11rb",
 ]
 
 [[package]]
