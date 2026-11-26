@@ -54,7 +54,7 @@ export type GatewayHarness = {
  * Windows refuses to delete a file this process still holds open, so a handle left open under the fixture fails only
  * there (EBUSY, #14555). Where `/proc/self/fd` exists, fail the same way on the platform pull requests run on.
  */
-function assertNoOpenHandlesUnder(dir: string): void {
+export function assertNoOpenHandlesUnder(dir: string): void {
   const fdDir = "/proc/self/fd"
   if (!existsSync(fdDir)) return
   const held: string[] = []
@@ -67,7 +67,7 @@ function assertNoOpenHandlesUnder(dir: string): void {
     }
     if (target.startsWith(`${dir}/`)) held.push(target)
   }
-  if (held.length > 0) throw new Error(`gateway harness: handles still open under ${dir}: ${held.join(", ")}`)
+  if (held.length > 0) throw new Error(`handles still open under ${dir}: ${held.join(", ")}`)
 }
 
 /** `remote`: the account surface whose device the senders stamp, through the same `stampThisDevice` every production sender uses (#13004). */

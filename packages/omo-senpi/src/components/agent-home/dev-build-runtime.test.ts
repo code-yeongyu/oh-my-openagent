@@ -166,11 +166,14 @@ test("#given HOME and USERPROFILE elsewhere #when the agent dir is the OS user r
   // A real directory as the record's home: a literal /home/<user> is the macOS auto_home trigger, where Bun's realpath of
   // the missing path's parent never returns and the test file never ends (#14866).
   const recordHome = temp("agent-home-record-")
+  // The facts are Linux's, so the record is a passwd line: its home field is a POSIX path. On win32 a temp dir carries a
+  // drive ("C:\..."), whose colon would split the line and leave no record at all (#14994); drop the drive there.
+  const recordValue = recordHome.replace(/^[A-Za-z]:/, "").replaceAll("\\", "/")
   try {
     process.env.HOME = join("/", "alternate-home")
     delete process.env.USERPROFILE
-    const record = facts(() => `me:x:1000:1000::${recordHome}:/bin/sh\n`)
-    expect(isSharedAgentDir(join(recordHome, ".omo", "agent"), { facts: record })).toBe(true)
+    const record = facts(() => `me:x:1000:1000::${recordValue}:/bin/sh\n`)
+    expect(isSharedAgentDir(join(recordValue, ".omo", "agent"), { facts: record })).toBe(true)
     expect(isSharedAgentDir(join("/", "tmp", "isolated-agent"), { facts: record })).toBe(false)
   } finally {
     rmSync(recordHome, { recursive: true, force: true })

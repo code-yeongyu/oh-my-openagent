@@ -1,10 +1,11 @@
 import { once } from "node:events"
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { createServer, type Socket } from "node:net"
 import { join } from "node:path"
 
 import { fakeHostTransport } from "../../../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import { testBudgetSignal } from "../../../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../../../test-support/short-tmp"
 
 export type WakeHostFrame = Readonly<Record<string, unknown>>
 
@@ -23,7 +24,7 @@ export type FakeWakeHost = {
 export async function startFakeWakeHost(
   respond: (frame: WakeHostFrame, index: number) => WakeHostReply,
 ): Promise<FakeWakeHost> {
-  const directory = mkdtempSync("/tmp/wake-host-")
+  const directory = shortTempDir("wake-host-")
   const socketPath = join(directory, "rpc.sock")
   const frames: WakeHostFrame[] = []
   const sockets = new Set<Socket>()

@@ -39,9 +39,17 @@ import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/com
 import { followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { candidateLines, personNextAction, sendWaitNotice, sessionVerbLines } from "./remote-render"
+import {
+  personNextAction,
+  refusalLines,
+  sendWaitNotice,
+  sessionEndedLine,
+  sessionVerbLines,
+  undeliveredPromptLines,
+} from "./remote-render"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { localPermissionPreset } from "./remote-permission-preset"
-import type { SessionArgs } from "./remote-session-args"
+import { STDIN_TEXT, type SessionArgs } from "./remote-session-args"
 
 /**
  * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
@@ -181,12 +189,10 @@ async function runSessionOn(
       )
     if (result.kind === "error") {
       if (!json && label !== "" && NO_SUCH_SESSION.has(String(result.error.details?.["reason"]))) {
-        dependencies.error(`omo remote: no session ${label} on this account.`)
+        dependencies.error(escapeForDisplay(`omo remote: no session ${label} on this account.`))
         dependencies.error("Run omo remote sessions to see them.")
       } else if (!json) {
-        dependencies.error(`omo remote: ${result.error.message}`)
-        dependencies.error(personNextAction(result.error.next_action))
-        for (const line of candidateLines(result.error)) dependencies.error(line)
+        for (const line of refusalLines(result.error)) dependencies.error(line)
       }
       return REMOTE_EXIT.failed
     }
@@ -214,7 +220,14 @@ async function runSessionOn(
   const answer: Show = (result, label) => show(named(result), label)
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
-  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer, named }, dependencies)
+  if (args.verb === "send") {
+    const text = args.text === STDIN_TEXT ? await (dependencies.readStdin ?? readProcessStdin)() : args.text
+    if (text === "") {
+      dependencies.error("omo remote send: stdin was empty; pipe the message text in, or pass it as an argument")
+      return REMOTE_EXIT.usage
+    }
+    return sendTo(remote, row, { ...args, text }, { label, json, show: answer, named }, dependencies)
+  }
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
@@ -237,7 +250,7 @@ async function openOn(
     mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
-    dependencies.error(error.message)
+    dependencies.error(escapeForDisplay(error.message))
     return REMOTE_EXIT.usage
   }
   // One open through the shared create path (#13409): the model and thinking level are the engine's launch profile on the
@@ -278,8 +291,7 @@ async function openOn(
   else {
     for (const line of sessionVerbLines("open", "", opened)) dependencies.output(line)
     if (sent.kind === "error") {
-      dependencies.error(`omo remote: opened ${label}, but its first prompt was not delivered: ${sent.error.message}`)
-      dependencies.error(`${sent.error.next_action} Send it again with omo remote send ${label} <text>.`)
+      for (const line of undeliveredPromptLines(label, sent.error)) dependencies.error(line)
     }
   }
   return sent.kind === "error" ? REMOTE_EXIT.failed : REMOTE_EXIT.ok
@@ -388,7 +400,7 @@ async function sendTo(
   const deliver = () => delivery.deliver(row, label, args.text, args.delivery, clientMessageId)
   const nothingToSteer = (result: ThreadToolResult): number | undefined => {
     if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
-    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+    dependencies.error(escapeForDisplay(`omo remote: nothing is running on ${label} to steer.`))
     dependencies.error("Send without --steer to start a turn.")
     return REMOTE_EXIT.failed
   }
@@ -422,7 +434,7 @@ async function sendTo(
     // A send that waits behind a running turn says so at once (#13268); under --json the notice rides the final
     // JSON value instead of stderr, so one JSON value always carries it (#13425).
     const waitNotice = sendWaitNotice(label, sent)
-    if (waitNotice !== null && !json) dependencies.error(waitNotice)
+    if (waitNotice !== null && !json) dependencies.error(escapeForDisplay(waitNotice))
     // #13425: the settle wait is bounded (--timeout seconds, default 120); a turn that never settles answers a
     // typed timeout instead of hanging the person at this terminal.
     const waitMs = args.timeout_seconds !== undefined ? args.timeout_seconds * 1000 : 120_000
@@ -453,18 +465,20 @@ async function sendTo(
         )
       else
         dependencies.error(
-          `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+          escapeForDisplay(
+            `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+          ),
         )
       return REMOTE_EXIT.failed
     }
     if (end === "interrupted") {
-      dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
+      dependencies.error(escapeForDisplay(`omo remote: the turn on ${label} was interrupted before it finished.`))
       return REMOTE_EXIT.failed
     }
     if (end !== "settled") {
       if (json)
         dependencies.output(JSON.stringify(named({ ...sent, kind: "session_ended", end, ...queuedNoticeField })))
-      else dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
+      else dependencies.error(sessionEndedLine(row.device, String(end)))
       return REMOTE_EXIT.failed
     }
     return REMOTE_EXIT.ok
@@ -480,6 +494,18 @@ async function sendTo(
  * the tool's hint says `force: true`, which this command takes as `--force`, and the ids (or `unavailable`) are printed.
  */
 function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
+  // omo#13905: the shared close body answers a session its device does not hold as ok with closed:false. For the CLI that
+  // is a failed close: a script must never read an id or route miss as success while the session may still run.
+  if (result.kind === "ok" && "closed" in result && result.closed === false)
+    return {
+      kind: "error",
+      error: {
+        code: "not_found",
+        message: `${label} is not open on its device, so nothing was closed.`,
+        next_action: "Run omo remote sessions to see the sessions each device holds, then close one by its address.",
+        details: { thread: label },
+      },
+    }
   if (result.kind !== "error" || result.error.details?.["pending_deliveries"] === undefined) return result
   const pending = result.error.details["pending_deliveries"]
   const ids = Array.isArray(pending)
@@ -492,4 +518,11 @@ function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
       next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.`,
     },
   }
+}
+
+/** The whole of this process's stdin as UTF-8, for `omo remote send <target> -` (omo#13905). */
+async function readProcessStdin(): Promise<string> {
+  const chunks: Buffer[] = []
+  for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  return Buffer.concat(chunks).toString("utf8")
 }

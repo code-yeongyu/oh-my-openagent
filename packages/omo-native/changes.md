@@ -1,3 +1,9 @@
+## 2026-11-22 - Thread train 11 (#14623)
+
+omo thread keeps list, send and read (#14319):
+
+`bin/lib/thread.js`: the binding verbs, `report`, `answer`, `outbox`, `ack`, `send --binding` and the author flags are removed; a removed verb is an unknown subcommand (exit 2).
+
 ## 2026-11-20 - omo sync status (#14437)
 
 - `sync-status-cli.ts` collects the report (`collectSyncStatus`, one typed section per source) and renders it (`syncStatusLines`). Joined = a live trust pin under `trustAnchorDir`; switch = `isDeviceSyncOff`; devices come from `service-auth/devices.ts` `listLiveDevices` (the same read and schema `omo account devices` uses; it parses `syncing`), exposed on `SyncContext.listDevices`.
