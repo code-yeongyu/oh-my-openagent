@@ -218,6 +218,7 @@ export async function createThread(
         outcome = await plan.host.open(
           {
             ...plan.request,
+            refuseApprovals: true,
             ...(openName === undefined ? {} : { name: openName }),
             ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
             ...(preset === undefined ? {} : { permissionPreset: preset }),
@@ -523,6 +524,7 @@ async function existingHere(
  */
 const fileOpen = (file: Extract<LocalExisting, { readonly kind: "file" }>) => ({
   sessionPath: file.sessionPath,
+  refuseApprovals: true,
   ...(file.cwd === undefined ? {} : { cwd: file.cwd }),
 })
 

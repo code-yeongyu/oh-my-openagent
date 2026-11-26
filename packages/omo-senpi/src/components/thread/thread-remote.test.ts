@@ -240,7 +240,13 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       {
         via: "endpoint",
         device: "b",
-        rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE, cwd: B_ROW.project },
+        rpc: {
+          type: "open_session",
+          retain_on_disconnect: true,
+          sessionPath: B_FILE,
+          cwd: B_ROW.project,
+          context: { approvals: "refuse" },
+        },
       },
     ])
   })
@@ -1413,6 +1419,7 @@ describe("remote == local: the same call answers the same on b as on this device
     await run("thread_create", { name: "thread-remote-763", device: "studio", skills: ["programming"] })
     expect(a.sent.find((entry) => entry.rpc?.["type"] === "open_session")?.rpc?.["context"]).toEqual({
       initial_skills: JSON.stringify(["programming"]),
+      approvals: "refuse",
     })
   })
 
