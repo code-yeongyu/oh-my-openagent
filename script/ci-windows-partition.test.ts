@@ -1,10 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { z } from "zod"
-import { discoverTestFiles, WINDOWS_SPLITS, type WindowsSplit, windowsTimedInvocations } from "./ci-test-discovery.ts"
+import {
+  discoverSuite,
+  discoverTestFiles,
+  WINDOWS_SPLITS,
+  type WindowsSplit,
+  windowsTimedInvocations,
+} from "./ci-test-discovery.ts"
 
-// Partition contract of the split Windows suites (#14942): the parallel Windows jobs together run every test file of
-// the unsplit suite (root shard 1 = omo-opencode + memory-core, and the Senpi package suite), each file exactly once.
+// Partition contract of the split Windows suites (#14942, #15096): the parallel Windows jobs together run every test file
+// of the unsplit suite (root shard 1 = omo-opencode + memory-core, root shard 2 = ci-root-shard-2.sh `all`, and the
+// Senpi package suite), each file exactly once.
 // Each part's files are derived from its telemetry-wrapped bun commands in ci.yml and the bunfig each one names, so a
 // part that drops, repeats or adds a file fails here. The status jobs check the same partition again on the hosted run
 // from the Bun timing records the parts upload (script/ci-shard-coverage.ts).
@@ -27,7 +34,14 @@ const splits = {
     steps: ["root-tests-windows-1a", "root-tests-windows-1b"],
     status: "windows-test-1-status",
     upload: "windows-shard-record-root-1${{ matrix.part }}",
-    download: "windows-shard-record-root-*",
+    download: "windows-shard-record-root-1*",
+  },
+  "windows-root-2": {
+    job: "test-windows-2",
+    steps: ["root-tests-windows-2a", "root-tests-windows-2b"],
+    status: "windows-test-2-status",
+    upload: "windows-shard-record-root-2${{ matrix.part }}",
+    download: "windows-shard-record-root-2*",
   },
   "windows-senpi": {
     job: "senpi-tests-windows",
@@ -71,8 +85,7 @@ describe("split Windows suites run every file of the unsplit suite exactly once 
   test.each(splitNames)(
     "#given %s #when its parts' files are counted #then none is missing, repeated or extra",
     (split) => {
-      const { suite } = WINDOWS_SPLITS[split]
-      const reference = discoverTestFiles(suite.config, suite.filters)
+      const reference = discoverSuite(WINDOWS_SPLITS[split].suite)
       const ran = recordsByFile(split)
       expect(reference.size).toBeGreaterThan(0)
       expect({

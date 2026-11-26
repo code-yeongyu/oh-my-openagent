@@ -17,18 +17,46 @@ export const ROOT_SHARD_1: Invocation = {
 }
 export const SENPI_SUITE: Invocation = { config: "bunfig.toml", filters: ["packages/omo-senpi"] }
 
-// The split Windows suites (#14942): each named invocation writes <name>.timings.json through windows-ci-telemetry.ps1
-// -TimingRecord, and the Linux status job checks the records against the unsplit suite.
+// The bun test commands of every flat if-block of .github/scripts/ci-root-shard-2.sh whose condition names this mode.
+// Mode "all" is the unsplit root shard 2: the serial quarantine, then the remainder.
+export function rootShard2Invocations(mode: string): Invocation[] {
+  const script = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
+  const blocks = [...script.matchAll(/^if (.+); then\n([\s\S]*?)^fi$/gm)]
+  const selected = blocks.filter(([, condition = ""]) =>
+    [...condition.matchAll(/"\$mode" = "([a-z]+)"/g)].some(([, name]) => name === mode),
+  )
+  if (selected.length === 0) throw new Error(`ci-root-shard-2.sh has no ${mode} block`)
+  return selected.flatMap(([, , body = ""]) =>
+    body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("bun "))
+      .map(parseBunTest),
+  )
+}
+
+// The split Windows suites (#14942, #15096): each named invocation writes <name>.timings.json through
+// windows-ci-telemetry.ps1 -TimingRecord, and the Linux status job checks the records against the unsplit suite, the
+// union of the files its invocations select.
 export const WINDOWS_SPLITS = {
-  "windows-root": { suite: ROOT_SHARD_1, records: ["shard-1a", "shard-1b"] },
+  "windows-root": { suite: [ROOT_SHARD_1], records: ["shard-1a", "shard-1b"] },
+  "windows-root-2": {
+    suite: rootShard2Invocations("all"),
+    records: ["shard-2-quarantine", "shard-2-rpc-host", "shard-2a", "shard-2b"],
+  },
   "windows-senpi": {
-    suite: SENPI_SUITE,
+    suite: [SENPI_SUITE],
     records: ["senpi-one", "senpi-two", "senpi-three-worker", "senpi-three-rest"],
   },
-} as const satisfies Record<string, { suite: Invocation; records: readonly string[] }>
+} as const satisfies Record<string, { suite: readonly Invocation[]; records: readonly string[] }>
 export type WindowsSplit = keyof typeof WINDOWS_SPLITS
 
-// One `bun [--config=<file>] test <flags and filters>` command line; an unmodeled flag fails instead of being guessed.
+export function discoverSuite(suite: readonly Invocation[]): Set<string> {
+  return new Set(suite.flatMap(({ config, filters }) => [...discoverTestFiles(config, filters)]))
+}
+
+// One `bun [script/bun-panic-retry.ts] [--config=<file>] test <flags and filters>` command line; an unmodeled flag
+// fails instead of being guessed. bun-panic-retry.ts re-runs the same bun arguments once only after a Bun crash.
 export function parseBunTest(line: string): Invocation {
   const tokens = line
     .replace(/\$\(junit [^)]*\)/g, "")
@@ -36,7 +64,7 @@ export function parseBunTest(line: string): Invocation {
     .split(/\s+/)
   if (tokens[0] !== "bun") throw new Error(`not a bun command: ${line}`)
   let config = "bunfig.toml"
-  let index = 1
+  let index = tokens[1] === "script/bun-panic-retry.ts" ? 2 : 1
   for (; tokens[index] !== "test"; index++) {
     const token = tokens[index]
     if (token === undefined || !token.startsWith("--config=")) throw new Error(`unmodeled bun command: ${line}`)
@@ -46,7 +74,7 @@ export function parseBunTest(line: string): Invocation {
   for (index++; index < tokens.length; index++) {
     const token = tokens[index] ?? ""
     if (token === "--timeout") index++
-    else if (token.startsWith("--") && token.includes("=")) continue
+    else if (token === "--parallel" || (token.startsWith("--") && token.includes("="))) continue
     else if (token.startsWith("-")) throw new Error(`unmodeled bun test flag ${token}: ${line}`)
     else filters.push(token)
   }

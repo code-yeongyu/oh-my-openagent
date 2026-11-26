@@ -12,7 +12,14 @@ const rootConfig = readFileSync(new URL("../bunfig.root.toml", import.meta.url),
 const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
 const win2WindowsParallelConfigPath = new URL("../bunfig.win2.parallel.windows.toml", import.meta.url)
+const win2WindowsRestConfigPath = new URL("../bunfig.win2.parallel.windows-rest.toml", import.meta.url)
 const win2RestConfigPath = new URL("../bunfig.win2.parallel.rest.toml", import.meta.url)
+const shard2RemainderConfigPaths = [
+  win2ParallelConfigPath,
+  win2WindowsParallelConfigPath,
+  win2WindowsRestConfigPath,
+  win2RestConfigPath,
+]
 const macosShard1bConfigPath = new URL("../bunfig.root-shard-1b.toml", import.meta.url)
 
 function quarantinedTestPaths(config: string): readonly string[] {
@@ -21,13 +28,6 @@ function quarantinedTestPaths(config: string): readonly string[] {
 
 function escapeForRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-function rootTestJob(): string {
-  const start = workflow.indexOf("  test:\n")
-  const end = workflow.indexOf("\n  test-linux:", start)
-  if (start < 0 || end < 0) throw new Error("root test job not found")
-  return workflow.slice(start, end)
 }
 
 function linuxTestJobs(): string {
@@ -46,6 +46,8 @@ function workflowSlice(from: string, to: string): string {
 
 const windowsShard1Job = () => workflowSlice("test-windows-1", "windows-test-1-status")
 const windowsShard1StatusJob = () => workflowSlice("windows-test-1-status", "typecheck")
+const windowsShard2Job = () => workflowSlice("test-windows-2", "windows-test-2-status")
+const windowsShard2StatusJob = () => workflowSlice("windows-test-2-status", "test-linux")
 const senpiCompatibilityJob = () => workflowSlice("senpi-tests-windows", "windows-senpi-status")
 
 interface TestBunfig {
@@ -91,23 +93,16 @@ function assertWindowsTelemetryContract(script: string): void {
 
 describe("root test CI partition", () => {
   test("#given required status check names #when the root matrix is declared #then only os and shard appear", () => {
-    const job = rootTestJob()
-    const start = job.indexOf("include:")
-    const end = job.indexOf("steps:", start)
-    const matrix = job.slice(start, end)
-
-    expect(matrix).toContain("- os: windows-latest")
-    expect(matrix).not.toContain("- os: ubuntu-latest")
-    expect(matrix).not.toContain("- os: macos-latest")
-    expect(matrix).not.toContain('shard: "1/2"')
-    expect(matrix).toContain('shard: "2/2"')
-    expect(windowsShard1StatusJob()).toContain(
-      "name: test\n    needs: [ci-mode, test-windows-1]\n    if: ${{ always() && !cancelled() }}\n    runs-on: ubuntu-26.04",
-    )
-    expect(windowsShard1StatusJob()).toContain('- os: windows-latest\n            shard: "1/2"')
-    expect(matrix).not.toContain("config:")
-    expect(matrix).not.toContain("test_args:")
-    expect(matrix).not.toContain("parallel_args:")
+    for (const [status, parts, shard] of [
+      [windowsShard1StatusJob(), "test-windows-1", "1/2"],
+      [windowsShard2StatusJob(), "test-windows-2", "2/2"],
+    ]) {
+      const matrix = status.slice(status.indexOf("include:"), status.indexOf("steps:"))
+      expect(status).toContain(
+        `name: test\n    needs: [ci-mode, ${parts}]\n    if: \${{ always() && !cancelled() }}\n    runs-on: ubuntu-26.04`,
+      )
+      expect(matrix).toBe(`include:\n          - os: windows-latest\n            shard: "${shard}"\n    `)
+    }
 
     const linux = linuxTestJobs()
     expect(linux).toContain("name: test\n    needs: [ci-mode, test-linux]")
@@ -117,13 +112,17 @@ describe("root test CI partition", () => {
   })
 
   test("#given global zauc mocks #when Windows root tests are partitioned #then omo-opencode stays in one process", () => {
-    const job = rootTestJob()
+    const job = windowsShard2Job()
 
     expect(windowsShard1Job()).toContain(
       '-TestArguments @("--config=bunfig.root-shard-1b.toml", "test", "packages/omo-opencode", "packages/memory-core")',
     )
     expect(linuxTestJobs()).toContain("run: bun test --timeout 20000 packages/omo-opencode\n")
-    expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")')
+    expect(job).toContain(
+      '-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel", "./script", "./packages/senpi-task")',
+    )
+    expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows-rest.toml", "test", "--parallel")')
+    expect(existsSync(win2WindowsRestConfigPath)).toBe(true)
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
     expect(existsSync(win2WindowsParallelConfigPath)).toBe(true)
@@ -133,7 +132,7 @@ describe("root test CI partition", () => {
   })
 
   test("#given the shared quarantine module #when a parallel leg is rendered #then its serial command lists exactly those files", () => {
-    const job = rootTestJob()
+    const job = windowsShard2Job()
     const serialCommand = serialQuarantineCommand()
 
     expect(ROOT_TEST_SERIAL_QUARANTINE_PATHS.length).toBeGreaterThan(0)
@@ -144,18 +143,22 @@ describe("root test CI partition", () => {
   })
 
   test("#given the shared quarantine module #when the shard-2 bunfigs are read #then each ignores exactly the quarantined files", () => {
-    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath, win2RestConfigPath]) {
+    for (const configPath of shard2RemainderConfigPaths) {
       expect(existsSync(configPath)).toBe(true)
 
       expect(quarantinedTestPaths(readFileSync(configPath, "utf8"))).toEqual([...ROOT_TEST_SERIAL_QUARANTINE_PATHS])
     }
   })
 
-  test("#given the macOS shard-2 light bunfig #when its ignore list is read #then it is the shared remainder plus the top-level script tree", () => {
-    const parallel = quotedPatterns(readFileSync(win2ParallelConfigPath, "utf8"))
-    const rest = quotedPatterns(readFileSync(win2RestConfigPath, "utf8"))
-
-    expect(rest).toEqual([...parallel, "script/**"])
+  test("#given the macOS shard-2 light and Windows shard-2b bunfigs #when read #then each is its remainder minus the other half's trees", () => {
+    for (const [half, remainder, trees] of [
+      [win2RestConfigPath, win2ParallelConfigPath, ["script/**"]],
+      [win2WindowsRestConfigPath, win2WindowsParallelConfigPath, ["script/**", "packages/senpi-task/**"]],
+    ] as const) {
+      const { pathIgnorePatterns, ...settings } = testBunfig(half)
+      const { pathIgnorePatterns: base, ...baseSettings } = testBunfig(remainder)
+      expect({ pathIgnorePatterns, ...settings }).toEqual({ pathIgnorePatterns: [...base, ...trees], ...baseSettings })
+    }
   })
 
   test("#given the macOS shard-1b bunfig #when it is read #then it is bunfig.toml plus exactly the shard-1a trees", () => {
@@ -173,7 +176,7 @@ describe("root test CI partition", () => {
   })
 
   test("#given the shard-2 remainder bunfigs #when a shard-2 leg runs the remainder #then each keeps every bunfig.root.toml exclusion", () => {
-    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath, win2RestConfigPath]) {
+    for (const configPath of shard2RemainderConfigPaths) {
       const parallelPatterns = quotedPatterns(readFileSync(configPath, "utf8"))
 
       for (const pattern of quotedPatterns(rootConfig)) {
@@ -225,7 +228,7 @@ describe("root test CI partition", () => {
   })
 
   test("#given global zauc mocks #when Linux parts are sharded #then only the remainder uses native file sharding", () => {
-    const job = rootTestJob()
+    const job = windowsShard2Job()
 
     expect(job).not.toContain("--shard=")
     expect(linuxTestJobs()).not.toContain("--shard=")
@@ -236,18 +239,17 @@ describe("root test CI partition", () => {
   })
 
   test("#given Windows hook tests read process platform #when root tests run #then bun is not launched under Git Bash", () => {
-    const job = rootTestJob()
-    const runBlock = job.slice(job.indexOf("      - name: Run tests"))
-
-    for (const part of ["a", "b"]) {
-      expect(windowsShard1Job()).toContain(`if: matrix.part == '${part}'\n        shell: pwsh\n`)
+    for (const job of [windowsShard1Job(), windowsShard2Job()]) {
+      for (const part of ["a", "b"]) {
+        expect(job).toMatch(
+          new RegExp(
+            `id: root-tests-windows-[12]${part}\\n        if: matrix.part == '${part}'\\n        shell: pwsh\\n`,
+          ),
+        )
+      }
+      expect(job).not.toContain("shell: bash\n        run: |")
+      expect(job).toContain("    timeout-minutes: 60\n")
     }
-    expect(windowsShard1Job()).not.toContain("shell: bash\n        run: |")
-    expect(runBlock).toContain(
-      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2'",
-    )
-    expect(runBlock).not.toContain("shell: bash\n        run: |")
-    expect(job).toContain("timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}")
   })
 
   test("#given a telemetry fixture without post-test state #when the contract is checked #then the diagnostic is stable", () => {
@@ -289,16 +291,16 @@ describe("root test CI partition", () => {
   })
 
   test("#given both Windows shards #when root tests run #then telemetry wraps every Bun invocation", () => {
-    const job = rootTestJob()
+    const job = windowsShard2Job()
 
-    expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(3)
+    expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(4)
     expect([...windowsShard1Job().matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(2)
     expect(windowsShard1Job()).toContain('-Invocation "shard-1a" `\n            -TimingRecord `')
     expect(windowsShard1Job()).toContain('-Invocation "shard-1b" `\n            -TimingRecord `')
-    expect(job).toContain('-Invocation "shard-2-quarantine"')
-    expect(job).toContain('-Invocation "shard-2-rpc-host"')
-    expect(job).toContain('-Invocation "shard-2-remainder"')
-    expect(job).toContain("WINDOWS_TEST_SHARD: ${{ matrix.shard }}")
+    for (const invocation of ["shard-2-rpc-host", "shard-2a", "shard-2-quarantine", "shard-2b"]) {
+      expect(job).toContain(`-Invocation "${invocation}" \`\n            -TimingRecord \``)
+    }
+    expect(job).toContain("WINDOWS_TEST_SHARD: 2/2")
   })
 
   test("#given Windows Senpi compatibility tests #when the package gate runs #then telemetry wraps the flaky test invocation", () => {
@@ -340,13 +342,13 @@ describe("root test CI partition", () => {
   })
 
   test("#given Windows telemetry files #when a matrix leg finishes #then immutable artifacts always upload without gating", () => {
-    const job = rootTestJob()
+    const job = windowsShard2Job()
     const uploadStep = job.slice(
       job.indexOf("      - name: Upload Windows post-test telemetry"),
-      job.indexOf("      - name: Write job summary"),
+      job.indexOf("      - name: Upload Windows shard record"),
     )
 
-    expect(uploadStep).toContain("if: always() && runner.os == 'Windows'")
+    expect(uploadStep).toContain("if: always()\n")
     expect(uploadStep).toContain("continue-on-error: true")
     expect(uploadStep).toContain("uses: actions/upload-artifact@v6")
     expect(uploadStep).toContain("${{ github.run_id }}-${{ github.run_attempt }}")
@@ -354,12 +356,10 @@ describe("root test CI partition", () => {
     expect(uploadStep).toContain("overwrite: false")
   })
 
-  test("#given Windows cache restore costs more than install #when the root matrix runs #then only non-Windows jobs restore Bun cache", () => {
-    const job = rootTestJob()
-    const cacheStart = job.indexOf("      - uses: actions/cache@v6")
-    const cacheEnd = job.indexOf("      - name: Install dependencies", cacheStart)
-    const cacheStep = job.slice(cacheStart, cacheEnd)
-
-    expect(cacheStep).toContain("if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true'")
+  test("#given Windows cache restore costs more than install #when the Windows root jobs run #then they never restore Bun cache", () => {
+    for (const job of [windowsShard1Job(), windowsShard2Job()]) {
+      expect(job).toContain("      - name: Install dependencies")
+      expect(job).not.toContain("actions/cache")
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
+  discoverSuite,
   discoverTestFiles,
   type Invocation,
   SENPI_SUITE,
@@ -35,8 +36,7 @@ function readTimings(path: string): Map<string, number> {
   return files
 }
 
-function compare(label: string, suite: Invocation, records: ReadonlyMap<string, Map<string, number>>) {
-  const expected = discoverTestFiles(suite.config, suite.filters)
+function compare(label: string, expected: ReadonlySet<string>, records: ReadonlyMap<string, Map<string, number>>) {
   const seen = new Set<string>()
   const differences: string[] = []
   for (const files of records.values()) {
@@ -70,7 +70,8 @@ function verify(group: Group, dir: string): Map<string, number> {
       readTimings(join(dir, `ci-shard-${group}-${part}`, "ci-shard-record.json")),
     ]),
   )
-  return compare(group, groups[group].suite, records)
+  const { suite } = groups[group]
+  return compare(group, discoverTestFiles(suite.config, suite.filters), records)
 }
 
 // The artifact directory names carry run ids, so each record is found by its file name, exactly once.
@@ -82,13 +83,13 @@ function verifyWindows(group: WindowsSplit, dir: string): void {
       throw new Error(`${group}: expected one ${name}.timings.json under ${dir}, found ${found.length}`)
     records.set(name, readTimings(join(dir, found[0] ?? "")))
   }
-  compare(group, WINDOWS_SPLITS[group].suite, records)
+  compare(group, discoverSuite(WINDOWS_SPLITS[group].suite), records)
 }
 
 const [mode, records, output, ...extra] = process.argv.slice(2)
 if (!records || extra.length > 0) {
   throw new Error(
-    "Usage: bun script/ci-shard-coverage.ts <root|senpi|windows-root|windows-senpi|merge> <records-dir> [merged-file]",
+    "Usage: bun script/ci-shard-coverage.ts <root|senpi|windows-root|windows-root-2|windows-senpi|merge> <records-dir> [merged-file]",
   )
 }
 if (mode === "merge" && output) {
@@ -100,10 +101,10 @@ if (mode === "merge" && output) {
   writeFileSync(output, `${JSON.stringify({ version: 1, files }, null, 2)}\n`)
 } else if ((mode === "root" || mode === "senpi") && output === undefined) {
   verify(mode, records)
-} else if ((mode === "windows-root" || mode === "windows-senpi") && output === undefined) {
+} else if ((mode === "windows-root" || mode === "windows-root-2" || mode === "windows-senpi") && output === undefined) {
   verifyWindows(mode, records)
 } else {
   throw new Error(
-    "Expected root, senpi, windows-root or windows-senpi without an output path, or merge with an output path",
+    "Expected root, senpi, windows-root, windows-root-2 or windows-senpi without an output path, or merge with an output path",
   )
 }

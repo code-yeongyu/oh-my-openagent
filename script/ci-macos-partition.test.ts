@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { z } from "zod"
-import { discoverTestFiles, type Invocation, parseBunTest, ROOT_SHARD_1 } from "./ci-test-discovery.ts"
+import {
+  discoverTestFiles,
+  type Invocation,
+  parseBunTest,
+  ROOT_SHARD_1,
+  rootShard2Invocations,
+} from "./ci-test-discovery.ts"
 
 // Partition contract of the macOS root tests (#14849): the parallel macOS jobs together run every root test file the
 // unsplit root suite runs, each file exactly once. The reference is independent of the macOS split: shard 1 is
@@ -14,23 +20,6 @@ const stepSchema = z.object({ id: z.string().optional(), run: z.string().optiona
 const { jobs } = z
   .object({ jobs: z.record(z.string(), z.object({ "runs-on": z.unknown(), steps: z.array(stepSchema) })) })
   .parse(Bun.YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")))
-const shard2Script = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
-
-// The bun commands of every flat if-block of ci-root-shard-2.sh whose condition names this mode.
-function shard2Invocations(mode: string): Invocation[] {
-  const blocks = [...shard2Script.matchAll(/^if (.+); then\n([\s\S]*?)^fi$/gm)]
-  const selected = blocks.filter(([, condition = ""]) =>
-    [...condition.matchAll(/"\$mode" = "([a-z]+)"/g)].some(([, name]) => name === mode),
-  )
-  if (selected.length === 0) throw new Error(`ci-root-shard-2.sh has no ${mode} block`)
-  return selected.flatMap(([, , body = ""]) =>
-    body
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("bun "))
-      .map(parseBunTest),
-  )
-}
 
 function stepInvocations(run: string): Invocation[] {
   return run
@@ -39,7 +28,7 @@ function stepInvocations(run: string): Invocation[] {
     .filter((line) => line !== "" && !line.startsWith("mkdir -p "))
     .flatMap((line) => {
       const shard2 = /^bash \.github\/scripts\/ci-root-shard-2\.sh ([a-z]+)$/.exec(line)
-      if (shard2?.[1] !== undefined) return shard2Invocations(shard2[1])
+      if (shard2?.[1] !== undefined) return rootShard2Invocations(shard2[1])
       if (line.startsWith("bun ")) return [parseBunTest(line)]
       throw new Error(`unmodeled root test line: ${line}`)
     })
@@ -66,7 +55,7 @@ function counts(list: readonly string[]): Map<string, number> {
 }
 
 describe("macOS root test partition across the parallel macOS jobs (#14849)", () => {
-  const reference = files([ROOT_SHARD_1, ...shard2Invocations("all")])
+  const reference = files([ROOT_SHARD_1, ...rootShard2Invocations("all")])
   const macos = macosRootJobs()
 
   test("#given the unsplit root suite #when its files are listed #then the reference is non-empty and duplicate-free", () => {
