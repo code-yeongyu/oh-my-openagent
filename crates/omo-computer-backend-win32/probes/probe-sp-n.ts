@@ -2578,10 +2578,18 @@ const LOGIC_CHECKS: readonly Check[] = [
       const labels = [...new Set(code.match(/S-1-16-\d+/g) ?? [])]
       if (labels.join() !== "S-1-16-8192") bad.push(`integrity labels named: ${labels.join(",") || "none"}, want only S-1-16-8192`)
       const sets = code.replace(/"[^"\n]*"/g, '""').match(/SetTokenInformation\([^)]*\)/g) ?? []
-      const decl = "SetTokenInformation(IntPtr token, int cls, ref TOKEN_MANDATORY_LABEL info, int len)"
-      const calls = sets.filter((s) => s !== decl)
-      if (sets.length - calls.length !== 1 || calls.length === 0 || calls.some((s) => !/^SetTokenInformation\(lowered, TokenIntegrityLevel,/.test(s)))
-        bad.push(`SetTokenInformation sets other than the label of the lowered copy: ${sets.join(" | ")}`)
+      // the label, and (run 45856172603: the elevated default DACL left the helper unable to open itself, 0xC0000142)
+      // the copy's default owner and DACL naming the run's own user and SYSTEM only
+      const calls = sets.filter((s) => !s.startsWith("SetTokenInformation(IntPtr token,"))
+      const classes = calls.map((s) => /^SetTokenInformation\(lowered, (TokenIntegrityLevel|TokenOwner|TokenDefaultDacl),/.exec(s)?.[1])
+      if (sets.length - calls.length !== 2 || classes.join() !== "TokenIntegrityLevel,TokenOwner,TokenDefaultDacl")
+        bad.push(`SetTokenInformation sets other than the lowered copy's label, owner and default DACL: ${sets.join(" | ")}`)
+      if (!/string sddl = "D:\(A;;GA;;;" \+ Marshal\.PtrToStringUni\(text\) \+ "\)\(A;;GA;;;SY\)";/.test(code))
+        bad.push("the default DACL does not grant exactly the run's user and SYSTEM")
+      if (!/SetTokenInformation\(lowered, TokenOwner, ref userSid,/.test(code) || !/GetTokenInformation\(own, TokenUser,/.test(code))
+        bad.push("the default owner is not the run's own user")
+      if (!/throw Failed\("SetTokenInformation\(TokenIntegrityLevel\)"\);\n\s+UserOwnsDefaults\(own, lowered\);/.test(code))
+        bad.push("StartMedium does not give the lowered copy its user's owner and DACL before the start")
       if (!/CreateRestrictedToken\(own, LUA_TOKEN,/.test(code)) bad.push("the helper token is not a LUA restricted copy of the run's own token")
       if (!/OpenProcessToken\(GetCurrentProcess\(\),/.test(code)) bad.push("the token is not this process's own")
       if (!/h\["label"\] = LabelOf\(pi\.hProcess\)/.test(code)) bad.push("the started process's label is not read back")

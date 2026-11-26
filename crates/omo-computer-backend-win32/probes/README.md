@@ -54,7 +54,10 @@ fixture. `runas /trustlevel:0x20000` keeps high integrity when UAC is off, as on
 `start-medium` leg (`sp-n-native-medium.ps1`, #13885) starts the helper from a restricted copy of the run's own
 token (`CreateRestrictedToken`, `LUA_TOKEN`) whose label is lowered to Medium (`SetTokenInformation`,
 `TokenIntegrityLevel`, `S-1-16-8192`), and reads the started process's label back; any other label fails the
-rows. Nothing raises a label, adjusts a privilege, takes another account's token or changes UAC; the self-test
+rows. The copy's default owner and DACL name the run's own user and SYSTEM, as on an unelevated token: the
+elevated default grants only Administrators, which the copy holds deny-only, so the helper could not open its own
+process and died with 0xC0000142 before its first line (run 45856172603). A helper that writes nothing is reported
+with its exit status in hex and the system's text, and its own stdout and stderr. Nothing raises a label, adjusts a privilege, takes another account's token or changes UAC; the self-test
 holds that file to lowering only. The rows record the OS's answer to a Medium sender, so they measure the
 boundary the engine answers with `PermissionDenied`, never a way around it.
 
