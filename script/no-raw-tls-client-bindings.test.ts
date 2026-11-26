@@ -38,8 +38,19 @@ const MODULE: readonly Placement[] = ["module before", "module after"]
 const stmts = (at: readonly Placement[], ...declares: ((n: string) => string)[]): Form[] =>
   declares.map((declare) => ({ at, declare }))
 // The module behind "./t" in the whole-program emit: its exports named like a runtime global are types only.
-const TYPES_ONLY_MODULE =
-  "export interface Bun { x: number }\nexport type Other = number\nexport default interface D { x: number }\n"
+// Generated from the receivers below, not from the scanner's set, so removing a name from the set cannot remove its
+// own check; the receiver control keeps every runtime global in that list.
+const TYPES_ONLY_MODULE = () =>
+  [
+    ...RECEIVERS.map((receiver) => `export type ${receiver.binding} = { x: number }`),
+    "export type Other = number",
+    "export default interface D { x: number }",
+  ].join("\n")
+const GLOBALS_DECLARATION = () =>
+  [
+    ...RECEIVERS.filter((receiver) => receiver.setup === "").map((receiver) => `declare var ${receiver.binding}: any`),
+    "declare var o: any",
+  ].join("\n")
 const NS = "namespace NS { export type T = number; export const v = { connect() {} } }"
 
 const FORMS: Record<string, readonly (Form | Program)[]> = {
@@ -220,8 +231,8 @@ const TRANSPILERS = {
     const host = ts.createCompilerHost(options)
     const files = new Map([
       ["x.ts", source],
-      ["t.ts", TYPES_ONLY_MODULE],
-      ["globals.d.ts", "declare var Bun: any\ndeclare var o: any\n"],
+      ["t.ts", TYPES_ONLY_MODULE()],
+      ["globals.d.ts", GLOBALS_DECLARATION()],
     ])
     const local = (name: string) => name.replace(/^\/+/, "")
     host.getSourceFile = (name, version) => {

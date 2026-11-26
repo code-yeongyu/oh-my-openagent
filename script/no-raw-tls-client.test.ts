@@ -14,9 +14,13 @@ import {
   WORKSPACE_ROOT,
 } from "./no-raw-tls-client-scan"
 
-const CHUNK_BYTES = 1_000_000
+// A chunk's cost grows with its bytes and with its file count (many small files cost as much as one large one), so a
+// chunk closes at either bound. Measured on one core: a single 1.5 MB generated bundle, the floor no chunking can split,
+// is about 2 s.
+const CHUNK_BYTES = 400_000
+const CHUNK_FILES = 64
 
-function chunkBySize(files: readonly string[], budget: number): string[][] {
+function chunkBySize(files: readonly string[], budget: number, maxFiles: number): string[][] {
   const chunks: string[][] = []
   let current: string[] = []
   let size = 0
@@ -25,7 +29,7 @@ function chunkBySize(files: readonly string[], budget: number): string[][] {
     try {
       bytes = statSync(path.join(WORKSPACE_ROOT, file)).size
     } catch {}
-    if (current.length > 0 && size + bytes > budget) {
+    if (current.length > 0 && (size + bytes > budget || current.length >= maxFiles)) {
       chunks.push(current)
       current = []
       size = 0
@@ -332,7 +336,7 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
   // test limit. Measured 2026-11-26: about 0.5 ms per KB on a calm host, so a chunk is about half a second; the
   // largest single file (1.5 MB) is about 1.4 s. The partition and coverage cases below prove no file is skipped.
   const corpus = collectShippedSourceFiles()
-  const chunks = chunkBySize(corpus, CHUNK_BYTES)
+  const chunks = chunkBySize(corpus, CHUNK_BYTES, CHUNK_FILES)
   const chunkCases = chunks.map((files, index) => [index + 1, files] as const)
 
   test("#given the shipped tree #when it is chunked #then every file is in exactly one chunk", () => {
