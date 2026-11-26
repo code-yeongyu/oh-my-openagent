@@ -13,13 +13,14 @@ import {
 // ran and two recoveries never close one operation twice. It is a file beside the log, created whole (written aside,
 // then linked into place) with its holder's pid and start identity, and broken ONLY when that holder is proven dead: the
 // pid is gone, or the process under it now started at another time. A live holder's lock is never broken; one call
-// waits at most LOCK_WAIT_MS for it in total, then reports what it could not write as unwritten.
+// spends at most LOCK_WAIT_MS waiting for it in total, then reports what it could not write as unwritten.
 
 export const LOCK_WAIT_MS = 2000
 const RETRY_MS = 5
 /**
  * A lock is created whole, so a live holder's lock always names it. One that names no holder was left by a crash or a
- * power loss inside the take; past this age it is treated as a dead holder's (review 6067451001 L1).
+ * power loss inside the take; past this age it is treated as a dead holder's (review 6067451001 L1). That makes a flush
+ * before the link unneeded, and a flush per take cost every call a disk sync under contention (review 6067671766 L3).
  */
 const HOLDERLESS_GRACE_MS = 5000
 
@@ -75,7 +76,6 @@ async function take(lockPath: string): Promise<boolean> {
   const handle = await open(staged, "wx", 0o600)
   try {
     await handle.writeFile(JSON.stringify({ pid: process.pid, start: await getProcessStartIdentity(process.pid) }))
-    await handle.sync()
   } finally {
     await handle.close()
   }
@@ -90,19 +90,30 @@ async function take(lockPath: string): Promise<boolean> {
   }
 }
 
-/** Runs `action` holding the log's lock, waiting at most until `deadline`; undefined when the lock was not had. */
+/** The time one call may still spend waiting for the lock; only waiting draws on it, never the operation's own run. */
+export type LockWait = { remainingMs: number }
+
+/** Runs `action` holding the log's lock, waiting at most what `wait` has left; undefined when the lock was not had. */
 export async function withCustodyLock<T>(
   logPath: string,
   action: () => Promise<T>,
-  deadline: number = Date.now() + LOCK_WAIT_MS,
+  wait: LockWait = { remainingMs: LOCK_WAIT_MS },
 ): Promise<T | undefined> {
   const lockPath = `${logPath}.lock`
+  const started = Date.now()
+  const deadline = started + wait.remainingMs
+  let taken = false
   for (;;) {
-    if (await take(lockPath)) break
+    if (await take(lockPath)) {
+      taken = true
+      break
+    }
     if (await breakIfDead(lockPath)) continue
-    if (Date.now() >= deadline) return undefined
-    else await delay(RETRY_MS)
+    if (Date.now() >= deadline) break
+    await delay(RETRY_MS)
   }
+  wait.remainingMs = Math.max(0, wait.remainingMs - (Date.now() - started))
+  if (!taken) return undefined
   try {
     return await action()
   } finally {

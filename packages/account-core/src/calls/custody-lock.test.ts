@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
 import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
@@ -120,5 +120,24 @@ describe("the custody log's lock", () => {
       async () => ok({ signedOut: true, revoked: true }),
     )
     expect(Date.now() - started).toBeLessThan(budget * 2)
+  })
+
+  test("#given an operation that outlasts the wait budget and a brief holder at its end #then its terminal record is kept", async () => {
+    const home = await temporaryHome()
+    const log = custodyLog({ home, principal: { kind: "person", id: "501" }, lockWaitMs: 300 })
+    const answer = await audited(log, "account.signIn", async () => {
+      await Bun.sleep(400)
+      const { lock } = await lockAt(home, await self())
+      setTimeout(() => rmSync(lock, { force: true }), 50)
+      return ok({ signedIn: true })
+    })
+    const phases = readFileSync(custodyLogPath(home), "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => (JSON.parse(line) as { readonly phase: string }).phase)
+    expect({ answer, phases }).toEqual({
+      answer: { kind: "ok", value: { signedIn: true } },
+      phases: ["started", "terminal"],
+    })
   })
 })

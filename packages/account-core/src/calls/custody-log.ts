@@ -4,7 +4,7 @@ import { userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { accountHome } from "../account-home"
 import { CredentialStoreError, KeychainLockedError } from "../keystore"
-import { LOCK_WAIT_MS, withCustodyLock } from "./custody-lock"
+import { LOCK_WAIT_MS, type LockWait, withCustodyLock } from "./custody-lock"
 import { recoverCustodyLog } from "./custody-recovery"
 import { type CallOutcome, ok } from "./outcome"
 
@@ -60,8 +60,8 @@ export function custodyLog(options: {
 }): CustodyLog {
   const path = custodyLogPath(options.home)
   const now = options.now ?? Date.now
-  const deadline = () => Date.now() + (options.lockWaitMs ?? LOCK_WAIT_MS)
-  const append = async (record: Omit<CustodyRecord, "id" | "at">, until: number): Promise<boolean> => {
+  const budget = (): LockWait => ({ remainingMs: options.lockWaitMs ?? LOCK_WAIT_MS })
+  const append = async (record: Omit<CustodyRecord, "id" | "at">, wait: LockWait): Promise<boolean> => {
     try {
       await mkdir(dirname(path), { recursive: true, mode: 0o700 })
       const line = `${JSON.stringify({ id: randomUUID(), at: new Date(now()).toISOString(), ...record })}\n`
@@ -72,7 +72,7 @@ export function custodyLog(options: {
           await chmod(path, 0o600)
           return true
         },
-        until,
+        wait,
       )
       return written === true
     } catch {
@@ -85,26 +85,27 @@ export function custodyLog(options: {
     capability,
     destination: "store" as const,
   })
-  const recover = (until: number) =>
-    withCustodyLock(path, () => recoverCustodyLog(path, now()), until).catch(() => undefined)
+  const recover = (wait: LockWait) =>
+    withCustodyLock(path, () => recoverCustodyLog(path, now()), wait).catch(() => undefined)
   return {
-    // One wait budget per call (#15036, review 6067451001 L2): the recovery step and both records share it, so a lock a
-    // live process keeps holding costs the call LOCK_WAIT_MS at most, never once per record.
+    // One wait budget per call (reviews 6067451001 L2, 6067671766 N1): the recovery step and both records draw on it,
+    // and only time spent waiting for the lock counts, so a long operation keeps its wait for its own terminal record and
+    // a lock a live process keeps holding costs the call LOCK_WAIT_MS at most, never once per record.
     async begin(capability) {
-      const until = deadline()
-      await recover(until)
+      const wait = budget()
+      await recover(wait)
       const base = open(capability)
-      const recorded = await append({ ...base, phase: "started", pid: process.pid }, until)
+      const recorded = await append({ ...base, phase: "started", pid: process.pid }, wait)
       return {
         recorded,
         end: (outcome, code) =>
-          append({ ...base, phase: "terminal", outcome, ...(code === undefined ? {} : { code }) }, until),
+          append({ ...base, phase: "terminal", outcome, ...(code === undefined ? {} : { code }) }, wait),
       }
     },
     async refused(capability, code) {
-      const until = deadline()
-      await recover(until)
-      return append({ ...open(capability), phase: "terminal", outcome: "refused", code }, until)
+      const wait = budget()
+      await recover(wait)
+      return append({ ...open(capability), phase: "terminal", outcome: "refused", code }, wait)
     },
   }
 }
