@@ -7,7 +7,7 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { TaskManager } from "../manager/types"
+import type { AdmitResident, TaskManager } from "../manager/types"
 import type { CancelOutcome } from "../steering"
 import type { DagNodeInput } from "./graph"
 import { RetryClock } from "./infra-retry-fixture"
@@ -33,7 +33,9 @@ export function cleanupSelfResumeRoots(): void {
 
 type StopHook = (taskId: string, outcome: CancelOutcome) => Promise<void> | void
 
-export async function selfResumeE2e(key: string, nodes: readonly DagNodeInput[], resumeFence = true) {
+type SelfResumeE2eOptions = { readonly resumeFence?: boolean; readonly admit?: AdmitResident }
+
+export async function selfResumeE2e(key: string, nodes: readonly DagNodeInput[], options: SelfResumeE2eOptions = {}) {
   const project = fs.mkdtempSync(join(tmpdir(), "senpi-dag-self-resume-e2e-"))
   roots.push(project)
   const runner = new ControlledRunner(undefined, { connectable: true })
@@ -44,7 +46,8 @@ export async function selfResumeE2e(key: string, nodes: readonly DagNodeInput[],
     project,
     runner,
     materializeSkills: identityMaterializer,
-    resumeFence,
+    resumeFence: options.resumeFence ?? true,
+    ...(options.admit === undefined ? {} : { admit: options.admit }),
     cancelling: () => scheduler?.cancelling() ?? false,
     destruction: {
       destroyResidentTask: async (taskId, cause) => {
