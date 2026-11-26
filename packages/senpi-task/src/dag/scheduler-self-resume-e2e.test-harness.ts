@@ -10,6 +10,7 @@ import { join } from "node:path"
 import type { TaskManager } from "../manager/types"
 import type { CancelOutcome } from "../steering"
 import type { DagNodeInput } from "./graph"
+import { RetryClock } from "./infra-retry-fixture"
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { GatedOwnedStarts } from "./scheduler-admission-e2e.test-harness"
 import { isLiveOwnedTask } from "./scheduler-context"
@@ -72,10 +73,12 @@ export async function selfResumeE2e(key: string, nodes: readonly DagNodeInput[],
       return typeof value === "function" ? value.bind(target) : value
     },
   })
+  const clock = new RetryClock()
   scheduler = createDagScheduler({
     store: fixture.store,
     taskManager,
     initialRecord: fixture.manager.record(runId, parentSessionId),
+    scheduleRetry: clock.schedule,
   })
   const run = scheduler
   const taskOf = (nodeId: string): string => {
@@ -109,6 +112,7 @@ export async function selfResumeE2e(key: string, nodes: readonly DagNodeInput[],
     fixture,
     runner,
     starts,
+    clock,
     scheduler: run,
     runId,
     destroyed,
