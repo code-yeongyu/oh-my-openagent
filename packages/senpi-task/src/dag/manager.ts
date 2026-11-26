@@ -16,8 +16,8 @@ import { projectSnapshot } from "./run-snapshot"
 import {
   batchedOwnedTaskReader,
   drainOutstandingStop,
-  outstandingRunStop,
   outstandingStopRefusal,
+  summaryOutstandingStop,
   withOutstandingStop,
   type DagOwnedTaskReader,
   type DagRunStopper,
@@ -257,7 +257,7 @@ export function createDagManager(options: DagManagerOptions): DagManager {
       return undefined
     const target = store.readCheckpoint<DagRunRecordV1>(error.runId)
     if (target?.parentSessionId !== params.parentSessionId) return undefined
-    return outstandingRunStop(options.ownedTasks, target) === undefined ? undefined : target
+    return outstandingStopRefusal(options.ownedTasks, target) === undefined ? undefined : target
   }
   const ownedReader = options.ownedTasks === undefined ? undefined : batchedOwnedTaskReader(options.ownedTasks)
   const snapshotOf = (record: DagRunRecordV1): DagRunSnapshot =>
@@ -380,7 +380,7 @@ export function createDagManager(options: DagManagerOptions): DagManager {
         return a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0
       })
       return summaries.slice(0, limit).map((summary) => {
-        const outstandingStop = outstandingRunStop(ownedReader, summary)
+        const outstandingStop = summaryOutstandingStop(ownedReader, store, summary)
         return outstandingStop === undefined ? summary : { ...summary, outstandingStop }
       })
     },
