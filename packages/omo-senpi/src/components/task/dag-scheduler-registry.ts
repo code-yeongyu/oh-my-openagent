@@ -75,12 +75,10 @@ export function createDagSchedulerRegistry(ports: {
       // A scheduler that failed holds nothing any more; a settled or retired one leaves its lease to
       // the write that ends its holding (terminal, park, Stop, or the shutdown pause).
       releaseDagRunLease(store, runId, lease.hostPid)
-      logger.error("omo-senpi dag scheduler failed", {
-        runId,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error("omo-senpi dag scheduler failed", { runId, error: message })
       // The run is left `running` with nothing driving it: hand it on (recovery, or park) at once.
-      void onSchedulerEnded.failed(runId, owned.scheduler.snapshot().parentSessionId)
+      void onSchedulerEnded.failed(runId, owned.scheduler.snapshot().parentSessionId, message)
     })
   }
 

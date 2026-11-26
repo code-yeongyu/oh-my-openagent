@@ -4,14 +4,9 @@
 // `running` run no scheduler here holds and follows its live children again (#15125).
 import { afterEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 
-import { createDagFileStore, type DagRunRecordV1 } from "@oh-my-opencode/senpi-task/dag"
-
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { createDagRuntime } from "./dag-runtime"
-import { dagNode, recoveryEngine, ScriptedRunner, within } from "./dag-runtime-recovery.test-support"
+import { within } from "./dag-runtime-recovery.test-support"
+import { failingScheduler as failingSchedulerIn } from "./dag-runtime-scheduler-failure.test-support"
 
 const cleanupRoots: string[] = []
 
@@ -19,47 +14,7 @@ afterEach(() => {
   for (const root of cleanupRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
 })
 
-async function failingScheduler(name: string) {
-  const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-scheduler-failure-${name}-`))
-  cleanupRoots.push(cwd)
-  const sessionId = `session-scheduler-failure-${name}`
-  const pi = new FakeExtensionAPI()
-  const runner = new ScriptedRunner()
-  const engine = recoveryEngine(cwd, sessionId, pi, runner)
-  // The first time the scheduler follows an admitted child, following it fails.
-  const waitFor = engine.manager.waitFor.bind(engine.manager)
-  let faulted = false
-  engine.manager.waitFor = (taskId: string) => {
-    if (faulted) return waitFor(taskId)
-    faulted = true
-    throw new Error("attachment fault")
-  }
-  let markFailed = (): void => undefined
-  const failed = new Promise<void>((resolve) => (markFailed = resolve))
-  const logger = {
-    info: () => undefined,
-    warn: () => undefined,
-    error: (message: string) => {
-      if (message === "omo-senpi dag scheduler failed") markFailed()
-    },
-  }
-  const runtime = createDagRuntime({ pi, engine, logger })
-  await within(runtime.attach(), "attach")
-  const started = await within(
-    runtime.manager.start({
-      parentSessionId: sessionId,
-      rootSessionId: sessionId,
-      definition: { key: name, name, nodes: [dagNode("only")] },
-    }),
-    "manager.start",
-  )
-  const runId = started.snapshot.runId
-  await within(runner.whenStarted(1), "the child starting")
-  await within(failed, "the scheduler failing")
-  const store = createDagFileStore({ project_dir: cwd })
-  const read = () => store.readCheckpoint<DagRunRecordV1>(runId)
-  return { sessionId, runtime, runner, engine, runId, read }
-}
+const failingScheduler = (name: string) => failingSchedulerIn(cleanupRoots, name)
 
 describe("DAG runtime after a scheduler of this process fails", () => {
   test("#given the scheduler failed while its child runs #when the child settles #then this process follows it again and the run completes", async () => {

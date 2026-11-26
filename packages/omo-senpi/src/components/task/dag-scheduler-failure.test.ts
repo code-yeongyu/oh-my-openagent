@@ -15,7 +15,8 @@ import {
   runId,
 } from "../../../../senpi-task/src/dag/__fixtures__/reattached-run"
 import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-reservations"
-import { createSchedulerFailureHandler, DAG_SCHEDULER_FAILED_PAUSE_REASON } from "./dag-scheduler-failure"
+import { DAG_SCHEDULER_FAILED_PAUSE_REASON } from "../../../../senpi-task/src/dag/events"
+import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
 
 const cleanupRoots: string[] = []
 
@@ -52,11 +53,11 @@ function failedSchedulerRun(holder: number) {
 describe("DAG scheduler failure handler", () => {
   test("#given a run whose scheduler failed once #when it fails again #then the first failure ran recovery and the second parks the run", async () => {
     const run = failedSchedulerRun(101)
-    await run.handler.failed(runId, run.running.parentSessionId)
+    await run.handler.failed(runId, run.running.parentSessionId, "fault")
     expect(run.recovered).toEqual([run.running.parentSessionId])
     expect(run.read()?.status).toBe("running")
 
-    await run.handler.failed(runId, run.running.parentSessionId)
+    await run.handler.failed(runId, run.running.parentSessionId, "fault")
     expect(run.recovered).toHaveLength(1)
     expect(run.read()?.status).toBe("paused")
     const events = run.store.readEvents(runId, 0, { limit: 50 }).events
@@ -67,17 +68,17 @@ describe("DAG scheduler failure handler", () => {
 
   test("#given a run whose scheduler settled in between #when it fails again #then that is a first failure: recovery, not a park", async () => {
     const run = failedSchedulerRun(101)
-    await run.handler.failed(runId, run.running.parentSessionId)
+    await run.handler.failed(runId, run.running.parentSessionId, "fault")
     run.handler.settled(runId)
-    await run.handler.failed(runId, run.running.parentSessionId)
+    await run.handler.failed(runId, run.running.parentSessionId, "fault")
     expect(run.recovered).toHaveLength(2)
     expect(run.read()?.status).toBe("running")
   })
 
   test("#given another live process took the run #when this process's second failure would park it #then nothing is written", async () => {
     const run = failedSchedulerRun(303)
-    await run.handler.failed(runId, run.running.parentSessionId)
-    await run.handler.failed(runId, run.running.parentSessionId)
+    await run.handler.failed(runId, run.running.parentSessionId, "fault")
+    await run.handler.failed(runId, run.running.parentSessionId, "fault")
     expect(run.read()?.status).toBe("running")
     expect(run.store.readEvents(runId, 0, { limit: 50 }).events).toEqual([])
   })
