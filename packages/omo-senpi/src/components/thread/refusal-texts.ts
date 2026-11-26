@@ -1,9 +1,9 @@
-import { ADDRESS_TEXTS } from "./address/refusal-texts"
-import { CONTROL_TEXTS } from "./control/refusal-texts"
+import { ADDRESS_TEXTS } from "./address-refusal-texts"
+import { CONTROL_TEXTS } from "./control-refusal-texts"
 import type { ThreadErrorCode } from "./errors"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import { READ_TEXTS } from "./read-refusal-texts"
-import { RELAY_TEXTS } from "./remote/refusal-texts"
+import { RELAY_TEXTS } from "./relay-refusal-texts"
 
 // The one producer of a keyed refusal's sentence (#14951, design lane ruling): each refusal is TEMPLATE DATA with named
 // slots, so the same table renders the first answer, a receipt records the template id and slots the producer attached

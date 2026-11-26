@@ -7,7 +7,7 @@ import { createRemoteThreadFixture } from "./thread-remote-fixture"
 
 // Slice T1b: threads.unload on the root, one `unload_session` with the caller's options on either leg (this device's
 // endpoint, another device through its device service). The answer names what the unload dropped; each engine refusal
-// is typed by the blocker it names, worded by its control.unload_* template (goldens in control/refusal-texts.test.ts).
+// is typed by the blocker it names, worded by its control.unload_* template (goldens in control-refusal-texts.test.ts).
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)

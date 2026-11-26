@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
-import { guidance, type GuidanceId, provenanceOf, REFUSAL_TEXTS, refusal, type RefusalId } from "../refusal-texts"
-import { CONTROL_TEXTS } from "./refusal-texts"
+import { guidance, type GuidanceId, provenanceOf, REFUSAL_TEXTS, refusal, type RefusalId } from "./refusal-texts"
+import { CONTROL_TEXTS } from "./control-refusal-texts"
 
 // Goldens for the control.* templates (#14951): each expected message and next_action is the sentence its call site built
 // by hand before the migration, copied from that code with the slot values substituted, so a template that drifts by one

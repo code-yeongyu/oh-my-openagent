@@ -1,4 +1,4 @@
-import type { GuidanceText, RefusalText } from "../refusal-texts"
+import type { GuidanceText, RefusalText } from "./refusal-texts"
 
 const UPDATE_HERE = "Update omo on this device and restart its host."
 const LIST_ALL_THEN_OPEN =
