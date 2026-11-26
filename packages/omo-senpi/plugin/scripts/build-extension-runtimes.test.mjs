@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
+import { buildOmoSdkRuntime, omoSenpiBuildDefines } from "./build-extension-core.mjs"
 import { checkExtensionCurrent } from "./build-extension.mjs"
 import { SDK_RUNTIME_FILES } from "./runtime-files.mjs"
 import {
@@ -242,6 +243,21 @@ describe("the SDK root's thread runtime file (P1c, #15031)", () => {
     const { set } = await staticModuleSet(undefined, { row: threadsRow })
     expect(definition).toBe(staticSetDefinition(threadsRow))
     expect(difference(set, modules)).toEqual({ added: [], removed: [] })
+  })
+})
+
+describe("the root runtime build's kept metafile", () => {
+  // Review 6074228823: the copy runs only after a successful build, and the build's own metafile is removed either way.
+  test("#given a metafile destination that cannot be written #when the root runtime builds #then the build rejects and leaves no metafile beside its output", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omo-sdk-keep-metafile-"))
+    perTestRoots.push(dir)
+    const output = join(dir, "sdk.js")
+    await expect(
+      buildOmoSdkRuntime(output, omoSenpiBuildDefines("0.0.0-test"), {
+        keepMetafile: join(dir, "missing", "meta.json"),
+      }),
+    ).rejects.toThrow()
+    expect(existsSync(`${output}.meta.json`)).toBe(false)
   })
 })
 

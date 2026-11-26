@@ -609,7 +609,7 @@ export async function buildExtension(options = {}) {
  * before it is removed: plugin/scripts/omo-sdk-static-set.mjs reads what this build keeps (#14950); `entry` lets its
  * control build one extra import on top of the same entry with the same settings.
  */
-function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
+export function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
   return buildRuntimeFile(SDK_RUNTIME_FILES[0], output, buildDefines, { keepMetafile, entry })
 }
 
@@ -652,7 +652,7 @@ async function buildEntry(
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
     await minifyBundle(output)
-    return await attachBuildMarker({
+    const inputs = await attachBuildMarker({
       output,
       entry,
       metafile,
@@ -661,8 +661,10 @@ async function buildEntry(
       buildSettings: digestSettingsFor(externals, builtinModuleNames),
       buildScriptPath,
     })
-  } finally {
+    // Kept only for a build that succeeded, so a failed build's own error is what the caller sees.
     if (keepMetafile !== undefined) await copyFile(metafile, keepMetafile)
+    return inputs
+  } finally {
     await rm(metafile, { force: true })
   }
 }
