@@ -1214,7 +1214,7 @@ class TaskManagerImpl implements TaskManager {
     handle: ManagedChildHandle,
     awaitingInput?: { readonly reason: AwaitingInputReason },
   ): Promise<ReattachResult> {
-    const followContinuation = this.#continuedRuns.follower(handle)
+    const followContinuation = this.#continuedRuns.follower(record.task_id, handle)
     const result = await reattachManagedTask({
       record,
       handle,
@@ -1241,6 +1241,8 @@ class TaskManagerImpl implements TaskManager {
       ...(awaitingInput === undefined ? {} : { awaitingInput }),
       ...(followContinuation === undefined ? {} : { followContinuation }),
     })
+    // A concurrent revival attached first: this one is done when that one has decided its continued run.
+    if (!result.ok && result.kind === "already_attached") await this.#continuedRuns.settled(record.task_id)
     const paused = result.ok ? this.get(record.task_id) : undefined
     if (paused?.status === "paused") this.#runPause.park(paused.task_id, paused.notification.run_epoch)
     // The flag is user-visible state: a live progress row leaves "starting" for
