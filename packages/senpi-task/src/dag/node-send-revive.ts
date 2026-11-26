@@ -14,6 +14,7 @@ import {
 } from "./node-control-context"
 import { persistDagNodeResult } from "./results"
 import { acquireDagRun, classifySend, dagRunEligibility, type DagSendClass } from "./run-acquisition"
+import { reserveWhenFree } from "./run-reservations"
 import type { DagSchedulerOptions } from "./scheduler"
 import { type DagNodeError, type DagNodeErrorCode, type DagNodeId, type DagRunId } from "./types"
 
@@ -108,39 +109,66 @@ function notOwned(runId: DagRunId, holderPid: number): DagNodeControlError {
   })
 }
 
-// A revived child can settle OUTSIDE the live settle loop (the run may already be quiescent):
-// no admission pass is necessarily awaiting this task, so the send arms the one watcher that folds
-// its new terminal outcome and persists its result exactly once.
+// A revived child can settle OUTSIDE the live settle loop (the run may already be quiescent): no
+// admission pass is necessarily awaiting this task, so the send arms the one watcher that folds its
+// new terminal outcome and persists its result exactly once. The fold is a mutation of the run like
+// every other: it waits for the run's reservation (#15125), so it is written only after any send of
+// this host still in flight, and a revive that send made keeps the lease alive past this fold.
 export async function watchRevivedTask(options: DagSchedulerOptions, nodeId: DagNodeId, taskId: string): Promise<void> {
+  let settled: TaskRecord | { readonly error: unknown }
+  try {
+    settled = await options.taskManager.waitFor(taskId)
+  } catch (error) {
+    settled = { error }
+  }
+  const runId = options.initialRecord.runId
+  const hold =
+    options.reservations === undefined ? undefined : await reserveWhenFree(options.reservations, runId, "revive fold")
+  try {
+    foldRevived(options, nodeId, taskId, settled)
+  } finally {
+    hold?.release()
+  }
+}
+
+function foldRevived(
+  options: DagSchedulerOptions,
+  nodeId: DagNodeId,
+  taskId: string,
+  settled: TaskRecord | { readonly error: unknown },
+): void {
   const now = options.now ?? Date.now
   const runId = options.initialRecord.runId
-  let task: TaskRecord
-  try {
-    task = await options.taskManager.waitFor(taskId)
-  } catch (error) {
-    failRevivedNode(options, nodeId, "task_error", controlErrorMessage(error), now)
-    return
-  }
-  if (task.status === "pending" || task.status === "running" || task.status === "paused") {
-    failRevivedNode(options, nodeId, "task_error", `revived task ${taskId} settled nonterminal`, now)
-    return
-  }
-  if (task.status !== "completed") {
-    const failure = revivedTaskFailure(task.status, task.error_message)
-    failRevivedNode(options, nodeId, failure.code, failure.message, now)
-    return
+  if (!stillRevived(currentRecord(options, runId), nodeId, taskId)) return
+  if ("error" in settled)
+    return failRevivedNode(options, nodeId, taskId, "task_error", controlErrorMessage(settled.error), now)
+  if (settled.status === "pending" || settled.status === "running" || settled.status === "paused")
+    return failRevivedNode(options, nodeId, taskId, "task_error", `revived task ${taskId} settled nonterminal`, now)
+  if (settled.status !== "completed") {
+    const failure = revivedTaskFailure(settled.status, settled.error_message)
+    return failRevivedNode(options, nodeId, taskId, failure.code, failure.message, now)
   }
   // Persist before the transition: the reducer rebuilds artifact metadata and run stats from the
   // durable copy, so a crash between the two still replays into an identical checkpoint.
-  const persisted = persistDagNodeResult({ store: options.store, runId, nodeId, record: task, now })
+  const persisted = persistDagNodeResult({ store: options.store, runId, nodeId, record: settled, now })
   if (persisted.kind === "failed") throw new Error(persisted.diagnostic.message)
-  const journal = controlJournal(options, currentRecord(options, runId))
-  journal.append(dagNodeTransitionedEvent({ nodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }))
+  const skip = (fresh: DagRunRecordV1) => !stillRevived(fresh, nodeId, taskId)
+  controlJournal(options, currentRecord(options, runId), undefined, skip).append(
+    dagNodeTransitionedEvent({ nodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }),
+  )
+}
+
+// The fold applies only while the node still runs this revived child (decided again under the
+// journal's run lock): nothing else may have moved it meanwhile.
+function stillRevived(record: DagRunRecordV1, nodeId: DagNodeId, taskId: string): boolean {
+  const node = record.nodes.find((entry) => entry.id === nodeId)
+  return node?.state === "running" && node.taskId === taskId
 }
 
 function failRevivedNode(
   options: DagSchedulerOptions,
   nodeId: DagNodeId,
+  taskId: string,
   code: DagNodeErrorCode,
   message: string,
   now: () => number,
@@ -149,8 +177,10 @@ function failRevivedNode(
   const pendingErrors = new Map<DagNodeId, DagNodeError>([
     [nodeId, { code, message, nodeId, at: new Date(now()).toISOString() }],
   ])
-  const journal = controlJournal(options, currentRecord(options, runId), pendingErrors)
-  journal.append(dagNodeTransitionedEvent({ nodeId, from: "running", to: "failed", reason: { kind: "failed" } }))
+  const skip = (fresh: DagRunRecordV1) => !stillRevived(fresh, nodeId, taskId)
+  controlJournal(options, currentRecord(options, runId), pendingErrors, skip).append(
+    dagNodeTransitionedEvent({ nodeId, from: "running", to: "failed", reason: { kind: "failed" } }),
+  )
 }
 
 function revivedTaskFailure(

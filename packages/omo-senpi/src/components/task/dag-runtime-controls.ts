@@ -81,7 +81,7 @@ export function createDagRuntimeControls(ports: {
       if (held !== undefined) return held.scheduler.sendToNode(runId, nodeId as DagNodeId, message)
       const record = coreManager.record(runId, ports.sessionId())
       return sendToDagNode(
-        { ...schedulerOptions, initialRecord: record, reservation },
+        { ...schedulerOptions, initialRecord: record, reservation, reservations: ports.reservations },
         runId,
         nodeId as DagNodeId,
         message,

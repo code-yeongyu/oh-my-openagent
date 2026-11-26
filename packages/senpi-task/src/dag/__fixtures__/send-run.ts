@@ -67,7 +67,7 @@ export function sendRun(
     try {
       const initialRecord = base.readCheckpoint<DagRunRecordV1>(runId) ?? failed
       return await sendToDagNode(
-        { store, taskManager, hostPid: THIS_HOST, isProcessAlive: alive, initialRecord, reservation },
+        { store, taskManager, hostPid: THIS_HOST, isProcessAlive: alive, initialRecord, reservation, reservations },
         runId,
         nodeId as DagNodeId,
         "again",

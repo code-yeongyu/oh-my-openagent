@@ -119,7 +119,6 @@ export function acquireReentryLease(
     hostPid: options.hostPid ?? process.pid,
     isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
   }
-  const heldBefore = readRecord(options.store, runId)?.leaseHolderPid === probe.hostPid
   const parentSessionId = options.initialRecord.parentSessionId
   const acquired = acquireDagRun(options.store, runId, {
     operation: "re-entry",
@@ -131,7 +130,8 @@ export function acquireReentryLease(
   // The re-entry decides and writes from this record: the one acquired, never an earlier read.
   return {
     record: acquired.record,
-    abandon: heldBefore ? () => undefined : () => releaseDagRunLease(options.store, runId, probe.hostPid),
+    // Only a lease this acquisition wrote (decided under its lock) is given back.
+    abandon: acquired.leaseTaken ? () => releaseDagRunLease(options.store, runId, probe.hostPid) : () => undefined,
   }
 }
 

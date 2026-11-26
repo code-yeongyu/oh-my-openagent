@@ -104,4 +104,52 @@ describe("DAG retry decided on the acquired record", () => {
     expect(refusal).toEqual(expect.objectContaining({ code: "run_not_user_paused" }))
     expect(base.readEvents(runId, 0, { limit: 500 }).events).toEqual([])
   })
+
+  test("#given a lease this host already holds lands inside the retry's acquisition lock #when the retry is then refused on the acquired record #then the retry leaves that lease alone", () => {
+    // given - another operation of this host took the run (its lease) and completed the target
+    const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-retry-lease-taken-"))
+    cleanupRoots.push(directory)
+    const base = createDagFileStore(ownedTaskState(directory))
+    const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(
+      { key: "retry-lease-taken", name: "retry lease taken", nodes: [node("broken")] },
+      { broken: { state: "failed" } },
+    )
+    const failed: DagRunRecordV1 = { ...paused, status: "failed" }
+    base.writeCheckpoint(runId, failed)
+    let raced = false
+    const store: DagFileStore = {
+      ...base,
+      withRunLock: (lockedRunId, operation) => {
+        if (!raced && lockedRunId === runId) {
+          raced = true
+          const nodes = failed.nodes.map((entry) => ({ ...entry, state: "completed" as const }))
+          base.writeCheckpoint(runId, { ...failed, nodes, leaseHolderPid: 101 } as DagRunRecordV1)
+        }
+        return base.withRunLock(lockedRunId, operation)
+      },
+    }
+
+    // when
+    let refusal: unknown
+    try {
+      retryDagNodes(
+        {
+          store,
+          taskManager: new LongRunningTaskManager(),
+          hostPid: 101,
+          isProcessAlive: (pid) => pid === 101,
+          initialRecord: failed,
+        },
+        runId,
+        ["broken" as DagNodeId],
+      )
+    } catch (error) {
+      refusal = error
+    }
+
+    // then
+    expect(raced).toBe(true)
+    expect(refusal).toEqual(expect.objectContaining({ code: "node_not_retryable" }))
+    expect(base.readCheckpoint<{ readonly leaseHolderPid?: number }>(runId)?.leaseHolderPid).toBe(101)
+  })
 })
