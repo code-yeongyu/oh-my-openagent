@@ -13,8 +13,9 @@ const GUARD_PATTERNS: readonly { readonly pattern: RegExp; readonly seam: (match
   { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\?\.([A-Za-z_$][\w$]*)/g, seam: (match) => `${match[1]}.${match[2]}` },
   { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\?\./g, seam: (match) => match[1] ?? "" },
   { pattern: /typeof\s+(?:[\w$]+\.)*(?:pi|api)\.(\w+)/g, seam: (match) => match[1] ?? "" },
-  { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\s*[!=]==?\s*undefined/g, seam: (match) => match[1] ?? "" },
-  { pattern: /["'](\w+)["']\s+in\s+(?:pi|api)(?![\w$.])/g, seam: (match) => match[1] ?? "" },
+  { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\s*[!=]==?\s*(?:undefined|null)\b/g, seam: (match) => match[1] ?? "" },
+  { pattern: /["'](\w+)["']\s+in\s+(?:[\w$]+\.)*(?:pi|api)(?![\w$.])/g, seam: (match) => match[1] ?? "" },
+  { pattern: /\bBoolean\(\s*(?:[\w$]+\.)*(?:pi|api)\.(\w+)\s*\)/g, seam: (match) => match[1] ?? "" },
   { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\s*(?:\?\?|&&|\|\||\?(?![.?]))/g, seam: (match) => match[1] ?? "" },
   { pattern: /!\s*(?:pi|api)\.(\w+)(?![\w$(.?])/g, seam: (match) => match[1] ?? "" },
   { pattern: /\bif\s*\(\s*(?:pi|api)\.(\w+)\s*\)/g, seam: (match) => match[1] ?? "" },
@@ -25,6 +26,12 @@ function guardedSeams(source: string): Set<string> {
   const seams = new Set<string>()
   for (const { pattern, seam } of GUARD_PATTERNS) {
     for (const match of code.matchAll(pattern)) seams.add(seam(match))
+  }
+  for (const match of code.matchAll(/\b(?:const|let|var)\s*\{([^{}]+)\}\s*=\s*(?:[\w$]+\.)*(?:pi|api)(?![\w$.])/g)) {
+    for (const binding of (match[1] ?? "").split(",")) {
+      const key = /^\s*([A-Za-z_$][\w$]*)\s*(?:$|:|=)/.exec(binding)?.[1]
+      if (key !== undefined) seams.add(key)
+    }
   }
   return seams
 }
@@ -87,6 +94,10 @@ describe("senpi seam contract", () => {
       "if (pi.getTheme) pi.getTheme()",
       'const status = api.setStatus && api.setStatus("x")',
       "if (!pi.setTitle) return",
+      "if (pi.nullEqual == null || pi.nullNotEqual != null || pi.nullStrict !== null) return",
+      "const enabled = Boolean(pi.boolGuard)",
+      "const { bindingGuard } = pi",
+      'if ("inDeps" in deps.pi) return',
       "const id = pi.sessionId || fallbackId",
       'const label = pi.sessionLabel ? pi.sessionLabel : "none"',
       'const n = pi.registerTool(tool) ?? pi.on("x", handler) && pi.cwd',
@@ -97,11 +108,17 @@ describe("senpi seam contract", () => {
 
     // then
     expect([...seams].sort()).toEqual([
+      "bindingGuard",
+      "boolGuard",
       "getTheme",
       "getWidgets",
       "hostVersion",
+      "inDeps",
       "lifecycle",
       "lifecycle.markRunCompleted",
+      "nullEqual",
+      "nullNotEqual",
+      "nullStrict",
       "registerRpcRemoteSource",
       "sessionId",
       "sessionLabel",
