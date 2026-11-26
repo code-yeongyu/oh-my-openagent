@@ -44,22 +44,18 @@ describe("the keychain helper under the test preload", () => {
   })
 
   // Custody review of 09d971691e, L5: a process a test starts is a test run too, through the environment mark.
-  test("#given a child process a test starts #then it is a test run when it inherits the environment or is passed the mark, and not otherwise", async () => {
+  test("#given a child process a test starts #then it is a test run when the test passes its environment or the mark, and not otherwise", async () => {
     const probe = `import { underTestRun } from ${JSON.stringify(join(import.meta.dir, "test-preload.ts"))}; console.log(underTestRun())`
-    const childSays = async (env?: Record<string, string>) => {
-      const child = Bun.spawn([process.execPath, "-e", probe], {
-        ...(env === undefined ? {} : { env: { PATH: process.env.PATH ?? "", ...env } }),
-        stdout: "pipe",
-        stderr: "pipe",
-      })
+    const childSays = async (env: Record<string, string | undefined>) => {
+      const child = Bun.spawn([process.execPath, "-e", probe], { env, stdout: "pipe", stderr: "pipe" })
       const [out] = await Promise.all([new Response(child.stdout).text(), child.exited])
       return out.trim()
     }
     expect({
-      inherited: await childSays(),
-      passed: await childSays({ [TEST_RUN_MARK]: "1" }),
-      bare: await childSays({}),
-    }).toEqual({ inherited: "true", passed: "true", bare: "false" })
+      testEnvironment: await childSays(process.env),
+      markPassed: await childSays({ PATH: process.env.PATH, [TEST_RUN_MARK]: "1" }),
+      bare: await childSays({ PATH: process.env.PATH }),
+    }).toEqual({ testEnvironment: "true", markPassed: "true", bare: "false" })
   })
 
   test("#given a new port wired to the real helper spawner #then it is refused by name and nothing is touched", async () => {

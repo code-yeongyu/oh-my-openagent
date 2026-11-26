@@ -13,13 +13,22 @@ export const underTestPreload = (): boolean => typeof Bun !== "undefined" && isI
 const TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/
 
 /**
- * Whether this process is a test run: under the preload, or run by `bun test`, whose main module is the test file. The
- * second holds wherever tests are started, with or without a package's own bunfig (review 6067671766 L2).
+ * The environment mark of a test run, for the processes a test starts (custody review of 09d971691e, L5): the test
+ * preload sets it in `process.env`, so a child the test starts with that environment carries it, and a test that builds
+ * a child's environment passes it. A child spawned with no `env` gets the runner's start-up environment instead (Bun's
+ * default), which has neither the mark nor the hermetic HOME: a test that starts the omo command passes its environment.
+ */
+export const TEST_RUN_MARK = "OMO_TEST_RUN"
+
+/**
+ * Whether this process is a test run: under the preload, run by `bun test` (whose main module is the test file, wherever
+ * tests are started; review 6067671766 L2), or started by a test that passed the mark.
  */
 export const underTestRun = (
   main: string = typeof Bun === "undefined" ? "" : Bun.main,
   secrets: unknown = typeof Bun === "undefined" ? undefined : Bun.secrets,
-): boolean => isInjectedSecrets(secrets) || TEST_FILE.test(main)
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean => isInjectedSecrets(secrets) || TEST_FILE.test(main) || env[TEST_RUN_MARK] === "1"
 
 /**
  * The repository's one guard on the signed keychain helper (security owner's order on the 2026-11-26 incident): in a

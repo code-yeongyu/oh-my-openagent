@@ -54,6 +54,9 @@ const testGitEnvironment = memoryGitEnvironment(process.env)
 for (const name of Object.keys(process.env)) {
   if (!Object.hasOwn(testGitEnvironment, name) || INJECTED_GIT_CONFIG.test(name.toUpperCase())) delete process.env[name]
 }
+// The filter above drops the test-run mark installHermeticHome set; a process this test starts needs it, or the keychain
+// helper guard would not hold there (account-core keychain-helper/test-preload.ts TEST_RUN_MARK).
+process.env.OMO_TEST_RUN = "1"
 
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {

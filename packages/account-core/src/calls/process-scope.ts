@@ -30,17 +30,29 @@ export const processScope = (): Promise<string | null> => (ownScope ??= readScop
 export type NamedProcess = { readonly pid: number; readonly start?: string | null; readonly scope?: string | null }
 
 /**
- * Whether `named` is provably gone: "gone" when its scope is this reader's and its pid is absent or now names a process
- * that started at another time; "elsewhere" when it was written in another scope, which this reader cannot judge; else
- * "alive". A record from before D22-17 (no scope) keeps the pid-only reading.
+ * Whether `named` is provably gone, judged by a reader whose own scope is `own`: "gone" when its scope is the reader's
+ * and its pid is absent or now names a process that started at another time; "elsewhere" when it was written in another
+ * scope; "unknown" when a scope or start identity needed for the judgement could not be read (written as null, or the
+ * reader's own): neither is proof of anything, so nobody calls it gone (decision D22-20). A record from before D22-17
+ * (no scope field at all) keeps the pid-only reading.
  */
-export async function processState(named: NamedProcess): Promise<"gone" | "alive" | "elsewhere"> {
-  if (named.scope !== undefined && named.scope !== null) {
-    const own = await processScope()
-    if (own === null || own !== named.scope) return "elsewhere"
-  }
+export async function processState(
+  named: NamedProcess,
+  own: string | null,
+): Promise<"gone" | "alive" | "elsewhere" | "unknown"> {
+  if (named.scope === undefined) return (await legacyGone(named)) ? "gone" : "alive"
+  if (named.scope === null || own === null) return "unknown"
+  if (own !== named.scope) return "elsewhere"
   if (getPidLiveness(named.pid) === "dead") return "gone"
-  if (named.start === undefined || named.start === null) return "alive"
+  if (named.start === undefined || named.start === null) return "unknown"
   const now = await processStart(named.pid)
-  return now !== null && now !== named.start ? "gone" : "alive"
+  if (now === null) return "unknown"
+  return now === named.start ? "alive" : "gone"
+}
+
+async function legacyGone(named: NamedProcess): Promise<boolean> {
+  if (getPidLiveness(named.pid) === "dead") return true
+  if (named.start === undefined || named.start === null) return false
+  const now = await processStart(named.pid)
+  return now !== null && now !== named.start
 }

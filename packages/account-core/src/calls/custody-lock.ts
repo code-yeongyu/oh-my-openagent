@@ -9,7 +9,8 @@ import { type NamedProcess, processScope, processStart, processState } from "./p
 // while it ran and two recoveries never close one operation twice. It is a file beside the log, created whole (written
 // aside, then linked into place) naming its holder by pid, start identity and scope. It is broken only:
 // - when that holder is proven gone in this reader's own scope (process-scope.ts),
-// - when it was written in another scope and is older than FOREIGN_SCOPE_BREAK_AGE_MS (a hold lasts milliseconds), or
+// - when it was written in another scope, or its holder's scope or start identity could not be read (unknown), and it is
+//   older than FOREIGN_SCOPE_BREAK_AGE_MS (a hold lasts milliseconds), or
 // - when it names no holder (a crash inside the take) and is older than HOLDERLESS_BREAK_AGE_MS.
 // A live holder in this scope is never broken. A wait ends PATIENCE_MS after the holder last changed and never later than
 // WAIT_CAP_MS: a holder that stays costs one patience, a queue that keeps moving is not starved.
@@ -34,7 +35,7 @@ function holderOf(text: string): NamedProcess | undefined {
     return {
       pid: value.pid,
       start: typeof value.start === "string" ? value.start : null,
-      ...(typeof value.scope === "string" ? { scope: value.scope } : {}),
+      ...("scope" in value ? { scope: typeof value.scope === "string" ? value.scope : null } : {}),
     }
   } catch {
     return undefined
@@ -48,8 +49,8 @@ async function breakable(path: string): Promise<boolean> {
   const age = held === undefined ? 0 : Date.now() - held.mtimeMs
   const holder = holderOf(text)
   if (holder === undefined) return age > HOLDERLESS_BREAK_AGE_MS
-  const state = await processState(holder)
-  return state === "gone" || (state === "elsewhere" && age > FOREIGN_SCOPE_BREAK_AGE_MS)
+  const state = await processState(holder, await processScope())
+  return state === "gone" || ((state === "elsewhere" || state === "unknown") && age > FOREIGN_SCOPE_BREAK_AGE_MS)
 }
 
 // Breakers are serialized by a second lock beside the first. Under it, the lock is judged again and removed: no taker can

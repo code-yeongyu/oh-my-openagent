@@ -43,6 +43,8 @@ test("omo account adopt on Linux with no gdbus succeeds and prints the fallback 
         OMO_SERVICE_API_URL: "http://127.0.0.1:1",
         // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
         OMO_TEST_CREDENTIAL_LOCK_HOME: home,
+        // A test run for the keychain helper guard (account-core keychain-helper/test-preload.ts).
+        OMO_TEST_RUN: "1",
       },
       stdin: new Blob([JSON.stringify(credential)]),
       stdout: "pipe",

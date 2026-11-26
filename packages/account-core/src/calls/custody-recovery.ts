@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { appendFile, readFile, rename, writeFile } from "node:fs/promises"
 import type { CustodyRecord } from "./custody-log"
-import { processState } from "./process-scope"
+import { processScope, processState } from "./process-scope"
 
 // The custody log's recovery step (security design 8.2, the security owner's ruling on review 6065026586), run under
 // the log's lock: an operation whose starter is provably gone is closed as `interrupted`, under the operation's own
@@ -9,7 +9,9 @@ import { processState } from "./process-scope"
 // however long it runs; one whose pid now names a process that started at another time is gone (D22-17). A starter
 // from another process-number space is never judged here: its operation is closed as `starter_scope_unreachable` only
 // once it reaches the retention horizon; one written before D22-17 (no scope) whose pid is still taken is closed there as
-// `starter_legacy_unverified`. Only a `started` record that names no process falls back to a deadline.
+// `starter_legacy_unverified`. One whose scope or start identity could not be read (written as null) is unknown, never
+// "no scope": it is closed only at the horizon, as `starter_identity_unknown` (decision D22-20). Only a `started` record that names no
+// process falls back to a deadline.
 // Records past retention whose operation is closed are dropped; every other line, a line that does not parse included,
 // is kept byte for byte.
 
@@ -26,19 +28,28 @@ function parse(line: string): CustodyRecord | undefined {
   }
 }
 
-type Interruption = "starter_ended" | "starter_scope_unreachable" | "starter_legacy_unverified" | "deadline_passed"
+type Interruption =
+  | "starter_ended"
+  | "starter_scope_unreachable"
+  | "starter_identity_unknown"
+  | "starter_legacy_unverified"
+  | "deadline_passed"
 
-async function interruption(record: CustodyRecord, now: number): Promise<Interruption | undefined> {
+async function interruption(record: CustodyRecord, now: number, own: string | null): Promise<Interruption | undefined> {
   const age = now - Date.parse(record.at)
   if (typeof record.pid !== "number") return age >= OPERATION_DEADLINE_MS ? "deadline_passed" : undefined
-  const state = await processState({
-    pid: record.pid,
-    ...(record.starter_start === undefined ? {} : { start: record.starter_start }),
-    ...(record.starter_scope === undefined ? {} : { scope: record.starter_scope }),
-  })
+  const state = await processState(
+    {
+      pid: record.pid,
+      ...(record.starter_start === undefined ? {} : { start: record.starter_start }),
+      ...(record.starter_scope === undefined ? {} : { scope: record.starter_scope }),
+    },
+    own,
+  )
   if (state === "gone") return "starter_ended"
   if (age < RETENTION_MS) return undefined
   if (state === "elsewhere") return "starter_scope_unreachable"
+  if (state === "unknown") return "starter_identity_unknown"
   // A record from before D22-17 names its starter by pid alone, which a live process may since have taken.
   return record.starter_scope === undefined ? "starter_legacy_unverified" : undefined
 }
@@ -67,7 +78,8 @@ export async function recoverCustodyLog(path: string, now: number): Promise<void
   const records = kept.map(parse).filter((record) => record !== undefined)
   const ended = new Set(records.filter((record) => record.phase === "terminal").map((record) => record.operation_id))
   const open = records.filter((record) => record.phase === "started" && !ended.has(record.operation_id))
-  const causes = await Promise.all(open.map((record) => interruption(record, now)))
+  const own = await processScope()
+  const causes = await Promise.all(open.map((record) => interruption(record, now, own)))
   const closings = open.flatMap<CustodyRecord>((record, index) => {
     const cause = causes[index]
     if (cause === undefined) return []

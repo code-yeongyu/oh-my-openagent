@@ -66,7 +66,12 @@ test("#given the fixture #when a probe requests non-local hosts and hands the op
       [process.execPath, "--preload", join(import.meta.dir, "account-goldens.fixture.ts"), "-e", PROBE],
       {
         cwd: home,
-        env: { PATH: process.env.PATH, HOME: home, GOLDEN_STORE_FILE: join(home, ".golden-store.json") },
+        env: {
+          PATH: process.env.PATH,
+          HOME: home,
+          GOLDEN_STORE_FILE: join(home, ".golden-store.json"),
+          OMO_TEST_RUN: "1",
+        },
         stdout: "pipe",
         stderr: "pipe",
       },
