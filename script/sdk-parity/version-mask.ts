@@ -5,7 +5,7 @@ import type { Outcome } from "./scenario-run"
 
 // Design 7.4 (version mask): a release or an engine pin bump changes the version a CLI prints, and nothing else. Before
 // the base-versus-head comparison each tree's outcome has ITS OWN declared versions replaced with fixed placeholders:
-// the omo version from that tree's packages/omo-native/package.json and the engine version from that tree's pin of
+// the omo package version from that tree's packages/omo-native/package.json and the engine version from that tree's pin of
 // @code-yeongyu/senpi there. Only those exact strings are replaced, never a pattern, so a version a tree does not declare
 // stays in its output and fails the comparison, and any other difference still fails. The goldens stay unmasked.
 

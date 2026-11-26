@@ -52,7 +52,7 @@ describe("version mask (positive control: the engine pin bump of #15075)", () =>
     expect(renderReport(report)).toContain(`VERSION MASK: ${ID}:`)
   })
 
-  test("#given only the declared omo version changed and native-version prints it #then it compares equal", () => {
+  test("#given only the declared omo package version changed and native-version prints it #then it compares equal", () => {
     const after = withText(base, (stdout) => stdout.split(declared.omo).join("9.9.9"))
     expect(run(after, { base: declared, head: { ...declared, omo: "9.9.9" } }).failures).toEqual([])
   })
