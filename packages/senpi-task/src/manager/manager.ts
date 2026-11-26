@@ -686,22 +686,23 @@ class TaskManagerImpl implements TaskManager {
     const registration =
       requestedRegistration ?? this.#names.register(spec.parent_session_id, undefined, claimed.task_id)
     spec.admission?.bind(claimed.task_id)
-    const admission = admitSpill(plan, this.#concurrency, claimed.task_id, claimed.notification.run_epoch)
-    const lease = admission.lease
-    // An earlier child already found these rungs spent: start on the first designated rung the memory clears (#11383).
-    const avoided = routeAroundSpentLimits(admission.plan, this.#limits)
+    // An earlier child already found these rungs spent: only the rungs the memory clears compete for capacity, so the
+    // lane a lease holds is always the lane of the model that launches (#11383).
+    const avoided = routeAroundSpentLimits(plan, this.#limits)
     if ("spent" in avoided) {
       return this.#failSpawn({
         claimed,
         registration,
         spec,
         executionMode,
-        lease,
+        lease: undefined,
         failure_kind: "usage_limit",
         error_message: `${avoided.spent}\nEvery model in this task's fallback chain is behind a usage limit an earlier task already hit, so it was not started. Retry once the limit resets, or point this category at another provider or model in omo.json.`,
       })
     }
-    const effectivePlan = avoided.plan
+    const admission = admitSpill(avoided.plan, this.#concurrency, claimed.task_id, claimed.notification.run_epoch)
+    const lease = admission.lease
+    const effectivePlan = admission.plan
     let finalRecord: TaskRecord
     let managedSpec: ManagedStartSpec
     let isolation: PreparedIsolation | undefined
