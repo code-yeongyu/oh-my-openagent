@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -15,6 +15,7 @@ import {
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 type Frame = Record<string, unknown>
 
@@ -24,7 +25,7 @@ afterEach(async () => {
 })
 
 function tempDir(prefix: string): string {
-  const directory = mkdtempSync(join("/tmp", prefix))
+  const directory = shortTempDir(prefix)
   cleanups.push(async () => rmSync(directory, { recursive: true, force: true }))
   return directory
 }

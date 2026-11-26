@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { resolveAddress, type ResolveOptions } from "."
+import { withCallDeadline } from "../../call-budget/call-deadline"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import { B, B_TWIN, OFF, QUIET, T, createTwoDevices, type TwoDeviceOptions } from "./testing/two-devices"
 
@@ -181,6 +182,23 @@ describe("#given a thread id nothing lists #when the per-device probe runs #then
       code: "host_unavailable",
       details: { reason: "device_unanswered", devices: [B.id] },
     })
+  })
+
+  test("#given B does not answer the probe and the call has less budget left than a solo retry and what follows it need #when probed #then B is not asked again and the refusal still names it (#14748 review M2)", async () => {
+    const two = createTwoDevices({ probe: true, silent: [B.id] })
+    cleanups.push(two.cleanup)
+    const context = { remote: two.remote, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive }
+
+    const resolved = await withCallDeadline(Date.now() + 10_000, () =>
+      resolveAddress(context, T.nowhere, { probe: true }),
+    )
+
+    expect(resolved).toMatchObject({
+      kind: "error",
+      code: "host_unavailable",
+      details: { reason: "device_unanswered", devices: [B.id] },
+    })
+    expect(two.account.lookups.filter((lookup) => lookup.device === B.id)).toHaveLength(1)
   })
 
   test("#given B misses the listing round but every device answers the probe with none #when probed #then not_found stands", async () => {
