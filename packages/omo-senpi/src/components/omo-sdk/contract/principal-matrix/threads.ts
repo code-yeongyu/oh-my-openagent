@@ -57,6 +57,20 @@ export const THREAD_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.1",
+    capability:
+      "A steer's turn guard (`expected_turn_id`): the id is a concurrency guard, not a permission, and who must supply it is decided once in the core, before any transport, the same on every leg",
+    slug: "steer-turn-guard",
+    rows: ["threads.send"],
+    input: { delivery: "steer" },
+    cells: columns({
+      people: allow("may omit it: the core steers the running turn"),
+      session: allow("must name the turn: a session that omits it is refused as the steer tool refuses today"),
+      connector: NA,
+      service: NA,
+    }),
+  },
+  {
+    section: "4.1",
     capability: "`self` as an address",
     slug: "self-address",
     rows: ["threads.read"],
@@ -117,20 +131,6 @@ export const THREAD_LINES: readonly MatrixLine[] = [
       session: allow("as a delivery"),
       connector: UNSUPPORTED_CONNECTOR,
       service: refuse("sender_not_allowed"),
-    }),
-  },
-  {
-    section: "4.1",
-    capability:
-      "A steer's turn guard (`expected_turn_id`): the id is a concurrency guard, not a permission, and who must supply it is decided once in the core, before any transport, the same on every leg",
-    slug: "steer-turn-guard",
-    rows: ["threads.send"],
-    input: { delivery: "steer" },
-    cells: columns({
-      people: allow("may omit it: the core steers the running turn"),
-      session: allow("must name the turn: a session that omits it is refused as the steer tool refuses today"),
-      connector: NA,
-      service: NA,
     }),
   },
   {
