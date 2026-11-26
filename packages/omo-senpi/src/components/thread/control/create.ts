@@ -11,6 +11,8 @@ import type {
   ThreadToolResult,
 } from "../contracts"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import { refusal as refusalText, withGuidance } from "../refusal-texts"
+import { queuedPromptGuidance } from "./prompt-guidance"
 import type { DeliveryTarget } from "../gateway/transport"
 import { checkInitialSkills } from "../initial-skills"
 import { createdDeviceRow } from "../remote/address-book"
@@ -22,6 +24,7 @@ import { resolveAddress } from "../address/lazy"
 import {
   addressBook,
   failure,
+  failureResult,
   noteCause,
   sendAddressBook,
   sendBookFor,
@@ -47,6 +50,7 @@ export type CreatePromptSend = {
   readonly thread: string
   readonly message: string
   readonly delivery?: ThreadCreateInput["delivery"]
+  readonly expected_turn_id?: string
 }
 
 /** What a create needs from the surface that runs it (the agent tools or the thread SDK). */
@@ -65,6 +69,8 @@ export type CreateContext = {
     send: CreatePromptSend,
     idempotencyKey: string,
   ) => Promise<ThreadToolResult>
+  /** The turn the first prompt names (the root's object prompt), checked by the send path as a send's own. */
+  readonly promptTurn?: string
   /** Waits, bounded by the call's budget, for the first prompt's gateway delivery on this device to start a turn. */
   readonly awaitPromptStart: (deliveryId: string) => Promise<PromptStart>
 }
@@ -120,11 +126,8 @@ export async function createThread(
     const skills =
       value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
     if (skills?.kind === "invalid")
-      return failure(
-        "invalid_arguments",
-        `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`,
-        "Pass skill names as listed by the skill index.",
-        { invalid: skills.names },
+      return failureResult(
+        refusalText("control.create_skill_names", { names: skills.names.join(", ") }, { invalid: skills.names }),
       )
     const loaded = skills?.kind === "ok" ? skills.names : undefined
     const entries = toThreadAddressEntries(addressBook(options, current))
@@ -305,11 +308,8 @@ async function promptThatRan(
   const { delivery } = prompt
   if (delivery.kind === "started" || delivery.kind === "steered") return prompt
   const local = thread.device === undefined
-  if (delivery.kind === "queued" && delivery.waiting_on?.kind === "wake")
-    return {
-      ...prompt,
-      next_action: `The prompt is stored${local ? "" : ` on device ${thread.device}`} and runs when ${thread.thread_id} wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).`,
-    }
+  const queued = queuedPromptGuidance(delivery, thread.thread_id, thread.device)
+  if (queued !== undefined) return withGuidance(prompt, "next_action", queued.id, queued.slots)
   if (!local && delivery.kind === "queued") return prompt
   const waited =
     local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
@@ -323,10 +323,14 @@ async function promptThatRan(
   const waitingOn = delivery.kind === "queued" ? delivery.waiting_on : undefined
   const where = local ? "" : ` on device ${thread.device}`
   return {
-    not_started: threadToolFailure(
-      "prompt_not_started",
-      `Thread ${thread.thread_id} was created${where}, but its first prompt did not start a turn (its delivery is ${state}${waitingOn === undefined ? "" : `, waiting on its ${waitingOn.kind}`}).`,
-      `The thread exists: read it with thread_read (tool.thread_read({ thread }) in an eval cell) to see whether the prompt ran, then send the prompt again with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell) if it did not. Do not create the thread again.`,
+    not_started: refusalText(
+      "control.create_prompt_not_started",
+      {
+        thread: thread.thread_id,
+        where,
+        state,
+        waiting: waitingOn === undefined ? "" : `, waiting on its ${waitingOn.kind}`,
+      },
       {
         thread: thread.thread_id,
         ...(thread.device === undefined ? {} : { device: thread.device }),
@@ -358,6 +362,7 @@ async function firstPrompt(
     thread: thread.thread_id,
     message: value.prompt ?? "",
     ...(value.delivery === undefined ? {} : { delivery: value.delivery }),
+    ...(context.promptTurn === undefined ? {} : { expected_turn_id: context.promptTurn }),
   }
   // The thread exists from here on: a delivery that throws (a store or connection failure, not a typed refusal) is the
   // prompt's outcome, never the create's, so the caller still gets the thread it made (review L1 at 0571de8).
@@ -373,20 +378,20 @@ async function firstPrompt(
     return {
       error:
         refusal === undefined
-          ? threadToolFailure(
-              "internal_error",
-              `The thread was created, but its first prompt was not delivered: ${message}.`,
-              `Send it with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell); read the thread first if the prompt may have arrived.`,
+          ? refusalText(
+              "control.create_prompt_undelivered",
+              { thread: thread.thread_id, error: message },
               { thread: thread.thread_id },
             )
-          : threadToolFailure(
-              refusal.code,
-              `The thread was created, but its first prompt was not delivered: this omo build reads gateway schema ${
-                (error as { readonly details?: { readonly supported?: unknown } }).details?.supported
-              }, while this machine's gateway store is at schema ${
-                (error as { readonly details?: { readonly found?: unknown } }).details?.found
-              }: a newer omo build already upgraded it.`,
-              `Update omo with \`omo update\`, then send the prompt with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell).`,
+          : refusalText(
+              "control.create_prompt_schema_too_new",
+              {
+                thread: thread.thread_id,
+                supported: String(
+                  (error as { readonly details?: { readonly supported?: unknown } }).details?.supported,
+                ),
+                found: String((error as { readonly details?: { readonly found?: unknown } }).details?.found),
+              },
               { ...refusal.details, thread: thread.thread_id },
             ),
     }
@@ -526,7 +531,7 @@ const fileOpen = (file: Extract<LocalExisting, { readonly kind: "file" }>) => ({
   ...(file.cwd === undefined ? {} : { cwd: file.cwd }),
 })
 
-/** The worktree an uncertain create's first answer kept (its receipt note, `uncertainNote`), when it names a whole one. */
+/** The worktree an uncertain create's first answer kept (its receipt note, `encodeNote`), when it names a whole one. */
 function keptWorktree(note: string | null | undefined): ThreadWorktree | undefined {
   const kept = note === null || note === undefined ? undefined : noteCause(note).details?.["worktree"]
   if (typeof kept !== "object" || kept === null) return undefined

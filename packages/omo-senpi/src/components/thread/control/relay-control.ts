@@ -5,14 +5,21 @@ import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { relayAddressEntry } from "../remote/address-book"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
-import { readContextTail } from "../remote/transcript-tail"
-import { selectEntryPage } from "../paged-reader"
+import { readTailPage } from "../remote/transcript-tail"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { REMOTE_GRACEFUL_MAX_WAIT_MS } from "../contracts/fields"
-import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
+import { closeLadder, type LadderSend, SESSION_GONE, type RecordAnswer, unloadOver } from "./close-ladder"
 import { interruptOver } from "./interrupt"
-import { ControlRefusal, refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { carryProvenance, refusal } from "../refusal-texts"
+import {
+  ControlRefusal,
+  refuse,
+  refuseWith,
+  sessionModelState,
+  SESSION_ONLY_THINKING_SCOPE,
+  type SessionControl,
+} from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 import { displayedThread } from "./relay-session-host"
 import { threadRow } from "../tools/thread-row"
@@ -60,6 +67,32 @@ export function createRelayControl(
     if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
     return { kind: "ok", data: replyData(outcome.response) }
   }
+  // The records that end the session (a close, an unload). The unload's reply names the session file: a reopen from this
+  // surface needs it while the listing lags (#14170). Its effect names when the holder recorded the end, on the holder's
+  // clock (#14273). Once the session ended this surface lists it ended; a refusal names the device.
+  const ending = async <T>(run: (send: LadderSend) => Promise<T>, ended: (answer: T) => boolean): Promise<T> => {
+    try {
+      let unloaded: string | undefined
+      let closedAt: number | undefined
+      const answered = await run(async (rpc) => {
+        const record = await answer(rpc)
+        const path = record.kind === "ok" ? record.data["sessionPath"] : undefined
+        if (typeof path === "string" && path !== "") unloaded = path
+        const effect = record.kind === "ok" ? record.data["effect"] : undefined
+        const at = isObject(effect) && typeof effect["updatedAt"] === "string" ? Date.parse(effect["updatedAt"]) : NaN
+        if (Number.isFinite(at)) closedAt = at
+        return record
+      })
+      if (ended(answered)) remote.sessions.closed?.(row, unloaded, closedAt)
+      return answered
+    } catch (error) {
+      throw error instanceof ControlRefusal
+        ? new ControlRefusal(
+            carryProvenance(error.failure, { ...error.failure, details: { device, ...error.failure.details } }),
+          )
+        : error
+    }
+  }
   return {
     thread_id: rowKey(row),
     device,
@@ -80,35 +113,16 @@ export function createRelayControl(
       }
     },
     interrupt: (turnId) => interruptOver((request) => command({ type: "interrupt", ...request }), turnId),
-    close: async (closeOptions) => {
-      try {
-        // The unload's reply names the session file: a reopen from this surface needs it while the listing lags (#14170).
-        // Its effect names when the holder recorded the close, on the holder's clock (#14273).
-        let unloaded: string | undefined
-        let closedAt: number | undefined
-        const closed = await closeLadder(
-          sessionId,
-          async (rpc) => {
-            const answered = await answer(rpc)
-            const path = answered.kind === "ok" ? answered.data["sessionPath"] : undefined
-            if (typeof path === "string" && path !== "") unloaded = path
-            const effect = answered.kind === "ok" ? answered.data["effect"] : undefined
-            const at =
-              isObject(effect) && typeof effect["updatedAt"] === "string" ? Date.parse(effect["updatedAt"]) : NaN
-            if (Number.isFinite(at)) closedAt = at
-            return answered
-          },
-          closeOptions,
-          REMOTE_GRACEFUL_MAX_WAIT_MS,
-        )
-        if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded, closedAt)
-        return closed
-      } catch (error) {
-        throw error instanceof ControlRefusal
-          ? new ControlRefusal({ ...error.failure, details: { device, ...error.failure.details } })
-          : error
-      }
-    },
+    close: (closeOptions) =>
+      ending(
+        (send) => closeLadder(sessionId, send, closeOptions, REMOTE_GRACEFUL_MAX_WAIT_MS),
+        (closed) => closed.outcome !== "held_elsewhere",
+      ),
+    unload: (unloadOptions) =>
+      ending(
+        (send) => unloadOver(sessionId, rowKey(row), send, unloadOptions),
+        () => true,
+      ),
     setName: async (name) => {
       await command({ type: "set_session_name", name })
     },
@@ -139,12 +153,7 @@ export function createRelayControl(
         scope: SESSION_ONLY_THINKING_SCOPE,
       })
       if (outcome.kind === "refused" && THINKING_LEVEL_UNSUPPORTED.test(outcome.reason))
-        throw refuse(
-          "thinking_level_unsupported",
-          `Thinking level ${level} is not supported by the active model.`,
-          "Choose a level from the supported list and retry.",
-          { device, level },
-        )
+        throw refuseWith(refusal("control.thinking_level_unsupported_on_device", { level }, { device, level }))
       if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
     },
     getMessages: async () => {
@@ -154,10 +163,8 @@ export function createRelayControl(
     readEntryPage: async (read) => {
       const project = await remote.loadProjector?.().catch(() => undefined)
       if (project === undefined) return { kind: "unsupported" }
-      const tail = await readContextTail(remote.sessions, device, sessionId, project)
-      if (tail.kind === "unsupported") return tail
-      if (tail.kind === "failed") return outcomeFailure(tail.outcome, device)
-      return selectEntryPage(tail.tail, read)
+      const page = await readTailPage(remote.sessions, device, sessionId, project, read)
+      return page.kind === "failed" ? outcomeFailure(page.outcome, device) : page
     },
     waitSettled: (timeoutMs, signal) =>
       waitForTurnEnd(

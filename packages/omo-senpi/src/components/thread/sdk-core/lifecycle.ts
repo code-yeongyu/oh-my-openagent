@@ -5,7 +5,7 @@ import { classifyWarmReply, type WarmAnswer } from "../../../../../senpi-task/sr
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
 import { resolveThreadSocket } from "../live-surface-paths"
 import type { ThreadCoreContext } from "./context"
-import { type Failure, thrown } from "./failures"
+import type { Failure } from "./failures"
 import type { LocatedThread } from "./reads"
 
 // The first load compiles the extension graph; a loaded host answers in well under a second (the task host's bound).
@@ -29,7 +29,7 @@ export function createLifecycle(
     try {
       return await releaseSession(thread.endpoint, { reason: "takeover", ...request })
     } catch (error) {
-      const failure = thrown(error)
+      const failure = context.fault(error)
       return { success: false, error: failure.error.code, errorData: { hint: failure.error.message } }
     }
   }

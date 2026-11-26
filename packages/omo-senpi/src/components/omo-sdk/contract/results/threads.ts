@@ -11,6 +11,7 @@ import type {
   ThreadSendResult,
   ThreadSetModelResult,
   ThreadSetReasoningResult,
+  ThreadUnloadResult,
   ThreadWaitOutcome,
 } from "../../../thread/contracts/results"
 import type { ReleaseSessionReply } from "../../../thread/gateway/adapter"
@@ -36,6 +37,7 @@ export type {
   ThreadSendResult,
   ThreadSetModelResult,
   ThreadSetReasoningResult,
+  ThreadUnloadResult,
 }
 
 /**
@@ -59,7 +61,19 @@ export type ThreadLocateResult = Ok<{ readonly located: LocatedThread }>
 
 export type ThreadEntriesResult = Ok<{ readonly page: ReadPage }>
 
-export type ThreadMessagesResult = Ok<{ readonly messages: readonly JsonObject[] }>
+/** The newest messages that fit the read's byte budget, oldest first; `truncated` when older ones did not fit. */
+/**
+ * The engine's whole message list, cut to the budget from the newest message back. Its messages carry no id and it takes
+ * no `after`: durable paging (an item id that holds across reads and devices, and reading after one) is `threads.read`'s.
+ */
+export type ThreadMessagesResult = Ok<{
+  readonly messages: readonly JsonObject[]
+  readonly truncated: boolean
+  readonly total_items: number
+  readonly max_bytes: number
+  /** The asked max_bytes passed the 1 MiB cap: `max_bytes` is the cap the read took (never a refusal). */
+  readonly clamped?: true
+}>
 
 export type ThreadGetResult = Ok<{ readonly session: SessionDetail }>
 
@@ -68,13 +82,6 @@ export type ThreadWaitResult = Ok<{ readonly wait: ThreadWaitOutcome }>
 /** The remote stream's nonterminal events; its own `end` and `failed` become the root stream's one terminal event. */
 export type ThreadFollowEvent = Exclude<FollowEvent, { readonly kind: "end" | "failed" }>
 export type ThreadFollowOutcome = FollowOutcome
-
-/** The session left its host and stays resumable; what it dropped is named, as `omo host session unload` reports it. */
-export type ThreadUnloadResult = Ok<{
-  readonly unloaded: boolean
-  readonly dropped_deliveries: readonly string[]
-  readonly detached_children: readonly string[]
-}>
 
 /** The engine's own `release_session` reply, kept as the value: release is one of the 4.4 exceptions. */
 export type ThreadReleaseResult = ReleaseSessionReply

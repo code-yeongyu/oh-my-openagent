@@ -247,7 +247,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Pick a level from details.supported.",
   },
   timeout: {
-    namespaces: ["daemon"],
+    namespaces: ["daemon", "threads"],
     next_action: "Retry the call; if it changes something, read the current state first.",
   },
   transport_expired: {

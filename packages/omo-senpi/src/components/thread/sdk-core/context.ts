@@ -8,6 +8,10 @@ import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayServices } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "../tools/ports"
+import { SYSTEM_WAIT_CLOCK, type WaitClock } from "../../call-budget/call-deadline"
+import { controlRefusalOf } from "../control/port"
+import { guarded, reportUnexpected, thrown } from "./failures"
+import { createKeyed } from "./keyed"
 
 export type ThreadCoreOptions = {
   readonly agentDir: string
@@ -30,6 +34,16 @@ export type ThreadCoreOptions = {
   /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
   readonly firstPromptWaitMs?: number
   readonly now?: () => number
+  /** Where the engine draws each delivery's id; absent, a random UUID (test seam). */
+  readonly deliveryId?: () => string
+  /** The clock a control's wait (signal, deadline_ms) reads; absent, the system clock (test seam). */
+  readonly waitClock?: WaitClock
+  /**
+   * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
+   * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   * A port that wrote the details to a local file answers that file's path, and the fixed message names it.
+   */
+  readonly onUnexpected?: (error: unknown) => unknown
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
    * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
@@ -69,6 +83,8 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     callerSessionId: () => UNKNOWN_CALLER,
     callerWorkspaceRoot: () => options.cwd,
     now,
+    ...(options.deliveryId === undefined ? {} : { deliveryId: options.deliveryId }),
+    ...(options.onUnexpected === undefined ? {} : { onUnexpected: options.onUnexpected }),
   }
   const view = () => hostView(surface)
   const { pipeline } = createGatewayServices(
@@ -87,5 +103,31 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     local,
     callerId: UNKNOWN_CALLER,
   })
-  return { options, principal, env, host, store, surface, view, pipeline, controls, resolveContext }
+  // Every operation's failure mapping, bound to this core's logger port (B8): an unexpected exception reaches it alone.
+  const guard = <T>(body: () => Promise<T>) => guarded(body, options.onUnexpected)
+  const keyed = createKeyed(store, principal, options.cwd, now, options.onUnexpected)
+  const fault = (error: unknown) => thrown(error, options.onUnexpected)
+  // A port call's failure that arrives after its wait was lost: a control's typed refusal is an answer no one awaits any
+  // more; anything else is unexpected and goes to the logger port (B8).
+  const late = (error: unknown): void => {
+    if (controlRefusalOf(error) === undefined) reportUnexpected(options.onUnexpected, error)
+  }
+  const waitClock = options.waitClock ?? SYSTEM_WAIT_CLOCK
+  return {
+    options,
+    principal,
+    env,
+    host,
+    store,
+    surface,
+    view,
+    pipeline,
+    controls,
+    resolveContext,
+    guard,
+    fault,
+    keyed,
+    late,
+    waitClock,
+  }
 }

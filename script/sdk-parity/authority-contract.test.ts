@@ -23,13 +23,18 @@ import {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   behaviourChangeProblems,
+  awaitingPairProblems,
   documentRowProblems,
   inventoryProblems,
   matrixProblems,
   refusalScenarioProblems,
   sectionFourRows,
   withoutAwaited,
+  type AwaitingOwnerRow,
 } from "./authority-check"
+import awaitingOwnerRows from "./awaiting-owner-rows.json"
+
+const AWAITING_OWNER_ROWS: readonly AwaitingOwnerRow[] = awaitingOwnerRows.rows
 import {
   AWAITING_ENGINE_PIN,
   AWAITING_REVISION,
@@ -63,7 +68,7 @@ import {
 import { inputProblems } from "./contract-check"
 import { TYPED_AHEAD_INPUTS, typedAheadProblems } from "./typed-ahead"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
-import { scenarioProblems, scenarioShapeProblems } from "./scenario-check"
+import { SCENARIO_FILL_OWNERS, scenarioProblems, scenarioShapeProblems } from "./scenario-check"
 
 // Slice P1a-s (#14949): the security-sensitive contracts of the omo SDK against the security design (#14945). Each check
 // has a negative control in authority-controls.test.ts.
@@ -116,15 +121,25 @@ describe("principals of slice P1a-s (#14949)", () => {
     expect(principalInputProblems(calls)).toEqual([])
   })
 
-  test("#given section 4 #then every refused cell has its code and a scenario answering it before any side effect", () => {
-    expect(matrixProblems(PRINCIPAL_MATRIX, rows, securityDesign, SOURCE_CODES)).toEqual([])
-    expect(sectionFourRows(securityDesign).length).toBeGreaterThanOrEqual(50)
-    expect(documentRowProblems(PRINCIPAL_MATRIX, securityDesign)).toEqual([])
-    const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
-    const inventory = inventoryProblems(PRINCIPAL_MATRIX, REFUSALS, securityDesign, ids, CALL_ALIASES)
-    expect(withoutAwaited(inventory, AWAITING_REVISION)).toEqual([])
-    expect(refusalScenarioProblems(REFUSALS, BEHAVIOUR_CHANGES, files)).toEqual([])
-  })
+  // Run against the tree's document and against revision 22 (PR 15033) as a fixture, so the matrix holds before and after
+  // that document merges; awaiting entries are inert where their row is absent and validated exactly against the fixture.
+  test.each([
+    ["the tree's document", securityDesign, false],
+    ["revision 22", readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8"), true],
+  ] as const)(
+    "#given section 4 of %s #then every refused cell has its code and a scenario answering it before any side effect",
+    (_name, document, exact) => {
+      const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
+      expect(matrixProblems(PRINCIPAL_MATRIX, rows, document, SOURCE_CODES)).toEqual([])
+      expect(sectionFourRows(document).length).toBeGreaterThanOrEqual(50)
+      expect(documentRowProblems(PRINCIPAL_MATRIX, document, AWAITING_OWNER_ROWS, exact)).toEqual([])
+      const lined = new Set(PRINCIPAL_MATRIX.flatMap((line) => line.rows as readonly string[]))
+      expect(awaitingPairProblems(AWAITING_OWNER_ROWS, document, ids, lined)).toEqual([])
+      const inventory = inventoryProblems(PRINCIPAL_MATRIX, REFUSALS, document, ids, CALL_ALIASES, AWAITING_OWNER_ROWS)
+      expect(withoutAwaited(inventory, AWAITING_REVISION)).toEqual([])
+      expect(refusalScenarioProblems(REFUSALS, BEHAVIOUR_CHANGES, files)).toEqual([])
+    },
+  )
 
   test("#given section 10 #then B1 to B6 are data and each scenario asserts what its evidence flag selects", () => {
     expect(behaviourChangeProblems(BEHAVIOUR_CHANGES, files)).toEqual([])
@@ -203,7 +218,10 @@ describe("the table P1a held, slice P1a-s (#14949)", () => {
   test("#given the rows and fields this slice typed #then P1a's input, scenario and code checks hold over them", () => {
     expect(inputProblems(sliceRows, sliceInputContract)).toEqual([])
     expect(typedAheadProblems(TYPED_AHEAD_INPUTS, rows, contractCalls, UNRESOLVED_IDS)).toEqual([])
-    expect(scenarioProblems(sliceRows, sliceContract, sliceFiles)).toEqual([])
+    // Only this slice's rows' owner entries: another slice's filled row is that slice's to check.
+    const sliceIds = new Set(sliceRows.map((row) => row.id))
+    const sliceOwners = Object.fromEntries(Object.entries(SCENARIO_FILL_OWNERS).filter(([id]) => sliceIds.has(id)))
+    expect(scenarioProblems(sliceRows, sliceContract, sliceFiles, sliceOwners)).toEqual([])
     const byId = new Map(rows.map((row) => [row.id, row]))
     const elsewhere = files.flatMap((file) =>
       file.scenarios

@@ -4,6 +4,7 @@ import type { JsonObject, RemoteThreadSurface } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { ENGINE, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
 import { senpiContext, sessionEntries, stamp, type FakeEntryLog } from "./thread-remote-entries-fixture"
+import { refusal } from "./refusal-texts"
 import type { ThreadHostSession } from "./tools"
 
 const fixture = createRemoteThreadFixture()
@@ -65,9 +66,15 @@ function pagingAccount(entries: ThreadTranscriptEntry[], leaf?: string) {
     },
   }
   const run = (args: JsonObject) => fixture.surface(remote, {}).run("thread_read", { thread: "dur-on-b", ...args })
-  const localAt = (at: string | null, args: JsonObject) =>
+  // `pages: false`: this device's engine answers get_messages only (its items carry no id).
+  const localAt = (at: string | null, args: JsonObject, pages = true) =>
     fixture
-      .surface(remote, { sessions: [LOCAL], engine: { ...ENGINE, messages: senpiContext(log.entries, at) } })
+      .surface(remote, {
+        sessions: [LOCAL],
+        engine: { ...ENGINE, messages: senpiContext(log.entries, at) },
+        // This device's engine pages the same session file: the same entries, the same leaf.
+        ...(pages ? { entries: { entries: log.entries, pages: 0, leaf: at } } : {}),
+      })
       .run("thread_read", { thread: "dur-local", ...args })
   const reads = () =>
     replies.filter((reply) => reply.rpc["type"] === "get_entries" || reply.rpc["type"] === "get_messages")
@@ -215,7 +222,7 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
       log.refuse = reason
       const refused = await run({ max_bytes: 800 })
       expect(comparable(refused)).toEqual(
-        comparable(await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 800 })),
+        comparable(await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 800 }, false)),
       )
       delete log.refuse
       await run({ max_bytes: 800 })
@@ -272,5 +279,96 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
       kind: "error",
       error: { code: "cursor_stale" },
     })
+  })
+})
+
+type Item = { readonly seq: number; readonly id?: string; readonly content: string }
+const idsOf = (result: ThreadToolResult) => (itemsOf(result) as readonly Item[]).map((item) => item.id)
+const errorOf = (result: ThreadToolResult) => (result.kind === "error" ? result.error : undefined)
+const sameRefusal = (id: Parameters<typeof refusal>[0], slots: Readonly<Record<string, string>>) => {
+  const { code, message, next_action } = refusal(id, slots)
+  return { code, message, next_action }
+}
+
+describe("#14951: a read item's id is durable across reads and legs, and after reads only the newer items", () => {
+  // 40 messages of ~2 KiB: a 9000-byte read takes the newest four, a 3000-byte read the newest one.
+  const ENTRIES = sessionEntries(MESSAGES.slice(0, 40))
+  const NEWEST = String(ENTRIES.at(-1)?.["id"])
+  const legs = [
+    ["another device (b's paging engine)", (args: JsonObject) => pagingAccount(ENTRIES).run(args), "dur-on-b"],
+    [
+      "this device (its engine's own get_entries)",
+      (args: JsonObject) => pagingAccount(ENTRIES).localAt(NEWEST, args),
+      "dur-local",
+    ],
+  ] as const
+
+  test("#given one thread read here and on b with two budgets #when the items are compared #then each message has the same id in every read and on both legs, and only seq moves", async () => {
+    const { run, localAt } = pagingAccount(ENTRIES)
+    const wide = await run({ max_bytes: 9000 })
+    const narrow = await run({ max_bytes: 3000 })
+    const here = await localAt(NEWEST, { max_bytes: 9000 })
+    const wideIds = idsOf(wide)
+    expect(wideIds.length).toBeGreaterThan(idsOf(narrow).length)
+    expect(wideIds.every((id) => typeof id === "string" && /^.+:\d+$/.test(id))).toBe(true)
+    expect(idsOf(here)).toEqual(wideIds)
+    // The narrow read's newest item is the wide read's newest: the same id and content, another seq.
+    const last = (result: ThreadToolResult) => (itemsOf(result) as readonly Item[]).at(-1)
+    expect(last(narrow)?.id).toBe(last(wide)?.id)
+    expect(last(narrow)?.content).toBe(last(wide)?.content)
+    expect(last(narrow)?.seq).not.toBe(last(wide)?.seq)
+  })
+
+  test.each(legs)(
+    "#given a read of a thread on %s #when it is read after an item id, then after each answer's last id with a small budget #then it answers exactly the newer items, oldest first, and the continued pages add up to them",
+    async (_leg, read) => {
+      const first = await read({ max_bytes: 9000 })
+      const ids = idsOf(first)
+      const [oldest] = ids
+      expect(oldest).toBeDefined()
+      const after = await read({ after: oldest, max_bytes: 9000 })
+      expect(idsOf(after)).toEqual(ids.slice(1))
+      expect(after).toMatchObject({ truncated: false })
+      expect(cursorOf(after)).toBeUndefined()
+      // A 2500-byte budget takes one ~2 KiB message per page: each page continues from the last id it returned.
+      const pages: (string | undefined)[] = []
+      let from = oldest
+      for (let page = 0; page < ids.length; page += 1) {
+        const next = await read({ after: from, max_bytes: 2500 })
+        pages.push(...idsOf(next))
+        from = idsOf(next).at(-1) ?? from
+        if ((next as { truncated?: boolean }).truncated !== true) break
+      }
+      expect(pages).toEqual(ids.slice(1))
+      expect(idsOf(await read({ after: ids.at(-1), max_bytes: 9000 }))).toEqual([])
+    },
+  )
+
+  test.each(legs)(
+    "#given a read of a thread on %s #when after names no item it holds, or comes with a cursor #then read.after_not_found or read.after_with_cursor, never an empty page",
+    async (_leg, read, thread) => {
+      expect(errorOf(await read({ after: "no-such-entry:0" }))).toMatchObject(
+        sameRefusal("read.after_not_found", { after: "no-such-entry:0", thread }),
+      )
+      const cursor = cursorOf(await read({ max_bytes: 3000 }))
+      expect(cursor).toBeDefined()
+      expect(errorOf(await read({ after: "no-such-entry:0", cursor }))).toMatchObject(
+        sameRefusal("read.after_with_cursor", {}),
+      )
+    },
+  )
+
+  test("#given this device's engine pages no entries (get_messages only) #when its thread is read, then read after an id #then its items carry no id and after is read.after_unsupported", async () => {
+    const a = fixture.account({ engine: { ...ENGINE, messages: senpiContext(ENTRIES, NEWEST) } })
+    const { run } = fixture.surface(a.remote, {
+      sessions: [LOCAL],
+      engine: { ...ENGINE, messages: senpiContext(ENTRIES, NEWEST) },
+    })
+    const plain = await run("thread_read", { thread: "dur-local", max_bytes: 9000 })
+    expect(idsOf(plain).length).toBeGreaterThan(0)
+    expect(idsOf(plain).every((id) => id === undefined)).toBe(true)
+    expect(errorOf(await run("thread_read", { thread: "dur-local", after: "e1:0" }))).toMatchObject(
+      sameRefusal("read.after_unsupported", { thread: "dur-local" }),
+    )
   })
 })

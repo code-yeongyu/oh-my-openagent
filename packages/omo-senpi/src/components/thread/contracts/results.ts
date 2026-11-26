@@ -158,7 +158,13 @@ export type ThreadAddressResolution = "id" | "exact_name" | "fuzzy"
 export type ThreadReadSource = "live_host" | "session_jsonl"
 
 export type ThreadTranscriptItem = {
+  /** Position inside this answer only (1 is the oldest returned): never compare it across reads. */
   readonly seq: number
+  /**
+   * The message's durable id (`<entryId>:<index>`), the same across reads and on every leg; pass it as `after` to read
+   * only newer items. Absent when the engine holding the thread pages no entries.
+   */
+  readonly id?: string
   readonly role: "user" | "assistant" | "tool" | "system"
   readonly content: string
 }
@@ -328,6 +334,8 @@ export type ThreadSendResult =
       readonly message_seq?: number
       readonly deduplicated: boolean
       readonly device?: string
+      /** The call passed `summary`, which no leg carries: it was accepted and not delivered. Absent otherwise. */
+      readonly not_carried?: readonly ["summary"]
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
@@ -384,6 +392,22 @@ export type ThreadCloseResult =
     }
   | ThreadDataError
 
+/**
+ * The SDK's `threads.unload` (no agent tool takes it): the session left its host and stays resumable from its file;
+ * `unloaded` is false when nothing held it live. What the unload dropped is named: the deliveries the engine handed back
+ * unwritten and the user messages taken out of the queue (senpi `unload_session` `dropped`).
+ */
+export type ThreadUnloadResult =
+  | {
+      readonly kind: "ok"
+      readonly thread: string
+      readonly unloaded: boolean
+      readonly dropped_deliveries: readonly string[]
+      readonly dropped_user_messages: readonly string[]
+      readonly device?: string
+    }
+  | ThreadDataError
+
 /** `thread_handoff` answers the thread it reached flat, like `thread_create`. */
 export type ThreadHandoffResult =
   | (ThreadResultSummary & {
@@ -434,16 +458,26 @@ export type ThreadSetReasoningResult =
     }
   | ThreadDataError
 
-export type ThreadToolResult =
-  | ThreadCreateResult
-  | ThreadListResult
-  | ThreadReadResult
-  | ThreadReceiptResult
-  | ThreadSendResult
-  | ThreadInterruptResult
-  | ThreadCloseResult
-  | ThreadHandoffResult
-  | ThreadRenameResult
-  | ThreadSetModelResult
-  | ThreadSetReasoningResult
-  | ThreadArchiveResult
+/**
+ * When the receipt of a call made under the caller's own `idempotency_key` expires (ISO time): until then a repeat under
+ * that key answers this result again and acts no second time (control/receipts.ts `RECEIPT_HORIZON_MS`, #14951).
+ * Absent when the caller named no key.
+ */
+export type ReceiptExpiry = { readonly receipt_expires_at?: string }
+
+export type ThreadToolResult = ReceiptExpiry &
+  (
+    | ThreadCreateResult
+    | ThreadListResult
+    | ThreadReadResult
+    | ThreadReceiptResult
+    | ThreadSendResult
+    | ThreadInterruptResult
+    | ThreadCloseResult
+    | ThreadUnloadResult
+    | ThreadHandoffResult
+    | ThreadRenameResult
+    | ThreadSetModelResult
+    | ThreadSetReasoningResult
+    | ThreadArchiveResult
+  )

@@ -1,3 +1,4 @@
+import { attachmentsRefused } from "./attachments-refusal"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal } from "./errors"
@@ -24,11 +25,7 @@ import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 import { sentThreadLink } from "./tools/send-link"
 export type { ThreadTranscriptEntry } from "./reader"
-import { hashArgs } from "./gateway/hash-args"
-import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
-import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { resolveAddress } from "./address/lazy"
-import { sendThread, sendToTarget, viewForSend } from "./sdk-send"
 import type { DeliveryOutcome, DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
@@ -37,7 +34,7 @@ import { rowState, threadModel } from "./tools/thread-state"
 import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { threadSendPermission } from "./tools/reply-permission"
-import { listAcross, readReceipt } from "./remote/lazy-ops"
+import { listAcross, readReceipt, sendThread, sendToTarget, viewForSend } from "./remote/lazy-ops"
 import { rowCreatedAt, rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
@@ -73,13 +70,22 @@ import {
   targetSession,
   type AnyTool,
   type ToolOutput,
-  uncertainFailure,
-  uncertainNote,
 } from "./tools/internals"
-import { currentResult, threadRow } from "./tools/thread-row"
+import { threadRow } from "./tools/thread-row"
+import { createReceipts } from "./control/receipts"
+import { thrown, type ThrownWording } from "./sdk-core/failures"
 
-/** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
-export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
+export { RECEIPT_RECOVERY_MAX_KEYS } from "./control/receipts"
+
+/** The thread tools' wording of the one thrown-failure mapping (sdk-core/failures.ts `thrown`). */
+const TOOL_WORDING: ThrownWording = {
+  hostUnavailable: "Retry when the shared Senpi host is running.",
+  unsupported: (command) =>
+    `The target's endpoint does not accept ${command}: that terminal runs an engine from before terminal session controls.`,
+  unsupportedNext:
+    "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list() in an eval cell) shows each thread's controls.",
+  unexpectedNext: "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
+}
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -100,48 +106,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     await options.ensureHost?.()
     return hostView(options, request)
   }
-  // Receipts this process began but could not settle (the store gave up at its lock-wait bound):
-  // the row stays `prepared` under this instance, which would answer `idempotency_in_progress`
-  // forever. A retry of such a key is `idempotency_uncertain` with the note instead.
-  const unsettled = new Map<string, string>()
-  // Keys whose receipt admission failed without a reply: the store may still have committed the
-  // prepared row (its worker exited after the commit), which this instance's retry would read as
-  // `in_progress` forever. Nothing ran for such a call, so a retry that finds that row while no
-  // invocation of this facade is running the key takes it up and runs the call. Each key is kept
-  // until the receipt it may have left expires (admission time + the receipt retention), at most
-  // `RECEIPT_RECOVERY_MAX_KEYS` at once: when full, a call under a new key is refused before its
-  // admission, so no key that may still need recovering is ever dropped. Disposal clears them.
-  const unanswered = new Map<string, number>()
-  // Keys whose admission is awaiting the store, with how many calls await it: each may become a
-  // recovery key, so it holds a slot from before its admission until the store answers (or the
-  // failure leaves it in `unanswered`). Overlapping calls under one key share one slot.
-  const admitting = new Map<string, number>()
-  const heldSlots = (): number => {
-    let held = unanswered.size
-    for (const key of admitting.keys()) if (!unanswered.has(key)) held++
-    return held
-  }
-  const recoverable = (key: string, at: number): boolean => {
-    const until = unanswered.get(key)
-    if (until !== undefined && until <= at) unanswered.delete(key)
-    return unanswered.has(key)
-  }
-  const recoveryFull = (at: number): boolean => {
-    if (heldSlots() < RECEIPT_RECOVERY_MAX_KEYS) return false
-    for (const [key, until] of unanswered) if (until <= at) unanswered.delete(key)
-    return heldSlots() >= RECEIPT_RECOVERY_MAX_KEYS
-  }
-  const releaseAdmitting = (key: string): void => {
-    const calls = admitting.get(key) ?? 0
-    if (calls <= 1) admitting.delete(key)
-    else admitting.set(key, calls - 1)
-  }
-  const running = new Set<string>()
-  const receiptKey = (scope: {
-    readonly principal: string
-    readonly operation: string
-    readonly idempotency_key: string
-  }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
+  const receipts = createReceipts(store, now, options.onUnexpected)
   async function execute<T extends ThreadToolName>(
     name: T,
     callId: string,
@@ -158,6 +123,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const callerId =
       (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??
       options.callerSessionId()
+    // Ruling on attachments: one typed refusal on every surface, before any effect (attachments-refusal.ts).
+    const attachments = name === "thread_send" || name === "thread_create" ? attachmentsRefused(args) : undefined
+    if (attachments !== undefined) return output({ kind: "error", error: attachments })
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
@@ -181,146 +149,18 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     // A send owns its idempotency: the gateway engine's receipt is written in the delivery's own
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
     const receipted = !(name === "thread_send" || name === "thread_handoff")
-    // An earlier run under this key failed after it may have acted: only thread_create may run again, and it decides (#14060).
+    // An earlier run under this key failed after it may have acted: only a call that decides it itself runs again (#14060).
     let retrying: { readonly error_note: string | null } | undefined
     if (receipted) {
-      // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
-      // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
-      const key = receiptKey(scope)
-      const at = now()
-      // The slot is taken before the admission is awaited, so overlapping calls cannot all pass the check.
-      if (!recoverable(key, at) && !admitting.has(key) && recoveryFull(at)) {
-        return output(
-          failure(
-            "overloaded",
-            `${RECEIPT_RECOVERY_MAX_KEYS} earlier calls on this surface failed before the gateway store answered and may still need recovering; nothing ran.`,
-            "Retry those calls under their own idempotency keys, then retry this one.",
-            { budget: "receipt_recovery", max_keys: RECEIPT_RECOVERY_MAX_KEYS },
-          ),
-        )
-      }
-      let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
-      admitting.set(key, (admitting.get(key) ?? 0) + 1)
-      try {
-        admission = await store.toolReceiptBegin({
-          ...scope,
-          now: at,
-          args_hash: hashArgs(value),
-          retry_uncertain: name === "thread_create",
-        })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        if (isLockWaitExceeded(error))
-          return output(
-            failure(
-              "overloaded",
-              `The gateway store is locked by another process; nothing ran: ${message}`,
-              "Wait a few seconds, then retry the call.",
-            ),
-          )
-        const schema = gatewaySchemaRefusal(error)
-        if (schema !== undefined) return output({ kind: "error", error: schema })
-        unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
-        return output(
-          failure(
-            "internal_error",
-            `The gateway store could not record the call; nothing ran: ${message}`,
-            "Retry the call; if it keeps failing, check the gateway store.",
-          ),
-        )
-      } finally {
-        // The slot passes to the key's recovery entry when the failure left one; otherwise it is free again.
-        releaseAdmitting(key)
-      }
-      // The store committed this key's reservation for a call whose reply was lost, so nothing ran under it: the call
-      // resumes as the reservation it found, a recovery keeping its first cause (#14623 review round 2 H1).
-      if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
-        admission =
-          admission.recovery === undefined
-            ? { kind: "accepted" }
-            : { kind: "retry", error_note: admission.recovery.error_note }
-      unanswered.delete(key)
-      if (admission.kind === "replay") {
-        const result = currentResult(admission.result as ThreadToolResult)
-        return output(name === "thread_create" && result.kind === "ok" ? { ...result, deduplicated: true } : result)
-      }
-      if (admission.kind === "conflict")
-        return output(
-          failure(
-            "idempotency_conflict",
-            "The idempotency key was already used with different arguments.",
-            "Retry with a new idempotency_key.",
-          ),
-        )
-      if (admission.kind === "in_progress") {
-        const note = unsettled.get(receiptKey(scope))
-        if (note !== undefined)
-          return output(
-            failure(
-              "idempotency_uncertain",
-              "The earlier operation may have been delivered.",
-              "Read the target transcript before deciding whether to retry.",
-              { error_note: note },
-            ),
-          )
-        return output(
-          failure(
-            "idempotency_in_progress",
-            "The same operation is already in progress.",
-            "Wait for the earlier call to settle, then retry.",
-          ),
-        )
-      }
-      // #14060: a thread_create that failed after the host made its thread may recover by re-running it; the create
-      // itself refuses unless it finds that thread (see thread_create). The store reserved the receipt for this retry
-      // alone (#14623 H1), so its answer settles it like a new call's.
-      if (admission.kind === "uncertain") return output(uncertainFailure(admission.error_note))
-      if (admission.kind === "retry") retrying = { error_note: admission.error_note }
-    }
-    const unrecorded = (what: string) => (settleError: unknown) => {
-      unsettled.set(
-        receiptKey(scope),
-        `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`,
-      )
+      const admission = await receipts.admit(scope, value)
+      if (admission.kind === "answer") return output(admission.result)
+      retrying = admission.retrying
     }
     const failed = async (error: unknown): Promise<ToolOutput> => {
-      const message = error instanceof Error ? error.message : String(error)
-      if (receipted)
-        await store
-          .toolReceiptSettle({ ...scope, now: now(), error_note: message })
-          .catch(unrecorded(`the call failed (${message})`))
-      running.delete(receiptKey(scope))
-      const schema = gatewaySchemaRefusal(error)
-      if (schema !== undefined) return output({ kind: "error", error: schema })
-      if (message.startsWith("host_unavailable:")) {
-        return output(
-          failure(
-            "host_unavailable",
-            `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`,
-            "Retry when the shared Senpi host is running.",
-          ),
-        )
-      }
-      if (message.startsWith("unsupported:")) {
-        return output(
-          failure(
-            "unsupported",
-            `The target's endpoint does not accept ${message.slice("unsupported:".length)}: that terminal runs an engine from before terminal session controls.`,
-            "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list() in an eval cell) shows each thread's controls.",
-            { command: message.slice("unsupported:".length) },
-          ),
-        )
-      }
-      return output(
-        failure(
-          "internal_error",
-          `Thread operation failed: ${message}`,
-          "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
-        ),
-      )
+      if (receipted) await receipts.fail(scope, error)
+      return output(thrown(error, options.onUnexpected, TOOL_WORDING))
     }
     let result: ThreadToolResult
-    if (receipted) running.add(receiptKey(scope))
     try {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
       // A reply whose sender is on another device resolves there alone (A4.3.1), so it takes no local listing.
@@ -339,27 +179,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (refusal === undefined) return await failed(error)
       result = { kind: "error", error: refusal }
     }
-    // A create that may have made its thread (its open's reply was lost) has no answer yet: its receipt stays uncertain,
-    // so a retry under the key runs the create again, which finds that thread or answers uncertain again (#14060). The
-    // note keeps the first uncertain answer's cause (#14569); a retry that fails in any way has not settled what the
-    // first run made, so its receipt stays uncertain under that same note and its error is never replayed as final.
-    const undecided =
-      name === "thread_create" &&
-      result.kind === "error" &&
-      (result.error.code === "idempotency_uncertain" || retrying !== undefined)
-        ? (retrying?.error_note ?? uncertainNote(result.error))
-        : undefined
-    if (receipted)
-      await store
-        .toolReceiptSettle({
-          ...scope,
-          now: now(),
-          ...(undecided === undefined ? { result } : { error_note: undecided }),
-        })
-        .then((settled) => {
-          if (!settled) unrecorded("the call ran")(new Error("this call no longer held its receipt"))
-        }, unrecorded("the call ran"))
-    running.delete(receiptKey(scope))
+    if (receipted) await receipts.settle(scope, result, retrying)
     return output(result)
   }
 
@@ -441,7 +261,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_send,
     execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) =>
       execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) =>
-        deliver(current, value, operationId, callerId),
+        notCarried(value, await deliver(current, value, operationId, callerId)),
       ),
   }
   const sendAs: ThreadSendAs = async (callerId, args) => {
@@ -450,7 +270,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       `send-as:${args.idempotency_key ?? callerId}`,
       args,
       { sessionManager: { getSessionId: () => callerId } },
-      async (current, value, operationId, id) => deliver(current, value, operationId, id),
+      async (current, value, operationId, id) => notCarried(value, await deliver(current, value, operationId, id)),
     )
     return sent.details.result
   }
@@ -526,7 +346,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const dispose = () => {
     pipeline.dispose()
-    unanswered.clear()
+    receipts.dispose()
   }
   return {
     tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, archive].map((tool) =>
@@ -559,6 +379,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     )
     return routed.kind === "error" ? routed : renderSend(options, current, routed.target, routed.sent, resolvedBy)
   }
+}
+
+/**
+ * thread_send takes `summary` (existing agent calls pass it) and no leg carries it: its answer says so with a fixed field,
+ * only when one was passed, so the drop is not silent (design lane ruling on summary).
+ */
+function notCarried(value: ThreadSendInput, result: ThreadToolResult): ThreadToolResult {
+  if (value.summary === undefined || result.kind !== "ok") return result
+  return { ...result, not_carried: ["summary"] } as ThreadToolResult
 }
 
 /** Render delivery facts in the tool contract, including links and handoff target details. */

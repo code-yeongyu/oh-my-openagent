@@ -2,8 +2,10 @@ import { normalizeThreadName } from "../addressing"
 import type { ThreadRenameInput, ThreadToolResult } from "../contracts"
 import type { LocalAliasReason } from "../remote/cross-device"
 import { renameAlias } from "../remote/lazy-ops"
-import { failure } from "../tools/internals"
+import { refusal } from "../refusal-texts"
+import { failure, failureResult } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
+import { type ControlWait, NO_WAIT } from "./control-wait"
 import { locateControl } from "./locate"
 import { NOT_LIVE } from "./operations"
 import { controlIdentity } from "./port"
@@ -20,10 +22,11 @@ export async function renameThread(
   value: ThreadRenameInput,
   key: string,
   callerId: string,
+  wait: ControlWait = NO_WAIT,
 ): Promise<ThreadToolResult> {
   if (value.name === undefined && value.alias === undefined)
     return failure("invalid_arguments", "Pass a new name, a new alias, or both.", "Retry with name or alias.")
-  const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
+  const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId, wait)
   if (located.kind === "error") return located.result
   const thread = located.kind === "control" ? located.control : located
   // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.
@@ -38,23 +41,20 @@ export async function renameThread(
     )
     return existing === undefined
       ? undefined
-      : failure(
-          "name_conflict",
-          `A thread named "${existing.name}" already exists.`,
-          "Call thread_list (tool.thread_list() in an eval cell) and choose another name.",
-        )
+      : failureResult(refusal("control.rename_conflict", { name: existing.name }))
   }
   let name = value.name?.trim()
   const refusedName = name === undefined ? undefined : await nameRefusal(name)
   if (refusedName !== undefined) return refusedName
   let localAlias: LocalAliasReason | undefined
-  if (value.alias !== undefined) {
-    const refused = await renameAlias(options.remote, thread.thread_id, thread.device, value.alias, key)
+  const { alias } = value
+  if (alias !== undefined) {
+    const refused = await wait.write(() => renameAlias(options.remote, thread.thread_id, thread.device, alias, key))
     if (refused !== undefined && "local" in refused) {
       // No account holds the alias and nothing changed (#13104): it becomes the thread's name unless one was given.
       localAlias = refused.local
       if (name === undefined) {
-        name = value.alias.trim()
+        name = alias.trim()
         const refusedAlias = await nameRefusal(name)
         if (refusedAlias !== undefined) return refusedAlias
       }

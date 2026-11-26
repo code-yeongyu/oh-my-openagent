@@ -8,8 +8,6 @@ import type { RemoteFailure } from "./types"
  */
 export const REMOTE_CODES = [
   ...THREAD_ERROR_CODES,
-  "timeout",
-  "cancelled",
   "session_ended",
   "sender_not_allowed",
   "local_only",

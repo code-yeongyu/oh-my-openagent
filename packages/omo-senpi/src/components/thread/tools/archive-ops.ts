@@ -1,4 +1,5 @@
 import type { ThreadArchiveInput, ThreadToolResult } from "../contracts"
+import { type ControlWait, NO_WAIT } from "../control/control-wait"
 import { locateControl } from "../control/locate"
 import { failure } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
@@ -13,9 +14,10 @@ export async function archiveThread(
   current: ThreadHostView,
   value: ThreadArchiveInput,
   callerId: string,
+  wait: ControlWait = NO_WAIT,
 ): Promise<ThreadToolResult> {
   const archived = value.archived ?? true
-  const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+  const located = await locateControl(options, current, value.thread, value.all_scope, callerId, wait)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live")
     return failure(

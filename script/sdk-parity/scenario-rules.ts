@@ -1,4 +1,4 @@
-import type { TableScenario } from "./expectation"
+import { isRepeat, type TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
 // Whether the scenario TABLE is valid, kept apart from whether a row is BUILT (design lane ruling on 7.3): a scenario that
@@ -24,7 +24,12 @@ export function tableProblems(rows: readonly Row[], scenarios: readonly TableSce
         problems.push(`${where}: refusal_from belongs to a refusal`)
       if (pure && call.kind === "effect" && call.answer === undefined)
         problems.push(`${where}: a pure call's effect scenario states its answer`)
-      if (!pure && call.kind === "effect" && call.expect.every((expectation) => (expectation.count ?? 1) === 0))
+      if (
+        !pure &&
+        call.kind === "effect" &&
+        call.expect.every((expectation) => (expectation.count ?? 1) === 0) &&
+        !isRepeat(calls.slice(0, index), call)
+      )
         problems.push(`${where}: an effect scenario states a port effect; an answer alone builds nothing`)
     }
     if (scenario.abort !== undefined && !scenario.expect.some((expectation) => expectation.count === 0))

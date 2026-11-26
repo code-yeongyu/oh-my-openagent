@@ -1,7 +1,7 @@
 import { Value } from "typebox/value"
 import type { Static, TObject } from "typebox"
 
-import { threadToolFailure } from "../errors"
+import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { ThreadDataError } from "./results"
 
 export type ThreadParamParse<S extends TObject> = { readonly kind: "ok"; readonly value: Static<S> } | ThreadDataError

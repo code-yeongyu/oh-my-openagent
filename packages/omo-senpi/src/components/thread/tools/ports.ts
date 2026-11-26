@@ -67,6 +67,7 @@ export type ThreadHostSession = {
 export type ThreadSessionPort = Pick<
   ThreadHost,
   | "getMessages"
+  | "getEntries"
   | "getState"
   | "prompt"
   | "interrupt"
@@ -79,6 +80,7 @@ export type ThreadSessionPort = Pick<
   | "wake"
   | "releaseSession"
   | "closeSession"
+  | "unloadSession"
   | "watchSession"
 >
 
@@ -123,6 +125,12 @@ export type ThreadHost = {
     readonly durableSessionId?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
+  /**
+   * One `get_entries` page of the session's entries (`tail`, `before`, `since`, `maxBytes`), the reply's data as the
+   * engine answers it; a refusal throws `<reason>: <message>` as every request does. Absent on a host port that cannot
+   * send it: reads there take `getMessages`, whose messages carry no id.
+   */
+  readonly getEntries?: (sessionId: string, page: Readonly<Record<string, unknown>>) => Promise<Record<string, unknown>>
   readonly getState: (
     sessionId: string,
     durable_session_id?: string,
@@ -190,6 +198,12 @@ export type ThreadHost = {
     durable_session_id?: string,
     options?: ThreadCloseOptions,
   ) => Promise<ThreadCloseAnswer>
+  /** senpi `unload_session` (`close-ladder.ts` `unloadOver`): the session leaves its host and stays resumable; hosts only. */
+  readonly unloadSession?: (
+    sessionId: string,
+    durable_session_id?: string,
+    options?: ThreadUnloadOptions,
+  ) => Promise<ThreadUnloadAnswer>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -253,6 +267,14 @@ export type ThreadToolSurfaceOptions = {
     readonly device?: string
   }[]
   readonly now?: () => number
+  /** Where the engine draws each delivery's id; absent, a random UUID (test seam). */
+  readonly deliveryId?: () => string
+  /**
+   * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
+   * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   * A port that wrote the details to a local file answers that file's path, and the fixed message names it.
+   */
+  readonly onUnexpected?: (error: unknown) => unknown
   /**
    * How long a create waits for its first prompt to start on this device (`control/prompt-start.ts`); absent,
    * FIRST_PROMPT_START_WAIT_MS, cut to the call's budget. A test seam: a test with no drain sets it short.
@@ -292,4 +314,26 @@ export type ThreadCloseAnswer = {
   readonly outcome: ThreadCloseOutcome
   readonly dropped_deliveries: readonly string[]
   readonly graceful?: ThreadCloseGraceful
+}
+
+/**
+ * The SDK's `threads.unload` (senpi `unload_session`): `interrupt` stops the running turn first, `force` unloads past
+ * other clients and published extension work, `clear_queue` drops the queued input instead of keeping it for the
+ * reopen, `children: "detach"` leaves the session's child tasks running (the engine refuses otherwise).
+ */
+export type ThreadUnloadOptions = {
+  readonly interrupt?: boolean
+  readonly force?: boolean
+  readonly clear_queue?: boolean
+  readonly children?: "refuse" | "detach"
+}
+
+/**
+ * An unload's outcome (`not_live`: the session was already closing) and what it dropped: the deliveries handed back
+ * unwritten and the user messages taken out of its queue (senpi `dropped.deliveries`, `dropped.user_messages`).
+ */
+export type ThreadUnloadAnswer = {
+  readonly outcome: "unloaded" | "not_live"
+  readonly dropped_deliveries: readonly string[]
+  readonly dropped_user_messages: readonly string[]
 }

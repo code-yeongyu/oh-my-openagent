@@ -12,6 +12,9 @@ import {
   type ThreadTranscriptReadResult,
 } from "./reader"
 import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES } from "./index"
+import { contextTail } from "./remote/context-tail"
+import type { JsonObject } from "./remote/ports"
+import { senpiProjector } from "./thread-remote-entries-fixture"
 
 // ---------------------------------------------------------------------------
 // Real temp files: every jsonl case below writes actual bytes to disk under a
@@ -64,12 +67,17 @@ function jsonlSource(
 }
 
 function expectOk(result: ThreadTranscriptReadResult): Extract<ThreadTranscriptReadResult, { kind: "ok" }> {
-  if (result.kind !== "ok") throw new Error(`expected ok, got error ${result.error.code}: ${result.error.message}`)
+  if (result.kind !== "ok")
+    throw new Error(
+      result.kind === "error"
+        ? `expected ok, got error ${result.error.code}: ${result.error.message}`
+        : `expected ok, got ${result.kind}`,
+    )
   return result
 }
 
 function expectError(result: ThreadTranscriptReadResult): Extract<ThreadTranscriptReadResult, { kind: "error" }> {
-  if (result.kind !== "error") throw new Error(`expected error, got ok with ${result.items.length} items`)
+  if (result.kind !== "error") throw new Error(`expected error, got ${result.kind}`)
   return result
 }
 
@@ -513,5 +521,40 @@ describe("readTranscript source reporting", () => {
 
     const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: 1 }))
     expect(result.items[0]).toEqual(entry)
+  })
+})
+
+describe("#14951: the session file's message items carry the durable id the paged legs give them", () => {
+  // 30 messages of ~300 bytes, with a model change between them (bookkeeping the messages view skips).
+  const ENTRIES: Entry[] = Array.from({ length: 30 }, (_, index) => messageEntry(index, "y".repeat(300)))
+  ENTRIES.splice(10, 0, { type: "model_change", id: "m1", parentId: "e9", timestamp: "2026-08-23T00:00:09.500Z" })
+  const fileOf = () =>
+    jsonlSource(writeJsonl(makeTempDir(), "s.jsonl", [sessionHeader(), ...ENTRIES]), { view: "messages" })
+
+  test("#given one session file #when it is read with two budgets #then every message item has its entry's id, the same in both reads, and the ids are the engine projection's own", () => {
+    const source = fileOf()
+    const wide = expectOk(readTranscript(source, { max_bytes: 4000 }))
+    const narrow = expectOk(readTranscript(source, { max_bytes: 1000 }))
+    expect(wide.item_ids).toHaveLength(wide.items.length)
+    expect(wide.item_ids?.slice(-(narrow.item_ids?.length ?? 0))).toEqual([...(narrow.item_ids ?? [])])
+    // The other legs name a message by senpi's projection of the same entries (context-tail.ts): the same ids.
+    const tail = contextTail([sessionHeader(), ...ENTRIES] as unknown as JsonObject[], "e29", true, senpiProjector)
+    if (tail.kind !== "closed") throw new Error(`expected a closed tail, got ${tail.kind}`)
+    expect(tail.tail.messages.map((message) => message.id).slice(-(wide.item_ids?.length ?? 0))).toEqual([
+      ...(wide.item_ids ?? []),
+    ])
+  })
+
+  test("#given a session file #when it is read after an id, after the newest, and after an id it does not hold #then the newer messages oldest first, none, and after_not_found", () => {
+    const source = fileOf()
+    const after = expectOk(readTranscript(source, { after: "e25:0", max_bytes: 100_000 }))
+    expect(after.item_ids).toEqual(["e26:0", "e27:0", "e28:0", "e29:0"])
+    expect(after.truncated).toBe(false)
+    expect(after.next_cursor).toBeNull()
+    const small = expectOk(readTranscript(source, { after: "e25:0", max_bytes: 700 }))
+    expect(small.item_ids).toEqual(["e26:0", "e27:0"])
+    expect(small.truncated).toBe(true)
+    expect(expectOk(readTranscript(source, { after: "e29:0" })).items).toEqual([])
+    expect(readTranscript(source, { after: "m1:0" })).toEqual({ kind: "after_not_found" })
   })
 })

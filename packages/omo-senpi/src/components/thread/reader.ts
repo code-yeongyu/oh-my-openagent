@@ -28,9 +28,9 @@
 import { closeSync, openSync, readSync } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
-import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
+import type { ThreadReadSource } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
-import { takeWithinBudget } from "./read-budget"
+import { readBudget, takeWithinBudget } from "./read-budget"
 
 /** Default number of trailing entries a tail read returns. */
 export const THREAD_TAIL_DEFAULT_ITEMS = 60
@@ -71,6 +71,11 @@ export type ThreadReadOptions = {
   readonly max_bytes?: number
   /** Opaque cursor from an earlier truncated read. */
   readonly cursor?: string
+  /**
+   * A message id (`item_ids`) of the messages view: the messages newer than it, oldest first, until the budget is spent.
+   * A truncated answer continues with `after` set to its last id; it carries no cursor.
+   */
+  readonly after?: string
 }
 
 export type ThreadTranscriptReadOk = {
@@ -81,6 +86,12 @@ export type ThreadTranscriptReadOk = {
   readonly source_incomplete: boolean
   readonly mode: ThreadReadMode
   readonly items: readonly ThreadTranscriptEntry[]
+  /**
+   * The messages view's durable id of each item, aligned with `items`: `<entryId>:0`, the id the engine's projection gives
+   * a message entry's message (`paged-reader.ts`), so one message has one id on every leg. Absent on the raw views and on a
+   * file whose message entries carry no id.
+   */
+  readonly item_ids?: readonly string[]
   /** Entries the source holds in total, independent of the returned slice. */
   readonly total_items: number
   readonly truncated: boolean
@@ -94,7 +105,10 @@ export type ThreadTranscriptReadOk = {
 }
 
 export type ThreadTranscriptReadResult =
-  ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
+  | ThreadTranscriptReadOk
+  | { readonly kind: "error"; readonly error: ThreadToolFailure }
+  /** `after` named no message of the messages view (or the view has no ids). */
+  | { readonly kind: "after_not_found" }
 
 const READ_CHUNK_BYTES = 65536
 const CURSOR_VERSION = "t1"
@@ -243,10 +257,21 @@ function decodeCursor(raw: string): Cursor | null {
 // Entry point
 // ---------------------------------------------------------------------------
 
-function durableMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry[] {
+type IdentifiedMessage = { readonly id: string | undefined; readonly message: ThreadTranscriptEntry }
+
+function durableMessage(entry: ThreadTranscriptEntry): IdentifiedMessage[] {
   const message = entry.message
   if (entry.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
-  return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
+  const id = typeof entry.id === "string" ? `${entry.id}:0` : undefined
+  return message.role === "user" || message.role === "assistant" || message.role === "toolResult"
+    ? [{ id, message }]
+    : []
+}
+
+/** The ids of a messages view, or undefined when one of its message entries has none (a pre-id session file). */
+function viewIds(view: readonly IdentifiedMessage[]): readonly string[] | undefined {
+  const ids = view.flatMap((entry) => (entry.id === undefined ? [] : [entry.id]))
+  return ids.length === view.length ? ids : undefined
 }
 
 /**
@@ -285,24 +310,9 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     }
   }
 
-  if (opts.max_bytes !== undefined) {
-    if (!isPositiveInteger(opts.max_bytes)) {
-      return fail(
-        "invalid_arguments",
-        `max_bytes must be a positive whole number; received ${String(opts.max_bytes)}.`,
-        `Retry with max_bytes between 1 and ${THREAD_READ_MAX_BYTES}, or omit it to take the default ${THREAD_READ_DEFAULT_BYTES}.`,
-      )
-    }
-    if (opts.max_bytes > THREAD_READ_MAX_BYTES) {
-      return fail(
-        "message_too_large",
-        `max_bytes ${opts.max_bytes} exceeds the ${THREAD_READ_MAX_BYTES}-byte hard cap.`,
-        `Re-read with max_bytes at most ${THREAD_READ_MAX_BYTES} and follow next_cursor for the rest of the transcript.`,
-      )
-    }
-  }
-
-  const maxBytes = opts.max_bytes ?? THREAD_READ_DEFAULT_BYTES
+  const budget = readBudget(opts.max_bytes)
+  if (budget.kind === "error") return budget
+  const { maxBytes } = budget
   const tailItems = opts.tail_items ?? THREAD_TAIL_DEFAULT_ITEMS
 
   let cursor: Cursor | null = null
@@ -352,7 +362,11 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     )
   }
 
-  const entries = messageView ? loaded.entries.flatMap(durableMessage) : loaded.entries
+  const view = messageView ? loaded.entries.flatMap(durableMessage) : undefined
+  const ids = view === undefined ? undefined : viewIds(view)
+  const entries = view === undefined ? loaded.entries : view.map((entry) => entry.message)
+  const idsOf = (start: number, count: number) =>
+    ids === undefined ? {} : { item_ids: ids.slice(start, start + count) }
   const base: Omit<ThreadTranscriptReadOk, "items" | "truncated" | "next_cursor" | "encoded_bytes"> = {
     kind: "ok",
     source: readSourceKind,
@@ -367,6 +381,20 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     return { ...base, items: [], truncated: false, next_cursor: null, encoded_bytes: 0 }
   }
 
+  if (opts.after !== undefined) {
+    const from = (ids?.indexOf(opts.after) ?? -1) + 1
+    if (from === 0) return { kind: "after_not_found" }
+    const { selected, encodedBytes } = takeWithinBudget(entries.slice(from), maxBytes)
+    return {
+      ...base,
+      items: selected,
+      ...idsOf(from, selected.length),
+      truncated: from + selected.length < entries.length,
+      next_cursor: null,
+      encoded_bytes: encodedBytes,
+    }
+  }
+
   const older = mode === "page" && cursor?.direction === "older" ? cursor : undefined
   if (mode === "page" && older === undefined) {
     const start = cursor?.direction === "forward" ? cursor.offset : 0
@@ -376,6 +404,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     return {
       ...base,
       items: selected,
+      ...idsOf(start, selected.length),
       truncated,
       next_cursor: truncated ? encodeCursor({ direction: "forward", revision, offset: nextOffset }) : null,
       encoded_bytes: encodedBytes,
@@ -392,6 +421,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
   return {
     ...base,
     items: selected,
+    ...idsOf(start, selected.length),
     truncated,
     next_cursor: truncated ? encodeCursor({ direction: "older", revision, before: start, floor }) : null,
     encoded_bytes: encodedBytes,

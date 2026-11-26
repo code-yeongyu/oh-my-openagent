@@ -15,6 +15,7 @@ function rematchControl(states: (SessionModelState | undefined | Error)[]): Sess
     visible: unused("visible"),
     interrupt: unused("interrupt"),
     close: unused("close"),
+    unload: unused("unload"),
     setName: unused("setName"),
     getAvailableModels: async (options) => ({
       models: [{ provider: options?.fresh === true ? "azure" : "openai", id: "gpt-x" }],

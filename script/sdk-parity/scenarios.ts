@@ -53,6 +53,7 @@ export const SCENARIOS: readonly Scenario[] = [
   native("native-thread-help", "threads.list", ["thread", "--help"]),
   native("native-thread-list-bad-state", "threads.list", ["thread", "list", "--state", "bogus"]),
   native("native-thread-send-arity", "threads.send", ["thread", "send", "x"]),
+  native("native-thread-close", "threads.close", ["thread", "close", "t-1", "--force", "--json"]),
   native("native-daemon-help", "daemon.run", ["daemon", "--help"]),
   native("native-daemon-attach-retired", "retired.daemon-attach", ["daemon", "attach"]),
   native("native-daemon-foreground-retired", "retired.daemon-run-foreground", ["daemon", "run", "--foreground"]),

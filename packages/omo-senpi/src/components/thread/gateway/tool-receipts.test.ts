@@ -30,13 +30,20 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
   test("#given a call this instance began #when the same key arrives again #then it is in_progress, different arguments are conflict, and a completed receipt replays its result to any instance", async () => {
     const { a, b } = twoInstances()
     const now = Date.now()
-    expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
-    expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({ kind: "in_progress" })
+    expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
+    })
+    expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({
+      kind: "in_progress",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
+    })
     expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-2" })).toEqual({ kind: "conflict" })
     expect(await a.toolReceiptSettle({ ...scope("k-1"), now, result: { thread_id: "t-1", seq: 1 } })).toBe(true)
     expect(await b.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({
       kind: "replay",
       result: { thread_id: "t-1", seq: 1 },
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
     expect(await b.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-2" })).toEqual({ kind: "conflict" })
   })
@@ -44,7 +51,10 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
   test("#given a call another instance began and never settled #when this instance retries the key #then it is uncertain with a note, stays uncertain, and the original owner can no longer settle it", async () => {
     const { a, b } = twoInstances()
     const now = Date.now()
-    expect(await a.toolReceiptBegin({ ...scope("k-2"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await a.toolReceiptBegin({ ...scope("k-2"), now, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
+    })
     const first = await b.toolReceiptBegin({ ...scope("k-2"), now, args_hash: "h-1" })
     expect(first.kind).toBe("uncertain")
     expect(first.kind === "uncertain" ? first.error_note : null).toContain("ended before recording its outcome")
@@ -56,7 +66,10 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
   test("#given a side effect that threw #when the key is retried by the same or another instance #then it is uncertain carrying the thrown error, never accepted again", async () => {
     const { a, b } = twoInstances()
     const now = Date.now()
-    expect(await a.toolReceiptBegin({ ...scope("k-3"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await a.toolReceiptBegin({ ...scope("k-3"), now, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
+    })
     expect(await a.toolReceiptSettle({ ...scope("k-3"), now, error_note: "transport exploded mid-delivery" })).toBe(
       true,
     )
@@ -68,15 +81,22 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
   test("#given a call that wrote nothing #when its owner releases the receipt #then the key is accepted as a new call, while another instance's receipt and a settled one are never dropped", async () => {
     const { a, b } = twoInstances()
     const now = Date.now()
-    expect(await a.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await a.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
+    })
     expect(await b.toolReceiptRelease(scope("k-5"))).toBe(false)
     expect(await a.toolReceiptRelease(scope("k-5"))).toBe(true)
-    expect(await b.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await b.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
+    })
     expect(await b.toolReceiptSettle({ ...scope("k-5"), now, result: { ok: true } })).toBe(true)
     expect(await b.toolReceiptRelease(scope("k-5"))).toBe(false)
     expect(await a.toolReceiptBegin({ ...scope("k-5"), now, args_hash: "h-1" })).toEqual({
       kind: "replay",
       result: { ok: true },
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
   })
 
@@ -90,10 +110,12 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await a.toolReceiptBegin({ ...scope("r-1"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "retry",
       error_note: "first cause",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
     expect(await a.toolReceiptBegin({ ...scope("r-1"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "in_progress",
       recovery: { error_note: "first cause" },
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
   })
 
@@ -105,6 +127,7 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     await a.toolReceiptBegin({ ...scope("r-7f"), now, args_hash: "h", retry_uncertain: true })
     expect(await a.toolReceiptBegin({ ...scope("r-7f"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "in_progress",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
     await a.toolReceiptBegin({ ...scope("r-7r"), now, args_hash: "h" })
     await a.toolReceiptSettle({ ...scope("r-7r"), now, error_note: "first cause" })
@@ -112,6 +135,7 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await a.toolReceiptBegin({ ...scope("r-7r"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "in_progress",
       recovery: { error_note: "first cause" },
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
   })
 
@@ -125,6 +149,7 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await b.toolReceiptBegin({ ...scope("r-2"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "replay",
       result: { thread: "t" },
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
   })
 
@@ -142,6 +167,7 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await a.toolReceiptBegin({ ...scope("r-3"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "retry",
       error_note: "first cause",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
   })
 
@@ -183,15 +209,23 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
 
   test("#given receipts are kept thirty days #when a completed receipt is older than that #then the key is accepted as a new call", async () => {
     let clock = Date.now()
+    const admitted = clock
     const { a } = twoInstances(() => clock)
-    expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: clock + GATEWAY_RECEIPT_RETENTION_MS,
+    })
     await a.toolReceiptSettle({ ...scope("k-4"), now: clock, result: { ok: true } })
     clock += GATEWAY_RECEIPT_RETENTION_MS - 1
     expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({
       kind: "replay",
       result: { ok: true },
+      expires_at: admitted + GATEWAY_RECEIPT_RETENTION_MS,
     })
     clock += 2
-    expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({ kind: "accepted" })
+    expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({
+      kind: "accepted",
+      expires_at: clock + GATEWAY_RECEIPT_RETENTION_MS,
+    })
   })
 })

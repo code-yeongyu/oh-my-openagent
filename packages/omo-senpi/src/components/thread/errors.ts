@@ -44,6 +44,9 @@ export const THREAD_ERROR_CODES = [
   "relay_requires_paid_plan",
   "alias_taken",
   "gateway_schema_too_new",
+  // A wait the caller gave a control (signal, deadline_ms) ended before its write was sent: nothing changed (slice T1b).
+  "timeout",
+  "cancelled",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]

@@ -19,6 +19,11 @@
     "stdout": "",
     "stderr": "omo thread send: expects 2 argument(s), got 1\n"
   },
+  "native-thread-close": {
+    "exit": 5,
+    "stdout": "{\"kind\":\"error\",\"error\":{\"code\":\"internal_error\",\"message\":\"omo thread: the plugin's thread SDK could not be loaded from <tree>/packages/omo-native/plugin/runtime/thread-sdk: Cannot find module '<tree>/packages/omo-native/plugin/runtime/thread-sdk/sdk.js' imported from <tree>/packages/omo-native/bin/lib/thread.js\",\"next_action\":\"Reinstall omo with: npm i -g omo-ai, then retry.\"}}\n",
+    "stderr": "omo thread: the plugin's thread SDK could not be loaded from <tree>/packages/omo-native/plugin/runtime/thread-sdk: Cannot find module '<tree>/packages/omo-native/plugin/runtime/thread-sdk/sdk.js' imported from <tree>/packages/omo-native/bin/lib/thread.js\n"
+  },
   "native-daemon-help": {
     "exit": 0,
     "stdout": "usage: omo daemon <run|adopt|status|stop|handoff|gc|rollback-prepare> [options]\n\n  run       ensure a daemon is serving this agent dir (start, reuse, or hand off)\n  adopt     take a session a host holds into this terminal (--interrupt, --force)\n  status    report who is serving and which sessions exist\n  stop      end the daemon; --drain lets in-flight work finish first\n  handoff   hand the socket to this build, keeping live sessions\n  gc        remove dead endpoint state; --prune-store-index drops missing store paths\n  rollback-prepare migrate retained task records back to rpc.sock before downgrading\n\n  --json            print the engine's JSON line instead of a summary\n  --no-upgrade      never hand off, even from an older build\n  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)\n  --include-workers include subagent sessions in status\n  --all             apply stop to every discovered endpoint\n  --wait            with stop --drain --all, wait for generations and claims to end\n",

@@ -1,4 +1,4 @@
-import type { ContextTail } from "../paged-reader"
+import { type ContextTail, type EntryPageRead, selectEntryPage } from "../paged-reader"
 import { contextTail } from "./context-tail"
 import { replyData } from "./remote-ops"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort, SessionProjector } from "./ports"
@@ -43,8 +43,11 @@ type Kept = { readonly entries: JsonObject[]; readonly complete: boolean; readon
 type Page = { readonly entries: JsonObject[]; readonly leaf: string | null; readonly more: boolean }
 type Refusal = Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>
 
-const kept = new WeakMap<RemoteSessionsPort, Map<string, Kept>>()
-const unpaged = new WeakMap<RemoteSessionsPort, Set<string>>()
+/** What a tail read sends: one `get_entries` command to the holder (another device's, or this device's engine). */
+export type EntryPagesPort = Pick<RemoteSessionsPort, "sessionCommand">
+
+const kept = new WeakMap<EntryPagesPort, Map<string, Kept>>()
+const unpaged = new WeakMap<EntryPagesPort, Set<string>>()
 
 const idOf = (entry: JsonObject | undefined): string | undefined =>
   typeof entry?.["id"] === "string" ? entry["id"] : undefined
@@ -74,7 +77,7 @@ function keep(sessions: Map<string, Kept>, key: string, entries: JsonObject[], c
 }
 
 export async function readContextTail(
-  port: RemoteSessionsPort,
+  port: EntryPagesPort,
   device: string,
   sessionId: string,
   project: SessionProjector,
@@ -159,4 +162,16 @@ export async function readContextTail(
     entries = [...older.entries, ...entries]
     complete = !older.more || older.entries.length === 0
   }
+}
+
+/** One bounded page of a session's tail (`readContextTail`, then the read's window or `after`); a tail it could not read is answered as it is. */
+export async function readTailPage(
+  port: EntryPagesPort,
+  device: string,
+  sessionId: string,
+  project: SessionProjector,
+  read: Parameters<typeof selectEntryPage>[1],
+): Promise<EntryPageRead | Exclude<ContextTailRead, { readonly kind: "ok" }>> {
+  const tail = await readContextTail(port, device, sessionId, project)
+  return tail.kind === "ok" ? selectEntryPage(tail.tail, read) : tail
 }

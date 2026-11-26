@@ -1,7 +1,9 @@
 import type { ThreadModel, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
-import { failure } from "../tools/internals"
+import { refusal } from "../refusal-texts"
+import { failure, failureResult } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
-import type { ThreadCloseOptions } from "../tools/ports"
+import type { ThreadCloseOptions, ThreadUnloadOptions } from "../tools/ports"
+import { SESSION_GONE } from "./close-ladder"
 import { controlIdentity, controlRefusalOf, refuse, type SessionControl, type SessionModelState } from "./port"
 
 /** A control's answer for a thread no engine holds live, on this device or another. */
@@ -69,11 +71,12 @@ export async function closeThread(
     )
   const { outcome, dropped_deliveries, graceful } = await control.close(options)
   if (outcome === "held_elsewhere")
-    return failure(
-      "foreign_live_owner",
-      `Thread ${control.thread_id} has no session file yet and another client still holds it, so only this tool's hold was released.`,
-      "Close it from the client that holds it, or send it a message first so it can be closed for every holder.",
-      control.device === undefined ? undefined : { device: control.device },
+    return failureResult(
+      refusal(
+        "control.close_held_elsewhere",
+        { thread: control.thread_id },
+        control.device === undefined ? undefined : { device: control.device },
+      ),
     )
   const closed = outcome === "closed"
   return {
@@ -83,6 +86,55 @@ export async function closeThread(
     reason: closed ? "closed" : "not_live",
     dropped_deliveries: [...dropped_deliveries],
     ...(graceful === undefined ? {} : { graceful }),
+  }
+}
+
+/** The unload options a `threads.unload` input names, absent ones left out. */
+export function unloadOptions(value: ThreadUnloadOptions): ThreadUnloadOptions {
+  return {
+    ...(value.interrupt === undefined ? {} : { interrupt: value.interrupt }),
+    ...(value.force === undefined ? {} : { force: value.force }),
+    ...(value.clear_queue === undefined ? {} : { clear_queue: value.clear_queue }),
+    ...(value.children === undefined ? {} : { children: value.children }),
+  }
+}
+
+/**
+ * The SDK's `threads.unload` (omo#14943 T1b): a running turn is refused `turn_active` before anything is sent unless the
+ * caller asked to stop it (`interrupt`) or to unload past what holds the session (`force`); `interrupt` sends the turn's
+ * abort first, then the unload, which settles what the abort left. The answer names what the unload dropped.
+ */
+export async function unloadThread(control: SessionControl, options: ThreadUnloadOptions): Promise<ThreadToolResult> {
+  const device = control.device === undefined ? {} : { device: control.device }
+  try {
+    if (options.interrupt !== true && options.force !== true && (await control.running()))
+      return failureResult(
+        refusal(
+          "control.unload_working",
+          { thread: control.thread_id, state: "a turn is running" },
+          { ...device, command: "unload_session", reason: "turn_active", retry_with: { interrupt: true } },
+        ),
+      )
+    if (options.interrupt === true) await control.interrupt(undefined)
+  } catch (error) {
+    // A holder that no longer holds the session answers the read or the abort before the unload as it would the unload.
+    const reason = controlRefusalOf(error)?.details?.["reason"]
+    if (typeof reason !== "string" || !SESSION_GONE.has(reason)) throw error
+    return failureResult(
+      refusal(
+        "control.unload_not_held",
+        { thread: control.thread_id, reason },
+        { ...device, command: "unload_session", reason },
+      ),
+    )
+  }
+  const { outcome, dropped_deliveries, dropped_user_messages } = await control.unload(options)
+  return {
+    kind: "ok",
+    ...controlIdentity(control),
+    unloaded: outcome === "unloaded",
+    dropped_deliveries: [...dropped_deliveries],
+    dropped_user_messages: [...dropped_user_messages],
   }
 }
 
@@ -259,11 +311,6 @@ async function applyThinkingLevel(control: SessionControl, level: string): Promi
   } catch (error) {
     if (controlRefusalOf(error)?.code !== "thinking_level_unsupported") throw error
     const supported = await control.getAvailableThinkingLevels()
-    return failure(
-      "thinking_level_unsupported",
-      `Thinking level "${level}" is not supported by the active model.`,
-      "Choose a level from the supported list and retry.",
-      { supported },
-    )
+    return failureResult(refusal("control.thinking_level_unsupported", { level }, { supported }))
   }
 }

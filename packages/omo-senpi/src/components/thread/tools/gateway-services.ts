@@ -66,7 +66,14 @@ export function createGatewayServices(
       }),
       options.remote,
     )
-  const engine = createGatewayEngine({ store, endpoints, resolve, now, senderProvenance })
+  const engine = createGatewayEngine({
+    store,
+    endpoints,
+    resolve,
+    now,
+    senderProvenance,
+    ...(options.deliveryId === undefined ? {} : { deliveryId: options.deliveryId }),
+  })
   const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
     const entry = (await entries()).find((candidate) => candidate.thread_id === durableId)
     return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint

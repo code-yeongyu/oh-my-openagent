@@ -31,7 +31,7 @@ import type { SessionWatchHandlers, SessionWatchOutcome } from "./control/wait-s
 import type { JsonObject } from "./remote/ports"
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { fencedCommand } from "./attachment-fence"
-import { closeLadder, SESSION_GONE } from "./control/close-ladder"
+import { closeLadder, type LadderSend, SESSION_GONE, unloadOver } from "./control/close-ladder"
 
 export type RpcFrame = {
   readonly success?: boolean
@@ -808,12 +808,50 @@ export function createLiveThreadSurface(
     }
   }
 
+  // Every record of a close or an unload is sent attached (`durableId`), the `get_state` probe included although the host
+  // exempts that read from its gate: the probe's attach itself answers whether the engine still holds the session.
+  const ladderSend =
+    (
+      socket: string | undefined,
+      send: <T>(type: string, data?: Record<string, unknown>, durableSessionId?: string) => Promise<T>,
+      durableId: string | undefined,
+    ): LadderSend =>
+    async ({ type, ...data }, record) => {
+      try {
+        return {
+          kind: "ok",
+          data:
+            // A graceful close is answered when the drain ends (omo#14313): its request outlives the drain it names,
+            // whatever this endpoint's own bound is (a terminal's is 1.5 s).
+            record?.waitMs !== undefined
+              ? await callOn<Record<string, unknown>>(
+                  socket ?? legacy,
+                  String(type),
+                  data,
+                  record.waitMs + LADDER_ANSWER_MARGIN_MS,
+                  durableId,
+                )
+              : type === "get_state"
+                ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_state", data, undefined, durableId, true)
+                : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
+                  type === "get_protocol_info"
+                  ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
+                  : await send<Record<string, unknown>>(String(type), data, durableId),
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
+        if (SESSION_GONE.has(reason)) return { kind: "gone", reason }
+        throw error
+      }
+    }
+
   const sessionMethods = (
     socket: string | undefined,
     send: <T>(type: string, data?: Record<string, unknown>, durableSessionId?: string) => Promise<T>,
   ): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => ({
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
+    getEntries: (sessionId, page) => send<Record<string, unknown>>("get_entries", { ...page, sessionId }),
     getState: (sessionId, durableId) => send("get_state", { sessionId }, durableId),
     watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
@@ -845,48 +883,10 @@ export function createLiveThreadSurface(
       releaseReply(
         await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId),
       ),
-    // Every rung of the ladder is sent attached (`durableId`), the `get_state` probe included although the host exempts
-    // that read from its gate: the probe's attach itself answers whether the engine still holds the session.
     closeSession: (sessionId, durableId, options) =>
-      closeLadder(
-        sessionId,
-        async ({ type, ...data }, record) => {
-          try {
-            return {
-              kind: "ok",
-              data:
-                // A graceful close is answered when the drain ends (omo#14313): its request outlives the drain it names,
-                // whatever this endpoint's own bound is (a terminal's is 1.5 s).
-                record?.waitMs !== undefined
-                  ? await callOn<Record<string, unknown>>(
-                      socket ?? legacy,
-                      String(type),
-                      data,
-                      record.waitMs + LADDER_ANSWER_MARGIN_MS,
-                      durableId,
-                    )
-                  : type === "get_state"
-                    ? await callOn<Record<string, unknown>>(
-                        socket ?? legacy,
-                        "get_state",
-                        data,
-                        undefined,
-                        durableId,
-                        true,
-                      )
-                    : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
-                      type === "get_protocol_info"
-                      ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
-                      : await send<Record<string, unknown>>(String(type), data, durableId),
-            }
-          } catch (error) {
-            const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
-            if (SESSION_GONE.has(reason)) return { kind: "gone", reason }
-            throw error
-          }
-        },
-        options,
-      ),
+      closeLadder(sessionId, ladderSend(socket, send, durableId), options),
+    unloadSession: (sessionId, durableId, options) =>
+      unloadOver(sessionId, durableId ?? sessionId, ladderSend(socket, send, durableId), options),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -1061,6 +1061,8 @@ export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
 export { reopenParkedRow } from "./remote/reopen-parked"
+export { readTailPage } from "./remote/transcript-tail"
+export { sendThread, sendToTarget, viewForSend } from "./sdk-send"
 export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"

@@ -62,6 +62,14 @@ export const ThreadReadParams = Type.Object({
         "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
+  after: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 256,
+      description:
+        "An item id from an earlier thread_read: return only the items newer than it, oldest first (a truncated answer continues with after set to its last id). Item ids are stable across reads; seq is not. Not with cursor.",
+    }),
+  ),
   max_bytes: Type.Optional(
     Type.Integer({
       minimum: 1,
@@ -221,6 +229,28 @@ const ThreadArchiveParams = Type.Object({
   idempotency_key: IdempotencyKey,
 })
 
+/**
+ * The SDK's `threads.unload` (design 6.2). No agent tool takes it: an agent ends a peer through the close ladder
+ * (`thread_close`), so it stays out of `threadToolParamSchemas`.
+ */
+export const ThreadUnloadParams = Type.Object({
+  thread: ThreadAddress,
+  interrupt: Type.Optional(Type.Boolean({ description: "Stop the running turn first." })),
+  force: Type.Optional(
+    Type.Boolean({ description: "Unload past other clients holding the session and its published extension work." }),
+  ),
+  clear_queue: Type.Optional(
+    Type.Boolean({ description: "Drop the queued input instead of keeping it for the reopen." }),
+  ),
+  children: Type.Optional(
+    Type.Union([Type.Literal("refuse"), Type.Literal("detach")], {
+      description: "refuse (the engine's default) refuses while child tasks work; detach leaves them running.",
+    }),
+  ),
+  all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
+})
+
 export type ThreadCreateInput = Static<typeof ThreadCreateParams>
 export type ThreadListInput = Static<typeof ThreadListParams>
 export type ThreadReadInput = Static<typeof ThreadReadParams>
@@ -232,6 +262,7 @@ export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
 export type ThreadArchiveInput = Static<typeof ThreadArchiveParams>
+export type ThreadUnloadInput = Static<typeof ThreadUnloadParams>
 
 export const threadToolParamSchemas = {
   thread_create: ThreadCreateParams,

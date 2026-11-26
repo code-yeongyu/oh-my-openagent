@@ -1085,6 +1085,48 @@
       "target": "this_device"
     },
     {
+      "id": "threads.messages/budget",
+      "row": "threads.messages",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "max_bytes": 4096
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "args": {
+            "thread": "t-1",
+            "all": true,
+            "max_bytes": 4096
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.messages/budget-over-cap-clamped",
+      "row": "threads.messages",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "max_bytes": 2097152
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "args": {
+            "thread": "t-1",
+            "all": true,
+            "max_bytes": 1048576
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.messages/missing",
       "row": "threads.messages",
       "kind": "refusal",
@@ -1530,23 +1572,45 @@
       "expect": [
         {
           "port": "store",
-          "op": "idempotency_get",
-          "args": {
-            "key": "k1"
-          },
-          "result": {
-            "stored": true
-          }
-        },
-        {
-          "port": "store",
           "op": "insert_delivery",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
         },
         {
           "port": "host",
           "op": "prompt",
-          "count": 0
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "deduplicated": true
+          }
         }
       ],
       "target": "this_device"
@@ -1746,28 +1810,210 @@
     {
       "id": "threads.send/key-reused",
       "row": "threads.send",
-      "kind": "refusal",
-      "refusal": "idempotency_conflict",
+      "kind": "effect",
       "input": {
         "thread": "t-1",
         "message": "status?",
-        "idempotency_key": "k2"
+        "idempotency_key": "k1"
       },
       "expect": [
         {
           "port": "store",
-          "op": "idempotency_get",
+          "op": "insert_delivery",
           "args": {
-            "key": "k2"
-          },
-          "result": {
-            "other_arguments": true
+            "thread": "t-1",
+            "mode": "auto"
           }
         },
         {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "other",
+            "idempotency_key": "k1"
+          },
+          "kind": "refusal",
+          "refusal": "idempotency_conflict",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ]
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/one-key-script-then-session",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
           "port": "store",
           "op": "insert_delivery",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "principal": {
+            "kind": "session",
+            "session_id": "session-1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "deduplicated": true
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/one-key-script-then-person",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "studio/t-2",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "principal": {
+            "kind": "person",
+            "uid": 501
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "remote",
+              "op": "sessions.send",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "device": "b",
+            "deduplicated": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/one-key-script-then-connector",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "principal": {
+            "kind": "connector",
+            "binding": "binding-1"
+          },
+          "kind": "refusal",
+          "refusal": "unsupported",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ]
         }
       ],
       "target": "this_device"
@@ -2453,6 +2699,83 @@
           "args": {
             "mode": "follow_up",
             "summary": "hi"
+          }
+        },
+        {
+          "port": "host",
+          "op": "follow_up"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/prompt-object-plain",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": {
+          "message": "hello",
+          "delivery": "follow_up"
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "follow_up"
+          }
+        },
+        {
+          "port": "host",
+          "op": "follow_up"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/prompt-object-attachments",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": {
+          "message": "hello",
+          "delivery": "follow_up",
+          "attachments": [
+            {
+              "path": "/w/a.png"
+            }
+          ]
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/w/a.png"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "follow_up",
+            "attachments": 1
           }
         },
         {
@@ -3809,19 +4132,73 @@
       },
       "expect": [
         {
-          "port": "store",
-          "op": "idempotency_get",
+          "port": "host",
+          "op": "rename_session",
           "args": {
-            "key": "k1"
-          },
-          "result": {
-            "stored": true
+            "thread": "t-1",
+            "name": "review"
           }
-        },
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "name": "review",
+            "idempotency_key": "k1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "host",
+              "op": "rename_session",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "name": "review"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.rename/key-reused",
+      "row": "threads.rename",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "name": "review",
+        "idempotency_key": "k1"
+      },
+      "expect": [
         {
           "port": "host",
           "op": "rename_session",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "name": "review"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "name": "other",
+            "idempotency_key": "k1"
+          },
+          "kind": "refusal",
+          "refusal": "idempotency_conflict",
+          "expect": [
+            {
+              "port": "host",
+              "op": "rename_session",
+              "count": 0
+            }
+          ]
         }
       ],
       "target": "this_device"
@@ -5019,6 +5396,82 @@
       "target": "this_device"
     },
     {
+      "id": "threads.unload/all-scope",
+      "row": "threads.unload",
+      "kind": "effect",
+      "input": {
+        "thread": "t-3",
+        "all_scope": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "args": {
+            "thread": "t-3"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.unload/outside-workspace",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-3"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.unload/idempotent-repeat",
+      "row": "threads.unload",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "idempotency_key": "k1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "host",
+              "op": "unload_session",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "unloaded": true
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.setReasoning/level-off",
       "row": "threads.setReasoning",
       "kind": "effect",
@@ -5227,6 +5680,119 @@
       "target": "other_device"
     },
     {
+      "id": "threads.read/after",
+      "row": "threads.read",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/after-on-other-device",
+      "row": "threads.read",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "args": {
+            "thread": "studio/t-2",
+            "max_bytes": 131072
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.read/after-unknown-item",
+      "row": "threads.read",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "thread": "t-1",
+        "after": "gone:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/after-with-cursor",
+      "row": "threads.read",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "thread": "t-1",
+        "cursor": "c1",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/after-engine-unpaged",
+      "row": "threads.read",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "thread": "t-1",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "result": {
+            "refused": "unsupported"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.readAfterWait/on-other-device",
       "row": "threads.readAfterWait",
       "kind": "effect",
@@ -5252,6 +5818,34 @@
         }
       ],
       "target": "other_device"
+    },
+    {
+      "id": "threads.readAfterWait/after",
+      "row": "threads.readAfterWait",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "wait_ms": 5000,
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "args": {
+            "thread": "t-1",
+            "wait_ms": 5000
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_entries",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.receipt/on-other-device",
@@ -5454,24 +6048,42 @@
     {
       "id": "threads.unload/on-other-device",
       "row": "threads.unload",
-      "kind": "refusal",
-      "refusal": "not_found",
-      "target": "other_device",
+      "kind": "effect",
       "input": {
         "thread": "studio/t-2"
       },
       "expect": [
         {
-          "port": "host",
-          "op": "unload_session",
+          "port": "remote",
+          "op": "sessions.close",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.unload/unknown-on-other-device",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.close",
           "args": {
             "thread": "studio/t-2"
           },
           "result": {
-            "error": "unknown_session"
+            "code": "unknown_session"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.release/on-other-device",
@@ -6437,6 +7049,61 @@
       ]
     },
     {
+      "id": "threads.interrupt/caller-cancels",
+      "row": "threads.interrupt",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.interrupt",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.interrupt/deadline-passes",
+      "row": "threads.interrupt",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.interrupt",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
       "id": "threads.close/session-live",
       "row": "threads.close",
       "kind": "effect",
@@ -6530,6 +7197,86 @@
       ]
     },
     {
+      "id": "threads.close/caller-cancels",
+      "row": "threads.close",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.close/deadline-passes",
+      "row": "threads.close",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "threads.unload/caller-cancels",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
       "id": "threads.setModel/session-live",
       "row": "threads.setModel",
       "kind": "effect",
@@ -6613,6 +7360,63 @@
       ]
     },
     {
+      "id": "threads.setModel/caller-cancels",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1",
+        "model": "opus"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.setModel/deadline-passes",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1",
+        "model": "opus"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
       "id": "threads.setReasoning/session-live",
       "row": "threads.setReasoning",
       "kind": "effect",
@@ -6694,6 +7498,63 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "threads.setReasoning/caller-cancels",
+      "row": "threads.setReasoning",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1",
+        "level": "high"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.setReasoning/deadline-passes",
+      "row": "threads.setReasoning",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1",
+        "level": "high"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
     },
     {
       "id": "threads.rename/session-live",
@@ -6785,6 +7646,112 @@
       ]
     },
     {
+      "id": "threads.rename/caller-cancels",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.rename/deadline-passes",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "threads.rename/deadline-passes-after-write",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "host",
+          "op": "rename_session",
+          "args": {
+            "thread": "t-1",
+            "name": "review"
+          },
+          "takes_ms": 100
+        },
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
       "id": "threads.archive/session-live",
       "row": "threads.archive",
       "kind": "effect",
@@ -6865,6 +7832,61 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "threads.archive/caller-cancels",
+      "row": "threads.archive",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "set_archived",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.archive",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.archive/deadline-passes",
+      "row": "threads.archive",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "store",
+          "op": "set_archived",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.archive",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
     },
     {
       "id": "threads.handoff/session-live",

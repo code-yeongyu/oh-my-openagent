@@ -1,12 +1,7 @@
-import {
-  OMO_CODE_REGISTRY,
-  type OmoCode,
-  type OmoFailure,
-  type OmoPrincipal,
-  PRINCIPAL_MATRIX,
-  ROOT_CALLS,
-  type RootCallKey,
-} from "../contract"
+import type { OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
+import { ROOT_CALL_ANSWERS } from "../contract/call-answers"
+import { OMO_CODE_REGISTRY, type OmoCode } from "../contract/codes"
+import { PRINCIPAL_MATRIX } from "../contract/principal-matrix"
 import { PENDING_CELLS } from "./pending-cells"
 
 /** The facts of a root a matrix line may be conditioned on: the root options it was built with. */
@@ -24,7 +19,7 @@ function boundaryLines(facts: RootFacts) {
 }
 
 /** The calls no line of the matrix names: a pair with no cell is refused by default, never served by omission. */
-export const UNLINED_CALLS: readonly RootCallKey[] = (Object.keys(ROOT_CALLS) as RootCallKey[]).filter(
+export const UNLINED_CALLS: readonly RootCallKey[] = (Object.keys(ROOT_CALL_ANSWERS) as RootCallKey[]).filter(
   (call) => !PRINCIPAL_MATRIX.some((line) => (line.rows as readonly string[]).includes(call)),
 )
 

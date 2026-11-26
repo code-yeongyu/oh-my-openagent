@@ -10,11 +10,12 @@ import type { ScenarioRun, ScenarioSetup } from "../conformance-run"
 import type { TableScenario } from "../expectation"
 import { loadScenarioTable } from "../scenario-table"
 import { accountPorts } from "./account"
+import { virtualClock } from "./clock"
 import { hostPort } from "./host"
 import { type FakeFsPort, type FakeProcessPort, fsPort, processPort } from "./process-fs"
 import { createRecorder, type Recorder } from "./recorder"
 import { remotePort } from "./remote"
-import { storePort } from "./store"
+import { deliveryLedger, storePort } from "./store"
 
 // One setup for every slice's scenario drivers: the scenario's fakes over one recorder, and the real omo SDK root built
 // over them (assembleOmoSdk, the scenario's principal and root options) in a temp home and agent dir of its own. A
@@ -37,6 +38,13 @@ export type SetupOptions = {
 }
 
 const FIXED_NOW = 1_764_000_000_000
+
+// The engine's delivery ids, counted per scenario, so a scenario stated twice draws the same ids and its answers that
+// name one (a repeat answering the first delivery) are the same in both runs.
+function deliveryIds(): () => string {
+  let issued = 0
+  return () => `00000000-0000-4000-8000-${(++issued).toString(16).padStart(12, "0")}`
+}
 export const FAKE_HOME_PREFIX = "sdk-parity-fakes-"
 
 const isStream = (value: unknown): value is AsyncIterable<unknown> =>
@@ -73,12 +81,14 @@ function callScoped(target: unknown, begin: () => void, end: () => Promise<void>
 }
 
 export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {}): ScenarioSetup {
-  const recorder = createRecorder(scenario)
+  const clock = virtualClock(FIXED_NOW)
+  const recorder = createRecorder(scenario, clock)
   const scenarioRoot = join(tmpdir(), `${FAKE_HOME_PREFIX}${randomUUID()}`)
   const home = join(scenarioRoot, "home")
   const elsewhere = join(scenarioRoot, "elsewhere")
   const agentDir = join(home, ".omo", "agent")
   const remote = remotePort(recorder)
+  const deliveries = deliveryLedger(recorder)
   const fakes: ScenarioFakes = {
     recorder,
     home,
@@ -97,14 +107,21 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     ...(scenario.root as Partial<OmoSdkOptions> | undefined),
     ports: {
       ...accountPorts(recorder, { desktopLaunch: options.desktopLaunch === true }),
-      host: hostPort(recorder, { agentDir, cwd: home, elsewhere }),
-      store: storePort(recorder, () => FIXED_NOW),
+      host: hostPort(recorder, { agentDir, cwd: home, elsewhere }, deliveries),
+      store: storePort(recorder, clock.now, deliveries),
       remote: remote.remote,
-      now: () => FIXED_NOW,
+      now: clock.now,
+      deliveryId: deliveryIds(),
+      waitClock: clock,
     },
   }
-  const root = assembleOmoSdk(sdkOptions, options.cores === undefined ? {} : { cores: options.cores(fakes) })
+  const cores = options.cores === undefined ? {} : { cores: options.cores(fakes) }
+  const root = assembleOmoSdk(sdkOptions, cores)
   if (recorder.given("session")["closed"] === true) root.close()
+  // A step that names its own principal runs on a root built for it over the same ports, so it shares every fake's state
+  // (the store's receipt book and deliveries included) with the scenario's other calls.
+  const rootAs = (principal: Readonly<Record<string, unknown>>): unknown =>
+    callScoped(assembleOmoSdk({ ...sdkOptions, principal: principal as OmoSdkOptions["principal"] }, cores), begin, end)
   const begin = (): void => {
     mkdirSync(agentDir, { recursive: true })
   }
@@ -112,7 +129,13 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
   }
-  return { root: callScoped(root, begin, end), calls: recorder.calls }
+  return {
+    root: callScoped(root, begin, end),
+    rootAs,
+    calls: recorder.calls,
+    after: clock.after,
+    sandbox: scenarioRoot,
+  }
 }
 
 export function scenarioRuns(

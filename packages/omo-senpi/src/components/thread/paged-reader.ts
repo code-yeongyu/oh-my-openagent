@@ -12,9 +12,8 @@
  * `cursor_stale`, as on every other source.
  */
 
-import { THREAD_READ_DEFAULT_BYTES } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
-import { takeWithinBudget } from "./read-budget"
+import { readBudget, takeWithinBudget } from "./read-budget"
 import { THREAD_TAIL_DEFAULT_ITEMS, type ThreadTranscriptEntry } from "./reader"
 
 /** The newest context messages of a session (at least the window's 60 unless it has fewer), oldest first. */
@@ -28,10 +27,14 @@ export type EntryPageRead =
   | {
       readonly kind: "ok"
       readonly messages: readonly ThreadTranscriptEntry[]
+      /** Each message's durable id (`<entryId>:<index>`), aligned with `messages`. */
+      readonly ids: readonly string[]
       readonly truncated: boolean
       readonly next_cursor: string | null
     }
   | { readonly kind: "error"; readonly error: ThreadToolFailure }
+  /** `after` named an id the tail does not hold. */
+  | { readonly kind: "after_not_found" }
 
 /** How many newest messages a tail must hold (unless the session has fewer) to answer every read. */
 export const CONTEXT_TAIL_MESSAGES = THREAD_TAIL_DEFAULT_ITEMS
@@ -70,12 +73,34 @@ export const staleEntryCursor = (): Extract<EntryPageRead, { readonly kind: "err
   ),
 })
 
-/** One bounded slice of the tail; `cursor` must be undefined or an entry cursor (`isEntryCursor`). */
+/**
+ * One bounded slice of the tail; `cursor` must be undefined or an entry cursor (`isEntryCursor`). `after` names a message
+ * by its id and takes the messages newer than it, oldest first, until the budget is spent: a truncated page continues
+ * with `after` set to its last id (no cursor). An id the tail does not hold is undefined (`read.after_not_found` there).
+ */
 export function selectEntryPage(
   tail: ContextTail,
-  read: { readonly max_bytes?: number; readonly cursor?: string },
+  read: { readonly max_bytes?: number; readonly cursor?: string; readonly after?: string },
 ): EntryPageRead {
+  const budget = readBudget(read.max_bytes)
+  if (budget.kind === "error") return budget
   const { messages, revision } = tail
+  if (read.after !== undefined) {
+    const from = messages.findIndex((entry) => entry.id === read.after) + 1
+    if (from === 0) return { kind: "after_not_found" }
+    const newer = messages.slice(from)
+    const { selected } = takeWithinBudget(
+      newer.map((entry) => entry.message),
+      budget.maxBytes,
+    )
+    return {
+      kind: "ok",
+      messages: selected,
+      ids: newer.slice(0, selected.length).map((entry) => entry.id),
+      truncated: selected.length < newer.length,
+      next_cursor: null,
+    }
+  }
   let floor = Math.max(0, messages.length - CONTEXT_TAIL_MESSAGES)
   let end = messages.length
   if (read.cursor !== undefined) {
@@ -87,7 +112,7 @@ export function selectEntryPage(
   }
   const { selected } = takeWithinBudget(
     messages.slice(floor, end).map((entry) => entry.message),
-    read.max_bytes ?? THREAD_READ_DEFAULT_BYTES,
+    budget.maxBytes,
     "end",
   )
   const start = end - selected.length
@@ -97,6 +122,7 @@ export function selectEntryPage(
   return {
     kind: "ok",
     messages: selected,
+    ids: messages.slice(start, end).map((entry) => entry.id),
     truncated,
     next_cursor:
       truncated && before !== undefined && first !== undefined

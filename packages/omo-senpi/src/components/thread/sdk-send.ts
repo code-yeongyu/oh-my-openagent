@@ -1,3 +1,4 @@
+import { throughSendBook } from "./sdk-core/send-book"
 import { withinCallBudget } from "../call-budget/call-deadline"
 import { toThreadAddressEntries } from "./address-book"
 import type { ThreadAddressEntry } from "./addressing"
@@ -6,6 +7,7 @@ import type { resolveAddress } from "./address/resolve"
 import type { Failed } from "./address/refusals"
 import { DEFAULT_THREAD_DELIVERY, type ThreadSendInput, type ThreadHandoffInput } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
+import { refusal } from "./refusal-texts"
 import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget, DeliveryOutcome } from "./gateway/transport"
 import type { DeliveryAuthority, GatewaySender } from "./gateway/types"
@@ -99,7 +101,7 @@ export async function sendToTarget(
       ? sessionSender(options, principal.id)
       : { kind: target.kind === "remote" ? "person" : "cli", uid: principal.uid, user: principal.user }
   const inboundHop = principal.kind === "session" ? options.callerChainHop?.() : undefined
-  return pipeline.deliver({
+  const delivery = {
     sender,
     caller_id: principal.kind === "session" ? principal.id : `${sender.kind}:${principal.uid}`,
     target,
@@ -111,7 +113,17 @@ export async function sendToTarget(
     args,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),
-  })
+  }
+  // A key the caller named admits through the one send book before any transport (#15021).
+  const named = value.idempotency_key?.trim()
+  if (named === undefined || named === "") return pipeline.deliver(delivery)
+  const hashed = {
+    message: value.message,
+    delivery: delivery.mode,
+    expected_turn_id: value.expected_turn_id,
+    ...("collapse_key" in value ? { collapse_key: value.collapse_key } : {}),
+  }
+  return throughSendBook(options.store, target, named, "local", hashed, () => pipeline.deliver(delivery))
 }
 
 function sessionSender(options: ThreadToolSurfaceOptions, id: string): GatewaySender {
@@ -320,10 +332,9 @@ function replySender(
   }
   const found = [...distinct.values()]
   if (found.length <= 1) return found[0]
-  return threadToolFailure(
-    "ambiguous_target",
-    `"${address}" names more than one sender of this run's deliveries; none was picked.`,
-    "Send to the intended thread as a normal send, by its id.",
+  return refusal(
+    "control.reply_sender_ambiguous",
+    { address },
     {
       candidates: found.map((sender) => ({
         thread: sender.session_id,

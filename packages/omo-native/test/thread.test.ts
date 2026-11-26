@@ -22,7 +22,7 @@ function fakeSdk(answers: Record<string, unknown> = {}) {
     calls.push({ method: name, request })
     return answers[name] ?? { kind: "ok", method: name, request }
   }
-  const sdk = Object.fromEntries(["list", "read", "send"].map((name) => [name, method(name)]))
+  const sdk = Object.fromEntries(["list", "read", "send", "close"].map((name) => [name, method(name)]))
   return {
     calls,
     disposed: () => disposed,
@@ -62,6 +62,17 @@ async function run(args: readonly string[], fake = fakeSdk(), extra: Record<stri
 }
 
 describe("omo thread: argv to SDK calls", () => {
+  test("#given close with --force and a key #when run #then the SDK closes once with those fields and the CLI exits ok", async () => {
+    const result = await run(["close", "dur-x", "--force", "--idempotency-key", "k1", "--json"])
+    expect(result.calls).toEqual([
+      {
+        method: "close",
+        request: { thread: "dur-x", force: true, wait_ms: undefined, idempotency_key: "k1" },
+      },
+    ])
+    expect(result.exitCode).toBe(THREAD_EXIT.ok)
+  })
+
   test("#given list --json #when run #then the SDK lists in the workspace scope and stdout is its whole result: threads, devices and remote_unavailable", async () => {
     const list = {
       kind: "ok",

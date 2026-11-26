@@ -1,3 +1,4 @@
+import { attachmentsRefused } from "./attachments-refusal"
 import type { WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
 import { assembleThreadFacade } from "../omo-sdk/thread-assembly"
@@ -155,7 +156,7 @@ function asThreadResult(answer: { readonly kind: string }): ThreadToolResult {
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   assertThreadSdkOptions(options)
-  const { agentDir, cwd, uid, user, env, host, store, remote, now } = options
+  const { agentDir, cwd, uid, user, env, host, store, remote, now, onUnexpected } = options
   const { provenanceWorkspaces, engineStatusAll, workerModuleUrl, firstPromptWaitMs } = options
   const { root, releaseLocated } = assembleThreadFacade({
     agentDir,
@@ -175,6 +176,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       ...(store === undefined ? {} : { store }),
       ...(remote === undefined ? {} : { remote }),
       ...(now === undefined ? {} : { now }),
+      ...(onUnexpected === undefined ? {} : { onUnexpected }),
     },
   })
   const threads = root.threads
@@ -198,6 +200,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     },
     read: async (request) => unknownKeys(request, READ_KEYS) ?? asThreadResult(await threads.read(request)),
     send: async (request) => {
+      const attachments = attachmentsRefused(request)
+      if (attachments !== undefined) return { kind: "error", error: attachments }
       const refused = unknownKeys(request, SEND_KEYS)
       if (refused !== undefined) return refused
       const { text, mode, expected_turn_id, ...rest } = request
@@ -221,6 +225,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         : { kind: "error", error: threadToolFailureOf(located) }
     },
     create: async (request) => {
+      const attachments = attachmentsRefused(request)
+      if (attachments !== undefined) return { kind: "error", error: attachments }
       // The facade takes the tool's create schema, narrower than the root's: what it refused, it still refuses as it did.
       const parsed = parseThreadParams(threadToolParamSchemas.thread_create, request)
       if (parsed.kind === "error") return parsed as ThreadToolResult

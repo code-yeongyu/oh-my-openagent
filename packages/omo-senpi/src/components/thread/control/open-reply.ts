@@ -1,5 +1,5 @@
 import type { ThreadDataError } from "../contracts"
-import { threadToolFailure } from "../errors"
+import { refusal } from "../refusal-texts"
 import type { JsonObject, RemoteCommandOutcome } from "../remote/ports"
 import { endpointOutcomeFailure } from "../remote/outcome"
 import { folderFailure } from "../worktree/failures"
@@ -27,10 +27,9 @@ export function modelRefusal(text: string, model: string | undefined, device?: s
   const where = device === undefined ? "this device" : `device ${device}`
   return {
     kind: "error",
-    error: threadToolFailure(
-      "model_not_found",
-      `No thread was created: ${where} cannot run ${model}.`,
-      `Pass a provider/id ${where} has (thread_set_model, tool.thread_set_model() in an eval cell, lists them), or leave model unset for its default.`,
+    error: refusal(
+      "control.open_model_unavailable",
+      { where, model },
       { reason: "model_unavailable", model, ...(device === undefined ? {} : { device }) },
     ),
   }
@@ -47,14 +46,9 @@ export function forkRefusal(text: string, forkFrom: string | undefined, device?:
   const where = device === undefined ? "this device" : `device ${device}`
   return {
     kind: "error",
-    error: threadToolFailure(
-      "not_found",
-      reason === "fork_source_not_local"
-        ? `No thread was created: ${forkFrom} is not a session ${where} holds, so its engine cannot fork it.`
-        : `No thread was created: ${where} has no readable session file for ${forkFrom} to fork.`,
-      reason === "fork_source_not_local"
-        ? "A fork is made on the device that holds its source: call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find that device, and fork the thread by the id listed there."
-        : "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) and fork a thread it lists.",
+    error: refusal(
+      reason === "fork_source_not_local" ? "control.open_fork_not_local" : "control.open_fork_not_found",
+      { source: forkFrom, where },
       { reason, thread: forkFrom, ...(device === undefined ? {} : { device }) },
     ),
   }

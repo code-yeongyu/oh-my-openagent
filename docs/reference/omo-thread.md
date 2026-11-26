@@ -75,7 +75,7 @@ with other arguments is `idempotency_conflict`.
 A `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
 the message enters the turn in flight, as typing into its terminal does, with that running turn as
 its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
-starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads). The result's
+starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads); `started` with a turn id means the turn the run is expected to take, and a start cancelled before it begins is delivered in a later turn. The result's
 `effective_mode` is the lane the receiver's answer proves (`started` is `start`, `steered` is `steer`, a queued answer is
 `follow_up`, except a delivery waiting only for a wake, which starts the woken session). The header is written before
 the receiver answers, so when a turn begins or ends in between, the header keeps the lane that was asked for; a
@@ -290,7 +290,15 @@ every other subcommand prints the full result.
 | --- | --- |
 | `list` | `[{thread, name, state: opening\|running\|idle\|inactive\|archived, model?: {provider, id}, status: live\|resumable (deprecated: resumable exactly when no engine holds the thread), machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, as_of?, controls?, error_note?, device?, alias?}]`; `--state` (repeatable or comma-separated) picks the states listed, and the default lists every state except `archived`; a thread its engine closed stays listed `inactive` from its session file (the newest 200 files in scope); `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
 | `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode: start\|steer\|follow_up (the requested mode while it waits for a receiver), endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
-| `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
+| `read` | `{kind:"ok", thread, link, items: [{seq, id?, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
+
+An item's `seq` is its position in that one answer (1 is the oldest returned) and names nothing across reads: the same
+message has another `seq` in a read with a different budget or after the thread grew. Its `id` (`<entry id>:<index>`, the
+session entry the message comes from and its place in that entry) is the same in every read and whichever device answers;
+the agent tool `thread_read` and the SDK's `threads.read` take it back as `after`, which returns only the newer items, oldest
+first, and continues a truncated answer with `after` set to its last id (`after` with a cursor is `invalid_arguments`, and
+an id the readable window no longer holds is `not_found`). A thread whose engine does not page its entries gives items no
+`id`, and `after` is `unsupported` there. `threads.messages` is the engine's whole message list and carries no ids.
 
 A failure is `{kind:"error", error: {code, message, next_action, details?}}`; the code is one of
 the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`, "Error taxonomy").

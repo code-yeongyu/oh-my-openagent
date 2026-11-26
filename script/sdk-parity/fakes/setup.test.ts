@@ -17,7 +17,7 @@ import { fsPort, processPort } from "./process-fs"
 import { createRecorder } from "./recorder"
 import { FAKE_HOME_PREFIX, scenarioSetup } from "./setup"
 
-// P1b's eight rows judged as isBuilt will judge them once the rows list their scenarios: each row's `scenarios` filled
+// P1b's rows, and T1b's threads.send and threads.unload, judged as isBuilt will judge them once the rows list their scenarios: each row's `scenarios` filled
 // from the table, the real effect classification (PORT_EFFECTS) and the table's inert fields. Every scenario the real
 // root answers differently from the table is an entry of the closed record scenario-differences.json, checked both
 // ways: a difference with no entry fails, and an entry whose scenario now passes fails as stale.
@@ -44,6 +44,8 @@ const ROWS = [
   "threads.locate",
   "threads.release",
   "threads.rename",
+  "threads.send",
+  "threads.unload",
   "config.status",
 ]
 const table = loadScenarioTable()
@@ -79,8 +81,13 @@ const scenarioOf = (id: string): TableScenario => {
   if (found === undefined) throw new Error(`no scenario ${id}`)
   return found
 }
+// A `then` step's problem (`<id>#step2`) is its scenario's difference: an entry names the scenario.
 const failing = (problems: readonly string[]): string[] =>
-  [...new Set(problems.flatMap((problem) => /scenario (\S+\/\S+?)(?::| )/.exec(problem)?.[1] ?? []))].toSorted()
+  [
+    ...new Set(
+      problems.flatMap((problem) => /scenario (\S+\/\S+?)(?::| )/.exec(problem)?.[1]?.replace(/#step\d+$/, "") ?? []),
+    ),
+  ].toSorted()
 async function judged(changed: TableScenario): Promise<string[]> {
   const row = rows.find((candidate) => candidate.id === changed.row)
   if (row === undefined) throw new Error(`no row ${changed.row}`)
@@ -91,9 +98,9 @@ async function judged(changed: TableScenario): Promise<string[]> {
 }
 
 describe("P1b scenario drivers over the real omo SDK root", () => {
-  test("#given the three runs modules #then every table scenario of the eight rows has exactly one run", () => {
+  test("#given the three runs modules #then every table scenario of the run rows has exactly one run", () => {
     expect(RUNS.map((run) => run.scenario.id).toSorted()).toEqual(scenarios.map((s) => s.id).toSorted())
-    expect(RUNS).toHaveLength(57)
+    expect(RUNS).toHaveLength(123)
   })
 
   test("#given the differences record #then it is sorted, complete per entry, and names only rows still unresolved", () => {
@@ -192,5 +199,101 @@ describe("the workspace scope is pinned by the scope scenarios' answers", () => 
   ] as const)("#given %s #when %s #then it no longer passes", async (id, _how, broken) => {
     expect(await judged(scenarioOf(id))).toEqual([])
     expect((await judged(broken(id))).length).toBeGreaterThan(0)
+  })
+})
+
+describe("the fake store's receipt book reaches the root's answer (T1b)", () => {
+  test("#given a keyed rename #when the key is repeated with other arguments, then with the same #then the root answers idempotency_conflict, then the first answer, and the host renamed once", async () => {
+    const scenario = scenarioOf("threads.rename/name")
+    const setup = scenarioSetup(scenario)
+    const root = setup.root as { readonly threads: { readonly rename: (input: unknown) => Promise<unknown> } }
+    const rename = (name: string) =>
+      root.threads.rename({
+        thread: "t-1",
+        name,
+        idempotency_key: "k-book",
+      })
+    const first = await rename("review")
+    expect(await rename("other")).toMatchObject({ kind: "error", error: { code: "idempotency_conflict" } })
+    expect(await rename("review")).toEqual(first)
+    expect(setup.calls().filter((call) => call.op === "rename_session")).toHaveLength(1)
+  })
+})
+
+describe("the root's extended send and create inputs over the fakes (T1b)", () => {
+  type Threads = {
+    readonly send: (input: unknown) => Promise<unknown>
+    readonly create: (input: unknown) => Promise<unknown>
+  }
+  const tableScenario = (id: string): TableScenario => {
+    const found = table.flatMap((file) => file.scenarios).find((scenario) => scenario.id === id)
+    if (found === undefined) throw new Error(`no scenario ${id}`)
+    return found
+  }
+  const rootOf = (id: string) => {
+    const setup = scenarioSetup(tableScenario(id))
+    return { threads: (setup.root as { readonly threads: Threads }).threads, ops: () => setup.calls().map((c) => c.op) }
+  }
+
+  test.each([
+    ["a thread on this device", "t-1", { path: "/w/a.png" }],
+    ["a thread on another device", "studio/t-2", { bytes: new Uint8Array([104, 105]), name: "a.txt" }],
+  ] as const)(
+    "#given attachments on a send to %s #then it is refused unsupported and nothing is read or delivered",
+    async (_where, thread, attachment) => {
+      const { threads, ops } = rootOf("threads.send/attachments")
+      const answer = await threads.send({ thread, message: "status?", attachments: [attachment] })
+      expect(answer).toMatchObject({
+        kind: "error",
+        error: { code: "unsupported", details: { field: "attachments", count: 1 } },
+      })
+      expect(ops()).toEqual([])
+    },
+  )
+
+  test("#given a create with an object prompt and a key #when it is repeated #then one thread gets one delivery of that prompt", async () => {
+    const { threads, ops } = rootOf("threads.create/prompt-object-plain")
+    const input = { prompt: { message: "hello", delivery: "follow_up" }, idempotency_key: "k-first" }
+    const first = await threads.create(input)
+    expect(first).toMatchObject({ kind: "ok" })
+    expect(await threads.create(input)).toEqual({ ...(first as object), deduplicated: true })
+    expect(ops().filter((op) => op === "open_session")).toHaveLength(1)
+    expect(ops().filter((op) => op === "insert_delivery")).toHaveLength(1)
+    expect(ops().filter((op) => op === "follow_up")).toHaveLength(1)
+  })
+
+  test("#given an object prompt that names its turn #then the delivery carries it, and a repeat naming another turn conflicts", async () => {
+    const setup = scenarioSetup(tableScenario("threads.create/prompt-object-plain"))
+    const { threads } = setup.root as { readonly threads: Threads }
+    const create = (turn: string) =>
+      threads.create({
+        prompt: { message: "hello", delivery: "follow_up", expected_turn_id: turn },
+        idempotency_key: "k-turn",
+      })
+    expect(await create("3")).toMatchObject({ kind: "ok" })
+    const inserted = setup.calls().filter((call) => call.op === "insert_delivery")
+    expect(inserted.map((call) => call.args)).toEqual([expect.objectContaining({ expected_turn_id: "3" })])
+    expect(await create("4")).toMatchObject({ kind: "error", error: { code: "idempotency_conflict" } })
+  })
+
+  test.each([
+    ["summary", { summary: "hi" }, "not_implemented"],
+    ["author", { author: { platform_user_id: "u-1", display: "Una" } }, "not_implemented"],
+    ["attachments", { attachments: [{ path: "/w/a.png" }] }, "unsupported"],
+  ] as const)(
+    "#given an object prompt with %s #then the create answers %s and opens no thread",
+    async (_field, extra, code) => {
+      const { threads, ops } = rootOf("threads.create/prompt-object")
+      const answer = await threads.create({ prompt: { message: "hello", ...extra } })
+      expect(answer).toMatchObject({ kind: "error", error: { code } })
+      expect(ops().filter((op) => op === "open_session")).toEqual([])
+    },
+  )
+
+  test("#given the create's delivery and its prompt's delivery differ #then it is refused before any open", async () => {
+    const { threads, ops } = rootOf("threads.create/prompt-object")
+    const answer = await threads.create({ delivery: "steer", prompt: { message: "hello", delivery: "follow_up" } })
+    expect(answer).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(ops()).toEqual([])
   })
 })

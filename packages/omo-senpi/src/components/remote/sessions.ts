@@ -4,12 +4,20 @@ import type { DeviceService } from "@oh-my-opencode/device-service-core/device-s
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
 import { DEFAULT_THREAD_DELIVERY } from "../thread/contracts/fields"
 import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
-import { answered, closeOptions, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
+import {
+  answered,
+  closeOptions,
+  closeThread,
+  interruptThread,
+  setModelOn,
+  setThinkingLevelOn,
+} from "../thread/control/operations"
 import { ControlRefusal, type SessionControl } from "../thread/control/port"
 import { createRelayControl } from "../thread/control/relay-control"
 import { createRelaySessionHost } from "../thread/control/relay-session-host"
 import type { SessionOpenRequest } from "../thread/control/session-host"
 import type { ThreadToolFailure } from "../thread/errors"
+import { GATEWAY_RECEIPT_RETENTION_MS } from "../thread/gateway/constants"
 import { hashArgs } from "../thread/gateway/hash-args"
 import { resolveProvenance } from "../thread/gateway/provenance-resolver"
 import type { ToolReceiptBegin } from "../thread/gateway/store-tool-receipts"
@@ -33,8 +41,6 @@ import { sessionDetail } from "./session-detail"
 import type {
   DeviceRow,
   SessionRow,
-  InterruptJob,
-  InterruptResult,
   OpenRequest,
   OpenResult,
   Opts,
@@ -110,24 +116,6 @@ const modelUnavailable = (failure: RemoteFailure, model: string | undefined): Re
       )
     : failure
 
-const isJob = (value: unknown): value is InterruptJob =>
-  isObject(value) && typeof value["kind"] === "string" && typeof value["id"] === "string"
-
-/** senpi#6675's per-job report of the interrupted turn's background jobs; an engine without it reports none. */
-const backgroundOf = (value: unknown): InterruptResult["background"] => {
-  if (!isObject(value) || value["status"] !== "stopped") return { status: "not_supported" }
-  const { stopped, failed } = value
-  if (!Array.isArray(stopped) || !Array.isArray(failed)) return { status: "not_supported" }
-  return {
-    status: "stopped",
-    stopped: stopped.filter(isJob),
-    failed: failed.filter(
-      (job): job is InterruptJob & { readonly reason: string } =>
-        isObject(job) && typeof job["reason"] === "string" && isJob(job),
-    ),
-  }
-}
-
 const unknownSession = (device: string, session?: string): RemoteFailure =>
   remoteFailure(
     "not_found",
@@ -195,7 +183,13 @@ function keepNewest<V extends { readonly settled: boolean }>(held: Map<string, V
  * without a key keeps a receipt under a fresh one nobody can retry, so the store keeps the newest (keepNewest).
  */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
-  type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }
+  type Receipt = {
+    readonly hash: string
+    readonly expires_at: number
+    settled: boolean
+    result?: unknown
+    note?: string
+  }
   const held = new Map<string, Receipt>()
   const keyOf = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) =>
     `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
@@ -204,13 +198,14 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
     toolReceiptBegin: async (request): Promise<ToolReceiptBegin> => {
       const known = held.get(keyOf(request))
       if (known === undefined) {
-        keepNewest(held, keyOf(request), { hash: request.args_hash, settled: false })
-        return { kind: "accepted" }
+        const expires_at = request.now + GATEWAY_RECEIPT_RETENTION_MS
+        keepNewest(held, keyOf(request), { hash: request.args_hash, expires_at, settled: false })
+        return { kind: "accepted", expires_at }
       }
       if (known.hash !== request.args_hash) return { kind: "conflict" }
-      if (!known.settled) return { kind: "in_progress" }
+      if (!known.settled) return { kind: "in_progress", expires_at: known.expires_at }
       if (known.note !== undefined) return { kind: "uncertain", error_note: known.note }
-      return { kind: "replay", result: known.result }
+      return { kind: "replay", result: known.result, expires_at: known.expires_at }
     },
     toolReceiptSettle: async (request) => {
       const known = held.get(keyOf(request))
@@ -413,7 +408,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     thread: ThreadHandle,
     opts: Opts | undefined,
     body: (control: SessionControl, target: Target, svc: DeviceService) => Promise<ThreadToolResult>,
-    value: (result: ThreadToolResult) => T,
+    value: (result: ThreadToolResult, target: Target) => T,
     onThisDevice: (target: SessionTarget) => Promise<Outcome<T>>,
   ): R<T> => {
     const stage = budget(core.timers, opts, DEADLINES.drive)
@@ -423,7 +418,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return core.member(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device)) return await onThisDevice(target)
       const result = await answered(() => body(controlOf(svc, target), target, svc))
-      return result.kind === "error" ? fromThread(result.error) : ok(value(result))
+      return result.kind === "error" ? fromThread(result.error) : ok(value(result, target))
     })
   }
 
@@ -713,32 +708,24 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         }
       })
     },
-    // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).
-    interrupt: async (thread, opts) => {
-      const stage = budget(core.timers, opts, DEADLINES.drive)
-      const resolved = await resolve(thread, stage)
-      if (resolved.kind === "error") return resolved
-      const target = resolved.value
-      return core.member(stage(), DEADLINES.drive, true, async (svc) => {
-        if (await isThisDevice(svc, target.device))
-          return await onThisDevice(target.device, (local) => local.interrupt(target, thread))
-        const { device, session } = target
-        const outcome = await legOf(svc).remote.sessions.sessionCommand(device, session, {
-          type: "interrupt",
-          sessionId: session,
-        })
-        if (outcome.kind !== "ok") return fromThread(outcomeFailure(outcome, device).error)
-        const reply = replyData(outcome.response)
-        const turn = text(reply["turnId"])
-        return ok({
-          thread,
-          ...(turn === undefined ? {} : { turn_id: turn }),
-          interrupted: reply["interrupted"] === true,
-          background: backgroundOf(reply["background"]),
-          device,
-        })
-      })
-    },
+    // The thread tools' interrupt body (#14951): one record that also stops the turn's background jobs, read by one rule.
+    interrupt: async (thread, opts) =>
+      controlled(
+        thread,
+        opts,
+        (control) => interruptThread(control, undefined),
+        (result, { device }) => {
+          const answer = result as Extract<ThreadToolResult, { readonly interrupted: boolean }>
+          return {
+            thread,
+            ...(answer.turn_id === undefined ? {} : { turn_id: answer.turn_id }),
+            interrupted: answer.interrupted,
+            background: answer.background,
+            device,
+          }
+        },
+        (target) => onThisDevice(target.device, (local) => local.interrupt(target, thread)),
+      ),
     setModel: async (thread, model, opts) => {
       const wanted = splitModel(model)
       if ("kind" in wanted) return wanted

@@ -239,7 +239,11 @@ describe("thread_create on another device survives a lost open reply", () => {
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
     expect(await run("thread_create", args)).toMatchObject({
       kind: "error",
-      error: { code: "idempotency_uncertain", details: { error_note: first.error.message } },
+      // The receipt keeps the first cause as its closed code and identifier details, never its sentence (#14951 ruling d).
+      error: {
+        code: "idempotency_uncertain",
+        details: { error_note: first.error.code, first_cause: first.error.details },
+      },
     })
     expect(opens(a.sent)).toHaveLength(1)
   })
@@ -309,13 +313,13 @@ describe("thread_create same-key recovery on another device (#14569)", () => {
 
     const first = await run("thread_create", args)
     expect(first).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
-    const firstError = (first as { error: { message: string; details: Record<string, unknown> } }).error
+    const firstError = (first as { error: { code: string; details: Record<string, unknown> } }).error
     for (const _ of [1, 2])
       expect(await run("thread_create", args)).toMatchObject({
         kind: "error",
         error: {
           code: "idempotency_uncertain",
-          details: { error_note: firstError.message, first_cause: firstError.details },
+          details: { error_note: firstError.code, first_cause: firstError.details },
         },
       })
   })

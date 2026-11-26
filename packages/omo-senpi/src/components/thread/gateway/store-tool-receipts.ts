@@ -25,12 +25,13 @@ type StoredReceipt = {
   readonly owner_instance: string
   readonly result: string | null
   readonly error_note: string | null
+  readonly expires_at: number
 }
 
 function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): StoredReceipt | undefined {
   const found = ctx.sql.one(
-    ["args_hash", "status", "owner_instance", "result", "error_note"],
-    "SELECT args_hash, status, owner_instance, result, error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+    ["args_hash", "status", "owner_instance", "result", "error_note", "expires_at"],
+    "SELECT args_hash, status, owner_instance, result, error_note, expires_at FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
     [key.principal, key.operation, key.idempotency_key],
   )
   if (found === undefined) return undefined
@@ -40,22 +41,24 @@ function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): S
     owner_instance: String(found.owner_instance),
     result: nullableString(found.result),
     error_note: nullableString(found.error_note),
+    expires_at: Number(found.expires_at),
   }
 }
 
 export type ToolReceiptBegin =
-  | { readonly kind: "accepted" }
-  | { readonly kind: "replay"; readonly result: unknown }
+  | { readonly kind: "accepted"; readonly expires_at: number }
+  /** `expires_at`: until when this receipt answers a repeat under its key (the gateway's receipt retention). */
+  | { readonly kind: "replay"; readonly result: unknown; readonly expires_at: number }
   | { readonly kind: "conflict" }
   /**
    * This instance holds the key's `prepared` receipt. `recovery` names a reserved retry of an uncertain call (it keeps
    * the first cause); a fresh call's reservation has none. A caller whose admission reply was lost resumes by it
    * (#14623 review round 2 H1), so a lost recovery reply never restarts the call as a fresh one.
    */
-  | { readonly kind: "in_progress"; readonly recovery?: { readonly error_note: string } }
+  | { readonly kind: "in_progress"; readonly recovery?: { readonly error_note: string }; readonly expires_at: number }
   | { readonly kind: "uncertain"; readonly error_note: string | null }
   /** The uncertain receipt is now this call's to recover (`retry_uncertain`): settle it like a new one. */
-  | { readonly kind: "retry"; readonly error_note: string | null }
+  | { readonly kind: "retry"; readonly error_note: string | null; readonly expires_at: number }
 
 /**
  * `prepared` before the side effect, `completed` with its result after, `uncertain` when it threw.
@@ -102,15 +105,19 @@ function admitToolReceipt(
         request.now + GATEWAY_RECEIPT_RETENTION_MS,
       ],
     )
-    return { kind: "accepted" }
+    return { kind: "accepted", expires_at: request.now + GATEWAY_RECEIPT_RETENTION_MS }
   }
   if (receipt.args_hash !== request.args_hash) return { kind: "conflict" }
   if (receipt.status === "completed")
-    return { kind: "replay", result: receipt.result === null ? null : JSON.parse(receipt.result) }
+    return {
+      kind: "replay",
+      result: receipt.result === null ? null : JSON.parse(receipt.result),
+      expires_at: receipt.expires_at,
+    }
   if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id)
     return receipt.error_note === null
-      ? { kind: "in_progress" }
-      : { kind: "in_progress", recovery: { error_note: receipt.error_note } }
+      ? { kind: "in_progress", expires_at: receipt.expires_at }
+      : { kind: "in_progress", recovery: { error_note: receipt.error_note }, expires_at: receipt.expires_at }
   if (receipt.status === "prepared") {
     write(
       ctx,
@@ -136,7 +143,7 @@ function admitToolReceipt(
     "UPDATE receipts SET status = 'prepared', owner_instance = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'uncertain'",
     [ctx.config.instance_id, request.now, request.principal, request.operation, request.idempotency_key],
   )
-  return { kind: "retry", error_note: errorNote }
+  return { kind: "retry", error_note: errorNote, expires_at: receipt.expires_at }
 }
 
 export async function toolReceiptSettle(

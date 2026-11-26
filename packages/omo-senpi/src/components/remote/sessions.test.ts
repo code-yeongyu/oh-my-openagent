@@ -13,6 +13,7 @@ import {
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { type ContractHost, withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { THREAD_READ_DEFAULT_BYTES } from "../thread/contracts/fields"
 import { createLiveThreadSurface } from "../thread/live-surface"
 import { DEADLINES } from "./deadlines"
 import { createLocalSessions } from "./local-sessions"
@@ -1134,6 +1135,38 @@ describe("an open on this device", () => {
     expect(prompts.filter((text) => text === "t-255")).toHaveLength(1)
     await valueOf(client.sessions.send(SELF_SESSION, { text: "t-0", idempotency_key: "k-0" }))
     expect(prompts.filter((text) => text === "t-0")).toHaveLength(2)
+  })
+
+  test("#given a session on this device holding more than a read's budget #when sessions.read names no tail #then the newest entries within 128 KiB, and next_before reports the rest (ruling 5 i)", async () => {
+    const messages = Array.from({ length: 200 }, (_, index) => ({ id: `e-${index}`, text: "x".repeat(1000) }))
+    const unused = async (): Promise<never> => {
+      throw new Error("not used by a read")
+    }
+    const fakeHost: ThreadHost = {
+      socket: "fake.sock",
+      listSessions: async () => [{ sessionId: "rpc-1", durableSessionId: "dur-selected", cwd: "/w", name: "target" }],
+      openSession: unused,
+      getMessages: async () => messages,
+      getState: unused,
+      prompt: unused,
+      interrupt: unused,
+      setSessionName: unused,
+      setModel: unused,
+      getAvailableModels: unused,
+      setThinkingLevel: unused,
+      getAvailableThinkingLevels: unused,
+    }
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+      localSessions: async () => createLocalSessions(async () => fakeHost),
+    })
+    const page = await valueOf(client.sessions.read(SELF_SESSION))
+    const bytes = page.entries.reduce((sum, item) => sum + Buffer.byteLength(JSON.stringify(item), "utf8"), 0)
+    expect(bytes).toBeLessThanOrEqual(THREAD_READ_DEFAULT_BYTES)
+    expect(page.entries.length).toBeLessThan(messages.length)
+    expect(page.entries.at(-1)?.entry_id).toBe("e-199")
+    expect(page.next_before).toBe(page.entries[0]?.entry_id ?? null)
+    expect(page.next_before).not.toBeNull()
   })
 
   test("#given a handle this device's host does not hold #when close addresses it #then not_found{session}", async () => {
