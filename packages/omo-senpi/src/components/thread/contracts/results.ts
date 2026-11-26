@@ -275,6 +275,8 @@ export type ThreadListResult =
        */
       readonly listing?: "incomplete"
       readonly unanswered_endpoints?: number
+      /** With `limit`: the matching threads this answer left out. */
+      readonly rows_omitted?: number
     }
   | ThreadDataError
 

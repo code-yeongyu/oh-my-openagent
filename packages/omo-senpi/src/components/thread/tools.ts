@@ -40,7 +40,8 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
-import { listThreads, readThread, withBacklog } from "./tools/read-ops"
+import { modelWithReasoning } from "./tools/model-match"
+import { listThreads, narrowListing, readThread, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { threadToolPermission } from "./tools/local-permission"
@@ -435,11 +436,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         args,
         ectx,
         async (current, value) =>
-          await listAcross(
-            options.remote,
-            await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
-            value.all_scope === true,
-            value.state,
+          narrowListing(
+            await listAcross(
+              options.remote,
+              await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
+              value.all_scope === true,
+              value.state,
+            ),
+            value.query,
+            value.limit,
           ),
       ),
   }
@@ -518,7 +523,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
         if (located.kind === "error") return located.result
         if (located.kind === "not_live") return NOT_LIVE
-        return await setModelOn(located.control, value.model, value.provider)
+        const model = modelWithReasoning(value.model, value.reasoning)
+        if (typeof model !== "string") return model
+        return await setModelOn(located.control, model, value.provider)
       }),
   }
   const setReasoning: AnyTool = {

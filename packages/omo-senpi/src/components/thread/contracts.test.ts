@@ -205,6 +205,77 @@ describe("parseThreadParams data-error contract", () => {
   })
 })
 
+// The wrong calls the fleet census (#15073) found agents making, each with what the parser now does with it: a familiar
+// name maps to its field, an alias that disagrees with its field is refused, and a truly unknown field is still refused
+// with the corrected call in next_action. Probe fields (`_p`, `bogus`) stay refused.
+const T = "019233a1-7c2e-7bbb"
+type CensusCase = {
+  readonly tool: keyof typeof threadToolParamSchemas
+  readonly call: Record<string, unknown>
+  readonly ok?: Record<string, unknown>
+  readonly refused?: { readonly field: string; readonly suggestion?: string }
+}
+const CENSUS_CALLS: readonly CensusCase[] = [
+  { tool: "thread_read", call: { thread: T, limit: 20 }, ok: { thread: T, limit: 20 } },
+  { tool: "thread_read", call: { thread: T, tail: 6 }, ok: { thread: T, limit: 6 } },
+  { tool: "thread_read", call: { thread: T, lines: 6 }, ok: { thread: T, limit: 6 } },
+  { tool: "thread_read", call: { thread: T, limit_bytes: 4096 }, ok: { thread: T, max_bytes: 4096 } },
+  { tool: "thread_read", call: { thread: T, wait_ms: 0 }, ok: { thread: T, wait_ms: 0 } },
+  { tool: "thread_read", call: { thread: T, mode: "status" }, refused: { field: "mode" } },
+  { tool: "thread_read", call: { thread: T, query: "review CLEAR" }, refused: { field: "query" } },
+  { tool: "thread_send", call: { thread: T, message: "hi", timeout: 60 }, refused: { field: "timeout", suggestion: undefined } },
+  { tool: "thread_send", call: { thread: T, message: "hi", mode: "steer" }, ok: { thread: T, message: "hi", delivery: "steer" } },
+  { tool: "thread_send", call: { thread: T, text: "hi" }, ok: { thread: T, message: "hi" } },
+  { tool: "thread_list", call: { limit: 5 }, ok: { limit: 5 } },
+  { tool: "thread_list", call: { query: "gw-29" }, ok: { query: "gw-29" } },
+  { tool: "thread_list", call: { message: "x" }, refused: { field: "message" } },
+  { tool: "thread_create", call: { thread: T, all_scope: true }, ok: { thread: T, all_scope: true } },
+  { tool: "thread_create", call: { title: "lane" }, ok: { name: "lane" } },
+  { tool: "thread_create", call: { message: "build it" }, ok: { prompt: "build it" } },
+  { tool: "thread_create", call: { _p: 1 }, refused: { field: "_p" } },
+  { tool: "thread_create", call: { bogus: 1 }, refused: { field: "bogus" } },
+  {
+    tool: "thread_set_model",
+    call: { thread: T, model: "anthropic/claude-opus-5-5", reasoning: "medium" },
+    ok: { thread: T, model: "anthropic/claude-opus-5-5", reasoning: "medium" },
+  },
+  { tool: "thread_set_reasoning", call: { thread: T, reasoning: "high" }, ok: { thread: T, level: "high" } },
+  { tool: "thread_rename", call: { thread: T, title: "lane-2" }, ok: { thread: T, name: "lane-2" } },
+]
+
+describe("the census's wrong calls (#15073)", () => {
+  test.each(CENSUS_CALLS.map((c) => [c.tool, JSON.stringify(c.call), c] as const))(
+    "#given %s(%s) #when parsed #then it maps to its field or is refused with the corrected call",
+    (_tool, _shown, c) => {
+      const outcome = parseThreadParams(threadToolParamSchemas[c.tool], c.call)
+      if (c.ok !== undefined) {
+        expect(outcome).toEqual({ kind: "ok", value: c.ok })
+        return
+      }
+      if (outcome.kind !== "error") throw new Error(`${c.tool} accepted ${JSON.stringify(c.call)}`)
+      expect(outcome.error.code).toBe("invalid_arguments")
+      const details = outcome.error.details as Record<string, unknown>
+      expect(details["field"]).toBe(c.refused?.field)
+      if (c.refused !== undefined && "suggestion" in c.refused) expect(details["suggestion"]).toBe(c.refused.suggestion)
+      const corrected = details["corrected_call"]
+      expect(typeof corrected).toBe("string")
+      expect(outcome.error.next_action).toContain(corrected as string)
+      // The corrected call parses: following the refusal's advice never meets the same refusal again.
+      const args = JSON.parse((corrected as string).replace(/^tool\.\w+\(/, "").replace(/\)$/, "")) as unknown
+      const again = parseThreadParams(threadToolParamSchemas[c.tool], args)
+      if (again.kind === "error") expect((again.error.details as Record<string, unknown> | undefined)?.["field"]).not.toBe(c.refused?.field)
+    },
+  )
+
+  test("#given an alias and its field with different values #when parsed #then it is refused naming both, never one dropped", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_send, { thread: T, message: "a", text: "b" })
+    expect(outcome).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "text", canonical: "message" } },
+    })
+  })
+})
+
 describe("thread error taxonomy", () => {
   test("#given the taxonomy #when inspected #then it is exactly the spec's code list with no duplicates", () => {
     expect([...THREAD_ERROR_CODES]).toEqual([

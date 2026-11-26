@@ -91,6 +91,30 @@ export function listThreads(
   }
 }
 
+/** A listing cut to the rows whose thread value, name, alias or folder contains `query` (ignoring case), then to `limit` rows. */
+export function narrowListing(
+  listed: ThreadToolResult,
+  query: string | undefined,
+  limit: number | undefined,
+): ThreadToolResult {
+  if ((query === undefined && limit === undefined) || listed.kind !== "ok" || !("threads" in listed)) return listed
+  const needle = query?.toLowerCase()
+  const matching =
+    needle === undefined
+      ? listed.threads
+      : listed.threads.filter((row) =>
+          [row.thread, row.name, row.alias, row.cwd].some(
+            (field) => typeof field === "string" && field.toLowerCase().includes(needle),
+          ),
+        )
+  const shown = limit === undefined ? matching : matching.slice(0, limit)
+  return {
+    ...listed,
+    threads: shown,
+    ...(shown.length < matching.length ? { rows_omitted: matching.length - shown.length } : {}),
+  }
+}
+
 /** Names each listed thread's undelivered messages from this device's gateway store (#14428): how many, where, since when. */
 export async function withBacklog(
   store: Pick<ThreadToolSurfaceOptions["store"], "backlogs">,
@@ -128,8 +152,18 @@ export async function withBacklog(
  * pages from it (a first read's cursor names the older part of that window). Tail mode ignores the cursor, so following
  * next_cursor in tail mode returned the same slice again.
  */
-function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?: number; cursor?: string } {
-  return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }
+function readWindow(value: ThreadReadInput): {
+  mode: "tail" | "page"
+  tail_items?: number
+  max_bytes?: number
+  cursor?: string
+} {
+  return {
+    mode: value.cursor === undefined ? "tail" : "page",
+    tail_items: value.limit,
+    max_bytes: value.max_bytes,
+    cursor: value.cursor,
+  }
 }
 
 /** `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint here is dead. */
@@ -140,6 +174,12 @@ export async function readThread(
   callerId: string,
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
+  if (value.limit !== undefined && value.cursor !== undefined)
+    return failure(
+      "invalid_arguments",
+      "limit sets the window of a first read, and a cursor continues an earlier window. Nothing was done.",
+      `Follow the cursor without limit: tool.thread_read(${JSON.stringify({ thread: value.thread, cursor: value.cursor })}).`,
+    )
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live" && located.row !== undefined && options.remote !== undefined) {
@@ -159,7 +199,7 @@ async function readLive(
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
   let wait: ThreadWaitOutcome | undefined
-  if (value.wait_ms !== undefined) {
+  if (value.wait_ms !== undefined && value.wait_ms > 0) {
     try {
       wait = await control.waitSettled(value.wait_ms, signal)
     } catch (error) {
@@ -182,6 +222,8 @@ async function readLive(
  * no longer pages is stale.
  */
 async function pagedReadResult(control: SessionControl, value: ThreadReadInput): Promise<ThreadToolResult | undefined> {
+  // The holder pages by bytes only; a read that names how many messages takes the whole transcript's window instead.
+  if (value.limit !== undefined) return undefined
   const entryCursor = value.cursor !== undefined && isEntryCursor(value.cursor)
   if (value.cursor !== undefined && !entryCursor) return undefined
   const page = await control.readEntryPage?.({

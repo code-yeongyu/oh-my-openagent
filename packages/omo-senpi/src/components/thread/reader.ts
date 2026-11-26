@@ -28,14 +28,20 @@
 import { closeSync, openSync, readSync } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
-import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
+import {
+  THREAD_READ_DEFAULT_BYTES,
+  THREAD_READ_DEFAULT_LIMIT,
+  THREAD_READ_MAX_BYTES,
+  THREAD_READ_MAX_LIMIT,
+  type ThreadReadSource,
+} from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
 import { takeWithinBudget } from "./read-budget"
 
 /** Default number of trailing entries a tail read returns. */
-export const THREAD_TAIL_DEFAULT_ITEMS = 60
+export const THREAD_TAIL_DEFAULT_ITEMS = THREAD_READ_DEFAULT_LIMIT
 /** Hard ceiling on a tail request; a larger `tail_items` is invalid_arguments. */
-export const THREAD_TAIL_MAX_ITEMS = 200
+export const THREAD_TAIL_MAX_ITEMS = THREAD_READ_MAX_LIMIT
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 

@@ -372,15 +372,15 @@ describe("thread_create naming a thread that is live already, with a prompt", ()
 // The owner's live lost-prompt case: thread_create({ ..., message: "<brief>" }) answered ok with no prompt and no error,
 // because an unknown field was dropped silently. A field a tool does not take is refused, naming it and the field meant.
 describe("thread tool fields the tool does not take", () => {
-  test("#given a create that passes its brief as message #when created #then invalid_arguments names message, suggests prompt, and nothing is created", async () => {
+  test("#given a create that passes its brief under a name no create field has #when created #then invalid_arguments names it, suggests prompt, and nothing is created", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    const here = await run("thread_create", { name: "misnamed-here", message: "build it" })
-    const there = await run("thread_create", { name: "misnamed-there", device: "studio", message: "build it" })
+    const here = await run("thread_create", { name: "misnamed-here", brief: "build it" })
+    const there = await run("thread_create", { name: "misnamed-there", device: "studio", brief: "build it" })
     for (const result of [here, there])
       expect(result).toMatchObject({
         kind: "error",
-        error: { code: "invalid_arguments", details: { field: "message", suggestion: "prompt" } },
+        error: { code: "invalid_arguments", details: { field: "brief", suggestion: "prompt" } },
       })
     expect(openSession).not.toHaveBeenCalled()
     expect(a.sent).toEqual([])
@@ -403,9 +403,9 @@ describe("thread tool fields the tool does not take", () => {
       kind: "error",
       error: { code: "invalid_arguments", details: { field: "priority" } },
     })
-    expect(await run("thread_send", { thread: "dur-local", prompt: "hi" })).toMatchObject({
+    expect(await run("thread_send", { thread: "dur-local", instructions: "hi" })).toMatchObject({
       kind: "error",
-      error: { code: "invalid_arguments", details: { field: "prompt", suggestion: "message" } },
+      error: { code: "invalid_arguments", details: { field: "instructions", suggestion: "message" } },
     })
     expect(enqueuedFor("dur-local")).toBe(0)
   })

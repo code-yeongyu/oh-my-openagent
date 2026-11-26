@@ -8,7 +8,9 @@ import {
   Message,
   Summary,
   THREAD_READ_DEFAULT_BYTES,
+  THREAD_READ_DEFAULT_LIMIT,
   THREAD_READ_MAX_BYTES,
+  THREAD_READ_MAX_LIMIT,
   ThreadAddress,
   ThreadDeliveryMode,
   thinkingLevel,
@@ -40,6 +42,19 @@ export const ThreadListParams = Type.Object({
       },
     ),
   ),
+  query: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "List only the threads whose thread value, name, alias or folder (cwd) contains this text, ignoring case. Also accepted as search.",
+    }),
+  ),
+  limit: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      description: "List at most this many threads, in listing order; rows_omitted counts the rest.",
+    }),
+  ),
   idempotency_key: IdempotencyKey,
 })
 
@@ -62,18 +77,25 @@ export const ThreadReadParams = Type.Object({
         "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
+  limit: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: THREAD_READ_MAX_LIMIT,
+      description: `How many of the newest messages to read, default ${THREAD_READ_DEFAULT_LIMIT}, at most ${THREAD_READ_MAX_LIMIT}; max_bytes still bounds the slice, and next_cursor pages the older part of those messages. Not combined with cursor. Also accepted as tail, lines, count or last.`,
+    }),
+  ),
   max_bytes: Type.Optional(
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_MAX_BYTES,
-      description: `Byte budget for the returned transcript slice, default ${THREAD_READ_DEFAULT_BYTES} and capped at ${THREAD_READ_MAX_BYTES}; a longer transcript returns truncated with next_cursor.`,
+      description: `Byte budget for the returned transcript slice, default ${THREAD_READ_DEFAULT_BYTES} and capped at ${THREAD_READ_MAX_BYTES}; a longer transcript returns truncated with next_cursor. Also accepted as limit_bytes or bytes.`,
     }),
   ),
   wait_ms: Type.Optional(
     Type.Integer({
-      minimum: 1,
+      minimum: 0,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description: "Wait up to this many ms for the thread's turn to end, then read; see result.wait.",
+      description: "Wait up to this many ms for the thread's turn to end, then read; see result.wait. 0 reads at once.",
     }),
   ),
   all_scope: AllScope,
@@ -162,7 +184,7 @@ export const ThreadRenameParams = Type.Object({
       minLength: 1,
       maxLength: 200,
       description:
-        "New display label for the thread; the thread keeps its id as its address, and a label already used by another visible thread returns name_conflict.",
+        "New display label for the thread; the thread keeps its id as its address, and a label already used by another visible thread returns name_conflict. Also accepted as title.",
     }),
   ),
   alias: Type.Optional(
@@ -190,6 +212,11 @@ export const ThreadSetModelParams = Type.Object({
         "Restricts resolution to one provider when the fragment alone would match models from several providers.",
     }),
   ),
+  reasoning: Type.Optional(
+    thinkingLevel(
+      "Thinking level to apply after switching, the same as appending :<level> to model; a model that already ends in a different level is refused.",
+    ),
+  ),
   all_scope: AllScope,
   idempotency_key: IdempotencyKey,
 })
@@ -197,7 +224,7 @@ export const ThreadSetModelParams = Type.Object({
 export const ThreadSetReasoningParams = Type.Object({
   thread: ThreadAddress,
   level: thinkingLevel(
-    "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged.",
+    "Thinking level to apply; a level the thread's active model cannot run returns thinking_level_unsupported with the supported list and leaves the thread unchanged. Also accepted as reasoning, thinking or thinking_level.",
   ),
   scope: Type.Optional(
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {
