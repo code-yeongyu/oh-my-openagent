@@ -31,7 +31,10 @@
           "pinned": {
             "type": "boolean"
           },
-          "launch_spec": {},
+          "launch_spec": {
+            "type": "string",
+            "minLength": 1
+          },
           "mcp_presenter_enforcement": {
             "type": "boolean"
           }
@@ -156,7 +159,10 @@
               }
             ]
           },
-          "launch_spec": {},
+          "launch_spec": {
+            "type": "string",
+            "minLength": 1
+          },
           "allow_downgrade": {
             "type": "boolean"
           },

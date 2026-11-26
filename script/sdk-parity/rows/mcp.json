@@ -11,10 +11,26 @@
       ],
       "input": {
         "properties": {
-          "server": {},
-          "server_url": {},
-          "client_id": {},
-          "scopes": {}
+          "server": {
+            "type": "string",
+            "minLength": 1
+          },
+          "server_url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
         },
         "required": [
           "server"
@@ -62,8 +78,14 @@
       ],
       "input": {
         "properties": {
-          "server": {},
-          "server_url": {}
+          "server": {
+            "type": "string",
+            "minLength": 1
+          },
+          "server_url": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "server"
@@ -109,7 +131,10 @@
       ],
       "input": {
         "properties": {
-          "server": {}
+          "server": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },

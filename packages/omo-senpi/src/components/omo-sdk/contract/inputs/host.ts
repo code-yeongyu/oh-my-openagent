@@ -1,8 +1,10 @@
 import { type Static, Type } from "typebox"
 
+import { LaunchSpec } from "./threads-authority"
+
 // The daemon, diagnostics, install and config calls of first-party design 6.7 and 6.11. The endpoint flags (socket,
-// key_root), launch_spec and mcp_presenter_enforcement are held for P1a-s (contract/gated.ts); every other host option
-// is typed here: a field in a type grants nothing.
+// key_root) are the root's endpoint selector (contract/root-options.ts), never a call input; launch_spec and
+// mcp_presenter_enforcement are slice P1a-s's (security design 4.4). A field in a type grants nothing.
 const None = Type.Object({})
 const Path = Type.String({ minLength: 1 })
 const Policy = Type.Optional(Type.Union([Type.Literal("upgrade"), Type.Literal("fallback"), Type.Literal("never")]))
@@ -16,7 +18,12 @@ export const ConfigModelCapabilitiesRefresh = Type.Object({
 })
 
 export const DaemonRun = Type.Object({ policy: Policy, pinned: Type.Optional(Type.Boolean()) })
-export const DaemonEnsure = Type.Object({ policy: Policy, pinned: Type.Optional(Type.Boolean()) })
+export const DaemonEnsure = Type.Object({
+  policy: Policy,
+  pinned: Type.Optional(Type.Boolean()),
+  launch_spec: LaunchSpec,
+  mcp_presenter_enforcement: Type.Optional(Type.Boolean()),
+})
 export const DaemonWarm = Type.Object({
   cwd: Type.Optional(Path),
   kind: Type.Optional(Type.String({ minLength: 1 })),
@@ -50,6 +57,7 @@ export const DaemonStopAll = Type.Object({
 })
 export const DaemonHandoff = Type.Object({
   policy: Policy,
+  launch_spec: LaunchSpec,
   allow_downgrade: Type.Optional(Type.Boolean()),
   when: Type.Optional(
     Type.Object(

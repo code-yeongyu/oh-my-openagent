@@ -53,14 +53,17 @@ describe("negative controls of the P1a checks", () => {
   })
 
   test("#given a held field typed on the root #then the scope check names it", () => {
-    const held = GATED.find(
-      (entry) => entry.field !== undefined && !entry.field.includes(".") && entry.rowExists && entry.row !== "root",
-    )
-    if (held?.field === undefined) throw new Error("GATED holds no field")
+    // GATED is empty since slice P1a-s (#14949) typed every entry, so the control holds a typed field again.
+    const held = {
+      row: "threads.send",
+      field: "author",
+      s0: ["4.1"],
+      reason: "a connector's identity",
+      rowExists: true,
+    }
+    expect(GATED).toEqual([])
     const sdk = rowOf(held.row).sdk
-    const call = contract.calls[sdk] ?? { properties: {}, required: [] }
-    const calls = { ...contract.calls, [sdk]: { ...call, properties: { ...call.properties, [held.field]: {} } } }
-    expect(scopeProblems(rows, { ...contract, calls }).join("\n")).toContain(`takes ${held.field} on ${sdk}`)
+    expect(scopeProblems(rows, { ...contract, gated: [held] }).join("\n")).toContain(`takes ${held.field} on ${sdk}`)
   })
 
   test("#given a schema field whose type drifted from the row #then the input check names it", () => {

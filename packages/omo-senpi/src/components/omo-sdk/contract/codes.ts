@@ -11,6 +11,24 @@ type CodeEntry = {
 }
 
 export const OMO_CODE_REGISTRY = {
+  accounts_unreachable: {
+    namespaces: ["account"],
+    next_action:
+      "The sign-in page did not answer; check the network or the accounts origin, then call account.signIn again.",
+  },
+  already_signed_in: {
+    namespaces: ["account"],
+    next_action: "This device is signed in; call account.whoami, or account.signOut before signing in again.",
+  },
+  device_limit: {
+    namespaces: ["account"],
+    next_action:
+      "The account is at its device limit; revoke one listed in details (devices.revoke), then sign in again.",
+  },
+  machine_exists: {
+    namespaces: ["account"],
+    next_action: "This machine already has a device on the account; sign in with replace to take it over.",
+  },
   alias_taken: {
     namespaces: ["threads"],
     next_action: "Choose another alias, or clear it from its holder (details.holder) first.",
@@ -190,7 +208,22 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Call it again with all_scope, or with an input this caller may pass.",
   },
   sender_not_allowed: {
-    namespaces: ["threads"],
+    namespaces: [
+      "account",
+      "boulder",
+      "config",
+      "daemon",
+      "deviceService",
+      "devices",
+      "diagnostics",
+      "engine",
+      "install",
+      "mcp",
+      "sync",
+      "threads",
+      "toolkit",
+      "worktrees",
+    ],
     next_action: "This caller may not send there; send as the principal that may.",
   },
   service_refused: {
@@ -255,10 +288,6 @@ export type HeldCode =
 // produces it today (a grep of thread/, remote/ and omo-sdk/ finds no producer), it is part of an ok answer, or only a
 // principal P1a-s wires can meet it.
 export const HELD_CODES: Readonly<Record<string, HeldCode>> = {
-  accounts_unreachable: { because: "held-rows", rows: ["account.signIn"] },
-  already_signed_in: { because: "held-rows", rows: ["account.signIn"] },
-  device_limit: { because: "held-rows", rows: ["account.signIn"] },
-  machine_exists: { because: "held-rows", rows: ["account.signIn"] },
   approval_route_locked: {
     because: "no-producer",
     note: "no producer in the source today (declared in THREAD_ERROR_CODES only); answering a dialog is attach's, held for P1a-s",
