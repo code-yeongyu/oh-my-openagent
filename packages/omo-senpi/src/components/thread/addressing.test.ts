@@ -131,7 +131,7 @@ describe("resolveTarget exact ladder", () => {
       thread({ thread_id: "t-1", name: "payments lane" }),
       thread({ thread_id: "t-2", name: "renderer" }),
     ]
-    const result = resolveTarget(entries, "  Payments   LANE  ", { callerWorkspaceRoot: CALLER })
+    const result = resolveTarget(entries, "  Payments\tLANE  ", { callerWorkspaceRoot: CALLER })
 
     expect(result.kind).toBe("ok")
     if (result.kind !== "ok") throw new Error("expected ok")
