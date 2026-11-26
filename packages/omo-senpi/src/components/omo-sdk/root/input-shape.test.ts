@@ -54,6 +54,10 @@ describe("the root's input shape check", () => {
     ["a number", 42],
     ["null", null],
     ["an array", [{}]],
+    ["a Date", new Date(0)],
+    ["a Map", new Map()],
+    ["a boxed string", Object("x")],
+    ["a class instance", new (class Probe {})()],
   ] as const)
     test(`#given ${label} as the input #when every root call is called with it #then each answers a typed refusal and no port is used`, async () => {
       used.length = 0

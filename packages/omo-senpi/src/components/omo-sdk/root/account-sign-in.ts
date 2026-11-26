@@ -2,7 +2,7 @@ import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import type { CallOptions, OmoValue, RootCallInput } from "../contract"
 import type { OmoResult } from "../result"
 import type { MemberOf } from "./members"
-import { invalidInput } from "./assemble"
+import { invalidInput, isPlainInput } from "./assemble"
 import { notImplemented } from "./not-implemented"
 
 type RootSignedIn =
@@ -23,8 +23,7 @@ export function accountSignIn(account: AccountApi, origin: string): SignIn {
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
     // Bad input answers a refusal and never throws: the object-shape check comes before the `method` read.
-    if (typeof input !== "object" || input === null || Array.isArray(input))
-      return { kind: "error", error: invalidInput("account.signIn") }
+    if (!isPlainInput(input)) return { kind: "error", error: invalidInput("account.signIn") }
     if (!isRootInput(input)) return account.signIn(input)
     if (!(await import("../contract/validate")).inputAccepts("account.signIn", input))
       return { kind: "error", error: invalidInput("account.signIn") }

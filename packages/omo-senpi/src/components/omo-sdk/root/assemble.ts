@@ -109,12 +109,23 @@ async function checkedInput(key: RootCallKey, input: unknown): Promise<unknown> 
 // The call table's schemas load on the first checked call, not when the root is built (design lane ruling on the
 // runtime's cold import); contract/eager-tables.test.ts builds them all so a bad schema still fails in CI.
 async function accepts(key: RootCallKey, input: unknown): Promise<boolean> {
+  if (!isPlainInput(input)) return false
   const { inputAccepts } = await import("../contract/validate")
   return inputAccepts(key, await checkedInput(key, input))
 }
 
 // An omitted input is the empty input; any other value, null included, is checked as given.
 const inputOf = (args: readonly unknown[]): unknown => (args[0] === undefined ? {} : args[0])
+
+/**
+ * A call's input is a plain object: its prototype is Object.prototype or null. A Date, a Map, a boxed string or a class
+ * instance would satisfy a schema with no required field as if it were the empty input, so the boundary refuses it.
+ */
+export const isPlainInput = (input: unknown): input is Record<string, unknown> => {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return false
+  const prototype: unknown = Object.getPrototypeOf(input)
+  return prototype === Object.prototype || prototype === null
+}
 
 function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[]): Call {
   const refuse = refusing(key, invalidInput(key), servings)
