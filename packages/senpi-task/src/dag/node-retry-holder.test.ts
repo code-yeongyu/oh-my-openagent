@@ -8,7 +8,7 @@ import { join } from "node:path"
 
 import { LongRunningTaskManager, node, owner, pausedRecord, runId, taskRecord } from "./__fixtures__/reattached-run"
 import type { DagDefinition } from "./graph"
-import { reenterDagRun } from "./node-retry"
+import { reenterDagRun } from "./run-reentry"
 import { createDagFileStore } from "./store"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
