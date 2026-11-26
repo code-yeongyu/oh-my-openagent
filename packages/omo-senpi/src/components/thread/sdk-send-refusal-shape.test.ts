@@ -73,6 +73,15 @@ describe("a refused ThreadSdk.send answers dev's refusal shape", () => {
       expect(answer.kind).toBe("error")
       expect(answer.error?.["code"]).toBe(code)
       expect(Object.keys(answer.error ?? {}).toSorted()).not.toContain("kind")
+      if (code === "ambiguous_target")
+        expect(answer.error?.["details"]).toEqual({
+          kind: "device",
+          device: B.name,
+          candidates: [
+            { device: B.id, name: B.name, online: true },
+            { device: "b7c4ffff00000000", name: B.name, online: true },
+          ],
+        })
     },
   )
 })
