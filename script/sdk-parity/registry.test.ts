@@ -26,6 +26,7 @@ import { firstDifferences, renderSection6, section6Of } from "./render"
 import { registryProblems } from "./schema"
 import { toolProblems } from "./tool-check"
 import { discoverOmoTools } from "./tool-registry"
+import { THREAD_PARAM_ALIASES, threadToolParamSchemas } from "../../packages/omo-senpi/src/components/thread/contracts"
 
 // The SDK parity registry of #14943 (design sections 6 and 7) over the real tree: each check is exact, and its own
 // negative controls live in negative-controls.test.ts.
@@ -120,4 +121,21 @@ describe("the head against the merge base's tree (runs whenever the merge base i
       expect(registryBaseProblems(repoGit, head)).toEqual({ problems: [] })
     },
   )
+})
+
+describe("the thread tools' declared aliases (#15073)", () => {
+  test("#given the rows #then each tool's declared aliases are exactly the names its parser rewrites, and none is a field of its schema", () => {
+    const declared: Record<string, Record<string, string>> = {}
+    for (const row of rows)
+      for (const entry of row.tool)
+        if (entry.aliases !== undefined) Object.assign((declared[entry.name] ??= {}), entry.aliases)
+    expect(declared).toEqual(THREAD_PARAM_ALIASES as Record<string, Record<string, string>>)
+    const shadowing = Object.entries(declared).flatMap(([tool, aliases]) =>
+      Object.keys(aliases).filter(
+        (alias) =>
+          alias in ((threadToolParamSchemas as Record<string, { properties: object }>)[tool]?.properties ?? {}),
+      ),
+    )
+    expect(shadowing).toEqual([])
+  })
 })

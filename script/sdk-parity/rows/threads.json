@@ -741,7 +741,14 @@
             "delivery",
             "idempotency_key",
             "all_scope"
-          ]
+          ],
+          "aliases": {
+            "message": "prompt",
+            "title": "name",
+            "mode": "delivery",
+            "thinking": "reasoning",
+            "thinking_level": "reasoning"
+          }
         }
       ],
       "planned": {},
@@ -1271,7 +1278,10 @@
             "summary",
             "idempotency_key",
             "all_scope"
-          ]
+          ],
+          "aliases": {
+            "mode": "delivery"
+          }
         }
       ],
       "planned": {
@@ -1501,7 +1511,10 @@
             "idempotency_key",
             "query",
             "limit"
-          ]
+          ],
+          "aliases": {
+            "search": "query"
+          }
         }
       ],
       "planned": {},
@@ -1625,8 +1638,7 @@
           },
           "limit": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 200
+            "minimum": 1
           }
         },
         "required": [
@@ -1672,7 +1684,15 @@
             "all_scope",
             "idempotency_key",
             "limit"
-          ]
+          ],
+          "aliases": {
+            "tail": "limit",
+            "lines": "limit",
+            "count": "limit",
+            "last": "limit",
+            "limit_bytes": "max_bytes",
+            "bytes": "max_bytes"
+          }
         }
       ],
       "planned": {},
@@ -1718,8 +1738,7 @@
           },
           "limit": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 200
+            "minimum": 1
           }
         },
         "required": [
@@ -1748,7 +1767,15 @@
             "all_scope",
             "idempotency_key",
             "limit"
-          ]
+          ],
+          "aliases": {
+            "tail": "limit",
+            "lines": "limit",
+            "count": "limit",
+            "last": "limit",
+            "limit_bytes": "max_bytes",
+            "bytes": "max_bytes"
+          }
         }
       ],
       "planned": {
@@ -1936,7 +1963,10 @@
             "alias",
             "all_scope",
             "idempotency_key"
-          ]
+          ],
+          "aliases": {
+            "title": "name"
+          }
         }
       ],
       "planned": {
@@ -2326,7 +2356,10 @@
             "idempotency_key",
             "collapse_key",
             "all_scope"
-          ]
+          ],
+          "aliases": {
+            "mode": "delivery"
+          }
         }
       ],
       "planned": {},

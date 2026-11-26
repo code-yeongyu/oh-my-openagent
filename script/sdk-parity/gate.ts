@@ -4,6 +4,7 @@ import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
+import { aliasScenarioProblems, freshAhead, toolSchemaAheadProblems, withoutAhead } from "./tool-ahead"
 import { schemaDifferences, type DiscoveredTool } from "./tool-check"
 
 // The changed-capability gate of design 7.4 (amendments 2 and 3). A demonstrated change fails it: a descriptor or tool-schema
@@ -44,6 +45,7 @@ export type GateReport = {
   readonly presentation: readonly string[]
   readonly presentationRows: readonly string[]
   readonly versionMasked: readonly string[]
+  readonly toolAhead: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -99,10 +101,23 @@ export function gateReport(input: GateInput): GateReport {
   const presentation: string[] = []
   const presentationRows: string[] = []
   const versionMasked: string[] = []
+  const aheadOf = new Map(
+    input.head.unresolved.flatMap((entry) => {
+      const ahead = freshAhead(entry, input.base.unresolved)
+      return ahead === undefined ? [] : [[entry.id, ahead] as const]
+    }),
+  )
+  const toolAhead: string[] = []
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
-    if (!initialization && (before === undefined || descriptorOf(before) !== descriptorOf(row))) {
+    const ahead = aheadOf.get(row.id)
+    const admitted =
+      ahead !== undefined &&
+      before !== undefined &&
+      descriptorOf(withoutAhead(before, ahead)) === descriptorOf(withoutAhead(row, ahead))
+    if (admitted && descriptorOf(before) !== descriptorOf(row)) toolAhead.push(row.id)
+    if (!initialization && !admitted && (before === undefined || descriptorOf(before) !== descriptorOf(row))) {
       failures.push(
         `${row.id}: its descriptor changed under an unresolved gap; add the SDK call ${row.sdk} and its scenarios in this pull request`,
       )
@@ -113,9 +128,14 @@ export function gateReport(input: GateInput): GateReport {
         (tools) => tools.find((tool) => tool.name === entry.name)?.parameters,
       )
       const moved = a !== undefined && b !== undefined ? schemaDifferences(a, b, entry.name) : []
-      if (moved.length > 0) {
+      const beyond =
+        ahead !== undefined && a !== undefined && b !== undefined
+          ? toolSchemaAheadProblems(a, b, ahead, entry.name)
+          : moved
+      if (moved.length > 0 && beyond.length === 0 && !toolAhead.includes(row.id)) toolAhead.push(row.id)
+      if (moved.length > 0 && beyond.length > 0) {
         failures.push(
-          `${row.id}: tool ${entry.name} changed its input schema under an unresolved gap (${moved[0]}); add the SDK call ${row.sdk}`,
+          `${row.id}: tool ${entry.name} changed its input schema under an unresolved gap (${beyond[0]}); add the SDK call ${row.sdk}`,
         )
         flagged.add(row.id)
       }
@@ -139,6 +159,12 @@ export function gateReport(input: GateInput): GateReport {
       versionMasked.push(`${scenario.id}#version-mask`)
       continue
     }
+    if (
+      scenario.surface === "tool" &&
+      scenario.alias !== undefined &&
+      aheadOf.get(scenario.capability)?.aliases === true
+    )
+      continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
       const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
@@ -157,6 +183,7 @@ export function gateReport(input: GateInput): GateReport {
       flagged.add(scenario.capability)
     }
   }
+  failures.push(...aliasScenarioProblems(input.scenarios, input.head.outcomes))
   const slices = new Set([...input.body.matchAll(SLICE_LINE)].map((match) => match[1]))
   const atHead = unresolved
   for (const entry of input.base.unresolved ?? [])
@@ -166,7 +193,7 @@ export function gateReport(input: GateInput): GateReport {
       )
   const changed = new Set(input.changedFiles)
   const annotated = input.head.rows
-    .filter((row) => unresolved.has(row.id) && !flagged.has(row.id) && !initialization)
+    .filter((row) => unresolved.has(row.id) && !flagged.has(row.id) && !initialization && !toolAhead.includes(row.id))
     .filter((row) => JSON.stringify(baseRows.get(row.id)) !== JSON.stringify(row))
     .map((row) => row.id)
   const closureMoved = [...input.closures]
@@ -191,6 +218,7 @@ export function gateReport(input: GateInput): GateReport {
     presentation: presentation.toSorted(),
     presentationRows: presentationRows.toSorted(),
     versionMasked: versionMasked.toSorted(),
+    toolAhead: toolAhead.toSorted(),
     head: input.headSha,
     // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
     // added later appends after these, so a merge that keeps both tiers keeps one order.
@@ -199,6 +227,7 @@ export function gateReport(input: GateInput): GateReport {
       ...liveSchema.map((id) => `${id}#live-schema`),
       ...presentationRows,
       ...versionMasked,
+      ...toolAhead.toSorted().map((id) => `${id}#tool-ahead`),
     ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
@@ -228,6 +257,7 @@ const reviewed = (report: GateReport): string[] => [
   ...report.liveSchema.map((id) => `${id}#live-schema`),
   ...report.presentationRows,
   ...report.versionMasked,
+  ...report.toolAhead.map((id) => `${id}#tool-ahead`),
 ]
 
 export function renderReport(report: GateReport): string {
@@ -255,6 +285,11 @@ export function renderReport(report: GateReport): string {
   if (report.versionMasked.length > 0)
     lines.push(
       `VERSION MASK: ${report.versionMasked.map((entry) => entry.replace("#version-mask", "")).join(", ")}: equal only once each tree's own declared omo package version and engine pin (packages/omo-native/package.json) are replaced by placeholders; the reviewer confirms the version is the only difference before CLEAR.`,
+      "",
+    )
+  if (report.toolAhead.length > 0)
+    lines.push(
+      `TOOL AHEAD: ${report.toolAhead.join(", ")}: the tool gained optional fields, widened fields or aliases under an unresolved gap, as its unresolved.json entry's toolAhead (added in this pull request) admits; the reviewer confirms each change is additive before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

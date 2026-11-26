@@ -309,5 +309,617 @@
         }
       }
     }
+  },
+  "alias-thread_create-message-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_create-message": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_create-message-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"message\" is another name for \"prompt\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"prompt\".",
+        "details": {
+          "field": "message",
+          "canonical": "prompt"
+        }
+      }
+    }
+  },
+  "alias-thread_create-title-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_create-title": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_create-title-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"title\" is another name for \"name\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"name\".",
+        "details": {
+          "field": "title",
+          "canonical": "name"
+        }
+      }
+    }
+  },
+  "alias-thread_create-mode-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "delivery names how prompt is delivered; no prompt was given.",
+        "next_action": "Pass prompt, or drop delivery."
+      }
+    }
+  },
+  "alias-thread_create-mode": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "delivery names how prompt is delivered; no prompt was given.",
+        "next_action": "Pass prompt, or drop delivery."
+      }
+    }
+  },
+  "alias-thread_create-mode-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"mode\" is another name for \"delivery\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"delivery\".",
+        "details": {
+          "field": "mode",
+          "canonical": "delivery"
+        }
+      }
+    }
+  },
+  "alias-thread_create-thinking-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "reasoning apply to a new thread; thread opens an existing one as it is.",
+        "next_action": "Drop them to open the thread, or drop thread to create a new one with them.",
+        "details": {
+          "fields": [
+            "reasoning"
+          ]
+        }
+      }
+    }
+  },
+  "alias-thread_create-thinking": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "reasoning apply to a new thread; thread opens an existing one as it is.",
+        "next_action": "Drop them to open the thread, or drop thread to create a new one with them.",
+        "details": {
+          "fields": [
+            "reasoning"
+          ]
+        }
+      }
+    }
+  },
+  "alias-thread_create-thinking-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"thinking\" is another name for \"reasoning\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"reasoning\".",
+        "details": {
+          "field": "thinking",
+          "canonical": "reasoning"
+        }
+      }
+    }
+  },
+  "alias-thread_create-thinking_level-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "reasoning apply to a new thread; thread opens an existing one as it is.",
+        "next_action": "Drop them to open the thread, or drop thread to create a new one with them.",
+        "details": {
+          "fields": [
+            "reasoning"
+          ]
+        }
+      }
+    }
+  },
+  "alias-thread_create-thinking_level": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "reasoning apply to a new thread; thread opens an existing one as it is.",
+        "next_action": "Drop them to open the thread, or drop thread to create a new one with them.",
+        "details": {
+          "fields": [
+            "reasoning"
+          ]
+        }
+      }
+    }
+  },
+  "alias-thread_create-thinking_level-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"thinking_level\" is another name for \"reasoning\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"reasoning\".",
+        "details": {
+          "field": "thinking_level",
+          "canonical": "reasoning"
+        }
+      }
+    }
+  },
+  "alias-thread_handoff-mode-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_handoff-mode": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_handoff-mode-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"mode\" is another name for \"delivery\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"delivery\".",
+        "details": {
+          "field": "mode",
+          "canonical": "delivery"
+        }
+      }
+    }
+  },
+  "alias-thread_list-search-field": {
+    "result": {
+      "kind": "ok",
+      "threads": [],
+      "scope": "workspace"
+    }
+  },
+  "alias-thread_list-search": {
+    "result": {
+      "kind": "ok",
+      "threads": [],
+      "scope": "workspace"
+    }
+  },
+  "alias-thread_list-search-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"search\" is another name for \"query\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"query\".",
+        "details": {
+          "field": "search",
+          "canonical": "query"
+        }
+      }
+    }
+  },
+  "alias-thread_read-tail-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-tail": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-tail-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"tail\" is another name for \"limit\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"limit\".",
+        "details": {
+          "field": "tail",
+          "canonical": "limit"
+        }
+      }
+    }
+  },
+  "alias-thread_read-lines-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-lines": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-lines-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"lines\" is another name for \"limit\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"limit\".",
+        "details": {
+          "field": "lines",
+          "canonical": "limit"
+        }
+      }
+    }
+  },
+  "alias-thread_read-count-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-count": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-count-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"count\" is another name for \"limit\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"limit\".",
+        "details": {
+          "field": "count",
+          "canonical": "limit"
+        }
+      }
+    }
+  },
+  "alias-thread_read-last-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-last": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-last-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"last\" is another name for \"limit\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"limit\".",
+        "details": {
+          "field": "last",
+          "canonical": "limit"
+        }
+      }
+    }
+  },
+  "alias-thread_read-limit_bytes-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-limit_bytes": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-limit_bytes-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"limit_bytes\" is another name for \"max_bytes\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"max_bytes\".",
+        "details": {
+          "field": "limit_bytes",
+          "canonical": "max_bytes"
+        }
+      }
+    }
+  },
+  "alias-thread_read-bytes-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-bytes": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_read-bytes-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"bytes\" is another name for \"max_bytes\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"max_bytes\".",
+        "details": {
+          "field": "bytes",
+          "canonical": "max_bytes"
+        }
+      }
+    }
+  },
+  "alias-thread_rename-title-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_rename-title": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_rename-title-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"title\" is another name for \"name\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"name\".",
+        "details": {
+          "field": "title",
+          "canonical": "name"
+        }
+      }
+    }
+  },
+  "alias-thread_send-mode-field": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_send-mode": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"missing-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  },
+  "alias-thread_send-mode-conflict": {
+    "result": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "\"mode\" is another name for \"delivery\", and the two were given different values. Nothing was done.",
+        "next_action": "Pass the value once, as \"delivery\".",
+        "details": {
+          "field": "mode",
+          "canonical": "delivery"
+        }
+      }
+    }
   }
 }

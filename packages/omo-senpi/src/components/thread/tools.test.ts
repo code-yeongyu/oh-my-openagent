@@ -395,6 +395,51 @@ describe("thread tools under the argument names agents predict", () => {
     ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(f.setModel).not.toHaveBeenCalled()
   })
+
+  test.each([
+    [500, 200, { limit: { requested: 500, used: 200 } }],
+    [200, 200, undefined],
+  ] as const)(
+    "#given a 600-message thread #when thread_read asks limit %i #then it reads the newest %i and reduced is %o",
+    async (asked, read, reduced) => {
+      // given
+      const f = fixture()
+      const many = Array.from({ length: 600 }, (_, index) => ({ role: "user", content: `m${index + 1}` }))
+      const run = runner({ ...f, host: { ...f.host, getMessages: async () => many } })
+
+      // when
+      const result = (await run("thread_read", { thread: "peer", limit: asked, max_bytes: 1048576 })) as unknown as {
+        kind: string
+        items: unknown[]
+        reduced?: unknown
+      }
+
+      // then
+      expect(result.kind).toBe("ok")
+      expect(result.items).toHaveLength(read)
+      expect(JSON.stringify(result.items.at(-1))).toContain("m600")
+      expect(result.reduced).toEqual(reduced)
+    },
+  )
+
+  test("#given a host that cannot report a turn end #when thread_read waits 0 then 1 ms #then 0 reads at once with wait not_waited and 1 tries to wait", async () => {
+    // given
+    const run = runner(fixture())
+
+    // when
+    const now = await run("thread_read", { thread: "peer", wait_ms: 0 })
+    const waited = await run("thread_read", { thread: "peer", wait_ms: 1 }, undefined, "call-2")
+
+    // then
+    expect(now).toMatchObject({ kind: "ok", wait: { outcome: "not_waited", waited_ms: 0 } })
+    expect(waited).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+  })
+
+  test("#given a receipt read #when it also names limit #then it is refused by name, never answered with limit dropped", async () => {
+    const result = await runner(fixture())("thread_read", { thread: "peer", delivery_id: "d-1", limit: 3 })
+    expect(result).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(JSON.stringify(result)).toContain("delivery_id")
+  })
 })
 
 describe("thread session controls", () => {

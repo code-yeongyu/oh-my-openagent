@@ -167,7 +167,15 @@
       "id": "devices.list",
       "gap": "no conformance scenario of its inputs yet",
       "slice": "P1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "query",
+          "limit"
+        ]
+      }
     },
     {
       "id": "devices.rename",
@@ -563,7 +571,14 @@
       "id": "threads.aliases.set",
       "gap": "partial: remote module `aliases.*`",
       "slice": "T1c",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "all_scope"
+        ]
+      }
     },
     {
       "id": "threads.archive",
@@ -587,7 +602,15 @@
       "id": "threads.create",
       "gap": "partial: the thread SDK creates; `omo remote open` skips the create orchestration (#13016 OMO-CTL-26); no `launch_spec`, no prompt metadata",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "all_scope"
+        ],
+        "aliases": true
+      }
     },
     {
       "id": "threads.entries",
@@ -635,7 +658,12 @@
       "id": "threads.handoff",
       "gap": "no SDK call",
       "slice": "T1c",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "aliases": true
+      }
     },
     {
       "id": "threads.interrupt",
@@ -647,7 +675,16 @@
       "id": "threads.list",
       "gap": "partial: no `workspace`, `device`, `project`, `name`, `archived` in the thread SDK (remote module has them, `R/types.ts:68, 233-239`)",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "query",
+          "limit"
+        ],
+        "aliases": true
+      }
     },
     {
       "id": "threads.locate",
@@ -665,19 +702,51 @@
       "id": "threads.read",
       "gap": "partial: no `idempotency_key`; `--limit` is sliced in the CLI (`N/bin/lib/thread.js:92-95`)",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "limit"
+        ],
+        "widened": [
+          "wait_ms"
+        ],
+        "aliases": true
+      }
     },
     {
       "id": "threads.readAfterWait",
       "gap": "no SDK call",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "limit"
+        ],
+        "widened": [
+          "wait_ms"
+        ],
+        "aliases": true
+      }
     },
     {
       "id": "threads.receipt",
       "gap": "no SDK call",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "limit"
+        ],
+        "widened": [
+          "wait_ms"
+        ]
+      }
     },
     {
       "id": "threads.release",
@@ -689,7 +758,12 @@
       "id": "threads.rename",
       "gap": "no conformance scenario of its inputs yet",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "aliases": true
+      }
     },
     {
       "id": "threads.resolve",
@@ -707,7 +781,12 @@
       "id": "threads.send",
       "gap": "partial: own target construction (#13016); `summary` and attachments only in the remote module; the facade's names are `text`, `mode`",
       "slice": "T1a",
-      "issue": "#13016"
+      "issue": "#13016",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "aliases": true
+      }
     },
     {
       "id": "threads.sendAndFollow",
@@ -719,7 +798,14 @@
       "id": "threads.setModel",
       "gap": "partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`)",
       "slice": "T1b",
-      "issue": "new"
+      "issue": "new",
+      "toolAhead": {
+        "pr": "#15076",
+        "until": "T1b",
+        "fields": [
+          "reasoning"
+        ]
+      }
     },
     {
       "id": "threads.setReasoning",

@@ -1,6 +1,12 @@
 import { toThreadAddressEntries } from "../address-book"
 import { workspaceDirectories, workspaceEntries } from "../addressing"
-import type { ThreadReadInput, ThreadState, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
+import {
+  THREAD_READ_MAX_LIMIT,
+  type ThreadReadInput,
+  type ThreadState,
+  type ThreadToolResult,
+  type ThreadWaitOutcome,
+} from "../contracts"
 import { listDiskSessions } from "../disk-list"
 import { locateControl } from "../control/locate"
 import { createRelayControl, reopenParkedRow } from "../remote/lazy-ops"
@@ -166,8 +172,26 @@ function readWindow(value: ThreadReadInput): {
   }
 }
 
-/** `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint here is dead. */
+/**
+ * `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint
+ * here is dead. A `limit` above THREAD_READ_MAX_LIMIT is read as that many, and the answer's `reduced.limit` says so.
+ */
 export async function readThread(
+  options: ThreadToolSurfaceOptions,
+  current: ThreadHostView,
+  value: ThreadReadInput,
+  callerId: string,
+  signal?: AbortSignal,
+): Promise<ThreadToolResult> {
+  if (value.limit === undefined || value.limit <= THREAD_READ_MAX_LIMIT)
+    return readThreadWithin(options, current, value, callerId, signal)
+  const result = await readThreadWithin(options, current, { ...value, limit: THREAD_READ_MAX_LIMIT }, callerId, signal)
+  return result.kind === "ok" && "items" in result
+    ? { ...result, reduced: { limit: { requested: value.limit, used: THREAD_READ_MAX_LIMIT } } }
+    : result
+}
+
+async function readThreadWithin(
   options: ThreadToolSurfaceOptions,
   current: ThreadHostView,
   value: ThreadReadInput,
@@ -198,7 +222,8 @@ async function readLive(
   value: ThreadReadInput,
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
-  let wait: ThreadWaitOutcome | undefined
+  let wait: ThreadWaitOutcome | undefined =
+    value.wait_ms === 0 ? { outcome: "not_waited", status: "wait_ms_zero", waited_ms: 0 } : undefined
   if (value.wait_ms !== undefined && value.wait_ms > 0) {
     try {
       wait = await control.waitSettled(value.wait_ms, signal)

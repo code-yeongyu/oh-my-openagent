@@ -46,13 +46,14 @@ export const ThreadListParams = Type.Object({
     Type.String({
       minLength: 1,
       description:
-        "List only the threads whose thread value, name, alias or folder (cwd) contains this text, ignoring case. Also accepted as search.",
+        "List only the threads whose thread value, name, alias or folder (cwd) contains this text, ignoring case; the devices list is not narrowed. Also accepted as search.",
     }),
   ),
   limit: Type.Optional(
     Type.Integer({
       minimum: 1,
-      description: "List at most this many threads, in listing order; rows_omitted counts the rest.",
+      description:
+        "List at most this many threads, in listing order; rows_omitted counts the rest. The devices list is not cut.",
     }),
   ),
   idempotency_key: IdempotencyKey,
@@ -80,8 +81,7 @@ export const ThreadReadParams = Type.Object({
   limit: Type.Optional(
     Type.Integer({
       minimum: 1,
-      maximum: THREAD_READ_MAX_LIMIT,
-      description: `How many of the newest messages to read, default ${THREAD_READ_DEFAULT_LIMIT}, at most ${THREAD_READ_MAX_LIMIT}; max_bytes still bounds the slice, and next_cursor pages the older part of those messages. Not combined with cursor. Also accepted as tail, lines, count or last.`,
+      description: `How many of the newest messages to read, default ${THREAD_READ_DEFAULT_LIMIT}; a larger number is read as ${THREAD_READ_MAX_LIMIT} and the answer's reduced.limit says so. max_bytes still bounds the slice, and next_cursor pages the older part of those messages. Not combined with cursor or delivery_id. Also accepted as tail, lines, count or last.`,
     }),
   ),
   max_bytes: Type.Optional(
