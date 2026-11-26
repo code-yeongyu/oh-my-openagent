@@ -9,15 +9,14 @@ import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import type { CancelOptions, CancelOutcome, SendInput, SendOutcome } from "../steering"
 import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
-import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
 import { ownedClaims } from "../manager/owned-claims"
 import type { DagTaskOwner, DagTaskOwnerScope, OwnedStartResult } from "./owner"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
-import type { DagNodeId, DagNodeState, DagRunEvent, DagRunId } from "./types"
+import type { DagNodeId, DagNodeState, DagRunEvent } from "./types"
+import { parentSessionId, runId } from "./scheduler-self-resume-record.test-harness"
 
-export const runId = "run-self-resume" as DagRunId
-const parentSessionId = "ses-parent"
+export { node, recordFor, runId } from "./scheduler-self-resume-record.test-harness"
 
 export function deferred<T = void>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
   let resolve = (_value: T): void => undefined
@@ -41,42 +40,6 @@ export function within<T>(promise: Promise<T>, ms = 2_000, waitingFor = "the sig
       },
     )
   })
-}
-
-export function node(id: string, dependsOn: readonly string[] = []): DagDefinition["nodes"][number] {
-  return { id, prompt: `do ${id}`, category: "quick", ...(dependsOn.length === 0 ? {} : { dependsOn }) }
-}
-
-export function recordFor(nodes: DagDefinition["nodes"]): DagRunRecordV1 {
-  const createdAt = "2026-11-26T00:00:00.000Z"
-  const input: DagDefinition = { key: "self-resume", name: "self resume", nodes }
-  const compiled = compileDag(input, { at: createdAt })
-  if (!compiled.ok) throw new Error("test DAG did not compile")
-  return {
-    schemaVersion: 1,
-    checkpointSeq: 0,
-    runId,
-    runKey: input.key,
-    name: input.name,
-    parentSessionId,
-    rootSessionId: "ses-root",
-    definitionFingerprint: "definition-fingerprint",
-    definition: {
-      key: input.key,
-      name: input.name,
-      nodes: nodes.map((entry) => ({ ...entry, effectivePrompt: entry.prompt })),
-    },
-    status: "pending",
-    generation: 1,
-    createdAt,
-    updatedAt: createdAt,
-    nodes: compiled.nodes,
-    edges: compiled.edges,
-    waves: compiled.waves,
-    criticalPath: compiled.criticalPath,
-    bottlenecks: compiled.bottlenecks,
-    diagnostics: compiled.diagnostics,
-  }
 }
 
 type Signal = { readonly promise: Promise<void>; readonly resolve: () => void }
@@ -206,7 +169,7 @@ export class SelfResumingTaskManager implements TaskManager {
     return this.#tasks.get(taskId)?.record
   }
   findOwnedTask(owner: Pick<DagTaskOwner, "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].find((task) => task.record.owner?.nodeId === owner.nodeId)?.record
+    return this.findOwnedTasks({ kind: "dag", nodeId: owner.nodeId }).at(0)
   }
   findOwnedTasks(scope: DagTaskOwnerScope): readonly TaskRecord[] {
     return ownedClaims(

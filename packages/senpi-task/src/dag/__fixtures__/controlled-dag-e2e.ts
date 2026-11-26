@@ -8,13 +8,14 @@ import type { TeardownStepDeadline } from "../../lifecycle/teardown-budget"
 import type { DestructionPort } from "../../steering"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
 import { ImmediateRunner } from "./controlled-runner"
+import { parentSessionId, planner, rootSessionId } from "./controlled-dag-definitions"
+import { resultPersistingManager } from "./result-persisting-manager"
 import { ownedTaskState, ownedTaskStateDir } from "../../store/__fixtures__/owned-task-state"
-import type { DagDefinition, DagNodeInput } from "../graph"
+import type { DagDefinition } from "../graph"
 import { createDagWaitSurface, type DagRunResult } from "../handle"
 import type { RetrySchedule } from "../infrastructure-retry"
 import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartResult } from "../manager"
 import { createDagOwnerResumeFence } from "../owner-resume-fence"
-import { persistDagNodeResult } from "../results"
 import type { TaskRecord } from "../../state"
 import {
   createDagScheduler,
@@ -27,64 +28,8 @@ import type { createDagSkillMaterializer } from "../skills"
 import { createDagFileStore, type DagFileStore } from "../store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "../types"
 
-export const parentSessionId = "session-e2e-failure-parent"
-export const rootSessionId = "session-e2e-failure-root"
-
-export function categoryNode(
-  id: string,
-  dependsOn: readonly string[] = [],
-  overrides: {
-    readonly prompt?: string
-    readonly label?: string
-    readonly task_summary?: string
-    readonly description?: string
-    readonly load_skills?: readonly string[]
-  } = {},
-): DagNodeInput {
-  return {
-    id,
-    prompt: `do ${id}`,
-    category: "quick",
-    ...(dependsOn.length === 0 ? {} : { dependsOn }),
-    ...overrides,
-  }
-}
-
-export function definition(key: string, nodes: readonly DagNodeInput[]): DagDefinition {
-  return { key, name: key.replaceAll("-", " "), nodes }
-}
-
-export function planner(spec: Parameters<ChildPlanner>[0]): ReturnType<ChildPlanner> {
-  const target = spec.category ?? spec.subagent_type ?? "default"
-  return {
-    kind: "resolved",
-    plan: {
-      model: spec.model ?? `scripted/${target}`,
-      ...(spec.category === undefined ? {} : { category: spec.category }),
-      ...(spec.subagent_type === undefined ? {} : { agentType: spec.subagent_type }),
-    },
-  }
-}
-
-export function resultPersistingManager(manager: TaskManager, store: DagFileStore): TaskManager {
-  return new Proxy(manager, {
-    get(target, property) {
-      if (property !== "waitFor") {
-        const value: unknown = Reflect.get(target, property, target)
-        return typeof value === "function" ? value.bind(target) : value
-      }
-      return async (taskId: string, options?: { readonly signal?: AbortSignal }) => {
-        const record = await target.waitFor(taskId, options)
-        const owner = record.owner
-        if (owner?.kind === "dag" && record.status === "completed") {
-          const persisted = persistDagNodeResult({ store, runId: owner.runId, nodeId: owner.nodeId, record })
-          if (persisted.kind === "failed") throw new Error(persisted.diagnostic.message)
-        }
-        return record
-      }
-    },
-  })
-}
+export { categoryNode, definition, parentSessionId, planner, rootSessionId } from "./controlled-dag-definitions"
+export { resultPersistingManager } from "./result-persisting-manager"
 
 export type E2eFixtureOptions = {
   readonly project?: string
