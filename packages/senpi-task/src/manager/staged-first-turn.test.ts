@@ -15,6 +15,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -43,7 +44,7 @@ function launchOver(createSession: () => Promise<ReturnType<typeof nativeChild>[
   const inProcess = createInProcessManagedRunner(new InProcessRunner({ createSession }))
   const manager = createTaskManager({
     cwd,
-    store: createTaskRecordStore({ project_dir: cwd }),
+    store: createTaskRecordStore(ownedTaskState(cwd)),
     config: settings(),
     planner: categoryPlanner(),
     runners: { "in-process": inProcess, process: new FakeRunner() },

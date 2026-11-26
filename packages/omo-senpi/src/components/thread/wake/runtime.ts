@@ -8,6 +8,8 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
+import { loadSenpiBarrel } from "../../../../../senpi-task/src/lazy/senpi-barrel"
+
 import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
 import { isCi } from "../../device-service/registrant-start"
 import type { DeliveryConsumer } from "../consumer/consumer"
@@ -23,6 +25,7 @@ import { connectDeliveryServicePort } from "../consumer/device-service-port"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
 import { engineDropsRetainedRecord } from "./engine-minimum"
 import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
+import { readHostMemoryHeadroom, readWakeMemoryFloor } from "./memory-headroom"
 
 /** How long a dead delivery consumer waits before it is started again (#13457's MEDIUM: never restarting left remote
  * wake off for the engine's life whenever the service was late or restarted). */
@@ -53,6 +56,10 @@ export type ThreadWakeOptions = {
   readonly deviceServiceStateDir?: string
   readonly engineVersion?: string
   readonly minimumEngine?: string | null
+  /** Replaces the engine's own `threads.chainCountLimit` read (`SettingsManager.getThreadChainCountLimit`) for a cwd. */
+  readonly chainCountLimit?: (cwd: string) => Promise<number | undefined>
+  /** Replaces the host memory probe (`memory-headroom.ts`) the carrier reads before it starts a woken session. */
+  readonly memoryHeadroom?: () => number | undefined
   readonly schedule?: (run: () => void, ms: number) => () => void
   readonly onWake?: (durableId: string, outcome: CarrierWakeOutcome) => void
 }
@@ -88,6 +95,8 @@ const unrefSchedule = (run: () => void, ms: number): (() => void) => {
   timer.unref?.()
   return () => clearTimeout(timer)
 }
+
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 /** A carry that ended: the session is no longer this carrier's, so its intake marks may now be drained. */
 const ENDED: ReadonlySet<CarrierEvaluation["kind"]> = new Set(["released", "handed_over", "closed_waiting", "held"])
@@ -241,6 +250,12 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
       return "unknown"
     }
   }
+  /** Tells the service which intake marks are drained now; a report that fails is retried at the next drain. */
+  const reportDrained = (): Promise<void> =>
+    serving?.consumer
+      .reportDrained()
+      .catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`)) ??
+    Promise.resolve()
   const carrier = createCarrier({
     store,
     sessionsDirectory,
@@ -258,19 +273,27 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
     remoteWake: () => consumer?.serving() ?? false,
     admitIntake: carrierAdmission,
+    memoryHeadroom: options.memoryHeadroom ?? (() => readHostMemoryHeadroom()),
+    memoryFloor: () => readWakeMemoryFloor(),
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
-      if (ENDED.has(event.outcome.kind))
-        void serving?.consumer
-          .reportDrained()
-          .catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`))
+      if (ENDED.has(event.outcome.kind)) void reportDrained()
     },
+    onError: (error) =>
+      input.warn(`thread wake: the carrier's sweep failed and retries at its next tick: ${errorText(error)}`),
   })
   // A send calls this from the sending session's handler: the renewal timer and the woken session's connection the
   // carrier creates must still belong to the process scope, or that session's shutdown reclaims them (#13456 M1).
   const wake = (durableId: string): Promise<void> =>
     scope.runInAsyncScope(async () => {
-      const outcome = await carrier.wake(durableId)
+      const outcome = await carrier.wake(durableId).catch((error: unknown) => {
+        // Every caller (a send, the consumer, the pending sweep) answers its sender without waiting on this wake, so the
+        // failure is reported here; the requested row stays and the carrier's sweep tries it again.
+        input.warn(`thread wake: ${durableId} was not woken and is retried by the sweep: ${errorText(error)}`)
+        throw error
+      })
+      // The rows a close settled during this wake leave drained marks no carry ending will report (#14273 follow-up).
+      if (outcome.kind === "nothing_queued") await reportDrained()
       if (outcome.kind === "failed")
         input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
       options.onWake?.(durableId, outcome)
@@ -330,6 +353,11 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
       engineVersion: options.engineVersion ?? input.engineVersion,
       minimumEngine: options.minimumEngine,
       wake,
+      // The setting the running engine admits a live thread call against (senpi `admitInputChain`), read the same way,
+      // so a queued delivery past the user's limit is refused at the intake as a live one is at admission.
+      chainCountLimit:
+        options.chainCountLimit ??
+        (async (cwd) => (await loadSenpiBarrel()).SettingsManager.create(cwd, agentDir).getThreadChainCountLimit()),
       sameDevice: (cwd) => input.settings(cwd).sameDevice,
       log: reportConsumerFailure,
     }).catch((error: unknown) => {
@@ -351,8 +379,13 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
   return {
     wake,
     admitIntake: async (device) => {
-      // The settled truth of this process's consumer: a restart in flight is awaited, so the answer is never a stale
-      // unknown from the moment before it.
+      // A consumer the service has acknowledged answers on its port at once (#14335). Its start is not over until the
+      // startup pending sweep has woken every parked session, and a session this host opens is drained here: senpi
+      // answers that wake only once the drain pass ends, and the drain asks this question, so waiting for the start
+      // would wait on itself until the carrier's request timed out, one parked session after another.
+      if (consumer?.serving() === true) return await carrierAdmission(device)
+      // No consumer serves yet: the settled truth of this process's consumer, so a restart in flight is awaited and the
+      // answer is never a stale unknown from the moment before it.
       await Promise.allSettled([ready, starting])
       return serving === undefined ? "unknown" : await serving.admitIntake(device)
     },

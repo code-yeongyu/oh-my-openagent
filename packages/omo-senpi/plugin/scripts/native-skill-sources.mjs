@@ -28,10 +28,6 @@ export function createNativeSkillSources(repoRoot) {
   /** @type {SkillSource[]} */
   const sources = [
     {
-      name: "dag-library",
-      source: join(nativeSkillsRoot, "dag-library"),
-    },
-    {
       name: "give-me-tips",
       source: join(nativeSkillsRoot, "give-me-tips"),
     },
@@ -46,6 +42,10 @@ export function createNativeSkillSources(repoRoot) {
     {
       name: "mass-ulw",
       source: join(nativeSkillsRoot, "mass-ulw"),
+    },
+    {
+      name: "omo-relay",
+      source: join(nativeSkillsRoot, "omo-relay"),
     },
     {
       name: "onboarding",

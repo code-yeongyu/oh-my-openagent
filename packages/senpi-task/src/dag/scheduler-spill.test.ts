@@ -7,6 +7,7 @@ import { createDagManager } from "./manager"
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagRunEvent } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -90,7 +91,7 @@ describe("DAG scheduler wave spill-through", () => {
     const holder = await taskManager.start(baseSpec({ name: "holder" }))
     if (holder.kind !== "started") throw new Error("expected holder")
 
-    const dagStore = createDagFileStore({ project_dir: project })
+    const dagStore = createDagFileStore(ownedTaskState(project))
     const dagManager = createDagManager({ store: dagStore })
     const started = await dagManager.start({
       definition: definition(),

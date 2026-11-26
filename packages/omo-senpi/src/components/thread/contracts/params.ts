@@ -2,7 +2,7 @@ import { type Static, Type } from "typebox"
 
 import {
   AllScope,
-  BindingId,
+  CollapseKey,
   ExpectedTurnId,
   IdempotencyKey,
   Message,
@@ -11,7 +11,6 @@ import {
   THREAD_READ_MAX_BYTES,
   ThreadAddress,
   ThreadDeliveryMode,
-  RelayText,
   thinkingLevel,
 } from "./fields"
 import { ThreadCreateParams } from "./create-params"
@@ -25,6 +24,23 @@ export const ThreadListParams = Type.Object({
         "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
+  state: Type.Optional(
+    Type.Array(
+      Type.Union([
+        Type.Literal("opening"),
+        Type.Literal("running"),
+        Type.Literal("idle"),
+        Type.Literal("inactive"),
+        Type.Literal("archived"),
+      ]),
+      {
+        minItems: 1,
+        description:
+          "Thread states to list: opening (not yet ready for controls), running, idle, inactive (no engine holds it) or archived; the default lists every state but archived.",
+      },
+    ),
+  ),
+  idempotency_key: IdempotencyKey,
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
@@ -32,10 +48,18 @@ const THREAD_READ_WAIT_MAX_MS = 600_000
 
 export const ThreadReadParams = Type.Object({
   thread: ThreadAddress,
+  delivery_id: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 128,
+      description:
+        "Query only the outcome of your original delivery to this exact thread ID. Reads no conversation, sends no message and wakes no session; after evidence expires answers outcome_unavailable.",
+    }),
+  ),
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
+        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(
@@ -53,6 +77,7 @@ export const ThreadReadParams = Type.Object({
     }),
   ),
   all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadSendParams = Type.Object({
@@ -62,6 +87,7 @@ export const ThreadSendParams = Type.Object({
   expected_turn_id: ExpectedTurnId,
   summary: Summary,
   idempotency_key: IdempotencyKey,
+  collapse_key: CollapseKey,
   all_scope: AllScope,
 })
 
@@ -74,6 +100,7 @@ export const ThreadInterruptParams = Type.Object({
     }),
   ),
   all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
 })
 
 const SelfOrThread = Type.Optional(
@@ -88,6 +115,25 @@ const ThreadCloseParams = Type.Object({
   thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
+  force: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close even when the thread has messages it has not read yet; they are dropped and listed in dropped_deliveries.",
+    }),
+  ),
+  graceful: Type.Optional(
+    Type.Boolean({
+      description:
+        "Let the running turn end instead of stopping it; new messages are refused and unread ones go back to their senders. Monitors, loops and the goal stop cleanly. Also closes a terminal's thread, which then exits.",
+    }),
+  ),
+  wait_ms: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: 600_000,
+      description: "How long a graceful close waits for the turn (default 30000, cut to what the call has left).",
+    }),
+  ),
 })
 
 export const ThreadHandoffParams = Type.Object({
@@ -136,7 +182,7 @@ export const ThreadSetModelParams = Type.Object({
   model: Type.String({
     minLength: 1,
     description:
-      "Model to switch the thread to, as provider/id, an exact model id, or a case-insensitive fragment of the id or display name resolved against the host's model catalog; no match returns model_not_found with the available list, several matches return model_ambiguous with candidates.",
+      "Model to switch the thread to, as provider/id, an exact model id, or a case-insensitive fragment of the id or display name, resolved against the target's catalog. Append a thinking level such as :max to apply it after switching. No match returns model_not_found with the available list; an absent provider adds details.reason = provider_not_configured and lists the target's available providers. Several matches return model_ambiguous with candidates.",
   }),
   provider: Type.Optional(
     Type.String({
@@ -163,82 +209,16 @@ export const ThreadSetReasoningParams = Type.Object({
   idempotency_key: IdempotencyKey,
 })
 
-export const ThreadReportParams = Type.Object({
-  binding_id: Type.Optional(
-    Type.String({
-      minLength: 1,
+const ThreadArchiveParams = Type.Object({
+  thread: ThreadAddress,
+  archived: Type.Optional(
+    Type.Boolean({
       description:
-        "Binding to report to; defaults to the originating binding, the one the message this session is answering now arrived through; refused when that is ambiguous.",
+        "true (the default) archives the thread, so thread_list (tool.thread_list() in an eval cell) hides it unless state includes archived; false unarchives it.",
     }),
   ),
-  kind: Type.Union(
-    [Type.Literal("milestone"), Type.Literal("report"), Type.Literal("question"), Type.Literal("completion")],
-    {
-      description:
-        "milestone updates the thread's progress message, report posts a result, question relays a pending question of this session and returns a reply_token, completion is written once when this session's run settles, with the run's real outcome.",
-    },
-  ),
-  text: RelayText,
-  request_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description: "For kind question: the id of this session's pending extension UI request the answer resolves.",
-    }),
-  ),
-  request_kind: Type.Optional(
-    Type.Union(
-      [
-        Type.Literal("question"),
-        Type.Literal("select"),
-        Type.Literal("confirm"),
-        Type.Literal("input"),
-        Type.Literal("editor"),
-      ],
-      {
-        description:
-          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer (tool.thread_answer() in an eval cell) accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
-      },
-    ),
-  ),
+  all_scope: AllScope,
   idempotency_key: IdempotencyKey,
-})
-
-export const ThreadOutboxParams = Type.Object({
-  binding_id: BindingId,
-  after_cursor: Type.Optional(
-    Type.Integer({
-      minimum: 0,
-      description: "Read rows after this cursor; unset continues after the binding's acknowledged cursor.",
-    }),
-  ),
-  limit: Type.Optional(
-    Type.Integer({ minimum: 1, maximum: 500, description: "Rows per read, default 100 and at most 500." }),
-  ),
-})
-
-export const ThreadOutboxAckParams = Type.Object({
-  binding_id: BindingId,
-  cursor: Type.Integer({
-    minimum: 1,
-    description: "Every outbox row up to this cursor is marked delivered; an older cursor changes nothing.",
-  }),
-  provider_message_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 256,
-      description:
-        "Platform id of the message posted for the row at cursor; the first one for a milestone becomes the progress message later milestones edit.",
-    }),
-  ),
-})
-
-export const ThreadAnswerParams = Type.Object({
-  binding_id: Type.String({
-    minLength: 1,
-    description: "Binding the answer arrived through; it must be the binding that asked the question.",
-  }),
-  reply_token: Type.String({ minLength: 1, description: "reply_token of the question row being answered." }),
-  answer: RelayText,
 })
 
 export type ThreadCreateInput = Static<typeof ThreadCreateParams>
@@ -251,10 +231,7 @@ export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
-export type ThreadReportInput = Static<typeof ThreadReportParams>
-export type ThreadOutboxInput = Static<typeof ThreadOutboxParams>
-export type ThreadOutboxAckInput = Static<typeof ThreadOutboxAckParams>
-export type ThreadAnswerInput = Static<typeof ThreadAnswerParams>
+export type ThreadArchiveInput = Static<typeof ThreadArchiveParams>
 
 export const threadToolParamSchemas = {
   thread_create: ThreadCreateParams,
@@ -267,10 +244,7 @@ export const threadToolParamSchemas = {
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,
   thread_set_reasoning: ThreadSetReasoningParams,
-  thread_report: ThreadReportParams,
-  thread_outbox: ThreadOutboxParams,
-  thread_outbox_ack: ThreadOutboxAckParams,
-  thread_answer: ThreadAnswerParams,
+  thread_archive: ThreadArchiveParams,
 } as const
 
 export type ThreadToolName = keyof typeof threadToolParamSchemas

@@ -7,6 +7,7 @@ import { createTaskRecordStore } from "../store"
 import { createInputEffects, InputUncertainError, InputConflictError } from "./input-effects"
 import { RpcRequestTimeout } from "./rpc/errors"
 import { mapSendOutcome } from "../tools/control/send-results"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -16,7 +17,7 @@ afterEach(() => {
 function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "t12-effects-"))
   dirs.push(dir)
-  const store = createTaskRecordStore({ project_dir: dir })
+  const store = createTaskRecordStore(ownedTaskState(dir))
   const record = createTaskRecord({
     parent_session_id: "parent",
     root_session_id: "parent",
@@ -34,13 +35,13 @@ test("#given a durable record #when inputs and a reloaded sender send #then ids 
   const { dir, store, taskId } = fixture()
   const ids: string[] = []
   const send = async (command: { clientMessageId: string }) => {
-    const fresh = createTaskRecordStore({ project_dir: dir }).load(taskId)
+    const fresh = createTaskRecordStore(ownedTaskState(dir)).load(taskId)
     const seq = Number(command.clientMessageId.split(":").at(-1))
     expect(fresh?.effect_seq).toBe(seq)
     ids.push(command.clientMessageId)
   }
   await createInputEffects({ taskId, store, send }).send({ type: "prompt", message: "initial" })
-  await createInputEffects({ taskId, store: createTaskRecordStore({ project_dir: dir }), send }).send({
+  await createInputEffects({ taskId, store: createTaskRecordStore(ownedTaskState(dir)), send }).send({
     type: "steer",
     message: "second",
   })
@@ -146,7 +147,7 @@ test("#given two timeouts #when a reloaded sender reconciles #then the pending p
   expect(store.load(taskId)?.uncertain_inputs).toHaveLength(1)
   await createInputEffects({
     taskId,
-    store: createTaskRecordStore({ project_dir: dir }),
+    store: createTaskRecordStore(ownedTaskState(dir)),
     send: async (command) => {
       commands.push(command)
     },
@@ -194,7 +195,7 @@ test("#given an input left uncertain by an earlier run #when a later run reconci
   }))
   const sent: unknown[] = []
   const events: string[] = []
-  const reloaded = createTaskRecordStore({ project_dir: dir })
+  const reloaded = createTaskRecordStore(ownedTaskState(dir))
   const append = reloaded.appendEvent
   await createInputEffects({
     taskId,
@@ -378,7 +379,7 @@ test("#given an earlier run's input the child admitted #when a later run reconci
     ...record,
     notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
   }))
-  const observed = observedEvents(createTaskRecordStore({ project_dir: dir }))
+  const observed = observedEvents(createTaskRecordStore(ownedTaskState(dir)))
   const sent: unknown[] = []
   await createInputEffects({
     taskId,
@@ -410,7 +411,7 @@ test("#given an earlier run's input and a failed admission read #when a later ru
     ...record,
     notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
   }))
-  const observed = observedEvents(createTaskRecordStore({ project_dir: dir }))
+  const observed = observedEvents(createTaskRecordStore(ownedTaskState(dir)))
   const sent: unknown[] = []
   await createInputEffects({
     taskId,
@@ -425,7 +426,7 @@ test("#given an earlier run's input and a failed admission read #when a later ru
   expect(sent).toEqual([])
   expect(observed.events).toEqual([])
   expect(
-    createTaskRecordStore({ project_dir: dir })
+    createTaskRecordStore(ownedTaskState(dir))
       .load(taskId)
       ?.uncertain_inputs?.map((input) => input.clientMessageId),
   ).toEqual(["ps-1-entry"])

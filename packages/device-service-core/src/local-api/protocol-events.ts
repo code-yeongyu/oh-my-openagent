@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/protocol-events.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/protocol-events.ts
 import type { EventOf, JsonObject, JsonValue, Status } from "./protocol.ts";
 import type { MachineEvent } from "./protocol-machine.ts";
 import type { DelegatedEvent } from "./protocol-delegated.ts";
@@ -57,6 +57,27 @@ export type ListingRow = {
    */
   readonly settled?: boolean;
   readonly settled_by?: ListingSettledBy;
+  /**
+   * Only on rows of a `sessions.list` with `rows: 6` or `rows: 7` (#1447): the retry the session's holder is waiting
+   * out, on a running row whose host reports one (absent: not waiting, or the host does not say).
+   */
+  readonly waiting?: ListingWait;
+  /**
+   * Only on rows of a `sessions.list` with `rows: 7` (#1447): the build of the engine holding the session, as it reports
+   * it (1-128 characters), on a row that has not ended; absent when the host does not report it.
+   */
+  readonly engine_version?: string;
+};
+/**
+ * A holder's retry wait (the keys keep the engine's camelCase): a rate limit or a retry, attempt `attempt` of
+ * `maxAttempts` (1 <= attempt <= maxAttempts), `delayMs` (>= 0) long, ending at `until` (an ISO 8601 UTC instant).
+ */
+export type ListingWait = {
+  readonly kind: "rate_limit" | "retry";
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  readonly delayMs: number;
+  readonly until: string;
 };
 /** What settled a session, as its engine names it (the keys keep the engine's camelCase). */
 export type ListingSettledBy =

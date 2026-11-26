@@ -6,10 +6,11 @@ import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { RpcProcessRunner } from "./rpc-process"
 import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 test("#given a stdio task #when initial, steer, and follow-up inputs are sent #then parsed wire identities share the durable sequence", async () => {
   const dir = mkdtempSync(join(tmpdir(), "t12-stdio-"))
-  const store = createTaskRecordStore({ project_dir: dir })
+  const store = createTaskRecordStore(ownedTaskState(dir))
   const record = createTaskRecord({
     parent_session_id: "parent",
     root_session_id: "parent",

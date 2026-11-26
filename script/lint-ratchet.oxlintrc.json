@@ -14,6 +14,7 @@
     "typescript/ban-ts-comment": "error",
     "typescript/no-non-null-assertion": "error",
     "omo-testing/no-fixed-sleep": "error",
-    "omo-testing/no-flake-masking": "error"
+    "omo-testing/no-flake-masking": "error",
+    "omo-testing/no-module-mock": "error"
   }
 }

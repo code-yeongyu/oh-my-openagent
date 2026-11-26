@@ -1,0 +1,1770 @@
+{
+  "domain": "daemon",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "daemon.run/ensure-then-warm",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure"
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/policy-never",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {
+        "policy": "never"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "never"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/pinned-host",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {
+        "pinned": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "pinned": true
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/warm-refused-run-succeeds",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure"
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "result": {
+            "kind": "refused",
+            "code": "host_unavailable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/ensure-refused-no-warm",
+      "row": "daemon.run",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "result": {
+            "action": "refuse",
+            "reason": "host_stopping"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/unknown-policy",
+      "row": "daemon.run",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "policy": "always"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/default",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure"
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/policy-fallback",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "policy": "fallback"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "fallback"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/pinned-host",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "pinned": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "pinned": true
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/host-refuses",
+      "row": "daemon.ensure",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "result": {
+            "action": "refuse",
+            "reason": "host_stopping"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/pinned-not-boolean",
+      "row": "daemon.ensure",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "pinned": "yes"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.warm/default",
+      "row": "daemon.warm",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.warm/in-cwd",
+      "row": "daemon.warm",
+      "kind": "effect",
+      "input": {
+        "cwd": "/work/project"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "warm",
+          "args": {
+            "cwd": "/work/project"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.warm/of-kind",
+      "row": "daemon.warm",
+      "kind": "effect",
+      "input": {
+        "kind": "task"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "warm",
+          "args": {
+            "kind": "task"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.warm/with-context",
+      "row": "daemon.warm",
+      "kind": "effect",
+      "input": {
+        "context": {
+          "lane": "a"
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "warm",
+          "args": {
+            "context": {
+              "lane": "a"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.warm/engine-has-no-warm",
+      "row": "daemon.warm",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "warm",
+          "result": {
+            "kind": "unsupported"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.warm/empty-cwd",
+      "row": "daemon.warm",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "cwd": ""
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.status/default-endpoint",
+      "row": "daemon.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "status"
+        }
+      ]
+    },
+    {
+      "id": "daemon.status/every-endpoint",
+      "row": "daemon.status",
+      "kind": "effect",
+      "input": {
+        "all": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.status/with-workers",
+      "row": "daemon.status",
+      "kind": "effect",
+      "input": {
+        "include_workers": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "include_workers": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.status/all-not-boolean",
+      "row": "daemon.status",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "all": "yes"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/hard-stop",
+      "row": "daemon.stop",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "result": {
+            "action": "stopped",
+            "pid": 4242
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/drain",
+      "row": "daemon.stop",
+      "kind": "effect",
+      "input": {
+        "drain": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "drain": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/drain-wait",
+      "row": "daemon.stop",
+      "kind": "effect",
+      "input": {
+        "drain": true,
+        "wait_ms": 5000
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "drain": true,
+            "wait_ms": 5000
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/drain-named-instance",
+      "row": "daemon.stop",
+      "kind": "effect",
+      "input": {
+        "drain": true,
+        "instance": "gen-a"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "drain": true,
+            "instance": "gen-a"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/force",
+      "row": "daemon.stop",
+      "kind": "effect",
+      "input": {
+        "force": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "force": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/expected-generation",
+      "row": "daemon.stop",
+      "kind": "effect",
+      "input": {
+        "expected_generation": {
+          "instance_id": "gen-a",
+          "generation": 3,
+          "pid": 4242,
+          "process_start_time": "2026-11-25T10:00:00Z"
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "expected_generation": {
+              "instance_id": "gen-a",
+              "generation": 3,
+              "pid": 4242,
+              "process_start_time": "2026-11-25T10:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/sessions-live",
+      "row": "daemon.stop",
+      "kind": "refusal",
+      "refusal": "foreign_live_owner",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "result": {
+            "action": "refuse",
+            "reason": "sessions_live"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/stale-generation",
+      "row": "daemon.stop",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "expected_generation": {
+          "instance_id": "gen-a",
+          "generation": 3,
+          "pid": 4242,
+          "process_start_time": "2026-11-25T10:00:00Z"
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "expected_generation": {
+              "instance_id": "gen-a",
+              "generation": 3,
+              "pid": 4242,
+              "process_start_time": "2026-11-25T10:00:00Z"
+            }
+          },
+          "result": {
+            "action": "refuse",
+            "reason": "stale_generation"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/unknown-owner",
+      "row": "daemon.stop",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "result": {
+            "action": "refuse",
+            "reason": "unknown_owner"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/drain-unsupported",
+      "row": "daemon.stop",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "drain": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "drain": true
+          },
+          "result": {
+            "action": "refuse",
+            "reason": "drain_unsupported"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/zero-wait",
+      "row": "daemon.stop",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "wait_ms": 0
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/request-not-awaited",
+      "row": "daemon.stopAll",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          },
+          "result": {
+            "endpoints": [
+              {
+                "socket": "/agent/rpc/rpc.sock",
+                "reachable": true,
+                "generations": [
+                  {
+                    "alive": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/drain",
+      "row": "daemon.stopAll",
+      "kind": "effect",
+      "input": {
+        "drain": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          },
+          "result": {
+            "endpoints": [
+              {
+                "socket": "/agent/rpc/rpc.sock",
+                "reachable": true,
+                "generations": [
+                  {
+                    "alive": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock",
+            "drain": true
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/wait-until-drained",
+      "row": "daemon.stopAll",
+      "kind": "effect",
+      "input": {
+        "wait": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          },
+          "result": {
+            "endpoints": [
+              {
+                "socket": "/agent/rpc/rpc.sock",
+                "reachable": true,
+                "generations": [
+                  {
+                    "alive": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "result": {
+            "generations": [],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "clock",
+          "op": "sleep",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/wait-polls-within-deadline",
+      "row": "daemon.stopAll",
+      "kind": "effect",
+      "input": {
+        "wait": true,
+        "deadline_ms": 1000
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          },
+          "result": {
+            "endpoints": [
+              {
+                "socket": "/agent/rpc/rpc.sock",
+                "reachable": true,
+                "generations": [
+                  {
+                    "alive": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "count": 2
+        },
+        {
+          "port": "clock",
+          "op": "sleep",
+          "args": {
+            "ms": 250
+          },
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/deadline-passes-still-live",
+      "row": "daemon.stopAll",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "wait": true,
+        "deadline_ms": 1000
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          },
+          "result": {
+            "endpoints": [
+              {
+                "socket": "/agent/rpc/rpc.sock",
+                "reachable": true,
+                "generations": [
+                  {
+                    "alive": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "result": {
+            "generations": [
+              {
+                "alive": true
+              }
+            ],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "clock",
+          "op": "sleep",
+          "args": {
+            "ms": 250
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/stop-refused",
+      "row": "daemon.stopAll",
+      "kind": "refusal",
+      "refusal": "foreign_live_owner",
+      "input": {
+        "wait": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          },
+          "result": {
+            "endpoints": [
+              {
+                "socket": "/agent/rpc/rpc.sock",
+                "reachable": true,
+                "generations": [
+                  {
+                    "alive": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "port": "host",
+          "op": "stop",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "result": {
+            "action": "refuse",
+            "reason": "sessions_live"
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/rpc.sock"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/zero-deadline",
+      "row": "daemon.stopAll",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "deadline_ms": 0
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/default",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "result": {
+            "action": "handoff"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/policy-never",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "policy": "never"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "policy": "never"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/allow-downgrade",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "allow_downgrade": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "allow_downgrade": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/when-idle",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "when": {
+          "idle": {
+            "operation": "op-1",
+            "if_instance": "gen-a",
+            "if_generation": 3,
+            "target_build": "sha256:abc"
+          }
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "when": {
+              "idle": {
+                "operation": "op-1",
+                "if_instance": "gen-a",
+                "if_generation": 3,
+                "target_build": "sha256:abc"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/no-host",
+      "row": "daemon.handoff",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "result": {
+            "action": "refuse",
+            "reason": "no_host"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/handoff-unsupported",
+      "row": "daemon.handoff",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "result": {
+            "action": "refuse",
+            "reason": "handoff_unsupported"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/older-engine",
+      "row": "daemon.handoff",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "result": {
+            "action": "refuse",
+            "reason": "older_engine"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/idle-operation-conflict",
+      "row": "daemon.handoff",
+      "kind": "refusal",
+      "refusal": "idempotency_conflict",
+      "input": {
+        "when": {
+          "idle": {
+            "operation": "op-1",
+            "if_instance": "gen-a",
+            "if_generation": 3,
+            "target_build": "sha256:abc"
+          }
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "when": {
+              "idle": {
+                "operation": "op-1",
+                "if_instance": "gen-a",
+                "if_generation": 3,
+                "target_build": "sha256:abc"
+              }
+            }
+          },
+          "result": {
+            "kind": "refused",
+            "reason": "operation_conflict"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/idle-stale-generation",
+      "row": "daemon.handoff",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "when": {
+          "idle": {
+            "operation": "op-1",
+            "if_instance": "gen-a",
+            "if_generation": 3,
+            "target_build": "sha256:abc"
+          }
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "when": {
+              "idle": {
+                "operation": "op-1",
+                "if_instance": "gen-a",
+                "if_generation": 3,
+                "target_build": "sha256:abc"
+              }
+            }
+          },
+          "result": {
+            "kind": "refused",
+            "reason": "stale_generation"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/idle-missing-target",
+      "row": "daemon.handoff",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "when": {
+          "idle": {
+            "operation": "op-1",
+            "if_instance": "gen-a",
+            "if_generation": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/removes-dead-sidecar",
+      "row": "daemon.gc",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "result": {
+            "removed": [
+              {
+                "socket": "/agent/rpc/shards/p-1.sock"
+              }
+            ],
+            "kept": []
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "args": {
+            "path": "/agent/rpc/shards/p-1.meta.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/prune-store-index",
+      "row": "daemon.gc",
+      "kind": "effect",
+      "input": {
+        "prune_store_index": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "result": {
+            "removed": [],
+            "kept": []
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/other-agent-dir",
+      "row": "daemon.gc",
+      "kind": "effect",
+      "input": {
+        "agent_dir": "/srv/agent"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "args": {
+            "agent_dir": "/srv/agent"
+          },
+          "result": {
+            "removed": [],
+            "kept": []
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/empty-agent-dir",
+      "row": "daemon.gc",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "agent_dir": ""
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/migrate-indexed-stores",
+      "row": "daemon.rollbackPrepare",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": {
+            "version": 1,
+            "stores": {
+              "/p/a": {}
+            }
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/shards/p-1.sock"
+          },
+          "result": {
+            "generations": [],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "/p/a"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/dry-run-writes-nothing",
+      "row": "daemon.rollbackPrepare",
+      "kind": "effect",
+      "input": {
+        "dry_run": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": {
+            "version": 1,
+            "stores": {
+              "/p/a": {}
+            }
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/shards/p-1.sock"
+          },
+          "result": {
+            "generations": [],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/explicit-store-without-index",
+      "row": "daemon.rollbackPrepare",
+      "kind": "effect",
+      "input": {
+        "stores": [
+          "/p/b"
+        ]
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": null
+        },
+        {
+          "port": "fs",
+          "op": "list",
+          "args": {
+            "path": "/agent/rpc/shards"
+          },
+          "result": [
+            "p-1.meta.json"
+          ]
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/shards/p-1.sock"
+          },
+          "result": {
+            "generations": [],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "/p/b"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/allow-missing-index",
+      "row": "daemon.rollbackPrepare",
+      "kind": "effect",
+      "input": {
+        "allow_missing_index": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": null
+        },
+        {
+          "port": "fs",
+          "op": "list",
+          "args": {
+            "path": "/agent/rpc/shards"
+          },
+          "result": [
+            "p-1.meta.json"
+          ]
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/shards/p-1.sock"
+          },
+          "result": {
+            "generations": [],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/index-missing",
+      "row": "daemon.rollbackPrepare",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": null
+        },
+        {
+          "port": "fs",
+          "op": "list",
+          "args": {
+            "path": "/agent/rpc/shards"
+          },
+          "result": [
+            "p-1.meta.json"
+          ]
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/endpoint-still-live",
+      "row": "daemon.rollbackPrepare",
+      "kind": "refusal",
+      "refusal": "foreign_live_owner",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": {
+            "version": 1,
+            "stores": {
+              "/p/a": {}
+            }
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/shards/p-1.sock"
+          },
+          "result": {
+            "generations": [
+              {
+                "alive": true
+              }
+            ],
+            "claims_live": 0
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/endpoint-status-unreadable",
+      "row": "daemon.rollbackPrepare",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/rpc/task-stores.json"
+          },
+          "result": {
+            "version": 1,
+            "stores": {
+              "/p/a": {}
+            }
+          }
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "socket": "/agent/rpc/shards/p-1.sock"
+          },
+          "result": null
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/empty-store-list",
+      "row": "daemon.rollbackPrepare",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "stores": []
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.shardPath/process-shard",
+      "row": "daemon.shardPath",
+      "kind": "effect",
+      "input": {
+        "kind": "p",
+        "owner": "sess-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "shard_path",
+          "args": {
+            "kind": "p",
+            "owner": "sess-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.shardPath/process-shard-under-root",
+      "row": "daemon.shardPath",
+      "kind": "effect",
+      "input": {
+        "kind": "p",
+        "owner": "sess-1",
+        "root": "/srv/shards"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "shard_path",
+          "args": {
+            "kind": "p",
+            "owner": "sess-1",
+            "root": "/srv/shards"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.shardPath/instance-shard",
+      "row": "daemon.shardPath",
+      "kind": "effect",
+      "input": {
+        "kind": "i",
+        "owner": "task-7"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "shard_path",
+          "args": {
+            "kind": "i",
+            "owner": "task-7"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.shardPath/unknown-kind",
+      "row": "daemon.shardPath",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "kind": "x",
+        "owner": "sess-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "shard_path",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/policy-upgrade",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {
+        "policy": "upgrade"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "upgrade"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/policy-fallback",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {
+        "policy": "fallback"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "fallback"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/policy-upgrade",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "policy": "upgrade"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "upgrade"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/policy-never",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "policy": "never"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "never"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/policy-upgrade",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "policy": "upgrade"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "policy": "upgrade"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/policy-fallback",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "policy": "fallback"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "policy": "fallback"
+          }
+        }
+      ]
+    }
+  ]
+}

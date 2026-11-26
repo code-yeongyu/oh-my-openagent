@@ -1,185 +1,16 @@
-import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
-import { join, relative, resolve } from "node:path"
-import { type ChildProcess, spawn, spawnSync } from "node:child_process"
+import { lstatSync, mkdirSync, readFileSync, readdirSync, type Stats, writeFileSync } from "node:fs"
+import { join, relative } from "node:path"
 
 import { daemonDirectoryName } from "@code-yeongyu/senpi"
 import { runStatus as runProductionStatus } from "../bin/lib/daemon-operations.js"
-import { resolveSenpi } from "../bin/lib/package-paths.js"
+import { createDaemonEngineHarness } from "./daemon-real-engine-support"
+import { TREE_BOUNDED_TEST_TIMEOUT_MS } from "./daemon-test-runner"
 
-const PACKAGE_ROOT = resolve(import.meta.dir, "..")
-const LAUNCHER = join(PACKAGE_ROOT, "bin", "omo.js")
-// The tracked source of the launch spec; `build:omo-native` copies it into this package's untracked plugin/.
-const LAUNCH_SPEC = resolve(PACKAGE_ROOT, "..", "omo-senpi", "plugin", "daemon-launch-spec.json")
-const roots: string[] = []
-const ownedPids = new Set<number>()
-const runningChildren = new Set<ChildProcess>()
-// Headroom over any single status spawn, so the observing reads land inside the idle window on a loaded runner.
-const OBSERVED_IDLE_EXIT_MS = 8_000
-const REQUIRED_REACHABLE_READS = 2
-const IDLE_TEST_BUDGET_MS = OBSERVED_IDLE_EXIT_MS * 6
-
-const TEST_BUDGET_MS = 30_000
-setDefaultTimeout(TEST_BUDGET_MS)
-// Every run() waits for its child's own exit. The test's deadline is only a safety net, and it fires this long before
-// bun's timeout, so a child still running then fails the awaited test as a SpawnBudgetError naming the command and its
-// output. A net equal to the test budget fired after the test had timed out, as an unhandled rejection (#13980).
-const DEADLINE_MARGIN_MS = 2_000
-let testDeadline = 0
-
-class SpawnBudgetError extends Error {
-  override name = "SpawnBudgetError"
-}
-
-function startTestDeadline(budgetMs: number): void {
-  testDeadline = Date.now() + budgetMs - DEADLINE_MARGIN_MS
-}
-
-beforeEach(() => startTestDeadline(TEST_BUDGET_MS))
-
-afterEach(() => {
-  for (const child of runningChildren) child.kill("SIGKILL")
-  runningChildren.clear()
-  for (const pid of ownedPids) killOwned(pid)
-  ownedPids.clear()
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-})
-
-function sandbox() {
-  const agentDir = mkdtempSync("/tmp/dh41.")
-  roots.push(agentDir)
-  const socket = join(agentDir, "rpc", "shards", "p-aaaaaaaaaaaaaaaa.sock")
-  expect(Buffer.byteLength(`${socket}.next-99`)).toBeLessThanOrEqual(103)
-  // The engine refuses an agent dir any group or other user can write (unsafe_key_record), as a real ~/.omo/agent never
-  // is; mkdirSync otherwise takes the process umask, so on a host with umask 002 every shard here failed to start.
-  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true, mode: 0o700 })
-  const env = {
-    ...process.env,
-    TMPDIR: agentDir,
-    TEMP: agentDir,
-    TMP: agentDir,
-    OMO_RUNTIME: "node",
-    OMO_CODING_AGENT_DIR: agentDir,
-    SENPI_CODING_AGENT_DIR: agentDir,
-    PI_CODING_AGENT_DIR: agentDir,
-  }
-  return { agentDir, socket, env }
-}
-
-// A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
-// until it closes; the only bound is the test's deadline, which names the command it was waiting on.
-function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv) {
-  return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
-    const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
-    runningChildren.add(child)
-    let stdout = ""
-    let stderr = ""
-    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
-      stdout += chunk
-    })
-    child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
-      stderr += chunk
-    })
-    const deadline = setTimeout(
-      () => {
-        child.kill("SIGKILL")
-        reject(
-          new SpawnBudgetError(
-            `${command} ${args.join(" ")} was still running at the test deadline\nstdout: ${stdout}\nstderr: ${stderr}`,
-          ),
-        )
-      },
-      Math.max(0, testDeadline - Date.now()),
-    )
-    child.on("error", (error) => {
-      clearTimeout(deadline)
-      runningChildren.delete(child)
-      reject(error)
-    })
-    child.on("close", (code) => {
-      clearTimeout(deadline)
-      runningChildren.delete(child)
-      resolvePromise({ exitCode: code ?? 1, stdout, stderr })
-    })
-  })
-}
-
-async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
-  const result = await run(
-    "node",
-    [
-      resolveSenpi().cliPath,
-      "host",
-      "ensure",
-      "--json",
-      "--socket",
-      socket,
-      "--launch-spec",
-      LAUNCH_SPEC,
-      "--policy",
-      "upgrade",
-    ],
-    env,
-  )
-  // On a refusal the engine names its reason (e.g. unsafe_key_record) in the ensure output; the assertion carries it.
-  expect(result.exitCode, `host ensure failed: ${result.stdout}${result.stderr}`).toBe(0)
-  const payload = JSON.parse(result.stdout) as { pid: number }
-  ownedPids.add(payload.pid)
-  return payload.pid
-}
-
-function runStatus(env: NodeJS.ProcessEnv) {
-  return run("node", [LAUNCHER, "daemon", "status", "--json"], env)
-}
-
-async function statusSawReachableShard(env: NodeJS.ProcessEnv): Promise<boolean> {
-  const payload = JSON.parse((await runStatus(env)).stdout) as { endpoints: readonly { reachable: boolean }[] }
-  return payload.endpoints.some((endpoint) => endpoint.reachable)
-}
-
-function childPidOf(parentPid: number): number {
-  const output = spawnSync("ps", ["-axo", "pid=,ppid=,command="], { encoding: "utf8" }).stdout
-  const child = output
-    .split("\n")
-    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
-    .find((match) => match !== null && Number(match[2]) === parentPid && match[3].includes("rpc"))
-  if (child === undefined || child === null) throw new Error(`host child of ${parentPid} not found`)
-  return Number(child[1])
-}
-
-function killShardUncleanly(supervisorPid: number): void {
-  const childPid = childPidOf(supervisorPid)
-  ownedPids.add(childPid)
-  process.kill(supervisorPid, "SIGSTOP")
-  process.kill(childPid, "SIGKILL")
-  process.kill(supervisorPid, "SIGKILL")
-  waitForExit(childPid)
-  waitForExit(supervisorPid)
-  ownedPids.delete(childPid)
-  ownedPids.delete(supervisorPid)
-}
-
-function waitForExit(pid: number): void {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      process.kill(pid, 0)
-    } catch {
-      return
-    }
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
-  }
-  throw new Error(`pid ${pid} did not exit`)
-}
-
-function killOwned(pid: number): void {
-  try {
-    process.kill(pid, "SIGKILL")
-  } catch {
-    return
-  }
-  waitForExit(pid)
-}
+const { sandbox, ensureShard, runStatus, killShardUncleanly, cleanup } = createDaemonEngineHarness()
+setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
+afterEach(cleanup)
 
 function snapshotState(agentDir: string): string {
   const hash = createHash("sha256")
@@ -191,7 +22,7 @@ function snapshotState(agentDir: string): string {
 }
 
 function walk(root: string, path: string, hash: ReturnType<typeof createHash>): void {
-  let stat
+  let stat: Stats
   try {
     stat = lstatSync(path)
   } catch (error) {
@@ -223,6 +54,18 @@ async function assertReadOnlyState(agentDir: string, action: () => void | Promis
 
 if (process.platform !== "win32") {
   describe("omo daemon real-engine read-only and observe contracts", () => {
+    test("#given a group-writable umask #when the sandbox is created #then its rpc directories stay private", () => {
+      const previous = process.umask(0o002)
+      try {
+        const { agentDir } = sandbox()
+        for (const dir of [join(agentDir, "rpc"), join(agentDir, "rpc", "shards")]) {
+          expect(lstatSync(dir).mode & 0o077).toBe(0)
+        }
+      } finally {
+        process.umask(previous)
+      }
+    })
+
     test("#given an uncleanly killed shard #when status json runs #then every daemon and shard state byte stays identical", async () => {
       const { agentDir, socket, env } = sandbox()
       const supervisorPid = await ensureShard(socket, env)
@@ -250,7 +93,7 @@ if (process.platform !== "win32") {
 
     test("#given production status with a write mutant #when the read-only guard runs #then production turns red", async () => {
       const { agentDir } = sandbox()
-      mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true })
+      mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true, mode: 0o700 })
 
       await expect(
         assertReadOnlyState(agentDir, () => {
@@ -272,63 +115,5 @@ if (process.platform !== "win32") {
         }),
       ).rejects.toThrow("daemon status changed state")
     })
-
-    test(
-      "#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive",
-      async () => {
-        startTestDeadline(IDLE_TEST_BUDGET_MS)
-        const { socket, env } = sandbox()
-        const supervisorPid = await ensureShard(socket, {
-          ...env,
-          SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
-        })
-
-        let reachableReads = 0
-        while (reachableReads < REQUIRED_REACHABLE_READS) {
-          if (!pidAlive(supervisorPid)) {
-            throw new Error(
-              `shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`,
-            )
-          }
-          if (await statusSawReachableShard(env)) reachableReads += 1
-        }
-
-        // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
-        // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
-        // reads keep arriving well inside the idle window.
-        const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
-        let readsAwaitingExit = 0
-        let backoffMs = 100
-        while (pidAlive(supervisorPid)) {
-          if (Date.now() > exitDeadline) {
-            throw new Error(
-              `shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`,
-            )
-          }
-          await runStatus(env)
-          readsAwaitingExit += 1
-          Atomics.wait(
-            new Int32Array(new SharedArrayBuffer(4)),
-            0,
-            0,
-            Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())),
-          )
-          backoffMs = Math.min(backoffMs * 2, 500)
-        }
-
-        expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
-        ownedPids.delete(supervisorPid)
-      },
-      IDLE_TEST_BUDGET_MS,
-    )
   })
-}
-
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
 }

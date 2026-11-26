@@ -42,6 +42,21 @@ export async function connectDeliveryServicePort(options: {
     return undefined
   }
   return {
+    notice: async (notice) => {
+      if (!(await client.peerAdmitted(notice.device))) return
+      await client.wakeCommand(
+        notice.device,
+        notice.session,
+        {
+          type: "delivery_outcome_notice",
+          sessionId: notice.session,
+          deliveryId: notice.delivery_id,
+          targetSessionId: notice.target_durable_id,
+          reason: notice.reason,
+        },
+        { waitMs: 15_000 },
+      )
+    },
     serve: (request) => client.serve(request),
     answer: (delivery, reply) => client.answer(delivery, reply as Parameters<typeof client.answer>[1]),
     held: (askId, holds) => client.held(askId, holds),

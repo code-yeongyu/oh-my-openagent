@@ -70,7 +70,7 @@ export type DagRoute =
 
 // Node-level user input mirrors the task tool field names exactly: category XOR subagent_type,
 // model only alongside subagent_type. The error vocabulary reuses the task tool codes
-// (both_targets / category_with_model / no_target) from tools/task/validation.ts.
+// (both_targets / category_with_model / agent_with_model / no_target) from tools/task/validation.ts.
 export type DagNodeTargetInput =
   | {
       readonly prompt: string

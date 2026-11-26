@@ -12,7 +12,7 @@ import {
 
 const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_create: { name: "payments-lane" },
-  thread_list: { all_scope: true },
+  thread_list: { all_scope: true, state: ["archived", "idle"] },
   thread_read: { thread: "019233a1-7c2e-7bbb", cursor: "rev12:seq40", max_bytes: 65536 },
   thread_send: { thread: "019233a1-7c2e-7bbb", message: "Continue the payments migration.", delivery: "auto" },
   thread_interrupt: { thread: "019233a1-7c2e-7bbb", turn_id: "turn-7" },
@@ -26,10 +26,7 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
   thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
   thread_set_reasoning: { thread: "019233a1-7c2e-7bbb", level: "high" },
-  thread_report: { kind: "milestone", text: "done step 1" },
-  thread_outbox: { binding_id: "bnd-1", after_cursor: 0 },
-  thread_outbox_ack: { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" },
-  thread_answer: { binding_id: "bnd-1", reply_token: "rt1.x.y", answer: "yes" },
+  thread_archive: { thread: "019233a1-7c2e-7bbb", archived: false },
 }
 
 const NEGATED_USE = /do not use|don't use|never use/i
@@ -61,10 +58,7 @@ describe("thread tool param schemas", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
-      "thread_report",
-      "thread_outbox",
-      "thread_outbox_ack",
-      "thread_answer",
+      "thread_archive",
     ])
 
     const verbs = Object.keys(threadToolParamSchemas).map((name) => name.replace(/^thread_/, ""))
@@ -181,18 +175,6 @@ describe("thread_set_reasoning params", () => {
   })
 })
 
-describe("relay tool params", () => {
-  test("#given a report of an unknown kind #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_report, { kind: "broadcast", text: "hi" })
-    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-  })
-
-  test("#given an answer with no binding it arrived through #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_answer, { reply_token: "rt1.x.y", answer: "yes" })
-    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-  })
-})
-
 describe("parseThreadParams data-error contract", () => {
   test("#given a thread_send payload missing thread #when parsed #then it returns a DATA error object, never a throw", () => {
     let thrown: unknown
@@ -238,6 +220,7 @@ describe("thread error taxonomy", () => {
       "foreign_live_owner",
       "no_active_turn",
       "turn_conflict",
+      "turn_active",
       "not_steerable",
       "message_too_large",
       "queue_full",
@@ -246,6 +229,8 @@ describe("thread error taxonomy", () => {
       "idempotency_conflict",
       "idempotency_in_progress",
       "idempotency_uncertain",
+      "delivered_unconfirmed",
+      "prompt_not_started",
       "approval_unavailable",
       "approval_route_locked",
       "partial_commit",
@@ -258,16 +243,12 @@ describe("thread error taxonomy", () => {
       "model_ambiguous",
       "thinking_level_unsupported",
       "loop_detected",
-      "binding_conflict",
-      "binding_mismatch",
-      "binding_inactive",
-      "stale_revision",
-      "stale_token",
-      "already_answered",
-      "answer_in_progress",
+      "pair_loop_guard",
+      "chain_count_limit",
       "device_offline",
       "relay_requires_paid_plan",
       "alias_taken",
+      "gateway_schema_too_new",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

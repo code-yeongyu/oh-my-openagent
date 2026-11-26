@@ -6,6 +6,7 @@
 // the publish claimant, if any, is gone, and the run recorded a valid outcome. Anything that cannot be
 // proven is "stuck", never "dead". Each rule carries a `rule:` tag named by its test.
 
+import { createHash } from "node:crypto"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
@@ -85,15 +86,18 @@ export function parsePlatformUuid(ioreg: string | null): string | null {
   return ioreg?.match(/"IOPlatformUUID"\s*=\s*"([^"]*)"/)?.[1]?.trim() || null
 }
 
-/** Single flight, and only an answer is remembered: caching a miss would pin a busy process to "unknown machine". */
+/** Hash the platform id before caching it; a failed probe is retried on the next call. */
 export function createMachineIdResolver(read: () => Promise<string | null>): () => Promise<string | null> {
   let cached: Promise<string | null> | undefined
   return () => {
     if (cached !== undefined) return cached
     cached = read().then(
       (value) => {
-        if (value === null) cached = undefined
-        return value
+        if (value === null) {
+          cached = undefined
+          return null
+        }
+        return createHash("sha256").update(`omo-reflection-host:${value}`).digest("hex")
       },
       (error: unknown) => {
         cached = undefined
@@ -104,12 +108,12 @@ export function createMachineIdResolver(read: () => Promise<string | null>): () 
   }
 }
 
-/** This machine's identity, or `null` where no probe exists. The prefix makes `active.lock` self-describing. */
+/** This machine's reflection-specific identity, or `null` where no probe exists. */
 export const getStableLocalHostId = createMachineIdResolver(async () => {
   if (process.platform !== "darwin") return null
   // An absolute path keeps this probe working when the host has no PATH.
   const uuid = parsePlatformUuid(await execFileText("/usr/sbin/ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"], 1_000))
-  return uuid && `darwin-uuid:${uuid}`
+  return uuid
 })
 
 /**
@@ -123,8 +127,9 @@ export async function isReflectionHostLocal(
   probe: ReflectionLockProbe,
 ): Promise<boolean> {
   const currentHostname = (probe.hostname ?? readHostname)()
+  if (typeof hostId !== "string" || hostId.length === 0) return hostname === currentHostname
   const currentHostId = await (probe.hostId ?? getStableLocalHostId)()
-  return typeof hostId === "string" && hostId && currentHostId ? hostId === currentHostId : hostname === currentHostname
+  return currentHostId ? hostId === currentHostId : hostname === currentHostname
 }
 
 function stuck(runId: string, reason: string): ReflectionLockVerdict {

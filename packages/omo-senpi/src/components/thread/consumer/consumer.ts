@@ -1,9 +1,10 @@
 import { GatewayMigrationError } from "../gateway/store-ops"
 import type { GatewayStore } from "../gateway/store"
-import type { IntakeRecord } from "../gateway/types"
+import type { IntakeOutcome, IntakeRecord } from "../gateway/types"
 import { findDiskSessions } from "../address-book"
 import { resolveWakeTarget } from "../wake/session-target"
 import { decodeServeAck, refusalCode, type DeliveryInboundEvent, type DeliveryServicePort } from "./port"
+import { receiptOutcomeOf } from "../remote/receipt"
 
 const DELIVERY_PROTOCOL_VERSION = 1
 
@@ -14,6 +15,12 @@ export type DeliveryConsumerOptions = {
   readonly port: DeliveryServicePort
   readonly agentDir: string
   readonly sessionsDirectory: string
+  /**
+   * The user's `threads.chainCountLimit` for the target session's cwd, read at each intake as the running engine reads
+   * it at each admission (senpi `admitInputChain` over `SettingsManager.getThreadChainCountLimit`), so a queued delivery
+   * past the limit is refused like a live one. `undefined` means the user set no limit.
+   */
+  readonly chainCountLimit: (cwd: string) => Promise<number | undefined>
   /** Starts the session (the carrier's wake); called only after the sender passed the admission check. */
   readonly wake: (durableId: string) => Promise<void>
   /** A tracked step that failed (a wake, an answer, a held reply): reported here, never left as an unhandled rejection. */
@@ -56,6 +63,24 @@ function intakeRecord(event: DeliveryInboundEvent): IntakeRecord | undefined {
 }
 
 const UNKNOWN_SHAPE = new Set(["unknown_type", "unsupported"])
+
+/** The numbers a refusal's details carry to the sender: a chain limit's counts, the pair loop guard's burst and wait. */
+const REFUSAL_NUMBERS = ["chain_count", "limit", "burst", "window_ms", "retry_after_ms"] as const
+
+/**
+ * The answer for a record the intake refused. The store names the precise cause in `details.reason` (for example
+ * `chain_count_limit`, with `chain_count` and `limit`); the sender maps that reason (`relay-transport.ts` `wakeRefusal`),
+ * so it is sent in place of the coarse tool code, which stays the reason only when the store named none (the pair loop
+ * guard: `pair_loop_guard`, with `burst`, `window_ms` and `retry_after_ms`).
+ */
+function intakeRefusal(refusal: Extract<IntakeOutcome, { kind: "refused" }>): Record<string, unknown> {
+  const details = refusal.details ?? {}
+  const reason = typeof details["reason"] === "string" ? details["reason"] : refusal.code
+  const counts = Object.fromEntries(
+    REFUSAL_NUMBERS.flatMap((key) => (typeof details[key] === "number" ? [[key, details[key]]] : [])),
+  )
+  return { kind: "refused", reason, ...counts }
+}
 
 /**
  * The engine side of the delivery protocol (#13037 5.4, 5.12, A2.4, A2.14). A handed record is resolved here first
@@ -106,6 +131,65 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   }
 
   const onInbound = async (event: DeliveryInboundEvent): Promise<void> => {
+    if (event.record["type"] === "delivery_outcome_notice") {
+      const pair = { sender_device: event.sender_device, command_id: event.command_id }
+      if (!(await port.peerAdmitted(event.sender_device))) {
+        await answer(pair, { kind: "refused", reason: "sender_not_admitted" })
+        return
+      }
+      const id = event.record["deliveryId"]
+      const outcome = receiptOutcomeOf({ kind: "refused", reason: event.record["reason"] })
+      if (typeof id === "string" && outcome.kind === "refused") {
+        const principal = `session:${event.durable_id}`
+        const held = await store.remoteReceipt({ now: store.now(), principal, delivery_id: id })
+        if (
+          held !== null &&
+          held.result.device === event.sender_device &&
+          held.result.thread_id === event.record["targetSessionId"] &&
+          (await port.peerAdmitted(event.sender_device))
+        )
+          await store.reconcileRemoteReceipt({
+            now: store.now(),
+            principal,
+            idempotency_key: held.idempotency_key,
+            delivery_id: id,
+            device: event.sender_device,
+            target_durable_id: held.result.thread_id,
+            outcome,
+          })
+      }
+      // A missing receipt, a duplicate and a kept notice have the same acknowledgment.
+      await answer(pair, { accepted: true })
+      return
+    }
+    if (event.record["type"] === "get_delivery_outcome") {
+      const pair = { sender_device: event.sender_device, command_id: event.command_id }
+      // The service attests the device principal and checks its grant again after this answer.
+      // Check here too, before touching a transcript or returning any receipt state.
+      if (!(await port.peerAdmitted(event.sender_device))) {
+        await answer(pair, { kind: "refused", reason: "sender_not_admitted" })
+        return
+      }
+      const deliveryId = event.record["deliveryId"]
+      if (typeof deliveryId !== "string") {
+        await answer(pair, { outcome: { kind: "outcome_unavailable" } })
+        return
+      }
+      const target = resolveWakeTarget(options.sessionsDirectory, event.durable_id)
+      const outcome = await store.receiptOutcome({
+        now: store.now(),
+        principal: `device:${event.sender_device}`,
+        delivery_id: deliveryId,
+        target_durable_id: event.durable_id,
+        ...(target.kind === "found" ? { session_path: target.session_path } : {}),
+      })
+      if (!(await port.peerAdmitted(event.sender_device))) {
+        await answer(pair, { kind: "refused", reason: "sender_not_admitted" })
+        return
+      }
+      await answer(pair, { outcome })
+      return
+    }
     const target = resolveWakeTarget(options.sessionsDirectory, event.durable_id)
     const reason =
       target.kind === "gone"
@@ -117,19 +201,30 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
             : undefined
     const pair = { sender_device: event.sender_device, command_id: event.command_id }
     const record = intakeRecord(event)
-    if (reason !== undefined || record === undefined) {
+    if (target.kind !== "found" || reason !== undefined || record === undefined) {
       await answer(pair, { kind: "refused", reason: reason ?? "invalid_record" })
       return
     }
+    // A limit that cannot be read (the settings barrel failed to load) fails open: the delivery is queued as it was before
+    // the limit was wired, and the failure is reported, so the sender never waits on a delivery nobody answered.
+    const chainCountLimit = await options.chainCountLimit(target.cwd).catch((error: unknown) => {
+      options.onError?.(error)
+      return undefined
+    })
     const outcome = await store.intake({
       now: store.now(),
       attested_device: event.sender_device,
       record,
       provenance: { workspace: "remote", project: "remote" },
       target_session_kind: "interactive",
+      ...(chainCountLimit === undefined ? {} : { chain_count_limit: chainCountLimit }),
     })
-    if (outcome.kind !== "queued") {
-      await answer(pair, { kind: "refused", reason: outcome.kind === "busy" ? "busy" : outcome.code })
+    if (outcome.kind === "busy") {
+      await answer(pair, { kind: "refused", reason: "busy" })
+      return
+    }
+    if (outcome.kind === "refused") {
+      await answer(pair, intakeRefusal(outcome))
       return
     }
     if (!outcome.deduplicated)
@@ -202,6 +297,23 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       return "serving"
     },
     reportDrained: async () => {
+      // The refusal notices are best-effort and each may wait on a slow peer, so they run beside the drained report,
+      // never ahead of it: startup and the service's marks do not wait on another device (#14623 review M3).
+      const send = port.notice
+      if (send !== undefined)
+        track(
+          (async () => {
+            for (const notice of await store.refusalNotices(store.now())) {
+              if (!(await port.peerAdmitted(notice.device))) {
+                await store.claimRefusalNotice({ now: store.now(), notice, suppress: true })
+                continue
+              }
+              if (!(await store.claimRefusalNotice({ now: store.now(), notice }))) continue
+              if (!(await port.peerAdmitted(notice.device))) continue
+              await send(notice).catch((error: unknown) => options.onError?.(error))
+            }
+          })(),
+        )
       if (!marksKept) return
       for (const pair of await store.intakeMarks.marked()) {
         const result = await store.intakeMarks.drained(pair)

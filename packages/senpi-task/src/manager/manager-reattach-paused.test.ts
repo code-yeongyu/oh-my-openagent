@@ -11,6 +11,7 @@ import {
   tempProject,
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -18,7 +19,7 @@ afterEach(cleanupProjects)
 // surviving child must not start a new task epoch or subscribe to its old turn.
 test("reattaching a paused child preserves its epoch and leaves its old turn unobserved", async () => {
   const cwd = tempProject()
-  const store = createTaskRecordStore({ project_dir: cwd })
+  const store = createTaskRecordStore(ownedTaskState(cwd))
   const taskId = "st_0a675201"
   const before = seedRecord(store, {
     task_id: taskId,

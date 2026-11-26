@@ -14,6 +14,7 @@ import { createTaskRecordStore } from "../store"
 import { createTaskLifecycle } from "./create"
 import { FakeRegistry } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -311,7 +312,7 @@ describe("idle cold revival", () => {
   test("#given a terminal persisted-only child #when task_send resumes it #then recorded session and policy reach one new epoch", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = {
       ...createTaskRecord({
         parent_session_id: "parent",

@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 
 import { isSpawnSpecV1, type PendingSteeringEntry, type SpawnSpecV1, type TaskRecord } from "../state"
 import { createTaskRecordStore, resolveStateDir } from "../store"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -19,7 +20,7 @@ function tempProject(): string {
 }
 
 function writePersistedRecord(project: string, taskId: string, fields: Record<string, unknown>): string {
-  const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
+  const tasksDir = join(resolveStateDir(ownedTaskState(project)), "tasks")
   const path = join(tasksDir, `${taskId}.json`)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(
@@ -50,7 +51,7 @@ describe("record-parse legacy team linkage", () => {
   test("#given a legacy record without team linkage #when listed #then it still decodes without team fields", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000000", {})
 
     // when
@@ -69,7 +70,7 @@ describe("record-parse notify_on_terminal legacy default", () => {
   test("#given a legacy record without notify_on_terminal #when listed #then the field defaults to false", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000001", {})
 
     // when
@@ -83,7 +84,7 @@ describe("record-parse notify_on_terminal legacy default", () => {
   test("#given a record with notify_on_terminal true #when listed #then the field round-trips", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000002", { notify_on_terminal: true })
 
     // when
@@ -99,7 +100,7 @@ describe("record-parse spawn_spec v1", () => {
   test("#given a legacy {cwd} spawn_spec #when listed #then it parses as the legacy variant (isSpawnSpecV1 false) with extensions/member_env dropped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000003", {
       spawn_spec: {
         cwd: "/safe/project",
@@ -122,7 +123,7 @@ describe("record-parse spawn_spec v1", () => {
   test("#given a v1 spawn_spec #when listed #then it round-trips with version, prompt, instructions, and member_scoped_tool_names", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const v1Spec: SpawnSpecV1 = {
       version: 1,
       cwd: "/project/child",
@@ -146,7 +147,7 @@ describe("record-parse spawn_spec v1", () => {
   test("#given a v1 spawn_spec with only required fields #when listed #then it round-trips without optional fields", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const v1Minimal: SpawnSpecV1 = {
       version: 1,
       cwd: "/project/child",
@@ -165,7 +166,7 @@ describe("record-parse spawn_spec v1", () => {
   test("#given a spawn_spec missing cwd #when listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000006", {
       spawn_spec: { version: 1, prompt: "no cwd" },
     })
@@ -182,7 +183,7 @@ describe("record-parse spawn_spec v1", () => {
   test("#given a v1 spawn_spec missing prompt #when listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000007", {
       spawn_spec: { version: 1, cwd: "/project/child" },
     })
@@ -201,7 +202,7 @@ describe("record-parse pending_steering", () => {
   test("#given a valid pending_steering array #when listed #then it round-trips", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const steering: PendingSteeringEntry[] = [
       { id: "msg-1", message: "focus on the auth module", deliver_as: "steer" },
       { id: "msg-2", message: "also check the db layer", deliver_as: "followUp" },
@@ -219,7 +220,7 @@ describe("record-parse pending_steering", () => {
   test("#given a malformed pending_steering entry #when listed #then the entry is dropped, siblings survive, AND the record remains in records with a parse_warning diagnostic", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const validEntry: PendingSteeringEntry = {
       id: "good-1",
       message: "survive",
@@ -265,7 +266,7 @@ describe("record-parse pending_steering", () => {
   test("#given pending_steering that is not an array #when listed #then diagnostic is typed and record is skipped (whole-field corruption)", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000012", {
       pending_steering: "not-an-array",
     })
@@ -282,7 +283,7 @@ describe("record-parse pending_steering", () => {
   test("#given pending_steering that is an object not array #when listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000013", {
       pending_steering: { id: "wrong", message: "shape", deliver_as: "steer" },
     })
@@ -299,7 +300,7 @@ describe("record-parse pending_steering", () => {
   test("#given a record with only malformed pending_steering entries #when listed #then record stays in records with warnings and empty steering", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000014", {
       pending_steering: [{ id: "bad", message: "ok", deliver_as: "invalid-type" }],
     })
@@ -322,7 +323,7 @@ describe("record-parse pending_steering with sibling records", () => {
   test("#given one record with bad steering and one clean record #when listed #then both records survive, only the bad one has a warning", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000020", {
       pending_steering: [{ message: "no id", deliver_as: "steer" }],
     })
@@ -349,7 +350,7 @@ describe("record-parse cancel_requested (omo#9403)", () => {
   test("#given a record with a pending cancel, with and without a reason #when listed #then cancel_requested round-trips", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000100", {
       status: "running",
       cancel_requested: { requested_at: "2026-07-06T00:01:00.000Z", reason: "no longer needed" },
@@ -375,7 +376,7 @@ describe("record-parse cancel_requested (omo#9403)", () => {
   test("#given a legacy record without cancel_requested #when listed #then it still loads with no pending cancel", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_02000102", { status: "running" })
 
     // when
@@ -394,7 +395,7 @@ describe("record-parse cancel_requested (omo#9403)", () => {
     (_label, value) => {
       // given
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       writePersistedRecord(project, "st_02000103", { status: "running", cancel_requested: value })
 
       // when

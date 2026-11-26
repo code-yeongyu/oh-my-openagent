@@ -1,7 +1,7 @@
 import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, builtinCategoryGateModels } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, categoryGateServedModels } from "./constants"
 import { resolveModel } from "../../shared/model-resolver"
-import { fuzzyMatchModel, isModelAvailable } from "../../shared/model-availability"
+import { fuzzyMatchModel } from "../../shared/model-availability"
 import { normalizeModel } from "../../shared/model-normalization"
 import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -13,6 +13,8 @@ export interface ResolveCategoryConfigOptions {
   inheritedModel?: string
   systemDefaultModel?: string
   availableModels?: Set<string>
+  /** The user's sisyphus-junior model, which every category runs on when set. */
+  modelOverride?: string
 }
 
 export interface ResolveCategoryConfigResult {
@@ -55,7 +57,13 @@ export function resolveCategoryConfig(
   categoryName: string,
   options: ResolveCategoryConfigOptions,
 ): ResolveCategoryConfigResult | null {
-  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels } = options
+  const {
+    userCategories,
+    inheritedModel: _inheritedModel,
+    systemDefaultModel,
+    availableModels,
+    modelOverride,
+  } = options
 
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const configuredUserConfig = userCategories?.[categoryName]
@@ -75,12 +83,17 @@ export function resolveCategoryConfig(
   }
 
   const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-  const requiredModels = builtinCategoryGateModels(categoryName, categoryReq?.requiresModel)
-  if (requiredModels.length > 0 && availableModels && !hasExplicitUserConfig) {
-    if (!requiredModels.some((requiredModel) => isModelAvailable(requiredModel, availableModels))) {
-      log(`[resolveCategoryConfig] Category ${categoryName} requires ${requiredModels.join(" or ")} but not available`)
-      return null
-    }
+  // A gated category opens only when a provider its chain lists serves a gate model under that exact id,
+  // or when the user picks the model; a variant or prompt tweak alone keeps the builtin model and its gate.
+  const hasUserModelChoice =
+    modelOverride !== undefined ||
+    configuredUserConfig?.model !== undefined ||
+    configuredUserConfig?.models !== undefined ||
+    configuredUserConfig?.fallback_models !== undefined
+  const servedGateModels = availableModels ? categoryGateServedModels(categoryName, availableModels) : undefined
+  if (servedGateModels?.size === 0 && !hasUserModelChoice) {
+    log(`[resolveCategoryConfig] Category ${categoryName} has no provider serving its exact gate model`)
+    return null
   }
   // requiresAnyModel: the lane opens only on one of its own chain models. Without this check the executor
   // walks the chain, finds nothing, and lands on the session's system default model.
@@ -88,6 +101,7 @@ export function resolveCategoryConfig(
     categoryReq?.requiresAnyModel &&
     availableModels &&
     !hasExplicitUserConfig &&
+    modelOverride === undefined &&
     !isAnyFallbackModelAvailable(categoryReq.fallbackChain, availableModels)
   ) {
     log(`[resolveCategoryConfig] Category ${categoryName} has no available model in its fallback chain`)

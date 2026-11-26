@@ -1,10 +1,17 @@
-import { readFile } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  createLockRecord,
+  memoryWriterLockPath,
+  readReflectionParkFile,
+  withLock,
+} from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
 import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
+import { sequencedStatus } from "./wiring-context"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -18,6 +25,8 @@ export const SYNC_BLOCKED_SEGMENT = " sync blocked"
 export const SYNC_HELD_SEGMENT = " sync held"
 /** Shared health history bound so footer and RPC streaks are computed from the same window. */
 export const MEMORY_HEALTH_SCAN_LIMIT = 20
+/** How long a dirty-marker sample waits for an in-flight memory write to commit before the segment is dropped. */
+const DIRTY_SAMPLE_LOCK_WAIT_MS = 2_000
 const SECOND_MS = 1_000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
@@ -71,6 +80,8 @@ export interface RefreshMemoryStatusInput {
 }
 
 export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Promise<MemoryStatusResult> {
+  // Taken before the first read, so a refresh that reads older state cannot replace a newer line (#13046).
+  const status = sequencedStatus(input.ui)
   const repo = input.gitRepo ?? createGitRepo(input.context.identityPaths.repo)
   const head = await repo.head()
   if (head === null) return { notified: false, footerShown: false }
@@ -81,7 +92,7 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
     const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
       const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
-      input.ui.setStatus(MEMORY_STATUS_KEY, formatMemoryStatusLine(input.context.identity, age, segments))
+      status.setStatus(MEMORY_STATUS_KEY, formatMemoryStatusLine(input.context.identity, age, segments))
       footerShown = true
     }
   }
@@ -116,7 +127,7 @@ export async function readMemoryStatusSegments(
   syncStatus?: SyncStatusReader,
 ): Promise<MemoryStatusSegments> {
   const [dirty, backlogSteps, streak, parked, sync] = await Promise.all([
-    readDirty(repo),
+    readDirty(repo, context.identityPaths.locks),
     readBacklogSteps(context, sessionId),
     readStreak(context),
     readParked(context),
@@ -168,9 +179,18 @@ async function readSyncState(
   }
 }
 
-async function readDirty(repo: GitRepoForStatus): Promise<boolean> {
+/**
+ * Every memory writer leaves the tree dirty from its file write until its commit, and holds the memory-write lock
+ * for that whole span. Sampling under the same lock means the marker reports a settled tree: a refresh that lands
+ * mid-write waits for the commit instead of catching the in-between state (#13046). A locks directory that does not
+ * exist yet means no writer has ever run, so there is nothing to wait for. A lock that stays busy drops the segment.
+ */
+async function readDirty(repo: GitRepoForStatus, locksDir: string): Promise<boolean> {
+  const sample = async (): Promise<boolean> => (await repo.status()).trim().length > 0
   try {
-    return (await repo.status()).trim().length > 0
+    if (!existsSync(locksDir)) return await sample()
+    const record = await createLockRecord("memory status")
+    return await withLock(memoryWriterLockPath(locksDir), record, sample, { waitTimeoutMs: DIRTY_SAMPLE_LOCK_WAIT_MS })
   } catch {
     return false
   }

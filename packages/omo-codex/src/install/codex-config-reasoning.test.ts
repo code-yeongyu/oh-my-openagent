@@ -88,7 +88,7 @@ describe("codex-config-reasoning", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain('model = "gpt-6-astra"')
+    expect(content).toContain('model = "gpt-6.2-astra"')
     expect(content).toContain("model_context_window = 600000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
@@ -127,7 +127,7 @@ describe("codex-config-reasoning", () => {
     expect(content.match(/^model_context_window\s*=/gm)).toHaveLength(1)
     expect(content.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
     expect(content.match(/^plan_mode_reasoning_effort\s*=/gm)).toHaveLength(1)
-    expect(content).toContain('model = "gpt-6-astra"')
+    expect(content).toContain('model = "gpt-6.2-astra"')
     expect(content).toContain("model_context_window = 600000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
@@ -169,6 +169,46 @@ describe("codex-config-reasoning", () => {
     expect(content).toContain('model_reasoning_effort = "medium"')
     expect(content).toContain('plan_mode_reasoning_effort = "medium"')
   })
+
+  // The shipped plugin/model-catalog.json and the in-code fallback must agree on which GPT-6 Astra
+  // root profile LazyCodex itself wrote, so an install on either path upgrades it and nothing else.
+  test.each([
+    ["shipped catalog", join(import.meta.dir, "..", ".."), 600_000, "gpt-6.2-astra", 600_000],
+    ["fallback catalog", "/repo/packages/omo-codex", 600_000, "gpt-6.2-astra", 600_000],
+    ["shipped catalog", join(import.meta.dir, "..", ".."), 400_000, "gpt-6-astra", 400_000],
+    ["fallback catalog", "/repo/packages/omo-codex", 400_000, "gpt-6-astra", 400_000],
+  ])(
+    "#given gpt-6-astra at %s window %d #when updating config #then root model is %s at %d",
+    async (_label, repoRoot, window, expectedModel, expectedWindow) => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-astra-"))
+      const configPath = join(root, "config.toml")
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-6-astra"',
+          `model_context_window = ${window}`,
+          'model_reasoning_effort = "high"',
+          'plan_mode_reasoning_effort = "xhigh"',
+          "",
+        ].join("\n"),
+      )
+
+      // when
+      await updateCodexConfig({
+        configPath,
+        repoRoot,
+        marketplaceName: "debug",
+        marketplaceSource: { sourceType: "local", source: repoRoot },
+        pluginNames: ["omo"],
+      })
+
+      // then
+      const content = await readFile(configPath, "utf8")
+      expect(content).toContain(`model = "${expectedModel}"`)
+      expect(content).toContain(`model_context_window = ${expectedWindow}`)
+    },
+  )
 
   test("#given bundled model catalog #when updating config #then reads defaults from catalog", async () => {
     // given
@@ -215,7 +255,7 @@ describe("codex-config-reasoning", () => {
     const catalog = await readCodexModelCatalog(root)
 
     // then
-    expect(catalog.current.model).toBe("gpt-6-astra")
+    expect(catalog.current.model).toBe("gpt-6.2-astra")
     expect(catalog.managedProfiles.map((profile) => profile.model)).not.toContain("gpt-5.4")
   })
 })

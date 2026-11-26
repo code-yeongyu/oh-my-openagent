@@ -30,9 +30,6 @@ const OFFENDERS: readonly string[] = [
   "remote-opt-out.ts -> ./bin/lib/agent-dir.js",
   "remote-permission-preset.ts -> ../omo-senpi/src/components/thread/contracts/permission-presets",
   "remote-session-args.ts -> ../omo-senpi/src/components/thread/contracts/fields",
-  "remote-session-target.ts -> ../omo-senpi/src/components/thread/errors",
-  "remote-session-target.ts -> ../omo-senpi/src/components/thread/remote/address-book",
-  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/ports",
   "remote-session-verbs.ts -> ../omo-senpi/src/components/remote/port/device-service",
   "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/control/operations",
   "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/control/relay-control",
@@ -59,8 +56,12 @@ const OFFENDERS: readonly string[] = [
 // graph (omo#13440): allowed only as a dynamic import from remote-cli.ts.
 const LAZY: ReadonlySet<string> = new Set(["remote-cli.ts -> ../omo-senpi/src/components/remote/local-sessions"])
 
+// The display escaping helper and its omo-native mirror are dependency-free leaf modules, allowed like node:*.
+const DISPLAY_ESCAPE: ReadonlySet<string> = new Set(["./display-escape.js", "@oh-my-opencode/utils/escape-for-display"])
+
 const allowed = (specifier: string): boolean =>
   specifier.startsWith("node:") ||
+  DISPLAY_ESCAPE.has(specifier) ||
   /^\.\/(remote-[\w-]+|thread-[\w-]+\.js)$/.test(specifier) ||
   /^\.\.\/omo-senpi\/src\/components\/remote\/(index|types)$/.test(specifier)
 

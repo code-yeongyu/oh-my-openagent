@@ -1,52 +1,21 @@
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import * as storageDetection from "../../shared/opencode-storage-detection"
+import { MESSAGE_STORAGE, SESSION_STORAGE } from "../../shared/opencode-storage-paths"
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-fallback-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
-const TEST_PART_STORAGE = join(TEST_DIR, "part")
-const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
-const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
-
-let sqliteBackend = false
+const fixtureDirs = new Set<string>()
 
 mock.module("./constants", () => ({
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-  SESSION_STORAGE: TEST_SESSION_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
-  TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
-  SESSION_LIST_DESCRIPTION: "test",
-  SESSION_READ_DESCRIPTION: "test",
-  SESSION_SEARCH_DESCRIPTION: "test",
-  SESSION_INFO_DESCRIPTION: "test",
+  TRANSCRIPT_DIR: join(TEST_DIR, "transcripts"),
 }))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
-  resetSqliteBackendCache: () => {},
-}))
-
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    if (!sessionID.startsWith("ses_")) return null
-    if (/[/\\]|\.\./.test(sessionID)) return null
-    if (!existsSync(TEST_MESSAGE_STORAGE)) return null
-
-    const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    if (existsSync(directPath)) return directPath
-
-    for (const dir of readdirSync(TEST_MESSAGE_STORAGE)) {
-      const nestedPath = join(TEST_MESSAGE_STORAGE, dir, sessionID)
-      if (existsSync(nestedPath)) return nestedPath
-    }
-
-    return null
-  },
-}))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
@@ -59,7 +28,8 @@ function createSdkUnavailableError(message: string): Error {
 }
 
 function createSessionMetadata(projectID: string, sessionID: string, directory: string, updated: number): void {
-  const projectDir = join(TEST_SESSION_STORAGE, projectID)
+  const projectDir = join(SESSION_STORAGE, projectID)
+  fixtureDirs.add(projectDir)
   mkdirSync(projectDir, { recursive: true })
   writeFileSync(
     join(projectDir, `${sessionID}.json`),
@@ -73,7 +43,8 @@ function createSessionMetadata(projectID: string, sessionID: string, directory: 
 }
 
 function createSessionMessage(sessionID: string, messageID: string, created: number, role = "user"): void {
-  const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
+  const sessionPath = join(MESSAGE_STORAGE, sessionID)
+  fixtureDirs.add(sessionPath)
   mkdirSync(sessionPath, { recursive: true })
   writeFileSync(join(sessionPath, `${messageID}.json`), JSON.stringify({ id: messageID, role, time: { created } }))
 }
@@ -84,6 +55,7 @@ function createSessionTodo(sessionID: string, items: Array<Record<string, unknow
 }
 
 describe("session-manager storage fallback", () => {
+  let restoreStorageDetection: () => void
   const mockClient = {
     session: {
       list: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
@@ -93,14 +65,8 @@ describe("session-manager storage fallback", () => {
   }
 
   beforeEach(() => {
-    sqliteBackend = true
-    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
-    mkdirSync(TEST_DIR, { recursive: true })
-    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
-    mkdirSync(TEST_PART_STORAGE, { recursive: true })
-    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
-    mkdirSync(TEST_TODO_DIR, { recursive: true })
-    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
+    const sqlite = spyOn(storageDetection, "isSqliteBackend").mockReturnValue(true)
+    restoreStorageDetection = () => sqlite.mockRestore()
     mockClient.session.list.mockReset()
     mockClient.session.messages.mockReset()
     mockClient.session.todo.mockReset()
@@ -109,7 +75,12 @@ describe("session-manager storage fallback", () => {
 
   afterEach(() => {
     storage.resetStorageClient()
-    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
+    restoreStorageDetection()
+    for (const directory of fixtureDirs) {
+      rmSync(directory, { recursive: true, force: true })
+    }
+    fixtureDirs.clear()
+    rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
   test("#given a legacy file-storage session the SQLite server answers NotFoundError for #when its messages are read #then the file copy is returned (#5854)", async () => {

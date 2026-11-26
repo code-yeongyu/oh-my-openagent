@@ -1,9 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 
 import { createMachineIdResolver, parsePlatformUuid } from "./stale-holder"
 
 describe("machine id resolver", () => {
+  test("#given a platform UUID #when resolving a host id #then only a domain-separated hash is returned", async () => {
+    const uuid = "C79FE553-52A7-5542-9639-3A49B5C119CD"
+    const resolve = createMachineIdResolver(async () => uuid)
+
+    expect(await resolve()).toBe(createHash("sha256").update(`omo-reflection-host:${uuid}`).digest("hex"))
+  })
+
   test("#given a probe that cannot answer #when it recovers #then the failure was not cached", async () => {
     let answer: string | null = null
     let probes = 0
@@ -16,7 +24,7 @@ describe("machine id resolver", () => {
     expect(probes).toBe(1)
 
     answer = "darwin-uuid:C79FE553-52A7-5542-9639-3A49B5C119CD"
-    expect(await resolve()).toBe(answer)
+    expect(await resolve()).toBe(createHash("sha256").update(`omo-reflection-host:${answer}`).digest("hex"))
     expect(probes).toBe(2)
   })
 
@@ -28,9 +36,10 @@ describe("machine id resolver", () => {
     })
 
     const [first, second] = await Promise.all([resolve(), resolve()])
-    expect(first).toBe("darwin-uuid:stable")
-    expect(second).toBe("darwin-uuid:stable")
-    expect(await resolve()).toBe("darwin-uuid:stable")
+    const expected = createHash("sha256").update("omo-reflection-host:darwin-uuid:stable").digest("hex")
+    expect(first).toBe(expected)
+    expect(second).toBe(expected)
+    expect(await resolve()).toBe(expected)
     expect(probes).toBe(1)
   })
 
@@ -81,7 +90,7 @@ describe("platform uuid reader", () => {
       )
 
       expect(result.status, result.stderr).toBe(0)
-      expect(result.stdout.trim()).toMatch(/^darwin-uuid:[0-9A-Fa-f-]{36}$/)
+      expect(result.stdout.trim()).toMatch(/^[0-9a-f]{64}$/)
     },
   )
 })

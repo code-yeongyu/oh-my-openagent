@@ -1,0 +1,3184 @@
+{
+  "domain": "engine",
+  "inert": {
+    "engine.launch.hand.api_key": "a readable handle; JSON cannot carry a stream, so P1b's driver supplies one",
+    "engine.launch.headless.api_key": "a readable handle; JSON cannot carry a stream, so P1b's driver supplies one",
+    "engine.launch.interactive.api_key": "a readable handle; JSON cannot carry a stream, so P1b's driver supplies one",
+    "engine.launch.print.api_key": "a readable handle; JSON cannot carry a stream, so P1b's driver supplies one",
+    "engine.launch.rpc.api_key": "a readable handle; JSON cannot carry a stream, so P1b's driver supplies one"
+  },
+  "scenarios": [
+    {
+      "id": "engine.auth.check/authority-base",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check"
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.check/authority-provider",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "input": {
+        "provider": "x-provider"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "provider": "x-provider"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.check/authority-model",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "input": {
+        "model": "x-model"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "model": "x-model"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.check/authority-refresh",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "input": {
+        "refresh": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "refresh": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/authority-base",
+      "row": "engine.auth.credentials",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials"
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/authority-provider",
+      "row": "engine.auth.credentials",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "provider": "x-provider"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "args": {
+            "provider": "x-provider"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/authority-model",
+      "row": "engine.auth.credentials",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "model": "x-model"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "args": {
+            "model": "x-model"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/authority-refresh",
+      "row": "engine.auth.credentials",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "refresh": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "args": {
+            "refresh": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/authority-destination",
+      "row": "engine.auth.credentials",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "args": {
+            "destination": {
+              "kind": "terminal"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/authority-base",
+      "row": "engine.auth.apiKey",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey"
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/authority-provider",
+      "row": "engine.auth.apiKey",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "provider": "x-provider"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey",
+          "args": {
+            "provider": "x-provider"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/authority-model",
+      "row": "engine.auth.apiKey",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "model": "x-model"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey",
+          "args": {
+            "model": "x-model"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/authority-destination",
+      "row": "engine.auth.apiKey",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey",
+          "args": {
+            "destination": {
+              "kind": "terminal"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/authority-base",
+      "row": "engine.auth.bearerToken",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken"
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/authority-provider",
+      "row": "engine.auth.bearerToken",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "provider": "x-provider"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "args": {
+            "provider": "x-provider"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/authority-model",
+      "row": "engine.auth.bearerToken",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "model": "x-model"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "args": {
+            "model": "x-model"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/authority-min-expiry-ms",
+      "row": "engine.auth.bearerToken",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        },
+        "min_expiry_ms": 1
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "args": {
+            "min_expiry_ms": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/authority-destination",
+      "row": "engine.auth.bearerToken",
+      "kind": "effect",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "args": {
+            "destination": {
+              "kind": "terminal"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.trust.ensure/authority-base",
+      "row": "engine.trust.ensure",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "trust.ensure"
+        }
+      ]
+    },
+    {
+      "id": "engine.trust.ensure/authority-wait",
+      "row": "engine.trust.ensure",
+      "kind": "effect",
+      "input": {
+        "wait": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "trust.ensure",
+          "args": {
+            "wait": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.trust.ensure/authority-lease-pid",
+      "row": "engine.trust.ensure",
+      "kind": "effect",
+      "input": {
+        "lease_pid": 1
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "trust.ensure",
+          "args": {
+            "lease_pid": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-base",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn"
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-session",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "session": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "session": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-setup",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-input",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "input": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "input": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-gated",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "gated": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "gated": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-tui-mode",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "tui_mode": "regular"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "tui_mode": "regular"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-verbose",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "verbose": true
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "verbose": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-attach",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "attach": {
+          "socket": "x-socket"
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "attach": {
+              "socket": "x-socket"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-presenter",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "presenter": {
+              "bootstrap_fd": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/authority-tui-mode-fullscreen",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "tui_mode": "fullscreen"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "tui_mode": "fullscreen"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-base",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn"
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-session",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "session": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "session": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-setup",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-input",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "input": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-gated",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "gated": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "gated": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-mode",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "mode": "text"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-presenter",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "presenter": {
+          "bootstrap_fd": 4
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "presenter": {
+              "bootstrap_fd": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-mode-json",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "json"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "mode": "json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-base",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn"
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-session",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "session": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "session": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-setup",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-gated",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "gated": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "gated": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-listen",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "listen": "x-listen"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "listen": "x-listen"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-multi-session",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "multi_session": true
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "multi_session": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-presenter",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "presenter": {
+              "bootstrap_fd": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/authority-input",
+      "row": "engine.launch.rpc",
+      "kind": "effect",
+      "input": {
+        "input": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "input": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/authority-base",
+      "row": "engine.launch.hand",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn"
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/authority-session",
+      "row": "engine.launch.hand",
+      "kind": "effect",
+      "input": {
+        "session": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "session": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/authority-setup",
+      "row": "engine.launch.hand",
+      "kind": "effect",
+      "input": {
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/authority-input",
+      "row": "engine.launch.hand",
+      "kind": "effect",
+      "input": {
+        "input": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "input": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/authority-presenter",
+      "row": "engine.launch.hand",
+      "kind": "effect",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "presenter": {
+              "bootstrap_fd": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/authority-gated",
+      "row": "engine.launch.hand",
+      "kind": "effect",
+      "input": {
+        "gated": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "gated": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-base",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn"
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-session",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {
+        "session": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "session": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-setup",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-listen",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {
+        "listen": "x-listen"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "listen": "x-listen"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-input",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {
+        "input": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "input": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-presenter",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "presenter": {
+              "bootstrap_fd": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/authority-gated",
+      "row": "engine.launch.headless",
+      "kind": "effect",
+      "input": {
+        "gated": {}
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "gated": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.models.list/authority-base",
+      "row": "engine.models.list",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list"
+        }
+      ]
+    },
+    {
+      "id": "engine.models.list/authority-setup",
+      "row": "engine.models.list",
+      "kind": "effect",
+      "input": {
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.promptSizes/authority-base",
+      "row": "engine.promptSizes",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "promptSizes"
+        }
+      ]
+    },
+    {
+      "id": "engine.promptSizes/authority-setup",
+      "row": "engine.promptSizes",
+      "kind": "effect",
+      "input": {
+        "setup": {}
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "promptSizes",
+          "args": {
+            "setup": {}
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.check/session-answer-withholds-provider-text",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "change": "B6",
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "refresh": false
+          },
+          "result": {
+            "status": "ready",
+            "provider": "p",
+            "authType": "oauth",
+            "accounts": [
+              {
+                "name": "sk-ant-api03-omo-canary-0000",
+                "source": "login",
+                "blocked": false,
+                "pinned": false,
+                "email": "sk-ant-api03-omo-canary-0000@leak.test",
+                "orgName": "sk-ant-api03-omo-canary-0000",
+                "subscriptionType": "sk-ant-api03-omo-canary-0000",
+                "usageUrl": "https://leak.test/sk-ant-api03-omo-canary-0000",
+                "signIn": "signed_in",
+                "check": {
+                  "model": "m",
+                  "outcome": "failed",
+                  "at": 1,
+                  "reason": "sk-ant-api03-omo-canary-0000",
+                  "message": "invalid key sk-ant-api03-omo-canary-0000"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "status": "ready",
+          "provider": "p",
+          "auth_type": "oauth",
+          "accounts": [
+            {
+              "signed_in": true,
+              "check": "unrecognized"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "engine.schedule.list/host-read-refuses-connector",
+      "row": "engine.schedule.list",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.list/host-read-refuses-connector",
+      "row": "engine.models.list",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.list/host-read-refuses-connector",
+      "row": "engine.packages.list",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.trust.ensure/host-change-refuses-connector",
+      "row": "engine.trust.ensure",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "trust.ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.trust.ensure/host-change-refuses-session",
+      "row": "engine.trust.ensure",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "trust.ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.trust.ensure/host-change-refuses-service",
+      "row": "engine.trust.ensure",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "trust.ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/packages-refuses-connector",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/packages-refuses-session",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/packages-refuses-service",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/packages-refuses-connector",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/packages-refuses-session",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/packages-refuses-service",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/packages-refuses-connector",
+      "row": "engine.packages.update",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/packages-refuses-session",
+      "row": "engine.packages.update",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/packages-refuses-service",
+      "row": "engine.packages.update",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/packages-refuses-connector",
+      "row": "engine.config.setResource",
+      "input": {
+        "source": "x-source",
+        "resource": {
+          "type": "x-type",
+          "path": "x-path"
+        },
+        "enabled": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/packages-refuses-session",
+      "row": "engine.config.setResource",
+      "input": {
+        "source": "x-source",
+        "resource": {
+          "type": "x-type",
+          "path": "x-path"
+        },
+        "enabled": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/packages-refuses-service",
+      "row": "engine.config.setResource",
+      "input": {
+        "source": "x-source",
+        "resource": {
+          "type": "x-type",
+          "path": "x-path"
+        },
+        "enabled": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.check/auth-check-refuses-connector",
+      "row": "engine.auth.check",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.check/auth-check-refuses-service",
+      "row": "engine.auth.check",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/discover-refuses-connector",
+      "row": "engine.models.discover",
+      "input": {
+        "provider": "x-provider"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/discover-refuses-session",
+      "row": "engine.models.discover",
+      "input": {
+        "provider": "x-provider"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/discover-refuses-service",
+      "row": "engine.models.discover",
+      "input": {
+        "provider": "x-provider"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/credential-refuses-connector",
+      "row": "engine.auth.apiKey",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/credential-refuses-session",
+      "row": "engine.auth.apiKey",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.apiKey/credential-refuses-service",
+      "row": "engine.auth.apiKey",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.apiKey",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/credential-refuses-connector",
+      "row": "engine.auth.bearerToken",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/credential-refuses-session",
+      "row": "engine.auth.bearerToken",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.bearerToken/credential-refuses-service",
+      "row": "engine.auth.bearerToken",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.bearerToken",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/credential-refuses-connector",
+      "row": "engine.auth.credentials",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/credential-refuses-session",
+      "row": "engine.auth.credentials",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.auth.credentials/credential-refuses-service",
+      "row": "engine.auth.credentials",
+      "input": {
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.credentials",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.cancel/schedule-refuses-connector",
+      "row": "engine.schedule.cancel",
+      "input": {
+        "id": "x-id"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.cancel",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.cancel/schedule-refuses-session",
+      "row": "engine.schedule.cancel",
+      "input": {
+        "id": "x-id"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.cancel",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.cancel/schedule-refuses-service",
+      "row": "engine.schedule.cancel",
+      "input": {
+        "id": "x-id"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.cancel",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/schedule-refuses-connector",
+      "row": "engine.schedule.run",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/schedule-refuses-session",
+      "row": "engine.schedule.run",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/schedule-refuses-service",
+      "row": "engine.schedule.run",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/launch-refuses-connector",
+      "row": "engine.launch.interactive",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/launch-refuses-session",
+      "row": "engine.launch.interactive",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/launch-refuses-service",
+      "row": "engine.launch.interactive",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/launch-refuses-connector",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/launch-refuses-session",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/launch-refuses-service",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/launch-refuses-connector",
+      "row": "engine.launch.rpc",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/launch-refuses-session",
+      "row": "engine.launch.rpc",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/launch-refuses-service",
+      "row": "engine.launch.rpc",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/launch-refuses-connector",
+      "row": "engine.launch.hand",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/launch-refuses-session",
+      "row": "engine.launch.hand",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/launch-refuses-service",
+      "row": "engine.launch.hand",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/launch-refuses-connector",
+      "row": "engine.launch.headless",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/launch-refuses-session",
+      "row": "engine.launch.headless",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/launch-refuses-service",
+      "row": "engine.launch.headless",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/spawned-by-refuses-connector",
+      "row": "engine.launch.interactive",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/spawned-by-refuses-session",
+      "row": "engine.launch.interactive",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/spawned-by-refuses-service",
+      "row": "engine.launch.interactive",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/spawned-by-refuses-connector",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/spawned-by-refuses-session",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/spawned-by-refuses-service",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/spawned-by-refuses-connector",
+      "row": "engine.launch.rpc",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/spawned-by-refuses-session",
+      "row": "engine.launch.rpc",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/spawned-by-refuses-service",
+      "row": "engine.launch.rpc",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/spawned-by-refuses-connector",
+      "row": "engine.launch.hand",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/spawned-by-refuses-session",
+      "row": "engine.launch.hand",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/spawned-by-refuses-service",
+      "row": "engine.launch.hand",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/spawned-by-refuses-connector",
+      "row": "engine.launch.headless",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/spawned-by-refuses-session",
+      "row": "engine.launch.headless",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/spawned-by-refuses-service",
+      "row": "engine.launch.headless",
+      "input": {
+        "session": {
+          "spawned_by": {
+            "parentSessionId": "p1",
+            "rootSessionId": "r1",
+            "taskId": "t1"
+          }
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/project-trust-refuses-connector",
+      "row": "engine.launch.interactive",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/project-trust-refuses-session",
+      "row": "engine.launch.interactive",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.interactive/project-trust-refuses-service",
+      "row": "engine.launch.interactive",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/project-trust-refuses-connector",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/project-trust-refuses-session",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/project-trust-refuses-service",
+      "row": "engine.launch.print",
+      "input": {
+        "input": {},
+        "mode": "text",
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/project-trust-refuses-connector",
+      "row": "engine.launch.rpc",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/project-trust-refuses-session",
+      "row": "engine.launch.rpc",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/project-trust-refuses-service",
+      "row": "engine.launch.rpc",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/project-trust-refuses-connector",
+      "row": "engine.launch.hand",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/project-trust-refuses-session",
+      "row": "engine.launch.hand",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.hand/project-trust-refuses-service",
+      "row": "engine.launch.hand",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/project-trust-refuses-connector",
+      "row": "engine.launch.headless",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/project-trust-refuses-session",
+      "row": "engine.launch.headless",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.headless/project-trust-refuses-service",
+      "row": "engine.launch.headless",
+      "input": {
+        "setup": {
+          "project_trust": true
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-trust-refuses-connector",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-trust-refuses-session",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-trust-refuses-service",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trust-refuses-connector",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trust-refuses-session",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trust-refuses-service",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/project-trust-refuses-connector",
+      "row": "engine.packages.update",
+      "input": {
+        "trust": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/project-trust-refuses-session",
+      "row": "engine.packages.update",
+      "input": {
+        "trust": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/project-trust-refuses-service",
+      "row": "engine.packages.update",
+      "input": {
+        "trust": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/presenter-refuses-connector",
+      "row": "engine.launch.rpc",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4,
+          "enforcement": true
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/presenter-refuses-session",
+      "row": "engine.launch.rpc",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4,
+          "enforcement": true
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.rpc/presenter-refuses-service",
+      "row": "engine.launch.rpc",
+      "input": {
+        "presenter": {
+          "bootstrap_fd": 4,
+          "enforcement": true
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

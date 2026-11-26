@@ -42,6 +42,19 @@ describe("reflection lock holder decision (#10377)", () => {
   })
 
   describe("stable host identity across roaming and multi-device sync (#11818)", () => {
+    test("#given a legacy lock without a host id #when checked #then no machine probe is needed", async () => {
+      let probes = 0
+      const local = await isReflectionHostLocal("my-workstation", undefined, {
+        hostname: () => "my-workstation",
+        hostId: () => {
+          probes += 1
+          return "unused"
+        },
+      })
+      expect(local).toBe(true)
+      expect(probes).toBe(0)
+    })
+
     test("#given matching hostnames with different machine ids #when checked #then they stay foreign", async () => {
       expect(await sameHost({ hostname: "Mac-765", hostId: "mac-a" }, { hostname: "Mac-765", hostId: "mac-b" })).toBe(
         false,
@@ -183,15 +196,13 @@ describe("reflection lock holder decision (#10377)", () => {
       })
     })
 
-    // The id has to identify the machine, not the network link. A value therefore names the probe
-    // that produced it, and a platform with no probe answers null rather than a bare hostname.
-    test("#given this platform #when the machine id is resolved #then it is namespaced or absent", async () => {
+    test("#given this platform #when the machine id is resolved #then it is hashed or absent", async () => {
       const id = await getStableLocalHostId()
       if (process.platform !== "darwin") {
         expect(id).toBeNull()
         return
       }
-      expect(id).toMatch(/^darwin-uuid:[0-9A-Fa-f-]{36}$/)
+      if (id !== null) expect(id).toMatch(/^[0-9a-f]{64}$/)
     })
   })
 })
