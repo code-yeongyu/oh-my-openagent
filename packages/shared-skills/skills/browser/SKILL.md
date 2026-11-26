@@ -104,8 +104,9 @@ const shot = await session.screenshot()                                         
 3. **Sync before every gated action except the first navigate.** Under the default `strict`
    policy a context from `session.cooperate("sync")` is good for one action; reads (`observe`,
    `read`, `snapshot`, `screenshot()`, `waitForElement`, `waitForNavigation`) need none. `expect`
-   names facts the extension checks right before the input; a false one refuses the action with
-   `precondition_failed` and nothing reaches the page. The `target` policy reuses one context
+   names facts the extension checks right before the input; a false one refuses the action and
+   nothing reaches the page. Under strict that refusal carries `cooperation_sync_required` and
+   a message starting `Precondition failed:`, so read the page again instead of waiting. The `target` policy reuses one context
    across DOM actions: [references/commands.md](references/commands.md). On
    `cooperation_sync_required` the person is using the tab:
    `session.cooperate("wait", { timeoutMs: 25_000 })` until `ready`, read again and replan; never

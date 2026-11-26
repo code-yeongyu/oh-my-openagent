@@ -55,7 +55,11 @@ await session.press("Enter", { context: next.context_id, observation: next.obser
 
 - **`expect`** is a list of literal facts the extension checks right before the input:
   `{ target, field, equals }`, where `field` is `text`, `value`, `checked`, `attribute` or `exists`.
-  A false fact refuses the action with `reason: "precondition_failed"` and nothing reaches the page.
+  A false fact refuses the action with `effect_state: "none"`, so nothing reached the page. The
+  reason differs by policy: under `target` it is `precondition_failed`; under `strict` it is
+  `cooperation_sync_required` with a message starting `Precondition failed: <target> <field>`.
+  Recognise the strict case by that prefix, and read the page again instead of calling
+  `cooperate("wait")`.
   Use it for the fact your decision rests on: the total you are about to pay, the row you are about
   to delete.
 - **The first `navigate`** of a session needs no context. If the extension refuses it because the new
@@ -186,8 +190,8 @@ Every refusal is a `BskRpcError` with the daemon's own `code`:
 | `no_browser_connected` | no extension attached | run the onboarding script, relay the human step, wait |
 | `not_found` | stale ref or unknown session | read again; if the session is gone, start a new one |
 | `invalid_params` | wrong option shape | fix the call, do not retry as-is |
-| `permission_denied` with `data.reason: "cooperation_sync_required"` | a gated action without the latest sync context, or the person is using the tab | `cooperate("wait")` until `ready`, sync, read the page again, replan |
-| `permission_denied` with `data.reason: "precondition_failed"` | an `expect` fact was false; nothing was sent | read the page again and decide afresh |
+| `permission_denied` with `data.reason: "cooperation_sync_required"` (any other message) | a gated action without the latest sync context, or the person is using the tab | `cooperate("wait")` until `ready`, sync, read the page again, replan |
+| `permission_denied` with `data.reason: "precondition_failed"` (target), or `cooperation_sync_required` with a message starting `Precondition failed:` (strict) | an `expect` fact was false; nothing was sent | read the page again and decide afresh |
 | `permission_denied` with `data.reason: "observation_required"` | target policy: a script, an untargeted key or a navigate without an unused observation | sync, pass `{ context, observation }` (or `expect` for a script) |
 | any `code` with `data.reason: "control_context_invalid"` | the observation was already used, or focus changed since the sync | sync again, read, replan |
 | `permission_denied` (any other reason) | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
