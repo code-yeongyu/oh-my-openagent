@@ -62,11 +62,38 @@ impl Presence for FakePresence {
 pub struct FakeStopListener {
     shared: Arc<Mutex<FakeState>>,
     script: StopPathScript,
+    // --- Row 21 (review L5): this listener's own press queue. ---
+    queue: Arc<std::sync::atomic::AtomicBool>,
+}
+
+/// Row 21 (review L5): a pending press goes to the queues of the listeners alive now.
+fn deliver_presses(state: &mut FakeState) {
+    state.stop_queues.retain(|queue| queue.strong_count() > 0);
+    if std::mem::take(&mut state.stop_pressed) {
+        for queue in state
+            .stop_queues
+            .iter()
+            .filter_map(std::sync::Weak::upgrade)
+        {
+            queue.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
 }
 
 impl FakeStopListener {
-    pub const fn new(shared: Arc<Mutex<FakeState>>, script: StopPathScript) -> Self {
-        Self { shared, script }
+    pub fn new(shared: Arc<Mutex<FakeState>>, script: StopPathScript) -> Self {
+        let queue = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        {
+            // A press made before this listener existed belongs to the listeners before it.
+            let mut state = lock(&shared);
+            deliver_presses(&mut state);
+            state.stop_queues.push(Arc::downgrade(&queue));
+        }
+        Self {
+            shared,
+            script,
+            queue,
+        }
     }
 }
 
@@ -80,7 +107,8 @@ impl StopListener for FakeStopListener {
         }
         let mut state = lock(&self.shared);
         state.stop_polls += 1;
-        Ok(std::mem::take(&mut state.stop_pressed))
+        deliver_presses(&mut state);
+        Ok(self.queue.swap(false, std::sync::atomic::Ordering::SeqCst))
     }
 }
 

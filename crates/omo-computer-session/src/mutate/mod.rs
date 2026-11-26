@@ -66,6 +66,9 @@ pub struct Refused {
     pub call_id: Option<String>,
     pub receipt: Option<Box<Value>>,
     pub interrupted: Option<Disposition>,
+    /// The members a consent or lease refusal carries on the wire (`app`, `identity`,
+    /// `window`, `holder`, `retryAfterMs`).
+    pub detail: Option<Box<Value>>,
     pub busy: Option<crate::settle::BusyDetail>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
@@ -78,6 +81,7 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            detail: None,
             busy: None,
             warning: None,
         }
@@ -102,6 +106,7 @@ pub(crate) struct Funnel {
     permits: Permits,
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
+    pub(crate) control: crate::grant::Control,
     #[cfg(test)]
     warned: Vec<String>,
 }
@@ -120,7 +125,7 @@ impl Funnel {
     /// STATE root.
     pub(crate) fn for_roots(roots: &Roots) -> Self {
         let artifacts = ArtifactStore::new(roots.state.join("artifacts"), GcLimits::default());
-        Self::with(
+        let mut funnel = Self::with(
             (
                 Box::new(MarkerDir::under(&roots.runtime)),
                 Poisoned::under(&roots.runtime),
@@ -128,7 +133,9 @@ impl Funnel {
             AuditSpec::Dir(roots.state.join("audit")),
             Some(InteractionLock::under(&roots.runtime)),
             Some(artifacts),
-        )
+        );
+        funnel.control.runtime = Some(roots.runtime.clone());
+        funnel
     }
 
     fn with(
@@ -149,13 +156,14 @@ impl Funnel {
             permits: Permits::default(),
             artifacts,
             secure: Box::new(SecureInputProbe),
+            control: crate::grant::Control::default(),
             #[cfg(test)]
             warned: Vec::new(),
         }
     }
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
-    fn audit(&mut self) -> &mut dyn AuditSink {
+    pub(crate) fn audit(&mut self) -> &mut dyn AuditSink {
         let sink = match self.audit.take() {
             Some(sink) => sink,
             None => self.open_audit(),
@@ -219,6 +227,10 @@ impl Session {
     pub fn with_binding(mut self, binding: Binding) -> Self {
         self.funnel.binding = binding;
         self
+    }
+
+    pub(crate) fn funnel_issuer(&self) -> String {
+        self.funnel.binding.issuer.clone()
     }
 
     /// The per-hand audit file, once the first exec opened it.

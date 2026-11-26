@@ -48,6 +48,9 @@ pub struct FakeState {
     pub stop_press_pos: usize,
     /// How many times a live stop listener was polled.
     pub stop_polls: u32,
+    // --- Row 21 (review L5, R70cl): each stop listener's own press queue. A press is handed to
+    // the listeners alive when it is delivered; a listener replaced before it is polled drops it. ---
+    pub stop_queues: Vec<std::sync::Weak<std::sync::atomic::AtomicBool>>,
 }
 
 impl FakeState {
@@ -96,6 +99,7 @@ impl FakeState {
             stop_pressed: false,
             stop_press_pos: 0,
             stop_polls: 0,
+            stop_queues: Vec::new(),
             scenario,
         }
     }

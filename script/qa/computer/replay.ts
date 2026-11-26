@@ -44,6 +44,7 @@ import {
   plantIn,
   ROOT,
   readText,
+  scenarioOverride,
   supersededBy,
   TRANSPORT_ARGS,
 } from "./replay-case"
@@ -161,7 +162,8 @@ async function replayCase(opts: Options, casePath: string): Promise<number> {
     OMO_COMPUTER_RUNTIME_DIR: runtime,
     ...Object.fromEntries(Object.entries(spec.env).map(([k, v]) => [k, v.replaceAll(RUNTIME_PLACEHOLDER, runtime)])),
   }
-  if (spec.scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, spec.scenario)
+  const scenario = (await scenarioOverride(casePath)) ?? spec.scenario
+  if (scenario) env.OMO_COMPUTER_FAKE_SCENARIO = resolve(ROOT, scenario)
   const spawn = () => {
     const peer = new Peer([opts.engine, ...TRANSPORT_ARGS[spec.transport]], env)
     peers.push(peer)
