@@ -118,6 +118,8 @@ function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReaso
       return "Parent kernel tools are unavailable for this child."
     case "model_unavailable":
       return MODEL_UNAVAILABLE_MESSAGE
+    case "usage_limit":
+      return "Every available model is behind a remembered usage limit. Retry once it resets or select another provider."
     case "session_unavailable":
       return reason !== undefined && SESSION_REFUSAL_REASONS.has(reason)
         ? `The task host refused the child session (${reason}).`
