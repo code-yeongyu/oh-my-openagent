@@ -16,6 +16,20 @@ import { UNKNOWN_CALLER, type ThreadHostView, type ThreadToolSurfaceOptions } fr
 import { consumedSendersOf } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 
+/**
+ * No leg carries an attachment yet: the gateway delivery on this device has no field for one, and neither has the relay
+ * record a send to another device becomes. So a send or a create's first prompt naming attachments (top level or in the
+ * object prompt) is refused with this one typed refusal on every surface, before any effect, never sent without them.
+ */
+export function attachmentsRefused(input: unknown): ThreadToolFailure | undefined {
+  const field = (from: unknown, name: string): unknown =>
+    typeof from === "object" && from !== null ? Reflect.get(from, name) : undefined
+  const attachments = field(input, "attachments") ?? field(field(input, "prompt"), "attachments")
+  if (attachments === undefined) return undefined
+  const count = Array.isArray(attachments) ? attachments.length : 1
+  return refusal("control.send_attachments_unsupported", { count: String(count) }, { field: "attachments", count })
+}
+
 /** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A reply to a sender on another device resolves on that device alone and reads no view of this one. */

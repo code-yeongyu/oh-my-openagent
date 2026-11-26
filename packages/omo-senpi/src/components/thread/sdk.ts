@@ -23,6 +23,7 @@ import type { GatewayDeliveryMode, GatewayDeliveryResult, GatewayDeliverySuccess
 import type { ThreadCoreOptions } from "./sdk-core/context"
 import type { Failure } from "./sdk-core/failures"
 import type { LocatedThread } from "./sdk-core/reads"
+import { attachmentsRefused } from "./sdk-send"
 export type {
   StoreExtensionApi,
   StoreExtensionRegistration,
@@ -199,6 +200,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     },
     read: async (request) => unknownKeys(request, READ_KEYS) ?? asThreadResult(await threads.read(request)),
     send: async (request) => {
+      const attachments = attachmentsRefused(request)
+      if (attachments !== undefined) return { kind: "error", error: attachments }
       const refused = unknownKeys(request, SEND_KEYS)
       if (refused !== undefined) return refused
       const { text, mode, expected_turn_id, ...rest } = request
@@ -222,6 +225,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         : { kind: "error", error: threadToolFailureOf(located) }
     },
     create: async (request) => {
+      const attachments = attachmentsRefused(request)
+      if (attachments !== undefined) return { kind: "error", error: attachments }
       // The facade takes the tool's create schema, narrower than the root's: what it refused, it still refuses as it did.
       const parsed = parseThreadParams(threadToolParamSchemas.thread_create, request)
       if (parsed.kind === "error") return parsed as ThreadToolResult

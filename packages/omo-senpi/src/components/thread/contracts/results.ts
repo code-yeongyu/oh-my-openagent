@@ -328,6 +328,8 @@ export type ThreadSendResult =
       readonly message_seq?: number
       readonly deduplicated: boolean
       readonly device?: string
+      /** The call passed `summary`, which no leg carries: it was accepted and not delivered. Absent otherwise. */
+      readonly not_carried?: readonly ["summary"]
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 

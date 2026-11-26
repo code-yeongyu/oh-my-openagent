@@ -112,18 +112,10 @@ const createFields = async (): Promise<readonly string[]> =>
 /** The object prompt's fields the root acts on; `summary` has no carrier yet and `author` is slice P1a-s's. */
 const FIRST = ["message", "delivery", "expected_turn_id", "attachments"]
 
-/**
- * No leg carries an attachment yet: the gateway delivery on this device has no field for one, and neither has the relay
- * record a send to another device becomes, so a message with attachments is refused before any effect, never sent without
- * them.
- */
-async function attachmentsRefused(attachments: unknown): Promise<OmoFailure | undefined> {
-  if (!Array.isArray(attachments)) return undefined
-  const count = attachments.length
-  const { refusal } = await import("../../thread/refusal-texts")
-  return threadFailure(
-    refusal("control.send_attachments_unsupported", { count: String(count) }, { field: "attachments", count }),
-  )
+/** The thread core's one attachments refusal (sdk-send.ts), answered on the root before any effect. */
+async function attachmentsRefused(input: unknown): Promise<OmoFailure | undefined> {
+  const refused = (await import("../../thread/sdk-send")).attachmentsRefused(input)
+  return refused === undefined ? undefined : threadFailure(refused)
 }
 
 type FirstPrompt = {
@@ -152,7 +144,7 @@ async function createWithObjectPrompt(
         .filter(([field, value]) => value !== undefined && !FIRST.includes(field))
         .map(([field]) => `prompt.${field}`),
     ) ??
-    (await attachmentsRefused(prompt["attachments"]))
+    (await attachmentsRefused({ prompt }))
   if (refused !== undefined) return refused
   const first = prompt as FirstPrompt
   if (rest["delivery"] !== undefined && first.delivery !== undefined && rest["delivery"] !== first.delivery) {
@@ -232,7 +224,7 @@ export function threadsNamespace(options: {
         )
       return (
         (await unbuilt("threads.send", input, SEND)) ??
-        (await attachmentsRefused(input?.attachments)) ??
+        (await attachmentsRefused(input)) ??
         onRoot(await (await thread()).send(input))
       )
     },

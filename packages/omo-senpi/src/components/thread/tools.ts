@@ -25,7 +25,7 @@ import { threadLink } from "./thread-link"
 import { sentThreadLink } from "./tools/send-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { resolveAddress } from "./address/lazy"
-import { sendThread, sendToTarget, viewForSend } from "./sdk-send"
+import { attachmentsRefused, sendThread, sendToTarget, viewForSend } from "./sdk-send"
 import type { DeliveryOutcome, DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
@@ -123,6 +123,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const callerId =
       (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??
       options.callerSessionId()
+    // Ruling on attachments: one typed refusal on every surface, before any effect (sdk-send.ts attachmentsRefused).
+    const attachments = name === "thread_send" || name === "thread_create" ? attachmentsRefused(args) : undefined
+    if (attachments !== undefined) return output({ kind: "error", error: attachments })
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
@@ -258,7 +261,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_send,
     execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) =>
       execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) =>
-        deliver(current, value, operationId, callerId),
+        notCarried(value, await deliver(current, value, operationId, callerId)),
       ),
   }
   const sendAs: ThreadSendAs = async (callerId, args) => {
@@ -267,7 +270,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       `send-as:${args.idempotency_key ?? callerId}`,
       args,
       { sessionManager: { getSessionId: () => callerId } },
-      async (current, value, operationId, id) => deliver(current, value, operationId, id),
+      async (current, value, operationId, id) => notCarried(value, await deliver(current, value, operationId, id)),
     )
     return sent.details.result
   }
@@ -376,6 +379,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     )
     return routed.kind === "error" ? routed : renderSend(options, current, routed.target, routed.sent, resolvedBy)
   }
+}
+
+/**
+ * thread_send takes `summary` (existing agent calls pass it) and no leg carries it: its answer says so with a fixed field,
+ * only when one was passed, so the drop is not silent (design lane ruling on summary).
+ */
+function notCarried(value: ThreadSendInput, result: ThreadToolResult): ThreadToolResult {
+  if (value.summary === undefined || result.kind !== "ok") return result
+  return { ...result, not_carried: ["summary"] } as ThreadToolResult
 }
 
 /** Render delivery facts in the tool contract, including links and handoff target details. */
