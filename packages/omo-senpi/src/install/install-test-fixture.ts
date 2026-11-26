@@ -9,7 +9,7 @@ const REQUIRED_SKILL_NAMES = [
   "coding-agent-sessions",
   "debugging",
   "frontend",
-  "git-master",
+  "git",
   "github",
   "init-deep",
   "lsp-setup",
