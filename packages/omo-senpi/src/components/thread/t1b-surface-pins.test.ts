@@ -2517,6 +2517,9 @@ describe("T1b pins: send and create inputs", () => {
             "kind": "ok",
             "link": "[local peer](omo-thread://v1/dur-local)",
             "message_seq": 3,
+            "not_carried": [
+              "summary",
+            ],
             "thread": "dur-local",
           },
         },

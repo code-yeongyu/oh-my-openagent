@@ -5,6 +5,7 @@ import type { OmoFailure } from "../omo-sdk/contract"
 import { storeRefusal } from "../omo-sdk/root/extension-codes"
 import { threadToolFailureOf } from "../omo-sdk/root/thread-failures"
 import {
+  attachmentsRefused,
   parseThreadParams,
   unknownKeys,
   threadToolParamSchemas,
@@ -23,7 +24,6 @@ import type { GatewayDeliveryMode, GatewayDeliveryResult, GatewayDeliverySuccess
 import type { ThreadCoreOptions } from "./sdk-core/context"
 import type { Failure } from "./sdk-core/failures"
 import type { LocatedThread } from "./sdk-core/reads"
-import { attachmentsRefused } from "./sdk-send"
 export type {
   StoreExtensionApi,
   StoreExtensionRegistration,

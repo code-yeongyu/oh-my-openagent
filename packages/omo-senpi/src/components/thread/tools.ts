@@ -3,6 +3,7 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal } from "./errors"
 import { type Static } from "typebox"
 import {
+  attachmentsRefused,
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadCloseInput,
@@ -25,7 +26,7 @@ import { threadLink } from "./thread-link"
 import { sentThreadLink } from "./tools/send-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { resolveAddress } from "./address/lazy"
-import { attachmentsRefused, sendThread, sendToTarget, viewForSend } from "./sdk-send"
+import { sendThread, sendToTarget, viewForSend } from "./sdk-send"
 import type { DeliveryOutcome, DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
@@ -123,7 +124,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const callerId =
       (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??
       options.callerSessionId()
-    // Ruling on attachments: one typed refusal on every surface, before any effect (sdk-send.ts attachmentsRefused).
+    // Ruling on attachments: one typed refusal on every surface, before any effect (contracts/parse.ts attachmentsRefused).
     const attachments = name === "thread_send" || name === "thread_create" ? attachmentsRefused(args) : undefined
     if (attachments !== undefined) return output({ kind: "error", error: attachments })
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)

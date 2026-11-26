@@ -112,9 +112,9 @@ const createFields = async (): Promise<readonly string[]> =>
 /** The object prompt's fields the root acts on; `summary` has no carrier yet and `author` is slice P1a-s's. */
 const FIRST = ["message", "delivery", "expected_turn_id", "attachments"]
 
-/** The thread core's one attachments refusal (sdk-send.ts), answered on the root before any effect. */
+/** The thread contract's one attachments refusal (contracts/parse.ts), answered on the root before any effect. */
 async function attachmentsRefused(input: unknown): Promise<OmoFailure | undefined> {
-  const refused = (await import("../../thread/sdk-send")).attachmentsRefused(input)
+  const refused = (await import("../../thread/contracts")).attachmentsRefused(input)
   return refused === undefined ? undefined : threadFailure(refused)
 }
 
