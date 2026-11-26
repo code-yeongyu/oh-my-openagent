@@ -175,7 +175,10 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // 751,149 with the after-dispose sentinel rethrown by the threads namespace's two catches (code review
 // 7202772023; root/threads.ts +47 B; LEAD ruling (a)).
 // 751,758 with free data under any-value fields copied at the boundary (LEAD ruling (1), 20:36Z; root/assemble.ts +609 B; ruling (a)).
-const OMO_SDK_RUNTIME_BYTES = 751_758
+// 755,500 with revision 22's matrix lines and the held cells (#15033 restacked on P1b; per input, unminified:
+// principal-matrix/threads.ts +1,596, account.ts +1,452, host.ts +639, root/pending-cells.ts -481, root/held-allows.ts
+// +659, root/authority.ts +108; ruling (a)).
+const OMO_SDK_RUNTIME_BYTES = 755_500
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,

@@ -258,11 +258,11 @@ describe("negative controls of custody and the held table (#14949)", () => {
     )
   })
 
-  // The awaiting record against revision 22 as a fixture (design lane ruling): an entry needs its row and, where the
+  // The awaiting record against the tree's document, revision 22 (design lane ruling): an entry needs its row and, where the
   // table has an Owner slice column, that exact slice; it goes stale once a line covers the row; a row dropped from the
   // record without a line fails.
   test("#given revision 22 #then an awaiting entry needs its exact slice, fails once lined, and a listed row dropped from the list fails", () => {
-    const revision = readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8")
+    const revision = securityDesign
     const awaiting = (
       JSON.parse(readFileSync(join(import.meta.dir, "awaiting-owner-rows.json"), "utf8")) as {
         rows: AwaitingOwnerRow[]

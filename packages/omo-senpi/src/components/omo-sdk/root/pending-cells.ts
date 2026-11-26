@@ -117,25 +117,6 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     served_by: "remote module factories aliases.clear (remote/aliases.ts:189)",
     owner: "T1c",
   },
-  { call: "account.show", principal: "person", served_by: "omo account show (account-cli.ts:137)", owner: "A1b" },
-  {
-    call: "account.show",
-    principal: "script",
-    served_by: "omo account show, JSON output (account-cli.ts:53)",
-    owner: "A1b",
-  },
-  {
-    call: "account.signInCheck",
-    principal: "person",
-    served_by: "omo account sign-in --check (account-sign-in.ts:175)",
-    owner: "A1b",
-  },
-  {
-    call: "account.signInCheck",
-    principal: "script",
-    served_by: "omo account sign-in --check, JSON output (account-sign-in.ts:176)",
-    owner: "A1b",
-  },
   {
     call: "devices.resolve",
     principal: "person",

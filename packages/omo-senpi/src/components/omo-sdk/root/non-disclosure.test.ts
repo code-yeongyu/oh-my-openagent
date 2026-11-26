@@ -337,7 +337,7 @@ const PORT_GAPS: readonly {
   readonly principals: readonly string[]
   readonly owner: string
 }[] = [
-  { call: "config.status", principals: ["script", "person", "session", "service"], owner: "C1b" },
+  { call: "config.status", principals: ["script", "person"], owner: "C1b" },
   { call: "daemon.warm", principals: ["script", "person"], owner: "C1a" },
 ]
 const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
