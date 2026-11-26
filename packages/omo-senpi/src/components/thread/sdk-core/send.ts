@@ -7,7 +7,7 @@ import { sendThread, viewForSend } from "../sdk-send"
 import { hostView } from "../tools/internals"
 import { sentThreadLink } from "../tools/send-link"
 import type { ThreadCoreContext } from "./context"
-import { type Failure, guarded } from "./failures"
+import { type Failure, fail, guarded } from "./failures"
 import { unknownKeys } from "../contracts"
 
 export type CoreSendRequest = {
@@ -72,7 +72,12 @@ export function createSend(context: ThreadCoreContext) {
         { kind: "operator", uid: options.uid, user: options.user },
         { ...rest, text: message, ...(delivery === undefined ? {} : { mode: delivery }) },
       )
-      if (routed.kind === "error") return routed
+      // The resolver's refusal is mapped to the core's failure (code, message, next_action, details), as the SDK answered it
+      // before the shared send operation: the refusal object itself carries a kind of its own.
+      if (routed.kind === "error") {
+        const { code, message, next_action, details } = routed.error
+        return fail(code, message, next_action, details)
+      }
       const sent = routed.sent
       if (sent.kind !== "ok") return sent
       const { thread_id, ...facts } = sent
