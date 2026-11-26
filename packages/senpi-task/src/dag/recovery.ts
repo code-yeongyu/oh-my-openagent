@@ -4,6 +4,7 @@ import { join } from "node:path"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagScheduler } from "./scheduler"
 import { installRecoveredDag } from "./recovery-install"
+import { reconcileCompletedNode } from "./recovery-completed-node"
 import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 
 import { defaultSignaller } from "../lifecycle/context"
@@ -11,7 +12,6 @@ import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
 import {
-  dagNodeReusedEvent,
   dagNodeRetriedEvent,
   dagNodeTaskAttachedEvent,
   dagNodeTransitionedEvent,
@@ -317,19 +317,7 @@ async function reconcileNodes(
   )
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
-      const result = readDagNodeResult({ store: context.store, runId: journal.snapshot().runId, nodeId: observed.id })
-      if (result !== null) {
-        reusedOutputs.set(observed.id, result.output)
-        if (observed.taskId !== undefined) {
-          journal.append(
-            dagNodeReusedEvent({
-              nodeId: observed.id,
-              taskId: observed.taskId,
-              sourceRunId: journal.snapshot().runId,
-            }),
-          )
-        }
-      }
+      reconcileCompletedNode({ ...context, journal, reusedOutputs, reattachedTasks }, observed)
       continue
     }
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue
