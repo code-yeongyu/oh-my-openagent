@@ -11,6 +11,7 @@ import {
 } from "./results"
 import type { DagFileStore } from "./store"
 import { resolveRecoveredNodeTask, type RecoveredNodeTask } from "./recovery-attempt"
+import { flagConsumedDependents } from "./scheduler-self-resume"
 import type { DagNode, DagNodeErrorCode, DagNodeId, DagRunId } from "./types"
 
 export type CompletedNodeRecovery = {
@@ -22,6 +23,7 @@ export type CompletedNodeRecovery = {
   // What recovery's run-wide stale-child fence left live, if anything (#11381).
   readonly staleLive: string | undefined
   readonly failNode: (nodeId: DagNodeId, code: DagNodeErrorCode, message: string) => void
+  readonly now: () => number
 }
 
 // A completed node is reused from its durable output, unless its child resumed on its own while no
@@ -51,7 +53,13 @@ function reopenThroughGate(
   resolved: RecoveredNodeTask,
 ): void {
   if (resolved.kind === "fail" && resolved.code === "stale_attempt_alive") {
-    return recovery.failNode(node.id, resolved.code, resolved.message)
+    recovery.failNode(node.id, resolved.code, resolved.message)
+    // The node's earlier result is no longer good either way: dependents that ran on it are flagged
+    // exactly as when its resumed failure is folded. A dependent holding a launched task consumed it.
+    const launched = recovery.journal
+      .snapshot()
+      .nodes.flatMap((entry) => (entry.taskId === undefined ? [] : [[entry.id, entry.taskId] as const]))
+    return flagConsumedDependents({ ...recovery, attachedTaskIds: new Map(launched) }, node.id)
   }
   // Not the node's current claim: its resumed outcome is not the node's, which keeps its own result.
   if (resolved.kind !== "task" || resolved.task.task_id !== task.task_id) return reuseCompletedNode(recovery, node)

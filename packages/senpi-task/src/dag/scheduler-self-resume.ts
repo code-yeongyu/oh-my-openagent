@@ -94,8 +94,16 @@ export function stillAdmissible(context: SchedulerContext, denied: readonly DagN
   return admissible
 }
 
-export function flagConsumedDependents(context: SchedulerContext, nodeId: DagNodeId, invalidatedBy = nodeId): void {
-  const { nodes, diagnostics } = context.journal.snapshot()
+// What flagging reads and writes: the run's journal, its clock, and which nodes hold a launched child.
+export type ConsumedOutputPort = Pick<SchedulerContext, "journal" | "now"> & {
+  readonly attachedTaskIds: ReadonlyMap<DagNodeId, string>
+}
+
+// The one rule for "a completed node's result is no longer good" (#12134): every dependent that
+// already consumed it - transitively - keeps its own outcome and carries a node_flag naming the node.
+// A dependent that has not run is left to the ordinary failed-dependency rule.
+export function flagConsumedDependents(port: ConsumedOutputPort, nodeId: DagNodeId, invalidatedBy = nodeId): void {
+  const { nodes, diagnostics } = port.journal.snapshot()
   const flagged = new Set(
     diagnostics.flatMap((entry) =>
       entry.kind === "node_flag" && entry.invalidatedBy !== undefined ? [entry.nodeId] : [],
@@ -107,17 +115,17 @@ export function flagConsumedDependents(context: SchedulerContext, nodeId: DagNod
       if (invalidated.has(node.id) || !node.dependsOn.includes(dependencyId)) continue
       if (node.state === "pending" || node.state === "blocked" || node.state === "skipped") continue
       // Scheduled without an attached task: denied residency, never admitted, consumed nothing.
-      if (node.state === "scheduled" && !context.attachedTaskIds.has(node.id)) continue
+      if (node.state === "scheduled" && !port.attachedTaskIds.has(node.id)) continue
       invalidated.add(node.id)
       if (flagged.has(node.id)) continue
-      context.journal.append({
+      port.journal.append({
         type: "dag.diagnostic.added",
         diagnostic: {
           kind: "node_flag",
           nodeId: node.id,
           invalidatedBy,
           message: `input from ${invalidatedBy} was invalidated by its resumed failure; this node retains its own outcome`,
-          at: new Date(context.now()).toISOString(),
+          at: new Date(port.now()).toISOString(),
         },
       })
     }
