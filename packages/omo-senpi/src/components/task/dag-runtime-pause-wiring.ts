@@ -62,7 +62,7 @@ export function registerDagPauseSource(ports: {
   adoptInstalled(installed: InstalledDagRun): void
   cancelRun(runId: DagRunId, parentSessionId: string, reason?: string): Promise<unknown>
 }): (() => void) | undefined {
-  const { deps, coreManager, schedulers } = ports
+  const { deps, coreManager } = ports
   return deps.engine.runPause?.register(
     createDagRunPauseSource({
       barrier: deps.engine.admissionBarrier,

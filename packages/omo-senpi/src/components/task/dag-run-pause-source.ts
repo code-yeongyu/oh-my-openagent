@@ -73,8 +73,9 @@ export function createDagRunPauseSource(ports: {
   readonly barrier: AdmissionBarrier
   records(parentSessionId: string): readonly DagRunRecordV1[]
   options(record: DagRunRecordV1): DagSchedulerOptions
-  // Retires the run and returns the release of the reservation it holds until the pause is written.
-  retire(runId: DagRunId): Promise<(() => void) | void>
+  // Retires the run; resolves with the release of the reservation it holds until the pause is
+  // written, when it holds one.
+  retire(runId: DagRunId): Promise<unknown>
   prepareResume(runId: DagRunId): void
   readonly recovery: DagRecovery
   adopt(installed: InstalledDagRun): void
@@ -123,7 +124,7 @@ export function createDagRunPauseSource(ports: {
       const records = active(parent)
       const retired = await Promise.allSettled(records.map((record) => ports.retire(record.runId)))
       const releases = retired.flatMap((outcome) =>
-        outcome.status === "fulfilled" && outcome.value !== undefined ? [outcome.value] : [],
+        outcome.status === "fulfilled" && typeof outcome.value === "function" ? [outcome.value as () => void] : [],
       )
       try {
         const failure = retired.find((outcome) => outcome.status === "rejected")

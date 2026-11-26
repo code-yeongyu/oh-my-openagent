@@ -7,7 +7,7 @@ import { acquireDagRun, dagRunEligibility, type DagRunAcquisition } from "./run-
 import { liveForeignHolder, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
-import { TERMINAL_DAG_RUN_STATUSES, type DagNodeError, type DagNodeId, type DagRunId } from "./types"
+import type { DagNodeError, DagNodeId, DagRunId } from "./types"
 
 export const DAG_NODE_CONTROL_ERROR_CODES = [
   "run_not_found",
