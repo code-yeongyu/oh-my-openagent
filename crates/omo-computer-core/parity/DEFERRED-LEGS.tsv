@@ -8,9 +8,9 @@ C4	`computer-error-table.test.ts`: every `(code, reason)` pair has a row, enumer
 C4	0 `COMPUTER_ERROR` fallthrough on tool	13	34	owed
 C4	0 `COMPUTER_ERROR` fallthrough on adapter	13	35	owed
 T1	`conformance_replay` byte-equal modulo variable pointers on the three CI legs (AC-1 replay leg)	14	28	owed
-C12	`apps_quit_protected_process` (`apps.quit()` on each protected-process entry -> `ProtectedProcess`, nothing sent, `force:true` included; the verb is built there, the table refusal here)	16	25	owed
-C12	`apps_quit_unprotected_delivered_verified`	16	25	owed
-C12	AC-53 fake leg: `apps.list()` returns every running app with its identity key per OS	16	25	owed
+C12	`apps_quit_protected_process` (`apps.quit()` on each protected-process entry -> `ProtectedProcess`, nothing sent, `force:true` included; the verb is built there, the table refusal here)	16	25	passed:omo-computer-session::menus::tests::apps_quit_protected_process
+C12	`apps_quit_unprotected_delivered_verified`	16	25	passed:omo-computer-session::menus::tests::apps_quit_unprotected_delivered_verified
+C12	AC-53 fake leg: `apps.list()` returns every running app with its identity key per OS	16	25	passed:omo-computer-session::menus::tests::apps_list_returns_every_running_app_with_its_identity_key
 C12	AC-53 fake leg: `raise()` and `activate()` without the foreground grant return `ControlRequired` with nothing sent (the Lease refusal is proven here; the verbs are built there)	16	31	owed
 C12	`session_open_without_host_self_set_still_refuses_own_pid_chain` (the MCP profile case)	16	28	owed
 C12	`self_set_allowlist_has_exactly_one_entry`	16	40	owed
@@ -32,6 +32,19 @@ C24	the two-connection replay of `v3-consent-foreground-lease.json`: a second se
 C15	AC-66's `DisplayAwakeHold` legs (`capabilities().displayAwake.state` idle/held/released/capped; `display.resume` re-arms the hold); row 21 builds `display.release` ending the lease with `user_moved_on` and no `Suspended`	21	22	owed
 C13	AC-71/AC-72 fleet legs: denial memory and the per-app stop per hand in a fanout (hand 3 denied -> hand 4 still prompts; one hand's per-app stop leaves the other 99 delivering)	21	66	owed
 C13	AC-56 fanout leg: an out-of-scope app in a fanout marks the hand `skipped{consent, app}`	21	66	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	43	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	48	owed
+C9	`elementAt(x, y)` answers the element under the point with the hit-test click runs before send (needs a real per-OS accessibility hit-test; no stub, R50)	23	59	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	43	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	48	owed
+C9	click report `hit{role,label}` and the per-OS delivery-evidence kinds (`barrier_consumed`, `xi2_raw_confirm`) for `click_reports_point_and_delivery_evidence` (row 23 asserts `delivered` + `route` now; R50)	23	59	owed
+C9	a true in-flight `cancel` exit path for a held key (needs a cancel RPC; row 23 covers cancel as `control.revoke` during a held `key.down`, R49)	23	28	owed
+C9	`self-target-drag-drop-onto-own-terminal.json` (SelfTarget for a drop on the session's own terminal): needs the host's self-set additions wired into guard.open at session.open; row 16's session-level gate test covers the stage meanwhile (R55)	23	73	owed
+C9	`two-sessions-drag-drop-onto-held-window-input-busy.json` (InputBusy{window, holder} for a drop on another session's reserved window): needs two sessions on one hand (R55)	23	85	owed
+C8	the imported `ax-type-text.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves ax.snapshot / ax.typeText with its own v3 cases (R56a)	24	28	owed
+C8	the imported `ax-unconfirmed.json` replay: its `stopPath.changed` and v1 `audit` notification legs (the notification channel); row 24 proves AxUnconfirmed for ax.perform / ax.setValue / ax.focus with its own v3 cases (R56a)	24	28	owed
+C8	the v1-consumer case `03-stdio-click-type-text-null.json` (whole case: host-relay notification, v1 audit notification, v1 capture size scaling 64x48), in row 28's v1_consumers suite (R56a)	24	28	owed
+C9	a drag point refused by another session's reservation: InputBusy's {window, holder} flat beside the stage pair (R60b), reachable only with two sessions (R60c)	23	85	owed
 C18	replay of the imported case `stale-ref.json` against the v3 engine exits 0 (plan L984: row 18 checks stale-ref.json (replay exits 0))	20	18	owed
 C9	replay of the imported case `bounded-holds-closed.json` against the v3 engine exits 0 (plan L1097: row 23 checks bounded-holds-closed.json (replay exits 0))	20	23	owed
 C14	replay of the imported case `remote-typing.json` against the v3 engine exits 0 (plan L1167: row 26 checks remote-typing.json (replay exits 0))	20	26	owed
@@ -89,3 +102,4 @@ A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (m
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (Windows, foreground lease and guard): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	57	owed
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (X11, the first X11 row that sends input): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	49	owed
 A-IS-65 L1	the interaction lock is still held at this OS's foreground restore (the remote leg): the funnel drops the lock after the send and the send returns only after the restore (R70cp(1)); the row proves the hold with its own test	17	67	owed
+C17	A-IS-64 item 6: the protected-table version entering the permission fingerprint (deniedTableVersion) and the consent file's protectedTableVersion are the session's applied table's; at row 23 no code reads a table version (grant/state.rs ChordTamper::fingerprint hashes the consent view only), ruling R70bp(1)	23	37	owed

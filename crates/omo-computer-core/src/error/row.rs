@@ -133,6 +133,16 @@ pub fn from_wire(number: i64, reason: Option<&str>) -> Result<&'static ErrorRow,
     keyed(Source::Engine(code), reason)
 }
 
+/// R60c: the row a refusal whose disposition is [`DispositionRule::OfInnerCode`] takes its
+/// disposition and next call from: the refusing stage's pair (`stageCode`, `stageReason`).
+///
+/// # Errors
+/// `UnknownFailure` for a stage code outside the closed table or a pair with no row.
+pub fn inner_row(stage_code: &str, stage_reason: Option<&str>) -> Result<&'static ErrorRow, UnknownFailure> {
+    let code = EngineCode::from_wire(stage_code).ok_or(UnknownFailure::Code(-1))?;
+    keyed(Source::Engine(code), stage_reason)
+}
+
 fn keyed(source: Source, reason: Option<&str>) -> Result<&'static ErrorRow, UnknownFailure> {
     let reason = match reason {
         None => None,

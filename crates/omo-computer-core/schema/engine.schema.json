@@ -230,7 +230,7 @@
         "$ref": "#/$defs/EmptyParams"
       },
       "result": {
-        "$ref": "#/$defs/ClipboardContent"
+        "$ref": "#/$defs/ClipboardReadReply"
       }
     },
     "menu.items": {
@@ -1163,6 +1163,24 @@
           ],
           "default": null
         },
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RefusalReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 24 (R60): why an `effect:\"refused\"` report sent nothing."
+        },
+        "nothingSent": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Row 24 (R60): `true` on a refused report: nothing was sent."
+        },
         "warning": {
           "type": [
             "string",
@@ -1205,6 +1223,18 @@
           "items": {
             "$ref": "#/$defs/Evidence"
           }
+        },
+        "urlPolicy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UrlPolicyStamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Row 25: `\"unknown\"` when a browser window's URL could not be read under a non-empty\n`computer.url_policy` (the send was delivered, fail-open).",
+          "default": null
         },
         "observation": {
           "$ref": "#/$defs/UntrustedText",
@@ -2388,6 +2418,17 @@
       ],
       "description": "`clipboard.read`: a concealed clipboard answers `{secure:true, text:null, reason:\"concealed\"}`."
     },
+    "ClipboardReadReply": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClipboardContent"
+        },
+        {
+          "$ref": "#/$defs/ActionReport"
+        }
+      ],
+      "description": "`clipboard.read`'s reply (R60a(b), repin item 52): the content, or under a secure focus the\nrefused report (`effect:\"refused\"`, `reason:\"secure_focus\"`, `nothingSent:true`), never a\n`ClipboardContent`."
+    },
     "ClipboardWriteParams": {
       "type": "object",
       "additionalProperties": false,
@@ -2733,6 +2774,13 @@
         },
         "observation": {
           "$ref": "#/$defs/UntrustedText"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProbeCheck"
+          },
+          "description": "R62: a backend's own doctor checks that are not permissions (an X11 display, the\naccessibility bus, MPX, the compositor). They never feed `ok`; absent when there are none."
         }
       },
       "required": [
@@ -3402,6 +3450,11 @@
           "type": "string",
           "const": "ax_change",
           "description": "A window-wide accessibility change during the settle window."
+        },
+        {
+          "type": "string",
+          "const": "frame_readback",
+          "description": "Row 24 (R59): a window frame read back after a frame verb; a receipt when every edge is\nwithin 1 px of the frame asked for (design row C8), both recorded raw."
         }
       ],
       "description": "What an evidence entry read."
@@ -4407,6 +4460,48 @@
       ],
       "description": "`mcp`: the `--mcp` shim's consent view."
     },
+    "MenuItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "accelerator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "submenu": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText"
+        }
+      },
+      "required": [
+        "label",
+        "enabled",
+        "checked",
+        "submenu",
+        "path",
+        "observation"
+      ],
+      "description": "One `menu.items()` record."
+    },
     "MenuItems": {
       "type": "object",
       "additionalProperties": false,
@@ -4414,7 +4509,7 @@
         "items": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ElementInfo"
+            "$ref": "#/$defs/MenuItem"
           }
         },
         "truncated": {
@@ -5427,6 +5522,37 @@
         "chord"
       ]
     },
+    "ProbeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ProbeState"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "description": "R62: one backend doctor check, e.g. `{name: \"ax_bus\", state: \"unavailable\", reason: \"unreachable\"}`."
+    },
+    "ProbeState": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "unavailable",
+        "unknown"
+      ]
+    },
     "RaiseWindowParams": {
       "type": "object",
       "additionalProperties": false,
@@ -5467,6 +5593,15 @@
         "height"
       ],
       "description": "A rectangle in the coordinate space of the reply that carries it."
+    },
+    "RefusalReason": {
+      "type": "string",
+      "enum": [
+        "secure_focus",
+        "concealed_clipboard",
+        "secret_no_clipboard_route"
+      ],
+      "description": "Row 24 (R60): the pinned reasons a report is `effect:\"refused\"` with nothing sent\n(`design/d-sdk-skill.md`:555). A closed enum until the design lane rules its type."
     },
     "ReleaseHelper": {
       "type": "object",
@@ -7072,6 +7207,13 @@
         "untrustedText"
       ],
       "additionalProperties": false
+    },
+    "UrlPolicyStamp": {
+      "type": "string",
+      "enum": [
+        "unknown"
+      ],
+      "description": "The `urlPolicy` member of an `ActionReport`."
     },
     "UserActive": {
       "type": "object",
