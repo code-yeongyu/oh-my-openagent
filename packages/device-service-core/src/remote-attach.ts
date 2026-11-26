@@ -138,6 +138,9 @@ export function openAttach(
 ): Promise<RemoteAttach> {
   // Events of the new attach can arrive before its handle is known, so they wait here until the response names it.
   const early: AttachEvent[] = []
+  // omo#11999: the replay buffer for a listener that subscribes between the snapshot and detach is bounded; the
+  // oldest records drop, the newest always replay.
+  const ATTACH_HISTORY_MAX = 512
   const history: RemoteAttachEvent[] = []
   const listeners = new Set<(event: RemoteAttachEvent) => void>()
   let handle: string | undefined
@@ -187,6 +190,7 @@ export function openAttach(
       resolveSnapshot(remote.snapshot)
     }
     history.push(remote)
+    if (history.length > ATTACH_HISTORY_MAX) history.splice(0, history.length - ATTACH_HISTORY_MAX)
     for (const listener of [...listeners]) {
       try {
         listener(remote)

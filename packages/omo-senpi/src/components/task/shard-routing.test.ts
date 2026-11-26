@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
@@ -16,6 +16,7 @@ import {
 import { buildProcessChildRunner } from "./engine-runners"
 import { createEngineHostRuntime, type EngineHostRuntimeOverrides } from "./host-execution-mode"
 import { TaskRuntimeContext } from "./runtime-context"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 const TREE_KEY = "0123456789abcdef"
 const CAPABLE = ["multi_session", "extension_events", "session_context", "session_kind", "generation_handoff"]
@@ -31,7 +32,7 @@ function world(input: {
   readonly env?: Record<string, string>
 }) {
   // A short root: darwin's TMPDIR alone would push the shard past the bind limit onto the alt root.
-  const root = mkdtempSync("/tmp/omo-t8-")
+  const root = shortTempDir("omo-t8-")
   dirs.push(root)
   const agentDir = join(root, "agent")
   const runtime = new TaskRuntimeContext(root)

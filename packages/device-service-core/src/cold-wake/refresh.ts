@@ -14,8 +14,17 @@ import {
   systemdSessionHostUnit,
 } from "./session-host-unit.ts"
 
-// The provisioned runtime a unit runs: `~/.omo/binary-runtime/<version>/omo`.
-const RUNTIME_VERSION = /\/binary-runtime\/([^/]+)\/[^/]+$/
+// An installed unit's omo-managed runtime: the compiled `~/.omo/binary-runtime/<version>/omo`, or the version-directory
+// layout's `~/.omo/omo-versions/<version>/...` launcher script its unit names behind the runtime that runs it (omo#14258).
+const INSTALLED_RUNTIME = /\/(?:binary-runtime|omo-versions)\/([^/]+)\//
+
+const installedRuntimeVersion = (argv: readonly string[]): string | undefined => {
+  for (const arg of argv) {
+    const version = INSTALLED_RUNTIME.exec(arg)?.[1]
+    if (version !== undefined) return version
+  }
+  return undefined
+}
 
 const INSTALLED: ColdWakeOutcome = { kind: "installed", serviceRestarted: false }
 
@@ -24,7 +33,8 @@ const INSTALLED: ColdWakeOutcome = { kind: "installed", serviceRestarted: false 
  * omo's KeepAlive / Restart=always unit naming an older `binary-runtime/<version>/omo` - and nothing else. The agent dir
  * and PATH stay the installed unit's, so the launching process's environment never reaches the unit (#14194 review H1/M1).
  * Undefined, after one file read and no service manager call, when there is nothing to do: no unit (a refresh never
- * installs one), a unit no provisioned runtime owns, or one `isOlder` does not call older than this runtime.
+ * installs one), a unit no omo-managed runtime owns (binary-runtime or omo-versions, omo#14258), or one `isOlder` does
+ * not call older than this runtime.
  */
 export async function refreshColdWake(
   host: ColdWakeHost,
@@ -36,7 +46,7 @@ export async function refreshColdWake(
     : join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
   if (!existsSync(path)) return undefined
   const installed = readInstalledSessionHostUnit(readFileSync(path, "utf8"), darwin)
-  const version = installed === undefined ? undefined : RUNTIME_VERSION.exec(installed.program)?.[1]
+  const version = installed === undefined ? undefined : installedRuntimeVersion(installed.argv)
   if (installed === undefined || version === undefined || !options.isOlder(version)) return undefined
   const agentDir = installed.env.get("OMO_CODING_AGENT_DIR")
   if (agentDir === undefined) return undefined
