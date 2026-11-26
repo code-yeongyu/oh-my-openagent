@@ -248,6 +248,13 @@ export function createDagManager(options: DagManagerOptions): DagManager {
   const now = options.now ?? Date.now
   const newRunId = options.newRunId ?? (() => `dag_${randomUUID()}` as DagRunId)
   const settings: DagSettings = { ...DAG_SETTINGS_DEFAULTS, ...options.settings }
+  const owedStopTarget = (error: unknown, params: DagAmendParams): DagRunRecordV1 | undefined => {
+    if (!(error instanceof DagManagerError) || error.code !== "run_still_active" || error.runId === undefined)
+      return undefined
+    const target = store.readCheckpoint<DagRunRecordV1>(error.runId)
+    if (target?.parentSessionId !== params.parentSessionId) return undefined
+    return outstandingRunStop(options.ownedTasks, target) === undefined ? undefined : target
+  }
   const snapshotOf = (record: DagRunRecordV1): DagRunSnapshot =>
     withOutstandingStop(projectSnapshot(record, store.stateDir), options.ownedTasks, record)
   // list() sits on the DAG widget's 1Hz repaint path AND on the runtime mutation listener that
@@ -320,22 +327,26 @@ export function createDagManager(options: DagManagerOptions): DagManager {
         ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
       }),
     amend: async (params) => {
-      const runId =
-        params.runId ??
-        (params.key === undefined ? undefined : store.readKey(params.parentSessionId, params.key)?.runId)
-      const target = runId === undefined ? null : store.readCheckpoint<DagRunRecordV1>(runId)
-      // Awaited only when the run owes a stop, so an amendment with nothing to drain applies synchronously.
-      if (target?.parentSessionId === params.parentSessionId && outstandingRunStop(options.ownedTasks, target)) {
-        await drainOutstandingStop(options.ownedTasks, target)
-      }
-      return amendRun(params, {
+      const context = {
         store,
         now,
         settings,
         ...(options.ownedTasks === undefined ? {} : { ownedTasks: options.ownedTasks }),
         ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-      })
+      }
+      // Validation first and synchronous: an amendment that is malformed or invalid is rejected before
+      // anything is drained. Only an owed-stop refusal of a run that really owes one drains, and the
+      // amendment then runs again, re-validating the durable run after the await (#11381).
+      try {
+        return amendRun(params, context)
+      } catch (error) {
+        const target = owedStopTarget(error, params)
+        if (target === undefined) throw error
+        await drainOutstandingStop(options.ownedTasks, target)
+      }
+      return amendRun(params, context)
     },
+
     attach(runId, parentSessionId) {
       ownedRecord(runId, parentSessionId)
       return {
