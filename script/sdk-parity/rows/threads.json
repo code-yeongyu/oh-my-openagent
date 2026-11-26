@@ -11,7 +11,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
+          "thread": {
+            "type": "string"
+          },
           "interrupt": {
             "type": "boolean"
           },
@@ -66,7 +68,10 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "thread"
@@ -97,7 +102,11 @@
       ],
       "input": {
         "properties": {
-          "alias": {}
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
         },
         "required": [
           "alias"
@@ -249,7 +258,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string"
+          }
         },
         "required": [
           "thread"
@@ -528,8 +539,14 @@
               },
               {
                 "type": "object",
+                "required": [
+                  "message"
+                ],
                 "properties": {
-                  "message": {},
+                  "message": {
+                    "type": "string",
+                    "maxLength": 32768
+                  },
                   "delivery": {
                     "anyOf": [
                       {
@@ -547,14 +564,80 @@
                     ],
                     "default": "auto"
                   },
-                  "expected_turn_id": {},
-                  "summary": {},
-                  "attachments": {},
-                  "author": {}
-                },
-                "required": [
-                  "message"
-                ]
+                  "expected_turn_id": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "path"
+                          ],
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "mime": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "bytes",
+                            "name"
+                          ],
+                          "properties": {
+                            "bytes": {},
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "mime": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1
+                  },
+                  "author": {
+                    "type": "object",
+                    "required": [
+                      "platform_user_id",
+                      "display"
+                    ],
+                    "properties": {
+                      "platform_user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "display": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
               }
             ]
           },
@@ -578,7 +661,10 @@
           "idempotency_key": {
             "type": "string"
           },
-          "launch_spec": {}
+          "launch_spec": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -674,12 +760,29 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "since": {},
-          "before": {},
-          "tail": {},
-          "limit": {},
-          "max_bytes": {}
+          "thread": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string",
+            "minLength": 1
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tail": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "thread"
@@ -727,8 +830,14 @@
       ],
       "input": {
         "properties": {
-          "name": {},
-          "op": {},
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
           "args": {}
         },
         "required": [
@@ -762,11 +871,128 @@
       ],
       "input": {
         "properties": {
-          "name": {},
-          "migrations": {},
-          "moduleUrl": {},
-          "sessionCallable": {},
-          "wakeDir": {}
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "migrations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "moduleUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sessionCallable": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "op",
+                    "parameters",
+                    "toolName",
+                    "description"
+                  ],
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {}
+                      }
+                    },
+                    "targetArg": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "toolName": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "await": {
+                      "type": "object",
+                      "required": [
+                        "statusOp",
+                        "expireOp",
+                        "timeoutMs"
+                      ],
+                      "properties": {
+                        "statusOp": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expireOp": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "timeoutMs": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "wake": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "op",
+                    "parameters",
+                    "internal"
+                  ],
+                  "properties": {
+                    "op": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {}
+                      }
+                    },
+                    "targetArg": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "internal": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "wakeDir": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "migrations",
@@ -799,14 +1025,20 @@
       ],
       "input": {
         "properties": {
-          "name": {},
-          "op": {},
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
           "args": {}
         },
         "required": [
-          "args",
           "name",
-          "op"
+          "op",
+          "args"
         ]
       },
       "cli": [],
@@ -860,8 +1092,31 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "from": {}
+          "thread": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "required": [
+              "thread",
+              "delivery_id"
+            ],
+            "properties": {
+              "thread": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delivery_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turn_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": [
           "thread"
@@ -892,7 +1147,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string"
+          }
         },
         "required": [
           "thread"
@@ -1150,11 +1407,25 @@
           "idempotency_key": {
             "type": "string"
           },
-          "workspace": {},
-          "device": {},
-          "project": {},
-          "name": {},
-          "archived": {}
+          "workspace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "archived": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -1237,8 +1508,12 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "all_scope": {}
+          "thread": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          }
         },
         "required": [
           "thread"
@@ -1268,7 +1543,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string"
+          }
         },
         "required": [
           "thread"
@@ -1331,7 +1608,10 @@
           "idempotency_key": {
             "type": "string"
           },
-          "limit": {}
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "thread"
@@ -1525,10 +1805,33 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "interrupt": {},
-          "force": {},
-          "move": {}
+          "thread": {
+            "type": "string"
+          },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "move": {
+            "type": "object",
+            "required": [
+              "id",
+              "target"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": [
           "thread"
@@ -1634,9 +1937,17 @@
       ],
       "input": {
         "properties": {
-          "address": {},
-          "all_scope": {},
-          "workspace": {}
+          "address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "address"
@@ -1667,21 +1978,69 @@
       ],
       "input": {
         "properties": {
-          "message": {},
-          "agent": {},
-          "model": {},
-          "directory": {},
-          "session_id": {},
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "endpoint": {
-            "properties": {
-              "port": {},
-              "attach_url": {}
-            }
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "port"
+                ],
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "attach_url"
+                ],
+                "properties": {
+                  "attach_url": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
           },
           "on_complete": {
+            "type": "object",
+            "required": [
+              "command"
+            ],
             "properties": {
-              "command": {}
-            }
+              "command": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "signal": {}
         },
@@ -1783,8 +2142,72 @@
           "all_scope": {
             "type": "boolean"
           },
-          "attachments": {},
-          "author": {}
+          "attachments": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "path"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "name"
+                  ],
+                  "properties": {
+                    "bytes": {},
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
+          "author": {
+            "type": "object",
+            "required": [
+              "platform_user_id",
+              "display"
+            ],
+            "properties": {
+              "platform_user_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display": {
+                "type": "string",
+                "minLength": 1
+              },
+              "user_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": [
           "message",
@@ -1944,9 +2367,76 @@
           "all_scope": {
             "type": "boolean"
           },
-          "attachments": {},
-          "author": {},
-          "deadline_ms": {}
+          "attachments": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "path"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "name"
+                  ],
+                  "properties": {
+                    "bytes": {},
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
+          "author": {
+            "type": "object",
+            "required": [
+              "platform_user_id",
+              "display"
+            ],
+            "properties": {
+              "platform_user_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "display": {
+                "type": "string",
+                "minLength": 1
+              },
+              "user_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "message",
@@ -2185,7 +2675,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
+          "thread": {
+            "type": "string"
+          },
           "interrupt": {
             "type": "boolean"
           },
@@ -2195,7 +2687,18 @@
           "clear_queue": {
             "type": "boolean"
           },
-          "children": {}
+          "children": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "refuse"
+              },
+              {
+                "type": "string",
+                "const": "detach"
+              }
+            ]
+          }
         },
         "required": [
           "thread"
@@ -2246,10 +2749,47 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "from": {},
-          "until": {},
-          "deadline_ms": {}
+          "thread": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "required": [
+              "thread",
+              "delivery_id"
+            ],
+            "properties": {
+              "thread": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delivery_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turn_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "idle"
+              },
+              {
+                "type": "string",
+                "const": "done"
+              }
+            ]
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "thread"

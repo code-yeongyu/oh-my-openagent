@@ -47,10 +47,12 @@ Other automation may be driving the same window.
 ## If it is locked
 
 ```js
-await session.requestHelp({ prompt: "Please unlock 1Password in this tab, then continue." })
+await tool.monitor({ description: "1Password unlocked", path: flag, event: "create" })   // subscribe first
+globalThis.help = session.requestHelp({ prompt: "Please unlock 1Password in this tab, then continue." })
+  .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))
 ```
 
-Then read the page again.
+End the cell; when the event arrives, read the page again.
 
 ## Not in scope
 

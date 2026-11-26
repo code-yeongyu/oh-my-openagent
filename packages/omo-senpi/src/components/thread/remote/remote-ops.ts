@@ -504,6 +504,14 @@ export async function followRemote(
       const ownPrompt = byId >= 0 ? byId : byText
       const settledAlready =
         ownPrompt >= 0 && buffer.slice(ownPrompt + 1).some((record) => record["type"] === "agent_settled")
+      // Only a stamped prompt identifies this send without consulting the transcript. If its run is still
+      // current, its buffered deltas are live output, not attach history (#13512).
+      if (byId >= 0 && byId > runStart && !settledAlready) {
+        for (const record of buffer.slice(byId + 1)) {
+          if (record["type"] === "message_start" && isUserEntry(record)) break
+          streamRecord(record)
+        }
+      }
       void probe(settledAlready, ownPrompt >= 0, byId < 0 && options?.clientMessageId !== undefined)
     }
   }

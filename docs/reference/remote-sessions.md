@@ -23,12 +23,14 @@ omo remote attach <session>      # open a session in the terminal UI, to watch a
 omo remote open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
                 [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]] [--json]
                                  # start a session on another device; prints <device>/<session>
-omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
+omo remote send <session> <text|-> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
 omo remote model <session> <provider/id> [--json]   # switch the session's model
 omo remote interrupt <session> [--json]   # stop the session's running turn
 omo remote close <session> [--force] [--json]  # end the session on its device; --force also drops messages it has not read
 ```
+
+`send <session> -` reads the message from stdin, so its text never appears in the process list; an empty stdin is a usage error. `close` exits 0 only when it closed the session; a session its device no longer holds is a `not_found` error with a non-zero exit.
 
 `devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
 `last_seen_ms` and `caps` (`attach`, `machine`, `control`), and `kind` when one is reported (this device's row has

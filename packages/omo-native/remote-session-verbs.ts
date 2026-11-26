@@ -1,7 +1,8 @@
 import { handleOf, relayUnavailable, resolveTypedAddress } from "../omo-senpi/src/components/remote/index"
 import type { RemoteCommandDependencies } from "./remote-local"
+import { REMOTE_EXIT } from "./remote-exit"
 import { closeLines, interruptLines } from "./remote-render"
-import type { SessionArgs } from "./remote-session-args"
+import { STDIN_TEXT, type SessionArgs } from "./remote-session-args"
 import { type PersonRemote, type Refusal, sessionAnswer } from "./remote-session-answer"
 import { openOn } from "./remote-session-open"
 import { sendTo } from "./remote-session-send"
@@ -42,8 +43,15 @@ export async function runSession(
   const label = resolved.address
   const { sessions } = remote.client
   switch (args.verb) {
-    case "send":
-      return sendTo(remote.client, thread, label, args, answer)
+    case "send": {
+      // omo#13905: `omo remote send <target> -` reads the message text from stdin; an empty stdin is a usage error.
+      const text = args.text === STDIN_TEXT ? await (dependencies.readStdin ?? readProcessStdin)() : args.text
+      if (text === "") {
+        dependencies.error("omo remote send: stdin was empty; pipe the message text in, or pass it as an argument")
+        return REMOTE_EXIT.usage
+      }
+      return sendTo(remote.client, thread, label, { ...args, text }, answer)
+    }
     case "model": {
       const set = await sessions.setModel(thread, args.model)
       return set.kind === "error"
@@ -62,6 +70,18 @@ export async function runSession(
         ...(args.wait_ms === undefined ? {} : { wait_ms: args.wait_ms }),
       })
       if (closed.kind === "error") return answer.refuse(withForceHint(closed, label), label)
+      // omo#13905: a close that closed nothing fails; a script must never read a miss as success while it may still run.
+      if (!closed.value.closed)
+        return answer.refuse(
+          {
+            code: "not_found",
+            message: `${label} is not open on its device, so nothing was closed.`,
+            next_action:
+              "Run omo remote sessions to see the sessions each device holds, then close one by its address.",
+            details: { thread: label },
+          },
+          label,
+        )
       return answer.ok({ thread, ...closed.value }, closeLines(label, closed.value))
     }
   }
@@ -81,4 +101,11 @@ function withForceHint<R extends Refusal>(refusal: R, label: string): R {
     ...refusal,
     next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.`,
   }
+}
+
+/** The whole of this process's stdin as UTF-8, for `omo remote send <target> -` (omo#13905). */
+async function readProcessStdin(): Promise<string> {
+  const chunks: Buffer[] = []
+  for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  return Buffer.concat(chunks).toString("utf8")
 }

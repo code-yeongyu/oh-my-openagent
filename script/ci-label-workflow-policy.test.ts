@@ -102,6 +102,37 @@ describe("#given required CI and an optional full-matrix label run", () => {
     expect(record(steps[checkout]?.["with"])["fetch-depth"]).toBeUndefined()
   })
 
+  // A called workflow whose job asks for more than its caller job grants, or receives an undeclared input, never starts:
+  // GitHub ends the run as startup_failure with no job (#14942: ci-mode's actions: read against the label caller).
+  test("#then every reusable call grants each permission and input its callee's jobs declare", () => {
+    const level = { none: 0, read: 1, write: 2 } as const
+    const rank = (value: unknown) => level[String(value ?? "none") as keyof typeof level] ?? Number.NaN
+    const caller = workflow("ci-full-matrix-label.yml")
+    const problems: string[] = []
+    for (const [callerJob, rawJob] of Object.entries(record(caller["jobs"]))) {
+      const job = record(rawJob)
+      const uses = String(job["uses"] ?? "")
+      if (!uses.startsWith("./.github/workflows/")) continue
+      const callee = workflow(uses.slice("./.github/workflows/".length))
+      const granted = record(job["permissions"] ?? caller["permissions"] ?? {})
+      for (const [calleeJob, rawCalleeJob] of Object.entries(record(callee["jobs"]))) {
+        const requested = record(record(rawCalleeJob)["permissions"] ?? callee["permissions"] ?? {})
+        for (const [scope, value] of Object.entries(requested)) {
+          if (!(rank(granted[scope]) >= rank(value))) {
+            problems.push(`${callerJob} -> ${calleeJob}: ${scope}: ${String(value)} not granted`)
+          }
+        }
+      }
+      // js-yaml reads the bare `on` key as the boolean true; an empty `workflow_call:` declares no inputs.
+      const triggers = record(callee["on"] ?? callee["true"])
+      const declared = Object.keys(record(record(triggers["workflow_call"] ?? {})["inputs"] ?? {}))
+      for (const input of Object.keys(record(job["with"] ?? {}))) {
+        if (!declared.includes(input)) problems.push(`${callerJob}: input ${input} not declared by ${uses}`)
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
   // Both callers of the classifier pass the event's file count, so they decide alike above the API cap (#13891).
   test("#then ci-mode and the platform decision both pass the pull request's changed-file count", () => {
     const steps = (job: Record<string, unknown>) =>

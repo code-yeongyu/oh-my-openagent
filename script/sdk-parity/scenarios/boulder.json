@@ -1,0 +1,175 @@
+{
+  "domain": "boulder",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "boulder.status/cwd-all-works",
+      "row": "boulder.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/boulder.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/a.md"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/b.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "boulder.status/directory-all-works",
+      "row": "boulder.status",
+      "kind": "effect",
+      "input": {
+        "directory": "/work/project"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/work/project/.omo/boulder.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/work/project/.omo/plans/a.md"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/work/project/.omo/plans/b.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "boulder.status/work-id-reads-one-plan",
+      "row": "boulder.status",
+      "kind": "effect",
+      "input": {
+        "work_id": "w-2"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/boulder.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/a.md"
+          },
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/b.md"
+          }
+        }
+      ]
+    },
+    {
+      "id": "boulder.status/no-boulder",
+      "row": "boulder.status",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/boulder.json"
+          },
+          "count": 1,
+          "result": null
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/a.md"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "boulder.status/unknown-work-id",
+      "row": "boulder.status",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "work_id": "w-9"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/boulder.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/a.md"
+          },
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.omo/plans/b.md"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "boulder.status/empty-work-id",
+      "row": "boulder.status",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "work_id": ""
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

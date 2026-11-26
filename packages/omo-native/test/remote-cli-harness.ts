@@ -114,6 +114,7 @@ export async function run(
     readonly client?: () => RemoteClient
     readonly optOut?: RemoteOptOut
     readonly localPermissionPreset?: () => string
+    readonly readStdin?: () => Promise<string>
   } = {},
 ) {
   let dir = stateDir

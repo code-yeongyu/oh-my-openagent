@@ -95,7 +95,14 @@
       ],
       "input": {
         "properties": {
-          "pids": {}
+          "pids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          }
         },
         "required": [
           "pids"
@@ -144,7 +151,18 @@
           "verbose": {
             "type": "boolean"
           },
-          "platform": {}
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "opencode"
+              },
+              {
+                "type": "string",
+                "const": "codex"
+              }
+            ]
+          }
         },
         "required": []
       },

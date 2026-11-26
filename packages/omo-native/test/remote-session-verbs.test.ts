@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { connectDeviceService } from "../../device-service-core/src/index.ts"
+import { type RemoteClient, remoteClientForPerson } from "../../omo-senpi/src/components/remote/index"
 import { REMOTE_EXIT } from "../remote-exit"
 import { owners, privateDir, run, SIGNED_IN, testBootstrap, useRemoteCliCleanup } from "./remote-cli-harness"
 import { commandTargets, liveKey, PEER, personWorld } from "./remote-person-world"
@@ -108,5 +110,76 @@ describe("omo remote session verbs take every address form", () => {
       details: { reason: "listing_incomplete" },
     })
     expect(result.targets).toEqual([])
+  })
+})
+
+// omo#13905: a close that closed nothing is a typed failure, and send can take its text from stdin, never argv.
+describe("omo remote close and send stdin (#13905)", () => {
+  // The person client the verb runs, with chosen sessions members standing in for the device's answer.
+  async function onClient(overrides: (original: RemoteClient["sessions"]) => Partial<RemoteClient["sessions"]>) {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: personWorld() })
+    owners.push(owner)
+    const client = (): RemoteClient => {
+      const real = remoteClientForPerson({
+        version: "5.1.52",
+        stateDir: owner.stateDir,
+        connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
+      })
+      // The same client object: the remote module lends its connection keyed on it, so the members are replaced in place.
+      Object.assign(real.sessions, overrides({ ...real.sessions }))
+      return real
+    }
+    return { owner, client }
+  }
+
+  test("#given a session its device no longer runs #when close names it #then it fails typed with a non-zero exit, never ok with closed:false", async () => {
+    const { owner, client } = await onClient(() => ({
+      close: async () => ({ kind: "ok", value: { closed: false, dropped_deliveries: [] } }) as const,
+    }))
+    const result = await run(["close", `${PEER}/${liveKey()}`, "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), {
+      client,
+    })
+    expect(parsed(result.out)).toMatchObject({ kind: "error", code: "not_found" })
+    expect(result.code).toBe(REMOTE_EXIT.failed)
+  })
+
+  // Train 12's 5.1.72 case on the person client: the device no longer holds the session at all.
+  test("#given a session key its device does not hold #when close names it #then it fails typed not_found with a non-zero exit and nothing is sent", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: personWorld() })
+    owners.push(owner)
+    const result = await run(["close", `${PEER}/bm8tc3VjaC1zZXNzaW9uLWtleQ`, "--json"], owner.stateDir, SIGNED_IN, testBootstrap())
+    expect(parsed(result.out)).toMatchObject({ kind: "error", code: "not_found" })
+    expect(result.code).toBe(REMOTE_EXIT.failed)
+    expect(commandTargets(owner.state.bindings)).toEqual([])
+  })
+
+  test("#given send <target> - #when stdin holds the text #then the prompt is those exact bytes and argv carries none of it", async () => {
+    const text = "--first line\nzweite Zeile, 한국어\n"
+    const sent: string[] = []
+    const { owner, client } = await onClient((original) => ({
+      send: (thread, request) => {
+        sent.push(request.text)
+        return original.send(thread, request)
+      },
+    }))
+    const args = ["send", `${PEER}/${liveKey()}`, "-", "--no-wait", "--json"]
+    const result = await run(args, owner.stateDir, SIGNED_IN, testBootstrap(), { client, readStdin: async () => text })
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    expect(args.join(" ")).not.toContain("first line")
+    expect(sent).toEqual([text])
+  })
+
+  test("#given send <target> - #when stdin is empty #then it is a usage error and nothing is sent", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: personWorld() })
+    owners.push(owner)
+    const result = await run(
+      ["send", `${PEER}/${liveKey()}`, "-", "--no-wait"],
+      owner.stateDir,
+      SIGNED_IN,
+      testBootstrap(),
+      { readStdin: async () => "" },
+    )
+    expect(result.code).toBe(REMOTE_EXIT.usage)
+    expect(commandTargets(owner.state.bindings)).toEqual([])
   })
 })

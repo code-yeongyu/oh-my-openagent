@@ -15,6 +15,7 @@ import type {
   JsonObject,
   RemoteCommandOutcome,
   RemoteDevice,
+  RemoteLookupOutcome,
   RemoteSessionRow,
   RemoteThreadSurface,
   RemoteWatchEnd,
@@ -22,6 +23,7 @@ import type {
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
+import { createLookupGate } from "./testing/lookup-gate"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOptions, ThreadCloseOutcome } from "./tools/ports"
 import type { SessionWatchHandlers } from "./control/wait-settled"
@@ -263,6 +265,8 @@ export function createRemoteThreadFixture() {
       silent?: readonly string[]
       /** Devices whose lookup exceeds the caller's cap. */
       lookupTimeouts?: readonly string[]
+      /** Devices whose lookup exceeds the caller's cap while another lookup is in flight, and answers when asked alone. */
+      crowdedLookups?: readonly string[]
       /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
       wakeFeature?: boolean
       /** omo#14270: what kind of device b registers as (`cli` daemon or `desktop` app); unset, b names none. */
@@ -389,6 +393,38 @@ export function createRemoteThreadFixture() {
     }
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
+    let lookupsInFlight = 0
+    // The device side of one single-probe locate: a crowded one answers silent at the caller's cap and its locate
+    // finishes on a later turn of the event loop, as a capped service request does (raced, never cancelled).
+    const lookupGate = createLookupGate((device, durableId) => {
+      lookups.push({ device, durable_id: durableId })
+      if (options.lookupTimeouts?.includes(device) === true)
+        return { answer: Promise.resolve({ kind: "silent", reason: "lookup_timeout" }), settled: Promise.resolve() }
+      lookupsInFlight += 1
+      let finish: () => void = () => {}
+      const settled = new Promise<void>((resolve) => {
+        finish = () => {
+          lookupsInFlight -= 1
+          resolve()
+        }
+      })
+      const answer = (async (): Promise<RemoteLookupOutcome> => {
+        // Every lookup of one wave is counted before any of them reads the count, and reads it before any leaves.
+        await Promise.resolve()
+        const crowded = lookupsInFlight > 1
+        await Promise.resolve()
+        if (crowded && options.crowdedLookups?.includes(device) === true) {
+          setImmediate(finish)
+          return { kind: "silent", reason: "lookup_timeout" }
+        }
+        finish()
+        if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
+        const key = options.ended?.[device]?.[durableId]
+        return key === undefined ? { kind: "none" } : { kind: "found", key }
+      })()
+      return { answer, settled }
+    }, 3_500)
+    const lookupMade = options.noLookup !== true && options.wakeFeature === true
     const deviceReads = { thisDevice: 0, devices: 0 }
     // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
     const listings = { all: 0, device: 0 }
@@ -666,6 +702,7 @@ export function createRemoteThreadFixture() {
       ...Object.keys(options.ended ?? {}),
       ...(options.silent ?? []),
       ...(options.lookupTimeouts ?? []),
+      ...(options.crowdedLookups ?? []),
     ])
       if (!devices.some((known) => known.device === device) && !(options.removed ?? []).includes(device))
         devices.push({ device, label: device, online: true })
@@ -895,14 +932,10 @@ export function createRemoteThreadFixture() {
           }
         },
         canLookup: async () => options.wakeFeature === true && options.noLookup !== true,
-        lookup: async (device, durableId) => {
-          if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
-          lookups.push({ device, durable_id: durableId })
-          if (options.lookupTimeouts?.includes(device) === true) return { kind: "silent", reason: "lookup_timeout" }
-          if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
-          const key = options.ended?.[device]?.[durableId]
-          return key === undefined ? { kind: "none" } : { kind: "found", key }
-        },
+        lookup: async (device, durableId) =>
+          lookupMade ? await lookupGate.lookup(device, durableId) : { kind: "unavailable" },
+        lookupAlone: async (device, durableId, waitMs) =>
+          lookupMade ? await lookupGate.lookupAlone(device, durableId, waitMs) : { kind: "unavailable" },
         canWake: async () => options.wakeFeature === true && options.noWake !== true,
         wake: async (device, durableId, rpc) => {
           if (options.noWake === true || options.wakeFeature !== true) return { kind: "unavailable" }
@@ -949,7 +982,7 @@ export function createRemoteThreadFixture() {
       },
     }
     if (options.withoutLookup === true) {
-      const { lookup: _lookup, canLookup: _canLookup, ...plain } = remote.sessions
+      const { lookup: _lookup, lookupAlone: _lookupAlone, canLookup: _canLookup, ...plain } = remote.sessions
       ;(remote as { sessions: typeof plain }).sessions = plain
     }
     const endWatches = (reason: RemoteWatchEnd) => {

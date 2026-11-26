@@ -86,6 +86,8 @@ export type CarrierOptions = {
   readonly memoryFloor?: () => number
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
+  /** A wake, takeover or look the carrier tends by itself threw; the row stays and the next sweep tries it again. */
+  readonly onError?: (error: unknown) => void
 }
 
 export type Carrier = {
@@ -145,6 +147,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
   const carried = new Map<string, Carried>()
   const chains = new Map<string, Promise<unknown>>()
   const emit = options.onEvent ?? (() => undefined)
+  const report = (error: unknown): void => options.onError?.(error)
   let stopped = false
   let cancelTimer: (() => void) | undefined
 
@@ -298,8 +301,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
 
   const carry = (durableId: string, connection: CarrierHostConnection, sessionId: string, generation: number) => {
     const off = connection.onEvent((frame) => {
-      if (frame.type === "session_lifecycle" && frame.sessionId === sessionId)
-        void evaluate(durableId).catch(() => undefined)
+      if (frame.type === "session_lifecycle" && frame.sessionId === sessionId) void evaluate(durableId).catch(report)
     })
     const entry: Carried = { durableId, connection, sessionId, generation, off }
     carried.set(durableId, entry)
@@ -502,16 +504,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
     const rows = await store.woken.list()
     for (const row of rows) {
       if (carried.has(row.durable_id)) {
-        await evaluate(row.durable_id).catch(() => undefined)
+        await evaluate(row.durable_id).catch(report)
         continue
       }
       if (row.state === "requested") {
         if (row.next_attempt_at === null || row.next_attempt_at <= now)
-          await serial(row.durable_id, () => wakeNow(row.durable_id)).catch(() => undefined)
+          await serial(row.durable_id, () => wakeNow(row.durable_id)).catch(report)
         continue
       }
       if (row.lease_expires_at !== null && row.lease_expires_at <= now)
-        await serial(row.durable_id, () => takeOver(row.durable_id)).catch(() => undefined)
+        await serial(row.durable_id, () => takeOver(row.durable_id)).catch(report)
     }
     return rows.length > 0 || carried.size > 0
   }
@@ -528,7 +530,10 @@ export function createCarrier(options: CarrierOptions): Carrier {
             if (hasWork) arm()
           },
           // A sweep that threw still had work to tend: the timer stays armed for the next tick (A3.1.4).
-          () => arm(),
+          (error: unknown) => {
+            report(error)
+            arm()
+          },
         )
       },
       Math.min(CARRIER_RENEW_MS, WAKE_LEASE_MS / 3),
@@ -546,9 +551,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
           .then((hasWork) => {
             if (hasWork) arm()
           })
-          .catch(() => undefined)
+          .catch(report)
     })
-    .catch(() => undefined)
+    .catch(report)
 
   return {
     wake: (durableId) =>
