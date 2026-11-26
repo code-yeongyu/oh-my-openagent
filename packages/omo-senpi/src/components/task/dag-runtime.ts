@@ -36,7 +36,7 @@ import { createDagWakeSource } from "./dag-wake-source"
 import type { TaskEngine } from "./engine"
 import { observeDagSchedulers, type DagNodeSendResult } from "../../../../senpi-task/src/dag/scheduler"
 import { createDagSkillMaterializer } from "../../../../senpi-task/src/dag/skills"
-import { createPausedNodeCancel, endedChildClosure, type PausedNodeHoldPort } from "./dag-paused-cancel"
+import { endedChildClosure, type PausedNodeHoldPort } from "./dag-paused-cancel"
 import { createDagRuntimeControls } from "./dag-runtime-controls"
 import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler-registry"
 import { createDagRecoverySweeps } from "./dag-recovery-sweeps"
@@ -243,12 +243,13 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     stoppedAdmissions.delete(runId)
   }
 
-  const { retry, send, amend, guide } = createDagRuntimeControls({
+  const { retry, send, amend, guide, cancelNode } = createDagRuntimeControls({
     coreManager,
     schedulerOptions,
     schedulers,
     reservations,
     holdsRun,
+    closure: childClosure,
     clearAdmissionLatch,
     adoptReentry,
     sessionId: () => deps.engine.runtime.sessionId() ?? "",
@@ -498,13 +499,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     cancelRun,
   })
   const runtime: DagRuntime = {
-    cancelNode: createPausedNodeCancel(
-      (runId) => ({
-        ...schedulerOptions,
-        initialRecord: coreManager.record(runId, deps.engine.runtime.sessionId() ?? ""),
-      }),
-      childClosure,
-    ),
+    cancelNode,
     manager,
     wait,
     cancel,

@@ -17,11 +17,12 @@ import {
   runBusy,
 } from "../../../../senpi-task/src/dag/node-control-context"
 import type { DagRunReservation, DagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
+import { createPausedNodeCancel, type PausedNodeHoldPort } from "./dag-paused-cancel"
 
 type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
 
 /**
- * The model-driven verbs (retry, send, amend, guide). Each holds the run's in-process reservation for
+ * The model-driven verbs (retry, send, amend, guide) and the user's node cancel. Each holds the run's in-process reservation for
  * its whole operation, so it never overlaps a recovery installation, another verb or a cancel of this
  * process; a run already reserved refuses with the retryable `run_busy` naming the operation in
  * flight (#15125). A verb on a run this host does not hold calls the engine verb with options and
@@ -36,6 +37,7 @@ export function createDagRuntimeControls(ports: {
   sessionId(): string
   clearAdmissionLatch(runId: DagRunId): void
   adoptReentry(runId: DagRunId, reentry: DagRunReentry): void
+  readonly closure?: PausedNodeHoldPort
 }) {
   const { coreManager, schedulerOptions, schedulers, clearAdmissionLatch, adoptReentry } = ports
 
@@ -114,5 +116,12 @@ export function createDagRuntimeControls(ports: {
       return applyPausedDagGuidance({ ...schedulerOptions, initialRecord: record }, runId, command)
     })
 
-  return { retry, send, amend, guide }
+  const pausedNodeCancel = createPausedNodeCancel(
+    (runId) => ({ ...schedulerOptions, initialRecord: coreManager.record(runId, ports.sessionId()) }),
+    ports.closure,
+  )
+  const cancelNode = (runId: DagRunId, nodeId: string): Promise<void> =>
+    reserved(runId, "cancel_node", () => pausedNodeCancel(runId, nodeId))
+
+  return { retry, send, amend, guide, cancelNode }
 }
