@@ -5,6 +5,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import type { ManagerStartSpec } from "../manager/types"
 import type { TaskRecord } from "../state"
+import type { CancelOutcome } from "../steering/types"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import {
   cleanupTempProjects,
@@ -162,4 +163,53 @@ describe("DAG admission batch keeps its lifetime through processing errors (#100
       expect(await Promise.race([outcome, timeout("the run to settle")])).toBe("rejected: unknown fake task task-x")
     },
   )
+})
+
+// A cancel stops the child it asks for, so whatever is still live afterwards was never asked.
+class CancellableFaultyAttachManager extends FaultyAttachManager {
+  override async cancelTask(taskId: string): Promise<CancelOutcome> {
+    const record = this.get(taskId)
+    if (record === undefined) throw new Error(`unknown fake task ${taskId}`)
+    this.complete(String(record.owner?.nodeId), "cancelled")
+    return { kind: "cancelled", task_id: taskId, previous_status: record.status }
+  }
+}
+
+describe("DAG run cancel after an admission processing error (#10057 review, composed with #11381)", () => {
+  test("#given an attachment fault while a sibling start is in flight #when the run is cancelled before the sibling's start returns #then the late child is stopped and the run reads cancelled", async () => {
+    // given - a's attachment fails; slow's start hangs on a busy host.
+    const hostBusy = deferred<undefined>()
+    const slowAttempted = deferred<undefined>()
+    const manager = new CancellableFaultyAttachManager("a", {
+      beforeStart: (nodeId) => {
+        if (nodeId !== "slow") return undefined
+        slowAttempted.resolve(undefined)
+        return hostBusy.promise
+      },
+    })
+    const { scheduler } = frontierFixture(definition([node("a"), node("slow")]), manager)
+    const run = settlement(scheduler.run())
+    await Promise.race([
+      Promise.all([slowAttempted.promise, manager.attachFailed.promise]),
+      timeout("a's attachment to fail while slow's start is pending"),
+    ])
+    await drainMicrotasks()
+
+    // when - the run is cancelled, then slow's start returns with a child.
+    const cancel = settlement(scheduler.cancel(scheduler.snapshot().runId, "operator stop"))
+    hostBusy.resolve(undefined)
+    await Promise.race([manager.whenStarted("slow"), timeout("slow's start to return")])
+
+    // then - no child the run owns is left running behind a cancelled run.
+    expect(await Promise.race([cancel.outcome, timeout("the cancel to settle")])).toBe("completed")
+    expect(await Promise.race([run.outcome, timeout("the run to settle")])).toBe(
+      "rejected: injected attachment fault for a",
+    )
+    expect(scheduler.snapshot().status).toBe("cancelled")
+    const live = ["a", "slow"].filter((nodeId) => {
+      const status = manager.recordOf(nodeId)?.status
+      return status === "pending" || status === "running" || status === "paused"
+    })
+    expect(live).toEqual([])
+  })
 })

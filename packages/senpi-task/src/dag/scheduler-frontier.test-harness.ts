@@ -264,7 +264,7 @@ export class FrontierFakeManager implements TaskManager {
   interruptTask(): Promise<never> {
     throw new Error("not implemented")
   }
-  cancelTask(): Promise<never> {
+  cancelTask(..._args: Parameters<TaskManager["cancelTask"]>): ReturnType<TaskManager["cancelTask"]> {
     throw new Error("not implemented")
   }
   list(): readonly [] {
