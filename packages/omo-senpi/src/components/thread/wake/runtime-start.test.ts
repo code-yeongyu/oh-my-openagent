@@ -4,7 +4,8 @@ import { existsSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
-import { createGatewayStore } from "../gateway/store"
+import { createGatewayStore, type GatewayStore } from "../gateway/store"
+import { assertNoOpenHandlesUnder } from "../gateway/testing/harness"
 import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
 import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
 import { shortTempDir } from "../../../../test-support/short-tmp"
@@ -24,9 +25,20 @@ function tempDir(prefix: string): string {
   return dir
 }
 
+// A store a test hands to the wake is the test's to close (stop() disposes only a store it created); an open store keeps
+// its database files open, and win32 then refuses to remove the directory (EBUSY).
+const stores: GatewayStore[] = []
+function openStore(agentDir: string): GatewayStore {
+  const store = createGatewayStore({ agentDir })
+  stores.push(store)
+  return store
+}
+
 afterEach(async () => {
   for (const latch of latches.splice(0)) for (const running of latch.running?.values() ?? []) await running.stop()
+  for (const store of stores.splice(0)) await store.dispose()
   for (const dir of made.splice(0)) {
+    assertNoOpenHandlesUnder(dir)
     rmSync(dir, { recursive: true, force: true })
     expect(existsSync(dir)).toBe(false)
   }
@@ -62,7 +74,7 @@ describe("a running wake over an empty wake table", () => {
   test("#given an engine at the wake minimum and an empty wake table #when the wake starts and its start read has settled #then no sweep timer is armed", async () => {
     const agentDir = tempDir("omo-wake-runtime-")
     const scheduled: number[] = []
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const running = start(agentDir, {
       store,
       deliveries: async () => undefined,
@@ -300,7 +312,7 @@ describe("the consumer's stop against an in-flight retry", () => {
     let fresh: ReturnType<typeof createFakeDeliveryService> | undefined
     // The store is handed over so stop() cannot dispose it: a disposed store would kill the racing retry on its
     // own (its first store call throws), closing the port without the fix and hiding the leak this test pins.
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const running = start(agentDir, {
       store,
       deliveries: async () => {
@@ -356,7 +368,7 @@ describe("a wake that settles a closed session's intake", () => {
     service.ackServe({ wake: true })
     const outcomes: string[] = []
     const running = start(agentDir, {
-      store: createGatewayStore({ agentDir }),
+      store: openStore(agentDir),
       deliveries: async () => service.port,
       onWake: (_durableId, outcome) => outcomes.push(outcome.kind),
     })
@@ -398,7 +410,7 @@ describe("the device's thread chain limit on the queued route", () => {
     writeSessionFile(join(agentDir, "sessions"), "dur-target", { cwd: tempDir("omo-wake-cwd-") })
     const service = createFakeDeliveryService({ admitted: true })
     service.ackServe({ wake: true })
-    const running = start(agentDir, { store: createGatewayStore({ agentDir }), deliveries: async () => service.port })
+    const running = start(agentDir, { store: openStore(agentDir), deliveries: async () => service.port })
     await running?.ready
     const reply = await service.inbound({
       command_id: "c-1",
@@ -578,7 +590,7 @@ describe("the wake's process scope", () => {
     const agentDir = tempDir("omo-wake-scope-")
     const latch: ThreadWakeLatch = {}
     latches.push(latch)
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const runs: number[] = []
     const scope = {
       runInAsyncScope: <T>(fn: () => T): T => {
@@ -621,7 +633,7 @@ describe("the wake's process scope", () => {
     const agentDir = tempDir("omo-wake-scope-")
     const latch: ThreadWakeLatch = {}
     latches.push(latch)
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const context = new AsyncLocalStorage<string>()
     const resource = context.run("process", () => new AsyncResource("omo-thread-wake-carrier-test"))
     const scheduledIn: (string | undefined)[] = []
