@@ -7204,6 +7204,136 @@
         "thread": "t-3"
       },
       "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/by-name",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "lane t-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "count": 2
+        }
+      ],
+      "answer": {
+        "thread": "here/t-1"
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/missing",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "address": "nobody"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "nobody"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/two-holders",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "ambiguous_target",
+      "input": {
+        "address": "lane t-1",
+        "all_scope": true
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "title": "lane t-1",
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 2
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "count": 2
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/device-silent",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {
+        "address": "studio/nothere"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "listingFails": true
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "result": {
+            "error": "host_unavailable"
+          }
+        }
+      ],
+      "target": "other_device"
     }
   ]
 }

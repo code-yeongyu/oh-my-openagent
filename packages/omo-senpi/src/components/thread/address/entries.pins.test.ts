@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { resolveTypedAddress } from "../../remote/device-address"
 import { resolveMember } from "../../remote/resolve"
+import heldBaseAnswers from "./testing/held-answers.base.json"
 import { remoteClientOn, sdkOn, type Cleanups } from "./testing/entries"
 import {
   ALIAS,
@@ -21,6 +22,9 @@ import {
 // lands in its own commit naming the #13016 row it closes. Outcomes are "ok <device>/<thread>" or the refusal code with
 // details.kind or details.reason in parentheses. Session files here are written to disk (sessionFiles), so a read or an
 // open of one answers the session its header names.
+
+// A cell of a site held-answers.ts keeps answers as the base branch did: captured by running this table in the base tree.
+const heldBase = (cell: keyof typeof heldBaseAnswers.answers): string => heldBaseAnswers.answers[cell]
 
 const cleanups: Cleanups = []
 afterEach(async () => {
@@ -112,7 +116,7 @@ const ROWS: readonly Row[] = [
       sdk_send: "caller_context_missing",
       sdk_locate: "caller_context_missing",
       sdk_interrupt: "caller_context_missing",
-      remote_sessions_resolve: "caller_context_missing",
+      remote_sessions_resolve: heldBase("self | remote_sessions_resolve"),
       omo_remote_control: "caller_context_missing",
       omo_remote_send: "caller_context_missing",
     },
@@ -303,7 +307,7 @@ const ROWS: readonly Row[] = [
     setup: { prefixTwin: true },
     answers: {
       thread_send: "ambiguous_target(thread)",
-      thread_handoff_fuzzy: "ambiguous_target(thread)",
+      thread_handoff_fuzzy: heldBase("an ambiguous id prefix on B | thread_handoff_fuzzy"),
       thread_interrupt: "ambiguous_target(thread)",
       thread_read: "ambiguous_target(thread)",
       thread_create_existing: "ambiguous_target(thread)",
@@ -456,7 +460,7 @@ const ROWS: readonly Row[] = [
       sdk_send: "ok HERE/hereSlash",
       sdk_locate: "ok HERE/hereSlash",
       sdk_interrupt: "ok HERE/hereSlash interrupted=false",
-      remote_sessions_resolve: "ok HERE/hereSlash",
+      remote_sessions_resolve: heldBase("text with a slash naming no device | remote_sessions_resolve"),
       omo_remote_control: "not_found(device)",
       omo_remote_send: "not_found(device)",
     },

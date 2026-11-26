@@ -218,7 +218,7 @@ async function runSessionOn(
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer, named }, dependencies)
   // #13016 CTL-26 / CLI-09: a session its device lists as ended is not live, as the thread tools answer it; nothing is
   // sent to its device.
-  const notLive = notLiveRow(row)
+  const notLive = held("remote-verbs-ended-row") ? undefined : notLiveRow(row)
   if (notLive !== undefined) return answer(notLiveAnswer(args.verb === "close" ? "close" : "control", notLive), label)
   const control = createRelayControl(remote, row)
   switch (args.verb) {
@@ -498,3 +498,5 @@ function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
     },
   }
 }
+
+import { held } from "../omo-senpi/src/components/thread/address/held-answers"

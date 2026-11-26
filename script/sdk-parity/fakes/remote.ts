@@ -79,6 +79,8 @@ export function remotePort(recorder: Recorder): {
     live: [STUDIO_THREAD],
     devices,
     ...(given["devicesFail"] === true ? { devicesFail: true } : {}),
+    // `listingFails: true`: the account listing (sessions.list) fails, as a device service that cannot read it does.
+    ...(given["listingFails"] === true ? { failSessionsList: true } : {}),
   })
   const label = (device: unknown): string => (device === STUDIO.id ? STUDIO.label : String(device))
   const address = (device: unknown, session: unknown): string => `${label(device)}/${String(session)}`

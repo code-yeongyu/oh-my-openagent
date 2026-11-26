@@ -1,4 +1,6 @@
 {
   "version": 1,
-  "rows": {}
+  "rows": {
+    "devices.resolve": "T1a"
+  }
 }

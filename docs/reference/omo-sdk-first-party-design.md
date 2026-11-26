@@ -372,7 +372,7 @@ The `state` filter, as a fixed table. The thread vocabulary is `opening`, `runni
 | Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
 |---|---|---|---|---|---|
 | `devices.list()` | `omo remote devices`; `omo account devices` | `thread_list` (its `devices` block) | yes; one listing after #14881 | None | shipped |
-| `devices.resolve({ device })` | implicit in every `<device>/...` | none | partial: remote module | Tool and CLI omitted: resolution is part of each verb | T1a |
+| `devices.resolve({ device })` | implicit in every `<device>/...` | none | yes | Tool and CLI omitted: resolution is part of each verb | T1a |
 | `devices.rename({ id, name })`, the name bounded as the sign-in bounds it (#14523) | none | none | yes | CLI planned (A1c): `omo account devices rename`. Tool omitted: an account-level change a person makes | A1c |
 | `devices.revoke({ device, confirm_name })`: by id, name or unique prefix; an ambiguity revokes nothing; never this device | `omo account devices revoke <id>` | none | **no** (#14364 keeps it as its last step) | Tool omitted: it destroys a sign-in and is the person's decision | A1c |
 

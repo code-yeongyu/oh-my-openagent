@@ -294,7 +294,12 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     const device = await resolveRemoteDevice(core, typedDevice, stage)
     // Design section 5, the text-with-a-slash row: a device reading is taken only when the first part names a device;
     // otherwise the whole text is a bare address, because a thread name may contain `/` (T1a finding 6).
-    if (device.kind === "error" && device.code === "not_found" && device.details?.["kind"] === "device") {
+    if (
+      !held("remote-resolve-slash") &&
+      device.kind === "error" &&
+      device.code === "not_found" &&
+      device.details?.["kind"] === "device"
+    ) {
       const listed = await core.sessionsList(undefined, stage(DEADLINES.sessionsList))
       if (listed.kind === "error") return listed
       remember(listed.value.rows, undefined)
@@ -333,3 +338,5 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     )
   }
 }
+
+import { held } from "../thread/address/held-answers"

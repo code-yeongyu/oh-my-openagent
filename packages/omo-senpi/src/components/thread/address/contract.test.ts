@@ -36,11 +36,13 @@ const ROWS: readonly Row[] = [
     want: "local HERE/hereLive",
   },
   {
-    rule: "fuzzy: an exact ambiguous_target answers as is, never swallowed into not_found",
+    // Held (held-answers.ts handoff-exact-ambiguity): the base answer stands until T1c clears threads.handoff, which
+    // flips this row to ambiguous_target in the same commit that removes the entry.
+    rule: "fuzzy: an exact ambiguous_target is ranked past while the hand-off row is held, answering not_found",
     address: T.bLive.slice(0, 8),
     request: { ...DELIVER, match: "fuzzy" },
     setup: { prefixTwin: true },
-    want: "ambiguous_target",
+    want: "not_found",
   },
   {
     rule: "a reply resolves to the sender it answers, by id",

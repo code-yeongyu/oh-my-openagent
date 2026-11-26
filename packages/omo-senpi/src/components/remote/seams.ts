@@ -25,7 +25,7 @@ export function canonicalizeThreadHandle(
     return remoteFailure("invalid_arguments", "A thread address is empty.", nextActionFor("invalid_arguments"))
   const parsed = parseAddress(text)
   // Design section 5, the caller row: `self` names the calling session, and a client of the remote module has none.
-  if (parsed.kind === "self")
+  if (parsed.kind === "self" && !held("remote-resolve-self"))
     return remoteFailure(
       "caller_context_missing",
       "self names the calling session, and this caller has none.",
@@ -52,3 +52,5 @@ export function describeThread(row: SessionRow): string {
   const label = row.name !== "" ? row.name : row.title !== "" ? row.title : "untitled thread"
   return `"${label}" on ${row.device.name} (${row.thread})`
 }
+
+import { held } from "../thread/address/held-answers"

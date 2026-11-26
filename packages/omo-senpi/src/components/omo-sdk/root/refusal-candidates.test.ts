@@ -67,6 +67,17 @@ describe("refusal candidates are the caller's list rows (ruling B2)", () => {
       })
 })
 
+describe("device refusal candidates (ruling B2)", () => {
+  for (const [kind, principal] of Object.entries(PRINCIPALS))
+    test(`#given a ${kind} #when devices.resolve names no device #then every candidate keeps its device id and name only`, async () => {
+      const refused = await call("devices.resolve", principal, { device: "nowhere" })
+      expect(Reflect.get(Object(Reflect.get(Object(refused), "error")), "code")).toBe("not_found")
+      const candidates = candidatesOf(refused)
+      expect(candidates.length).toBeGreaterThan(0)
+      for (const candidate of candidates) expect(Object.keys(candidate).toSorted()).toEqual(["device", "name"])
+    })
+})
+
 describe("the projection itself", () => {
   const rows = [{ thread: "t-1", name: "lane", cwd: "/w", state: "idle" }]
   const candidates = [

@@ -1,0 +1,9 @@
+{
+  "captured_from": "08c03295c9cdc4b85306d355c4e120051a43b00c",
+  "by": "this table's entries over the head's two-devices fixture, run in the base tree",
+  "answers": {
+    "an ambiguous id prefix on B | thread_handoff_fuzzy": "not_found(thread)",
+    "self | remote_sessions_resolve": "not_found(session)",
+    "text with a slash naming no device | remote_sessions_resolve": "not_found(device)"
+  }
+}
