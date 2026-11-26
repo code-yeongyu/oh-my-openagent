@@ -285,10 +285,11 @@ describe("a row added to the SDK runtime file table", () => {
     const out = await mkdtemp(join(tmpdir(), "omo-sdk-probe-row-"))
     const reproduction = await mkdtemp(join(tmpdir(), "omo-sdk-probe-row-expected-"))
     perTestRoots.push(source, out, reproduction)
-    await writeFile(
-      join(source, "entry.ts"),
-      `export { RUNTIME_STAMP } from "../../components/omo-sdk/runtime-stamp"\nexport const probe = "probe"\n`,
-    )
+    for (const name of ["entry", "sibling"])
+      await writeFile(
+        join(source, `${name}.ts`),
+        `export { RUNTIME_STAMP } from "../../components/omo-sdk/runtime-stamp"\nexport const ${name} = "${name}"\n`,
+      )
     const probe = {
       name: "probe",
       entry: join(source, "entry.ts"),
@@ -300,26 +301,36 @@ describe("a row added to the SDK runtime file table", () => {
       packages: [],
     }
     const table = [...SDK_RUNTIME_FILES, probe]
+    // What is built: the probe and a second tiny row, so the stamp is compared across two files of one build without
+    // rebuilding the shipped rows (those are built and pinned once, by the shared build above). Every check that does not
+    // build takes the whole table.
+    const sibling = {
+      ...probe,
+      name: "sibling",
+      entry: join(source, "sibling.ts"),
+      output: "runtime/omo-sdk/sibling.js",
+    }
+    const built = [sibling, probe]
     const defines = omoSenpiBuildDefines(packageVersion)
 
     // built, with the stamp every file of the build carries
-    const inputs = await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(out, table), defines, table)
-    const paths = sdkRuntimeOutputPaths(out, table)
+    const inputs = await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(out, built), defines, built)
+    const paths = sdkRuntimeOutputPaths(out, built)
     expect(inputs.probe.some((input) => input.endsWith("entry.ts"))).toBe(true)
-    const [probeStamp, threadsStamp] = await Promise.all(
-      [paths.probe, paths.threads].map(async (path) => (await importBuilt(path)).RUNTIME_STAMP),
+    const [probeStamp, siblingStamp] = await Promise.all(
+      [paths.probe, paths.sibling].map(async (path) => (await importBuilt(path)).RUNTIME_STAMP),
     )
-    expect(probeStamp).toBe(threadsStamp)
+    expect(probeStamp).toBe(siblingStamp)
 
     // sized and kept-list-checked by the same pins as the shipped rows; each negative control is named
-    const { set } = await staticModuleSet(undefined, { row: probe, table })
+    const { set } = await staticModuleSet(undefined, { row: probe, table: built })
     await writeFile(probe.staticSet, JSON.stringify({ definition: staticSetDefinition(probe), modules: set }))
-    expect(await pinFindings(probe, paths.probe, inputs.probe, table)).toEqual(pinned(probe))
-    expect((await pinFindings({ ...probe, ceiling: 1 }, paths.probe, inputs.probe, table)).overCeiling).toMatch(
+    expect(await pinFindings(probe, paths.probe, inputs.probe, built)).toEqual(pinned(probe))
+    expect((await pinFindings({ ...probe, ceiling: 1 }, paths.probe, inputs.probe, built)).overCeiling).toMatch(
       /over its ceiling of 1$/,
     )
     await writeFile(probe.staticSet, JSON.stringify({ definition: staticSetDefinition(probe), modules: set.slice(1) }))
-    expect((await pinFindings(probe, paths.probe, inputs.probe, table)).added).toEqual([set[0]])
+    expect((await pinFindings(probe, paths.probe, inputs.probe, built)).added).toEqual([set[0]])
 
     // listed for the installer; every other row leaves it external, and it leaves every other row external, the root
     // included, so a lazy file that imports the root's specifier cannot inline the root (review 6076881626)
@@ -330,8 +341,8 @@ describe("a row added to the SDK runtime file table", () => {
     }
 
     // checked for freshness: current against an independent reproduction, then missing, then stale
-    await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(reproduction, table), defines, table)
-    const expected = sdkRuntimeOutputPaths(reproduction, table)
+    await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(reproduction, built), defines, built)
+    const expected = sdkRuntimeOutputPaths(reproduction, built)
     expect(await sdkRuntimeFilesCurrent(paths, expected)).toEqual({ ok: true })
     await writeFile(paths.probe, `${readFileSync(paths.probe, "utf8")}\n`)
     expect(await sdkRuntimeFilesCurrent(paths, expected)).toEqual({
