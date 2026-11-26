@@ -3,7 +3,7 @@ import type { DagRecovery, InstalledDagRun } from "../../../../senpi-task/src/da
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunId } from "../../../../senpi-task/src/dag/types"
 import { controlJournal } from "../../../../senpi-task/src/dag/node-control-context"
-import { decideDagRun } from "../../../../senpi-task/src/dag/run-acquisition"
+import { dagRunEligibility, decideDagRun } from "../../../../senpi-task/src/dag/run-acquisition"
 import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 import { dispatchGuidance } from "../../../../senpi-task/src/pause/guidance"
 import type { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
@@ -38,10 +38,7 @@ function stopUnderHolderRule(
   }
   let refusedBy: number | undefined
   const journal = controlJournal({ ...options, initialRecord: record }, record, undefined, (fresh) => {
-    const decision = decideDagRun(fresh, {
-      probe,
-      eligible: (run) => STOPPABLE.has(run.status) && (run.pause?.pauseSeq ?? 0) < pauseSeq,
-    })
+    const decision = decideDagRun(fresh, { probe, eligible: dagRunEligibility.userStop(pauseSeq) })
     if (decision.kind === "not_eligible") return true
     if (decision.kind === "free") return false
     const scheduling = fresh.status !== "paused" || fresh.leaseHolderPid === decision.holderPid
@@ -51,8 +48,6 @@ function stopUnderHolderRule(
   journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq })
   return refusedBy
 }
-
-const STOPPABLE = new Set(["pending", "running", "paused"])
 
 export function createDagRunPauseSource(ports: {
   readonly barrier: AdmissionBarrier

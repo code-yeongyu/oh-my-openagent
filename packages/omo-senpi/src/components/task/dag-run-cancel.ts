@@ -1,10 +1,13 @@
 import type { DagFileStore, DagRunId, DagRunRecordV1, DagSchedulerOptions } from "@oh-my-opencode/senpi-task/dag"
 
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/node-control-context"
-import { acquireDagRun, type DagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
+import {
+  acquireDagRun,
+  dagRunEligibility,
+  type DagRunReservations,
+} from "../../../../senpi-task/src/dag/run-acquisition"
 import type { DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler } from "../../../../senpi-task/src/dag/scheduler"
-import { TERMINAL_DAG_RUN_STATUSES } from "../../../../senpi-task/src/dag/types"
 import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 import { endPausedRunChildren, type PausedNodeHoldPort } from "./dag-paused-cancel"
 import type { OwnedScheduler } from "./dag-scheduler-registry"
@@ -47,7 +50,7 @@ export function createDagRunCancel(ports: {
         operation: "cancel",
         probe: ports.holders,
         reservation,
-        eligible: (fresh) => fresh.parentSessionId === parentSessionId && !TERMINAL_DAG_RUN_STATUSES.has(fresh.status),
+        eligible: dagRunEligibility.unheldCancel(parentSessionId),
       })
       if (acquired.kind === "held") {
         throw new DagNodeControlError({

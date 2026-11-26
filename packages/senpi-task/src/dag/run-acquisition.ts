@@ -6,7 +6,7 @@
 import type { DagRunRecordV1 } from "./manager"
 import { liveForeignHolder, type DagRunHolderProbe } from "./run-lease"
 import type { DagFileStore } from "./store"
-import type { DagRunId } from "./types"
+import { TERMINAL_DAG_RUN_STATUSES, type DagRunId } from "./types"
 
 /** This process's claim on one run while an operation installs, re-enters or mutates it. */
 export type DagRunReservation = {
@@ -52,6 +52,75 @@ export function createDagRunReservations(): DagRunReservations {
 }
 
 type LeasedRecord = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
+type Eligibility = (fresh: LeasedRecord) => boolean
+
+const LIVE_STATUSES = new Set(["pending", "running"])
+const STOPPABLE_STATUSES = new Set(["pending", "running", "paused"])
+const hasActiveNode = (record: LeasedRecord): boolean =>
+  record.nodes.some((node) => node.state === "scheduled" || node.state === "running")
+const stoppedByUser = (record: LeasedRecord): boolean => record.pause?.reason === "user_stop"
+
+/**
+ * Each entry's complete eligibility, decided on the fresh record under the run lock (#15125). An
+ * entry passes exactly one of these to `acquireDagRun` / `decideDagRun`; a pre-check outside the lock
+ * is only ever a fast path whose answer this re-decides.
+ */
+export const dagRunEligibility = {
+  /** A fresh start: still `pending`, of this session. */
+  freshStart:
+    (parentSessionId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId && fresh.status === "pending",
+  /** A retry or amend re-entry: of this session; settled, or paused (not by the user) with no active node. */
+  reentry:
+    (parentSessionId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId &&
+      (TERMINAL_DAG_RUN_STATUSES.has(fresh.status) ||
+        (fresh.status === "paused" && !stoppedByUser(fresh) && !hasActiveNode(fresh))),
+  /**
+   * Automatic recovery (session start, lease-watch re-sweep): of this session; paused but never by the
+   * user and not held by a scheduler here, or left `running` with no scheduler here.
+   */
+  automaticRecovery:
+    (parentSessionId: string, heldHere: () => boolean | undefined): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId &&
+      ((fresh.status === "paused" && !stoppedByUser(fresh) && heldHere() !== true) ||
+        (fresh.status === "running" && heldHere() === false)),
+  /** A fork adopting its immediate source's run: paused but never by the user, with a recorded holder. */
+  forkSourceAdoption:
+    (sourceSessionId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === sourceSessionId &&
+      fresh.status === "paused" &&
+      !stoppedByUser(fresh) &&
+      (fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid) !== undefined,
+  /** The user's Resume: of this session, paused by exactly the Stop being resumed, not held here. */
+  userResume:
+    (parentSessionId: string, pauseSeq: number, heldHere: () => boolean | undefined): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId &&
+      fresh.status === "paused" &&
+      stoppedByUser(fresh) &&
+      fresh.pause?.pauseSeq === pauseSeq &&
+      heldHere() !== true,
+  /** Cancel of a run no scheduler here holds: of this session, not yet settled. */
+  unheldCancel:
+    (parentSessionId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId && !TERMINAL_DAG_RUN_STATUSES.has(fresh.status),
+  /** The shutdown pause: of this session, still live, not stopped by the user. */
+  shutdownPause:
+    (parentSessionId: string): Eligibility =>
+    (fresh) =>
+      fresh.parentSessionId === parentSessionId && LIVE_STATUSES.has(fresh.status) && !stoppedByUser(fresh),
+  /** The user's Stop: live or paused, not already under this Stop or a newer one. */
+  userStop:
+    (pauseSeq: number): Eligibility =>
+    (fresh) =>
+      STOPPABLE_STATUSES.has(fresh.status) && (fresh.pause?.pauseSeq ?? 0) < pauseSeq,
+} as const
 
 export type DagRunAcquisition<T extends LeasedRecord> =
   | { readonly kind: "acquired"; readonly record: T; readonly reservation: DagRunReservation | undefined }

@@ -3,7 +3,7 @@
 import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
-import { acquireDagRun, type DagRunAcquisition } from "./run-acquisition"
+import { acquireDagRun, dagRunEligibility, type DagRunAcquisition } from "./run-acquisition"
 import { liveForeignHolder, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
@@ -121,19 +121,10 @@ export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunI
     operation: "re-entry",
     probe,
     ...(options.reservation === undefined ? {} : { reservation: options.reservation }),
-    eligible: (fresh) => fresh.parentSessionId === parentSessionId && reenterable(fresh),
+    eligible: dagRunEligibility.reentry(parentSessionId),
   })
   if (acquired.kind !== "acquired") throw reentryRefusal(runId, acquired, parentSessionId)
   return heldBefore ? () => undefined : () => releaseDagRunLease(options.store, runId, probe.hostPid)
-}
-
-function reenterable(record: DagRunRecordV1): boolean {
-  if (TERMINAL_DAG_RUN_STATUSES.has(record.status)) return true
-  return record.status === "paused" && record.pause?.reason !== "user_stop" && !record.nodes.some(isActiveNode)
-}
-
-function isActiveNode(node: DagRunRecordV1["nodes"][number]): boolean {
-  return node.state === "scheduled" || node.state === "running"
 }
 
 function reentryRefusal(

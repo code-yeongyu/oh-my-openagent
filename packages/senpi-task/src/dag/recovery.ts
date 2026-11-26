@@ -143,7 +143,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     installResumedRun: async (runId, parentSessionId, pauseSeq, credential) => {
       const record = context.store.readCheckpoint<RecoverableRecord>(runId)
       if (record?.pause?.pauseSeq !== pauseSeq) return { kind: "skipped", runId, reason: "not_paused" }
-      const claim = claimPausedRun(context, runId, parentSessionId)
+      const claim = claimPausedRun(context, runId, parentSessionId, { kind: "resume", pauseSeq })
       if (claim.kind === "skipped") return { ...claim, runId }
       try {
         const context_ = { ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) }
@@ -198,9 +198,11 @@ async function visitPausedRuns(
     if (observed.pause?.reason === "user_stop") continue
     const foreign = observed.parentSessionId !== parentSessionId
     if (foreign && (forkSource === undefined || normalizeSessionId(observed.parentSessionId) !== forkSource)) continue
-    const claim = foreign
-      ? claimOrphanedRun(context, observed, parentSessionId)
-      : claimPausedRun(context, observed.runId, parentSessionId)
+    // The observed filters above are fast paths only: each claim re-decides on the fresh record.
+    const claim =
+      foreign && forkSource !== undefined
+        ? claimOrphanedRun(context, observed.runId, observed.parentSessionId, parentSessionId)
+        : claimPausedRun(context, observed.runId, parentSessionId, { kind: "automatic" })
     if (claim.kind === "skipped") {
       if (!foreign && claim.reason === "live_lease") {
         outcomes.push({ runId: observed.runId, kind: "skipped", reason: claim.reason, holderPid: claim.holderPid })

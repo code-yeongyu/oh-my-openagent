@@ -2,10 +2,8 @@
 // paused, and the pause write hands this host's lease over as the previous holder (#15125).
 import { dagRunPausedEvent } from "./events"
 import { listRunRecords, recoveryJournal, type RecoverableRecord, type RecoveryContext } from "./recovery"
-import { acquireDagRun } from "./run-acquisition"
+import { acquireDagRun, dagRunEligibility } from "./run-acquisition"
 import type { DagRunId } from "./types"
-
-const LIVE_RUN_STATUSES = new Set(["pending", "running"])
 
 export function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: string): readonly DagRunId[] {
   const paused: DagRunId[] = []
@@ -17,10 +15,7 @@ export function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: 
       operation: "shutdown pause",
       probe: context,
       reservations: context.reservations,
-      eligible: (fresh) =>
-        fresh.parentSessionId === parentSessionId &&
-        LIVE_RUN_STATUSES.has(fresh.status) &&
-        fresh.pause?.reason !== "user_stop",
+      eligible: dagRunEligibility.shutdownPause(parentSessionId),
     })
     if (acquired.kind !== "acquired") continue
     try {

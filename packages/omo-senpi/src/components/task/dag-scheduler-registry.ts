@@ -8,7 +8,11 @@ import type {
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { ComponentLogger } from "../../extension/types"
-import { acquireDagRun, type DagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
+import {
+  acquireDagRun,
+  dagRunEligibility,
+  type DagRunReservations,
+} from "../../../../senpi-task/src/dag/run-acquisition"
 import { releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
 
@@ -75,7 +79,7 @@ export function createDagSchedulerRegistry(ports: {
       operation: "start",
       probe: lease,
       reservations: ports.reservations,
-      eligible: (fresh) => fresh.status === "pending" && fresh.parentSessionId === parentSessionId,
+      eligible: dagRunEligibility.freshStart(parentSessionId),
     })
     if (acquired.kind !== "acquired") return !(acquired.kind === "not_eligible" && acquired.record.status === "running")
     try {
