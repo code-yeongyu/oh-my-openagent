@@ -7058,6 +7058,23 @@
           }
         }
       ]
+    },
+    {
+      "id": "threads.list/unknown-key-refused",
+      "row": "threads.list",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
     }
   ]
 }

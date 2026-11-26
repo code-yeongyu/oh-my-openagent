@@ -96,11 +96,31 @@ export const invalidInput = (key: RootCallKey): OmoFailure["error"] => ({
  * today (design lane ruling on closed schemas). Closed list: slice P1a's follow-up fills it and pins each call; whether
  * such a key should be refused instead is a later, recorded decision.
  */
-const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
+const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = [
+  // The shipped calls that have always ignored an unknown top-level key keep doing so (#15014); whether they should
+  // refuse it instead is #15016. script/sdk-parity/unknown-key-pins.test.ts pins each through the real root.
+  "config.status",
+  "account.whoami",
+  "account.signIn",
+  "devices.list",
+  "devices.rename",
+  "deviceService.status",
+  "daemon.warm",
+]
 
-/** The input as its schema sees it: for a call in the list, only the keys the schema names. */
+const isPlainObject = (input: unknown): input is object => {
+  if (typeof input !== "object" || input === null) return false
+  const prototype: unknown = Object.getPrototypeOf(input)
+  return prototype === Object.prototype || prototype === null
+}
+
+/**
+ * The input as its schema sees it: for a call in the list, a plain object loses only the keys the schema does not name.
+ * Any other input (an array, a primitive, a class instance) reaches the schema check unchanged, so the list never
+ * changes what type a call accepts (review 6070597557).
+ */
 async function checkedInput(key: RootCallKey, input: unknown): Promise<unknown> {
-  if (!UNKNOWN_KEYS_DROPPED.includes(key) || typeof input !== "object" || input === null) return input
+  if (!UNKNOWN_KEYS_DROPPED.includes(key) || !isPlainObject(input)) return input
   const { ROOT_CALLS } = await import("../contract/calls")
   const named = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
   return Object.fromEntries(Object.entries(input).filter(([field]) => named.includes(field)))

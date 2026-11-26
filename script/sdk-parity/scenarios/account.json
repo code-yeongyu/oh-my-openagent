@@ -700,6 +700,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "account.show/unknown-key-refused",
+      "row": "account.show",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
     }
   ]
 }

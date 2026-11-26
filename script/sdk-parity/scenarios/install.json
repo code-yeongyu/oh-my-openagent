@@ -1816,6 +1816,23 @@
         }
       ],
       "refusal": "unsupported"
+    },
+    {
+      "id": "install.setup.detect/unknown-key-refused",
+      "row": "install.setup.detect",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
     }
   ]
 }

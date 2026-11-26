@@ -179,6 +179,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "config.migrate/unknown-key-refused",
+      "row": "config.migrate",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
     }
   ]
 }

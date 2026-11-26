@@ -637,7 +637,8 @@
                     },
                     "additionalProperties": false
                   }
-                }
+                },
+                "additionalProperties": false
               }
             ]
           },

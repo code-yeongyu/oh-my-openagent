@@ -609,6 +609,24 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "devices.resolve/unknown-key-refused",
+      "row": "devices.resolve",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "device": "desktop",
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.resolve",
+          "count": 0
+        }
+      ]
     }
   ]
 }

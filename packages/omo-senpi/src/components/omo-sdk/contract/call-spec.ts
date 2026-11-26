@@ -14,12 +14,24 @@ export type CallSpec<Input extends TSchema, Result, Shape extends AnswerShape, W
   readonly [RESULT]?: Result
 }
 
+// Design 4.4: an input outside the call's schema answers invalid_arguments, an unknown key included. The thread tools'
+// own parameter schemas are open objects, so every root input is closed here, at the one place a call is declared: the
+// top-level object, or each object form of a union. The static type is the schema's own; only validation narrows.
+type Node = { readonly type?: unknown; readonly anyOf?: readonly Node[]; readonly additionalProperties?: unknown }
+const closeNode = (node: Node): Node =>
+  node.anyOf !== undefined
+    ? { ...node, anyOf: node.anyOf.map(closeNode) }
+    : node.type === "object" && node.additionalProperties === undefined
+      ? { ...node, additionalProperties: false }
+      : node
+const closed = <Input extends TSchema>(input: Input): Input => closeNode(input as Node) as Input
+
 export type StreamResult<Event, Outcome> = { readonly event: Event; readonly outcome: Outcome }
 
 export const valueCall =
   <Result>() =>
   <Input extends TSchema>(input: Input): CallSpec<Input, Result, "value", true> => ({
-    input,
+    input: closed(input),
     answer: "value",
     waits: true,
   })
@@ -28,7 +40,7 @@ export const valueCall =
 export const instantCall =
   <Result>() =>
   <Input extends TSchema>(input: Input): CallSpec<Input, Result, "value", false> => ({
-    input,
+    input: closed(input),
     answer: "value",
     waits: false,
   })
@@ -36,7 +48,7 @@ export const instantCall =
 export const threadCall =
   <Result>() =>
   <Input extends TSchema>(input: Input): CallSpec<Input, Result, "thread", true> => ({
-    input,
+    input: closed(input),
     answer: "thread",
     waits: true,
   })
@@ -44,7 +56,7 @@ export const threadCall =
 export const streamCall =
   <Event, Outcome>() =>
   <Input extends TSchema>(input: Input): CallSpec<Input, StreamResult<Event, Outcome>, "stream", true> => ({
-    input,
+    input: closed(input),
     answer: "stream",
     waits: true,
   })

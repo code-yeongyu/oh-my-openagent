@@ -541,6 +541,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "deviceService.info/unknown-key-refused",
+      "row": "deviceService.info",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.info",
+          "count": 0
+        }
+      ]
     }
   ]
 }

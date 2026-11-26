@@ -399,6 +399,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "sync.status/unknown-key-refused",
+      "row": "sync.status",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
     }
   ]
 }

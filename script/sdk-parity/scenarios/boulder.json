@@ -170,6 +170,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "boulder.status/unknown-key-refused",
+      "row": "boulder.status",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
     }
   ]
 }
