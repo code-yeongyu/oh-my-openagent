@@ -115,12 +115,12 @@ describe("computer-is-gates --adoption ledger rules", () => {
     {
       name: "a row number past the program's last row",
       lines: [entry("ADP-1", "goat-cu", "adopt", "4, 999")],
-      finding: "ADOPTION ledger line 2: ADP-1 names row 999, outside the program's rows 1-51",
+      finding: "ADOPTION ledger line 2: ADP-1 names row 999, outside the program's rows 1-53",
     },
     {
       name: "row 0",
       lines: [entry("ADP-1", "goat-cu", "adopt", "0")],
-      finding: "ADOPTION ledger line 2: ADP-1 names row 0, outside the program's rows 1-51",
+      finding: "ADOPTION ledger line 2: ADP-1 names row 0, outside the program's rows 1-53",
     },
     { name: "a ledger with no entries", lines: [], finding: "ADOPTION ledger has no entries" },
   ]

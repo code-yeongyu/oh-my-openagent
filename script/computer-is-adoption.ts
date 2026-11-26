@@ -14,8 +14,8 @@ const LEDGER = "script/computer-adoption.tsv"
 const NOTICES = "THIRD-PARTY-NOTICES.md"
 const COLUMNS = ["id", "source", "head", "licence", "verdict", "mechanism", "rows"] as const
 const VERDICTS = ["adopt", "adapt", "probe", "reject"] as const
-// The ideal-state plan has 51 rows (todos 1-51); ledger rows name those, never cu-v3 rows.
-const LAST_PROGRAM_ROW = 51
+// The ideal-state plan has 53 rows (todos 1-53); ledger rows name those, never cu-v3 rows.
+const LAST_PROGRAM_ROW = 53
 const PORT_MARKER = /adoption-port: (ADP-\d+)/g
 const PROOF_TAG = /\[(ADP-\d+)\]/
 const PROOF_PATH = /(\.(test|spec)\.[cm]?[jt]sx?$|_test\.rs$|(^|\/)(tests?|qa|scenarios?)\/)/
