@@ -63,6 +63,58 @@ describe("shipped root calls that ignore an unknown key today (recorded differen
     })
 })
 
+// The recorded difference covers extra keys on an otherwise valid object only, never the input's type (review
+// 6070597557): an array, even one carrying every named key, and a primitive are refused exactly as for any other call.
+// account.signIn is not here: its root member (root/account-sign-in.ts) dispatches between its two contracts before
+// the boundary's check, so the boundary's list never sees its input.
+const BOUNDARY_CHECKED = SHIPPED_IGNORING.filter(([key]) => key !== "account.signIn")
+
+describe("shipped root calls that ignore an unknown key still refuse a non-object input", () => {
+  for (const [key, input] of BOUNDARY_CHECKED)
+    for (const [shape, malformed] of [
+      ["an array carrying the valid input's keys", Object.assign([], input)],
+      ["a string", "input"],
+      ["a number", 42],
+    ] as const)
+      test(`#given ${key} #when the input is ${shape} #then it is refused as invalid_arguments`, async () => {
+        const home = mkdtempSync(join(tmpdir(), "omo-non-object-"))
+        const requests: string[] = []
+        const root = createOmoSdk({
+          env: { HOME: home, OMO_SERVICE_API_URL: "http://127.0.0.1:9" },
+          cwd: home,
+          agentDir: join(home, "agent"),
+          ports: {
+            desktopLaunch: () => false,
+            credentialStore: { read: async () => null },
+            session: {
+              accessToken: async () => "token",
+              request: async (path) => {
+                requests.push(path)
+                throw new Error("no service in this test")
+              },
+            },
+            deviceServiceStatus: async () => ({ kind: "no_answer" }) as never,
+            signInProcess: (async () => ({ code: 1 })) as never,
+          },
+        })
+        try {
+          const call = member(root, key) as (input?: unknown) => Promise<unknown>
+          expect(await call(malformed)).toEqual({
+            kind: "error",
+            error: {
+              code: "invalid_arguments",
+              message: `The input of ${key} does not match its schema.`,
+              next_action: expect.any(String),
+            },
+          })
+          expect(requests).toEqual([])
+        } finally {
+          await root.dispose()
+          rmSync(home, { recursive: true, force: true })
+        }
+      })
+})
+
 describe("the scenario table agrees with the recorded difference", () => {
   test("#given the seven calls that ignore an unknown key #then no scenario claims one of them refuses it", () => {
     const ignoring = new Set(SHIPPED_IGNORING.map(([key]) => key))
