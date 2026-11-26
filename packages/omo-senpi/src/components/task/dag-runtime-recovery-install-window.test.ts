@@ -32,12 +32,21 @@ afterEach(() => {
   for (const root of cleanupRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
 })
 
+const DEAD_HOST_PID = 2_147_483_646
 const quietLogger = { info: () => undefined, warn: () => undefined, error: () => undefined }
 
 type NodeStates = Readonly<Record<string, Partial<DagRunRecordV1["nodes"][number]>>>
 
-/** A session whose runs a dead (or dying) host left `running` under its lease, and its successor runtime. */
-async function successorSession(name: string, runs: Readonly<Record<string, NodeStates>>, holder: { alive: boolean }) {
+/**
+ * A session whose runs a dying host left `running` under its lease (`deadHolder` runs name a host
+ * that is already gone), and its successor runtime.
+ */
+async function successorSession(
+  name: string,
+  runs: Readonly<Record<string, NodeStates>>,
+  holder: { alive: boolean },
+  deadHolder: ReadonlySet<string> = new Set(),
+) {
   const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-install-${name}-`))
   cleanupRoots.push(cwd)
   const sessionId = `session-install-${name}`
@@ -54,7 +63,8 @@ async function successorSession(name: string, runs: Readonly<Record<string, Node
     const record = store.readCheckpoint<DagRunRecordV1>(runId)
     if (record === null) throw new Error("expected a started checkpoint")
     const nodes = record.nodes.map((entry) => ({ ...entry, ...states[String(entry.id)] }))
-    store.writeCheckpoint(runId, { ...record, nodes, status: "running", leaseHolderPid: FOREIGN_HOST_PID })
+    const leaseHolderPid = deadHolder.has(key) ? DEAD_HOST_PID : FOREIGN_HOST_PID
+    store.writeCheckpoint(runId, { ...record, nodes, status: "running", leaseHolderPid })
     runIds.set(key, runId)
   }
 
@@ -77,6 +87,8 @@ async function successorSession(name: string, runs: Readonly<Record<string, Node
   }
   const eventTypes = (key: string): readonly DagRunEvent["type"][] =>
     store.readEvents(runId(key), 0, { limit: 500 }).events.map((event) => event.type)
+  const lease = (key: string): number | undefined =>
+    store.readCheckpoint<{ readonly leaseHolderPid?: number }>(runId(key))?.leaseHolderPid
   const status = (key: string): string =>
     store.readCheckpoint<{ readonly status: string }>(runId(key))?.status ?? "missing"
   return {
@@ -87,6 +99,7 @@ async function successorSession(name: string, runs: Readonly<Record<string, Node
     startOwned: admission.calls,
     runId,
     eventTypes,
+    lease,
     status,
     gate: (key: string) => gated.add(runId(key)),
     entered: admission.entered,
@@ -150,6 +163,38 @@ describe("DAG runtime while recovery is still installing a claimed run", () => {
       `${session.runId("gated")}:second`,
     ])
     expect(session.runner.handles).toHaveLength(3)
+    session.runtime.dispose()
+  })
+
+  test("#given a claim still installing and a run a live host holds #when the session shuts down and that host exits afterwards #then no recovery starts after the shutdown", async () => {
+    // given
+    const holder = { alive: true }
+    const session = await successorSession(
+      "shutdown-fence",
+      { claimed: { first: { state: "scheduled" } }, leased: { first: { state: "completed" } } },
+      holder,
+      new Set(["claimed"]),
+    )
+    session.gate("claimed")
+    const attaching = session.runtime.attach()
+    await within(session.entered, "the claim reaching the admission")
+
+    // when - the sweep finishes, and reports the leased run, only after the shutdown began
+    const pausing = session.runtime.pauseForShutdown()
+    session.release()
+    await within(attaching, "attach")
+    await within(pausing, "pauseForShutdown")
+    const before = session.eventTypes("leased")
+
+    // then - no lease watch survives the shutdown
+    expect(session.timers.pending()).toBe(0)
+
+    // and when the leased run's holder exits, no recovery of this host claims it
+    holder.alive = false
+    session.timers.tick()
+    expect(session.lease("leased")).toBe(FOREIGN_HOST_PID)
+    expect(session.eventTypes("leased")).toEqual(before)
+    expect(session.status("leased")).toBe("running")
     session.runtime.dispose()
   })
 })
