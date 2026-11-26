@@ -42,7 +42,12 @@ type Messages = {
   readonly total_items: number
   readonly max_bytes: number
 }
-type Page = { readonly kind: string; readonly items: readonly unknown[]; readonly truncated: boolean; next_cursor?: string }
+type Page = {
+  readonly kind: string
+  readonly items: readonly unknown[]
+  readonly truncated: boolean
+  next_cursor?: string
+}
 type Refused = { readonly kind: "error"; readonly error: { readonly code: string } }
 
 function overCap(answer: unknown): void {
