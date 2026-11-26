@@ -32,7 +32,7 @@ import type {
   TaskRecord,
   TaskRunStats,
 } from "../state"
-import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
+import { createSelfResumedListeners, reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { createSteeringEngine } from "../steering"
 import type {
   CancelOptions,
@@ -239,6 +239,7 @@ class TaskManagerImpl implements TaskManager {
   // Callers can subscribe before a queued task owns a handle. Each entry is attached exactly once
   // when #launch promotes it, and its returned cleanup owns both pending and live subscriptions.
   readonly #childSubscribers = new Map<string, Map<ManagedChildListener, () => void>>()
+  readonly #selfResumed = createSelfResumedListeners()
   // Release guard: latest released run_epoch per task_id. A revived task (higher epoch) can still
   // release its LATER occupancy, while a stale re-release of an already-released epoch is a no-op.
   // Keyed by task_id (not `${taskId}:${epoch}`) so growth is bounded by live tasks and forget()
@@ -1114,6 +1115,10 @@ class TaskManagerImpl implements TaskManager {
     return () => subscribers.get(listener)?.()
   }
 
+  subscribeSelfResumed(taskId: string, listener: () => void): () => void {
+    return this.#selfResumed.subscribe(taskId, listener)
+  }
+
   runStatsSnapshot(taskId: string): TaskRunStats | undefined {
     return this.#runStats.get(taskId)?.snapshot(this.#now())
   }
@@ -1681,6 +1686,7 @@ class TaskManagerImpl implements TaskManager {
       waitForTerminal: (taskId) => this.waitFor(taskId),
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
       trackOutcome: (taskId, handle, model, epoch) => this.#outcome.trackOutcome(taskId, handle, model, epoch),
+      announce: (taskId) => this.#selfResumed.announce(taskId),
     }
   }
 
