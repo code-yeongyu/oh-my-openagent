@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, posix, win32 } from "node:path"
 
-import { isolationProblems, prepareBaseTree } from "./base-tree"
+import { isInside, isInstalled, isolationProblems, prepareBaseTree } from "./base-tree"
 
 // Review 6061267823 H2: the merge-base tree must run its own workspace packages, never the head's. Guards the gate's
 // base-versus-head comparison (design 7.4): a base that imports the head's source compares the head with itself.
@@ -27,6 +27,35 @@ function trees(): { readonly head: string; readonly base: string } {
   mkdirSync(join(head, "node_modules", "left-pad"))
   return { head, base }
 }
+
+// Issue #15052: Windows real paths use backslashes and another drive's path is absolute after relative(); these run the
+// Windows path rules on any host, so a separator assumption fails here before it reaches the hosted Windows leg.
+describe("real paths per path dialect (#15052)", () => {
+  test("#given backslash real paths #then an installed package is recognised by its node_modules directory", () => {
+    expect(isInstalled("C:\\work\\head\\node_modules\\left-pad", win32)).toBe(true)
+    expect(isInstalled("C:\\work\\head\\node_modules\\.bun\\core-copy\\node_modules\\@ws\\core", win32)).toBe(true)
+    expect(isInstalled("C:/work/head/node_modules/left-pad", win32)).toBe(true)
+    expect(isInstalled("C:\\work\\head\\packages\\core", win32)).toBe(false)
+  })
+
+  // Review 6067780823 LOW: on POSIX a backslash is a file-name character, so only "/" separates directories there.
+  test("#given POSIX real paths with a backslash inside a name #then only a whole node_modules directory counts", () => {
+    expect(isInstalled("/work/head/node_modules/left-pad", posix)).toBe(true)
+    expect(isInstalled("/work/head/packages/node_modules-notes", posix)).toBe(false)
+    expect(isInstalled("/work/head/packages/a\\node_modules\\b", posix)).toBe(false)
+    expect(isInstalled("/work/head/node_modules\\x/core", posix)).toBe(false)
+    expect(isInside("/work/head/a\\..\\b", "/work/head", posix)).toBe(true)
+  })
+
+  test("#given Windows paths #then inside, a sibling, a parent and another drive are told apart", () => {
+    expect(isInside("C:\\work\\head\\packages\\core", "C:\\work\\head", win32)).toBe(true)
+    expect(isInside("C:\\work\\head", "C:\\work\\head", win32)).toBe(true)
+    expect(isInside("C:\\work\\head\\..notes", "C:\\work\\head", win32)).toBe(true)
+    expect(isInside("C:\\work\\base\\packages\\core", "C:\\work\\head", win32)).toBe(false)
+    expect(isInside("C:\\work", "C:\\work\\head", win32)).toBe(false)
+    expect(isInside("D:\\cache\\left-pad", "C:\\work\\head", win32)).toBe(false)
+  })
+})
 
 describe("merge-base dependency isolation (review H2)", () => {
   test("#given a package-level node_modules whose workspace link points at the head (review 6061624223 M4) #then it is named", () => {
