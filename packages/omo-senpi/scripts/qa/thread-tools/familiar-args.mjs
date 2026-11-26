@@ -52,7 +52,10 @@ print("QA15073=" + JSON.stringify({
   fixed: outcome(fixed),
 }))
 `
-const CALL = { name: "eval", args: { language: "js", summary: "QA: thread tools under familiar argument names", code: CELL } }
+const CALL = {
+  name: "eval",
+  args: { language: "js", summary: "QA: thread tools under familiar argument names", code: CELL },
+}
 const textOf = (message) =>
   typeof message?.content === "string"
     ? message.content
@@ -135,13 +138,24 @@ report.assert(
 )
 report.assert(
   "thread_read-limit-and-tail-take-the-newest",
-  out?.readLimit === "ok" && out.readLimitN >= 1 && out.readLimitN <= 2 && out?.readTail === "ok" && out.readTailN === out.readLimitN,
+  out?.readLimit === "ok" &&
+    out.readLimitN >= 1 &&
+    out.readLimitN <= 2 &&
+    out?.readTail === "ok" &&
+    out.readTailN === out.readLimitN,
   `limit=${out?.readLimit}/${out?.readLimitN} tail=${out?.readTail}/${out?.readTailN}`,
 )
-report.assert("thread_read-limit-with-cursor-refused", out?.readBoth === "invalid_arguments", `readBoth=${out?.readBoth}`)
+report.assert(
+  "thread_read-limit-with-cursor-refused",
+  out?.readBoth === "invalid_arguments",
+  `readBoth=${out?.readBoth}`,
+)
 report.assert(
   "unknown-field-refused-with-a-runnable-corrected-call",
-  out?.unknown === "invalid_arguments" && out.unknownField === "bogus" && out.nextShowsCorrected === true && out?.fixed === "ok",
+  out?.unknown === "invalid_arguments" &&
+    out.unknownField === "bogus" &&
+    out.nextShowsCorrected === true &&
+    out?.fixed === "ok",
   `unknown=${out?.unknown} field=${out?.unknownField} corrected=${out?.corrected} fixed=${out?.fixed}`,
 )
 const shardSockets = stopOwnedShardHosts(scratch.dir)

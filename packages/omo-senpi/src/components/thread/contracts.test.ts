@@ -223,8 +223,16 @@ const CENSUS_CALLS: readonly CensusCase[] = [
   { tool: "thread_read", call: { thread: T, wait_ms: 0 }, ok: { thread: T, wait_ms: 0 } },
   { tool: "thread_read", call: { thread: T, mode: "status" }, refused: { field: "mode" } },
   { tool: "thread_read", call: { thread: T, query: "review CLEAR" }, refused: { field: "query" } },
-  { tool: "thread_send", call: { thread: T, message: "hi", timeout: 60 }, refused: { field: "timeout", suggestion: undefined } },
-  { tool: "thread_send", call: { thread: T, message: "hi", mode: "steer" }, ok: { thread: T, message: "hi", delivery: "steer" } },
+  {
+    tool: "thread_send",
+    call: { thread: T, message: "hi", timeout: 60 },
+    refused: { field: "timeout", suggestion: undefined },
+  },
+  {
+    tool: "thread_send",
+    call: { thread: T, message: "hi", mode: "steer" },
+    ok: { thread: T, message: "hi", delivery: "steer" },
+  },
   { tool: "thread_send", call: { thread: T, text: "hi" }, refused: { field: "text", suggestion: "message" } },
   { tool: "thread_list", call: { limit: 5 }, ok: { limit: 5 } },
   { tool: "thread_list", call: { query: "gw-29" }, ok: { query: "gw-29" } },
@@ -239,7 +247,11 @@ const CENSUS_CALLS: readonly CensusCase[] = [
     call: { thread: T, model: "anthropic/claude-opus-5-5", reasoning: "medium" },
     ok: { thread: T, model: "anthropic/claude-opus-5-5", reasoning: "medium" },
   },
-  { tool: "thread_set_reasoning", call: { thread: T, reasoning: "high" }, refused: { field: "reasoning", suggestion: "level" } },
+  {
+    tool: "thread_set_reasoning",
+    call: { thread: T, reasoning: "high" },
+    refused: { field: "reasoning", suggestion: "level" },
+  },
   { tool: "thread_rename", call: { thread: T, title: "lane-2" }, ok: { thread: T, name: "lane-2" } },
 ]
 
@@ -263,7 +275,8 @@ describe("the census's wrong calls (#15073)", () => {
       // The corrected call parses: following the refusal's advice never meets the same refusal again.
       const args = JSON.parse((corrected as string).replace(/^tool\.\w+\(/, "").replace(/\)$/, "")) as unknown
       const again = parseThreadParams(threadToolParamSchemas[c.tool], args)
-      if (again.kind === "error") expect((again.error.details as Record<string, unknown> | undefined)?.["field"]).not.toBe(c.refused?.field)
+      if (again.kind === "error")
+        expect((again.error.details as Record<string, unknown> | undefined)?.["field"]).not.toBe(c.refused?.field)
     },
   )
 

@@ -54,7 +54,9 @@ export function parseThreadParams<S extends TObject>(schema: S, input: unknown):
     input = aliased.value
     const known = Object.keys(schema.properties)
     // A key set to undefined passes nothing (a caller spreading its optional fields), so only a field with a value counts.
-    const unknown = Object.entries(aliased.value).find(([field, value]) => value !== undefined && !known.includes(field))?.[0]
+    const unknown = Object.entries(aliased.value).find(
+      ([field, value]) => value !== undefined && !known.includes(field),
+    )?.[0]
     if (unknown !== undefined) {
       const suggestion = MEANT[unknown]?.find((field) => known.includes(field))
       const { [unknown]: given, ...rest } = aliased.value
@@ -139,7 +141,9 @@ function correctedCall(tool: string | undefined, args: Record<string, unknown>):
       .filter(([, value]) => value !== undefined)
       .map(([field, value]) => [
         field,
-        typeof value === "string" && value.length > SHOWN_STRING_CHARS ? `${value.slice(0, SHOWN_STRING_CHARS)}...` : value,
+        typeof value === "string" && value.length > SHOWN_STRING_CHARS
+          ? `${value.slice(0, SHOWN_STRING_CHARS)}...`
+          : value,
       ]),
   )
   return `tool.${tool ?? "<tool>"}(${JSON.stringify(shown)})`

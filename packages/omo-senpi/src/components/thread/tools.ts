@@ -430,22 +430,17 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     ...metadata("thread_list"),
     parameters: threadToolParamSchemas.thread_list,
     execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) =>
-      execute(
-        "thread_list",
-        id,
-        args,
-        ectx,
-        async (current, value) =>
-          narrowListing(
-            await listAcross(
-              options.remote,
-              await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
-              value.all_scope === true,
-              value.state,
-            ),
-            value.query,
-            value.limit,
+      execute("thread_list", id, args, ectx, async (current, value) =>
+        narrowListing(
+          await listAcross(
+            options.remote,
+            await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
+            value.all_scope === true,
+            value.state,
           ),
+          value.query,
+          value.limit,
+        ),
       ),
   }
   const read: AnyTool = {

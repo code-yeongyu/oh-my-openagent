@@ -329,8 +329,7 @@ describe("thread links", () => {
 
 // #15073: the names the fleet census found agents predicting do what they say on the real tools, not only in the parser.
 describe("thread tools under the argument names agents predict", () => {
-  const tenMessages = () =>
-    Array.from({ length: 10 }, (_, index) => ({ role: "user", content: `m${index + 1}` }))
+  const tenMessages = () => Array.from({ length: 10 }, (_, index) => ({ role: "user", content: `m${index + 1}` }))
 
   test.each(["limit", "tail", "lines"] as const)(
     "#given a ten-message thread #when thread_read names %s 3 #then it returns the newest three, ending at the latest",

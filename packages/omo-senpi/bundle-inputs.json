@@ -1675,6 +1675,7 @@
     "packages/omo-senpi/src/components/thread/consumer/consumer.ts",
     "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts",
     "packages/omo-senpi/src/components/thread/consumer/port.ts",
+    "packages/omo-senpi/src/components/thread/contracts/aliases.ts",
     "packages/omo-senpi/src/components/thread/contracts/create-params.ts",
     "packages/omo-senpi/src/components/thread/contracts/fields.ts",
     "packages/omo-senpi/src/components/thread/contracts/index.ts",
