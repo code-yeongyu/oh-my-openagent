@@ -164,7 +164,11 @@ export function threadCoreAccess(options: {
         return refuse(error, CORE_MESSAGE)
       }
     })().then((made) => {
-      if (isFailure(made) && made !== DISPOSED && pending === creating) pending = undefined
+      // A creation that fails after a dispose began answers the disposed refusal, as a call racing dispose is promised
+      // (review 6081000144, LOW 1); its exception already reached the logger port.
+      if (!isFailure(made)) return made
+      if (disposed) return DISPOSED
+      if (pending === creating) pending = undefined
       return made
     })
     pending = creating

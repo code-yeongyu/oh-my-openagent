@@ -225,8 +225,23 @@ describe("a dispose that races the first thread call", () => {
     expect(source.match(/\bloadRuntime\(\)/g)?.length).toBe(1)
   })
 
-  test("#given a first load held open #when dispose runs and the load then fails #then no core is built and the caller's store is released", async () => {
-    const gate = held()
+  // Dispose wins (design ruling; review 6081000144, LOW 1): a call racing dispose answers the shared ROOT_DISPOSED whatever
+  // its creation then did, for every way the creation can fail, at both stages it can fail in, and the caller's store is
+  // released once.
+  const LOAD_FAILURES: Readonly<Record<string, (gate: ReturnType<typeof held>) => void>> = {
+    "the file is missing": (gate) => gate.reject(new Error(EXCEPTION_TEXT)),
+    "the file is from another build": (gate) =>
+      gate.release({ ...runtimeWith(() => undefined), RUNTIME_STAMP: "another-build" } as ThreadsRuntime),
+    "the file has a misshapen export": (gate) =>
+      gate.release({ ...runtimeWith(() => undefined), threadToolParamSchemas: [] } as unknown as ThreadsRuntime),
+  }
+  const CONSTRUCT_FAILURES: Readonly<
+    Record<string, (finish: (core: unknown) => void, fail: (error: Error) => void) => void>
+  > = {
+    "the core cannot be built": (_finish, fail) => fail(new Error(CONSTRUCTION_TEXT)),
+    "the built core is misshapen": (finish) => finish({}),
+  }
+  const disposingNamespace = (load: () => Promise<ThreadsRuntime>) => {
     let storeDisposed = 0
     const served = threadsNamespace({
       agentDir: "/agent-dir-never-read",
@@ -235,7 +250,7 @@ describe("a dispose that races the first thread call", () => {
       user: "probe",
       env: {},
       principal: { kind: "script", uid: 501 },
-      loadThreadsRuntime: gate.load,
+      loadThreadsRuntime: load,
       ports: {
         store: {
           dispose: async () => {
@@ -244,17 +259,54 @@ describe("a dispose that races the first thread call", () => {
         } as unknown as NonNullable<Parameters<typeof threadsNamespace>[0]["ports"]>["store"],
       },
     })
-    const call = list(served)
-    await gate.loading
-    const disposed = served.dispose?.()
-    gate.reject(new Error(EXCEPTION_TEXT))
-    const [answer] = await Promise.all([call, disposed])
-    expect((answer as { error: { details: unknown } }).error.details).toEqual({
-      reason: RUNTIME_FILE_UNAVAILABLE,
-      file: "threads",
+    return { served, storeDisposed: () => storeDisposed }
+  }
+
+  for (const [failure, settle] of Object.entries(LOAD_FAILURES))
+    test(`#given a first load held open #when dispose runs and then ${failure} #then the call answers the disposed refusal and the caller's store is released`, async () => {
+      const gate = held()
+      const { served, storeDisposed } = disposingNamespace(gate.load)
+      const call = list(served)
+      await gate.loading
+      const disposed = served.dispose?.()
+      settle(gate)
+      const [answer] = await Promise.all([call, disposed])
+      expect({ answer, storeDisposed: storeDisposed() }).toEqual({
+        answer: { kind: "error", error: ROOT_DISPOSED },
+        storeDisposed: 1,
+      })
     })
-    expect(storeDisposed).toBe(1)
-  })
+
+  for (const [failure, settle] of Object.entries(CONSTRUCT_FAILURES))
+    test(`#given a core construction held open #when dispose runs and then ${failure} #then the call answers the disposed refusal and the caller's store is released`, async () => {
+      let constructing: () => void = () => undefined
+      const started = new Promise<void>((resolve) => {
+        constructing = resolve
+      })
+      let finish: (core: unknown) => void = () => undefined
+      let fail: (error: Error) => void = () => undefined
+      const built = new Promise<unknown>((resolve, reject) => {
+        finish = resolve
+        fail = reject
+      })
+      const runtime = {
+        ...runtimeWith(() => undefined),
+        createThreadCore: () => {
+          constructing()
+          return built
+        },
+      } as unknown as ThreadsRuntime
+      const { served, storeDisposed } = disposingNamespace(() => Promise.resolve(runtime))
+      const call = list(served)
+      await started
+      const disposed = served.dispose?.()
+      settle(finish, fail)
+      const [answer] = await Promise.all([call, disposed])
+      expect({ answer, storeDisposed: storeDisposed() }).toEqual({
+        answer: { kind: "error", error: ROOT_DISPOSED },
+        storeDisposed: 1,
+      })
+    })
 })
 
 // Security note (B) and review 6075851574 MEDIUM 3, one boundary: a loaded file whose core cannot be built answers every
