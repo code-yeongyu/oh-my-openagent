@@ -108,7 +108,7 @@ describe("DAG recovery of a run its host left running", () => {
         "next:completed",
       ])
       expect(fixture.manager.startOwnedCalls).toEqual(["next"])
-    }, 30_000)
+    })
   }
 
   test("#given a run left running whose recorded holder is still alive #when the session reopens #then it is skipped as a live lease and left untouched", async () => {
@@ -168,7 +168,7 @@ describe("DAG recovery of a run its host left running", () => {
     expect(second).toEqual([{ runId, kind: "skipped", reason: "live_lease", holderPid: THIS_HOST_PID }])
     expect(resumedEvents(store)).toBe(1)
     expect(manager.startOwnedCalls).toEqual(["slow", "next"])
-  }, 30_000)
+  })
 
   for (const [given, isRunHeldInProcess] of [
     ["this process still schedules", () => true],

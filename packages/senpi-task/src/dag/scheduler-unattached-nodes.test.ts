@@ -72,7 +72,7 @@ describe("DAG scheduler over active nodes it does not hold", () => {
       "gone:completed",
       "after:completed",
     ])
-  }, 30_000)
+  })
 
   test("#given a parked scheduler #when the run is re-entered and parks again twice #then no parked scheduler keeps refreshing on the later commits", async () => {
     // given
