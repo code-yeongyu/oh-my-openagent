@@ -11,6 +11,7 @@ import type {
   ThreadSendResult,
   ThreadSetModelResult,
   ThreadSetReasoningResult,
+  ThreadUnloadResult,
   ThreadWaitOutcome,
 } from "../../../thread/contracts/results"
 import type { ReleaseSessionReply } from "../../../thread/gateway/adapter"
@@ -36,6 +37,7 @@ export type {
   ThreadSendResult,
   ThreadSetModelResult,
   ThreadSetReasoningResult,
+  ThreadUnloadResult,
 }
 
 /**
@@ -68,13 +70,6 @@ export type ThreadWaitResult = Ok<{ readonly wait: ThreadWaitOutcome }>
 /** The remote stream's nonterminal events; its own `end` and `failed` become the root stream's one terminal event. */
 export type ThreadFollowEvent = Exclude<FollowEvent, { readonly kind: "end" | "failed" }>
 export type ThreadFollowOutcome = FollowOutcome
-
-/** The session left its host and stays resumable; what it dropped is named, as `omo host session unload` reports it. */
-export type ThreadUnloadResult = Ok<{
-  readonly unloaded: boolean
-  readonly dropped_deliveries: readonly string[]
-  readonly detached_children: readonly string[]
-}>
 
 /** The engine's own `release_session` reply, kept as the value: release is one of the 4.4 exceptions. */
 export type ThreadReleaseResult = ReleaseSessionReply

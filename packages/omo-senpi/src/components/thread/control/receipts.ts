@@ -25,11 +25,14 @@ export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
 export const RECEIPT_HORIZON_MS = GATEWAY_RECEIPT_RETENTION_MS
 
 /** The calls that may run again under a key whose earlier run is uncertain: the call itself finds what the first run did. */
-const RETRIES_UNCERTAIN: ReadonlySet<ThreadToolName> = new Set(["thread_create"])
+const RETRIES_UNCERTAIN: ReadonlySet<ReceiptOperation> = new Set(["thread_create"])
+
+/** Every keyed thread call: the tools', and the SDK's unload, which no tool takes (`ThreadUnloadParams`). */
+export type ReceiptOperation = ThreadToolName | "thread_unload"
 
 export type ReceiptScope = {
   readonly principal: string
-  readonly operation: ThreadToolName
+  readonly operation: ReceiptOperation
   readonly idempotency_key: string
 }
 

@@ -2707,6 +2707,12 @@
                 "const": "detach"
               }
             ]
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string"
           }
         },
         "required": [

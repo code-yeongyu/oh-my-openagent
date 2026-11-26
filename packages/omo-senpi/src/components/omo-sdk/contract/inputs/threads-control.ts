@@ -10,6 +10,7 @@ import {
   ThreadSetModelParams,
   ThreadSetReasoningParams,
   threadToolParamSchemas,
+  ThreadUnloadParams,
 } from "../../../thread/contracts/params"
 import { AliasName, Attachments, DeadlineMs, Thread } from "./thread-fields"
 import { Author, LaunchSpec, SessionCallable } from "./threads-authority"
@@ -43,13 +44,7 @@ export const ThreadsInterrupt = ThreadInterruptParams
 
 export const ThreadsClose = threadToolParamSchemas.thread_close
 
-export const ThreadsUnload = Type.Object({
-  thread: Thread,
-  interrupt: Type.Optional(Type.Boolean()),
-  force: Type.Optional(Type.Boolean()),
-  clear_queue: Type.Optional(Type.Boolean()),
-  children: Type.Optional(Type.Union([Type.Literal("refuse"), Type.Literal("detach")])),
-})
+export const ThreadsUnload = ThreadUnloadParams
 
 export const ThreadsRelease = Type.Object({
   thread: Thread,

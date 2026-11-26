@@ -9,6 +9,8 @@ import {
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
   type ThreadToolResult,
+  type ThreadUnloadInput,
+  ThreadUnloadParams,
 } from "../contracts"
 import { createThread } from "../control/create"
 import { locateControl } from "../control/locate"
@@ -19,6 +21,8 @@ import {
   NOT_LIVE,
   setModelOn,
   setThinkingLevelOn,
+  unloadOptions,
+  unloadThread,
 } from "../control/operations"
 import { controlWait, type ControlWait, waitRefusal } from "../control/control-wait"
 import { controlIdentity } from "../control/port"
@@ -40,6 +44,10 @@ type ControlName =
   | "thread_set_model"
   | "thread_set_reasoning"
   | "thread_archive"
+  | "thread_unload"
+
+// Each control's parameter schema: the tool's, and the SDK's unload, which no tool takes.
+const SCHEMAS = { ...threadToolParamSchemas, thread_unload: ThreadUnloadParams } as const
 
 /**
  * The session controls of the agent tools (thread_create, thread_interrupt, thread_close, thread_rename,
@@ -59,7 +67,7 @@ export function createControls(context: ThreadCoreContext) {
     body: (value: I, key: string, retrying: Retrying, wait: ControlWait) => Promise<ThreadToolResult>,
   ): Promise<ThreadToolResult> {
     return context.guard(async () => {
-      const parsed = parseThreadParams(threadToolParamSchemas[name], request)
+      const parsed = parseThreadParams(SCHEMAS[name], request)
       if (parsed.kind === "error") return parsed as ThreadToolResult
       const value = parsed.value as I & { readonly idempotency_key?: string }
       const wait = callWait(options, context.waitClock, context.late)
@@ -143,6 +151,21 @@ export function createControls(context: ThreadCoreContext) {
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE
         return await setThinkingLevelOn(found.control, value.level, value.scope)
+      }),
+    unload: (request: ThreadUnloadInput, options?: CallWaitOptions) =>
+      control("thread_unload", request, options, async (value, _key, _retrying, wait) => {
+        const found = await located(value.thread, value.all_scope, wait)
+        if (found.kind === "error") return found.result
+        // Nothing live holds it: it is already out of every host and stays resumable from its session file.
+        if (found.kind === "not_live")
+          return {
+            kind: "ok",
+            ...controlIdentity(found),
+            unloaded: false,
+            dropped_deliveries: [],
+            dropped_user_messages: [],
+          }
+        return await unloadThread(found.control, unloadOptions(value))
       }),
     archive: (request: ThreadArchiveInput, options?: CallWaitOptions) =>
       control("thread_archive", request, options, async (value, _key, _retrying, wait) =>

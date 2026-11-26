@@ -384,6 +384,22 @@ export type ThreadCloseResult =
     }
   | ThreadDataError
 
+/**
+ * The SDK's `threads.unload` (no agent tool takes it): the session left its host and stays resumable from its file;
+ * `unloaded` is false when nothing held it live. What the unload dropped is named: the deliveries the engine handed back
+ * unwritten and the user messages taken out of the queue (senpi `unload_session` `dropped`).
+ */
+export type ThreadUnloadResult =
+  | {
+      readonly kind: "ok"
+      readonly thread: string
+      readonly unloaded: boolean
+      readonly dropped_deliveries: readonly string[]
+      readonly dropped_user_messages: readonly string[]
+      readonly device?: string
+    }
+  | ThreadDataError
+
 /** `thread_handoff` answers the thread it reached flat, like `thread_create`. */
 export type ThreadHandoffResult =
   | (ThreadResultSummary & {
@@ -450,6 +466,7 @@ export type ThreadToolResult = ReceiptExpiry &
     | ThreadSendResult
     | ThreadInterruptResult
     | ThreadCloseResult
+    | ThreadUnloadResult
     | ThreadHandoffResult
     | ThreadRenameResult
     | ThreadSetModelResult

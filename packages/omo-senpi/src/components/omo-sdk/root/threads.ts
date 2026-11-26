@@ -142,6 +142,7 @@ export function threadsNamespace(options: {
       onRoot((await thread().interrupt(input, wait)) as result.ThreadInterruptResult),
     "threads.close": async (input = {}, wait) =>
       onRoot((await thread().close(input, wait)) as result.ThreadCloseResult),
+    "threads.unload": async (input, wait) => onRoot((await thread().unload(input, wait)) as result.ThreadUnloadResult),
     "threads.rename": async (input = {}, wait) =>
       onRoot((await thread().rename(input, wait)) as result.ThreadRenameResult),
     "threads.setModel": async (input, wait) =>

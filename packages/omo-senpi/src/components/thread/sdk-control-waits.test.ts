@@ -15,6 +15,7 @@ afterEach(cleanup)
 const WRITES = new Set([
   "interrupt",
   "closeSession",
+  "unloadSession",
   "setSessionName",
   "setModel",
   "setThinkingLevel",
@@ -98,6 +99,7 @@ type Key = { readonly idempotency_key?: string }
 const CONTROLS: readonly (readonly [string, (root: Root, key: Key, wait?: CallWaitOptions) => Promise<unknown>])[] = [
   ["interrupt", (root, key, wait) => root.threads.interrupt({ thread: "dur-local", ...key }, wait)],
   ["close", (root, key, wait) => root.threads.close({ thread: "dur-local", ...key }, wait)],
+  ["unload", (root, key, wait) => root.threads.unload({ thread: "dur-local", ...key }, wait)],
   [
     "setModel",
     (root, key, wait) => root.threads.setModel({ thread: "dur-local", model: "anthropic/m-1", ...key }, wait),

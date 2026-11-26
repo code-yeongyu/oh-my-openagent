@@ -19,6 +19,7 @@ const HONOURED = new Set<string>([
   // Slice T1b: the thread core's controls (sdk-core/controls.ts over control/control-wait.ts).
   "threads.interrupt",
   "threads.close",
+  "threads.unload",
   "threads.setModel",
   "threads.setReasoning",
   "threads.rename",
