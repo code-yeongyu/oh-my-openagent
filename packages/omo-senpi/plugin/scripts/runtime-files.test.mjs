@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { REQUIRED_PLUGIN_ARTIFACTS } from "../../src/install/plugin-artifacts.ts"
+import { checkInstallCliCurrent } from "./build-install.mjs"
 import { runtimeFileExternals } from "./build-extension-core.mjs"
 import { staticSetPath } from "./omo-sdk-static-set.mjs"
 import { RUNTIME_IMPORT_MAP, runtimeArtifactPaths, SDK_RUNTIME_FILES } from "./runtime-files.mjs"
@@ -59,6 +60,15 @@ describe("the SDK runtime file table", () => {
     for (const entry of table.filter((candidate) => candidate !== added))
       expect(runtimeFileExternals(entry, table)).toContain(added.specifier)
     expect(runtimeFileExternals(added, table)).not.toContain(added.specifier)
+  })
+})
+
+// The installer is bundled self-contained, so it carries its own copy of this table (its required list); the committed
+// copy is the one a fresh build writes, which holds the two tables byte-equal (the design lane's ruling on security
+// review 6077124491: at 21a6cf8a43 the committed copy still said the root's old ceiling).
+describe("the committed installer's copy of the table", () => {
+  test("#given the committed plugin/scripts/install.mjs #then it is the fresh build of its sources", async () => {
+    expect(await checkInstallCliCurrent()).toEqual({ current: true })
   })
 })
 

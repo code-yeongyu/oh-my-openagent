@@ -429,12 +429,12 @@ export const omoSenpiBuildDefines = (version) => ({ OMO_SENPI_PACKAGE_VERSION: v
 
 // The root SDK runtime's externals: node builtins, and the wake sidecar the root's thread core carries like the thread
 // SDK below (#14972). plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
-// Every SDK runtime file leaves node builtins, the wake sidecar the thread core carries (#14972) and every OTHER lazily
-// loaded SDK runtime file external, so no file inlines another (slice P1c, #15031).
+// Every SDK runtime file leaves node builtins, the wake sidecar the thread core carries (#14972) and every OTHER SDK
+// runtime file of the table external, lazy or not, so no file inlines another (slice P1c, #15031; review 6076881626).
 export const runtimeFileExternals = (row, table = SDK_RUNTIME_FILES) => [
   ...sdkExternalSpecifiers,
   "#omo-wake-runtime",
-  ...table.filter((other) => other !== row && other.lazy).map((other) => other.specifier),
+  ...table.filter((other) => other !== row).map((other) => other.specifier),
 ]
 
 export async function buildExtension(options = {}) {

@@ -6,6 +6,7 @@ export type SdkRuntimeFile = {
   readonly lazy: boolean
   readonly ceiling: number
   readonly staticSet: string
+  readonly packages: readonly string[]
 }
 
 export const SDK_RUNTIME_FILES: readonly SdkRuntimeFile[]

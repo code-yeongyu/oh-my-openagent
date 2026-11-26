@@ -229,8 +229,9 @@ var SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
     lazy: false,
-    ceiling: 608704,
-    staticSet: "omo-sdk-static-modules.json"
+    ceiling: 609933,
+    staticSet: "omo-sdk-static-modules.json",
+    packages: ["jsonc-parser", "typebox", "zod"]
   },
   {
     name: "threads",
@@ -239,7 +240,8 @@ var SDK_RUNTIME_FILES = [
     specifier: "#omo-sdk-threads-runtime",
     lazy: true,
     ceiling: 532882,
-    staticSet: "omo-sdk-threads-static-modules.json"
+    staticSet: "omo-sdk-threads-static-modules.json",
+    packages: ["typebox"]
   }
 ];
 var runtimeArtifactPaths = (table = SDK_RUNTIME_FILES) => table.map((row) => join3(...row.output.split("/")));

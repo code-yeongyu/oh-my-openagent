@@ -12,6 +12,7 @@ import {
   buildOmoSdkRuntime,
   buildRuntimeFile,
   buildSdkRuntimeFiles,
+  runtimeFileExternals,
   omoSenpiBuildDefines,
   resolveOutputs,
 } from "./build-extension-core.mjs"
@@ -159,10 +160,6 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
   test("#given the thread SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
     expect(inlinedPackages((await sharedOutputs()).threadSdkInputs)).toEqual(["typebox"])
   })
-
-  test("#given the omo SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
-    expect(inlinedPackages((await sharedOutputs()).sdkRuntimeInputs.root)).toEqual(["jsonc-parser", "typebox", "zod"])
-  })
 })
 
 // The provisioned SDK root runtime's cold-import decision (design lane and owner, P1b #14950): the call table, the thread
@@ -179,8 +176,11 @@ const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "
 // slice that changes a set edits the list in the same commit, where its reviewer sees it.
 const { modules: STATIC_SET } = JSON.parse(readFileSync(STATIC_SET_PATH, "utf8"))
 
-/** What a row's pins say of one built file: over its ceiling or not, and how its kept modules differ from its list. */
-async function pinFindings(row, outputPath, table = SDK_RUNTIME_FILES) {
+/**
+ * What a row's pins say of one built file: over its ceiling or not, how its kept modules differ from its list, and the
+ * packages it inlines against the row's set (review 6076881626: every SDK runtime file has its own package pin).
+ */
+async function pinFindings(row, outputPath, inputs, table = SDK_RUNTIME_FILES) {
   const bytes = Bun.file(outputPath).size
   const { definition, modules } = JSON.parse(readFileSync(staticSetPath(row), "utf8"))
   const { set } = await staticModuleSet(undefined, { row, table })
@@ -189,15 +189,26 @@ async function pinFindings(row, outputPath, table = SDK_RUNTIME_FILES) {
     overCeiling: bytes > row.ceiling ? `${bytes} bytes, over its ceiling of ${row.ceiling}` : null,
     definition: definition === staticSetDefinition(row),
     ...difference(set, modules),
+    packages: inlinedPackages(inputs),
   }
 }
 
-const pinned = (file) => ({ file, overCeiling: null, definition: true, added: [], removed: [] })
+const pinned = (row) => ({
+  file: row.name,
+  overCeiling: null,
+  definition: true,
+  added: [],
+  removed: [],
+  packages: [...row.packages],
+})
 
 describe("every SDK runtime file within its row's ceiling, shipping exactly its committed list", () => {
   for (const row of SDK_RUNTIME_FILES)
     test(`#given the built ${row.name} runtime file #then it is within its row's ceiling and ships exactly its row's kept list`, async () => {
-      expect(await pinFindings(row, sdkFile(await sharedOutputs(), row.name))).toEqual(pinned(row.name))
+      const outputs = await sharedOutputs()
+      expect(await pinFindings(row, sdkFile(outputs, row.name), outputs.sdkRuntimeInputs[row.name])).toEqual(
+        pinned(row),
+      )
     })
 })
 
@@ -270,6 +281,7 @@ describe("a row added to the SDK runtime file table", () => {
       lazy: true,
       ceiling: 4096,
       staticSet: join(source, "kept.json"),
+      packages: [],
     }
     const table = [...SDK_RUNTIME_FILES, probe]
     const defines = omoSenpiBuildDefines(packageVersion)
@@ -286,15 +298,20 @@ describe("a row added to the SDK runtime file table", () => {
     // sized and kept-list-checked by the same pins as the shipped rows; each negative control is named
     const { set } = await staticModuleSet(undefined, { row: probe, table })
     await writeFile(probe.staticSet, JSON.stringify({ definition: staticSetDefinition(probe), modules: set }))
-    expect(await pinFindings(probe, paths.probe, table)).toEqual(pinned("probe"))
-    expect((await pinFindings({ ...probe, ceiling: 1 }, paths.probe, table)).overCeiling).toMatch(
+    expect(await pinFindings(probe, paths.probe, inputs.probe, table)).toEqual(pinned(probe))
+    expect((await pinFindings({ ...probe, ceiling: 1 }, paths.probe, inputs.probe, table)).overCeiling).toMatch(
       /over its ceiling of 1$/,
     )
     await writeFile(probe.staticSet, JSON.stringify({ definition: staticSetDefinition(probe), modules: set.slice(1) }))
-    expect((await pinFindings(probe, paths.probe, table)).added).toEqual([set[0]])
+    expect((await pinFindings(probe, paths.probe, inputs.probe, table)).added).toEqual([set[0]])
 
-    // listed for the installer, and every other row leaves it external
+    // listed for the installer; every other row leaves it external, and it leaves every other row external, the root
+    // included, so a lazy file that imports the root's specifier cannot inline the root (review 6076881626)
     expect(runtimeArtifactPaths(table)).toContain(join("runtime", "omo-sdk", "probe.js"))
+    for (const other of table.filter((row) => row !== probe)) {
+      expect(runtimeFileExternals(other, table)).toContain(probe.specifier)
+      expect(runtimeFileExternals(probe, table)).toContain(other.specifier)
+    }
 
     // checked for freshness: current against an independent reproduction, then missing, then stale
     await buildSdkRuntimeFiles(sdkRuntimeOutputPaths(reproduction, table), defines, table)
@@ -585,12 +602,14 @@ describe("omo SDK runtime", () => {
       `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
       `const root = createOmoSdk({ env: { HOME: ${JSON.stringify(plugin)} }, cwd: ${JSON.stringify(plugin)}, home: ${JSON.stringify(plugin)}, agentDir: ${JSON.stringify(join(plugin, "agent"))}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
       `const threads = ${JSON.stringify(threads)}`,
-      "const config = await root.config.status()",
       "const answers = []",
+      // A non-thread call, run where a step puts it (with the thread file absent, in the retry test: review 6076881626).
+      "const configs = []",
+      "const askConfig = async () => { configs.push((await root.config.status()).kind) }",
       "const ask = async () => { const sent = await root.threads.list({}); answers.push(sent.kind === 'error' ? { code: sent.error.code, reason: sent.error.details?.reason ?? null, restart: sent.error.code === 'internal_error' ? /restart/i.test(sent.error.message) : null } : sent.kind) }",
       ...steps,
       "await root.dispose()",
-      "console.log(JSON.stringify({ config: config.kind, answers }))",
+      "console.log(JSON.stringify({ configs, answers }))",
     ].join("\n")
     const child = spawn(runtime, runtime === "node" ? ["--input-type=module", "-e", probe] : ["-e", probe], {
       stdio: ["ignore", "pipe", "pipe"],
@@ -615,7 +634,10 @@ describe("omo SDK runtime", () => {
   for (const runtime of ["node", "bun"]) {
     test(`#given the two built SDK files in a plugin layout #when ${runtime} runs a script #then an account call needs no thread file and a thread call loads it, never through the manifest above the package`, async () => {
       const plugin = await pluginLayout(await sharedOutputs())
-      expect(await runSteps(runtime, plugin, ["await ask()"])).toEqual({ config: "ok", answers: [LOADED] })
+      expect(await runSteps(runtime, plugin, ["await askConfig()", "await ask()"])).toEqual({
+        configs: ["ok"],
+        answers: [LOADED],
+      })
     })
 
     // Review 6075851574 MEDIUM 5, the retry contract: the root re-imports on every call and keeps nothing itself, so a
@@ -625,10 +647,11 @@ describe("omo SDK runtime", () => {
       const answered = await runSteps(runtime, plugin, [
         "await rename(threads, `${threads}.aside`)",
         "await ask()",
+        "await askConfig()",
         "await rename(`${threads}.aside`, threads)",
         "await ask()",
       ])
-      expect(answered).toEqual({ config: "ok", answers: [UNAVAILABLE, LOADED] })
+      expect(answered).toEqual({ configs: ["ok"], answers: [UNAVAILABLE, LOADED] })
     })
 
     // The platform's module loader keeps a file whose evaluation failed for the life of the process: the refusal says to
@@ -642,7 +665,7 @@ describe("omo SDK runtime", () => {
         "await copyFile(`${threads}.good`, threads)",
         "await ask()",
       ])
-      expect(answered).toEqual({ config: "ok", answers: [UNAVAILABLE, UNAVAILABLE] })
+      expect(answered).toEqual({ configs: [], answers: [UNAVAILABLE, UNAVAILABLE] })
     })
 
     // Design lane ruling on the security note (A), recorded behaviour B11: a root of one build with the thread file of
@@ -657,7 +680,7 @@ describe("omo SDK runtime", () => {
       })
       const plugin = await pluginLayout(outputs, join(other, "threads.js"))
       expect(await runSteps(runtime, plugin, ["await ask()"])).toEqual({
-        config: "ok",
+        configs: [],
         answers: [{ code: "internal_error", reason: "runtime_file_mismatch", restart: true }],
       })
     })

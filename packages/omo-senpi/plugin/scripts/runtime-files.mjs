@@ -5,7 +5,8 @@ import { join } from "node:path"
 // loaded file is one row here and nowhere else by hand. `entry` is relative to the omo-senpi package, `output` to the
 // plugin root; `specifier` is the import-map name both manifests map (the source package to the entry, the shipped plugin
 // to the output). `lazy` marks a file the root loads on first use. `ceiling` is the file's byte budget, measured with bun
-// 1.4.4 and node 24.22.0 on a frozen install; `staticSet` names its committed kept-module list in plugin/scripts.
+// 1.4.4 and node 24.22.0 on a frozen install; `staticSet` names its committed kept-module list in plugin/scripts;
+// `packages` is the exact set of node packages the file inlines, by name, so an import that widens it fails naming it.
 export const SDK_RUNTIME_FILES = [
   {
     name: "root",
@@ -13,8 +14,9 @@ export const SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
     lazy: false,
-    ceiling: 608_770,
+    ceiling: 609_933,
     staticSet: "omo-sdk-static-modules.json",
+    packages: ["jsonc-parser", "typebox", "zod"],
   },
   {
     name: "threads",
@@ -24,6 +26,7 @@ export const SDK_RUNTIME_FILES = [
     lazy: true,
     ceiling: 532_882,
     staticSet: "omo-sdk-threads-static-modules.json",
+    packages: ["typebox"],
   },
 ]
 
