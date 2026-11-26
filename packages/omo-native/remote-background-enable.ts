@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 
 import type { BackgroundRemote } from "./remote-bootstrap"
 import { AFTER_LOGIN_FLAG } from "./remote-verbs"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 /** The part of node's spawn this needs; a test passes a recorder. */
 export type DetachedSpawn = (
@@ -35,7 +36,7 @@ export function backgroundRemote(
       env: process.env,
     })
     child.once("error", (error: Error) =>
-      (options.log ?? ((line: string) => process.stderr.write(`${line}\n`)))(
+      (options.log ?? ((line: string) => process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`)))(
         `omo remote ${verb} could not start in the background (${error.message}). Run: omo remote ${verb}`,
       ),
     )

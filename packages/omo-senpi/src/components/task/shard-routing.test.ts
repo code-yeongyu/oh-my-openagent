@@ -7,6 +7,7 @@ import {
   HostUnavailableError,
   RpcProcessRunner,
   RunnerError,
+  resolveShardSocket,
   shardKey,
   shardSocketPathForKey,
   type EnsureTaskDaemonInput,
@@ -35,6 +36,7 @@ function world(input: {
   const root = shortTempDir("omo-t8-")
   dirs.push(root)
   const agentDir = join(root, "agent")
+  assertPrimaryShardFits(agentDir)
   const runtime = new TaskRuntimeContext(root)
   if (input.sessionId !== undefined) {
     runtime.captureFrom({
@@ -92,6 +94,23 @@ function world(input: {
     probes,
     answer: (value: "silent" | "H1") => (probeAnswer = value),
   }
+}
+
+// Every assertion here expects the primary shard root; a test root too long for the bind limit would silently move the
+// shard to the alternate root (or fail it) and surface as an unrelated mismatch, so say so directly.
+function assertPrimaryShardFits(agentDir: string): void {
+  const identity = { kind: "p" as const, key: TREE_KEY, ownerSessionId: "precondition", inherited: false }
+  const primary = shardSocketPathForKey(join(agentDir, "rpc", "shards"), "p", TREE_KEY)
+  let root: string
+  try {
+    root = resolveShardSocket({ agentDir, env: {}, identity }).root
+  } catch {
+    root = "alt"
+  }
+  if (root !== "primary")
+    throw new Error(
+      `test root too long: shard socket ${primary} (${primary.length} bytes) leaves no room for its siblings under the bind limit`,
+    )
 }
 
 function ensured(socket: string): EnsuredTaskDaemon {
