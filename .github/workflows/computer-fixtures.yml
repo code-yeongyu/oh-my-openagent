@@ -578,7 +578,7 @@ jobs:
         run: echo "binary=$(bash script/qa/computer/conformance/fixtures/webview-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
 
       # The temp-folder cleanup must fail closed (delete nothing) when it cannot tell its own WebKit helpers apart;
-      # checked against a scratch TMPDIR only.
+      # checked against a scratch directory passed as its argument (TMPDIR is left unset).
       - name: Temp cleanup fails closed without the fixture's start time
         shell: bash
         run: |
