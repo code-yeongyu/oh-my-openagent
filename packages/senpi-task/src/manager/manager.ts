@@ -795,7 +795,8 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
-    const behind = await sendBehindRefusedStop(this.#refusedStops, input.idOrName)
+    const waiting = sendBehindRefusedStop(this.#refusedStops, input.idOrName)
+    const behind = waiting === undefined ? undefined : await waiting
     if (behind !== undefined) return behind
     const outcome = await this.#steering.sendToTask(input)
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
@@ -812,11 +813,7 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const refused = await cancelBehindRefusedStop(
-      this.#refusedStops,
-      idOrName,
-      () => this.#tryLoad(idOrName)?.status ?? "completed",
-    )
+    const refused = cancelBehindRefusedStop(this.#refusedStops, idOrName, () => this.#tryLoad(idOrName)?.status)
     if (refused !== undefined) return refused
     const outcome = await this.#steering.cancelTask(idOrName, reason, options)
     if (outcome.kind === "cancelled") {
