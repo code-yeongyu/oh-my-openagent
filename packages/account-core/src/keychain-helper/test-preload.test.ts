@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
 import { storeEnable, storeSwitchPort } from "../calls/store"
 import { resolveHelperAccess } from "./access"
 import { spawnDetachedHelper } from "./client"
 import { helperAccess } from "./darwin-backend"
 import { keychainProcessState } from "./process-state"
-import { KeychainHelperUnderTestPreload, underTestPreload, underTestRun } from "./test-preload"
+import { KeychainHelperUnderTestPreload, TEST_RUN_MARK, underTestPreload, underTestRun } from "./test-preload"
 
 // The repository's one guard on the signed keychain helper (security owner's order on the 2026-11-26 incident): under the
 // test preload, any port that would reach the real helper is refused by name before anything is located, pinned,
@@ -35,11 +36,30 @@ describe("the keychain helper under the test preload", () => {
   test("#given a bun test run without the preload's mark #then it is still a test run; a program is not", () => {
     const unmarked = { get: async () => null }
     expect({
-      testFile: underTestRun("/repo/packages/account-core/src/calls/store.test.ts", unmarked),
-      specFile: underTestRun("/repo/x.spec.mjs", unmarked),
-      launcher: underTestRun("/usr/local/lib/node_modules/omo-ai/launcher/main.js", unmarked),
-      compiled: underTestRun("/opt/omo-ai/omo-native", unmarked),
+      testFile: underTestRun("/repo/packages/account-core/src/calls/store.test.ts", unmarked, {}),
+      specFile: underTestRun("/repo/x.spec.mjs", unmarked, {}),
+      launcher: underTestRun("/usr/local/lib/node_modules/omo-ai/launcher/main.js", unmarked, {}),
+      compiled: underTestRun("/opt/omo-ai/omo-native", unmarked, {}),
     }).toEqual({ testFile: true, specFile: true, launcher: false, compiled: false })
+  })
+
+  // Custody review of 09d971691e, L5: a process a test starts is a test run too, through the environment mark.
+  test("#given a child process a test starts #then it is a test run when it inherits the environment or is passed the mark, and not otherwise", async () => {
+    const probe = `import { underTestRun } from ${JSON.stringify(join(import.meta.dir, "test-preload.ts"))}; console.log(underTestRun())`
+    const childSays = async (env?: Record<string, string>) => {
+      const child = Bun.spawn([process.execPath, "-e", probe], {
+        ...(env === undefined ? {} : { env: { PATH: process.env.PATH ?? "", ...env } }),
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const [out] = await Promise.all([new Response(child.stdout).text(), child.exited])
+      return out.trim()
+    }
+    expect({
+      inherited: await childSays(),
+      passed: await childSays({ [TEST_RUN_MARK]: "1" }),
+      bare: await childSays({}),
+    }).toEqual({ inherited: "true", passed: "true", bare: "false" })
   })
 
   test("#given a new port wired to the real helper spawner #then it is refused by name and nothing is touched", async () => {

@@ -147,6 +147,39 @@ describe("the custody log's lock", () => {
     expect(await Bun.file(log).exists()).toBe(false)
   })
 
+  // Custody review of 09d971691e, L3 (b) and (c), L4 (a): each rule below had a mutant no test turned red.
+  test("#given a holder that keeps changing for longer than the wait's cap #then the wait ends at the cap while the holder is still there", async () => {
+    const own = await self()
+    const { log, lock } = lockAt(await temporaryHome(), own)
+    let turn = 0
+    const moving = setInterval(() => writeFileSync(lock, JSON.stringify({ ...own, turn: ++turn })), 40)
+    try {
+      expect(await withCustodyLock(log, async () => "held", wait(300, 600))).toBeUndefined()
+      expect(existsSync(lock)).toBe(true)
+    } finally {
+      clearInterval(moving)
+    }
+  })
+
+  test("#given a lock this process takes #then the lock file names its pid, start identity and scope", async () => {
+    const home = await temporaryHome()
+    const log = custodyLogPath(home)
+    mkdirSync(dirname(log), { recursive: true })
+    const written = await withCustodyLock(log, async () => JSON.parse(readFileSync(`${log}.lock`, "utf8")) as unknown)
+    expect(written).toEqual(await self())
+  })
+
+  test("#given a dead holder's lock while a live breaker holds the break lock #then no other waiter breaks it", async () => {
+    const { log, lock } = lockAt(await temporaryHome(), {
+      pid: await deadPid(),
+      start: null,
+      scope: await processScope(),
+    })
+    writeFileSync(`${lock}.break`, JSON.stringify(await self()))
+    expect(await held(log, 50)).toBeUndefined()
+    expect(existsSync(lock)).toBe(true)
+  })
+
   test("#given an operation that outlasts the wait and a brief holder at its end #then its terminal record waits and is kept", async () => {
     const home = await temporaryHome()
     const log = custodyLog({ home, principal: { kind: "person", id: "501" }, wait: wait(300) })
