@@ -37,6 +37,9 @@ export function sumProcessTreeCpuSeconds(pid: number, table: ProcessTable): numb
   return total
 }
 
+// Only a stamp strictly earlier than the parent's proves a stale parent pid. Equal stamps count: darwin stamps are whole
+// seconds, so a child spawned in its parent's first second carries the parent's stamp. An unreadable stamp counts too:
+// on Windows a process that cannot be opened has no readable CPU either, so it adds nothing.
 function bornBefore(child: number, parent: number, table: ProcessTable): boolean {
   const childStart = table.startTime(child)
   const parentStart = table.startTime(parent)
