@@ -86,8 +86,8 @@ await session.press("Enter", { context: next.context_id, observation: next.obser
 | Form | Meaning |
 |---|---|
 | `"@e3"` / `"e3"` | a ref from the last `observe()` / `snapshot()` |
-| `"#login > button"` | a CSS selector, resolved live |
-| `{ captureId, x, y }` | a point in a screenshot, from `screenshot()`; `click` only |
+| `"#login > button"` | a CSS selector, resolved live in the main document; a gated action refuses one that matches more than one element (`invalid_params`, `target_unavailable`) |
+| `{ captureId, x, y }` | a point in a screenshot, from `screenshot()`; `click` only. `captureId` is `null` when the daemon reports `captureUnavailable`; use a ref or selector then |
 | `css.e3` from `bskSnapshot` | the light-DOM CSS path of an OmOWright ref (`null` inside shadow roots — use the daemon ref instead) |
 
 ## Reading
@@ -97,7 +97,7 @@ await session.press("Enter", { context: next.context_id, observation: next.obser
 | `bskSnapshot(session, { interactive, maxDepth, context })` | `{ tree, refs, css }` — the OmOWright accessibility tree with refs, computed in the page **without** leaving a global or touching the DOM |
 | `session.observe({ maxTokens, cursor, probeHover })` | the daemon's semantic tree (`@vom`) with `@eN` refs, layers and hover probes — **the default read for shadow DOM and iframes** |
 | `session.snapshot({ maxDepth, maxTokens })` | the daemon's plain accessibility tree |
-| `session.read(target, { fields, maxNodes })` | text, value and attributes of the matching nodes, with no script and no context |
+| `session.read(target, { fields, maxNodes })` | `{ items: [{ ref, values: { text, ... } }], page_url, title }` for the matching nodes, with no script and no context; `items` is empty when nothing matches. Each field is an object: `fields: [{ key: "href", read: "attribute", attribute: "href" }]` puts the link's `href` in `values.href` (`read` is `text`, `attribute`, `value`, `checked` or `exists`) |
 | `session.extract("table" \| "list" \| "discover", { target, itemSelector, fields })` | rows of a table or list |
 | `session.getHtml({ ref, maxBytes })` | exact markup |
 | `session.screenshot({ ref })` / `screenshot({ fullPage: true })` | `{ buffer, width, height, captureId }`; full-page captures stream back in chunks |
@@ -192,8 +192,9 @@ Every refusal is a `BskRpcError` with the daemon's own `code`:
 | `invalid_params` | wrong option shape | fix the call, do not retry as-is |
 | `permission_denied` with `data.reason: "cooperation_sync_required"` (any other message) | a gated action without the latest sync context, or the person is using the tab | `cooperate("wait")` until `ready`, sync, read the page again, replan |
 | `permission_denied` with `data.reason: "precondition_failed"` (target), or `cooperation_sync_required` with a message starting `Precondition failed:` (strict) | an `expect` fact was false; nothing was sent | read the page again and decide afresh |
-| `permission_denied` with `data.reason: "observation_required"` | target policy: a script, an untargeted key or a navigate without an unused observation | sync, pass `{ context, observation }` (or `expect` for a script) |
-| any `code` with `data.reason: "control_context_invalid"` | the observation was already used, or focus changed since the sync | sync again, read, replan |
+| `permission_denied` with `data.reason: "observation_required"` | target policy: a script, an untargeted key or a navigate with no observation, or with one already used | sync, pass `{ context, observation }` (or `expect` for a script) |
+| `permission_denied` with `data.reason: "observation_changed"` | target policy: the page changed between the sync and this action | sync again, read, replan |
+| `data.reason: "control_context_invalid"` | the keyboard focus changed since the sync | sync again, read, replan |
 | `permission_denied` (any other reason) | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
 | `timeout` | the tool did not finish in its budget | read the page state before retrying once |
 | `user_aborted` | the user pressed Stop in the browser | stop the task and report |

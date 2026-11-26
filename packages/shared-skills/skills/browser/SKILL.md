@@ -90,16 +90,16 @@ globalThis.session = await omowright.connectBrowserSkill({ name: "<task>", focus
 const sync = async () => (await session.cooperate("sync")).context_id                      // strict policy: one context per gated action
 await session.navigate("https://example.com/", { waitUntil: "load" })                      // the first navigate needs no context
 const vom = await session.observe({ maxTokens: 4000 })                                     // @eN refs; shadow DOM and frames included
-const heading = await session.read("h1")                                                   // text, value, attributes: no context, no script
-await session.click("h1", { context: await sync(), expect: [{ target: "h1", field: "text", equals: "Example Domain" }] })
+const { items } = await session.read("a")                                                  // [{ ref, values: { text } }]: no context, no script
+await session.hover("a", { context: await sync(), expect: [{ target: "a", field: "text", equals: items[0].values.text }] })
 await session.press("End", { context: await sync() })
 await session.navigate("https://example.org/", { waitUntil: "load", context: await sync() })
 const shot = await session.screenshot()                                                    // { buffer, width, height, captureId }
 // the task's last cell, on success and failure: await session.stop()                      // returns borrowed tabs
 ```
 
-1. **Refs are reissued by every read.** Act on a ref in the cycle you read it; navigation and large
-   DOM changes stale all of them.
+1. **Refs are reissued by every read, `cooperate("sync")` included.** Act on a ref in the cycle you
+   read it, or use a CSS selector, which resolves live; navigation and large DOM changes stale all refs.
 2. **Two identical failures mean change approach, not retry.** A third identical attempt is a defect.
 3. **Sync before every gated action except the first navigate.** Under the default `strict`
    policy a context from `session.cooperate("sync")` is good for one action; reads (`observe`,
