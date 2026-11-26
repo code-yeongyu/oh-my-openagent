@@ -6,6 +6,7 @@
         "script/beta-follows-latest.mjs",
         "script/build-binaries.ts",
         "script/build-brand-logo.ts",
+        "script/bundle-guards.ts",
         "script/build-cli-node.ts",
         "script/build-codex-install.ts",
         "script/build-model-capabilities.ts",
