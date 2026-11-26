@@ -50,8 +50,6 @@ export type GatewayStoreOptions = {
   }
 }
 
-export { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "./store-worker-sidecar"
-
 /**
  * Where the worker thread's module is, seen from the module the store facade runs in: inside the
  * built extension that is the `gateway-store-worker.mjs` sidecar the build emits beside `omo.js`

@@ -465,7 +465,11 @@ export async function buildExtension(options = {}) {
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
-  const omoSdkInputs = await buildEntry(omoSdkEntryPath, omoSdkOutput, buildDefines, sdkExternalSpecifiers)
+  // The root's thread core carries the same parked-session wake as the thread SDK below (#14972), loaded the same way.
+  const omoSdkInputs = await buildEntry(omoSdkEntryPath, omoSdkOutput, buildDefines, [
+    ...sdkExternalSpecifiers,
+    "#omo-wake-runtime",
+  ])
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
