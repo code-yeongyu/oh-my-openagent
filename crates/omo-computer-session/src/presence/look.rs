@@ -22,8 +22,8 @@ pub enum Action {
     Key,
 }
 
+#[cfg(test)]
 impl Action {
-    /// Every action, in the vocabulary's order.
     pub const ALL: [Self; 7] =
         [Self::Idle, Self::Navigate, Self::Click, Self::Drag, Self::Scroll, Self::Text, Self::Key];
 }
@@ -58,21 +58,21 @@ pub struct CursorLook {
     /// The session colours as sRGB hex, by the session's place.
     pub session_colours: [String; 4],
     pub badges: Vec<Action>,
-    /// The mark's opacity once the session has been idle for `idle_after_ms`.
+    /// The mark's opacity once the session has been idle for `idle_after_ms`: 0.35 after 700 ms,
+    /// the app's agent cursor dim (omo-desktop-app `apps/web/DESIGN.md` §6 "Agent cursor", Dim).
     pub idle_opacity: f64,
     pub idle_after_ms: f64,
 }
 
 impl CursorLook {
-    /// The shipped look (parsed once; the table tests prove the file parses).
+    /// The shipped look, parsed once.
     ///
     /// # Panics
-    /// The shipped look file does not parse.
+    /// Never for the compiled-in file: `packaged_cursor_look_is_byte_equal_to_the_crate_description` parses it.
     #[must_use]
+    #[expect(clippy::expect_used, reason = "the look is compiled in and its tests parse it")]
     pub fn shipped() -> &'static Self {
         static LOOK: OnceLock<CursorLook> = OnceLock::new();
-        LOOK.get_or_init(|| {
-            serde_json::from_str(LOOK_JSON).unwrap_or_else(|error| panic!("shipped cursor look: {error}"))
-        })
+        LOOK.get_or_init(|| serde_json::from_str(LOOK_JSON).expect("the shipped cursor-look.json parses"))
     }
 }

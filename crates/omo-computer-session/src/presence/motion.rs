@@ -3,13 +3,15 @@
 //! sampled at the display's refresh rate, and the renderer adds no timing of its own. It never
 //! moves the operating system's pointer and never holds an input send: the report goes out before
 //! the send and the renderer animates on its own clock. Times are milliseconds on the caller's
-//! clock; positions are the display's backing pixels.
+//! clock; positions are backing pixels and distances are converted to points through the scale.
 
+use std::cmp::Ordering;
 use std::sync::OnceLock;
 
 use serde::Deserialize;
 
 use super::look::{Action, CursorLook};
+use super::units::{PixelPoint, Points, RefreshRate, Scale};
 
 pub(super) const MOTION_JSON: &str = include_str!("cursor-motion.json");
 
@@ -30,28 +32,33 @@ pub struct MotionTable {
 }
 
 impl MotionTable {
-    /// The shipped table (parsed once; the table tests prove the file parses).
+    /// The shipped table, parsed once.
     ///
     /// # Panics
-    /// The shipped motion table does not parse.
+    /// Never for the compiled-in file: `packaged_motion_table_is_byte_equal_to_the_crate_table` parses it.
     #[must_use]
+    #[expect(clippy::expect_used, reason = "the table is compiled in and its tests parse it")]
     pub fn shipped() -> &'static Self {
         static TABLE: OnceLock<MotionTable> = OnceLock::new();
-        TABLE.get_or_init(|| {
-            serde_json::from_str(MOTION_JSON).unwrap_or_else(|error| panic!("shipped cursor motion: {error}"))
-        })
+        TABLE.get_or_init(|| serde_json::from_str(MOTION_JSON).expect("the shipped cursor-motion.json parses"))
     }
 
-    /// `clamp(minMs, maxMs, baseMs + perDoublingMs * log2(1 + d / distanceUnitPoints))`, `d` in points.
+    /// `clamp(minMs, maxMs, baseMs + perDoublingMs * log2(1 + d / distanceUnitPoints))`.
     #[must_use]
-    pub fn glide_ms(&self, distance_points: f64) -> f64 {
-        let ms = self.base_ms + self.per_doubling_ms * (1.0 + distance_points / self.distance_unit_points).log2();
+    pub fn glide_ms(&self, distance: Points) -> f64 {
+        let ms = self.base_ms + self.per_doubling_ms * (1.0 + distance.0 / self.distance_unit_points).log2();
         ms.clamp(self.min_ms, self.max_ms)
     }
 
     /// The eased progress at the time fraction `t` in `0..=1`.
     #[must_use]
     pub fn ease(&self, t: f64) -> f64 {
+        if t >= 1.0 {
+            return 1.0;
+        }
+        if t <= 0.0 {
+            return 0.0;
+        }
         let [x1, y1, x2, y2] = self.easing;
         let bezier = |p1: f64, p2: f64, s: f64| {
             let r = 1.0 - s;
@@ -60,46 +67,32 @@ impl MotionTable {
         // x(s) and y(s) both rise on 0..=1 when every control point is in 0..=1, so bisection on
         // x with a fixed interval and step count gives a parameter, and a progress, that never
         // goes back as t grows.
-        let target = t.clamp(0.0, 1.0);
         let (mut low, mut high) = (0.0_f64, 1.0_f64);
         for _ in 0..48 {
-            let middle = (low + high) / 2.0;
-            if bezier(x1, x2, middle) < target {
+            let middle = f64::midpoint(low, high);
+            if bezier(x1, x2, middle) < t {
                 low = middle;
             } else {
                 high = middle;
             }
         }
-        if target >= 1.0 {
-            return 1.0;
-        }
-        if target <= 0.0 {
-            return 0.0;
-        }
-        bezier(y1, y2, (low + high) / 2.0)
+        bezier(y1, y2, f64::midpoint(low, high))
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
 }
 
 /// One report of the stream: where the next action lands and what it is.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Report {
-    pub to: Point,
+    pub to: PixelPoint,
     pub action: Action,
     pub at_ms: f64,
 }
 
-/// The display the cursor is drawn on.
+/// The display the cursor is drawn on; its scale and refresh rate are parsed at the boundary.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Display {
-    /// Backing pixels per point.
-    pub scale: f64,
-    pub refresh_hz: f64,
+    pub scale: Scale,
+    pub refresh: RefreshRate,
     pub reduced_motion: bool,
 }
 
@@ -117,15 +110,15 @@ pub enum Travel {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Sample {
     pub at_ms: f64,
-    pub position: Point,
+    pub position: PixelPoint,
     pub opacity: f64,
 }
 
 /// The path from where the cursor is to one report's point.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Plan {
-    pub from: Point,
-    pub to: Point,
+    pub from: PixelPoint,
+    pub to: PixelPoint,
     pub action: Action,
     pub start_ms: f64,
     pub travel: Travel,
@@ -134,15 +127,15 @@ pub struct Plan {
 
 impl Plan {
     #[must_use]
-    pub fn new(from: Point, report: &Report, display: &Display) -> Self {
+    pub fn new(from: PixelPoint, report: &Report, display: &Display) -> Self {
         let table = MotionTable::shipped();
-        let distance_points = (report.to.x - from.x).hypot(report.to.y - from.y) / display.scale;
+        let distance = display.scale.to_points(from.distance(report.to));
         let travel = if display.reduced_motion {
             Travel::Fade { duration_ms: table.fade_ms }
-        } else if distance_points < CursorLook::shipped().footprint_pt {
+        } else if distance < Points(CursorLook::shipped().footprint_pt) {
             Travel::Place
         } else {
-            Travel::Glide { duration_ms: table.glide_ms(distance_points) }
+            Travel::Glide { duration_ms: table.glide_ms(distance) }
         };
         Self {
             from,
@@ -150,7 +143,7 @@ impl Plan {
             action: report.action,
             start_ms: report.at_ms,
             travel,
-            frame_ms: 1_000.0 / display.refresh_hz,
+            frame_ms: display.refresh.frame_ms(),
         }
     }
 
@@ -164,21 +157,13 @@ impl Plan {
     #[must_use]
     pub fn at(&self, now_ms: f64) -> Sample {
         let elapsed = (now_ms - self.start_ms).max(0.0);
-        let drawn = |position: Point, opacity: f64| Sample { at_ms: now_ms, position, opacity };
-        match self.travel {
-            Travel::Place => drawn(self.to, 1.0),
-            Travel::Fade { duration_ms } => {
-                drawn(self.to, MotionTable::shipped().ease(elapsed / duration_ms))
-            }
-            Travel::Glide { duration_ms } => {
-                let progress = MotionTable::shipped().ease(elapsed / duration_ms);
-                let position = Point {
-                    x: self.from.x + (self.to.x - self.from.x) * progress,
-                    y: self.from.y + (self.to.y - self.from.y) * progress,
-                };
-                drawn(position, 1.0)
-            }
-        }
+        let table = MotionTable::shipped();
+        let (position, opacity) = match self.travel {
+            Travel::Place => (self.to, 1.0),
+            Travel::Fade { duration_ms } => (self.to, table.ease(elapsed / duration_ms)),
+            Travel::Glide { duration_ms } => (self.from.toward(self.to, table.ease(elapsed / duration_ms)), 1.0),
+        };
+        Sample { at_ms: now_ms, position, opacity }
     }
 
     #[must_use]
@@ -189,7 +174,9 @@ impl Plan {
         }
     }
 
-    /// Every frame from the report to the end of the travel, at the display's refresh rate.
+    /// Every frame from the report to the end of the travel, at the display's refresh rate. The
+    /// frame step is finite and positive (`RefreshRate`), and a frame time that is not below the
+    /// end (including a non-finite one) ends the path, so this always returns.
     #[must_use]
     pub fn samples(&self) -> Vec<Sample> {
         let end = self.end_ms();
@@ -197,7 +184,7 @@ impl Plan {
         let mut frame = 0_u32;
         loop {
             let at = self.start_ms + f64::from(frame) * self.frame_ms;
-            if at >= end {
+            if at.partial_cmp(&end) != Some(Ordering::Less) {
                 samples.push(self.at(end));
                 return samples;
             }
