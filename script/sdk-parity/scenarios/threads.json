@@ -6796,6 +6796,36 @@
       }
     },
     {
+      "id": "threads.interrupt/deadline-passes",
+      "row": "threads.interrupt",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.interrupt",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
       "id": "threads.close/session-live",
       "row": "threads.close",
       "kind": "effect",
@@ -6911,6 +6941,36 @@
       "target": "this_device",
       "abort": {
         "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.close/deadline-passes",
+      "row": "threads.close",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
       }
     },
     {
@@ -7048,6 +7108,37 @@
       }
     },
     {
+      "id": "threads.setModel/deadline-passes",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1",
+        "model": "opus"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
       "id": "threads.setReasoning/session-live",
       "row": "threads.setReasoning",
       "kind": "effect",
@@ -7154,6 +7245,37 @@
       "target": "this_device",
       "abort": {
         "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.setReasoning/deadline-passes",
+      "row": "threads.setReasoning",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1",
+        "level": "high"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
       }
     },
     {
@@ -7277,6 +7399,81 @@
       }
     },
     {
+      "id": "threads.rename/deadline-passes",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "threads.rename/deadline-passes-after-write",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "host",
+          "op": "rename_session",
+          "args": {
+            "thread": "t-1",
+            "name": "review"
+          },
+          "takes_ms": 100
+        },
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
+      }
+    },
+    {
       "id": "threads.archive/session-live",
       "row": "threads.archive",
       "kind": "effect",
@@ -7381,6 +7578,36 @@
       "target": "this_device",
       "abort": {
         "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.archive/deadline-passes",
+      "row": "threads.archive",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "takes_ms": 100
+        },
+        {
+          "port": "store",
+          "op": "set_archived",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.archive",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "options": {
+        "deadline_ms": 50
       }
     },
     {
