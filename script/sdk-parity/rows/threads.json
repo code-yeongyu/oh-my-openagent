@@ -1702,7 +1702,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The thread SDK's read (thread/sdk.ts READ_KEYS) does not take limit or wait_ms yet and answers 'Unknown option'; the tool is ahead of it until T1b (#15076)."
     },
     {
       "id": "threads.readAfterWait",
@@ -1787,7 +1788,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The thread SDK's read (thread/sdk.ts READ_KEYS) does not take limit or wait_ms yet and answers 'Unknown option'; the tool is ahead of it until T1b (#15076)."
     },
     {
       "id": "threads.receipt",

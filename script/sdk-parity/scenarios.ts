@@ -77,7 +77,7 @@ const ALIAS_VALUES: Readonly<Record<string, readonly [unknown, unknown]>> = {
 }
 
 // Three scenarios per declared alias, once per tool: the alias alone, its field alone (the twin), and both disagreeing.
-export function aliasScenarios(rows: readonly Row[]): ToolScenario[] {
+function aliasScenarios(rows: readonly Row[]): ToolScenario[] {
   const seen = new Set<string>()
   const out: ToolScenario[] = []
   for (const row of rows)
