@@ -58,6 +58,29 @@ function usageBlock(lines: readonly string[], command: string): Block | undefine
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 
+// A row owns the scenarios it names: each must exist and declare a usage block, and one verb of one scenario is named by
+// at most one row, so which row cleared a line is never ambiguous. Rows for different verbs of one scenario coexist.
+export function presentationRowProblems(rows: readonly PresentationRow[], scenarios: readonly Scenario[]): string[] {
+  const problems: string[] = []
+  const claimed = new Set<string>()
+  for (const row of rows) {
+    if (row.changes.length === 0) problems.push(`${PRESENTATION_PATH}: the row for ${row.verb} names no changed line`)
+    for (const id of row.scenarios) {
+      const scenario = scenarios.find((candidate) => candidate.id === id)
+      if (scenario === undefined)
+        problems.push(`${PRESENTATION_PATH}: the row for ${row.verb} names scenario ${id}, which does not exist`)
+      else if (!("usage" in scenario) || scenario.usage === undefined)
+        problems.push(
+          `${PRESENTATION_PATH}: the row for ${row.verb} names scenario ${id}, which declares no usage block`,
+        )
+      const key = `${id} ${row.verb}`
+      if (claimed.has(key)) problems.push(`${PRESENTATION_PATH}: scenario ${id} has two rows for ${row.verb}`)
+      claimed.add(key)
+    }
+  }
+  return problems
+}
+
 export function presentationProblems(
   scenario: Scenario,
   before: Outcome,
@@ -71,6 +94,9 @@ export function presentationProblems(
   const keys = (outcome: Outcome) => Object.keys(outcome).toSorted().join(",")
   if (keys(before) !== "exit,stderr,stdout" || keys(after) !== "exit,stderr,stdout")
     return ["the outcome is not an exit code with its two streams"]
+  const typed = (outcome: Outcome) =>
+    typeof outcome["exit"] === "number" && STREAMS.every((stream) => typeof outcome[stream] === "string")
+  if (!typed(before) || !typed(after)) return ["the outcome's fields are not a numeric exit code and two text streams"]
   if (before["exit"] !== after["exit"]) return [`the exit code changed (${before["exit"]} -> ${after["exit"]})`]
   const named = rows.filter((row) => row.scenarios.includes(scenario.id))
   if (named.length === 0) return [`no row of ${PRESENTATION_PATH} names scenario ${scenario.id}`]
@@ -80,7 +106,7 @@ export function presentationProblems(
     if (!row.verb.startsWith(`${command} `)) problems.push(`the row names ${row.verb}, not a verb of omo ${command}`)
   }
   for (const stream of STREAMS) {
-    const [a, b] = [String(before[stream]), String(after[stream])]
+    const [a, b] = [`${before[stream]}`, `${after[stream]}`]
     if (a === b) continue
     const [linesA, linesB] = [a.split("\n"), b.split("\n")]
     const [blockA, blockB] = [usageBlock(linesA, command), usageBlock(linesB, command)]

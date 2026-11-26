@@ -1,5 +1,5 @@
 import { type BaselineEntry, sha256 } from "./baseline"
-import { type Goldens, type PresentationRow, presentationProblems } from "./presentation"
+import { type Goldens, type PresentationRow, presentationProblems, presentationRowProblems } from "./presentation"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
@@ -79,7 +79,7 @@ export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
 export function gateReport(input: GateInput): GateReport {
-  const failures: string[] = []
+  const failures: string[] = [...presentationRowProblems(input.presentation, input.scenarios)]
   const unresolved = new Set(input.head.unresolved.map((entry) => entry.id))
   const initialization = input.base.rows === undefined
   const baseRows = new Map((input.base.rows ?? []).map((row) => [row.id, row]))
