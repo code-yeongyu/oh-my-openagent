@@ -104,6 +104,7 @@ import { createHeldSend } from "./held-send"
 import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
 import { defaultSignaller } from "../lifecycle/context"
+import { defaultTeardownStepDeadline, withinTeardownBudget } from "../lifecycle/teardown-budget"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
 import { AdmissionBarrier, type ResumeCredential } from "../pause/admission-barrier"
@@ -1655,12 +1656,23 @@ class TaskManagerImpl implements TaskManager {
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
       trackOutcome: (taskId, handle, model, epoch) => this.#outcome.trackOutcome(taskId, handle, model, epoch),
       ...(this.#options.ownerResumeFence === undefined ? {} : { ownerResumeFence: this.#options.ownerResumeFence }),
-      endRefusedRun: (taskId, handle) => this.#endRefusedRun(taskId, handle),
+      endRefusedRun: (taskId, handle, disposition) => this.#endRefusedRun(taskId, handle, disposition),
     }
   }
 
-  // The owner refused a self-started run: the record stays settled, so nothing may keep running.
-  async #endRefusedRun(taskId: string, handle: ManagedChildHandle): Promise<void> {
+  // The owner refused a self-started run; the record stays settled either way. `retire` ends the child.
+  // `hold` aborts only the turn, through the same bounded abort a cancel or interrupt sends, and keeps the
+  // child resident and send-revivable; a rejected abort is recorded, never turned into a teardown.
+  async #endRefusedRun(taskId: string, handle: ManagedChildHandle, disposition: "retire" | "hold"): Promise<void> {
+    if (disposition === "hold") {
+      const target = { taskId, pid: handle.pid }
+      await withinTeardownBudget(defaultTeardownStepDeadline, target, "abort", () => handle.abort()).catch((error) => {
+        const reason = error instanceof Error ? error.message : String(error)
+        this.#options.store.appendEvent(taskId, { type: "task_self_resume_hold_failed", payload: { reason } })
+        log("senpi-task could not stop a held self-started run", { taskId, reason })
+      })
+      return
+    }
     const destruction = this.#options.destruction
     if (destruction !== undefined) return destruction.destroyResidentTask(taskId, "cancel")
     this.forget(taskId, { path: "end" })

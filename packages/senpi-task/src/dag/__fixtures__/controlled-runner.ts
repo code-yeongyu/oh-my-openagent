@@ -38,6 +38,8 @@ export type ControlledHandle = {
   readonly selfResume: () => Promise<void>
   /** How often the manager aborted and disposed this child. */
   readonly stops: { aborted: number; disposed: number }
+  /** Resolves with the next stop the manager sends this child: an abort, or a dispose. */
+  readonly nextStop: () => Promise<"aborted" | "disposed">
   /** Holds the next abort pending: `reached` resolves when it is sent, `release` lets it finish. */
   readonly holdStops: () => { readonly reached: Promise<void>; readonly release: () => void }
   readonly connection: ControlledConnection
@@ -51,6 +53,11 @@ export type ControlledConnection = {
 
 export function controlledHandle(taskId: string, connectable = false): ControlledHandle {
   const stops = { aborted: 0, disposed: 0 }
+  const stopWaiters: Array<(stop: "aborted" | "disposed") => void> = []
+  const stopped = (stop: "aborted" | "disposed"): void => {
+    for (const waiter of stopWaiters.splice(0)) waiter(stop)
+  }
+  const nextStop = (): Promise<"aborted" | "disposed"> => new Promise((resolve) => stopWaiters.push(resolve))
   let stopGate: { readonly reached: () => void; readonly released: Promise<void> } | undefined
   const holdStops = (): { readonly reached: Promise<void>; readonly release: () => void } => {
     let release = (): void => undefined
@@ -92,6 +99,7 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
   return {
     settle,
     stops,
+    nextStop,
     holdStops,
     connection,
     selfResume: () =>
@@ -115,6 +123,7 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
       followUp: () => Promise.resolve(),
       abort: () => {
         stops.aborted += 1
+        stopped("aborted")
         const gate = stopGate
         stopGate = undefined
         if (gate === undefined) return Promise.resolve()
@@ -126,6 +135,7 @@ export function controlledHandle(taskId: string, connectable = false): Controlle
       lastAssistantText: () => undefined,
       dispose: () => {
         stops.disposed += 1
+        stopped("disposed")
         return Promise.resolve()
       },
       ...(connectable ? { transportRecovering: () => recovering, stopWhenReachable: () => reconnected } : {}),
