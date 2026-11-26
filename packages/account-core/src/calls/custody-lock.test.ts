@@ -73,6 +73,17 @@ describe("the custody log's lock", () => {
     expect(await held(log, 50)).toBe("held")
   })
 
+  // Custody review of 09d971691e, L1 (design lane ruling): a holder that wrote its scope as unreadable (null) is UNKNOWN,
+  // never "no scope", so its absent pid proves nothing and the lock waits the foreign-scope age.
+  test("#given a lock whose holder wrote an unreadable (null) scope, its pid absent here #then it survives the holderless age and breaks past the foreign-scope age", async () => {
+    const { log, lock } = lockAt(await temporaryHome(), { pid: await deadPid(), start: null, scope: null })
+    expect(await held(log, 50)).toBeUndefined()
+    ageBy(lock, HOLDERLESS_BREAK_AGE_MS + 1000)
+    expect(await held(log, 50)).toBeUndefined()
+    ageBy(lock, FOREIGN_SCOPE_BREAK_AGE_MS + 1000)
+    expect(await held(log, 50)).toBe("held")
+  })
+
   test("#given a lock that names no holder #then it is broken past the holderless age and not before", async () => {
     const { log, lock } = lockAt(await temporaryHome(), "")
     expect(await held(log, 50)).toBeUndefined()

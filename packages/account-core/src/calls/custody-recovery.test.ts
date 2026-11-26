@@ -254,4 +254,43 @@ describe("the starter's start identity and scope (security design 8.2, D22-17)",
       old: ["interrupted starter_legacy_unverified"],
     })
   })
+
+  // Custody review of 09d971691e, L1 and L2 (design lane ruling): a scope or start identity the writer could not read is UNKNOWN,
+  // never "no scope": its pid proves nothing either way, so it is not closed early and is closed at the horizon with its
+  // own reason.
+  test("#given a starter whose scope was written as unreadable (null) and whose pid is absent here #then it stays open until the horizon, then closes as identity unknown", async () => {
+    const home = await temporaryHome()
+    const unknown = { pid: await deadPid(), starter_start: null, starter_scope: null }
+    seed(home, [
+      started({ at: fresh(), operation_id: "op-young", ...unknown }),
+      started({ at: OLD, operation_id: "op-old", ...unknown }),
+    ])
+    await run(home)
+    expect({ young: outcomeOf(home, "op-young"), old: outcomeOf(home, "op-old") }).toEqual({
+      young: [],
+      old: ["interrupted starter_identity_unknown"],
+    })
+  })
+
+  test("#given a starter whose scope was written as unreadable (null) and whose pid is taken #then it is closed at the horizon as identity unknown", async () => {
+    const home = await temporaryHome()
+    seed(home, [started({ at: OLD, operation_id: "op-old", pid: livePid(), starter_start: null, starter_scope: null })])
+    await run(home)
+    expect(outcomeOf(home, "op-old")).toEqual(["interrupted starter_identity_unknown"])
+  })
+
+  test("#given a starter in this scope whose start identity was unreadable (null) and whose pid is taken #then it stays open until the horizon, then closes as identity unknown", async () => {
+    const home = await temporaryHome()
+    const pid = livePid()
+    const scope = await processScope()
+    seed(home, [
+      started({ at: fresh(), operation_id: "op-young", pid, starter_start: null, starter_scope: scope }),
+      started({ at: OLD, operation_id: "op-old", pid, starter_start: null, starter_scope: scope }),
+    ])
+    await run(home)
+    expect({ young: outcomeOf(home, "op-young"), old: outcomeOf(home, "op-old") }).toEqual({
+      young: [],
+      old: ["interrupted starter_identity_unknown"],
+    })
+  })
 })
