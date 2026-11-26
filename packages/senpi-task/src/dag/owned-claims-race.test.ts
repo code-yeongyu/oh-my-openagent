@@ -24,7 +24,7 @@ function project(): string {
 // Review finding 3 of #15135: the re-entry sweep runs once, so an older attempt's child that resumes
 // on its own AFTER it is hidden behind a newer, already terminal claim. The owned start must see every
 // live claim of the node, not only the newest record, or the automatic retry adds a third writer.
-test("#11381 #given an older attempt's child that resumed after the sweep behind a newer terminal claim #when the infrastructure retry admits the node #then no new child starts beside it and it is stopped", async () => {
+test("#11381 #given an older attempt's child that resumed after the sweep behind a newer terminal claim #when the infrastructure retry admits the node #then it is stopped before a new child starts, never beside it", async () => {
   // given
   const clock = new RetryClock()
   const runner = new ControlledRunner()
@@ -55,14 +55,11 @@ test("#11381 #given an older attempt's child that resumed after the sweep behind
 
   // when
   clock.advance()
-  await Promise.race([reentry.run, runner.whenStarted(3)])
+  await runner.whenStarted(3)
 
-  // then
-  expect(runner.startedSpecs.map((spec) => spec.prompt)).toEqual(["do A", "do A-fixed"])
-  const record = await reentry.run
-  expect(record.nodes.find((entry) => entry.id === "A")).toMatchObject({
-    state: "failed",
-    error: { code: "stale_attempt_alive" },
-  })
+  // then - the manager refuses a start while the old claim is live, so the third child starting means
+  // the admission fence stopped the old one first: never two writers at once
   expect(fixture.taskStore.load(oldest)?.status).toBe("cancelled")
+  runner.settle("A-fixed", completed("A-fixed"))
+  expect((await reentry.run).status).toBe("completed")
 })

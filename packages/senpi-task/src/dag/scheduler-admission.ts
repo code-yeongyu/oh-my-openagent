@@ -1,7 +1,7 @@
 import type { ResidencyDenied } from "../manager/types"
 import type { OwnedStartResult } from "./owner"
 import { errorMessage, failNode, transition, type SchedulerContext } from "./scheduler-context"
-import { resolveAdmissionIdle } from "./scheduler-cancellation"
+import { fenceStaleChildren, resolveAdmissionIdle, supersededChildren } from "./scheduler-cancellation"
 import { emitWaveAdmissions } from "./scheduler-frontier"
 import { startSpec, owner, isRunnable } from "./scheduler-start"
 import { attachStarted, settleOne } from "./scheduler-task-attachment"
@@ -25,6 +25,10 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
       )
       .map((node) => node.id)
     if (denied.length === 0 && runnable.length === 0) return true
+    const stale = supersededChildren(context)
+    if (stale.length > 0 && (await fenceStaleChildren(context, stale, [...denied, ...runnable])).length === 0) {
+      return !(context.suspended || context.cancellationStarted)
+    }
 
     for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
     emitWaveAdmissions(context, runnable)

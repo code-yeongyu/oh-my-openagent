@@ -3,7 +3,6 @@ import {
   countNodes,
   errorMessage,
   failNode,
-  isLiveTask,
   transition,
   TERMINAL_NODE_STATES,
   type SchedulerContext,
@@ -80,43 +79,59 @@ export function supersededChildren(context: SchedulerContext): readonly Supersed
   )
 }
 
-/**
- * Stops superseded children before any new attempt starts, so a replaced definition never keeps
- * writing beside, or gets adopted as, the new one (#11381). A child that cannot be stopped fails its
- * node with the retryable `stale_attempt_alive`. Runs as an admission pass, so cancel and suspend
- * wait for it.
- */
+// One stop attempt per stale task id per scheduler: the re-entry sweep and every admission fence share
+// it, so a child that refused to stop is reported, not hammered, and a retry's fresh scheduler re-asks.
+const staleStops = new WeakMap<SchedulerContext, Map<string, string | undefined>>()
+
+/** Stops the live superseded or removed-node children not yet asked; a rejected stop keeps its message. */
 export async function disposeSupersededChildren(
   context: SchedulerContext,
   stale: readonly SupersededChild[],
 ): Promise<void> {
+  const asked = staleStops.get(context) ?? new Map<string, string | undefined>()
+  staleStops.set(context, asked)
+  const fresh = stale.filter(({ taskId }) => !asked.has(taskId))
+  if (fresh.length === 0) return
+  for (const { taskId } of fresh) asked.set(taskId, undefined)
   context.admissionInProgress = true
-  let results: PromiseSettledResult<unknown>[]
   try {
-    results = await Promise.allSettled(
-      stale.map(({ nodeId, taskId }) => context.taskManager.cancelTask(taskId, supersededReason(context, nodeId))),
+    const results = await Promise.allSettled(
+      fresh.map(({ nodeId, taskId }) => context.taskManager.cancelTask(taskId, supersededReason(context, nodeId))),
     )
+    fresh.forEach(({ taskId }, index) => {
+      const result = results[index]
+      if (result?.status === "rejected") asked.set(taskId, errorMessage(result.reason))
+    })
   } finally {
     context.admissionInProgress = false
     resolveAdmissionIdle(context)
   }
-  if (context.suspended || context.cancellationStarted) return
-  stale.forEach(({ nodeId, taskId }, index) => {
-    const task = context.taskManager.get(taskId)
-    if (!isLiveTask(task)) return
-    // Only a node still to be admitted can fail closed; an already settled or attached node keeps its
-    // state, and a removed node has none - its child stays the run cancel's to stop.
-    const state = context.journal.snapshot().nodes.find((node) => node.id === nodeId)?.state
-    if (state !== "pending" && state !== "blocked") return
-    const result = results[index]
-    const cause = result?.status === "rejected" ? `: ${errorMessage(result.reason)}` : ""
-    failNode(
-      context,
-      nodeId,
-      "stale_attempt_alive",
-      `task ${taskId} of a superseded attempt is still ${task?.status} and could not be stopped${cause}`,
-    )
+}
+
+/**
+ * No node is admitted in a pass after which a superseded or removed-node child is still live (#11381):
+ * live stale children are asked to stop, and if any survives, every node this pass would admit fails
+ * with the retryable `stale_attempt_alive`. Failing the ready nodes rather than the run is what node
+ * retry already recovers from: it re-enters, sweeps, and admits once the stop has landed. Runs as an
+ * admission pass, so cancel and suspend wait for it. Called only when `stale` is non-empty, so a run
+ * with nothing stale admits without yielding. Returns the nodes still admissible.
+ */
+export async function fenceStaleChildren(
+  context: SchedulerContext,
+  stale: readonly SupersededChild[],
+  nodeIds: readonly DagNodeId[],
+): Promise<readonly DagNodeId[]> {
+  await disposeSupersededChildren(context, stale)
+  if (context.suspended || context.cancellationStarted) return []
+  const alive = supersededChildren(context)
+  if (alive.length === 0) return nodeIds
+  const ids = alive.map(({ taskId }) => {
+    const cause = staleStops.get(context)?.get(taskId)
+    return cause === undefined ? taskId : `${taskId} (${cause})`
   })
+  const message = `task ${ids.join(", ")} of a superseded attempt or removed node is still live and could not be stopped`
+  for (const nodeId of nodeIds) failNode(context, nodeId, "stale_attempt_alive", message)
+  return []
 }
 
 function supersededReason(context: SchedulerContext, nodeId: DagNodeId): string {

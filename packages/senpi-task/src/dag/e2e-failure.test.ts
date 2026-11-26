@@ -905,7 +905,7 @@ describe("DAG retry, amend, and revive end to end", () => {
     expect((await secondAmend.run).status).toBe("completed")
   })
 
-  test("#11381 #given an infrastructure-failed child that resumed before its automatic retry #when the retry finds it live #then the child is cancelled and the node fails stale_attempt_alive", async () => {
+  test("#11381 #given an infrastructure-failed child that resumed before its automatic retry #when the retry finds it live #then the child is stopped before the retry's child starts", async () => {
     // given
     const clock = new RetryClock()
     const runner = new ControlledRunner()
@@ -928,15 +928,17 @@ describe("DAG retry, amend, and revive end to end", () => {
 
     // when
     clock.advance()
-    const record = await fixture.running(runId)
+    await runner.whenStarted(2)
 
-    // then
-    expect(record.nodes.find((entry) => entry.id === "A")).toMatchObject({
-      state: "failed",
-      error: { code: "stale_attempt_alive" },
-    })
+    // then - a start is refused while the stale claim is live, so the retry starting proves the order
     expect(fixture.taskStore.load(staleTaskId)?.status).toBe("cancelled")
-    expect(runner.startedSpecs).toHaveLength(1)
+    runner.settle("A", completed("A"))
+    const record = await fixture.running(runId)
+    expect(record.nodes.find((entry) => entry.id === "A")).toMatchObject({ state: "completed" })
+    expect(runner.startedSpecs).toHaveLength(2)
+    expect(
+      fixture.taskManager.findOwnedTasks({ kind: "dag", runId }).filter((task) => task.status === "running"),
+    ).toEqual([])
   })
 
   test("#given a settled run #when an amendment adds a node #then the added node executes on re-entry", async () => {
