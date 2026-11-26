@@ -24,7 +24,8 @@ export async function prepareLimitRevival(
 ): Promise<PreparedLimitRevival> {
   const routed = routeAroundSpentLimits(record, ports.limits)
   if ("spent" in routed) return { refused: routed.spent, failure_kind: "usage_limit" }
-  if (routed.plan === record) return { record, handle }
+  // A warm session moves only when the rung it runs on is spent; its spent fallbacks are skipped by the walk anyway.
+  if (routed.plan.resolved_model === record.resolved_model) return { record, handle }
   const path = record.host_session?.session_path ?? newestSessionPath(ports, record.task_id)
   if (path === undefined)
     return {

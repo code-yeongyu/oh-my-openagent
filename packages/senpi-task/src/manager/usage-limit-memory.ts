@@ -108,8 +108,10 @@ export function createUsageLimitMemory(now: () => number): UsageLimitMemory {
 }
 
 /**
- * A new child never starts on a rung whose limit an earlier child already found spent: it starts on the first rung
- * the memory clears, or, when every rung is spent, it is refused with the remembered reason (#11383).
+ * A new child never starts on a rung whose limit an earlier child already found spent: every spent rung, primary or
+ * fallback, leaves the plan, so it starts on the first rung the memory clears and only cleared rungs can take spill
+ * capacity; when every rung is spent it is refused with the remembered reason (#11383). A plan with no spent rung is
+ * returned as the same object.
  */
 export function routeAroundSpentLimits<
   Plan extends {
@@ -118,10 +120,12 @@ export function routeAroundSpentLimits<
     readonly fallback_models?: readonly ResolvedModelRecord[]
   },
 >(plan: Plan, limits: UsageLimitMemory): { readonly plan: Plan } | { readonly spent: string } {
+  const fallbacks = plan.fallback_models ?? []
+  const usable = fallbacks.filter((rung) => !limits.familySpent(rung.provider, rung.model_id))
   const primary = plan.resolved_model
   const reason = primary === undefined ? undefined : limits.spentReason(primary.provider, primary.model_id)
-  if (reason === undefined) return { plan }
-  const usable = (plan.fallback_models ?? []).filter((rung) => !limits.familySpent(rung.provider, rung.model_id))
+  if (reason === undefined)
+    return { plan: usable.length === fallbacks.length ? plan : { ...plan, fallback_models: usable } }
   const [next, ...rest] = usable
   if (next === undefined) return { spent: reason }
   return { plan: { ...plan, model: next.display, resolved_model: next, fallback_models: rest } }

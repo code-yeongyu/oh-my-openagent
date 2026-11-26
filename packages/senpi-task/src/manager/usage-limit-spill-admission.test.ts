@@ -17,6 +17,9 @@ const rung = (provider: string, modelId: string): ResolvedModelRecord => ({
 })
 const primary = rung("vendor-a", "primary")
 const fallback = rung("vendor-b", "fallback")
+const spentToo = rung("vendor-c", "spent")
+const healthy = rung("vendor-d", "healthy")
+const ACCOUNT_LIMIT = "Account usage limit reached"
 
 class WatchedRunner extends FakeRunner {
   readonly #waiting = new Map<string, () => void>()
@@ -31,18 +34,16 @@ class WatchedRunner extends FakeRunner {
   }
 }
 
-function fixture() {
+function chainOf(first: ResolvedModelRecord, ...fallbacks: ResolvedModelRecord[]): ResolvedChildPlan {
+  return { model: first.display, requested_model: first, resolved_model: first, fallback_models: fallbacks }
+}
+
+function fixture(spillPlan: ResolvedChildPlan = chainOf(primary, fallback), held: ResolvedModelRecord = fallback) {
   const project = tempProject()
   const store = createTaskRecordStore({ project_dir: project })
   const memory = createUsageLimitMemory(Date.now)
   const runner = new WatchedRunner()
-  const spillPlan: ResolvedChildPlan = {
-    model: primary.display,
-    requested_model: primary,
-    resolved_model: primary,
-    fallback_models: [fallback],
-  }
-  const holderPlan: ResolvedChildPlan = { model: fallback.display, resolved_model: fallback, fallback_models: [] }
+  const holderPlan: ResolvedChildPlan = { model: held.display, resolved_model: held, fallback_models: [] }
   const manager = createTaskManager({
     store,
     usageLimits: memory,
@@ -79,6 +80,45 @@ test("#given a spent primary with a free lane and a full fallback lane #when spa
     await holderDone
     await launched
     expect(f.runner.startedSpecs.at(-1)).toMatchObject({ taskId: result.task_id, model: fallback.display })
+  } finally {
+    f.manager.workpools.dispose()
+  }
+})
+
+test("#given a busy unspent primary and only spent fallbacks with free lanes #when spawning #then the task queues on the primary and never starts on a spent rung (review 15140 delta HIGH)", async () => {
+  // given
+  const f = fixture(chainOf(primary, fallback, spentToo), primary)
+  try {
+    const holder = await f.manager.start(baseSpec({ name: "holder" }))
+    if (holder.kind !== "started" || holder.status !== "running") throw new Error("expected a running holder")
+    f.memory.settle("earlier", fallback.provider, fallback.model_id, ACCOUNT_LIMIT)
+    f.memory.settle("earlier", spentToo.provider, spentToo.model_id, ACCOUNT_LIMIT)
+
+    // when
+    const result = await f.manager.start(baseSpec({ name: "spill" }))
+
+    // then
+    expect(result).toMatchObject({ kind: "started", status: "pending", resolved_model: primary })
+    expect(f.runner.startedSpecs.map((spec) => spec.taskId)).toEqual([holder.task_id])
+  } finally {
+    f.manager.workpools.dispose()
+  }
+})
+
+test("#given a busy unspent primary, a free spent fallback and a free healthy fallback #when spawning #then the task starts on the healthy fallback (review 15140 delta HIGH)", async () => {
+  // given
+  const f = fixture(chainOf(primary, fallback, healthy), primary)
+  try {
+    const holder = await f.manager.start(baseSpec({ name: "holder" }))
+    if (holder.kind !== "started" || holder.status !== "running") throw new Error("expected a running holder")
+    f.memory.settle("earlier", fallback.provider, fallback.model_id, ACCOUNT_LIMIT)
+
+    // when
+    const result = await f.manager.start(baseSpec({ name: "spill" }))
+
+    // then
+    expect(result).toMatchObject({ kind: "started", status: "running", resolved_model: healthy })
+    expect(f.runner.startedSpecs.at(-1)).toMatchObject({ model: healthy.display })
   } finally {
     f.manager.workpools.dispose()
   }
