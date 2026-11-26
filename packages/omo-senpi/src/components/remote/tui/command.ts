@@ -1,5 +1,7 @@
 import { isAbsolute } from "node:path"
 
+import { escapeForDisplay as shown } from "@oh-my-opencode/utils/escape-for-display"
+
 import type { SenpiExtensionAPI } from "../../../extension/types"
 import { type OmoRun, type OmoRunner, omoRunner } from "./run-omo"
 
@@ -90,7 +92,7 @@ type Remote = {
 }
 
 const failed = (ui: RemoteCommandUi, error: unknown): void =>
-  ui.notify(`/remote: ${error instanceof Error ? error.message : String(error)}`, "error")
+  ui.notify(`/remote: ${shown(error instanceof Error ? error.message : String(error))}`, "error")
 
 async function runRemoteCommand(remote: Remote, args: string): Promise<void> {
   const { ui, run } = remote
@@ -107,7 +109,8 @@ async function runRemoteCommand(remote: Remote, args: string): Promise<void> {
     if (target === undefined || rest.length > 1) return usage(ui, "/remote attach needs one <device>/<session>.")
     return attachNotice(ui, target)
   }
-  if (!PASS_THROUGH_VERBS.has(verb)) return usage(ui, verb === "help" ? undefined : `Unknown /remote command: ${verb}`)
+  if (!PASS_THROUGH_VERBS.has(verb))
+    return usage(ui, verb === "help" ? undefined : `Unknown /remote command: ${shown(verb)}`)
   const answer = await run(["remote", verb, ...rest, "--json"])
   show(ui, verb, rest[0] ?? "", answer)
 }
@@ -118,7 +121,7 @@ function usage(ui: RemoteCommandUi, problem: string | undefined): void {
 
 function attachNotice(ui: RemoteCommandUi, target: string): void {
   ui.notify(
-    `Attaching opens that session's own screen, which cannot run inside this one. In a new terminal, run:\n  omo remote attach ${target}`,
+    `Attaching opens that session's own screen, which cannot run inside this one. In a new terminal, run:\n  omo remote attach ${shown(target)}`,
     "info",
   )
 }
@@ -126,7 +129,10 @@ function attachNotice(ui: RemoteCommandUi, target: string): void {
 // The reply arrives when the remote turn ends, which can take minutes, so the TUI is not held for it: the command
 // returns at once and the reply (or the failure) is shown when it lands. `/remote interrupt` ends the turn early.
 function send({ ui, run }: Remote, target: string, text: string): void {
-  ui.notify(`Sending to ${target}. Its reply will show here; /remote interrupt ${target} stops the turn.`, "info")
+  ui.notify(
+    `Sending to ${shown(target)}. Its reply will show here; /remote interrupt ${shown(target)} stops the turn.`,
+    "info",
+  )
   run(["remote", "send", "--json", target, "--", text], SEND_DEADLINE_MS).then(
     (answer) => show(ui, "send", target, answer),
     (error: unknown) => failed(ui, error),
@@ -155,15 +161,18 @@ async function pick(remote: Remote): Promise<void> {
   const rows = rowsOf(parsed(sessionsAnswer))
   if (rows === undefined) return unreadable(ui, "sessions", sessionsAnswer)
   const rowOptions = rows.map(rowLine)
-  const choice = await ui.select(`Sessions on ${device.name}`, [`${OPEN_NEW} on ${device.name}`, ...rowOptions])
+  const choice = await ui.select(`Sessions on ${shown(device.name)}`, [
+    `${OPEN_NEW} on ${shown(device.name)}`,
+    ...rowOptions,
+  ])
   if (choice === undefined) return
   if (choice.startsWith(OPEN_NEW))
     return show(ui, "open", device.id, await run(["remote", "open", device.id, "--json"]))
   const target = rows[rowOptions.indexOf(choice)]?.target
   if (target === undefined) return
-  const action = await ui.select(`${target}: what now?`, [...ACTIONS])
+  const action = await ui.select(`${shown(target)}: what now?`, [...ACTIONS])
   if (action === "Send a message") {
-    const text = await ui.input?.(`Message to ${target}`)
+    const text = await ui.input?.(`Message to ${shown(target)}`)
     if (text === undefined || text.trim() === "") return
     return send(remote, target, text)
   }
@@ -195,7 +204,7 @@ async function close(remote: Remote, target: string): Promise<void> {
   const answer = await run(["remote", "close", target, "--json"])
   show(ui, "close", target, answer)
   if (unreadOf(parsed(answer)) === undefined || ui.select === undefined) return
-  const choice = await ui.select(`${target} has messages it has not read`, [CLOSE_ANYWAY, "Keep it open"])
+  const choice = await ui.select(`${shown(target)} has messages it has not read`, [CLOSE_ANYWAY, "Keep it open"])
   if (choice === CLOSE_ANYWAY) show(ui, "close", target, await run(["remote", "close", target, "--force", "--json"]))
 }
 
@@ -220,22 +229,25 @@ function typedFailure(value: unknown, verb?: string, target?: string): string | 
     const ids =
       unread === "unavailable"
         ? "message ids: unavailable on that device's engine"
-        : `messages it has not read: ${unread.join(", ")}`
-    return `${value["error"]["message"]}\n${ids}. /remote close ${target ?? ""} --force closes it anyway; those messages are dropped.`
+        : `messages it has not read: ${shown(unread.join(", "))}`
+    return `${shown(value["error"]["message"])}\n${ids}. /remote close ${shown(target ?? "")} --force closes it anyway; those messages are dropped.`
   }
   const { message, next_action: next } = isRecord(value["error"]) ? value["error"] : value
   if (typeof message !== "string") return undefined
-  return typeof next === "string" && next !== "" ? `${message}\n${next}` : message
+  return typeof next === "string" && next !== "" ? `${shown(message)}\n${shown(next)}` : shown(message)
 }
 
 function unreadable(ui: RemoteCommandUi, verb: string, answer: OmoRun): void {
-  ui.notify(`omo remote ${verb} answered something /remote cannot read: ${answer.stdout.trim().slice(0, 200)}`, "error")
+  ui.notify(
+    `omo remote ${verb} answered something /remote cannot read: ${shown(answer.stdout.trim().slice(0, 200))}`,
+    "error",
+  )
 }
 
 function stoppedLine(verb: string, target: string, ended: "deadline" | "aborted"): string | undefined {
   if (ended === "aborted") return undefined
   if (verb === "send")
-    return `No reply from ${target} within ${SEND_DEADLINE_MS / 60_000} minutes, so /remote stopped waiting. The turn may still be running there: /remote interrupt ${target} stops it.`
+    return `No reply from ${shown(target)} within ${SEND_DEADLINE_MS / 60_000} minutes, so /remote stopped waiting. The turn may still be running there: /remote interrupt ${shown(target)} stops it.`
   return `omo remote ${verb} did not answer within ${COMMAND_DEADLINE_MS / 1000} seconds and was stopped.`
 }
 
@@ -248,9 +260,9 @@ function succeeded(ui: RemoteCommandUi, verb: string, target: string, answer: Om
   const value = parsed(answer)
   const failure = typedFailure(value, verb, target)
   if (answer.code === 0 && failure === undefined) return true
-  const stderr = answer.stderr.trim()
+  const stderr = shown(answer.stderr.trim(), { keepLineFeeds: true })
   // `enable` that stops prints {state, notice} on stdout and exits 3 (omo-native remote-bootstrap.ts): the notice says why.
-  const notice = isRecord(value) && typeof value["notice"] === "string" ? value["notice"] : undefined
+  const notice = isRecord(value) && typeof value["notice"] === "string" ? shown(value["notice"]) : undefined
   ui.notify(
     failure ?? notice ?? (stderr !== "" ? stderr : `omo remote exited with code ${String(answer.code)}`),
     "error",
@@ -262,7 +274,7 @@ function show(ui: RemoteCommandUi, verb: string, target: string, answer: OmoRun)
   if (!succeeded(ui, verb, target, answer)) return
   ui.notify(rendered(verb, target, parsed(answer)).join("\n"), "info")
   // A verb that succeeds can still say something on stderr (enable: device not linked, a session-host notice).
-  const stderr = answer.stderr.trim()
+  const stderr = shown(answer.stderr.trim(), { keepLineFeeds: true })
   if (stderr !== "") ui.notify(stderr, "warning")
 }
 
@@ -275,11 +287,13 @@ function rendered(verb: string, target: string, value: unknown): readonly string
     const rows = rowsOf(value) ?? []
     const lines = rows.length === 0 ? ["No sessions."] : rows.map(rowLine)
     const missing = unansweredOf(value)
-    return missing.length === 0 ? lines : [...lines, `No answer from: ${missing.join(", ")}`]
+    return missing.length === 0 ? lines : [...lines, shown(`No answer from: ${missing.join(", ")}`)]
   }
-  if (verb === "status" && isRecord(value)) return statusLines(value)
-  if (!isRecord(value)) return [JSON.stringify(value)]
-  return sessionVerbLines(verb, target, value)
+  if (verb === "status" && isRecord(value)) return statusLines(value).map((line) => shown(line))
+  if (!isRecord(value)) return [shown(JSON.stringify(value))]
+  if (verb === "send" && typeof value["reply"] === "string" && value["reply"] !== "")
+    return [`${shown(target)}:`, shown(value["reply"], { keepLineFeeds: true })]
+  return sessionVerbLines(verb, target, value).map((line) => shown(line))
 }
 
 function unansweredOf(value: unknown): readonly string[] {
@@ -294,8 +308,6 @@ function sessionVerbLines(verb: string, target: string, result: Record<string, u
     return [`Opened ${typeof device === "string" ? `${device}/` : ""}${result["thread"]}.`]
   }
   if (verb === "send") {
-    const reply = result["reply"]
-    if (typeof reply === "string" && reply !== "") return [`${target}:`, reply]
     const position = result["queue_position"]
     return typeof position === "number" ? [`Queued on ${target} at position ${position}.`] : [`Sent to ${target}.`]
   }
@@ -371,6 +383,6 @@ function rowsOf(value: unknown): readonly Row[] | undefined {
 }
 
 const deviceLine = (device: Device): string =>
-  `${device.name}  ${device.id}  ${device.online ? "online" : "offline"}${device.self ? "  (this device)" : ""}`
+  shown(`${device.name}  ${device.id}  ${device.online ? "online" : "offline"}${device.self ? "  (this device)" : ""}`)
 
-const rowLine = (row: Row): string => `${row.target}  ${row.state}  ${row.title}`.trimEnd()
+const rowLine = (row: Row): string => shown(`${row.target}  ${row.state}  ${row.title}`.trimEnd())
