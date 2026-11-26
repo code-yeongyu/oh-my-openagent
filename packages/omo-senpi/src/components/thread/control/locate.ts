@@ -8,6 +8,7 @@ import type { RemoteSessionRow } from "../remote/ports"
 import { refusal } from "../refusal-texts"
 import { failureResult, sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
+import { type ControlWait, NO_WAIT, waitedControl } from "./control-wait"
 import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
 
@@ -36,23 +37,33 @@ export async function locateControl(
   address: string,
   allScope: boolean | undefined,
   callerId: string,
+  /** The caller's wait (slice T1b): the address read under it, and every port call of the control it answers. */
+  wait: ControlWait = NO_WAIT,
 ): Promise<LocatedControl> {
   // Decision 0027: the entries are the ones a send resolves against, session files no engine runs included, so every
   // tool finds the thread a send finds. A thread id no device lists gets the per-device probe (A4.3.3, #13215): a
   // session another device holds but runs nowhere is its ended row, so it answers not_live there as here.
   const localFor = sendBookFor(options, current)
   const entries = localFor(address)
-  const resolved = await resolveAddress(
-    { remote: options.remote, callerWorkspaceRoot: options.callerWorkspaceRoot(), local: entries, localFor, callerId },
-    address,
-    { all_scope: allScope, probe: true, need: "online" },
+  const resolved = await wait.read(() =>
+    resolveAddress(
+      {
+        remote: options.remote,
+        callerWorkspaceRoot: options.callerWorkspaceRoot(),
+        local: entries,
+        localFor,
+        callerId,
+      },
+      address,
+      { all_scope: allScope, probe: true, need: "online" },
+    ),
   )
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
   if (resolved.where.kind === "device" && options.remote !== undefined) {
     const row = resolved.where.row
     if (row.state === "ended")
       return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device, row }
-    return { kind: "control", control: createRelayControl(options.remote, row) }
+    return { kind: "control", control: waitedControl(createRelayControl(options.remote, row), wait) }
   }
   const session = targetSession(current, resolved.thread)
   if (session === undefined) return { kind: "not_live", thread_id: resolved.thread, title: resolved.entry.name }
@@ -69,8 +80,11 @@ export async function locateControl(
     }
   return {
     kind: "control",
-    control: createLocalControl(options, session, resolved.thread, resolved.entry.name, () =>
-      allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot()),
+    control: waitedControl(
+      createLocalControl(options, session, resolved.thread, resolved.entry.name, () =>
+        allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot()),
+      ),
+      wait,
     ),
   }
 }

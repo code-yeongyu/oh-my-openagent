@@ -8,7 +8,9 @@ import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayServices } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "../tools/ports"
-import { guarded, thrown } from "./failures"
+import { SYSTEM_WAIT_CLOCK, type WaitClock } from "../../call-budget/call-deadline"
+import { controlRefusalOf } from "../control/port"
+import { guarded, reportUnexpected, thrown } from "./failures"
 import { createKeyed } from "./keyed"
 
 export type ThreadCoreOptions = {
@@ -32,6 +34,8 @@ export type ThreadCoreOptions = {
   /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
   readonly firstPromptWaitMs?: number
   readonly now?: () => number
+  /** The clock a control's wait (signal, deadline_ms) reads; absent, the system clock (test seam). */
+  readonly waitClock?: WaitClock
   /**
    * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
    * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
@@ -100,6 +104,12 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
   const guard = <T>(body: () => Promise<T>) => guarded(body, options.onUnexpected)
   const keyed = createKeyed(store, principal, options.cwd, now, options.onUnexpected)
   const fault = (error: unknown) => thrown(error, options.onUnexpected)
+  // A port call's failure that arrives after its wait was lost: a control's typed refusal is an answer no one awaits any
+  // more; anything else is unexpected and goes to the logger port (B8).
+  const late = (error: unknown): void => {
+    if (controlRefusalOf(error) === undefined) reportUnexpected(options.onUnexpected, error)
+  }
+  const waitClock = options.waitClock ?? SYSTEM_WAIT_CLOCK
   return {
     options,
     principal,
@@ -114,5 +124,7 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     guard,
     fault,
     keyed,
+    late,
+    waitClock,
   }
 }

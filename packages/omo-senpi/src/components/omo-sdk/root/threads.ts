@@ -1,6 +1,7 @@
 import { threadToolParamSchemas } from "../../thread/contracts"
 import type { GatewayStore } from "../../thread/gateway/store"
 import type { ProvenanceWorkspaces } from "../../thread/gateway/provenance-resolver"
+import type { WaitClock } from "../../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import { createThreadCore, type ThreadCore } from "../../thread/sdk-core"
 import { fail } from "../../thread/sdk-core/failures"
@@ -26,6 +27,8 @@ export type ThreadPorts = {
   readonly store?: GatewayStore
   readonly remote?: RemoteThreadSurface
   readonly now?: () => number
+  /** The clock a control's wait (signal, deadline_ms) reads; absent, the system clock (test seam). */
+  readonly waitClock?: WaitClock
   /**
    * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
    * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
@@ -135,13 +138,18 @@ export function threadsNamespace(options: {
       unbuilt("threads.readAfterWait", input, [...READ, "wait_ms"]) ??
       onRoot((await thread().readAfterWait(input)) as result.ThreadReadAfterWaitResult),
     "threads.messages": async (input) => onRoot((await thread().messages(input)) as result.ThreadMessagesResult),
-    "threads.interrupt": async (input) => onRoot((await thread().interrupt(input)) as result.ThreadInterruptResult),
-    "threads.close": async (input = {}) => onRoot((await thread().close(input)) as result.ThreadCloseResult),
-    "threads.rename": async (input = {}) => onRoot((await thread().rename(input)) as result.ThreadRenameResult),
-    "threads.setModel": async (input) => onRoot((await thread().setModel(input)) as result.ThreadSetModelResult),
-    "threads.setReasoning": async (input) =>
-      onRoot((await thread().setReasoning(input)) as result.ThreadSetReasoningResult),
-    "threads.archive": async (input) => onRoot((await thread().archive(input)) as result.ThreadArchiveResult),
+    "threads.interrupt": async (input, wait) =>
+      onRoot((await thread().interrupt(input, wait)) as result.ThreadInterruptResult),
+    "threads.close": async (input = {}, wait) =>
+      onRoot((await thread().close(input, wait)) as result.ThreadCloseResult),
+    "threads.rename": async (input = {}, wait) =>
+      onRoot((await thread().rename(input, wait)) as result.ThreadRenameResult),
+    "threads.setModel": async (input, wait) =>
+      onRoot((await thread().setModel(input, wait)) as result.ThreadSetModelResult),
+    "threads.setReasoning": async (input, wait) =>
+      onRoot((await thread().setReasoning(input, wait)) as result.ThreadSetReasoningResult),
+    "threads.archive": async (input, wait) =>
+      onRoot((await thread().archive(input, wait)) as result.ThreadArchiveResult),
     "threads.release": async (input) => {
       const refused = unbuilt("threads.release", input, ["thread", "interrupt", "force"])
       if (refused !== undefined) return refused

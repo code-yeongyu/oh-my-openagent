@@ -20,13 +20,15 @@ import {
   setModelOn,
   setThinkingLevelOn,
 } from "../control/operations"
+import { controlWait, type ControlWait, waitRefusal } from "../control/control-wait"
 import { controlIdentity } from "../control/port"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "../control/prompt-start"
 import { renameThread } from "../control/rename"
 import { archiveThread } from "../tools/archive-ops"
 import { sendToTarget } from "../sdk-send"
 import { UNKNOWN_CALLER } from "../tools/ports"
-import { waitWithinCallBudget } from "../../call-budget/call-deadline"
+import { callWait, type CallWaitOptions, waitWithinCallBudget } from "../../call-budget/call-deadline"
+import { failureResult } from "../tools/internals"
 import type { ThreadCoreContext } from "./context"
 import type { Retrying } from "./keyed"
 
@@ -47,25 +49,34 @@ type ControlName =
 export function createControls(context: ThreadCoreContext) {
   const { options, principal, store, pipeline, controls, view } = context
   // One session control as its tool runs it: the tool's parameter schema, the core's receipt book for its key
-  // (sdk-core/keyed.ts), then its body; a control's typed refusal is data.
+  // (sdk-core/keyed.ts), then its body; a control's typed refusal is data. The root call's wait options (slice T1b) bound
+  // every port call of the body: a wait already lost answers before the receipt book admits anything, and the body runs
+  // inside the deadline scope, so its remote commands are cut to what is left.
   function control<I>(
     name: ControlName,
     request: I,
-    body: (value: I, key: string, retrying: Retrying) => Promise<ThreadToolResult>,
+    options: CallWaitOptions | undefined,
+    body: (value: I, key: string, retrying: Retrying, wait: ControlWait) => Promise<ThreadToolResult>,
   ): Promise<ThreadToolResult> {
     return context.guard(async () => {
       const parsed = parseThreadParams(threadToolParamSchemas[name], request)
       if (parsed.kind === "error") return parsed as ThreadToolResult
       const value = parsed.value as I & { readonly idempotency_key?: string }
-      return await context.keyed(name, value, value.idempotency_key, (key, retrying) => body(value, key, retrying))
+      const wait = callWait(options, context.waitClock, context.late)
+      const lost = wait.lost()
+      if (lost !== undefined) return failureResult(waitRefusal(lost).failure)
+      const waited = controlWait(wait)
+      return await wait.scoped(() =>
+        context.keyed(name, value, value.idempotency_key, (key, retrying) => body(value, key, retrying, waited)),
+      )
     })
   }
-  async function located(address: string, allScope: boolean | undefined) {
-    return await locateControl(controls, await view(), address, allScope, UNKNOWN_CALLER)
+  async function located(address: string, allScope: boolean | undefined, wait: ControlWait) {
+    return await locateControl(controls, await wait.read(view), address, allScope, UNKNOWN_CALLER, wait)
   }
   return {
     create: (request: ThreadCreateInput) =>
-      control("thread_create", request, async (value, key, retrying) =>
+      control("thread_create", request, undefined, async (value, key, retrying) =>
         createThread(controls, await view(), value, {
           operationId: key,
           callerId: UNKNOWN_CALLER,
@@ -99,41 +110,43 @@ export function createControls(context: ThreadCoreContext) {
             ),
         }),
       ),
-    interrupt: (request: ThreadInterruptInput) =>
-      control("thread_interrupt", request, async (value) => {
-        const found = await located(value.thread, value.all_scope)
+    interrupt: (request: ThreadInterruptInput, options?: CallWaitOptions) =>
+      control("thread_interrupt", request, options, async (value, _key, _retrying, wait) => {
+        const found = await located(value.thread, value.all_scope, wait)
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE
         return await interruptThread(found.control, value.turn_id)
       }),
-    close: (request: ThreadCloseInput) =>
-      control("thread_close", request, async (value) => {
-        const found = await located(value.thread ?? "self", value.all_scope)
+    close: (request: ThreadCloseInput, options?: CallWaitOptions) =>
+      control("thread_close", request, options, async (value, _key, _retrying, wait) => {
+        const found = await located(value.thread ?? "self", value.all_scope, wait)
         if (found.kind === "error") return found.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (found.kind === "not_live")
           return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
         return await closeThread(found.control, closeOptions(value))
       }),
-    rename: (request: ThreadRenameInput) =>
-      control("thread_rename", request, async (value, key) =>
-        renameThread(controls, await view(), value, key, UNKNOWN_CALLER),
+    rename: (request: ThreadRenameInput, options?: CallWaitOptions) =>
+      control("thread_rename", request, options, async (value, key, _retrying, wait) =>
+        renameThread(controls, await wait.read(view), value, key, UNKNOWN_CALLER, wait),
       ),
-    setModel: (request: ThreadSetModelInput) =>
-      control("thread_set_model", request, async (value) => {
-        const found = await located(value.thread, value.all_scope)
+    setModel: (request: ThreadSetModelInput, options?: CallWaitOptions) =>
+      control("thread_set_model", request, options, async (value, _key, _retrying, wait) => {
+        const found = await located(value.thread, value.all_scope, wait)
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE
         return await setModelOn(found.control, value.model, value.provider)
       }),
-    setReasoning: (request: ThreadSetReasoningInput) =>
-      control("thread_set_reasoning", request, async (value) => {
-        const found = await located(value.thread, value.all_scope)
+    setReasoning: (request: ThreadSetReasoningInput, options?: CallWaitOptions) =>
+      control("thread_set_reasoning", request, options, async (value, _key, _retrying, wait) => {
+        const found = await located(value.thread, value.all_scope, wait)
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE
         return await setThinkingLevelOn(found.control, value.level, value.scope)
       }),
-    archive: (request: ThreadArchiveInput) =>
-      control("thread_archive", request, async (value) => archiveThread(controls, await view(), value, UNKNOWN_CALLER)),
+    archive: (request: ThreadArchiveInput, options?: CallWaitOptions) =>
+      control("thread_archive", request, options, async (value, _key, _retrying, wait) =>
+        archiveThread(controls, await wait.read(view), value, UNKNOWN_CALLER, wait),
+      ),
   }
 }
