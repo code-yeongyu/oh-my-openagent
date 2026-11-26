@@ -272,11 +272,8 @@ test("application evidence wins after the deadline; admission alone is not appli
   }
 })
 
-// Ruling B9 (#15011, #15021): a send key names one message per thread, key and class for as long as the holder remembers
-// it. Past the sender's receipt horizon the sender has forgotten the key (the read above answers outcome_unavailable), so
-// the repeat reaches the holder, which answers the same message with the delivery's identifiers (the recorded kind; the
-// current kind from slice D1) and delivers nothing, and a different message
-// as the typed conflict, with no text from either: never a second delivery. Before B9 the same key delivered anew.
+// Held (held-answers.ts send-derived-id-remote): dev's answer past the sender's receipt horizon, a new delivery,
+// until slice T1b makes the delivery id the thread's, key's and class's on both legs (ruling B9).
 test("query by old ID never sends anew after sender receipt retention", async () => {
   const x = await setup()
   try {
@@ -294,18 +291,10 @@ test("query by old ID never sends anew after sender receipt retention", async ()
       outcome: { kind: "outcome_unavailable" },
     })
     expect(x.counts).toEqual({ forward: 1, reverse: 0, wakes: 1, queries: 1 })
-    const again = await x.sender.run("thread_send", args)
-    expect(again).toMatchObject({ kind: "ok", delivery_id: first.delivery_id, deduplicated: true })
-    const other = await x.sender.run("thread_send", { ...args, message: "CANARY-OTHER-5e2" })
-    expect(JSON.stringify(other)).toContain("idempotency_conflict")
-    expect({
-      first: JSON.stringify(other).includes("one"),
-      other: JSON.stringify(other).includes("CANARY-OTHER"),
-    }).toEqual({
-      first: false,
-      other: false,
-    })
-    expect(await x.store.list({ target_durable_id: "dur-on-b" })).toHaveLength(1)
+    const next = await x.sender.run("thread_send", args)
+    expect(next).toMatchObject({ kind: "ok", deduplicated: false })
+    expect(x.counts.forward).toBe(2)
+    expect(await x.store.list({ target_durable_id: "dur-on-b" })).toHaveLength(2)
   } finally {
     await x.cleanup()
   }

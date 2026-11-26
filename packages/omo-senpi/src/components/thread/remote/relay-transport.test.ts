@@ -74,13 +74,14 @@ async function admitted(sent: readonly Sent[], count: number): Promise<void> {
 // #15011: the receiving engine admits one delivery per delivery id (admit_external_message answers already_admitted for
 // an id its history holds). A keyed delivery's id is derived from the sender and the key, so a repeat from another
 // process, whose gateway store holds no receipt, reaches the holder under the id it already admitted.
-describe("a keyed delivery to another device is named by its sender and key", () => {
-  test("#given a keyed delivery #when a second process with an empty store sends it again #then both admit records carry one delivery id", async () => {
+// Held (held-answers.ts send-derived-id-remote): dev's random delivery id until slice T1b derives it on both legs.
+describe("a keyed delivery to another device is named as dev names it while its id is held", () => {
+  test("#given a keyed delivery #when a second process with an empty store sends it again #then the two admit records carry two delivery ids, as dev answers", async () => {
     const a = account()
     await transport(a.remote).relay.deliver(delivery("once", "k-same"))
     await transport(a.remote).relay.deliver(delivery("once", "k-same"))
     const ids = admits(a.sent).map((record) => record["deliveryId"])
-    expect({ admits: ids.length, ids: new Set(ids).size }).toEqual({ admits: 2, ids: 1 })
+    expect({ admits: ids.length, ids: new Set(ids).size }).toEqual({ admits: 2, ids: 2 })
   })
 
   test("#given two unkeyed-looking deliveries under different keys #when each is sent #then their delivery ids differ", async () => {

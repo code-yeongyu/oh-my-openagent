@@ -9,8 +9,10 @@ afterEach(async () => {
 
 // T1a of #14943 (the T1b pin of the SDK's send): a send to a thread on another device answers the id of what it sent,
 // from the agent's tool (a delivery) and from a script's SDK (the person's prompt), so either caller can name it later.
-describe("a send to a thread on another device answers its delivery_id", () => {
-  test("#given a live thread on device b #when thread_send and ThreadSdk.send address it #then both answers carry a delivery_id", async () => {
+// Held (held-answers.ts sdk-send-delivery-id): ThreadSdk.send's prompt carries no client message id, so its answer has no
+// delivery_id, as dev answers it, until slice T1b.
+describe("a send to a thread on another device answers as dev does while the SDK's delivery_id is held", () => {
+  test("#given a live thread on device b #when thread_send and ThreadSdk.send address it #then the tool's answer carries a delivery_id and the SDK's none", async () => {
     // given
     const td = createTwoDevices()
     cleanups.push(td.cleanup)
@@ -27,12 +29,12 @@ describe("a send to a thread on another device answers its delivery_id", () => {
 
     // then
     expect({ tool: tool.kind, sdk: sdk.kind }).toEqual({ tool: "ok", sdk: "ok" })
-    expect({ tool: typeof tool.delivery_id, sdk: typeof sdk.delivery_id }).toEqual({ tool: "string", sdk: "string" })
+    expect({ tool: typeof tool.delivery_id, sdk: typeof sdk.delivery_id }).toEqual({ tool: "string", sdk: "undefined" })
   })
 
   // #15011: the holder admits a person's prompt once per client message id, so a keyed repeat must carry the same id
   // from any process (a fresh SDK object here), not only from the client whose cache still holds the key.
-  test("#given a keyed ThreadSdk.send to device b #when a fresh SDK repeats the key #then both prompts carry one client message id", async () => {
+  test("#given a keyed ThreadSdk.send to device b #when a fresh SDK repeats the key #then neither prompt carries a client message id, as dev sends them", async () => {
     // given
     const td = createTwoDevices()
     cleanups.push(td.cleanup)
@@ -45,15 +47,16 @@ describe("a send to a thread on another device answers its delivery_id", () => {
     const ids = td.account.sent
       .filter((entry) => entry.rpc?.["type"] === "prompt")
       .map((entry) => entry.rpc?.["clientMessageId"])
-    expect({ prompts: ids.length, ids: new Set(ids).size }).toEqual({ prompts: 2, ids: 1 })
+    expect({ prompts: ids.length, ids }).toEqual({ prompts: 2, ids: [undefined, undefined] })
   })
 })
 
 // #15021: one keyed send is one message at the holder whatever adapter and principal carried it, so the id the holder
 // admits is derived from the thread and the key: the tool's delivery and the script's prompt to one thread under one key
 // carry the same id (the engine's two id books are code-yeongyu/senpi#7479; this device's receipt book is T1b's half).
-describe("a keyed send's holder id is derived from the thread and the key (#15021)", () => {
-  test("#given one key #when thread_send and ThreadSdk.send address one thread on device b #then the delivery and the prompt carry one id", async () => {
+// Held (held-answers.ts send-derived-id-remote, sdk-send-delivery-id): dev's ids until slice T1b derives one id on both legs.
+describe("a keyed send's holder ids while T1a holds them (#15021)", () => {
+  test("#given one key #when thread_send and ThreadSdk.send address one thread on device b #then the delivery carries a fresh id and the prompt none, as dev sends them", async () => {
     // given
     const td = createTwoDevices()
     cleanups.push(td.cleanup)
@@ -66,10 +69,10 @@ describe("a keyed send's holder id is derived from the thread and the key (#1502
     const sent = td.account.sent.map((entry) => entry.rpc ?? {})
     const delivery = sent.filter((rpc) => rpc["type"] === "admit_external_message").map((rpc) => rpc["deliveryId"])
     const prompt = sent.filter((rpc) => rpc["type"] === "prompt").map((rpc) => rpc["clientMessageId"])
-    expect({ delivery: delivery.length, prompt: prompt.length, same: delivery[0] === prompt[0] }).toEqual({
+    expect({ delivery: delivery.length, prompt, id: typeof delivery[0] }).toEqual({
       delivery: 1,
-      prompt: 1,
-      same: true,
+      prompt: [undefined],
+      id: "string",
     })
   })
 })
