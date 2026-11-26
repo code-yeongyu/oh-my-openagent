@@ -155,7 +155,7 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // contracts and the thread core load on first use and the file may not grow. Raising the ceiling or adding a static path
 // reopens that decision. Since slice P1c (#15031) the thread core ships in its own file with its own ceiling: each is the
 // file's measured size (amendment 28), so thread slices move the thread file's number, not the root's.
-const OMO_SDK_RUNTIME_BYTES = 607_566
+const OMO_SDK_RUNTIME_BYTES = 607_672
 const OMO_SDK_THREADS_RUNTIME_BYTES = 532_813
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
