@@ -138,7 +138,12 @@ async function waitAction(deps: DagToolDeps, params: DagToolInput, runId: string
     )
   }
   const result = await deps.wait(runId as DagRunId, parentSessionId)
-  return toolResult(`Dag run ${runId} finished with status ${result.status}.`, {
+  const owed = result.snapshot.outstandingStop
+  const stop =
+    owed === undefined
+      ? ""
+      : ` Its stop is outstanding: child ${owed.liveTaskIds.join(", ")} is still live; cancel again.`
+  return toolResult(`Dag run ${runId} finished with status ${result.status}.${stop}`, {
     kind: "waited",
     run_id: runId,
     result,

@@ -152,6 +152,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const coreManager = createDagManager({
     store,
     materializeSkills,
+    ownedTasks: deps.engine.manager,
     ...(dagSettings === undefined ? {} : { settings: dagSettings }),
   })
   const taskManager = admissionTaskManager(deps.engine.manager, (runId) => stoppedAdmissions.has(runId))
@@ -332,7 +333,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     sessionId: () => deps.engine.runtime.sessionId() ?? "",
   })
 
-  const waitSurface = createDagWaitSurface({ store, subscribe, cancel })
+  const waitSurface = createDagWaitSurface({ store, subscribe, cancel, ownedTasks: taskManager })
   const wait = async (runId: DagRunId, parentSessionId: string) => {
     const result = await waitSurface.wait(runId, parentSessionId)
     const owned = schedulers.get(runId)

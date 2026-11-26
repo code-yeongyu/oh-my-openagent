@@ -166,6 +166,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
   let nextRun = 0
   const manager = createDagManager({
     store,
+    ownedTasks: taskManager,
     newRunId: () => {
       nextRun += 1
       return `dag-e2e-failure-${nextRun}` as DagRunId
@@ -176,6 +177,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
   const runs = new Map<DagRunId, Promise<DagRunRecordV1>>()
   const waitSurface = createDagWaitSurface({
     store,
+    ownedTasks: taskManager,
     subscribe: (runId, listener) => {
       const scheduler = schedulers.get(runId)
       if (scheduler === undefined) throw new Error(`missing scheduler for ${runId}`)

@@ -4,7 +4,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { DagNodeId } from "./types"
-import { categoryNode, createE2eFixture, definition, identityMaterializer } from "./__fixtures__/controlled-dag-e2e"
+import {
+  categoryNode,
+  createE2eFixture,
+  definition,
+  identityMaterializer,
+  parentSessionId,
+} from "./__fixtures__/controlled-dag-e2e"
 import { ControlledRunner, completed } from "./__fixtures__/controlled-runner"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
@@ -71,8 +77,11 @@ test("#11381 #given a self-resumed child whose connection is down #when the run 
   await expect(first).rejects.toThrow(detached)
   expect((await fixture.running(runId)).status).toBe("cancelled")
   expect(fixture.taskStore.load(detached)?.status).toBe("running")
+  // cancelled, but not cleanly: the derived reading names the stop the run still owes
+  expect(fixture.manager.snapshot(runId, parentSessionId).outstandingStop).toEqual({ liveTaskIds: [detached] })
   await expect(fixture.cancel(runId, "stop the run")).rejects.toThrow(detached)
   runner.child("A").connection.reconnect()
   await fixture.cancel(runId, "stop the run")
   expect(fixture.taskStore.load(detached)?.status).toBe("cancelled")
+  expect(fixture.manager.snapshot(runId, parentSessionId).outstandingStop).toBeUndefined()
 })
