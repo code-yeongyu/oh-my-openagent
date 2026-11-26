@@ -68,6 +68,7 @@ export function shippedNamespaces(options: {
       "deviceService.status": serviceStatus(deviceService),
       "config.status": config.status,
     },
+    legacy: ["account.signIn"],
     close: options.access.close,
   }
 }

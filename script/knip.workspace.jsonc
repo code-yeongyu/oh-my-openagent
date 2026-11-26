@@ -5,6 +5,7 @@
       "entry": [
         "script/beta-follows-latest.mjs",
         "script/build-binaries.ts",
+        "script/capture-shipped-thread-refusals.ts",
         "script/build-brand-logo.ts",
         "script/build-cli-node.ts",
         "script/build-codex-install.ts",

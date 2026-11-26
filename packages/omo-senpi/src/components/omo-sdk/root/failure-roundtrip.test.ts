@@ -21,26 +21,33 @@ const AWKWARD: readonly (Readonly<Record<string, unknown>> | undefined)[] = [
   { present: null, absent: undefined },
 ]
 
-const threadFailures = THREAD_ERROR_CODES.flatMap((code) =>
-  AWKWARD.map((details): ThreadToolFailure => ({
-    code,
-    message: `m ${code}`,
-    next_action: `n ${code}`,
-    ...(details === undefined ? {} : { details }),
-  })),
+const reversed = <T extends object>(value: T): T => Object.fromEntries(Object.entries(value).toReversed()) as T
+const bothOrders = <T extends object>(values: readonly T[]): T[] => values.flatMap((value) => [value, reversed(value)])
+
+const threadFailures = bothOrders(
+  THREAD_ERROR_CODES.flatMap((code) =>
+    AWKWARD.map((details): ThreadToolFailure => ({
+      code,
+      message: `m ${code}`,
+      next_action: `n ${code}`,
+      ...(details === undefined ? {} : { details }),
+    })),
+  ),
 )
 
-const remoteFailures = REMOTE_CODES.flatMap((code) =>
-  AWKWARD.map((details): RemoteFailure => ({
-    kind: "error",
-    code,
-    message: `m ${code}`,
-    next_action: `n ${code}`,
-    uncertain: false,
-    command_id: "cmd",
-    partial: null,
-    ...(details === undefined ? {} : { details }),
-  })),
+const remoteFailures = bothOrders(
+  REMOTE_CODES.flatMap((code) =>
+    AWKWARD.map((details): RemoteFailure => ({
+      kind: "error",
+      code,
+      message: `m ${code}`,
+      next_action: `n ${code}`,
+      uncertain: false,
+      command_id: "cmd",
+      partial: null,
+      ...(details === undefined ? {} : { details }),
+    })),
+  ),
 )
 
 const rootFailures = Object.keys(OMO_CODE_REGISTRY).flatMap((code) =>
@@ -55,17 +62,19 @@ const rootFailures = Object.keys(OMO_CODE_REGISTRY).flatMap((code) =>
   })),
 )
 
+// JSON text catches key order; strict deep equality catches an undefined-valued field JSON drops. Lossless needs both.
+const changed = (before: unknown, after: unknown): boolean =>
+  JSON.stringify(after) !== JSON.stringify(before) || !Bun.deepEquals(after, before, true)
+
 describe("lossless failure conversion, by property", () => {
   test("#given every thread code crossed with awkward details #when converted to the root and back #then each is deeply equal", () => {
-    expect(
-      threadFailures.filter((failure) => !Bun.deepEquals(threadToolFailureOf(threadFailure(failure)), failure, true)),
-    ).toEqual([])
+    expect(threadFailures.filter((failure) => changed(failure, threadToolFailureOf(threadFailure(failure))))).toEqual(
+      [],
+    )
   })
 
   test("#given every remote code crossed with awkward details #when converted to the root and back #then each is deeply equal", () => {
-    expect(
-      remoteFailures.filter((failure) => !Bun.deepEquals(remoteFailureOf(remoteFailure(failure)), failure, true)),
-    ).toEqual([])
+    expect(remoteFailures.filter((failure) => changed(failure, remoteFailureOf(remoteFailure(failure))))).toEqual([])
   })
 
   test("#given every registered root failure a thread code names, crossed with awkward details #when converted to the thread shape and back #then each is deeply equal", () => {
@@ -73,9 +82,7 @@ describe("lossless failure conversion, by property", () => {
       (THREAD_ERROR_CODES as readonly string[]).includes(failure.error.code),
     )
     expect(threadNamed.length).toBeGreaterThan(0)
-    expect(
-      threadNamed.filter((failure) => !Bun.deepEquals(threadFailure(threadToolFailureOf(failure)), failure, true)),
-    ).toEqual([])
+    expect(threadNamed.filter((failure) => changed(failure, threadFailure(threadToolFailureOf(failure))))).toEqual([])
   })
 
   test("#given every registered root failure a remote code names, crossed with awkward details #when converted to the remote shape and back #then each is deeply equal", () => {
@@ -83,9 +90,21 @@ describe("lossless failure conversion, by property", () => {
       (REMOTE_CODES as readonly string[]).includes(failure.error.code),
     )
     expect(remoteNamed.length).toBeGreaterThan(0)
-    expect(
-      remoteNamed.filter((failure) => !Bun.deepEquals(remoteFailure(remoteFailureOf(failure)), failure, true)),
-    ).toEqual([])
+    expect(remoteNamed.filter((failure) => changed(failure, remoteFailure(remoteFailureOf(failure))))).toEqual([])
+  })
+
+  test("#given registered failures whose keys come in another order than the root rebuilds #when converted there and back #then the JSON text is identical, key order included", () => {
+    const thread = {
+      details: { probe: 1 },
+      next_action: "n",
+      message: "m",
+      code: "not_found",
+    } as unknown as ThreadToolFailure
+    const remote = { code: "timeout", kind: "error", next_action: "n", message: "m" } as unknown as RemoteFailure
+    expect(JSON.stringify(threadToolFailureOf(threadFailure(thread)))).toBe(JSON.stringify(thread))
+    expect(JSON.stringify(remoteFailureOf(remoteFailure(remote)))).toBe(JSON.stringify(remote))
+    expect(threadToolFailureOf(threadFailure(thread))).toStrictEqual(thread)
+    expect(remoteFailureOf(remoteFailure(remote))).toStrictEqual(remote)
   })
 
   test("#given a producer's failure that already carries the reserved key in its details #when converted #then it is refused as internal_error, never read as a held code", () => {

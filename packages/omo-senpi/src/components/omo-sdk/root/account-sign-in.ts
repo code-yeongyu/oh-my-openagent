@@ -15,6 +15,7 @@ import type { OmoResult } from "../result"
 import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
 import { launchBlocked } from "./account"
 import type { MemberOf } from "./members"
+import { invalidInput } from "./assemble"
 
 type RootSignedIn =
   MemberOf<"account.signIn"> extends (...args: never[]) => Promise<OmoValue<infer Value>> ? Value : never
@@ -104,6 +105,11 @@ export function accountSignIn(
     }
     const blocked = await launchBlocked(access, custody, "account.signIn")
     if (blocked !== undefined) return blocked
+    // An input outside the call's schema is refused before anything runs (slice P1b) and recorded like every refusal.
+    if (isRootInput(input) && !(await import("../contract/validate")).inputAccepts("account.signIn", input)) {
+      await custody.refused("account.signIn", "invalid_arguments").catch(() => false)
+      return { kind: "error", error: invalidInput("account.signIn") }
+    }
     if (!isRootInput(input)) {
       if (inProcess === undefined) return childSignIn(() => account.signIn(input), input.signal)
       const answer = await inProcess(
