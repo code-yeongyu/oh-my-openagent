@@ -1,6 +1,6 @@
 import type { TaskRecord } from "../state"
 import { isSpawnSpecV1 } from "../state"
-import { reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { isFallbackHandoff } from "./fallback-handoff"
@@ -148,7 +148,8 @@ export async function reviveClaimed(
   // its process running.
   if (fresh.execution_mode === "process" && fresh.pid !== undefined && !isHostSessionRecord(fresh)) {
     const terminated = await terminateOldRpc(context, fresh)
-    if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+    if (interrupted())
+      return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
     if (!terminated) {
       return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
     }
@@ -165,10 +166,12 @@ export async function reviveClaimed(
     return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
   }
   // Everything above awaited: a stop or another owner that landed meanwhile ends this revival here.
-  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted())
+    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
 
   const reached = isHostSessionRecord(fresh) ? await reachRecordedHost(context, fresh.host_session) : "alive"
-  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted())
+    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
   if (reached !== "alive") {
     const outcome = rollbackOrDeferred(context, fresh.task_id, rollbackResidency, reached, fresh)
     markSuspensionReason(context, fresh.task_id, parkedReason(reached))
@@ -343,7 +346,7 @@ function isSameClaim(context: LifecycleContext, claimed: TaskRecord): boolean {
 
 export function isOrphan(context: LifecycleContext, record: TaskRecord): boolean {
   if (record.host_pid === context.hostPid) return !hasLiveHandle(context, record.task_id)
-  return record.host_pid === undefined || !context.signaller.isAlive(record.host_pid)
+  return !claimantAlive(context, record)
 }
 
 function hasLiveHandle(context: LifecycleContext, taskId: string): boolean {
