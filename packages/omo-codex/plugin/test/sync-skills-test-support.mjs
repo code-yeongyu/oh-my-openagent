@@ -14,6 +14,7 @@ export const expectedSkills = [
   "eval-integrity",
   "frontend",
   "git-master",
+  "github",
   "init-deep",
   "lcx-contribute-bug-fix",
   "lcx-doctor",

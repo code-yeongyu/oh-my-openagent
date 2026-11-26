@@ -10,6 +10,7 @@ const REQUIRED_SKILL_NAMES = [
   "debugging",
   "frontend",
   "git-master",
+  "github",
   "init-deep",
   "lsp-setup",
   "programming",

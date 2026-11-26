@@ -20,6 +20,8 @@
 packages/web/
 # Vendored, fixture, golden and generated code is compared byte for byte or owned upstream.
 **/vendor/**
+# The github skill runtime, vendored byte for byte from its upstream source.
+packages/shared-skills/skills/github/scripts/
 **/upstreams/**
 **/fixtures/**
 **/golden/**
