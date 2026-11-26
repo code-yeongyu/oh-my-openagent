@@ -158,7 +158,13 @@ export type ThreadAddressResolution = "id" | "exact_name" | "fuzzy"
 export type ThreadReadSource = "live_host" | "session_jsonl"
 
 export type ThreadTranscriptItem = {
+  /** Position inside this answer only (1 is the oldest returned): never compare it across reads. */
   readonly seq: number
+  /**
+   * The message's durable id (`<entryId>:<index>`), the same across reads and on every leg; pass it as `after` to read
+   * only newer items. Absent when the engine holding the thread pages no entries.
+   */
+  readonly id?: string
   readonly role: "user" | "assistant" | "tool" | "system"
   readonly content: string
 }

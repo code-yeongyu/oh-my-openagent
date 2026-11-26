@@ -62,6 +62,14 @@ export const ThreadReadParams = Type.Object({
         "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
+  after: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 256,
+      description:
+        "An item id from an earlier thread_read: return only the items newer than it, oldest first (a truncated answer continues with after set to its last id). Item ids are stable across reads; seq is not. Not with cursor.",
+    }),
+  ),
   max_bytes: Type.Optional(
     Type.Integer({
       minimum: 1,

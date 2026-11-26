@@ -66,6 +66,8 @@ export type SessionControl = {
   readonly readEntryPage?: (read: {
     readonly max_bytes?: number
     readonly cursor?: string
+    /** A message id (`<entryId>:<index>`): the messages newer than it, oldest first. */
+    readonly after?: string
   }) => Promise<EntryPageRead | { readonly kind: "unsupported" }>
   /**
    * Waits, bounded, until the thread's turn is observed to end, on the leg's own status events (never a polling loop):

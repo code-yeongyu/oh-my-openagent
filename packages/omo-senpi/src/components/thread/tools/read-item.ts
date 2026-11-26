@@ -15,6 +15,20 @@ function contentOf(message: ThreadTranscriptEntry): string {
   return JSON.stringify([...parts, { type: "error", text: error.slice(0, ERROR_TEXT_MAX_CHARS) }])
 }
 
-export function readItem(message: ThreadTranscriptEntry, index: number) {
-  return { seq: index + 1, role: transcriptRole(message["role"]), content: contentOf(message) }
+/**
+ * One read item. `seq` is its position in this answer only (1 is the oldest returned), never the same message across
+ * reads; `id` (`<entryId>:<index>`) is, on every leg that pages entries, and is absent where the engine gives none.
+ */
+export function readItem(message: ThreadTranscriptEntry, index: number, id: string | undefined) {
+  return {
+    seq: index + 1,
+    ...(id === undefined ? {} : { id }),
+    role: transcriptRole(message["role"]),
+    content: contentOf(message),
+  }
+}
+
+/** A slice's messages as items, each with its id when the leg named one. */
+export function readItems(messages: readonly ThreadTranscriptEntry[], ids: readonly string[] | undefined) {
+  return messages.map((message, index) => readItem(message, index, ids?.[index]))
 }

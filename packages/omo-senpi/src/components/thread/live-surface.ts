@@ -851,6 +851,7 @@ export function createLiveThreadSurface(
   ): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => ({
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
+    getEntries: (sessionId, page) => send<Record<string, unknown>>("get_entries", { ...page, sessionId }),
     getState: (sessionId, durableId) => send("get_state", { sessionId }, durableId),
     watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),

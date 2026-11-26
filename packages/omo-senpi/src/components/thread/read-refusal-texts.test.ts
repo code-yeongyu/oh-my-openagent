@@ -23,6 +23,27 @@ const GOLDENS: readonly {
     message: "max_bytes 2000000 exceeds the 1048576-byte hard cap.",
     next: "Re-read with max_bytes at most 1048576 and follow next_cursor for the rest of the transcript.",
   },
+  {
+    id: "read.after_not_found",
+    slots: { after: "e9:0", thread: "dur-1" },
+    message:
+      "Item e9:0 is not among the items thread dur-1 can read now: it is older than the readable window, it was rewritten away, or it belongs to another thread.",
+    next: "Re-read the thread without after to take its newest items, then continue from an id that read returns.",
+  },
+  {
+    id: "read.after_with_cursor",
+    slots: {},
+    message:
+      "after and cursor cannot be passed together: after continues forward from an item, cursor pages older items.",
+    next: "Pass only one of them.",
+  },
+  {
+    id: "read.after_unsupported",
+    slots: { thread: "dur-1" },
+    message:
+      "Thread dur-1 is held by an engine that does not page its entries, so its items carry no id and a read cannot continue after one.",
+    next: "Re-read the thread without after; update omo on the device that holds it to read by item id.",
+  },
 ]
 
 describe("the read refusal templates (#14951)", () => {

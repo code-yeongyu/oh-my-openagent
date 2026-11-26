@@ -45,7 +45,9 @@ export type CoreReadRequest = Scoped & {
   readonly thread: string
   readonly max_bytes?: number
   readonly cursor?: string
-  /** The newest `limit` items of the read page (`omo thread read --limit`). */
+  /** An item id: only the items newer than it, oldest first (thread_read's `after`). */
+  readonly after?: string
+  /** The newest `limit` items of the read page (`omo thread read --limit`); with `after`, the oldest `limit`. */
   readonly limit?: number
   readonly idempotency_key?: string
 }
@@ -85,7 +87,7 @@ const LIST_KEYS = [
   "archived",
   "idempotency_key",
 ] as const
-const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope", "limit", "idempotency_key"] as const
+const READ_KEYS = ["thread", "max_bytes", "cursor", "after", "all_scope", "limit", "idempotency_key"] as const
 const LOCATE_KEYS = ["thread", "all_scope"] as const
 const RECEIPT_KEYS = ["thread", "delivery_id", "all_scope"] as const
 const MESSAGES_KEYS = ["thread", "all_scope", "max_bytes"] as const
@@ -109,10 +111,16 @@ export type CoreMessagesResult =
     }
   | Failure
 
-/** The newest `limit` items of a read page; the page's cursor and budget are the read's own. */
-function newest(result: ThreadToolResult, limit: number | undefined): ThreadToolResult {
+/**
+ * The newest `limit` items of a read page; the page's cursor and budget are the read's own. A read `after` an item keeps
+ * the OLDEST `limit` items instead (and says it was truncated), so continuing after its last id skips nothing.
+ */
+function newest(result: ThreadToolResult, limit: number | undefined, after: string | undefined): ThreadToolResult {
   if (limit === undefined || result.kind !== "ok" || !("items" in result)) return result
-  return { ...result, items: result.items.slice(Math.max(0, result.items.length - limit)) } as ThreadToolResult
+  if (after === undefined)
+    return { ...result, items: result.items.slice(Math.max(0, result.items.length - limit)) } as ThreadToolResult
+  if (result.items.length <= limit) return result
+  return { ...result, items: result.items.slice(0, limit), truncated: true } as ThreadToolResult
 }
 
 export function createReads(context: ThreadCoreContext) {
@@ -151,11 +159,13 @@ export function createReads(context: ThreadCoreContext) {
               thread: request.thread,
               max_bytes: request.max_bytes,
               cursor: request.cursor,
+              after: request.after,
               all_scope: request.all_scope,
             },
             UNKNOWN_CALLER,
           ),
           request.limit,
+          request.after,
         ),
       )
     })
@@ -234,12 +244,14 @@ export function createReads(context: ThreadCoreContext) {
               thread: request.thread,
               max_bytes: request.max_bytes,
               cursor: request.cursor,
+              after: request.after,
               all_scope: request.all_scope,
               wait_ms: request.wait_ms,
             },
             UNKNOWN_CALLER,
           ),
           request.limit,
+          request.after,
         ),
       )
     })

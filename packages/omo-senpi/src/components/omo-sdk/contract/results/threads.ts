@@ -62,6 +62,10 @@ export type ThreadLocateResult = Ok<{ readonly located: LocatedThread }>
 export type ThreadEntriesResult = Ok<{ readonly page: ReadPage }>
 
 /** The newest messages that fit the read's byte budget, oldest first; `truncated` when older ones did not fit. */
+/**
+ * The engine's whole message list, cut to the budget from the newest message back. Its messages carry no id and it takes
+ * no `after`: durable paging (an item id that holds across reads and devices, and reading after one) is `threads.read`'s.
+ */
 export type ThreadMessagesResult = Ok<{
   readonly messages: readonly JsonObject[]
   readonly truncated: boolean

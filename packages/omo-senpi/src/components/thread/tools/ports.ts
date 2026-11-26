@@ -67,6 +67,7 @@ export type ThreadHostSession = {
 export type ThreadSessionPort = Pick<
   ThreadHost,
   | "getMessages"
+  | "getEntries"
   | "getState"
   | "prompt"
   | "interrupt"
@@ -124,6 +125,12 @@ export type ThreadHost = {
     readonly durableSessionId?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
+  /**
+   * One `get_entries` page of the session's entries (`tail`, `before`, `since`, `maxBytes`), the reply's data as the
+   * engine answers it; a refusal throws `<reason>: <message>` as every request does. Absent on a host port that cannot
+   * send it: reads there take `getMessages`, whose messages carry no id.
+   */
+  readonly getEntries?: (sessionId: string, page: Readonly<Record<string, unknown>>) => Promise<Record<string, unknown>>
   readonly getState: (
     sessionId: string,
     durable_session_id?: string,

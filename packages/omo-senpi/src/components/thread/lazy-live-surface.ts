@@ -35,6 +35,11 @@ export function createLazyLiveThreadSurface(
         const port = await target()
         return await port.getMessages(sessionId)
       },
+      getEntries: async (sessionId, page) => {
+        const { getEntries } = await target()
+        if (getEntries === undefined) throw new Error("unsupported: get_entries")
+        return await getEntries(sessionId, page)
+      },
       getState: async (sessionId) => {
         const port = await target()
         return await port.getState(sessionId)

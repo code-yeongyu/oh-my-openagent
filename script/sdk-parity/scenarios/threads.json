@@ -5680,6 +5680,119 @@
       "target": "other_device"
     },
     {
+      "id": "threads.read/after",
+      "row": "threads.read",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/after-on-other-device",
+      "row": "threads.read",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "args": {
+            "thread": "studio/t-2",
+            "max_bytes": 131072
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.read/after-unknown-item",
+      "row": "threads.read",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "thread": "t-1",
+        "after": "gone:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/after-with-cursor",
+      "row": "threads.read",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "thread": "t-1",
+        "cursor": "c1",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/after-engine-unpaged",
+      "row": "threads.read",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "thread": "t-1",
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "result": {
+            "refused": "unsupported"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.readAfterWait/on-other-device",
       "row": "threads.readAfterWait",
       "kind": "effect",
@@ -5705,6 +5818,34 @@
         }
       ],
       "target": "other_device"
+    },
+    {
+      "id": "threads.readAfterWait/after",
+      "row": "threads.readAfterWait",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "wait_ms": 5000,
+        "after": "e3:0"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "args": {
+            "thread": "t-1",
+            "wait_ms": 5000
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_entries",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.receipt/on-other-device",

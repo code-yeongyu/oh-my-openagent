@@ -1011,6 +1011,8 @@ export function createRemoteThreadFixture() {
       env?: Readonly<Record<string, string | undefined>>
       sessions?: ThreadHostSession[]
       engine?: Engine
+      /** This device's session entries, which its engine pages through `get_entries`; absent: it answers only get_messages. */
+      entries?: FakeEntryLog
       caller?: string
       diskSessions?: readonly string[]
       /** #14274: the name a disk session's thread had (by durable id); absent ids have none. */
@@ -1155,6 +1157,16 @@ export function createRemoteThreadFixture() {
       },
       openSession,
       getMessages: async () => [...engine.messages],
+      ...(extra.entries === undefined
+        ? {}
+        : {
+            getEntries: async (_sessionId: string, page: Readonly<Record<string, unknown>>) => {
+              const answer = answerGetEntries(extra.entries as FakeEntryLog, page as JsonObject)
+              // As live-surface throws an engine refusal.
+              if ("refused" in answer) throw new Error(`thread RPC request failed: ${JSON.stringify(answer.refused)}`)
+              return answer.data
+            },
+          }),
       getState: async () => ({ isStreaming: false }),
       prompt: async () => {
         localPrompts += 1

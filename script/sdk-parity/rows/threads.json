@@ -1606,6 +1606,11 @@
           "cursor": {
             "type": "string"
           },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
           "max_bytes": {
             "type": "integer",
             "minimum": 1,
@@ -1661,6 +1666,7 @@
           "reads": [
             "thread",
             "cursor",
+            "after",
             "max_bytes",
             "all_scope",
             "idempotency_key"
@@ -1697,6 +1703,11 @@
           "cursor": {
             "type": "string"
           },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
           "max_bytes": {
             "type": "integer",
             "minimum": 1,
@@ -1731,6 +1742,7 @@
             "thread",
             "wait_ms",
             "cursor",
+            "after",
             "max_bytes",
             "all_scope",
             "idempotency_key"

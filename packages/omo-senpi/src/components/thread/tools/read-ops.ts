@@ -7,9 +7,10 @@ import { createRelayControl, reopenParkedRow } from "../remote/lazy-ops"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "../control/port"
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
+import { refusal } from "../refusal-texts"
 import { threadLink } from "../thread-link"
 import { addressBook, degradedSummary, failure, rowNamed, sendAddressBook, summary } from "./internals"
-import { readItem } from "./read-item"
+import { readItems } from "./read-item"
 import { threadRow } from "./thread-row"
 import { listedStates } from "./thread-state"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
@@ -128,9 +129,24 @@ export async function withBacklog(
  * pages from it (a first read's cursor names the older part of that window). Tail mode ignores the cursor, so following
  * next_cursor in tail mode returned the same slice again.
  */
-function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?: number; cursor?: string } {
-  return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }
+function readWindow(value: ThreadReadInput): {
+  mode: "tail" | "page"
+  max_bytes?: number
+  cursor?: string
+  after?: string
+} {
+  return {
+    mode: value.cursor === undefined ? "tail" : "page",
+    max_bytes: value.max_bytes,
+    cursor: value.cursor,
+    after: value.after,
+  }
 }
+
+const afterNotFound = (after: string, thread: string): ThreadToolResult => ({
+  kind: "error",
+  error: refusal("read.after_not_found", { after, thread }),
+})
 
 /** `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint here is dead. */
 export async function readThread(
@@ -140,6 +156,8 @@ export async function readThread(
   callerId: string,
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
+  if (value.after !== undefined && value.cursor !== undefined)
+    return { kind: "error", error: refusal("read.after_with_cursor", {}) }
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live" && located.row !== undefined && options.remote !== undefined) {
@@ -168,9 +186,11 @@ async function readLive(
       return { kind: "error", error: refusal }
     }
   }
-  const result =
-    (await pagedReadResult(control, value)) ??
-    liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
+  const paged = await pagedReadResult(control, value)
+  // The whole-transcript leg (`get_messages`) names no message, so it cannot continue after one.
+  if (paged === undefined && value.after !== undefined)
+    return { kind: "error", error: refusal("read.after_unsupported", { thread: control.thread_id }) }
+  const result = paged ?? liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
   return result.kind === "ok"
     ? { ...result, ...controlIdentity(control), ...(wait === undefined ? {} : { wait }) }
     : result
@@ -187,42 +207,43 @@ async function pagedReadResult(control: SessionControl, value: ThreadReadInput):
   const page = await control.readEntryPage?.({
     ...(value.max_bytes === undefined ? {} : { max_bytes: value.max_bytes }),
     ...(value.cursor === undefined ? {} : { cursor: value.cursor }),
+    ...(value.after === undefined ? {} : { after: value.after }),
   })
   if (page === undefined || page.kind === "unsupported") {
     if (!entryCursor) return undefined
     return staleEntryCursor()
   }
   if (page.kind === "error") return page
+  if (page.kind === "after_not_found") return afterNotFound(value.after ?? "", control.thread_id)
   return {
     kind: "ok",
     thread: control.thread_id,
     link: threadLink(control.thread_id, control.title),
-    items: liveItems(page.messages),
+    items: readItems(page.messages, page.ids),
     truncated: page.truncated,
     ...(page.next_cursor === null ? {} : { next_cursor: page.next_cursor }),
     source: "live_host",
   }
 }
 
-/** A live slice's messages as items, numbered from 1, on every leg. */
-function liveItems(messages: readonly ThreadTranscriptEntry[]) {
-  return messages.map(readItem)
-}
-
-/** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
+/**
+ * A live session's whole transcript (`get_messages`) through the bounded reader; the same window rules on this device and
+ * on another one. Its messages carry no entry id, so its items have none (and `after` is refused before this).
+ */
 export function liveReadResult(
   threadId: string,
   title: string | undefined,
   messages: readonly ThreadTranscriptEntry[],
   value: ThreadReadInput,
 ): ThreadToolResult {
-  const live = readTranscript({ kind: "live", entries: () => messages }, readWindow(value))
+  const live = readTranscript({ kind: "live", entries: () => messages }, { ...readWindow(value), after: undefined })
   if (live.kind === "error") return { kind: "error", error: live.error }
+  if (live.kind === "after_not_found") return afterNotFound(value.after ?? "", threadId)
   return {
     kind: "ok",
     thread: threadId,
     link: threadLink(threadId, title),
-    items: liveItems(live.items),
+    items: readItems(live.items, undefined),
     truncated: live.truncated,
     ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }),
     source: live.source,
@@ -248,11 +269,12 @@ function readDegraded(
     readWindow(value),
   )
   if (durable.kind === "error") return { kind: "error", error: durable.error }
+  if (durable.kind === "after_not_found") return afterNotFound(value.after ?? "", threadId)
   return {
     kind: "ok",
     thread: threadId,
     link: threadLink(threadId, entry.title),
-    items: durable.items.map(readItem),
+    items: readItems(durable.items, durable.item_ids),
     truncated: durable.truncated,
     ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }),
     source: durable.source,

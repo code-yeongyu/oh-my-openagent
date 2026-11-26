@@ -43,8 +43,11 @@ type Kept = { readonly entries: JsonObject[]; readonly complete: boolean; readon
 type Page = { readonly entries: JsonObject[]; readonly leaf: string | null; readonly more: boolean }
 type Refusal = Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>
 
-const kept = new WeakMap<RemoteSessionsPort, Map<string, Kept>>()
-const unpaged = new WeakMap<RemoteSessionsPort, Set<string>>()
+/** What a tail read sends: one `get_entries` command to the holder (another device's, or this device's engine). */
+export type EntryPagesPort = Pick<RemoteSessionsPort, "sessionCommand">
+
+const kept = new WeakMap<EntryPagesPort, Map<string, Kept>>()
+const unpaged = new WeakMap<EntryPagesPort, Set<string>>()
 
 const idOf = (entry: JsonObject | undefined): string | undefined =>
   typeof entry?.["id"] === "string" ? entry["id"] : undefined
@@ -74,7 +77,7 @@ function keep(sessions: Map<string, Kept>, key: string, entries: JsonObject[], c
 }
 
 export async function readContextTail(
-  port: RemoteSessionsPort,
+  port: EntryPagesPort,
   device: string,
   sessionId: string,
   project: SessionProjector,
