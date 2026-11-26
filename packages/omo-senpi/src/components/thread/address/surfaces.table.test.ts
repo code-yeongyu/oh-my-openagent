@@ -115,6 +115,7 @@ function remoteClientOn(td: TwoDevices): ClientCore {
   let client: RemoteClient | undefined
   const core: ClientCore = {
     sender: { kind: "person", uid: "user-1" },
+    onClose: () => undefined,
     timers: fakeClock(),
     deps: {
       version: "5.1.70",

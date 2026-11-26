@@ -74,6 +74,8 @@ While OmO accounts are not open to everyone, these are the only forms of `omo lo
 
 A Linux machine with no Secret Service keyring, or with a locked one, cannot store the sign-in: omo reports the store as unavailable or locked and saves nothing. A Mac whose login keychain stays locked can use OmO's own keychain; see [`omo account store`](#omo-account-store-macos-opt-in) below.
 
+If the credential store fails while `omo logout` reads it (a locked or stalled keyring), the command stops after that one store call: nothing is cleared, the message says the store could not be read, and the exit code is 9 (native storage failure), the same code `omo account` uses for a storage failure. Nothing else about the stored sign-in changes; run `omo logout` again once the keyring answers.
+
 Before it prints a code, `omo login` checks that the OmO service answers, so an unreachable service fails at once.
 
 When the sign-in completes, omo turns remote sessions on for this device. See [Set up a device](./remote-sessions.md#set-up-a-device).

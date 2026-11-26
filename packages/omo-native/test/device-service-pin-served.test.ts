@@ -13,9 +13,9 @@ import { DEVICE_SERVICE_ORIGIN } from "../../device-service-core/src/release/acq
 const RELEASE_GATE = process.env.OMO_RELEASE_GATE === "1"
 const SKIP_REASON = "skipped: release gate only, set OMO_RELEASE_GATE=1 to read the live origin"
 
-// sha256 of the published device-service-v0.1.40 checksums.txt; the committed fixture in
-// fixtures/device-service-0.1.40/ is the same file (remote-bootstrap-published-release.test.ts).
-const PINNED_CHECKSUMS_SHA256 = "a7dae160ef2b2e368fc9acd32689a61d7ed628e78d15b56ba803702d0419a019"
+// sha256 of the published device-service-v0.1.45 checksums.txt; the committed fixture in
+// fixtures/device-service-0.1.45/ is the same file (remote-bootstrap-published-release.test.ts).
+const PINNED_CHECKSUMS_SHA256 = "ff6e320e5b897c38e2f8712a8fc6cbbad6d10e8b2201472ca49917f79bbbfa8a"
 const FETCH_TIMEOUT_MS = 30_000
 
 const download = async (url: string): Promise<Uint8Array> => {

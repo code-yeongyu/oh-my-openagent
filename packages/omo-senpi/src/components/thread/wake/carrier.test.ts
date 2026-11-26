@@ -64,6 +64,7 @@ async function setup(
     readonly schedule?: (run: () => void, ms: number) => () => void
     readonly memoryHeadroom?: () => number | undefined
     readonly memoryFloor?: () => number
+    readonly onError?: (error: unknown) => void
   } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
@@ -98,6 +99,7 @@ async function setup(
     ...(options.memoryHeadroom === undefined ? {} : { memoryHeadroom: options.memoryHeadroom }),
     ...(options.memoryFloor === undefined ? {} : { memoryFloor: options.memoryFloor }),
     schedule: options.schedule ?? (() => () => undefined),
+    ...(options.onError === undefined ? {} : { onError: options.onError }),
     onEvent: (event) => {
       events.push(event)
       for (const waiter of waiters.splice(0)) {
@@ -578,6 +580,35 @@ describe("the lease (A3.1.3)", () => {
     await reArmed
     expect(timers).toHaveLength(2)
     await carrier.stop()
+  })
+
+  test("#given a requested wake whose store start throws #when the sweep tends it #then the failure reaches onError instead of being dropped, and the next sweep opens and wakes the session", async () => {
+    let starts = 0
+    const errors: string[] = []
+    const { fake, carrier, path } = await setup({
+      storeWrap: (real) => ({
+        ...real,
+        woken: {
+          ...real.woken,
+          start: async (request) => {
+            starts += 1
+            if (starts <= 2) throw new Error(`the store write failed (${starts})`)
+            return await real.woken.start(request)
+          },
+        },
+      }),
+      onError: (error) => errors.push(error instanceof Error ? error.message : String(error)),
+    })
+    path("t")
+    await expect(carrier.wake("t")).rejects.toThrow("the store write failed (1)")
+
+    await carrier.sweep()
+    expect(errors).toEqual(["the store write failed (2)"])
+    expect(sent(fake, "wake")).toHaveLength(0)
+
+    await carrier.sweep()
+    expect(sent(fake, "wake")).toHaveLength(1)
+    expect(errors).toHaveLength(1)
   })
 
   // Review of #13220 (MEDIUM): a successor must reopen the session in the session's own directory, never its own, or an

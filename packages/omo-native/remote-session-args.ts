@@ -9,6 +9,9 @@ import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-pres
 
 // The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted. The target
 // stays the typed text: one string the address module resolves (#14305, design section 2).
+/** `omo remote send <target> -`: the message is read from stdin (omo#13905). */
+export const STDIN_TEXT = "-"
+
 export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
 export type SessionVerb = (typeof SESSION_VERBS)[number]
 export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some((verb) => verb === value)
@@ -34,6 +37,7 @@ export type SessionArgs =
   | {
       readonly verb: "send"
       readonly target: string
+      /** The message; `-` reads it from stdin instead, so it never appears in argv (omo#13905). */
       readonly text: string
       readonly delivery: "auto" | "steer" | "follow_up"
       readonly wait: boolean

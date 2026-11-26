@@ -4,12 +4,11 @@
 
 ## Shipped skills
 
-The plugin ships 28 skills by default:
+The plugin ships 27 skills by default:
 
 - `ast-grep` — structural code search and rewrites
 - `browser` — drive a real browser from the js eval kernel: signed-in sites, forms, screenshots, web QA
 - `coding-agent-sessions` — find, read, and reconstruct coding-agent session transcripts
-- `dag-library` — save a DAG definition once and re-run it by name
 - `data-scientist` — analyze CSV/parquet/JSON data with DuckDB and Polars
 - `debugging` — hypothesis-driven runtime debugging across languages
 - `eval-integrity` — check whether an eval, benchmark, or metric claim is trustworthy
@@ -19,7 +18,7 @@ The plugin ships 28 skills by default:
 - `hyperplan` — adversarial 5-member cross-critique planning
 - `init-deep` — deep project initialization and scaffold setup
 - `lsp-setup` — Language Server configuration and troubleshooting
-- `mass-ulw` — dependency-ordered child work through the native workflow tool
+- `mass-ulw` — dependency-ordered child work through the native workflow tool, plus saved graphs re-run by name
 - `omo-relay` — work on the account's other machines and threads, one at a time or all at once
 - `onboarding` — guide a first-time omo user through setup and the core workflow
 - `programming` — type-strict, modern-stack programming guidance

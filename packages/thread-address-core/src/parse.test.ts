@@ -18,6 +18,10 @@ describe("#given an address text #when parseAddress reads it #then it names self
     ["a relative path", "./x", { kind: "bare", text: "./x" }],
     ["a home path", "~/x", { kind: "bare", text: "~/x" }],
     ["a drive letter", "C:/x", { kind: "bare", text: "C:/x" }],
+    ["mixed drive path", "C:\\a/b", { kind: "bare", text: "C:\\a/b" }],
+    ["mixed UNC path", "\\\\srv\\share/x", { kind: "bare", text: "\\\\srv\\share/x" }],
+    ["mixed relative path", "dir\\sub/x", { kind: "bare", text: "dir\\sub/x" }],
+    ["drive-relative path", "C:dir/x", { kind: "bare", text: "C:dir/x" }],
     ["a session file", "dir/x.jsonl", { kind: "bare", text: "dir/x.jsonl" }],
   ] as const)("%s", (_label, text, expected) => {
     expect(parseAddress(text)).toEqual(expected)
