@@ -537,7 +537,7 @@ class TaskManagerImpl implements TaskManager {
 
     return withTaskRecordLockAsync(lockPath, async () => {
       spec.admission?.assertOpen()
-      const raced = ownedStartResult(this.findOwnedTasks(owner), owner)
+      const raced = ownedStartResult(this.findOwnedTasks(owner), owner, (claim) => this.#refusedStops.isLive(claim))
       if (raced !== undefined) return raced
       const result = await withResidentStart(
         this.#options,

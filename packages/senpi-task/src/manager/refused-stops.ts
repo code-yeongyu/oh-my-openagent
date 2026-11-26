@@ -5,6 +5,7 @@ import type { TaskRecord, TaskStatus } from "../state"
 import type { CancelOutcome, DestructionPort, SendOutcome } from "../steering"
 import type { TaskRecordStore } from "../store"
 import { discardManagedHandle, type ManagedChildHandle } from "./child-handle"
+import { isTerminalRecord } from "./manager-helpers"
 import type { OwnerResumeFence } from "./types"
 
 type Disposition = "retire" | "hold"
@@ -41,6 +42,11 @@ export class RefusedStops {
 
   pending(taskId: string): boolean {
     return this.#entries.has(taskId)
+  }
+
+  /** The manager-side liveness rule: a claim that is not settled, or a refused turn not confirmed stopped. */
+  isLive(claim: TaskRecord): boolean {
+    return !isTerminalRecord(claim) || this.pending(claim.task_id)
   }
 
   /** Awaits the stop already in flight and, if it failed, issues a new one; true once the runner confirmed it. */

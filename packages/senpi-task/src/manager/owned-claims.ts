@@ -12,11 +12,16 @@ export function ownedClaims(records: readonly TaskRecord[], scope: DagTaskOwnerS
 }
 
 /** The owned start's answer from the owner key's claims, oldest first; undefined starts a fresh child. */
-export function ownedStartResult(claims: readonly TaskRecord[], owner: DagTaskOwner): OwnedStartResult | undefined {
+export function ownedStartResult(
+  claims: readonly TaskRecord[],
+  owner: DagTaskOwner,
+  // Live means "can still do work": a record that is not settled, or a refused turn not yet confirmed stopped.
+  isLive: (claim: TaskRecord) => boolean = (claim) => !isTerminalRecord(claim),
+): OwnedStartResult | undefined {
   // Every live claim is checked before any reuse, not only the newest: an older attempt's child can
   // be live behind a newer claim, settled or not, and must never run beside it (#11381). Which live
   // claim this is - same attempt, earlier, or newer - the DAG layer decides.
-  const other = claims.findLast((claim) => !isTerminalRecord(claim) && claim.owner?.fingerprint !== owner.fingerprint)
+  const other = claims.findLast((claim) => isLive(claim) && claim.owner?.fingerprint !== owner.fingerprint)
   if (other !== undefined) {
     return {
       kind: "owner_conflict",
