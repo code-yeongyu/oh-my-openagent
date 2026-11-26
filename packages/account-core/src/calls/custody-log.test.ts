@@ -12,7 +12,18 @@ import { ok, refusedWith } from "./outcome"
 // interrupted by the recovery step, under the operation's own principal; a refusal at the boundary is one record.
 
 const principal = { kind: "person", id: "501" } as const
-const STARTED = ["at", "capability", "destination", "id", "operation_id", "phase", "pid", "principal"]
+const STARTED = [
+  "at",
+  "capability",
+  "destination",
+  "id",
+  "operation_id",
+  "phase",
+  "pid",
+  "principal",
+  "starter_scope",
+  "starter_start",
+]
 const TERMINAL = ["at", "capability", "destination", "id", "operation_id", "outcome", "phase", "principal"]
 const records = (home: string): CustodyRecord[] =>
   readFileSync(custodyLogPath(home), "utf8")

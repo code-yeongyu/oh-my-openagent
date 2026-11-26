@@ -5,6 +5,7 @@ import { dirname } from "node:path"
 import { temporaryHome } from "../test-support"
 import { type CustodyRecord, audited, custodyLog, custodyLogPath } from "./custody-log"
 import { ok } from "./outcome"
+import { processScope, processStart } from "./process-scope"
 
 // Review 6065710236 on the custody log's recovery step and its lock: a starter alive in another process is never
 // closed however long it runs; concurrent calls lose no record and close a dead operation once; a prune keeps every
@@ -146,8 +147,15 @@ describe("the custody log's recovery", () => {
   test("#given a started record past retention whose operation never closed #then the prune keeps it; a closed one past retention goes", async () => {
     const home = await temporaryHome()
     const old = "2020-01-01T00:00:00.000Z"
+    const pid = livePid()
     seed(home, [
-      started({ at: old, operation_id: "op-open", pid: livePid() }),
+      started({
+        at: old,
+        operation_id: "op-open",
+        pid,
+        starter_start: await processStart(pid),
+        starter_scope: await processScope(),
+      }),
       started({ at: old, operation_id: "op-closed" }),
       JSON.stringify({
         id: "t",
@@ -174,5 +182,76 @@ describe("the custody log's recovery", () => {
     chmodSync(custodyLogPath(home), 0o644)
     await custodyLog({ home, principal }).refused("account.signOut", "sender_not_allowed")
     expect(statSync(custodyLogPath(home)).mode & 0o777).toBe(0o600)
+  })
+})
+
+describe("the starter's start identity and scope (security design 8.2, D22-17)", () => {
+  const OLD = "2020-01-01T00:00:00.000Z"
+  const fresh = () => new Date().toISOString()
+  const outcomeOf = (home: string, operation: string) =>
+    records(home)
+      .filter((record) => record.operation_id === operation && record.phase === "terminal")
+      .map((record) => `${record.outcome} ${record.code}`)
+  const run = (home: string) => custodyLog({ home, principal }).refused("account.signOut", "sender_not_allowed")
+
+  test("#given a started record whose pid a later process took, in this scope #then it is closed as interrupted", async () => {
+    const home = await temporaryHome()
+    const pid = livePid()
+    seed(home, [
+      started({
+        at: fresh(),
+        operation_id: "op-reused",
+        pid,
+        starter_start: "an-earlier-start",
+        starter_scope: await processScope(),
+      }),
+    ])
+    await run(home)
+    expect(outcomeOf(home, "op-reused")).toEqual(["interrupted starter_ended"])
+  })
+
+  test("#given a live starter with the same pid and start, in this scope #then it is kept open", async () => {
+    const home = await temporaryHome()
+    const pid = livePid()
+    seed(home, [
+      started({
+        at: fresh(),
+        operation_id: "op-live",
+        pid,
+        starter_start: await processStart(pid),
+        starter_scope: await processScope(),
+      }),
+    ])
+    await run(home)
+    expect(outcomeOf(home, "op-live")).toEqual([])
+  })
+
+  test("#given a starter in another scope whose pid is absent here #then it stays open until the horizon, then closes with its reason", async () => {
+    const home = await temporaryHome()
+    const pid = await deadPid()
+    const foreign = { pid, starter_start: "another-boot:1", starter_scope: "another-scope" }
+    seed(home, [
+      started({ at: fresh(), operation_id: "op-young", ...foreign }),
+      started({ at: OLD, operation_id: "op-old", ...foreign }),
+    ])
+    await run(home)
+    expect({ young: outcomeOf(home, "op-young"), old: outcomeOf(home, "op-old") }).toEqual({
+      young: [],
+      old: ["interrupted starter_scope_unreachable"],
+    })
+  })
+
+  test("#given a record from before D22-17 whose pid is taken #then it is kept before the horizon and closed after it", async () => {
+    const home = await temporaryHome()
+    const pid = livePid()
+    seed(home, [
+      started({ at: fresh(), operation_id: "op-young", pid }),
+      started({ at: OLD, operation_id: "op-old", pid }),
+    ])
+    await run(home)
+    expect({ young: outcomeOf(home, "op-young"), old: outcomeOf(home, "op-old") }).toEqual({
+      young: [],
+      old: ["interrupted starter_legacy_unverified"],
+    })
   })
 })

@@ -2,68 +2,67 @@ import { randomUUID } from "node:crypto"
 import { link, open, readFile, stat, unlink } from "node:fs/promises"
 import { setTimeout as delay } from "node:timers/promises"
 
-import {
-  getPidLiveness,
-  getProcessStartIdentity,
-  startIdentitiesConflict,
-} from "@oh-my-opencode/memory-core/process-identity"
+import { type NamedProcess, processScope, processStart, processState } from "./process-scope"
 
-// The custody log's own lock (security design 8.2; reviews 6065710236 N1 and N4, 6066498814 Y1 and Y2, with the security
-// owner's ruling on Y2): every append and the recovery step take it, so a prune never drops a record appended while it
-// ran and two recoveries never close one operation twice. It is a file beside the log, created whole (written aside,
-// then linked into place) with its holder's pid and start identity, and broken ONLY when that holder is proven dead: the
-// pid is gone, or the process under it now started at another time. A live holder's lock is never broken; one call
-// spends at most LOCK_WAIT_MS waiting for it in total, then reports what it could not write as unwritten.
+// The custody log's own lock (security design 8.2, decision D22-17; reviews 6065710236 N1 and N4, 6066498814 Y2,
+// 6067451001 L1, 6067671766 L3): every append and the recovery step take it, so a prune never drops a record appended
+// while it ran and two recoveries never close one operation twice. It is a file beside the log, created whole (written
+// aside, then linked into place) naming its holder by pid, start identity and scope. It is broken only:
+// - when that holder is proven gone in this reader's own scope (process-scope.ts),
+// - when it was written in another scope and is older than FOREIGN_SCOPE_BREAK_AGE_MS (a hold lasts milliseconds), or
+// - when it names no holder (a crash inside the take) and is older than HOLDERLESS_BREAK_AGE_MS.
+// A live holder in this scope is never broken. A wait ends PATIENCE_MS after the holder last changed and never later than
+// WAIT_CAP_MS: a holder that stays costs one patience, a queue that keeps moving is not starved.
 
-export const LOCK_WAIT_MS = 2000
+export const PATIENCE_MS = 2000
+export const WAIT_CAP_MS = 6000
 const RETRY_MS = 5
-/**
- * A lock is created whole, so a live holder's lock always names it. One that names no holder was left by a crash or a
- * power loss inside the take; past this age it is treated as a dead holder's (review 6067451001 L1). That makes a flush
- * before the link unneeded, and a flush per take cost every call a disk sync under contention (review 6067671766 L3).
- */
-const HOLDERLESS_GRACE_MS = 5000
+/** A lock that names no holder (a crash inside the take): broken past this age. */
+export const HOLDERLESS_BREAK_AGE_MS = 5000
+/** A lock whose holder is in another process-number space, which this reader cannot judge: broken past this age. */
+export const FOREIGN_SCOPE_BREAK_AGE_MS = 60_000
 
-type Holder = { readonly pid: number; readonly start: string | null }
+export type LockWait = { readonly patienceMs: number; readonly capMs: number }
+export const DEFAULT_WAIT: LockWait = { patienceMs: PATIENCE_MS, capMs: WAIT_CAP_MS }
+/** One attempt, no waiting: for a step that may be skipped while another call holds the lock. */
+export const NO_WAIT: LockWait = { patienceMs: 0, capMs: 0 }
 
-function holderOf(text: string): Holder | undefined {
+function holderOf(text: string): NamedProcess | undefined {
   try {
-    const value = JSON.parse(text) as Partial<Holder>
-    return typeof value.pid === "number" && Number.isInteger(value.pid) && value.pid > 0
-      ? { pid: value.pid, start: typeof value.start === "string" ? value.start : null }
-      : undefined
+    const value = JSON.parse(text) as { pid?: unknown; start?: unknown; scope?: unknown }
+    if (typeof value.pid !== "number" || !Number.isInteger(value.pid) || value.pid <= 0) return undefined
+    return {
+      pid: value.pid,
+      start: typeof value.start === "string" ? value.start : null,
+      ...(typeof value.scope === "string" ? { scope: value.scope } : {}),
+    }
   } catch {
     return undefined
   }
 }
 
-async function provenDead(holder: Holder): Promise<boolean> {
-  if (getPidLiveness(holder.pid) === "dead") return true
-  if (holder.start === null) return false
-  const now = await getProcessStartIdentity(holder.pid)
-  return now !== null && startIdentitiesConflict(holder.start, now)
-}
-
-async function holderDead(path: string): Promise<boolean> {
+async function breakable(path: string): Promise<boolean> {
   const text = await readFile(path, "utf8").catch(() => undefined)
   if (text === undefined) return false
-  const holder = holderOf(text)
-  if (holder !== undefined) return provenDead(holder)
   const held = await stat(path).catch(() => undefined)
-  return held !== undefined && Date.now() - held.mtimeMs > HOLDERLESS_GRACE_MS
+  const age = held === undefined ? 0 : Date.now() - held.mtimeMs
+  const holder = holderOf(text)
+  if (holder === undefined) return age > HOLDERLESS_BREAK_AGE_MS
+  const state = await processState(holder)
+  return state === "gone" || (state === "elsewhere" && age > FOREIGN_SCOPE_BREAK_AGE_MS)
 }
 
 // Breakers are serialized by a second lock beside the first. Under it, the lock is judged again and removed: no taker can
 // create the lock meanwhile (it exists until removed) and no other breaker can remove it, so a lock taken by a live
-// waiter is never the one removed. A break lock whose own holder is proven dead is removed the same way it was judged.
-async function breakIfDead(lockPath: string): Promise<boolean> {
+// waiter is never the one removed. A break lock is removed by the same judgement.
+async function breakIfBreakable(lockPath: string): Promise<boolean> {
   const breakPath = `${lockPath}.break`
   if (!(await take(breakPath))) {
-    if (await holderDead(breakPath)) await unlink(breakPath).catch(() => undefined)
+    if (await breakable(breakPath)) await unlink(breakPath).catch(() => undefined)
     return false
   }
   try {
-    if (!(await holderDead(lockPath))) return false
+    if (!(await breakable(lockPath))) return false
     await unlink(lockPath).catch(() => undefined)
     return true
   } finally {
@@ -73,9 +72,10 @@ async function breakIfDead(lockPath: string): Promise<boolean> {
 
 async function take(lockPath: string): Promise<boolean> {
   const staged = `${lockPath}.${randomUUID()}.taking`
+  const [start, scope] = await Promise.all([processStart(process.pid), processScope()])
   const handle = await open(staged, "wx", 0o600)
   try {
-    await handle.writeFile(JSON.stringify({ pid: process.pid, start: await getProcessStartIdentity(process.pid) }))
+    await handle.writeFile(JSON.stringify({ pid: process.pid, start, scope }))
   } finally {
     await handle.close()
   }
@@ -90,30 +90,28 @@ async function take(lockPath: string): Promise<boolean> {
   }
 }
 
-/** The time one call may still spend waiting for the lock; only waiting draws on it, never the operation's own run. */
-export type LockWait = { remainingMs: number }
-
-/** Runs `action` holding the log's lock, waiting at most what `wait` has left; undefined when the lock was not had. */
+/** Runs `action` holding the log's lock, or answers undefined when `wait` ran out first. */
 export async function withCustodyLock<T>(
   logPath: string,
   action: () => Promise<T>,
-  wait: LockWait = { remainingMs: LOCK_WAIT_MS },
+  wait: LockWait = DEFAULT_WAIT,
 ): Promise<T | undefined> {
   const lockPath = `${logPath}.lock`
   const started = Date.now()
-  const deadline = started + wait.remainingMs
-  let taken = false
+  let holder: string | undefined
+  let changed = started
   for (;;) {
-    if (await take(lockPath)) {
-      taken = true
-      break
+    if (await take(lockPath)) break
+    if (await breakIfBreakable(lockPath)) continue
+    const seen = await readFile(lockPath, "utf8").catch(() => undefined)
+    const now = Date.now()
+    if (seen !== holder) {
+      holder = seen
+      changed = now
     }
-    if (await breakIfDead(lockPath)) continue
-    if (Date.now() >= deadline) break
+    if (now - changed >= wait.patienceMs || now - started >= wait.capMs) return undefined
     await delay(RETRY_MS)
   }
-  wait.remainingMs = Math.max(0, wait.remainingMs - (Date.now() - started))
-  if (!taken) return undefined
   try {
     return await action()
   } finally {
