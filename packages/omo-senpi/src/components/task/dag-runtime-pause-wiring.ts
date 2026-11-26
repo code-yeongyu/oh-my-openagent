@@ -12,11 +12,16 @@ import type { DagRunReservations } from "../../../../senpi-task/src/dag/run-acqu
 import { createDagRunPauseSource, type DagGuidanceDelivery } from "./dag-run-pause-source"
 import type { OwnedScheduler } from "./dag-scheduler-registry"
 import type { TaskEngine } from "./engine"
+import type { ComponentLogger } from "../../extension/types"
 import { ownedSubtree } from "./engine-run-pause"
 
 /** The runtime's ports for the user Stop / Resume run-pause source (`dag-run-pause-source.ts`). */
 export function registerDagPauseSource(ports: {
-  readonly deps: { readonly engine: TaskEngine; readonly pausedGuidance?: DagGuidanceDelivery }
+  readonly deps: {
+    readonly engine: TaskEngine
+    readonly pausedGuidance?: DagGuidanceDelivery
+    readonly logger: ComponentLogger
+  }
   readonly coreManager: DagManager
   readonly store: DagFileStore
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
@@ -57,6 +62,7 @@ export function registerDagPauseSource(ports: {
         if (schedulers.get(runId) === owned) schedulers.delete(runId)
       },
       prepareResume: (runId) => ports.clearAdmissionLatch(runId),
+      warn: (message, fields) => deps.logger.warn(message, fields),
       recovery: ports.recovery,
       adopt: ports.adoptInstalled,
       cancel: async (runId) => {

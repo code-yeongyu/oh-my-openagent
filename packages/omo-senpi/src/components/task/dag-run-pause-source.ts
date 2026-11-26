@@ -3,6 +3,8 @@ import type { DagRecovery, InstalledDagRun } from "../../../../senpi-task/src/da
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunId } from "../../../../senpi-task/src/dag/types"
 import { controlJournal } from "../../../../senpi-task/src/dag/node-control-context"
+import { decideDagRun } from "../../../../senpi-task/src/dag/run-acquisition"
+import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 import { dispatchGuidance } from "../../../../senpi-task/src/pause/guidance"
 import type { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
 import { RunPauseAdmissionHeld } from "../../../../senpi-task/src/manager/run-pause"
@@ -17,6 +19,41 @@ export type DagGuidanceDelivery = (
   },
 ) => Promise<{ readonly entryId?: string }>
 
+/**
+ * Journals the user's Stop on one run, decided on the fresh record under the journal's run lock by
+ * the acquisition's own decision (`decideDagRun`, #15125). A run another live process schedules
+ * (pending or running, or paused under that process's own lease: it has just claimed the run) is
+ * left untouched and its holder pid returned; any other live run is paused exactly as before,
+ * keeping the previous holder the holder rule reads. Stop never takes the lease: it ends holding.
+ */
+function stopUnderHolderRule(
+  options: DagSchedulerOptions,
+  record: DagRunRecordV1,
+  pauseSeq: number,
+): number | undefined {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  let refusedBy: number | undefined
+  const journal = controlJournal({ ...options, initialRecord: record }, record, undefined, (fresh) => {
+    const decision = decideDagRun(fresh, {
+      probe,
+      eligible: (run) => STOPPABLE.has(run.status) && (run.pause?.pauseSeq ?? 0) < pauseSeq,
+    })
+    if (decision.kind === "not_eligible") return true
+    if (decision.kind === "free") return false
+    const scheduling = fresh.status !== "paused" || fresh.leaseHolderPid === decision.holderPid
+    if (scheduling) refusedBy = decision.holderPid
+    return scheduling
+  })
+  journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq })
+  return refusedBy
+}
+
+const STOPPABLE = new Set(["pending", "running", "paused"])
+
 export function createDagRunPauseSource(ports: {
   readonly barrier: AdmissionBarrier
   records(parentSessionId: string): readonly DagRunRecordV1[]
@@ -27,6 +64,7 @@ export function createDagRunPauseSource(ports: {
   adopt(installed: InstalledDagRun): void
   cancel(runId: DagRunId): Promise<void>
   readonly deliverGuidance?: DagGuidanceDelivery
+  warn?(message: string, fields?: Record<string, unknown>): void
 }): RunPauseSource {
   const active = (parent: string) =>
     ports
@@ -40,17 +78,14 @@ export function createDagRunPauseSource(ports: {
       for (const initial of records) {
         const options = ports.options(initial)
         const record = options.store.readCheckpoint<DagRunRecordV1>(initial.runId)
-        if (
-          record === null ||
-          (record.status !== "pending" && record.status !== "running" && record.status !== "paused")
-        )
-          continue
-        if ((record.pause?.pauseSeq ?? 0) >= pauseSeq) continue
-        controlJournal({ ...options, initialRecord: record }, record).append({
-          type: "dag.run.paused",
-          reason: "user_stop",
-          pauseSeq,
-        })
+        if (record === null) continue
+        const refusedBy = stopUnderHolderRule(options, record, pauseSeq)
+        if (refusedBy !== undefined) {
+          ports.warn?.("omo-senpi DAG Stop left a run to the live process that is scheduling it", {
+            runId: record.runId,
+            holderPid: refusedBy,
+          })
+        }
       }
     },
     async dispatchGuidance(parent) {

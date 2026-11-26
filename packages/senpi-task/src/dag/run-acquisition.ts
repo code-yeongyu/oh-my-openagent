@@ -74,6 +74,24 @@ export type DagRunAcquisitionRequest<T extends LeasedRecord> = {
   readonly claim?: (fresh: T) => T
 }
 
+/**
+ * The acquisition's decision on a fresh record, without taking anything: is it eligible for the
+ * caller, and does a live process other than this one hold it. Callers evaluate it while holding the
+ * run lock on the record they will write (`acquireDagRun`, or a journal's locked `skipDuplicate` for an
+ * entry such as Stop that writes without taking the lease).
+ */
+export function decideDagRun<T extends LeasedRecord>(
+  fresh: T,
+  request: Pick<DagRunAcquisitionRequest<T>, "eligible" | "probe" | "holder">,
+):
+  | { readonly kind: "not_eligible" }
+  | { readonly kind: "held"; readonly holderPid: number }
+  | { readonly kind: "free" } {
+  if (!request.eligible(fresh)) return { kind: "not_eligible" }
+  const holderPid = request.holder === undefined ? liveForeignHolder(request.probe, fresh) : request.holder(fresh)
+  return holderPid === undefined ? { kind: "free" } : { kind: "held", holderPid }
+}
+
 export function acquireDagRun<T extends LeasedRecord>(
   store: Pick<DagFileStore, "withRunLock" | "readCheckpoint" | "writeCheckpoint">,
   runId: DagRunId,
@@ -82,9 +100,9 @@ export function acquireDagRun<T extends LeasedRecord>(
   return store.withRunLock(runId, () => {
     const fresh = store.readCheckpoint<T>(runId)
     if (fresh === null) return { kind: "missing" }
-    if (!request.eligible(fresh)) return { kind: "not_eligible", record: fresh }
-    const holderPid = request.holder === undefined ? liveForeignHolder(request.probe, fresh) : request.holder(fresh)
-    if (holderPid !== undefined) return { kind: "held", holderPid }
+    const decision = decideDagRun(fresh, request)
+    if (decision.kind === "not_eligible") return { kind: "not_eligible", record: fresh }
+    if (decision.kind === "held") return decision
     let reservation = request.reservation
     if (reservation === undefined && request.reservations !== undefined) {
       reservation = request.reservations.reserve(runId, request.operation)

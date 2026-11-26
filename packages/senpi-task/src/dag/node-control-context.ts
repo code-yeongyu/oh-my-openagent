@@ -199,6 +199,8 @@ export function controlJournal(
   options: DagSchedulerOptions,
   record: DagRunRecordV1,
   pendingErrors: ReadonlyMap<DagNodeId, DagNodeError> = new Map(),
+  // Decided on the recovered checkpoint under the journal's run lock: true drops the append.
+  skip?: (recovered: DagRunRecordV1) => boolean,
 ): DagJournal<DagRunRecordV1> {
   const now = options.now ?? Date.now
   return createDagJournal<DagRunRecordV1>({
@@ -213,7 +215,8 @@ export function controlJournal(
       }),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
-    skipDuplicate: skipDuplicateTerminalTransition,
+    skipDuplicate: (recovered, payload) =>
+      skipDuplicateTerminalTransition(recovered, payload) || (skip?.(recovered) ?? false),
   })
 }
 
