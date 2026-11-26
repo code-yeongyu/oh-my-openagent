@@ -1,6 +1,6 @@
 # X1a proof: the cross-device thread scenario on three surfaces
 
-Build under test: senpi 2026.11.23; thread SDK entry sha256 ba06d1303196f7eb. Regenerate with `bun script/qa/sdk-proof/run.ts`.
+Build under test: senpi 2026.11.23; thread SDK entry sha256 5937f8142a0bfe78. Regenerate with `bun script/qa/sdk-proof/run.ts`.
 
 Isolation: 0 request(s) to a non-loopback address refused; the loopback guard loaded in 40 world processes; session bus in the world's environment: absent.
 
@@ -25,7 +25,7 @@ The table states what this world (real engine hosts, fake model, account and rel
 | set-model-parked (setModel) | fail: the surface answered error partial_commit (T1b-m (#14939, folded into T1b), #14939) | fail: the surface answered error partial_commit (T1b-m (#14939, folded into T1b), #14939) | fail: the surface answered error partial_commit (T1b-m (#14939, folded into T1b), #14939) |
 | after-compaction (send) | fail: B's transcript lacks the message or its answer QA-ACK QA-TOKEN-x1a-after-compaction-sdk (T1b-m (#14939, folded into T1b), #15026, senpi#7482) | fail: B's transcript lacks the message or its answer QA-ACK QA-TOKEN-x1a-after-compaction-tools (T1b-m (#14939, folded into T1b), #15026, senpi#7482) | fail: B's transcript lacks the message or its answer QA-ACK QA-TOKEN-x1a-after-compaction-cli (T1b-m (#14939, folded into T1b), #15026, senpi#7482) |
 | set-level (setReasoning) | not reached: no call on this surface today (T1b (threads.setReasoning)) | pass | not reached: no call on this surface today (T3 (the omo thread verbs over the SDK root)) |
-| close (close) | pass | pass | fail: the surface answered exit 1: omo: undefined is not an object (evaluating 'flags.has') (T1b (PR 15000), #14992) |
+| close (close) | pass | pass | pass |
 
 ## The same keyed send through two surfaces (#15021)
 
