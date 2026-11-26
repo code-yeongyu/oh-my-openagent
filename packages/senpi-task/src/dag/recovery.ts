@@ -16,13 +16,12 @@ import {
   dagNodeTaskAttachedEvent,
   dagNodeTransitionedEvent,
   dagRunPausedEvent,
-  dagRunResumedEvent,
 } from "./events"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
-import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
+import { applyDagSchedulerEvent, type DagNodeSpawnPolicy } from "./scheduler"
 import { readDagDirectory, type DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
 
@@ -57,9 +56,11 @@ export type DagRecoveryOptions = {
   // Liveness probe for a paused run's previous lease holder. Defaults to the lifecycle port's
   // signaller so the signal-0 existence check has exactly one implementation in the package.
   readonly isProcessAlive?: (pid: number) => boolean
-  // Whether THIS process still runs a scheduler for the run. Consulted only when the recorded holder
-  // pid is our own: a signal-0 probe on ourselves is always true, so without this a same-process
+  // Whether THIS process still runs a scheduler for the run. Consulted when the recorded holder pid
+  // is our own: a signal-0 probe on ourselves is always true, so without this a same-process
   // session reopen (multi-session host) would wait for its own host to exit. (#8006)
+  // It also gates the claim of a run left `running`: only a caller that can tell its own live
+  // scheduler from a dead host's may take such a run over.
   readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
   readonly now?: () => number
   readonly subscriberRing?: number
@@ -262,9 +263,15 @@ function claimOrphanedRun(context: RecoveryContext, observed: RecoverableRecord,
 function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSessionId: string): ClaimedRun {
   return context.store.withRunLock(runId, () => {
     const fresh = context.store.readCheckpoint<RecoverableRecord>(runId)
-    if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
+    if (fresh === null) return { kind: "skipped", reason: "not_paused" }
+    // A host that dies without its shutdown pause (kill, crash, power loss) leaves the run `running`.
+    // With no scheduler for it in this process it is as stopped as a paused run and is claimed the
+    // same way; nothing else would ever fold its children or start its dependents.
+    const interrupted = fresh.status === "running" && context.isRunHeldInProcess?.(runId) === false
+    if (fresh.status !== "paused" && !interrupted) return { kind: "skipped", reason: "not_paused" }
     if (fresh.parentSessionId !== parentSessionId) return { kind: "skipped", reason: "foreign_session" }
-    const priorHolder = fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid
+    const priorHolder =
+      fresh.leaseHolderPid ?? fresh.previousLeaseHolderPid ?? (interrupted ? liveChildOwner(context, fresh) : undefined)
     if (priorHolder !== undefined && holderStillLive(context, runId, priorHolder)) {
       return { kind: "skipped", reason: "live_lease", holderPid: priorHolder }
     }
@@ -272,6 +279,18 @@ function claimPausedRun(context: RecoveryContext, runId: DagRunId, parentSession
     context.store.writeCheckpoint(runId, claimed)
     return { kind: "claimed", record: claimed }
   })
+}
+
+// A first-generation run records no lease, so the process that still owns its attached children
+// stands in for the holder. Lifecycle reconcile runs first and takes over the children of a dead
+// owner, so a record still under a live foreign pid means that process is running them.
+function liveChildOwner(context: RecoveryContext, record: RecoverableRecord): number | undefined {
+  for (const node of record.nodes) {
+    if (node.taskId === undefined || (node.state !== "scheduled" && node.state !== "running")) continue
+    const owner = context.taskManager.get(node.taskId)?.host_pid
+    if (owner !== undefined && owner !== context.hostPid && context.isProcessAlive(owner)) return owner
+  }
+  return undefined
 }
 
 // Our own pid is always alive to a signal-0 probe, so for it the only holder that can still matter

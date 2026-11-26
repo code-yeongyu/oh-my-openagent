@@ -4,7 +4,6 @@ import {
   awaitingInputDetails,
   createChildProgress,
   type ManagedChildEvent,
-  type TaskManager,
   type TaskRecord,
 } from "@oh-my-opencode/senpi-task"
 import {
@@ -13,12 +12,12 @@ import {
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
+  DAG_UNATTACHED_NODES_PAUSE_REASON,
   type DagDefinition,
   type DagFileStore,
   type DagLeaseWatchOptions,
   type DagNodeSpawnPolicy,
   type DagManager,
-  type DagNodeId,
   type DagRecoveryOutcome,
   type DagRunEvent,
   type DagRunId,
@@ -26,11 +25,11 @@ import {
   type DagRunSnapshot,
   type DagScheduler,
   type InstalledDagRun,
-  type OwnedStartResult,
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import { admissionTaskManager } from "./dag-admission-task-manager"
 import { resolveDagForkSource } from "./dag-fork-source"
 import { scheduleDagRetentionSweep, type DagRetentionSweepOptions } from "./dag-retention-sweep"
 import { createDagRpcBridge, type DagBridgeTimers } from "./dag-rpc-bridge"
@@ -231,6 +230,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const ensureScheduled = (runId: DagRunId, parentSessionId: string): void => {
     const initialRecord = coreManager.record(runId, parentSessionId)
     if (!SCHEDULABLE_RUN_STATUSES.has(initialRecord.status)) return
+    // Children already attached to the run's nodes belong to another scheduler: a live one in
+    // another process, or one that died with its host. Recovery is what reattaches them; a fresh
+    // scheduler here would hold none of them.
+    if (!schedulers.has(runId) && initialRecord.nodes.some(hasAttachedChild)) return
     const owned = controller(runId, parentSessionId)
     if (owned.running !== undefined) return
     const running = owned.scheduler
@@ -476,6 +479,11 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const onEvent = (event: DagRunEvent): void => {
     if (event.type === "dag.run.started") wakeSource.onRunStart(event.runId)
     if (event.type === "dag.run.paused") {
+      if (event.reason === DAG_UNATTACHED_NODES_PAUSE_REASON) {
+        deps.logger.error("omo-senpi dag run parked: its scheduler holds none of the children its nodes record", {
+          runId: event.runId,
+        })
+      }
       notifyPaused(event)
       return
     }
@@ -729,23 +737,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   return runtime
 }
 
-function admissionTaskManager(manager: TaskManager, admissionStopped: (runId: DagRunId) => boolean): TaskManager {
-  return new Proxy(manager, {
-    get(target, property) {
-      if (property === "startOwned") {
-        return (spec: Parameters<TaskManager["startOwned"]>[0], owner: Parameters<TaskManager["startOwned"]>[1]) => {
-          if (admissionStopped(owner.runId)) return stoppedAdmission()
-          return target.startOwned({ ...spec, run_in_background: false }, owner)
-        }
-      }
-      const value: unknown = Reflect.get(target, property, target)
-      return typeof value === "function" ? value.bind(target) : value
-    },
-  })
-}
-
-function stoppedAdmission(): Promise<OwnedStartResult> {
-  return new Promise<OwnedStartResult>(() => undefined)
+function hasAttachedChild(node: DagRunRecordV1["nodes"][number]): boolean {
+  return node.state === "scheduled" || node.state === "running"
 }
 
 function removeListeners(
