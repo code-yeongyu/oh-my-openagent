@@ -1,0 +1,365 @@
+{
+  "domain": "sync",
+  "inert": {
+    "sync.enable.signal": "an abort signal; cancellation is a P1b scenario on the virtual clock",
+    "sync.recover.signal": "an abort signal; cancellation is a P1b scenario on the virtual clock"
+  },
+  "scenarios": [
+    {
+      "id": "sync.enable/authority-base",
+      "row": "sync.enable",
+      "kind": "effect",
+      "input": {
+        "onCode": "$callback",
+        "confirm": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.enable"
+        }
+      ]
+    },
+    {
+      "id": "sync.recover/authority-base",
+      "row": "sync.recover",
+      "kind": "effect",
+      "input": {
+        "confirm": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.recover"
+        }
+      ]
+    },
+    {
+      "id": "sync.status/account-read-refuses-connector",
+      "row": "sync.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.status/account-read-refuses-service",
+      "row": "sync.status",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.enable/phrase-refuses-connector",
+      "row": "sync.enable",
+      "input": {
+        "onCode": "$callback",
+        "confirm": "$callback"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.enable/phrase-refuses-session",
+      "row": "sync.enable",
+      "input": {
+        "onCode": "$callback",
+        "confirm": "$callback"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.enable/phrase-refuses-service",
+      "row": "sync.enable",
+      "input": {
+        "onCode": "$callback",
+        "confirm": "$callback"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.recover/phrase-refuses-connector",
+      "row": "sync.recover",
+      "input": {
+        "confirm": "$callback"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.recover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.recover/phrase-refuses-session",
+      "row": "sync.recover",
+      "input": {
+        "confirm": "$callback"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.recover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.recover/phrase-refuses-service",
+      "row": "sync.recover",
+      "input": {
+        "confirm": "$callback"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.recover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/sync-change-refuses-connector",
+      "row": "sync.approve",
+      "input": {
+        "confirmCode": "x-confirmCode"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/sync-change-refuses-session",
+      "row": "sync.approve",
+      "input": {
+        "confirmCode": "x-confirmCode"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.approve/sync-change-refuses-service",
+      "row": "sync.approve",
+      "input": {
+        "confirmCode": "x-confirmCode"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.approve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.disable/sync-change-refuses-connector",
+      "row": "sync.disable",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.disable/sync-change-refuses-session",
+      "row": "sync.disable",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.disable/sync-change-refuses-service",
+      "row": "sync.disable",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sync.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.retirePin/sync-change-refuses-connector",
+      "row": "sync.retirePin",
+      "input": {
+        "account": "x-account"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.retirePin/sync-change-refuses-session",
+      "row": "sync.retirePin",
+      "input": {
+        "account": "x-account"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "sync.retirePin/sync-change-refuses-service",
+      "row": "sync.retirePin",
+      "input": {
+        "account": "x-account"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

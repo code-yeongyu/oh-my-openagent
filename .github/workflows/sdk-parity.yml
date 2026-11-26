@@ -1,0 +1,65 @@
+name: SDK Parity
+
+# The omo SDK parity registry and the changed-capability gate of #14943 (design sections 6 and 7). Intended to become a
+# required check after one green day on dev.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  sdk-parity:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      # The pull request's own head, not GitHub's merge ref: the gate's digest is bound to the head a reviewer reads.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Registry, inventories, import family and negative controls
+        env:
+          SDK_PARITY_BASE: origin/${{ github.base_ref }}
+        run: bun test --timeout 20000 script/sdk-parity script/remote-import-guard.test.ts
+
+      - name: Changed-capability gate
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SDK_PARITY_PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun script/sdk-parity/gate-cli.ts --base "origin/$BASE_REF" --expect-head "$HEAD_SHA"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: SDK parity
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Checks the parity registry against the real dispatch of both editions, the tool registry and the baseline.
+            - Runs the scenarios on the merge base and the head; the gate report above lists failures and closure-only capabilities.
+          JOB_SUMMARY_NEXT: Fix the first failure the gate names; a closure-only change needs the body line SDK-Parity-Unchanged yes.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

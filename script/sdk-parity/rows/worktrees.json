@@ -1,0 +1,78 @@
+{
+  "domain": "worktrees",
+  "rows": [
+    {
+      "id": "worktrees.sweep",
+      "kind": "capability",
+      "sdk": "worktrees.sweep",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "apply": {
+            "type": "boolean"
+          },
+          "older_than_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "repos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "worktree-sweep"
+          ],
+          "flags": {
+            "--apply": "apply=true",
+            "--older-than": "older_than_days",
+            "--repo": "repos",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC2)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "position": 12,
+      "ids": [
+        "worktrees.sweep"
+      ],
+      "cells": [
+        "`worktrees.sweep({ apply?, older_than_days?, repos? })`: a plan unless `apply` is set, with today's refusals and deletion guard",
+        "`worktree-sweep [--apply] [--older-than <days>] [--repo <path>]... [--json]`",
+        "**no**",
+        "Planned (OC2)",
+        "OC2"
+      ]
+    }
+  ]
+}
