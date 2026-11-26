@@ -427,13 +427,16 @@ export function resolveOutputs(options) {
 
 export const omoSenpiBuildDefines = (version) => ({ OMO_SENPI_PACKAGE_VERSION: version, OMO_SENPI_BUNDLED: true })
 
-// The root SDK runtime's externals: node builtins, and the wake sidecar the root's thread core carries like the thread
-// SDK below (#14972). plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
-// Every SDK runtime file leaves node builtins, the wake sidecar the thread core carries (#14972) and every OTHER SDK
-// runtime file of the table external, lazy or not, so no file inlines another (slice P1c, #15031; review 6076881626).
+// The base externals of every SDK runtime file: node builtins, the wake sidecar the thread core carries like the thread SDK
+// below (#14972), and the thread client sidecar, which the thread core loads on its first host operation (P1b size
+// ruling: an external file takes bytes out, a dynamic import inside a file does not). The plugin manifest maps both to
+// their shipped extensions. plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
+const OMO_SDK_EXTERNALS = [...sdkExternalSpecifiers, "#omo-wake-runtime", "#omo-thread-client-runtime"]
+
+// Every SDK runtime file also leaves every OTHER SDK runtime file of the table external, lazy or not, so no file inlines
+// another (slice P1c, #15031; review 6076881626).
 export const runtimeFileExternals = (row, table = SDK_RUNTIME_FILES) => [
-  ...sdkExternalSpecifiers,
-  "#omo-wake-runtime",
+  ...OMO_SDK_EXTERNALS,
   ...table.filter((other) => other !== row).map((other) => other.specifier),
 ]
 

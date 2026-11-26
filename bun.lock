@@ -75,7 +75,7 @@
         "jsonc-parser": "^3.3.1",
         "knip": "6.43.0",
         "node-pty": "^1.1.0",
-        "omowright": "^0.3.4",
+        "omowright": "^0.3.10",
         "oxc-parser": "0.148.0",
         "oxlint": "1.89.0",
         "picocolors": "^1.1.1",
@@ -85,18 +85,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.83",
-        "oh-my-opencode-darwin-x64": "5.1.83",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.83",
-        "oh-my-opencode-linux-arm64": "5.1.83",
-        "oh-my-opencode-linux-arm64-musl": "5.1.83",
-        "oh-my-opencode-linux-x64": "5.1.83",
-        "oh-my-opencode-linux-x64-baseline": "5.1.83",
-        "oh-my-opencode-linux-x64-musl": "5.1.83",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.83",
-        "oh-my-opencode-windows-arm64": "5.1.83",
-        "oh-my-opencode-windows-x64": "5.1.83",
-        "oh-my-opencode-windows-x64-baseline": "5.1.83",
+        "oh-my-opencode-darwin-arm64": "5.1.84",
+        "oh-my-opencode-darwin-x64": "5.1.84",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.84",
+        "oh-my-opencode-linux-arm64": "5.1.84",
+        "oh-my-opencode-linux-arm64-musl": "5.1.84",
+        "oh-my-opencode-linux-x64": "5.1.84",
+        "oh-my-opencode-linux-x64-baseline": "5.1.84",
+        "oh-my-opencode-linux-x64-musl": "5.1.84",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.84",
+        "oh-my-opencode-windows-arm64": "5.1.84",
+        "oh-my-opencode-windows-x64": "5.1.84",
+        "oh-my-opencode-windows-x64-baseline": "5.1.84",
       },
     },
     "packages/agents-md-core": {
@@ -222,7 +222,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.83",
+      "version": "5.1.84",
       "dependencies": {
         "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -322,7 +322,7 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.83",
+      "version": "5.1.84",
       "bin": {
         "omo": "bin/omo.js",
       },
@@ -369,7 +369,7 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.83",
+      "version": "5.1.84",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.23",
@@ -1875,7 +1875,7 @@
 
     "omo-ai": ["omo-ai@workspace:packages/omo-native"],
 
-    "omowright": ["omowright@0.3.4", "", { "dependencies": { "ws": "^8.23.0", "zod": "^4.6.7" }, "bin": { "omowright-cloak": "dist/bin/omowright-cloak.js" } }, "sha512-Un2qcPtVbWfYIgaXVHlVAyCl8AEhNEltoGxPAA9HE7X2QYRJVX2Ex+0DGWRsle1qBpNrGT3RL0fTtNXAGRmMkw=="],
+    "omowright": ["omowright@0.3.10", "", { "dependencies": { "ws": "^8.23.0", "zod": "^4.6.7" }, "bin": { "omowright-cloak": "dist/bin/omowright-cloak.js" } }, "sha512-/mY4xr9JE2BVcwIT2MONr5sAWaBnQcnANvu5yfGSeOeHK9a0FhPneybvuMMnOq+7fKCBBDFibuqz+wfJ3/tRdQ=="],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 

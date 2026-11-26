@@ -171,6 +171,22 @@ def main() -> int:
 - For concurrency gates, use `anyio.CapacityLimiter` (not `asyncio.Semaphore`).
 - Load `async-anyio.md` when writing async code for the full pattern library.
 
+### Thread and process pools
+
+- I/O-bound blocking calls go to `ThreadPoolExecutor`, CPU-bound work to `ProcessPoolExecutor`. Open both with `with`, so workers are joined on exit, and always pass `max_workers`.
+- In async code, never block the loop: `await anyio.to_thread.run_sync(fn, *args, limiter=limiter)` for I/O, `anyio.to_process.run_sync` for CPU, fanned out through a task group.
+- Bound every wait: `future.result(timeout=...)` or `anyio.fail_after(...)`. A timed-out thread keeps running; only a process can be killed, so anything that must be cancellable runs in a process.
+- Process pools pickle their work: pass module-level functions and plain data, guard the entry point with `if __name__ == "__main__":`, and create the pool with `mp_context=multiprocessing.get_context("spawn")`. Forking a threaded process deadlocks, and macOS already defaults to `spawn`.
+
+```python
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+
+with ProcessPoolExecutor(max_workers=4, mp_context=multiprocessing.get_context("spawn")) as pool:
+    futures = {pool.submit(render, page): page for page in pages}
+    results = {futures[done]: done.result(timeout=60) for done in as_completed(futures)}
+```
+
 ### Data modeling — which container, when
 
 All model fields carry type annotations. No `Any`, no untyped dicts in public APIs.

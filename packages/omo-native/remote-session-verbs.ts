@@ -20,8 +20,7 @@ import {
 import { randomUUID } from "node:crypto"
 import { userInfo } from "node:os"
 import { join } from "node:path"
-import { createGatewayStore } from "../omo-senpi/src/components/thread/gateway/store"
-import { storeWorkerAnchor } from "../omo-senpi/src/components/thread/gateway/store-worker-sidecar"
+import { createGatewayStore, storeWorkerAnchor } from "../omo-senpi/src/components/thread/gateway/store"
 import { resolveProvenance } from "../omo-senpi/src/components/thread/gateway/provenance-resolver"
 import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/relay-transport"
 import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/components/thread/gateway/engine"
@@ -38,7 +37,15 @@ import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/com
 import { followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { candidateLines, personNextAction, sendWaitNotice, sessionVerbLines } from "./remote-render"
+import {
+  personNextAction,
+  refusalLines,
+  sendWaitNotice,
+  sessionEndedLine,
+  sessionVerbLines,
+  undeliveredPromptLines,
+} from "./remote-render"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { localPermissionPreset } from "./remote-permission-preset"
 import { STDIN_TEXT, type SessionArgs } from "./remote-session-args"
 
@@ -179,12 +186,10 @@ async function runSessionOn(
       )
     if (result.kind === "error") {
       if (!json && label !== "" && NO_SUCH_SESSION.has(String(result.error.details?.["reason"]))) {
-        dependencies.error(`omo remote: no session ${label} on this account.`)
+        dependencies.error(escapeForDisplay(`omo remote: no session ${label} on this account.`))
         dependencies.error("Run omo remote sessions to see them.")
       } else if (!json) {
-        dependencies.error(`omo remote: ${result.error.message}`)
-        dependencies.error(personNextAction(result.error.next_action))
-        for (const line of candidateLines(result.error)) dependencies.error(line)
+        for (const line of refusalLines(result.error)) dependencies.error(line)
       }
       return REMOTE_EXIT.failed
     }
@@ -242,7 +247,7 @@ async function openOn(
     mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
-    dependencies.error(error.message)
+    dependencies.error(escapeForDisplay(error.message))
     return REMOTE_EXIT.usage
   }
   // One open through the shared create path (#13409): the model and thinking level are the engine's launch profile on the
@@ -283,8 +288,7 @@ async function openOn(
   else {
     for (const line of sessionVerbLines("open", "", opened)) dependencies.output(line)
     if (sent.kind === "error") {
-      dependencies.error(`omo remote: opened ${label}, but its first prompt was not delivered: ${sent.error.message}`)
-      dependencies.error(`${sent.error.next_action} Send it again with omo remote send ${label} <text>.`)
+      for (const line of undeliveredPromptLines(label, sent.error)) dependencies.error(line)
     }
   }
   return sent.kind === "error" ? REMOTE_EXIT.failed : REMOTE_EXIT.ok
@@ -393,7 +397,7 @@ async function sendTo(
   const deliver = () => delivery.deliver(row, label, args.text, args.delivery, clientMessageId)
   const nothingToSteer = (result: ThreadToolResult): number | undefined => {
     if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
-    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+    dependencies.error(escapeForDisplay(`omo remote: nothing is running on ${label} to steer.`))
     dependencies.error("Send without --steer to start a turn.")
     return REMOTE_EXIT.failed
   }
@@ -427,7 +431,7 @@ async function sendTo(
     // A send that waits behind a running turn says so at once (#13268); under --json the notice rides the final
     // JSON value instead of stderr, so one JSON value always carries it (#13425).
     const waitNotice = sendWaitNotice(label, sent)
-    if (waitNotice !== null && !json) dependencies.error(waitNotice)
+    if (waitNotice !== null && !json) dependencies.error(escapeForDisplay(waitNotice))
     // #13425: the settle wait is bounded (--timeout seconds, default 120); a turn that never settles answers a
     // typed timeout instead of hanging the person at this terminal.
     const waitMs = args.timeout_seconds !== undefined ? args.timeout_seconds * 1000 : 120_000
@@ -458,18 +462,20 @@ async function sendTo(
         )
       else
         dependencies.error(
-          `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+          escapeForDisplay(
+            `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+          ),
         )
       return REMOTE_EXIT.failed
     }
     if (end === "interrupted") {
-      dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
+      dependencies.error(escapeForDisplay(`omo remote: the turn on ${label} was interrupted before it finished.`))
       return REMOTE_EXIT.failed
     }
     if (end !== "settled") {
       if (json)
         dependencies.output(JSON.stringify(named({ ...sent, kind: "session_ended", end, ...queuedNoticeField })))
-      else dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
+      else dependencies.error(sessionEndedLine(row.device, String(end)))
       return REMOTE_EXIT.failed
     }
     return REMOTE_EXIT.ok

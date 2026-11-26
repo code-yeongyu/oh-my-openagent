@@ -63,6 +63,22 @@ const importBuilt = (path) => import(pathToFileURL(path).href)
 const packageRoot = fileURLToPath(new URL("../..", import.meta.url))
 const packageVersion = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version
 
+// Runs a probe as a plain node script (`--input-type=module -e`) or as a bun process, the way an eval cell runs one.
+const runProbe = async (runtime, probe) => {
+  const child = spawn(runtime, runtime === "node" ? ["--input-type=module", "-e", probe] : ["-e", probe], {
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+  let stdout = ""
+  let stderr = ""
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk
+  })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk
+  })
+  const exitCode = await new Promise((resolve) => child.once("close", resolve))
+  return { exitCode, stderr: unexpectedStderr(stderr), stdout: stdout.trim() }
+}
 // #13965: the cold builds run once as setup, bounded by their progress and CPU use, not this hook's outer bound.
 beforeAll(() => fixture.warmBuilds({ reproduction: false }), BUILD_HOOK_OUTER_BOUND_MS)
 afterEach(fixture.cleanupTest)
@@ -417,14 +433,15 @@ describe("thread SDK runtime", () => {
   })
 
   test("#given the built SDK two levels below the extensions directory #when plain node opens it #then the store runs on the emitted worker sidecar", async () => {
-    // given: the plugin layout, runtime/thread-sdk/sdk.js beside extensions/gateway-store-worker.mjs
+    // given: the plugin layout, runtime/thread-sdk/sdk.js beside the extensions directory and under the plugin manifest,
+    // whose imports map the thread client sidecar the SDK's thread core loads on its first host operation (P1b)
     const outputs = await sharedOutputs()
     const plugin = await mkdtemp(join(tmpdir(), "omo-thread-sdk-built-"))
     perTestRoots.push(plugin)
     await mkdir(join(plugin, "runtime", "thread-sdk"), { recursive: true })
-    await mkdir(join(plugin, "extensions"), { recursive: true })
+    await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
     await cp(outputs.threadSdkOutputPath, join(plugin, "runtime", "thread-sdk", "sdk.js"))
-    await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
+    await cp(dirname(outputs.gatewayStoreWorkerOutputPath), join(plugin, "extensions"), { recursive: true })
     const agentDir = join(plugin, "agent")
     // A thread no host serves, known from its session file: a send to it is stored queued_offline by the worker.
     const sessionsDir = join(agentDir, "sessions", "--probe--")
@@ -462,26 +479,115 @@ describe("thread SDK runtime", () => {
       "console.log(JSON.stringify({ sent: sent.kind === 'ok' ? sent.delivery.kind : sent.error.code, missing: code(missing), unreached: code(unreached), principal: sdk.principal }))",
     ].join("\n")
 
-    // when: a connector script run inline, whose `--input-type` the store worker must not inherit
-    const child = spawn("node", ["--input-type=module", "-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
-    let stdout = ""
-    let stderr = ""
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk
-    })
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk
-    })
-    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+    // when: a connector script run inline (node, whose `--input-type` the store worker must not inherit) and a bun process
+    const answers = await Promise.all(["node", process.execPath].map((runtime) => runProbe(runtime, probe)))
 
     // then
-    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
-    expect(JSON.parse(stdout.trim())).toEqual({
-      sent: "queued_offline",
-      missing: "not_found",
-      unreached: "host_unavailable",
-      principal: "cli:501",
-    })
+    for (const answer of answers) {
+      expect({ exitCode: answer.exitCode, stderr: answer.stderr }).toEqual({ exitCode: 0, stderr: "" })
+      expect(JSON.parse(answer.stdout)).toEqual({
+        sent: "queued_offline",
+        missing: "not_found",
+        unreached: "host_unavailable",
+        principal: "cli:501",
+      })
+    }
+  })
+
+  // P1b size ruling: the thread SDK's thread core loads the thread client from the shipped sidecar. Every member is
+  // called once; a member that needs the client and cannot load it answers the fixed internal_error, never a throw.
+  const threadSdkProbe = (sdkPath, agentDir, extra) =>
+    [
+      `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(sdkPath).href)})`,
+      `const sdk = createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined })`,
+      "const settle = async (run) => { try { const answer = await run(); return answer?.kind === 'error' ? { code: answer.error.code, message: answer.error.message } : { kind: answer?.kind, answer: JSON.stringify(answer) } } catch (error) { return { threw: String(error) } } }",
+      // One valid input per member, so each call gets past its own argument check to the host it needs.
+      "const inputs = { list: { all_scope: true }, read: { thread: 'dur-off', all_scope: true }, send: { thread: 'dur-off', text: 'ping', all_scope: true }, locate: { thread: 'dur-off', all_scope: true }, create: {}, rename: { thread: 'dur-off', name: 'probe' }, set_model: { thread: 'dur-off', provider: 'p', model: 'm' }, extensionCall: { name: 'probe.ext', op: 'ping', args: {} }, registerStoreExtension: {} }",
+      "const members = Object.keys(sdk).filter((key) => typeof sdk[key] === 'function' && key !== 'dispose').sort()",
+      "const answers = {}",
+      "for (const key of members) answers[key] = await settle(() => sdk[key](inputs[key] ?? { thread: 'dur-off' }))",
+      ...extra,
+      "await sdk.dispose()",
+    ].join("\n")
+  const threadClientRefusal = "The thread client of this omo install could not be loaded."
+  const expectTyped = (answers) => {
+    expect(Object.entries(answers).filter(([, outcome]) => "threw" in outcome)).toEqual([])
+    expect(
+      Object.entries(answers).filter(([, outcome]) =>
+        /omo-thread-client|#omo-|\/|\\/.test(outcome.message ?? outcome.answer ?? ""),
+      ),
+    ).toEqual([])
+    const refused = Object.entries(answers).filter(([, outcome]) => outcome.code === "internal_error")
+    expect(refused.filter(([, outcome]) => outcome.message !== threadClientRefusal)).toEqual([])
+    // Every member that reaches a host; the store-only members (extensions, warmDaemon) and release answer their own way.
+    expect(refused.map(([key]) => key).sort()).toEqual([
+      "close",
+      "create",
+      "interrupt",
+      "list",
+      "locate",
+      "read",
+      "rename",
+      "send",
+      "set_model",
+    ])
+  }
+
+  test("#given only the thread SDK file and the store worker, copied out of the plugin #when every member runs #then each answers typed and none throws", async () => {
+    // given: no manifest maps the client alias and no client file is beside them
+    const outputs = await sharedOutputs()
+    const dir = await mkdtemp(join(tmpdir(), "omo-thread-sdk-loose-"))
+    perTestRoots.push(dir)
+    await mkdir(join(dir, "runtime", "thread-sdk"), { recursive: true })
+    await mkdir(join(dir, "extensions"), { recursive: true })
+    await cp(outputs.threadSdkOutputPath, join(dir, "runtime", "thread-sdk", "sdk.js"))
+    await cp(outputs.gatewayStoreWorkerOutputPath, join(dir, "extensions", "gateway-store-worker.mjs"))
+    const probe = threadSdkProbe(join(dir, "runtime", "thread-sdk", "sdk.js"), join(dir, "agent"), [
+      "console.log(JSON.stringify(answers))",
+    ])
+
+    // when
+    const answer = await runProbe("node", probe)
+
+    // then
+    expect({ exitCode: answer.exitCode, stderr: answer.stderr }).toEqual({ exitCode: 0, stderr: "" })
+    expectTyped(JSON.parse(answer.stdout))
+  })
+
+  test("#given the installed layout without the thread client #when every thread SDK member runs #then each answers typed with fixed text, and the client is loaded once it is back", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const plugin = await mkdtemp(join(tmpdir(), "omo-thread-sdk-no-client-"))
+    perTestRoots.push(plugin)
+    await mkdir(join(plugin, "runtime", "thread-sdk"), { recursive: true })
+    await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
+    await cp(outputs.threadSdkOutputPath, join(plugin, "runtime", "thread-sdk", "sdk.js"))
+    await cp(dirname(outputs.gatewayStoreWorkerOutputPath), join(plugin, "extensions"), { recursive: true })
+    const agentDir = join(plugin, "agent")
+    const sessionsDir = join(agentDir, "sessions", "--probe--")
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(
+      join(sessionsDir, "epoch_dur-off.jsonl"),
+      `${JSON.stringify({ type: "session", id: "dur-off", cwd: process.cwd(), timestamp: "2026-10-02T00:00:00Z" })}\n`,
+    )
+    const client = join(plugin, "extensions", "omo-thread-client.js")
+    await cp(client, `${client}.saved`)
+    await rm(client)
+    const probe = threadSdkProbe(join(plugin, "runtime", "thread-sdk", "sdk.js"), agentDir, [
+      `const { copyFileSync } = await import("node:fs")`,
+      `copyFileSync(${JSON.stringify(`${client}.saved`)}, ${JSON.stringify(client)})`,
+      "const back = await sdk.send({ thread: 'dur-off', text: 'ping', all_scope: true })",
+      "console.log(JSON.stringify({ answers, back: back.kind === 'ok' ? back.delivery.kind : back.error.code }))",
+    ])
+
+    // when
+    const answer = await runProbe("node", probe)
+
+    // then: a failed load is not kept, so the restored file is loaded by the same SDK instance
+    expect({ exitCode: answer.exitCode, stderr: answer.stderr }).toEqual({ exitCode: 0, stderr: "" })
+    const { answers, back } = JSON.parse(answer.stdout)
+    expectTyped(answers)
+    expect(back).toBe("queued_offline")
   })
 
   test("#given the built extension without the thread SDK #when freshness is checked #then it reports that output missing", async () => {
@@ -569,6 +675,124 @@ describe("omo SDK runtime", () => {
     expect(JSON.parse(stdout.trim())).toEqual({ code: "not_found", refusal: "extension_unknown_name" })
   })
 
+  // P1b size ruling: the root's thread core loads the thread client from the shipped sidecar (#omo-thread-client-runtime,
+  // extensions/omo-thread-client.js) instead of carrying it. The installed layout is the plugin manifest (its imports map
+  // the alias), runtime/omo-sdk/sdk.js and the extensions directory.
+  const installedRoot = async (prefix) => {
+    const outputs = await sharedOutputs()
+    const plugin = await mkdtemp(join(tmpdir(), prefix))
+    perTestRoots.push(plugin)
+    await mkdir(join(plugin, "runtime", "omo-sdk"), { recursive: true })
+    await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
+    await cp(sdkFile(outputs, "root"), join(plugin, "runtime", "omo-sdk", "sdk.js"))
+    await cp(sdkFile(outputs, "threads"), join(plugin, "runtime", "omo-sdk", "threads.js"))
+    await cp(dirname(outputs.threadClientOutputPath), join(plugin, "extensions"), { recursive: true })
+    const agentDir = join(plugin, "agent")
+    // A thread no host serves, known from its session file: a send to it is stored queued_offline, through the client.
+    const sessionsDir = join(agentDir, "sessions", "--probe--")
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(
+      join(sessionsDir, "epoch_dur-off.jsonl"),
+      `${JSON.stringify({ type: "session", id: "dur-off", cwd: plugin, timestamp: "2026-10-02T00:00:00Z" })}\n`,
+    )
+    return { plugin, agentDir, client: join(plugin, "extensions", "omo-thread-client.js") }
+  }
+  const openRoot = (plugin, agentDir) =>
+    [
+      `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
+      `const root = createOmoSdk({ env: { HOME: ${JSON.stringify(plugin)} }, cwd: ${JSON.stringify(plugin)}, home: ${JSON.stringify(plugin)}, agentDir: ${JSON.stringify(agentDir)} })`,
+    ].join("\n")
+
+  test("#given the installed layout #when a plain node script and a bun process send through the root #then the root loads the shipped thread client and the send is stored", async () => {
+    // given
+    const { plugin, agentDir } = await installedRoot("omo-sdk-thread-client-")
+    const probe = [
+      openRoot(plugin, agentDir),
+      "const sent = await root.threads.send({ thread: 'dur-off', message: 'ping', all_scope: true })",
+      "await root.dispose()",
+      "console.log(JSON.stringify(sent.kind === 'ok' ? { delivery: sent.delivery.kind } : { code: sent.error.code }))",
+    ].join("\n")
+
+    // when: node runs it as a script; bun runs it as an eval cell's process does
+    const answers = await Promise.all(["node", process.execPath].map((runtime) => runProbe(runtime, probe)))
+
+    // then
+    for (const answer of answers) {
+      expect({ exitCode: answer.exitCode, stderr: answer.stderr }).toEqual({ exitCode: 0, stderr: "" })
+      expect(JSON.parse(answer.stdout)).toEqual({ delivery: "queued_offline" })
+    }
+  })
+
+  test("#given the installed layout without the thread client #when every root thread call runs #then each answers a typed refusal with fixed text, and the client is loaded once it is back", async () => {
+    // given: one input per threads.* call, built from its schema's required fields
+    const { ROOT_CALLS } = await import("../../src/components/omo-sdk/contract/calls.ts")
+    const { ROOT_CALL_ANSWERS } = await import("../../src/components/omo-sdk/contract/call-answers.ts")
+    const valueOf = (schema) =>
+      schema?.type === "boolean"
+        ? false
+        : schema?.type === "number" || schema?.type === "integer"
+          ? 1
+          : schema?.type === "object"
+            ? {}
+            : schema?.type === "array"
+              ? []
+              : "dur-off"
+    const calls = Object.keys(ROOT_CALL_ANSWERS)
+      .filter((key) => key.startsWith("threads."))
+      .map((key) => {
+        const input = ROOT_CALLS[key].input
+        const fields = Object.fromEntries(
+          (input.required ?? []).map((field) => [field, valueOf(input.properties?.[field])]),
+        )
+        return { key, input: fields, stream: ROOT_CALL_ANSWERS[key] === "stream" }
+      })
+    const { plugin, agentDir, client } = await installedRoot("omo-sdk-no-thread-client-")
+    const saved = `${client}.saved`
+    await cp(client, saved)
+    await rm(client)
+    const probe = [
+      openRoot(plugin, agentDir),
+      `const calls = ${JSON.stringify(calls)}`,
+      "const at = (key) => key.split('.').reduce((node, part) => node[part], root)",
+      "const settle = async ({ key, input, stream }) => {",
+      "  try {",
+      "    const answer = at(key)(input)",
+      "    if (stream) { for await (const event of answer) if (event.kind === 'end') return event.failure ? { code: event.failure.code, message: event.failure.message } : { kind: 'end' }; return { kind: 'no_end' } }",
+      "    const settled = await answer",
+      "    return settled.kind === 'error' ? { code: settled.error.code, message: settled.error.message } : { kind: settled.kind }",
+      "  } catch (error) { return { threw: String(error) } }",
+      "}",
+      "const absent = {}",
+      "for (const call of calls) absent[call.key] = await settle(call)",
+      `const { copyFileSync } = await import('node:fs')`,
+      `copyFileSync(${JSON.stringify(saved)}, ${JSON.stringify(client)})`,
+      "const back = await root.threads.send({ thread: 'dur-off', message: 'ping', all_scope: true })",
+      "await root.dispose()",
+      "console.log(JSON.stringify({ absent, back: back.kind === 'ok' ? back.delivery.kind : back.error.code }))",
+    ].join("\n")
+
+    // when
+    const answer = await runProbe("node", probe)
+
+    // then: nothing throws, nothing names a path or the specifier, and every call that needs the client answers the
+    // fixed internal_error; a failed load is not kept, so the restored file is loaded by the same root
+    expect({ exitCode: answer.exitCode, stderr: answer.stderr }).toEqual({ exitCode: 0, stderr: "" })
+    const { absent, back } = JSON.parse(answer.stdout)
+    expect(Object.keys(absent).sort()).toEqual(calls.map(({ key }) => key).sort())
+    expect(Object.entries(absent).filter(([, outcome]) => "threw" in outcome)).toEqual([])
+    expect(
+      Object.entries(absent).filter(([, outcome]) => /omo-thread-client|#omo-|\/|\\/.test(outcome.message ?? "")),
+    ).toEqual([])
+    const refused = Object.entries(absent).filter(([, outcome]) => outcome.code === "internal_error")
+    expect(
+      refused.every(([, outcome]) => outcome.message === "The thread client of this omo install could not be loaded."),
+    ).toBe(true)
+    expect(refused.map(([key]) => key)).toEqual(
+      expect.arrayContaining(["threads.list", "threads.read", "threads.send"]),
+    )
+    expect(back).toBe("queued_offline")
+  })
+
   // Slice P1c (#15031): the thread core ships in its own file beside the root, resolved through the plugin manifest's
   // import map, so a source-layout test proves nothing about it; these run the shipped files in a plugin layout, in a
   // directory whose parent holds a manifest that maps the same specifiers elsewhere (security review 6075906719, L3).
@@ -580,8 +804,8 @@ describe("omo SDK runtime", () => {
     await cp(sdkFile(outputs, "root"), join(plugin, "runtime", "omo-sdk", "sdk.js"))
     await cp(threadsFile, join(plugin, "runtime", "omo-sdk", "threads.js"))
     await cp(fileURLToPath(new URL("../package.json", import.meta.url)), join(plugin, "package.json"))
-    await mkdir(join(plugin, "extensions"), { recursive: true })
-    await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
+    // The thread core loads the thread client from the shipped extensions (P1b size ruling).
+    await cp(dirname(outputs.threadClientOutputPath), join(plugin, "extensions"), { recursive: true })
     await writeFile(join(parent, "decoy.mjs"), "throw new Error('the decoy above the package was loaded')\n")
     await writeFile(
       join(parent, "package.json"),
