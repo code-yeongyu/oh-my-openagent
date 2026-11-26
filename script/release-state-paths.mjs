@@ -32,13 +32,16 @@ const VERSION_STAMPED_PATHS = [
 // stale or hand-edited copy fails there. extensions/*.js|mjs and these runtime files: senpi-compatibility (ubuntu-latest)
 // "Verify committed Senpi plugin bundle is current" (build-extension.mjs --check). runtime/dag/ is not compared there.
 // install-local.mjs: script/codex-install-bundle-freshness.test.ts. service-auth.generated.js:
-// script/build-service-auth.test.ts "the native auth bundle matches its source" (test, ubuntu-latest).
+// script/build-service-auth.test.ts "the native auth bundle matches its source" (test, ubuntu-latest). remote-sdk.generated.js:
+// script/build-remote-sdk.test.ts "the bundle and its declarations match their source" (test, ubuntu-latest); its declaration
+// tree carries no version, so a stamp never changes it.
 const LINUX_VERIFIED_GENERATED_PATHS = [
   /^packages\/omo-senpi\/plugin\/extensions\/[^/]+\.m?js$/,
   /^packages\/omo-senpi\/plugin\/runtime\/(?:agent-toolkit-sdk|bunshin-ts|omo-sdk|thread-sdk)\/sdk\.js$/,
   /^packages\/omo-senpi\/plugin\/runtime\/rollback-migrate\.js$/,
   /^packages\/omo-codex\/scripts\/install-dist\/install-local\.mjs$/,
   /^packages\/omo-native\/bin\/lib\/service-auth\.generated\.js$/,
+  /^packages\/omo-native\/bin\/lib\/remote-sdk\.generated\.js$/,
 ]
 
 const matches = (patterns, path) => patterns.some((pattern) => pattern.test(path))
