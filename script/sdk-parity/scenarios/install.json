@@ -1,0 +1,1821 @@
+{
+  "domain": "install",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "install.setup.detect/scans-without-writing",
+      "row": "install.setup.detect",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/plans-without-writing",
+      "row": "install.setup.plan",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        },
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/all-consents-once",
+      "row": "install.setup.apply",
+      "kind": "effect",
+      "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": []
+          },
+          "stages": [
+            {
+              "id": "import-credentials",
+              "description": "import API credentials"
+            }
+          ]
+        },
+        "consent": "all"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<agent-dir>/auth.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/given-plan-applies-its-stages",
+      "row": "install.setup.apply",
+      "kind": "effect",
+      "input": {
+        "consent": "all",
+        "plan": {
+          "inventory": {
+            "harnesses": []
+          },
+          "stages": [
+            {
+              "id": "import-credentials",
+              "description": "import"
+            }
+          ]
+        }
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          },
+          "count": 0
+        },
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<agent-dir>/auth.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<agent-dir>/models.json"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/plan-not-a-setup-plan",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "consent": "all",
+        "plan": {
+          "stages": "all"
+        }
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/each-asks-per-stage",
+      "row": "install.setup.apply",
+      "kind": "effect",
+      "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": []
+          },
+          "stages": [
+            {
+              "id": "import-credentials",
+              "description": "import API credentials"
+            }
+          ]
+        },
+        "consent": "each"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 2
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<agent-dir>/auth.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.setup.apply/unknown-consent",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "consent": "some"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/installs-channel-target",
+      "row": "install.update",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.update/dry-run-prints-only",
+      "row": "install.update",
+      "kind": "effect",
+      "input": {
+        "dry_run": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/registry-unconfirmed-versioned",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "service_unreachable",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.update/dry-run-not-boolean",
+      "row": "install.update",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "dry_run": "yes"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.version/reads-omo-and-engine-versions",
+      "row": "install.version",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<senpi>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.sdkRoot/reads-package-root",
+      "row": "install.sdkRoot",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/interactive-prompts",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": true,
+        "skip_auth": true
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read"
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/non-interactive-no-providers",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasClaude": false,
+              "hasGemini": false,
+              "hasCopilot": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/claude-max20",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "max20",
+        "gemini": "no",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasClaude": true,
+              "isMax20": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/claude-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "yes",
+        "gemini": "no",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasClaude": true,
+              "isMax20": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/openai-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "openai": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasOpenAI": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/gemini-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "yes",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasGemini": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/copilot-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasCopilot": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencode-zen-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "opencodeZen": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasOpencodeZen": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/zai-coding-plan-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "zaiCodingPlan": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasZaiCodingPlan": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/kimi-for-coding-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "kimiForCoding": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasKimiForCoding": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencode-go-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "opencodeGo": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasOpencodeGo": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/bailian-coding-plan-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "bailianCodingPlan": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasBailianCodingPlan": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/minimax-cn-coding-plan-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "minimaxCnCodingPlan": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasMinimaxCnCodingPlan": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/minimax-coding-plan-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "minimaxCodingPlan": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasMinimaxCodingPlan": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/vercel-ai-gateway-yes",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "vercelAiGateway": "yes"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasVercelAiGateway": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/platform-codex-writes-codex-only",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "platform": "codex"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.codex/config.toml"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/auth-hints-unless-skipped",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": false,
+        "claude": "yes",
+        "gemini": "no",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasClaude": true
+            }
+          }
+        },
+        {
+          "port": "terminal",
+          "op": "write",
+          "args": {
+            "box": "Authenticate Your Providers"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/non-interactive-missing-claude",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "gemini": "no",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/non-interactive-missing-gemini",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "copilot": "no"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/non-interactive-missing-copilot",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/non-interactive-no-flags",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "interactive": false,
+        "skip_auth": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/codex-with-provider-flag",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "platform": "codex",
+        "claude": "yes"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/native-dev-not-enabled",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "platform": "native-dev"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/missing-skip-auth",
+      "row": "install.plugin",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "interactive": false
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/codex-default-home",
+      "row": "install.cleanup",
+      "kind": "effect",
+      "input": {
+        "platform": "codex"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.codex/config.toml"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "args": {
+            "path": "~/.codex/plugins/omo"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<project>/.codex/config.toml"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/codex-home-override",
+      "row": "install.cleanup",
+      "kind": "effect",
+      "input": {
+        "platform": "codex",
+        "codex_home": "/alt/codex"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "/alt/codex/config.toml"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "args": {
+            "path": "/alt/codex/plugins/omo"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<project>/.codex/config.toml"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/project-repairs-local-config",
+      "row": "install.cleanup",
+      "kind": "effect",
+      "input": {
+        "platform": "codex",
+        "project": "/work/project"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.codex/config.toml"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "args": {
+            "path": "~/.codex/plugins/omo"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "/work/project/.codex/config.toml"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/no-platform",
+      "row": "install.cleanup",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/platform-not-codex",
+      "row": "install.cleanup",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "platform": "opencode"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/unknown-platform",
+      "row": "install.cleanup",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "platform": "vim"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.localVersion/cwd-config",
+      "row": "install.localVersion",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.localVersion/directory-config",
+      "row": "install.localVersion",
+      "kind": "effect",
+      "input": {
+        "directory": "/work/project"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/work/project/.opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.localVersion/empty-directory",
+      "row": "install.localVersion",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "directory": ""
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/platform-opencode",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "platform": "opencode"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.codex/config.toml"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/platform-both",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "platform": "both"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.codex/config.toml"
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/platform-native",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "platform": "native"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "omo"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          },
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.codex/config.toml"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/openai-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "openai": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasOpenAI": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencodezen-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "opencodeZen": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasOpencodeZen": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/zaicodingplan-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "zaiCodingPlan": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasZaiCodingPlan": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/kimiforcoding-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "kimiForCoding": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasKimiForCoding": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/opencodego-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "opencodeGo": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasOpencodeGo": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/bailiancodingplan-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "bailianCodingPlan": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasBailianCodingPlan": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/minimaxcncodingplan-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "minimaxCnCodingPlan": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasMinimaxCnCodingPlan": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/minimaxcodingplan-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "minimaxCodingPlan": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasMinimaxCodingPlan": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.plugin/vercelaigateway-no",
+      "row": "install.plugin",
+      "kind": "effect",
+      "input": {
+        "interactive": false,
+        "skip_auth": true,
+        "claude": "no",
+        "gemini": "no",
+        "copilot": "no",
+        "vercelAiGateway": "no"
+      },
+      "expect": [
+        {
+          "port": "terminal",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc",
+            "generated_from": {
+              "hasVercelAiGateway": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "install.cleanup/platform-both",
+      "row": "install.cleanup",
+      "kind": "refusal",
+      "input": {
+        "platform": "both"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ],
+      "refusal": "unsupported"
+    },
+    {
+      "id": "install.cleanup/platform-native",
+      "row": "install.cleanup",
+      "kind": "refusal",
+      "input": {
+        "platform": "native"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ],
+      "refusal": "unsupported"
+    },
+    {
+      "id": "install.cleanup/platform-native-dev",
+      "row": "install.cleanup",
+      "kind": "refusal",
+      "input": {
+        "platform": "native-dev"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ],
+      "refusal": "unsupported"
+    }
+  ]
+}

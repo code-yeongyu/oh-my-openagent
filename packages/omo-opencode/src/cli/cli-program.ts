@@ -241,4 +241,6 @@ export function runCli(): void {
   program.parse()
 }
 
+export { program as cliProgram }
+
 export { openCodeServiceAuthHooks }

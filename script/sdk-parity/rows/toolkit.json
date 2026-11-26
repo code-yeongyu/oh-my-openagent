@@ -1,0 +1,983 @@
+{
+  "domain": "toolkit",
+  "rows": [
+    {
+      "id": "toolkit.addGoal",
+      "kind": "capability",
+      "sdk": "toolkit.addGoal",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "successCriteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "scenario",
+                "expectedEvidence"
+              ],
+              "properties": {
+                "scenario": {
+                  "type": "string"
+                },
+                "expectedEvidence": {
+                  "type": "string"
+                },
+                "userModel": {
+                  "enum": [
+                    "happy",
+                    "edge",
+                    "regression",
+                    "adversarial"
+                  ]
+                },
+                "essential": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "title",
+          "objective"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "add-goal"
+          ],
+          "flags": {
+            "--title": "title",
+            "--objective": "objective",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.checkpoint",
+      "kind": "capability",
+      "sdk": "toolkit.checkpoint",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "goalId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "failed",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "codexGoalJson": {
+            "type": "string"
+          },
+          "qualityGateJson": {
+            "type": "string"
+          },
+          "printTemplate": {
+            "enum": [
+              true
+            ]
+          },
+          "advance": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "goalId",
+          "status",
+          "evidence"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "checkpoint"
+          ],
+          "flags": {
+            "--print-template": "printTemplate=true",
+            "--goal-id": "goalId",
+            "--goal": "goalId",
+            "--status": "status",
+            "--evidence": "evidence",
+            "--codex-goal-json": "codexGoalJson",
+            "--quality-gate-json": "qualityGateJson",
+            "--no-advance": "advance=false",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "advance is filled by --no-advance and is missing from the component manifest; the gap stays in the baseline (amendment 2, D3)."
+    },
+    {
+      "id": "toolkit.completeGoals",
+      "kind": "capability",
+      "sdk": "toolkit.completeGoals",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "retryFailed": {
+            "type": "boolean"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "complete-goals"
+          ],
+          "flags": {
+            "--retry-failed": "retryFailed=true",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.createGoals",
+      "kind": "capability",
+      "sdk": "toolkit.createGoals",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "brief": {
+            "type": "string"
+          },
+          "codexGoalMode": {
+            "enum": [
+              "aggregate",
+              "per_story"
+            ]
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "validationBatchesJson": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "brief"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "create-goals"
+          ],
+          "flags": {
+            "--brief": "brief",
+            "--brief-file": "brief",
+            "--from-stdin": "parse",
+            "--codex-goal-mode": "codexGoalMode",
+            "--validation-batch-json": "validationBatchesJson",
+            "--force": "force=true",
+            "--after-json": "parse",
+            "--directive-json": "parse",
+            "--directive-file": "parse",
+            "--target-goal-id": "parse",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {
+            "brief": "brief"
+          },
+          "values": [],
+          "parseOnly": {
+            "--after-json": "its value is removed from the positional brief; nothing reads it",
+            "--directive-json": "its value is removed from the positional brief; nothing reads it",
+            "--directive-file": "its value is removed from the positional brief; nothing reads it",
+            "--target-goal-id": "its value is removed from the positional brief; nothing reads it",
+            "--from-stdin": "the adapter reads the brief from standard input; the call takes brief as text"
+          }
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.criteria",
+      "kind": "capability",
+      "sdk": "toolkit.criteria",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "goalId": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "goalId"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "criteria"
+          ],
+          "flags": {
+            "--goal-id": "goalId",
+            "--goal": "goalId",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.forSession",
+      "kind": "capability",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "cwd"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {
+        "cli": "OC2"
+      },
+      "omitted": {
+        "tool": "Tool omitted: the binding is the shared input of the loop operations, not an operation"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.help",
+      "kind": "capability",
+      "sdk": "toolkit.help",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "help"
+          ],
+          "flags": {
+            "--json": "render",
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "ulw-loop"
+          ],
+          "flags": {},
+          "positionals": {
+            "args": "process"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "pure": true,
+      "pureReason": "answers its usage text from the build, with no child process and no port"
+    },
+    {
+      "id": "toolkit.recordEvidence",
+      "kind": "capability",
+      "sdk": "toolkit.recordEvidence",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "goalId": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "goalId",
+          "criterionId",
+          "status",
+          "evidence"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "record-evidence"
+          ],
+          "flags": {
+            "--goal-id": "goalId",
+            "--goal": "goalId",
+            "--criterion-id": "criterionId",
+            "--status": "status",
+            "--evidence": "evidence",
+            "--notes": "notes",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.recordReviewBlockers",
+      "kind": "capability",
+      "sdk": "toolkit.recordReviewBlockers",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "goalId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "codexGoalJson": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "goalId",
+          "title",
+          "objective",
+          "evidence"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "record-review-blockers"
+          ],
+          "flags": {
+            "--goal-id": "goalId",
+            "--goal": "goalId",
+            "--title": "title",
+            "--objective": "objective",
+            "--evidence": "evidence",
+            "--codex-goal-json": "codexGoalJson",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.status",
+      "kind": "capability",
+      "sdk": "toolkit.status",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "status"
+          ],
+          "flags": {
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.steer",
+      "kind": "capability",
+      "sdk": "toolkit.steer",
+      "today": "partial",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "add_subgoal",
+              "split_subgoal",
+              "reorder_pending",
+              "revise_pending_wording",
+              "revise_criterion",
+              "annotate_ledger",
+              "mark_blocked_superseded"
+            ]
+          },
+          "source": {
+            "enum": [
+              "finding",
+              "user_prompt_submit",
+              "cli"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "goalId": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "expectedEvidence": {
+            "type": "string"
+          },
+          "userModel": {
+            "enum": [
+              "happy",
+              "edge",
+              "regression",
+              "adversarial"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "childGoals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "title",
+                "objective"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "objective": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "revisedTitle": {
+            "type": "string"
+          },
+          "revisedObjective": {
+            "type": "string"
+          },
+          "pendingOrder": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blockedReason": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "proposals": {},
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "source",
+          "evidence",
+          "rationale"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "ulw-loop",
+            "steer"
+          ],
+          "flags": {
+            "--kind": "kind",
+            "--source": "source",
+            "--evidence": "evidence",
+            "--rationale": "rationale",
+            "--proposals-json": "proposals",
+            "--goal-id": "goalId",
+            "--goal": "goalId",
+            "--criterion-id": "criterionId",
+            "--scenario": "scenario",
+            "--expected-evidence": "expectedEvidence",
+            "--user-model": "userModel",
+            "--title": "title",
+            "--objective": "objective",
+            "--children": "childGoals",
+            "--replacements": "childGoals",
+            "--order": "pendingOrder",
+            "--idempotency-key": "idempotencyKey",
+            "--json": "render",
+            "--help": "render",
+            "-h": "render",
+            "--session-id": "session_id"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the loop's agent surface is that edition's plugin hooks, outside the three surfaces of #14943"
+      },
+      "projection": {
+        "session_id": "toolkit.forSession({ cwd, session_id })"
+      },
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "kind": "pointer",
+      "position": 10,
+      "ids": [
+        "toolkit.help",
+        "toolkit.createGoals",
+        "toolkit.status",
+        "toolkit.completeGoals",
+        "toolkit.checkpoint",
+        "toolkit.steer",
+        "toolkit.addGoal",
+        "toolkit.criteria",
+        "toolkit.recordEvidence",
+        "toolkit.recordReviewBlockers"
+      ],
+      "cells": [
+        "The loop's ten operations and five hook entries, enumerated in the table below",
+        "`ulw-loop [args...]`, which starts a separately installed component's CLI as a child with the arguments unchanged (`C/runtime-commands.ts:99-107`, `C/codex-ulw-loop.ts:31-73`)",
+        "partial: see below",
+        "Planned (OC2)",
+        "OC2"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 1,
+      "ids": [
+        "toolkit.help"
+      ],
+      "cells": [
+        "`help`",
+        "`toolkit.help()`",
+        "partial: in the component's SDK, not on the root"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 2,
+      "ids": [
+        "toolkit.createGoals"
+      ],
+      "cells": [
+        "`create-goals [--brief \\| --brief-file \\| --from-stdin \\| positional text] [--codex-goal-mode aggregate\\|per_story] [--validation-batch-json] [--force]`",
+        "`createGoals({ brief, codexGoalMode?, validationBatchesJson?, force? })`. The brief has four sources that all fill the one `brief` field, taken in this order: `--brief`, then the file of `--brief-file`, then stdin with `--from-stdin`, then the positional words not consumed by a flag, joined by spaces. A brief that is empty after that is refused `ULW_LOOP_BRIEF_REQUIRED` (`cli-subcommands.ts:29-41`, `cli-arg-parser.ts:44-54`). The order and the refusal are the descriptor's parse, pinned by scenarios. The parser also accepts `--after-json`, `--directive-json`, `--directive-file` and `--target-goal-id` (`cli-arg-parser.ts:8`) only to keep their values out of the positional brief; nothing reads them. They are adapter parse flags with no SDK input and the written reason \"its value is removed from the positional brief; nothing reads it\", with one scenario that shows the brief excludes the value",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 3,
+      "ids": [
+        "toolkit.status"
+      ],
+      "cells": [
+        "`status`",
+        "`toolkit.status()`",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 4,
+      "ids": [
+        "toolkit.completeGoals"
+      ],
+      "cells": [
+        "`complete-goals [--retry-failed]`",
+        "`toolkit.completeGoals({ retryFailed? })`",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 5,
+      "ids": [
+        "toolkit.criteria"
+      ],
+      "cells": [
+        "`criteria --goal-id`",
+        "`toolkit.criteria(...)`",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 6,
+      "ids": [
+        "toolkit.recordEvidence"
+      ],
+      "cells": [
+        "`record-evidence --goal-id --criterion-id --status pass\\|fail\\|blocked --evidence [--notes]`",
+        "`toolkit.recordEvidence(...)`",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 7,
+      "ids": [
+        "toolkit.checkpoint"
+      ],
+      "cells": [
+        "`checkpoint --print-template [--goal-id]`; `checkpoint --goal-id --status complete\\|failed\\|blocked --evidence --codex-goal-json [--quality-gate-json] [--no-advance]`",
+        "`toolkit.checkpoint(...)`, two branches. The second branch takes `advance?`, which `--no-advance` sets to false (`checkpoint-continuation.ts:51`); the component's manifest does not carry it in the checkpoint arguments today, so it is an entry of the baseline",
+        "same, without `advance`"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 8,
+      "ids": [
+        "toolkit.steer"
+      ],
+      "cells": [
+        "`steer --kind <kind> --evidence --rationale [--proposals-json]`, with the flags each of the seven kinds requires (`cli-steering.ts:84-90`)",
+        "`toolkit.steer(...)`, one branch per kind",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 9,
+      "ids": [
+        "toolkit.addGoal"
+      ],
+      "cells": [
+        "`add-goal --title --objective`",
+        "`toolkit.addGoal(...)`",
+        "same"
+      ]
+    },
+    {
+      "table": "6.11-loop",
+      "position": 10,
+      "ids": [
+        "toolkit.recordReviewBlockers"
+      ],
+      "cells": [
+        "`record-review-blockers --goal-id --title --objective --evidence --codex-goal-json`",
+        "`toolkit.recordReviewBlockers(...)`",
+        "same"
+      ]
+    }
+  ]
+}
