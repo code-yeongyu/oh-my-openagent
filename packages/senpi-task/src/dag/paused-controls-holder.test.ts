@@ -13,6 +13,7 @@ import { applyPausedDagGuidance, cancelPausedDagNode, guidePausedDag } from "./p
 import type { DagSchedulerOptions } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const THIS_HOST = 101
@@ -52,7 +53,11 @@ function stoppedRun(lease: number, atLock: number) {
   const stopped: DagRunRecordV1 = { ...paused, pause: { reason: "user_stop", pauseSeq: 2 } }
   base.writeCheckpoint(runId, stopped)
   const plain = { store: base, taskManager: new LongRunningTaskManager(), hostPid: THIS_HOST, initialRecord: stopped }
-  const guidance = guidePausedDag({ ...plain, isProcessAlive: () => false }, runId, "first")
+  const guidance = guidePausedDag(
+    { reservations: createDagRunReservations(), ...plain, isProcessAlive: () => false },
+    runId,
+    "first",
+  )
   const eventsBefore = base.readEvents(runId, 0, { limit: 500 }).events.length
   let locks = 0
   const store: DagFileStore = {
@@ -67,6 +72,7 @@ function stoppedRun(lease: number, atLock: number) {
   }
   const current = base.readCheckpoint<DagRunRecordV1>(runId) ?? stopped
   const options: DagSchedulerOptions = {
+    reservations: createDagRunReservations(),
     ...plain,
     store,
     initialRecord: current,

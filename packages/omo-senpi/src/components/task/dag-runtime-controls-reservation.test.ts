@@ -74,7 +74,7 @@ describe("DAG runtime amend overlapping a recovery sweep", () => {
     const isProcessAlive = (pid: number): boolean => pid === process.pid
     const controls = createDagRuntimeControls({
       coreManager: gatedManager,
-      schedulerOptions: { store, taskManager, isProcessAlive },
+      schedulerOptions: { reservations: reservations, store, taskManager, isProcessAlive },
       schedulers,
       holdsRun,
       reservations,

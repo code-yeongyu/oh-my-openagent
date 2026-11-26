@@ -13,6 +13,7 @@ import { LongRunningTaskManager, node, pausedRecord } from "../../../../senpi-ta
 import { createDagRecovery } from "../../../../senpi-task/src/dag/recovery"
 import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
 import { createDagRunPauseSource } from "./dag-run-pause-source"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-reservations"
 import { FOREIGN_HOST_PID } from "./dag-runtime-recovery.test-support"
 
 const cleanupRoots: string[] = []
@@ -45,7 +46,13 @@ function session(holder: { alive: boolean }) {
   const source = createDagRunPauseSource({
     barrier: new AdmissionBarrier(),
     records: () => runs.map((record) => store.readCheckpoint<DagRunRecordV1>(record.runId) ?? record),
-    options: (record) => ({ store, taskManager, isProcessAlive, initialRecord: record }),
+    options: (record) => ({
+      reservations: createDagRunReservations(),
+      store,
+      taskManager,
+      isProcessAlive,
+      initialRecord: record,
+    }),
     retire: async () => undefined,
     prepareResume: () => undefined,
     recovery,

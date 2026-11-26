@@ -13,6 +13,7 @@ import { retryDagNodes } from "./node-retry"
 import { liveForeignHolder } from "./run-lease"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const THIS_HOST = 101
@@ -124,6 +125,7 @@ describe("DAG amendment under the one holder rule", () => {
     try {
       retryDagNodes(
         {
+          reservations: createDagRunReservations(),
           store: run.store,
           taskManager: run.taskManager,
           hostPid: THIS_HOST,

@@ -71,7 +71,7 @@ describe("DAG scheduler registry acquisition of a pending run", () => {
       const registry = createDagSchedulerRegistry({
         schedulers,
         store,
-        schedulerOptions: { store, taskManager, isProcessAlive },
+        schedulerOptions: { reservations: createDagRunReservations(), store, taskManager, isProcessAlive },
         logger: quietLogger,
         isProcessAlive,
         reservations: createDagRunReservations(),

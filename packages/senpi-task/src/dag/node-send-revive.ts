@@ -140,12 +140,11 @@ export async function watchRevivedTask(options: DagSchedulerOptions, nodeId: Dag
     settled = { error }
   }
   const runId = options.initialRecord.runId
-  const hold =
-    options.reservations === undefined ? undefined : await reserveWhenFree(options.reservations, runId, "revive fold")
+  const hold = await reserveWhenFree(options.reservations, runId, "revive fold")
   try {
     foldRevived(options, nodeId, taskId, settled)
   } finally {
-    hold?.release()
+    hold.release()
   }
 }
 

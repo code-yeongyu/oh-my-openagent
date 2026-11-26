@@ -54,7 +54,7 @@ describe("DAG scheduler registry lease across a shutdown retirement", () => {
     const registry = createDagSchedulerRegistry({
       schedulers,
       store,
-      schedulerOptions: { store, taskManager, isProcessAlive },
+      schedulerOptions: { reservations: createDagRunReservations(), store, taskManager, isProcessAlive },
       logger: quietLogger,
       isProcessAlive,
       reservations: createDagRunReservations(),

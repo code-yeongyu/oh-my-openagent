@@ -23,7 +23,13 @@ describe("DAG cancel of a failed run with a revived node (current behaviour, pin
     const isProcessAlive = (pid: number): boolean => pid === THIS_HOST
     const cancelRun = createDagRunCancel({
       store: run.base,
-      schedulerOptions: { store: run.base, taskManager: run.manager, hostPid: THIS_HOST, isProcessAlive },
+      schedulerOptions: {
+        reservations: run.reservations,
+        store: run.base,
+        taskManager: run.manager,
+        hostPid: THIS_HOST,
+        isProcessAlive,
+      },
       schedulers: new Map(),
       reservations: run.reservations,
       holders: { taskManager: run.manager, hostPid: THIS_HOST, isProcessAlive },

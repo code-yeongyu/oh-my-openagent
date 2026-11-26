@@ -157,6 +157,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     // Control verbs judge a lease by the same probe recovery and the registry use.
     isProcessAlive,
+    // Required: every revive watcher a scheduler or verb of this runtime arms waits on this registry.
+    reservations,
   }
 
   const subscribe = (runId: DagRunId, listener: (event: DagRunEvent) => void): (() => void) => {

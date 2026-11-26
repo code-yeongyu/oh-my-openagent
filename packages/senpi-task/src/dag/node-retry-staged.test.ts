@@ -10,6 +10,7 @@ import { LongRunningTaskManager, node, pausedRecord, runId } from "./__fixtures_
 import { createDagJournal } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import { retryDagNodes } from "./node-retry"
+import { createDagRunReservations } from "./run-reservations"
 import { applyDagSchedulerEvent, type DagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagNodeId } from "./types"
@@ -33,7 +34,12 @@ describe("DAG retry staged on a user-stopped run", () => {
     )
     const stopped: DagRunRecordV1 = { ...paused, pause: { reason: "user_stop", pauseSeq: 1 } }
     store.writeCheckpoint(runId, stopped)
-    const options = { store, taskManager: new LongRunningTaskManager(), initialRecord: stopped }
+    const options = {
+      store,
+      taskManager: new LongRunningTaskManager(),
+      initialRecord: stopped,
+      reservations: createDagRunReservations(),
+    }
 
     // when
     const staged: DagScheduler[] = []

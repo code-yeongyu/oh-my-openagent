@@ -67,7 +67,7 @@ describe("DAG user Stop holds each run's reservation", () => {
     const isProcessAlive = (pid: number): boolean => pid === process.pid
     const controls = createDagRuntimeControls({
       coreManager: createDagManager({ store }),
-      schedulerOptions: { store, taskManager, isProcessAlive },
+      schedulerOptions: { reservations: reservations, store, taskManager, isProcessAlive },
       schedulers,
       reservations,
       holdsRun: (id) => schedulers.get(id)?.running !== undefined,
@@ -80,7 +80,7 @@ describe("DAG user Stop holds each run's reservation", () => {
     const source = createDagRunPauseSource({
       barrier: new AdmissionBarrier(),
       records: () => runs.map((run) => store.readCheckpoint<DagRunRecordV1>(run.runId) ?? run),
-      options: (record) => ({ store, taskManager, isProcessAlive, initialRecord: record }),
+      options: (record) => ({ reservations: reservations, store, taskManager, isProcessAlive, initialRecord: record }),
       retire: createStopRetirement({ schedulers, reservations, stoppedAdmissions: new Set() }),
       prepareResume: () => undefined,
       recovery: createDagRecovery({ store, taskManager }),
