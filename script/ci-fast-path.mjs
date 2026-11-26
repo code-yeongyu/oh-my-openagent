@@ -42,6 +42,8 @@ const platformSensitivePrefixes = [
   "packages/omo-codex/src/install/",
   "packages/omo-native/",
   "packages/omo-codex/scripts/install-",
+  // Native process readers: win32 (kernel32) and darwin (libproc) branches that Linux CI never runs.
+  "packages/senpi-task/src/platform/",
   "script/qa/desktop/macos/",
   "script/qa/desktop/windows/",
 ]
