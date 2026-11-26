@@ -471,7 +471,9 @@ async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json> {
   if (started.label !== MEDIUM_LABEL)
     throw new Error(`the helper started with label ${str(started.label)}, not Medium (${MEDIUM_LABEL})`)
   return waitFile(out, 60_000, { started: `${out}.started`, alive: pidAlive }).catch((e: Error) => {
-    throw new Error(mediumFailure(e.message, started, existsSync(log) ? clean(readFileSync(log, "utf8")).slice(-400) : ""))
+    throw new Error(
+      mediumFailure(e.message, started, existsSync(log) ? clean(readFileSync(log, "utf8")).slice(-400) : ""),
+    )
   })
 }
 const MEDIUM_LABEL = "S-1-16-8192"
@@ -483,7 +485,9 @@ function mediumFailure(why: string, started: Json, said: string): string {
   const code = started.exitedWithin3s
   const text = started.exitText ? ` (${str(started.exitText)})` : ""
   const exit =
-    typeof code === "number" ? `; exited within 3 s with 0x${(code >>> 0).toString(16).toUpperCase().padStart(8, "0")}${text}` : ""
+    typeof code === "number"
+      ? `; exited within 3 s with 0x${(code >>> 0).toString(16).toUpperCase().padStart(8, "0")}${text}`
+      : ""
   return `${why}${exit}${said ? `; helper output: ${said}` : "; no helper output"}`
 }
 
@@ -1526,7 +1530,10 @@ const CITE_RULES: ReadonlyArray<readonly [RegExp, Cite]> = [
   [/^n-affinity-/, D(393, "cover-window oracle reads > 0 -> hide_ack")],
   [
     /^n-uipi-postmessage$/,
-    D(151, "windows above the engine's integrity RID: UIPI drops input; the posted route is refused, ERROR_ACCESS_DENIED"),
+    D(
+      151,
+      "windows above the engine's integrity RID: UIPI drops input; the posted route is refused, ERROR_ACCESS_DENIED",
+    ),
   ],
   [/^n-uipi-/, D(151, "windows above the engine's integrity RID: UIPI drops input silently")],
   [
@@ -2542,22 +2549,35 @@ const LOGIC_CHECKS: readonly Check[] = [
       const legs = psCode(source("sp-n-legs-delivery.ps1")).join("\n")
       const wheelLeg = legs.slice(legs.indexOf("function Leg-wheel("))
       const settled = wheelLeg.slice(wheelLeg.indexOf("if ($a.mode -eq 'settled') {"), wheelLeg.indexOf("} else {"))
-      const move = settled.search(/SetCursorPos\(\$px \+ \d+, \$py \+ \d+\); \[void\]\[SpN\]::SetCursorPos\(\$px, \$py\)/)
+      const move = settled.search(
+        /SetCursorPos\(\$px \+ \d+, \$py \+ \d+\); \[void\]\[SpN\]::SetCursorPos\(\$px, \$py\)/,
+      )
       const m0 = settled.indexOf("$m0 = MoveCount $a.state")
       const wait = settled.search(/if \(\(MoveCount \$a\.state\) -gt \$m0\) \{ \$hover = \$true; break \}/)
       const before = settled.indexOf("$before = WheelCount $a.state")
       if (m0 < 0 || move < m0 || wait < move || before < wait)
         bad.push("the settled control does not move off and back and wait for the box's move before the wheel")
-      if (!/if \(-not \$hover\) \{ \$notHover\+\+ \}/.test(settled)) bad.push("a wheel without the hover proof is not counted")
-      if (!/notUnderCursorAtWheel = \$notHover/.test(wheelLeg)) bad.push("Leg-wheel does not emit notUnderCursorAtWheel")
+      if (!/if \(-not \$hover\) \{ \$notHover\+\+ \}/.test(settled))
+        bad.push("a wheel without the hover proof is not counted")
+      if (!/notUnderCursorAtWheel = \$notHover/.test(wheelLeg))
+        bad.push("Leg-wheel does not emit notUnderCursorAtWheel")
       const target = psCode(source("sp-n-target.ps1")).join("\n")
-      if (!/\$box\.Add_MouseMove\(\{ \$script:moves\+\+; Write-State/.test(target)) bad.push("the edit target counts no mouse moves")
+      if (!/\$box\.Add_MouseMove\(\{ \$script:moves\+\+; Write-State/.test(target))
+        bad.push("the edit target counts no mouse moves")
       if (!/moves = \$script:moves/.test(target)) bad.push("the edit target's state has no move counter")
-      if (!/notHover: num\(j\.notUnderCursorAtWheel\)/.test(source("probe-sp-n.ts"))) bad.push("the wheel tally drops the hover count")
-      const t = (d: number, notHover?: number): Tally => ({ delivered: d, runs: 6, acquire: "plain", notFg: 0, ...(notHover === undefined ? {} : { notHover }) })
+      if (!/notHover: num\(j\.notUnderCursorAtWheel\)/.test(source("probe-sp-n.ts")))
+        bad.push("the wheel tally drops the hover count")
+      const t = (d: number, notHover?: number): Tally => ({
+        delivered: d,
+        runs: 6,
+        acquire: "plain",
+        notFg: 0,
+        ...(notHover === undefined ? {} : { notHover }),
+      })
       const ctl = wheelResults(t(4, 2), t(9), t(3))["n-wheel-control-settled"] as Result
       if (!ctl.measured.includes("not under the cursor at the wheel 2/6")) bad.push(`control text: ${ctl.measured}`)
-      if (JSON.stringify(parseControl(ctl.measured)) !== "[[4,6]]") bad.push(`control text no longer parses: ${ctl.measured}`)
+      if (JSON.stringify(parseControl(ctl.measured)) !== "[[4,6]]")
+        bad.push(`control text no longer parses: ${ctl.measured}`)
       return bad.length ? bad.join("; ") : undefined
     },
   },
@@ -2570,11 +2590,14 @@ const LOGIC_CHECKS: readonly Check[] = [
       const self = source("probe-sp-n.ts").replace(/\r\n?/g, "\n")
       const fn = self.slice(self.indexOf("async function medium("), self.indexOf("const MEDIUM_LABEL"))
       if (/runas/.test(fn.replace(/^\s*\/\/.*$/gm, ""))) bad.push("medium() still starts the helper through runas")
-      if (!/await leg\(ctx, "start-medium", \{ command: psCommand\(/.test(fn)) bad.push("medium() does not use the start-medium leg")
-      if (!/if \(started\.label !== MEDIUM_LABEL\)\s*throw /.test(fn)) bad.push("medium() does not refuse a label other than Medium")
+      if (!/await leg\(ctx, "start-medium", \{ command: psCommand\(/.test(fn))
+        bad.push("medium() does not use the start-medium leg")
+      if (!/if \(started\.label !== MEDIUM_LABEL\)\s*throw /.test(fn))
+        bad.push("medium() does not refuse a label other than Medium")
       if (!/const MEDIUM_LABEL = "S-1-16-8192"/.test(self)) bad.push("MEDIUM_LABEL is not S-1-16-8192")
       if (/runas/.test(ELEVATED)) bad.push("the elevated rows' condition still names runas")
-      if (!/foreach \(\$f in [^)]*'medium'\)/.test(source("sp-n.ps1"))) bad.push("sp-n.ps1 does not compile sp-n-native-medium.ps1")
+      if (!/foreach \(\$f in [^)]*'medium'\)/.test(source("sp-n.ps1")))
+        bad.push("sp-n.ps1 does not compile sp-n-native-medium.ps1")
       if (!/function Leg-start-medium\(\$a\) \{ Emit \(\[SpN\]::StartMedium\(/.test(source("sp-n-legs-delivery.ps1")))
         bad.push("no start-medium leg")
       // lowering only: a restricted copy of the run's own token, labelled Medium, and nothing else
@@ -2590,21 +2613,34 @@ const LOGIC_CHECKS: readonly Check[] = [
       )
       if (banned) bad.push(`sp-n-native-medium.ps1 calls ${[...new Set(banned)].join(",")}`)
       const labels = [...new Set(code.match(/S-1-16-\d+/g) ?? [])]
-      if (labels.join() !== "S-1-16-8192") bad.push(`integrity labels named: ${labels.join(",") || "none"}, want only S-1-16-8192`)
+      if (labels.join() !== "S-1-16-8192")
+        bad.push(`integrity labels named: ${labels.join(",") || "none"}, want only S-1-16-8192`)
       const sets = code.replace(/"[^"\n]*"/g, '""').match(/SetTokenInformation\([^)]*\)/g) ?? []
       // the label, and (run 45856172603: the elevated default DACL left the helper unable to open itself, 0xC0000142)
       // the copy's default owner and DACL naming the run's own user and SYSTEM only
       const calls = sets.filter((s) => !s.startsWith("SetTokenInformation(IntPtr token,"))
-      const classes = calls.map((s) => /^SetTokenInformation\(lowered, (TokenIntegrityLevel|TokenOwner|TokenDefaultDacl),/.exec(s)?.[1])
+      const classes = calls.map(
+        (s) => /^SetTokenInformation\(lowered, (TokenIntegrityLevel|TokenOwner|TokenDefaultDacl),/.exec(s)?.[1],
+      )
       if (sets.length - calls.length !== 2 || classes.join() !== "TokenIntegrityLevel,TokenOwner,TokenDefaultDacl")
-        bad.push(`SetTokenInformation sets other than the lowered copy's label, owner and default DACL: ${sets.join(" | ")}`)
+        bad.push(
+          `SetTokenInformation sets other than the lowered copy's label, owner and default DACL: ${sets.join(" | ")}`,
+        )
       if (!/string sddl = "D:\(A;;GA;;;" \+ Marshal\.PtrToStringUni\(text\) \+ "\)\(A;;GA;;;SY\)";/.test(code))
         bad.push("the default DACL does not grant exactly the run's user and SYSTEM")
-      if (!/SetTokenInformation\(lowered, TokenOwner, ref userSid,/.test(code) || !/GetTokenInformation\(own, TokenUser,/.test(code))
+      if (
+        !/SetTokenInformation\(lowered, TokenOwner, ref userSid,/.test(code) ||
+        !/GetTokenInformation\(own, TokenUser,/.test(code)
+      )
         bad.push("the default owner is not the run's own user")
-      if (!/throw Failed\("SetTokenInformation\(TokenIntegrityLevel\)"\);\n\s+UserOwnsDefaults\(own, lowered\);/.test(code))
+      if (
+        !/throw Failed\("SetTokenInformation\(TokenIntegrityLevel\)"\);\n\s+UserOwnsDefaults\(own, lowered\);/.test(
+          code,
+        )
+      )
         bad.push("StartMedium does not give the lowered copy its user's owner and DACL before the start")
-      if (!/CreateRestrictedToken\(own, LUA_TOKEN,/.test(code)) bad.push("the helper token is not a LUA restricted copy of the run's own token")
+      if (!/CreateRestrictedToken\(own, LUA_TOKEN,/.test(code))
+        bad.push("the helper token is not a LUA restricted copy of the run's own token")
       if (!/OpenProcessToken\(GetCurrentProcess\(\),/.test(code)) bad.push("the token is not this process's own")
       if (!/h\["label"\] = LabelOf\(pi\.hProcess\)/.test(code)) bad.push("the started process's label is not read back")
       return bad.length ? bad.join("; ") : undefined
@@ -2617,7 +2653,11 @@ const LOGIC_CHECKS: readonly Check[] = [
     async run() {
       const bad: string[] = []
       const why = "uipi.medium.json: not written within 60 s; the helper never started (no start marker)"
-      const early = mediumFailure(why, { pid: 7, label: MEDIUM_LABEL, exitedWithin3s: 3221225794, exitText: "{DLL Initialization Failed}" }, "")
+      const early = mediumFailure(
+        why,
+        { pid: 7, label: MEDIUM_LABEL, exitedWithin3s: 3221225794, exitText: "{DLL Initialization Failed}" },
+        "",
+      )
       if (!early.startsWith(why)) bad.push(`the deadline reason is dropped: ${early}`)
       if (!early.includes("exited within 3 s with 0xC0000142 ({DLL Initialization Failed})"))
         bad.push(`an early exit does not read as its NTSTATUS in hex with its text: ${early}`)
@@ -2629,8 +2669,10 @@ const LOGIC_CHECKS: readonly Check[] = [
       if (!plain.includes("exited within 3 s with 0x00000001;")) bad.push(`a plain exit code reads: ${plain}`)
       const self = source("probe-sp-n.ts")
       const fn = self.slice(self.indexOf("async function medium("), self.indexOf("const MEDIUM_LABEL"))
-      if (!/throw new Error\(mediumFailure\(e\.message, started, /.test(fn)) bad.push("medium() does not report through mediumFailure")
-      if (!/h\["exitText"\] = /.test(source("sp-n-native-medium.ps1"))) bad.push("StartMedium does not read the exit status's text")
+      if (!/throw new Error\(mediumFailure\(e\.message, started, /.test(fn))
+        bad.push("medium() does not report through mediumFailure")
+      if (!/h\["exitText"\] = /.test(source("sp-n-native-medium.ps1")))
+        bad.push("StartMedium does not read the exit status's text")
       return bad.length ? bad.join("; ") : undefined
     },
   },
