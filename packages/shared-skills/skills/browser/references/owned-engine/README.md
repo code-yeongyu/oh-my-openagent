@@ -4,7 +4,9 @@ A browser **your code launches and owns**, driven over CDP by omowright with its
 opposite of the attached engine: no user logins, full control.
 
 ```js
+const { loadOmowright } = await import("<skill-root>/scripts/omowright.mjs")
 const { omowright } = await loadOmowright()
+const { mkdtempSync, rmSync } = await import("node:fs"), { tmpdir } = await import("node:os"), { join } = await import("node:path")
 const profile = mkdtempSync(join(tmpdir(), "omowright-"))
 const browser = await omowright.connectPipe({
   browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary,   // or omowright.findCloakBrowserPath(); never a guessed path

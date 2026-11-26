@@ -6,10 +6,11 @@ daemon's tool surface; options are the daemon's parameter names in camelCase.
 ## Sessions
 
 ```js
+// given: omowright (from the loader in SKILL.md)
 const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false, browser: "<instance id>", width: 1200, height: 800 })
 session.sessionId            // four letters, e.g. "ckhg"
 session.browserInstanceId    // which connected browser owns the Agent Window
-await session.stop()         // ALWAYS, on success and failure
+// the task's last cell, on success and failure: await session.stop()   (the examples below use this session)
 ```
 
 `browser` is needed only when more than one browser is connected (`bskDoctor()` lists them).
@@ -162,6 +163,7 @@ Traps:
 ## Tabs
 
 ```js
+// given: tabId, url, id (a tab id from tabs, the URL to open, the id tabCreate returned)
 const { tabs } = await session.tabList({ scope: "user" })   // "user" | "agent" | "all"
 await session.tabBorrow(tabId)                                // the user confirms in the browser (60 s)
 await session.tabReturn(tabId)                                // stop() returns anything still borrowed
@@ -173,8 +175,9 @@ Never invent tab ids and never repeat a denied borrow.
 ## Humans
 
 ```js
+const flag = `${(await import("node:os")).tmpdir()}/help-${Date.now()}.flag`
 await tool.monitor({ description: "help finished", path: flag, event: "create" })   // subscribe first
-globalThis.help = session.requestHelp({ prompt, title, targets: ["@e4"], completionCriteria, timeoutMs })
+globalThis.help = session.requestHelp({ prompt: "Please finish the sign-in, then continue.", targets: ["@e4"], timeoutMs: 300_000 })   // optional: title, completionCriteria
   .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))
 // outcome: "completed" | "continued" | "cancelled" | "timed_out" | "navigated" | "disabled"
 ```
