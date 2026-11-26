@@ -106,4 +106,30 @@ describe("a turn that ends on a note while its work is pending, before agent_idl
     // then
     expect(await h.handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "all green" })
   })
+
+  test("#given the process runner #when the child exits after the note's message_end but before agent_end #then the outcome is async_work_pending", async () => {
+    // given - the streamed note is the only text; no agent_end ever held an outcome
+    const h = processHarness()
+    h.emit(lifecycleRecord(DETACHED_CELL_WAITS))
+    h.emit(cleanTurnEnd(PROGRESS_NOTE)[0])
+
+    // when
+    h.child.emit("close", 0, null)
+
+    // then
+    expectAbandonedCell(await h.handle.waitForOutcome())
+  })
+
+  test("#given the shared-host runner #when the parent closes the session after the note's message_end but before agent_end #then the outcome is async_work_pending", async () => {
+    // given
+    const h = hostHarness()
+    h.emit(lifecycleRecord(DETACHED_CELL_WAITS))
+    h.emit(cleanTurnEnd(PROGRESS_NOTE)[0])
+
+    // when
+    await h.handle.close()
+
+    // then
+    expectAbandonedCell(await h.handle.waitForOutcome())
+  })
 })

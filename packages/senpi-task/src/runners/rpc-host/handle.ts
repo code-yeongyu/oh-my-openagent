@@ -198,7 +198,8 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     waiters.flushIdle()
     if (turnOutcome === undefined)
       settleTurn(
-        settlement.pending(intent === "terminated" ? "terminated" : undefined) ?? exitTurnOutcome(built, finalText),
+        settlement.pending(intent === "terminated" ? "terminated" : undefined) ??
+          exitTurnOutcome(built, finalText, tracking.evidence()),
       )
     settlement.cancelConfirmation()
     waiters.settleExit(built)
@@ -435,11 +436,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       if (state === undefined) return undefined
       return sessionIsIdle(state)
     },
-    waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+    waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText, tracking.evidence()),
     runPause: createRpcRunPause({
       taskId,
       claimNextTurn: claims.claim,
-      currentOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+      currentOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText, tracking.evidence()),
       control: () => {
         const wire = client.taskParentWire?.()
         if (wire === undefined) throw new TaskParentControlError("unsupported")

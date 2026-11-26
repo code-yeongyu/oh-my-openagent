@@ -1,5 +1,6 @@
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
+import type { PendingWorkEvidence } from "../pending-async-work"
 import { createTurnAsyncWork } from "./turn-async-work"
 import { createTurnSettlement, type TurnSettlement, type TurnSettlementInput } from "./turn-settlement"
 import { createTurnWakeSources } from "./turn-wake-sources"
@@ -11,6 +12,8 @@ export type TurnTracking = {
   readonly observe: (event: AgentSessionEvent) => void
   readonly observeState: (state: unknown) => void
   readonly resetTurn: () => void
+  // What the engine has said about the child's own async work, for a turn that ends for good (omo#10487).
+  readonly evidence: () => PendingWorkEvidence
 }
 
 /**
@@ -51,5 +54,6 @@ export function createTurnTracking(input: TurnTrackingInput): TurnTracking {
     },
     observeState: asyncWork.observeState,
     resetTurn: wakeSources.resetTurn,
+    evidence: asyncWork.evidence,
   }
 }

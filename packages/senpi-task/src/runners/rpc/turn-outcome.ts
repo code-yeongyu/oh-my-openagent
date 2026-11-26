@@ -2,6 +2,7 @@ import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
 import type { ChildExitOutcome } from "../types"
+import { finishedTurnOutcome, type PendingWorkEvidence } from "../pending-async-work"
 import { mapExitOutcomeToError } from "./exit-mapping"
 
 export function promptFailureOutcome(error: unknown): RunnerOutcome {
@@ -79,13 +80,19 @@ function replacementCause(event: unknown): RunnerOutcome | undefined {
   }
 }
 
-export function exitTurnOutcome(exit: ChildExitOutcome, finalText: string | undefined): RunnerOutcome {
+// `evidence`: the child's own async work as the engine last reported it. Text streamed while that work
+// was pending is a held note whose work ends with the session, never the result (omo#10487).
+export function exitTurnOutcome(
+  exit: ChildExitOutcome,
+  finalText: string | undefined,
+  evidence: PendingWorkEvidence,
+): RunnerOutcome {
   const processExit =
     exit.facts.pid !== undefined && exit.kind !== "spawn_error"
       ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
       : {}
   if (exit.kind === "clean" && finalText !== undefined && finalText.length > 0) {
-    return { status: "completed", finalResponse: finalText }
+    return finishedTurnOutcome(finalText, evidence)
   }
   if (exit.kind === "clean") {
     return {

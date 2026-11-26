@@ -1,10 +1,12 @@
-import { readLifecyclePendingWork, type PendingAsyncWork } from "../pending-async-work"
+import { readLifecyclePendingWork, type PendingAsyncWork, type PendingWorkEvidence } from "../pending-async-work"
 import type { TurnWakeSources } from "./turn-wake-sources"
 
 export type TurnAsyncWork = {
   readonly observe: (record: unknown) => void
   readonly observeState: (state: unknown) => void
   readonly pending: () => PendingAsyncWork | undefined
+  // What the engine has said about that work: `"unrecorded"` only when it never reported a lifecycle.
+  readonly evidence: () => PendingWorkEvidence
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -30,5 +32,9 @@ export function createTurnAsyncWork(wakeSources: TurnWakeSources): TurnAsyncWork
       if (isRecord(state)) take(state.lifecycle)
     },
     pending: () => (lifecycle === undefined ? wakeSources.pendingAsyncWork() : (lifecycle ?? undefined)),
+    evidence: () => {
+      const work = lifecycle === undefined ? wakeSources.pendingAsyncWork() : (lifecycle ?? undefined)
+      return work ?? (lifecycle === undefined ? "unrecorded" : "none-pending")
+    },
   }
 }

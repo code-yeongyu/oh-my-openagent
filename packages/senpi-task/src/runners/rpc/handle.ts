@@ -168,7 +168,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     flush(idleWaiters)
     if (turnOutcome === undefined)
       settleTurn(
-        settlement.pending(terminationRequested ? "terminated" : undefined) ?? exitTurnOutcome(built, finalText),
+        settlement.pending(terminationRequested ? "terminated" : undefined) ??
+          exitTurnOutcome(built, finalText, tracking.evidence()),
       )
     settlement.cancelConfirmation()
     for (const waiter of exitWaiters.splice(0)) {
@@ -231,7 +232,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       ? Promise.resolve(turnOutcome)
       : outcome === undefined
         ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
-        : Promise.resolve(exitTurnOutcome(outcome, finalText))
+        : Promise.resolve(exitTurnOutcome(outcome, finalText, tracking.evidence()))
   const control = createTaskParentControl({ width: 80, send: (command) => client.sendTaskParent(command) })
   const runPause = createRpcRunPause({
     taskId,
