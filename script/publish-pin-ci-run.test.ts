@@ -11,8 +11,8 @@ import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-o
 /**
  * Release contract (#15094): a pinned release owns the CI run its gate waits on. ci.yml keeps only the newest pending
  * push run per ref, so on dev a later merge can cancel the pin's push run before it starts. publish.yml's pin-ci job
- * admits the source first (read-only), then puts it on its own ref, refs/heads/release-ci/<sha>, dispatches ci.yml
- * there and records the run it got; unpin-ci removes the ref on every outcome. Executes the shipped steps against a
+ * admits the source first (read-only), then puts it on this attempt's own ref, release-ci/<sha>-<run id>-<attempt>,
+ * dispatches ci.yml there and records the run id the dispatch returned; unpin-ci cancels and removes them on every outcome. Executes the shipped steps against a
  * real git origin with `gh` stubbed.
  */
 
@@ -43,8 +43,8 @@ function stepRun(job: string, name: string): string {
   return run
 }
 
-// REF_AT: where refs/heads/release-ci/<sha> points ("" = absent). RUN_SEEN_AFTER: the runs listing shows run 77 only
-// from this read on. RUN_STATUS: what the run read in unpin-ci answers.
+// REF_POST: "lost" creates the ref but answers with an error, "fails" creates nothing. REF_READ: "error" answers HTTP 502.
+// DISPATCH: "no-id" answers without a run id. RUN_READ / CANCEL: "error" fails that call. RUN_STATUS: the run's status.
 const GH_STUB = [
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
@@ -52,15 +52,12 @@ const GH_STUB = [
   '  for argument in "$@"; do [ "$previous" = --jq ] && filter="$argument"; previous="$argument"; done',
   '  case "$*" in',
   '    *"/contents/.github/workflows/ci.yml?ref="*) cat "$CI_YML" ;;',
-  '    "api --method POST "*"/git/refs "*) [ -z "$REF_AT" ] && { printf "%s" "$SOURCE_SHA_LOWER" > "$STATE/ref"; return 0; }; return 1 ;;',
-  '    *"/git/ref/heads/release-ci/"*) local at="$REF_AT"; [ -f "$STATE/ref" ] && at=$(cat "$STATE/ref"); [ -f "$STATE/deleted" ] && at=""; [ -n "$at" ] || return 1; printf \'{"object":{"sha":"%s"}}\' "$at" | jq -r "$filter" ;;',
+  '    "api --method POST "*"/git/refs "*) [ "${REF_POST:-}" = fails ] && return 1; printf "%s" "$SOURCE_SHA_LOWER" > "$STATE/ref"; [ "${REF_POST:-}" != lost ] ;;',
+  '    *"/git/ref/heads/release-ci/"*) [ "${REF_READ:-}" = error ] && { echo "gh: Server Error (HTTP 502)"; return 1; }; { [ -f "$STATE/ref" ] && [ ! -f "$STATE/deleted" ]; } || { echo "gh: Not Found (HTTP 404)"; return 1; }; printf \'{"object":{"sha":"%s"}}\' "$(cat "$STATE/ref")" | jq -r "$filter" ;;',
   '    "api --method DELETE "*) touch "$STATE/deleted" ;;',
-  '    "workflow run "*) [ -z "$DISPATCH_FAILS" ] ;;',
-  '    *"actions/workflows/ci.yml/runs"*)',
-  '      local n=0; [ -f "$STATE/reads" ] && n=$(cat "$STATE/reads"); printf "%s" $((n + 1)) > "$STATE/reads"',
-  '      if [ "$n" -ge "${RUN_SEEN_AFTER:-0}" ]; then printf \'{"workflow_runs":[{"id":77,"head_sha":"%s","created_at":"2999-01-01T00:00:00Z"}]}\' "$SOURCE_SHA_LOWER"; else printf \'{"workflow_runs":[]}\'; fi ;;',
-  '    *"/actions/runs/77 "*) printf \'{"status":"%s"}\' "$RUN_STATUS" | jq -r "$filter" ;;',
-  '    "run cancel 77"*) touch "$STATE/cancelled" ;;',
+  '    *"/actions/workflows/ci.yml/dispatches "*) if [ "${DISPATCH:-}" = no-id ]; then echo "{}"; else echo \'{"workflow_run_id":77}\'; fi | jq -r "$filter" ;;',
+  '    *"/actions/runs/77 "*) [ "${RUN_READ:-}" = error ] && return 1; printf \'{"status":"%s"}\' "$RUN_STATUS" | jq -r "$filter" ;;',
+  '    "run cancel 77"*) [ "${CANCEL:-}" = error ] && return 1; touch "$STATE/cancelled" ;;',
   "    *) return 1 ;;",
   "  esac",
   "}",
@@ -84,9 +81,15 @@ afterEach(() => {
 interface Pin {
   readonly pin: string
   readonly ciYml?: string
-  readonly refAt?: string
-  readonly runSeenAfter?: number
-  readonly dispatchFails?: boolean
+  readonly refPost?: "lost" | "fails"
+  readonly dispatch?: "no-id"
+}
+
+interface Cleanup {
+  readonly runStatus: string
+  readonly runRead?: "error"
+  readonly cancel?: "error"
+  readonly refRead?: "error"
 }
 
 interface Outcome {
@@ -146,9 +149,10 @@ function pinCi(input: Pin): Outcome {
     CI_BASIS_RECEIPT: "",
     PREPARED_RELEASE_SHA: "",
     CI_YML: join(root, "ci.yml"),
-    REF_AT: input.refAt ?? "",
-    RUN_SEEN_AFTER: String(input.runSeenAfter ?? 0),
-    DISPATCH_FAILS: input.dispatchFails ? "1" : "",
+    GITHUB_RUN_ID: "900",
+    GITHUB_RUN_ATTEMPT: "1",
+    REF_POST: input.refPost ?? "",
+    DISPATCH: input.dispatch ?? "",
   })
   const outputs = Object.fromEntries(
     readFileSync(output, "utf8")
@@ -159,17 +163,17 @@ function pinCi(input: Pin): Outcome {
   return { ...result, ghCalls: readFileSync(join(root, "gh-calls"), "utf8"), outputs, root }
 }
 
-function unpinCi(
-  after: Outcome,
-  runStatus: string,
-): { status: number; output: string; deleted: boolean; cancelled: boolean } {
+function unpinCi(after: Outcome, input: Cleanup) {
   writeFileSync(join(after.root, "gh-calls"), "")
   const result = run(stepRun("unpin-ci", UNPIN_STEP), after.root, {
     SOURCE_SHA: after.outputs.source_sha ?? "",
     SOURCE_SHA_LOWER: after.outputs.source_sha ?? "",
     CI_RUN_ID: after.outputs.ci_run_id ?? "",
-    REF_AT: "",
-    RUN_STATUS: runStatus,
+    CI_REF: after.outputs.ci_ref ?? "",
+    RUN_STATUS: input.runStatus,
+    RUN_READ: input.runRead ?? "",
+    CANCEL: input.cancel ?? "",
+    REF_READ: input.refRead ?? "",
   })
   const exists = (name: string) => spawnSync("test", ["-e", join(after.root, name)]).status === 0
   return { ...result, deleted: exists("deleted"), cancelled: exists("cancelled") }
@@ -188,21 +192,20 @@ describe("publish.yml pin-ci (#15094)", () => {
     expect(publish.jobs["unpin-ci"]?.if).toContain("needs.pin-ci.outputs.ref_owned == 'true'")
   })
 
-  test("#when the pin is admitted #then it is put on release-ci/<sha>, CI is dispatched there and the run is recorded", () => {
-    const result = pinCi({ pin: fixture.sha.B, runSeenAfter: 2 })
+  test("#when the pin is admitted #then this attempt's own ref is created, CI is dispatched there and the returned run recorded", () => {
+    const result = pinCi({ pin: fixture.sha.B })
+    const ref = `release-ci/${fixture.sha.B}-900-1`
     expect(result.status, result.output).toBe(0)
-    expect(result.outputs).toEqual({ source_sha: fixture.sha.B, ref_owned: "true", ci_run_id: "77" })
-    expect(result.ghCalls).toContain(
-      `repos/${REPO}/git/refs -f ref=refs/heads/release-ci/${fixture.sha.B} -f sha=${fixture.sha.B}`,
-    )
-    expect(result.ghCalls).toContain(`workflow run ci.yml --ref release-ci/${fixture.sha.B}`)
+    expect(result.outputs).toEqual({ source_sha: fixture.sha.B, ci_ref: ref, ref_owned: "true", ci_run_id: "77" })
+    expect(result.ghCalls).toContain(`repos/${REPO}/git/refs -f ref=refs/heads/${ref} -f sha=${fixture.sha.B}`)
+    expect(result.ghCalls).toContain(`actions/workflows/ci.yml/dispatches -f ref=${ref} -F return_run_details=true`)
   })
 
   test("#when the pin is given in uppercase #then the ref, dispatch and outputs use the canonical SHA", () => {
     const result = pinCi({ pin: fixture.sha.B.toUpperCase() })
     expect(result.status, result.output).toBe(0)
     expect(result.outputs.source_sha).toBe(fixture.sha.B)
-    expect(result.ghCalls).toContain(`--ref release-ci/${fixture.sha.B}`)
+    expect(result.ghCalls).toContain(`-f ref=release-ci/${fixture.sha.B}-900-1 `)
   })
 
   test("#when the pin is not on dev #then nothing is written or dispatched", () => {
@@ -218,37 +221,64 @@ describe("publish.yml pin-ci (#15094)", () => {
     expect(result.status, result.output).toBe(0)
     expect(result.outputs.ref_owned).toBeUndefined()
     expect(result.ghCalls).not.toContain("--method POST")
-    expect(result.ghCalls).not.toContain("workflow run")
   })
 
-  test("#when release-ci/<sha> already names another commit #then it refuses and owns nothing", () => {
-    const result = pinCi({ pin: fixture.sha.B, refAt: fixture.sha.C })
+  test("#when creating the ref answers an error but created it #then the ref is owned and the release continues", () => {
+    const result = pinCi({ pin: fixture.sha.B, refPost: "lost" })
+    expect(result.status, result.output).toBe(0)
+    expect(result.outputs.ref_owned).toBe("true")
+  })
+
+  test("#when creating the ref fails #then it refuses, owns nothing and dispatches nothing", () => {
+    const result = pinCi({ pin: fixture.sha.B, refPost: "fails" })
     expect(result.status).not.toBe(0)
     expect(result.outputs.ref_owned).toBeUndefined()
-    expect(result.ghCalls).not.toContain("workflow run")
+    expect(result.ghCalls).not.toContain("dispatches")
   })
 
-  test("#when the dispatch fails after the ref was created #then the ref is still owned, and unpin-ci removes it", () => {
-    const result = pinCi({ pin: fixture.sha.B, dispatchFails: true })
+  test("#when the dispatch answers no run id #then it fails without a second dispatch, and unpin-ci removes the ref", () => {
+    const result = pinCi({ pin: fixture.sha.B, dispatch: "no-id" })
     expect(result.status).not.toBe(0)
     expect(result.outputs.ref_owned).toBe("true")
-    const cleanup = unpinCi(result, "completed")
+    expect(result.outputs.ci_run_id).toBeUndefined()
+    expect(result.ghCalls.split("\n").filter((call) => call.includes("dispatches"))).toHaveLength(1)
+    const cleanup = unpinCi(result, { runStatus: "completed" })
     expect(cleanup.status, cleanup.output).toBe(0)
     expect(cleanup.deleted).toBe(true)
   })
 
   test("#when the gate is done while the release's own run still runs #then unpin-ci cancels it and removes the ref", () => {
-    const result = pinCi({ pin: fixture.sha.B })
-    const cleanup = unpinCi(result, "in_progress")
+    const cleanup = unpinCi(pinCi({ pin: fixture.sha.B }), { runStatus: "in_progress" })
     expect(cleanup.status, cleanup.output).toBe(0)
     expect(cleanup.cancelled).toBe(true)
     expect(cleanup.deleted).toBe(true)
   })
 
+  test.each([
+    ["the run cannot be read", { runRead: "error" }],
+    ["the run cannot be cancelled", { cancel: "error" }],
+  ] as const)(
+    "#when %s #then unpin-ci still removes the ref but fails, naming what is unresolved",
+    (_name, failure) => {
+      const cleanup = unpinCi(pinCi({ pin: fixture.sha.B }), { runStatus: "in_progress", ...failure })
+      expect(cleanup.status).not.toBe(0)
+      expect(cleanup.deleted).toBe(true)
+      expect(cleanup.output).toContain("is unresolved")
+    },
+  )
+
+  test("#when reading the ref fails with a server error #then unpin-ci does not call it gone and fails", () => {
+    const cleanup = unpinCi(pinCi({ pin: fixture.sha.B }), { runStatus: "completed", refRead: "error" })
+    expect(cleanup.status).not.toBe(0)
+    expect(cleanup.deleted).toBe(false)
+    expect(cleanup.output).not.toContain("is already gone")
+    expect(cleanup.output).toContain("read-ref")
+  })
+
   test("#when the ref is already gone #then unpin-ci succeeds without deleting anything", () => {
     const result = pinCi({ pin: fixture.sha.B })
     writeFileSync(join(result.root, "deleted"), "")
-    const cleanup = unpinCi(result, "completed")
+    const cleanup = unpinCi(result, { runStatus: "completed" })
     expect(cleanup.status, cleanup.output).toBe(0)
     expect(cleanup.output).toContain("is already gone")
   })
@@ -256,7 +286,7 @@ describe("publish.yml pin-ci (#15094)", () => {
   test("#when the ref was moved to another commit #then unpin-ci leaves it and fails loudly", () => {
     const result = pinCi({ pin: fixture.sha.B })
     writeFileSync(join(result.root, "ref"), fixture.sha.C)
-    const cleanup = unpinCi(result, "completed")
+    const cleanup = unpinCi(result, { runStatus: "completed" })
     expect(cleanup.status).not.toBe(0)
     expect(cleanup.deleted).toBe(false)
     expect(cleanup.output).toContain("leaving it for a maintainer")

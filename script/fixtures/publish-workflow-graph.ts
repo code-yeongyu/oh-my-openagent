@@ -71,11 +71,11 @@ export const PRE_TAG_WRITERS: Readonly<Record<string, PreTagWriter>> = {
     guard: "inputs.prepared_release_sha == ''",
   },
   "pin-ci": {
-    reason: "creates refs/heads/release-ci/<sha> at the pinned source and dispatches ci.yml on it, so the gate waits on a run no dev merge can cancel (#15094); it publishes nothing",
+    reason: "creates this attempt's refs/heads/release-ci/<sha>-<run>-<attempt> at the pinned source and dispatches ci.yml on it, so the gate waits on a run no dev merge can cancel (#15094); it publishes nothing",
     guard: "inputs.prepared_release_sha == ''",
   },
   "unpin-ci": {
-    reason: "deletes the release-ci/<sha> ref pin-ci created once gate-reuse is done; it publishes nothing",
+    reason: "cancels the run and deletes the ref pin-ci created once gate-reuse is done; it publishes nothing",
     guard: "inputs.prepared_release_sha == ''",
   },
 }
