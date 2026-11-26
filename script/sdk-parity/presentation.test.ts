@@ -67,7 +67,12 @@ describe("presentation attribution (positive control: train 12's usage line)", (
 })
 
 describe("presentation attribution (negative controls: a capability change dressed as wording fails even with the row)", () => {
-  const failsAll = (edit: Edit, reason: string, rows: readonly PresentationRow[] = [ROW], goldens?: Record<string, Outcome>) => {
+  const failsAll = (
+    edit: Edit,
+    reason: string,
+    rows: readonly PresentationRow[] = [ROW],
+    goldens?: Record<string, Outcome>,
+  ) => {
     const report = run(edit, rows, goldens)
     expect(report.presentation).toEqual([])
     expect(report.failures).toHaveLength(3)
@@ -82,9 +87,7 @@ describe("presentation attribution (negative controls: a capability change dress
     const report = run((outcome) =>
       train12({ ...outcome, stderr: String(outcome["stderr"]).replace("omo remote", "omo  remote") }),
     )
-    expect(report.failures).toContainEqual(
-      expect.stringContaining("native-remote-unknown answers differently"),
-    )
+    expect(report.failures).toContainEqual(expect.stringContaining("native-remote-unknown answers differently"))
     expect(report.failures.join("\n")).toContain("a line outside the usage block of omo remote changed")
   })
 

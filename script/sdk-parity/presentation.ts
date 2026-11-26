@@ -19,7 +19,7 @@ export type PresentationRow = {
   readonly reason: string
 }
 
-export const PRESENTATION_PATH = "script/sdk-parity/presentation.json"
+const PRESENTATION_PATH = "script/sdk-parity/presentation.json"
 
 export const loadPresentation = (root: string = REPO_ROOT): readonly PresentationRow[] =>
   (JSON.parse(readFileSync(join(root, PRESENTATION_PATH), "utf8")) as { readonly rows: readonly PresentationRow[] })
