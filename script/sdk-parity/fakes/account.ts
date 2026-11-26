@@ -1,4 +1,4 @@
-import { ApiRefusal, type Credentials, RequestFailure } from "@oh-my-opencode/omo-opencode/service-auth"
+import { ApiRefusal, type Credentials, RequestFailure } from "@oh-my-opencode/account-core"
 
 import type { AccessPorts } from "../../../packages/omo-senpi/src/components/omo-sdk/access"
 import type { Recorder } from "./recorder"
