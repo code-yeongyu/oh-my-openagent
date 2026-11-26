@@ -15,6 +15,9 @@ public static partial class SpN {
     public short wShowWindow, cbReserved2; public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
   }
   [StructLayout(LayoutKind.Sequential)] struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
+  [StructLayout(LayoutKind.Sequential)] struct SECURITY_ATTRIBUTES { public int nLength; public IntPtr lpSecurityDescriptor; public bool bInheritHandle; }
+  [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern IntPtr CreateFileW(string name, uint access, uint share, ref SECURITY_ATTRIBUTES sa, uint disposition, uint flags, IntPtr template);
+  [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
   [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
   [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
   [DllImport("advapi32.dll", SetLastError = true)] static extern bool CreateRestrictedToken(IntPtr existing, uint flags, uint nDisable, IntPtr disable, uint nDelete, IntPtr delete, uint nRestrict, IntPtr restrict, out IntPtr created);
@@ -30,7 +33,7 @@ public static partial class SpN {
   const int TokenIntegrityLevel = 25;
   const uint LUA_TOKEN = 0x4, SE_GROUP_INTEGRITY = 0x20;
   const uint TOKEN_ASSIGN_PRIMARY = 0x1, TOKEN_DUPLICATE = 0x2, TOKEN_QUERY = 0x8, TOKEN_ADJUST_DEFAULT = 0x80;
-  const uint CREATE_NEW_CONSOLE = 0x10, STARTF_USESHOWWINDOW = 0x1;
+  const uint CREATE_NEW_CONSOLE = 0x10, STARTF_USESHOWWINDOW = 0x1, STARTF_USESTDHANDLES = 0x100;
 
   static Exception Failed(string what) {
     int code = Marshal.GetLastWin32Error();
@@ -38,9 +41,10 @@ public static partial class SpN {
   }
 
   // Starts command from a restricted copy of this process's token labelled Medium, hidden, on this session's
-  // interactive desktop: @{ pid; label } with the label read back from the started process.
-  public static Hashtable StartMedium(string command) {
-    IntPtr own = IntPtr.Zero, lowered = IntPtr.Zero, sid = IntPtr.Zero;
+  // interactive desktop, its stdout and stderr in the file log: @{ pid; label } with the label read back from the
+  // started process, plus exitedWithin3s when it ended that early (a helper that dies before its first write).
+  public static Hashtable StartMedium(string command, string log) {
+    IntPtr own = IntPtr.Zero, lowered = IntPtr.Zero, sid = IntPtr.Zero, output = IntPtr.Zero;
     var pi = new PROCESS_INFORMATION();
     try {
       if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_DEFAULT, out own))
@@ -50,14 +54,20 @@ public static partial class SpN {
       var tml = new TOKEN_MANDATORY_LABEL(); tml.Label.Sid = sid; tml.Label.Attributes = SE_GROUP_INTEGRITY;
       if (!SetTokenInformation(lowered, TokenIntegrityLevel, ref tml, Marshal.SizeOf(typeof(TOKEN_MANDATORY_LABEL)) + GetLengthSid(sid)))
         throw Failed("SetTokenInformation(TokenIntegrityLevel)");
+      var sa = new SECURITY_ATTRIBUTES(); sa.nLength = Marshal.SizeOf(typeof(SECURITY_ATTRIBUTES)); sa.bInheritHandle = true;
+      // GENERIC_WRITE, shared read/write, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL
+      output = CreateFileW(log, 0x40000000, 0x3, ref sa, 2, 0x80, IntPtr.Zero);
+      if (output == new IntPtr(-1)) { output = IntPtr.Zero; throw Failed("CreateFileW(" + log + ")"); }
       var si = new STARTUPINFOW(); si.cb = Marshal.SizeOf(typeof(STARTUPINFOW)); si.lpDesktop = "winsta0\\default";
-      si.dwFlags = (int)STARTF_USESHOWWINDOW; si.wShowWindow = 0;
-      if (!CreateProcessAsUserW(lowered, null, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, false, CREATE_NEW_CONSOLE, IntPtr.Zero, null, ref si, out pi))
+      si.dwFlags = (int)(STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES); si.wShowWindow = 0; si.hStdOutput = output; si.hStdError = output;
+      if (!CreateProcessAsUserW(lowered, null, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, true, CREATE_NEW_CONSOLE, IntPtr.Zero, null, ref si, out pi))
         throw Failed("CreateProcessAsUserW");
       var h = H(); h["pid"] = pi.dwProcessId; h["label"] = LabelOf(pi.hProcess);
+      uint code;
+      if (WaitForSingleObject(pi.hProcess, 3000) == 0 && GetExitCodeProcess(pi.hProcess, out code)) h["exitedWithin3s"] = (long)code;
       return h;
     } finally {
-      foreach (var x in new[] { own, lowered, pi.hProcess, pi.hThread }) if (x != IntPtr.Zero) CloseHandle(x);
+      foreach (var x in new[] { own, lowered, output, pi.hProcess, pi.hThread }) if (x != IntPtr.Zero) CloseHandle(x);
       if (sid != IntPtr.Zero) LocalFree(sid);
     }
   }

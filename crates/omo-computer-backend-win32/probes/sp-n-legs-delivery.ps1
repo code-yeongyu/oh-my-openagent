@@ -84,7 +84,7 @@ function Leg-chord($a) {
 }
 
 # Starts the uipi leg's helper at Medium (sp-n-native-medium.ps1) and returns its pid and read-back label.
-function Leg-start-medium($a) { Emit ([SpN]::StartMedium([string]$a.command)) }
+function Leg-start-medium($a) { Emit ([SpN]::StartMedium([string]$a.command, [string]$a.log)) }
 
 function Leg-uipi($a) {
   $top = [IntPtr][int64]$a.top

@@ -466,10 +466,16 @@ async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json> {
   const out = join(ctx.tmp, `${name}.medium.json`)
   rmSync(out, { force: true })
   rmSync(`${out}.started`, { force: true })
-  const started = await leg(ctx, "start-medium", { command: psCommand(ctx.tmp, name, arg, out) })
+  const log = `${out}.log`
+  const started = await leg(ctx, "start-medium", { command: psCommand(ctx.tmp, name, arg, out), log })
   if (started.label !== MEDIUM_LABEL)
     throw new Error(`the helper started with label ${str(started.label)}, not Medium (${MEDIUM_LABEL})`)
-  return waitFile(out, 60_000, { started: `${out}.started`, alive: pidAlive })
+  return waitFile(out, 60_000, { started: `${out}.started`, alive: pidAlive }).catch((e: Error) => {
+    // the helper's own words: its exit code if it ended within 3 s, and the tail of its stdout and stderr
+    const exit = started.exitedWithin3s === undefined ? "" : `; exited within 3 s with ${str(started.exitedWithin3s)}`
+    const said = existsSync(log) ? clean(readFileSync(log, "utf8")).slice(-400) : ""
+    throw new Error(`${e.message}${exit}${said ? `; helper output: ${said}` : "; no helper output"}`)
+  })
 }
 const MEDIUM_LABEL = "S-1-16-8192"
 
