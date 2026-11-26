@@ -35,7 +35,7 @@
  */
 
 import { matchThread, rowKey, rowName, type LadderView } from "@oh-my-opencode/thread-address-core"
-import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import { escapeForDisplay, hasControlCharacter } from "@oh-my-opencode/utils/escape-for-display"
 import {
   normalizeName,
   SESSION_ID_SHAPE,
@@ -131,11 +131,6 @@ const FUZZY_CWD_WEIGHT = 0.7
 const FUZZY_ACCEPT_SCORE = 0.72
 const FUZZY_ACCEPT_MARGIN = 0.08
 
-// C0 control characters that normalization cannot fold away: whitespace
-// controls (\t \n \v \f \r) are collapsed by the whitespace pass, the rest is
-// garbage an address must never silently match.
-const UNFOLDABLE_CONTROLS = /[\u0000-\u0008\u000e-\u001f\u007f]/
-
 /** The one name comparison of threads and devices (thread-address-core `normalizeName`). */
 export const normalizeThreadName = normalizeName
 
@@ -153,7 +148,9 @@ function guardInput(value: string, what: string): Guarded {
       ),
     }
   }
-  if (UNFOLDABLE_CONTROLS.test(value)) {
+  // The whitespace controls (tab, line feed, vertical tab, form feed, carriage return) fold into a space as before (the
+  // whitespace pass); every other control character, C1 included, is refused.
+  if (hasControlCharacter(value.replace(/[\t\n\v\f\r]/g, " "))) {
     return {
       ok: false,
       error: addressError(
