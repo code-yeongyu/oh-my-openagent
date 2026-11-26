@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync, spawnSync } from "node:child_process"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join, relative } from "node:path"
 import { markerLine, splitFragment } from "./package-log-blocks.ts"
 import { removeTempRoot } from "./remove-temp-root.ts"
 
 // Each case spawns git and bun several times (about 4 s alone), so it gets a budget above bun's 5 s default.
 const SPAWN_TIMEOUT_MS = 30_000
 const SCRIPT_DIR = import.meta.dir
+const REPO_ROOT = dirname(SCRIPT_DIR)
+const CLIS = ["stamp-release-changelog.ts", "changelog-fragments-cli.ts", "check-pr-changelog.ts"]
 const LOG = "packages/omo-senpi/changes.md"
 const ENV = {
   ...process.env,
@@ -26,6 +28,24 @@ const commit = (cwd: string, message: string) => {
 const bun = (cwd: string, args: string[], env: Record<string, string> = {}) =>
   spawnSync("bun", args, { cwd, encoding: "utf8", env: { ...ENV, ...env } })
 
+// Each scratch repo gets only the CLIs and the files they import, never all of script/ (~750 files): committing the
+// whole tree in every case made setup cost grow with script/ and pushed a loaded Windows runner past the budget.
+const cliSources = (): string[] => {
+  const transpiler = new Bun.Transpiler({ loader: "ts" })
+  const seen = new Set<string>()
+  const pending = CLIS.map((name) => join(SCRIPT_DIR, name))
+  for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
+    if (seen.has(file)) continue
+    seen.add(file)
+    // scanImports parses a module, which has no shebang line; a CLI's own `#!` line is not an import.
+    for (const { path } of transpiler.scanImports(readFileSync(file, "utf8").replace(/^#!.*/, ""))) {
+      if (path.startsWith(".")) pending.push(Bun.resolveSync(path, dirname(file)))
+    }
+  }
+  return [...seen]
+}
+const CLI_SOURCES = cliSources()
+
 const scratchDirs: string[] = []
 // A timed-out or aborted test never reaches a finally block, and scratch() itself runs git and bun after the
 // mkdtemp, so the directory is registered the moment it exists and removed here on every path (#9766).
@@ -40,7 +60,11 @@ const scratch = () => {
   git(dir, "init", "-q", "-b", "dev")
   // A runner's global core.autocrlf=true (windows-latest) would check files out with CRLF; the expectations are bytes.
   git(dir, "config", "core.autocrlf", "false")
-  cpSync(SCRIPT_DIR, join(dir, "script"), { recursive: true, filter: (p) => !p.includes("node_modules") })
+  for (const source of CLI_SOURCES) {
+    const target = join(dir, relative(REPO_ROOT, source))
+    mkdirSync(dirname(target), { recursive: true })
+    copyFileSync(source, target)
+  }
   mkdirSync(join(dir, "packages/omo-senpi"), { recursive: true })
   mkdirSync(join(dir, "changes/unreleased"), { recursive: true })
   writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-01 - old\n")
