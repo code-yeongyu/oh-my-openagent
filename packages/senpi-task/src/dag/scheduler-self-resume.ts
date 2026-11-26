@@ -27,12 +27,26 @@ function holdsNodeTask(context: SchedulerContext, binding: NodeTaskBinding): boo
 // admitted wait for the node again (or are skipped if it fails). Only a completed node is re-opened
 // (an attached node instead discards its superseded settlement). A reopen during cancellation
 // attaches the task, and cancellation drains attached tasks until none is left uncancelled.
-export function watchSelfResume(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
+export function watchSelfResume(context: SchedulerContext, nodeId: DagNodeId, taskId: string): NodeTaskBinding {
   disposeSelfResumeWatch(context, nodeId)
   const execAttempt = nodeById(context.journal.snapshot(), nodeId).execAttempt ?? 0
   const binding: NodeTaskBinding = { nodeId, taskId, execAttempt }
   const unsubscribe = context.taskManager.subscribeSelfResumed?.(taskId, () => followSelfResume(context, binding))
   if (unsubscribe !== undefined) context.selfResumeWatches.set(nodeId, unsubscribe)
+  return binding
+}
+
+// A scheduler that takes over a running run (recovery, re-entry) only arms watches through
+// attachment, which completed nodes never pass again. Watch each completed node's task, and follow
+// one whose child already resumed on its own before this scheduler held the run.
+export function followCompletedNodeTasks(context: SchedulerContext): void {
+  for (const node of context.journal.snapshot().nodes) {
+    if (node.state !== "completed" || node.taskId === undefined) continue
+    const binding = watchSelfResume(context, node.id, node.taskId)
+    const task = context.taskManager.get(node.taskId)
+    const live = task?.status === "pending" || task?.status === "running" || task?.status === "paused"
+    if (live && task.resumed_run_epoch === task.notification.run_epoch) followSelfResume(context, binding)
+  }
 }
 
 function followSelfResume(context: SchedulerContext, binding: NodeTaskBinding): void {

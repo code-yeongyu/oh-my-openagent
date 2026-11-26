@@ -26,9 +26,9 @@ export function deferred<T = void>(): { readonly promise: Promise<T>; readonly r
   return { promise, resolve }
 }
 
-export function within<T>(promise: Promise<T>, ms = 2_000): Promise<T> {
+export function within<T>(promise: Promise<T>, ms = 2_000, waitingFor = "the signal"): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+    const timeout = setTimeout(() => reject(new Error(`waited ${ms}ms for ${waitingFor}; it never came`)), ms)
     void promise.then(
       (value) => {
         clearTimeout(timeout)

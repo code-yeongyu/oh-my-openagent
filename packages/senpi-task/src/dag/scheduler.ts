@@ -18,7 +18,7 @@ import { applyDagSchedulerEvent } from "./scheduler-projection"
 import { cancelRun, whenAdmissionIdle } from "./scheduler-cancellation"
 import { runFrontier } from "./scheduler-frontier"
 import { attachTaskSettlement, watchRevivedInScheduler, disposePromotionWatch } from "./scheduler-task-attachment"
-import { disposeSelfResumeWatches } from "./scheduler-self-resume"
+import { disposeSelfResumeWatches, followCompletedNodeTasks } from "./scheduler-self-resume"
 import { createInfrastructureRetries, type RetrySchedule } from "./infrastructure-retry"
 export { applyDagSchedulerEvent } from "./scheduler-projection"
 export { DAG_NODE_CONTROL_ERROR_CODES, DagNodeControlError } from "./node-control-context"
@@ -172,7 +172,12 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => (running ??= runFrontier(context).finally(() => disposeSelfResumeWatches(context))),
+    run: () => {
+      if (running !== undefined) return running
+      followCompletedNodeTasks(context)
+      running = runFrontier(context).finally(() => disposeSelfResumeWatches(context))
+      return running
+    },
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     suspend: async () => {
       context.suspended = true
