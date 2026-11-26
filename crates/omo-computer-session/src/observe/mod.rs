@@ -19,7 +19,7 @@ use omo_computer_core::error::EngineCode;
 use omo_computer_core::listing::ElementInfo;
 use omo_computer_core::observation::{Cut, Observation};
 use omo_computer_core::params::ObserveParams;
-use omo_computer_core::requests::{read_observe, ReadRequest};
+use omo_computer_core::requests::{read_observe, ReadRequest, SettleSpec};
 use omo_computer_core::untrusted::UntrustedText;
 
 use crate::diff::{decide, Decision, Outline, Side};
@@ -32,6 +32,8 @@ pub struct Request {
     pub since: Option<u64>,
     pub query: Option<String>,
     pub style: Style,
+    /// The call's `settle`; absent runs the engine's regime.
+    pub settle: Option<SettleSpec>,
 }
 
 impl Request {
@@ -45,13 +47,14 @@ impl Request {
             since: spec.since,
             query: spec.query.filter(|query| !query.trim().is_empty()),
             style: Style { skeleton: spec.skeleton.unwrap_or(true), depth: spec.depth, actions: spec.actions.unwrap_or(false) },
+            settle: spec.settle,
         }
     }
 
     /// The default read of `target`.
     #[must_use]
     pub fn of(target: &str) -> Self {
-        Self { target: target.to_owned(), since: None, query: None, style: Style::default() }
+        Self { target: target.to_owned(), since: None, query: None, style: Style::default(), settle: None }
     }
 }
 
