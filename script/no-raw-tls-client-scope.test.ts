@@ -89,6 +89,35 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
     expect(connectHits(runtimeAlias + runtimeRead)).toBe(1)
   })
 
+  test.each([
+    "var t = globalThis.Bun; function f(a = t.connect(o)) { var t = 1; return a }",
+    "var t = globalThis.Bun; function f(a = () => t.connect(o)) { var t = 1; return a() }",
+    "var t = globalThis.Bun; function f(a = t.connect(o)) { let t = 1; return a }",
+    "var t = globalThis.Bun; function f(a = t.connect(o)) { function t() {} return a }",
+    "var t = globalThis.Bun; const f = (a = () => t.connect(o)) => { var t = 1; return a() }",
+    "var t = globalThis.Bun; class C { m(a = t.connect(o)) { const t = 1; return a } }",
+    "var t = globalThis.Bun; async function* f(a = t.connect(o)) { var t = 1 }",
+    "var t = globalThis.Bun; function f({ a = t.connect(o) } = {}) { var t = 1; return a }",
+    "var t = globalThis.Bun; function f({ [t.connect(o)]: a }) { var t = 1; return a }",
+    "function f(a = t.connect(o)) { return a } var t = globalThis.Bun",
+  ])("a parameter list resolves outside its function body: %s", (sample) => {
+    expect(connectHits(sample)).toBe(1)
+  })
+
+  test("a tls client read in a parameter default ignores a body declaration of the same name", () => {
+    const hits = findRawTlsClients(
+      'import tls from "node:tls"; function f(a = tls.connect(o)) { var tls = 1; return a }',
+    )
+    expect(hits.some((hit) => hit.id === "tls.connect(")).toBe(true)
+  })
+
+  test.each([
+    "var t = globalThis.Bun; function f(a = () => t.connect(o), t) { return a }",
+    "var t = globalThis.Bun; function f(a) { var t = a; return t.connect(o) }",
+  ])("a parameter list still sees its own parameters, and a body still sees its own declarations: %s", (sample) => {
+    expect(connectHits(sample)).toBe(0)
+  })
+
   test("a sibling shadow does not hide, and does not duplicate, the real reference", () => {
     expect(
       connectHits("var t = globalThis.Bun; function f(t) { return t.connect } function g() { return t.connect }"),

@@ -42,14 +42,16 @@ function isScope(node: ts.Node): boolean {
   )
 }
 
-function asScope(node: ts.Node): ts.Node {
-  return ts.isBlock(node) && !ts.isSourceFile(node.parent) && isFunctionScope(node.parent) ? node.parent : node
+function bodyOf(fn: ts.Node): ts.Block | undefined {
+  if (ts.isSourceFile(fn) || !isFunctionScope(fn)) return undefined
+  const body: unknown = Reflect.get(fn, "body")
+  return body !== undefined && ts.isBlock(body as ts.Node) ? (body as ts.Block) : undefined
 }
 
 function enclosing(node: ts.Node, test: (candidate: ts.Node) => boolean): ts.Node {
   let current = node.parent
   while (!test(current)) current = current.parent
-  return asScope(current)
+  return current
 }
 
 function bindingNames(name: ts.BindingName): ts.Identifier[] {
@@ -72,8 +74,10 @@ function declarationsOf(node: ts.Node, argumentsUsers: Set<ts.Node>): Declaratio
   const at = (names: ts.Identifier[], scope: ts.Node, shadows = true): Declaration[] =>
     names.map((name) => ({ name, scope, shadows }))
   if (ts.isVariableDeclaration(node) && ts.isVariableDeclarationList(node.parent)) {
-    const blockScoped = (node.parent.flags & ts.NodeFlags.BlockScoped) !== 0
-    return at(bindingNames(node.name), enclosing(node.parent, blockScoped ? isScope : isFunctionScope))
+    if ((node.parent.flags & ts.NodeFlags.BlockScoped) !== 0)
+      return at(bindingNames(node.name), enclosing(node.parent, isScope))
+    const fn = enclosing(node.parent, isFunctionScope)
+    return at(bindingNames(node.name), bodyOf(fn) ?? fn)
   }
   if (ts.isParameter(node)) return at(bindingNames(node.name), node.parent, !argumentsUsers.has(node.parent))
   if (ts.isCatchClause(node) && node.variableDeclaration) return at(bindingNames(node.variableDeclaration.name), node)
@@ -151,11 +155,15 @@ export function createBindingScopes<T>(nodes: readonly ts.Node[], globals: Reado
     if (cached) return cached
     const chain: Declaration[][] = []
     const skipped = new Set<ts.Node>()
+    const here = (scope: ts.Node): Declaration[] => byScope.get(scope)?.get(reference.text) ?? []
     for (let previous: ts.Node = reference, scope = reference.parent; scope; previous = scope, scope = scope.parent) {
       const outside = evaluatedOutside(previous)
       if (outside) skipped.add(outside)
-      const declarations = skipped.has(scope) ? undefined : byScope.get(scope)?.get(reference.text)
-      if (declarations) chain.push(declarations)
+      if (skipped.has(scope)) continue
+      const declarations =
+        ts.isBlock(scope) && bodyOf(scope.parent) === scope ? [...here(scope), ...here(scope.parent)] : here(scope)
+      if (ts.isBlock(scope) && bodyOf(scope.parent) === scope) skipped.add(scope.parent)
+      if (declarations.length > 0) chain.push(declarations)
     }
     chains.set(reference, chain)
     return chain
