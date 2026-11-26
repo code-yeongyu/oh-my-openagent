@@ -170,7 +170,10 @@ describe("a refused turn is found by the record a name resolves to", () => {
   function manualDeadline() {
     const pending: Array<() => void> = []
     const deadline: TeardownStepDeadline = () => new Promise<void>((resolve) => pending.push(resolve))
-    return { deadline, expire: () => pending.splice(0).forEach((resolve) => resolve()) }
+    const expire = (): void => {
+      for (const resolve of pending.splice(0)) resolve()
+    }
+    return { deadline, expire }
   }
 
   async function heldTurnPastItsBudget() {
