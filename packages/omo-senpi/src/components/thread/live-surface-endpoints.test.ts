@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -9,6 +9,7 @@ import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAl
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 type Frame = Record<string, unknown>
 type Answer = (frame: Frame) => Record<string, unknown>
@@ -20,7 +21,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 
 function tempDir(prefix: string): string {
   // Short /tmp paths: a unix socket path is capped near 104 bytes on darwin.
-  const directory = mkdtempSync(join("/tmp", prefix))
+  const directory = shortTempDir(prefix)
   cleanups.push(async () => rmSync(directory, { recursive: true, force: true }))
   return directory
 }

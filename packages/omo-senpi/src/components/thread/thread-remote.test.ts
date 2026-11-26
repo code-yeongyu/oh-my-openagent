@@ -695,6 +695,51 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
+  test("#given b and c answer a single probe only when it is the one in flight #when a closed thread on b is reopened and sent to by its bare id #then it routes to b exactly as <device>/<thread> does, never host_unavailable", async () => {
+    const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d271"
+    const file = `/home/b/.omo/agent/sessions/--home-b--/2026-11-22T02-05-00-000Z_${closed}.jsonl`
+    const a = account({
+      wakeFeature: true,
+      ended: { b: { [closed]: "rk-closed" } },
+      sessionFiles: { [closed]: file },
+      crowdedLookups: ["b", "c"],
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: closed })).toMatchObject({ kind: "ok", thread: closed, device: "b" })
+    expect(await run("thread_send", { thread: closed, message: "still there?" })).toMatchObject({
+      kind: "ok",
+      thread: closed,
+      delivery: { kind: "started" },
+    })
+    expect(
+      a.sent.flatMap((entry) =>
+        entry.rpc?.["type"] === "open_session" || entry.rpc?.["type"] === "admit_external_message"
+          ? [[entry.rpc["type"], entry.device]]
+          : [],
+      ),
+    ).toEqual([
+      ["open_session", "b"],
+      ["admit_external_message", "b"],
+    ])
+  })
+
+  test("#given two bare-id reads at once of closed threads on b and on c, both devices answering only a probe that is the one in flight #when both run on one port #then each finds its thread: their solo retries never overlap (#14748 review M3)", async () => {
+    const onB = "0195f0c2-1a2b-7c3d-8e4f-00000000d273"
+    const onC = "0195f0c2-1a2b-7c3d-8e4f-00000000d274"
+    const a = account({
+      wakeFeature: true,
+      ended: { b: { [onB]: "rk-on-b-closed" }, c: { [onC]: "rk-on-c-closed" } },
+      crowdedLookups: ["b", "c"],
+    })
+    const { run } = surface(a.remote)
+
+    const [readB, readC] = await Promise.all([run("thread_read", { thread: onB }), run("thread_read", { thread: onC })])
+
+    // A closed thread's transcript reads from its holder without reopening it (dev #14623): each read lands on its own device.
+    expect(readB).toMatchObject({ kind: "ok", device: "b" })
+    expect(readC).toMatchObject({ kind: "ok", device: "c" })
+  })
+
   test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
     const a = account({ rows: [{ ...B_ROW, title: "" }] })
     const { run } = surface(a.remote)

@@ -11,7 +11,7 @@ import {
   type HostRpcClientFactory,
   type HostSessionOpenInput,
 } from "./session-transport"
-import { toOpenFailure } from "./session-wire"
+import { HostSessionDetachedError, toOpenFailure } from "./session-wire"
 
 interface SessionOpeningPorts {
   readonly socketPath: string
@@ -20,7 +20,8 @@ interface SessionOpeningPorts {
   readonly socketAccepts: (socketPath: string) => Promise<boolean>
   readonly onDisconnect: (error: RpcTransportGoneError) => void
   readonly onEvent: (record: unknown) => void
-  readonly bindClient: (client: HostRpcClient | undefined) => void
+  /** False when the owner was released while this connection was still dialing: the open must not go on. */
+  readonly bindClient: (client: HostRpcClient | undefined) => boolean
 }
 
 /** Probe and open one child connection; preserve the host's refusal and profile contracts. */
@@ -36,7 +37,11 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
   const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
   client.onEvent(ports.onEvent)
   await client.start()
-  ports.bindClient(client)
+  // A release during the probe or the dial found no client to stop; this connection is the one it meant to end.
+  if (!ports.bindClient(client)) {
+    await client.stop()
+    throw new HostSessionDetachedError("open_session")
+  }
   // No capability names spawnedBy, so the host's engine version decides; an unproven host opens without it.
   const spawnedByHonored = engineAcceptsSpawnedBy(identity.engineVersion)
   if (!spawnedByHonored && input.spawnedBy !== undefined) {

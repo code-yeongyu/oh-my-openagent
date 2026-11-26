@@ -3105,12 +3105,11 @@
           "ast-grep",
           "browser",
           "coding-agent-sessions",
-          "dag-library",
           "data-scientist",
           "debugging",
           "eval-integrity",
           "frontend",
-          "git",
+          "git-master",
           "give-me-tips",
           "hyperplan",
           "init-deep",
@@ -3943,5 +3942,5 @@
       }
     }
   },
-  "sha256": "d1d3cbf17a17315b1c2fecb7f465d6eb89898eddeae4b113be0d217976f27ce4"
+  "sha256": "4db9624c48ceb27b119abccb5239058ea4c73a35027babca9e7dceb3e4b83b1d"
 }

@@ -36,7 +36,6 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "ast-grep",
   "browser",
   "coding-agent-sessions",
-  "dag-library",
   "data-scientist",
   "debugging",
   "eval-integrity",
