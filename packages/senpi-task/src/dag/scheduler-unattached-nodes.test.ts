@@ -16,8 +16,9 @@ import {
   taskRecord,
 } from "./__fixtures__/reattached-run"
 import type { DagDefinition } from "./graph"
+import { subscribeDagJournal } from "./journal"
 import { createDagRecovery } from "./recovery"
-import { createDagScheduler } from "./scheduler"
+import { createDagScheduler, reenterDagRun } from "./scheduler"
 import { createDagFileStore } from "./store"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
@@ -66,4 +67,41 @@ describe("DAG scheduler over active nodes it does not hold", () => {
       "after:completed",
     ])
   }, 30_000)
+
+  test("#given a parked scheduler #when the run is re-entered and parks again twice #then no parked scheduler keeps refreshing on the later commits", async () => {
+    // given
+    const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-unattached-"))
+    cleanupRoots.push(directory)
+    const store = createDagFileStore(ownedTaskState(directory))
+    const manager = new LongRunningTaskManager()
+    const input: DagDefinition = { key: "parked-twice", name: "parked twice", nodes: [node("gone")] }
+    const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(input, {
+      gone: { state: "running", taskId: "task-gone", attempt: 1 },
+    })
+    const initialRecord = { ...paused, status: "running" as const }
+    store.writeCheckpoint(runId, initialRecord)
+    manager.add(taskRecord(owner("gone"), "running", "task-gone"))
+    const parked = [createDagScheduler({ store, taskManager: manager, initialRecord })]
+    await parked[0]?.run()
+
+    for (let round = 0; round < 2; round += 1) {
+      // when - a re-entry parks again; its commit reaches every subscriber before this probe
+      const seen = parked.map((scheduler) => scheduler.snapshot().checkpointSeq)
+      let unsubscribe = (): void => undefined
+      const committed = new Promise<void>((resolve) => {
+        unsubscribe = subscribeDagJournal(store, runId, (event) => {
+          if (event.type === "dag.run.paused") resolve()
+        })
+      })
+      const reentry = reenterDagRun({ store, taskManager: manager, initialRecord })
+      await reentry.run
+      await committed
+      unsubscribe()
+
+      // then
+      expect(reentry.scheduler.snapshot().status).toBe("paused")
+      expect(parked.map((scheduler) => scheduler.snapshot().checkpointSeq)).toEqual(seen)
+      parked.push(reentry.scheduler)
+    }
+  })
 })

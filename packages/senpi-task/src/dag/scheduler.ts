@@ -171,7 +171,13 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => (running ??= runFrontier(context)),
+    // A frontier that returns the run paused (parked or held) has exited for good, so it stops
+    // listening for commits like a terminal one; later commits belong to whoever resumes the run.
+    run: () =>
+      (running ??= runFrontier(context).then((record) => {
+        if (record.status === "paused") unsubscribeCommits()
+        return record
+      })),
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     suspend: async () => {
       context.suspended = true
