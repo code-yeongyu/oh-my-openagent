@@ -9,6 +9,7 @@ import { capabilityClosures, ImportGraph } from "./closures"
 import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { loadPresentation, parsePresentation } from "./presentation"
+import { readDeclaredVersions } from "./version-mask"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
@@ -92,6 +93,10 @@ try {
   else prepareBaseTree(REPO_ROOT, baseTree)
   const isolation = [...isolationProblems(baseTree), ...isolationProblems(REPO_ROOT)]
   if (isolation.length > 0) throw new Error(isolation.join("\n"))
+  const baseVersions = readDeclaredVersions(baseTree)
+  const headVersions = readDeclaredVersions(REPO_ROOT)
+  if (headVersions === undefined)
+    throw new Error("the head has no packages/omo-native/package.json to read versions from")
   const baseSide = runSide(baseTree)
   const headSide = runSide(REPO_ROOT)
   const comparedMs = Date.now() - started
@@ -129,6 +134,7 @@ try {
     changedFiles,
     body,
     headSha: git("rev-parse", "HEAD").trim(),
+    versions: { base: baseVersions, head: headVersions },
     presentation: {
       base: baseRowsText === undefined ? undefined : parsePresentation(baseRowsText),
       head: loadPresentation(),
