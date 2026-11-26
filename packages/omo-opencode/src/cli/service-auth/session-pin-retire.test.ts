@@ -151,4 +151,132 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(await h.pins()).toEqual({ live: 0, retired: 1 })
     expect(h.logs).toEqual([])
   })
+
+  // #12383: a refresh runs from 30 s before the access token expires, so a refused refresh may still hold a token the
+  // service accepts. The discard asks the service for the account of a legacy sign-in only with such a token: an expired
+  // one is never sent (no request inside the credential lock), and a refused or expired one keeps the pin.
+  const NOW = Date.parse("2030-01-01T00:00:00Z")
+  test.each([
+    {
+      token: "a still-valid",
+      expiresIn: 10_000,
+      me: "names the account",
+      calls: ["POST /v1/session/refresh", "GET /v1/me"],
+      live: 0,
+    },
+    {
+      token: "a still-valid",
+      expiresIn: 10_000,
+      me: "refuses",
+      calls: ["POST /v1/session/refresh", "GET /v1/me"],
+      live: 1,
+    },
+    { token: "an expired", expiresIn: -1_000, me: "names the account", calls: ["POST /v1/session/refresh"], live: 1 },
+  ])(
+    "#given a legacy sign-in with no account, a live pin and $token access token #when its refresh is refused device_revoked and /v1/me $me #then the requests are $calls and $live live pin(s) remain",
+    async ({ expiresIn, me, calls: expected, live }) => {
+      const h = await pinnedHome()
+      const calls: string[] = []
+      const api = fakeApi((request) => {
+        const path = new URL(request.url).pathname
+        calls.push(`${request.method} ${path}`)
+        if (path !== "/v1/me") return refusal("device_revoked", undefined, 401)
+        return me === "refuses"
+          ? refusal("unauthorized", undefined, 401)
+          : Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } })
+      })
+      const s = memoryStore({ ...grant, ...privateKeys, accessTokenExpiresAt: new Date(NOW + expiresIn).toISOString() })
+      const error = await createSession({
+        api,
+        store: s.store,
+        home: h.home,
+        now: () => NOW,
+        beforeKeysDiscarded: h.hook,
+      })
+        .accessToken()
+        .catch((e: unknown) => e)
+      expect(error).toMatchObject({ code: "device_revoked" })
+      expect(s.current()).toBeNull()
+      expect(calls).toEqual(expected)
+      expect(await h.pins()).toEqual({ live, retired: 1 - live })
+    },
+  )
+
+  // #12308: plain forget reads the account of a legacy sign-in the same way; `omo account forget` owns the stamped case.
+  test("#given a legacy sign-in with no account and a live pin #when it is forgotten #then the account is read from the service and its pin is retired", async () => {
+    const h = await pinnedHome()
+    const calls: string[] = []
+    const api = fakeApi((request) => {
+      calls.push(`${request.method} ${new URL(request.url).pathname}`)
+      return Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } })
+    })
+    const s = memoryStore({ ...grant, ...privateKeys })
+    await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).forget()
+    expect(s.current()).toBeNull()
+    expect(calls).toEqual(["GET /v1/me"])
+    expect(await h.pins()).toEqual({ live: 0, retired: 1 })
+  })
+
+  // #13662: the kept pin is reported with the command that clears it (the token the CLI dispatches on).
+  test("#given a legacy sign-in with no account, a live pin and an expired access token #when it is forgotten #then no request is made, it is deleted, its pin is kept, and the retire-sync command is named", async () => {
+    const h = await pinnedHome()
+    const calls: string[] = []
+    const api = fakeApi((request) => {
+      calls.push(`${request.method} ${new URL(request.url).pathname}`)
+      return Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } })
+    })
+    const s = memoryStore({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
+    await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).forget()
+    expect(s.current()).toBeNull()
+    expect(calls).toEqual([])
+    expect(await h.pins()).toEqual({ live: 1, retired: 0 })
+    expect(h.logs).toHaveLength(1)
+    expect(h.logs[0]).toContain("omo account retire-sync --account")
+  })
+
+  test("#given an unreadable stored item #when it is forgotten #then it is still deleted, its pin is kept, and one line is logged", async () => {
+    const h = await pinnedHome()
+    const s = memoryStore(stored, true)
+    await createSession({
+      api: "https://api.omo.dev",
+      store: s.store,
+      home: h.home,
+      beforeKeysDiscarded: h.hook,
+    }).forget()
+    expect(s.current()).toBeNull()
+    expect(await h.pins()).toEqual({ live: 1, retired: 0 })
+    expect(h.logs).toHaveLength(1)
+  })
+
+  // #13642 review (b088286) L1: the account lookup runs under the credential lock, so it gets the fix-up's short budget;
+  // a stalled service keeps the pin (reported) instead of holding the sign-out for the 30 s request timeout.
+  test("#given a legacy sign-in with a live pin and a service that never answers /v1/me #when it is forgotten #then the lookup gives up within its budget, the item is deleted and the kept pin is reported", async () => {
+    const h = await pinnedHome()
+    const api = fakeApi(() => new Promise<Response>(() => undefined))
+    const s = memoryStore({ ...grant, ...privateKeys })
+    const started = performance.now()
+    await createSession({
+      api,
+      store: s.store,
+      home: h.home,
+      beforeKeysDiscarded: h.hook,
+      machine: { digest: async () => undefined, name: () => "test", budgetMs: 50 },
+    }).forget()
+    // The budget under test is 50 ms; the unbounded lookup waits for the request timeout (seconds).
+    expect(performance.now() - started).toBeLessThan(3_000)
+    expect(s.current()).toBeNull()
+    expect(await h.pins()).toEqual({ live: 1, retired: 0 })
+    expect(h.logs).toHaveLength(1)
+  })
+
+  // #13642 review L1: with no live pin there is nothing left in place, so nothing is reported.
+  test("#given an unreadable stored item and no live pin #when it is forgotten #then it is deleted and nothing is logged", async () => {
+    const home = await temporaryHome()
+    const logs: string[] = []
+    const hook = retireSyncPinOnDiscard({ pinDir: () => join(home, "sync-device"), log: (line) => logs.push(line) })
+    const s = memoryStore(stored, true)
+    await createSession({ api: "https://api.omo.dev", store: s.store, home, beforeKeysDiscarded: hook }).forget()
+    expect(s.current()).toBeNull()
+    expect(logs).toEqual([])
+  })
 })

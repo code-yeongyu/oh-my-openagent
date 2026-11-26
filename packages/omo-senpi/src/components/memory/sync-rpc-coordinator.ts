@@ -5,6 +5,7 @@ import type {
   SyncEnableRequest,
   SyncApproveRequest,
   SyncApproveResponse,
+  SyncDisableResponse,
   SyncEnableResponse,
   SyncRpcProblem,
   SyncUnavailableCode,
@@ -19,6 +20,7 @@ import type {
 } from "./sync-rpc-ports"
 import {
   identityOf,
+  LOGGABLE_CODE,
   refused,
   RetiredSyncOperation,
   runSyncRpcOperation,
@@ -306,6 +308,32 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           ...(request.credentialId !== undefined ? { credentialId: request.credentialId } : {}),
         }),
       )
+    },
+    /** Turns sync off on this device (#14093): `off`, or a typed problem that never carries the service's words. */
+    async disable(owner: SyncRpcContext): Promise<SyncDisableResponse> {
+      const result = await this.read(owner, async (ports, account, auth) => ({
+        outcome: await options.runtime.disableSync({
+          account: account.descriptor.accountId,
+          serviceDeviceId: account.descriptor.serviceDeviceId,
+          pairing: ports.pairing,
+          pinDir: options.pinDir,
+          authority: auth,
+          signal: auth.signal,
+        }),
+      }))
+      if ("kind" in result) return result
+      if (result.outcome.kind === "refused") {
+        const { code } = result.outcome
+        options.warn?.("memory sync disable refused", {
+          path: "disable",
+          ...(LOGGABLE_CODE.test(code) ? { code } : {}),
+        })
+        return { kind: "refused", reason: "The service did not turn memory sync off for this device." }
+      }
+      // The switch is off on the service and locally; an engine this process still runs for the device stops now,
+      // so the next status read already shows a device that does not sync.
+      await options.stopSync?.()
+      return { kind: "off" }
     },
     async read<T>(
       owner: SyncRpcContext,

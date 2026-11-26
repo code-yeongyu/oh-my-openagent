@@ -179,6 +179,20 @@ async with managed_connection("postgres://...") as conn:
 # conn is closed here, guaranteed
 ```
 
+### A variable number of resources
+
+```python
+from contextlib import AsyncExitStack
+
+async with AsyncExitStack() as stack:
+    conns = [await stack.enter_async_context(managed_connection(url)) for url in urls]
+    stack.callback(cleanup_tmp, workdir)  # a plain function runs at exit too
+    await sync_all(conns)
+# every conn is closed here, in reverse order
+```
+
+`ExitStack` is the sync form; `stack.pop_all()` hands the open resources to a longer-lived owner.
+
 ---
 
 ## Exception hierarchy — when you do raise

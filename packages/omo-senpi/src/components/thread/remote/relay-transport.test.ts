@@ -5,7 +5,9 @@ import { join } from "node:path"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { B_ROW, createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
+import type { RemoteSessionRow } from "../remote/ports"
 import { createRelayTransport } from "./relay-transport"
+import { commandWaitMs, withCallDeadline } from "../../call-budget/call-deadline"
 
 const { account, cleanup } = createRemoteThreadFixture()
 const directories: string[] = []
@@ -70,7 +72,28 @@ async function admitted(sent: readonly Sent[], count: number): Promise<void> {
 }
 
 describe("a delivery the receiver's open draft holds is queued at once, like a same-device one, and re-sent in the background", () => {
-  test("#given b's user has a draft open that holds two admissions #when a message is sent #then the send answers queued at b's pending count at once, the same record reaches b three times, and the third is taken", async () => {
+  // omo#14130 review H1: the call's budget bounds the call, never the background re-sends it queued.
+  test("#given a held delivery sent inside a call whose budget is already spent #when it is re-sent in the background #then the re-send carries no inherited deadline and still goes out", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, pending: 1 } })
+    const admitWaits: number[] = []
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          if (args[2]["type"] === "admit_external_message") admitWaits.push(commandWaitMs(45_000))
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    const { relay } = transport(remote)
+    const sent = await withCallDeadline(Date.now() - 1, () => relay.deliver(delivery("held past budget", "k-h1")))
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    await admitted(a.sent, 2)
+    expect(admitWaits.slice(1)).toEqual([45_000])
+  })
+
+  test("#given idle b's user has a draft open that holds two admissions #when a message is sent #then the send answers a follow-up queued at b's pending count at once, the record reaches b three times as a follow-up after the first start, and the third is taken", async () => {
     const a = account({ heldDraft: 2, engine: { ...ENGINE, pending: 2 } })
     const { relay, log } = transport(a.remote)
     const first = await relay.deliver(delivery("hold me", "k1"))
@@ -79,15 +102,18 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       device: "b",
       delivery: { kind: "queued", queue_position: 2 },
       deduplicated: false,
+      effective_mode: "follow_up",
     })
     await admitted(a.sent, 3)
     const records = admits(a.sent)
     expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
-    expect(records.map((record) => record["text"])).toEqual([
-      records[0]?.["text"],
-      records[0]?.["text"],
-      records[0]?.["text"],
+    // The probe found b idle, so the first record starts a turn; the draft held it, so the re-sends wait behind it.
+    expect(records.map((record) => /effective=(\S+)/.exec(String(record["text"]))?.[1])).toEqual([
+      "start",
+      "follow_up",
+      "follow_up",
     ])
+    expect(records[2]?.["text"]).toBe(records[1]?.["text"])
     expect(log.filter((line) => line.startsWith("relay_delivery_held:"))).toHaveLength(2)
     expect(log.filter((line) => line.startsWith("relay_delivery_failed:"))).toEqual([])
     // The receiver took the third; nothing more is sent and a retry of the send under its key replays the first answer.
@@ -305,6 +331,35 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     relay.dispose()
   })
 
+  test("#given b is mid-turn and its get_state counts no admitted delivery (senpi enqueues one straight to the agent's follow-up queue, outside pendingMessageCount) #when a follow_up message is sent #then the engine's queued admission is the answer: queued with its delivery id, never idempotency_uncertain", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 } })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("then reply SECOND_OK", "k8"), mode: "follow_up" })
+    const deliveryId = admits(a.sent)[0]?.["deliveryId"]
+    expect(typeof deliveryId).toBe("string")
+    expect(sent).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery_id: deliveryId,
+      effective_mode: "follow_up",
+      delivery: { kind: "queued", queue_position: 1 },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#given b answers the admission queued and the get_state read after it fails #when the message is sent #then the queued admission is still the answer at position 1, never idempotency_uncertain", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 },
+      stateRefusedAfterAdmit: "reply_lost",
+    })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("after a lost state read", "k9"), mode: "follow_up" })
+    expect(sent).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
   test("#given b already holds the delivery (a lost reply retried) #when the retry reaches b #then the send is deduplicated at b's real pending count, not an invented 1", async () => {
     const a = account({
       admitOutcome: {
@@ -325,6 +380,157 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       deduplicated: true,
       delivery: { kind: "queued", queue_position: 3 },
     })
+  })
+})
+
+// #14320: b's engine can answer a steer whose turn is no longer the running one as reply data (`data.kind`) or as a refused
+// command (`reason`). Both forms are the same race and the sender answers them alike, never as an unsupported device.
+describe("a steer admission the receiver answers turn_conflict or not_steerable, in either form (#14320)", () => {
+  type Outcome = Awaited<ReturnType<Parameters<typeof createRelayTransport>[0]["remote"]["sessions"]["sessionCommand"]>>
+  const replyConflict: Outcome = {
+    kind: "ok",
+    response: {
+      type: "response",
+      command: "admit_external_message",
+      success: true,
+      data: { kind: "turn_conflict", turnId: "4" },
+    },
+  }
+  const forms: ReadonlyArray<readonly [string, Outcome]> = [
+    ["reply data turn_conflict", replyConflict],
+    ["refused turn_conflict", { kind: "refused", reason: "turn_conflict" }],
+    ["refused not_steerable", { kind: "refused", reason: "not_steerable" }],
+  ]
+
+  /** b streams turn 3; its steer admissions answer `answer` (the first `times` of them), every other record reaches the fixture. */
+  function racing(answer: Outcome, times = Number.POSITIVE_INFINITY) {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 } })
+    const records: Array<Readonly<Record<string, unknown>>> = []
+    let answered = 0
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          const rpc = args[2]
+          if (rpc["type"] !== "admit_external_message") return a.remote.sessions.sessionCommand(...args)
+          records.push(rpc)
+          if (rpc["deliverAs"] === "steer" && answered < times) {
+            answered += 1
+            return Promise.resolve(answer)
+          }
+          if (rpc["deliverAs"] !== "steer" && times === Number.POSITIVE_INFINITY) return Promise.resolve(answer)
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    return { remote, records }
+  }
+
+  test.each(forms)(
+    "#given b streams turn 3 and its steer admission answers %s #when a default-mode message is sent #then it is re-sent once on the follow-up lane under the same delivery id and answered queued with effective_mode follow_up",
+    async (_form, answer) => {
+      const { remote, records } = racing(answer, 1)
+      const { relay } = transport(remote)
+      const sent = await relay.deliver(delivery("race the turn", "r1"))
+      expect(sent).toMatchObject({
+        kind: "ok",
+        device: "b",
+        effective_mode: "follow_up",
+        delivery: { kind: "queued", queue_position: 1 },
+      })
+      expect(records.map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([
+        ["steer", "3"],
+        ["followUp", null],
+      ])
+      expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+      relay.dispose()
+    },
+  )
+
+  test("#given b refuses the steer turn_conflict and then the follow-up re-send turn_conflict too #when a default-mode message is sent #then that refusal is the answer with its own code, after exactly two records", async () => {
+    const { remote, records } = racing({ kind: "refused", reason: "turn_conflict" })
+    const { relay } = transport(remote)
+    expect(await relay.deliver(delivery("race twice", "r2"))).toMatchObject({
+      kind: "error",
+      error: { code: "turn_conflict", details: { device: "b" } },
+    })
+    expect(records.map((record) => record["deliverAs"])).toEqual(["steer", "followUp"])
+    relay.dispose()
+  })
+
+  test.each([
+    [forms[0]?.[0], "turn_conflict", forms[0]?.[1]],
+    [forms[1]?.[0], "turn_conflict", forms[1]?.[1]],
+    [forms[2]?.[0], "not_steerable", forms[2]?.[1]],
+  ] as const)(
+    "#given b streams turn 3 and its steer admission answers %s #when an explicit steer of turn 3 is sent #then it answers %s naming the device, with no re-send",
+    async (_form, code, answer) => {
+      const { remote, records } = racing(answer as Outcome)
+      const { relay } = transport(remote)
+      expect(
+        await relay.deliver({ ...delivery("steer turn 3", "r3"), mode: "steer", expected_turn_id: "3" }),
+      ).toMatchObject({ kind: "error", error: { code, details: { device: "b" } } })
+      expect(records.map((record) => record["deliverAs"])).toEqual(["steer"])
+      relay.dispose()
+    },
+  )
+})
+
+describe("a held explicit steer whose background re-send is refused turn_conflict (#14320 review)", () => {
+  test("#given b's draft holds a steer of turn 3 and refuses its re-send turn_conflict #when the re-send settles #then a retry under the same key replays turn_conflict naming the delivery, and nothing more is sent", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 } })
+    const records: Array<Readonly<Record<string, unknown>>> = []
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          if (args[2]["type"] === "admit_external_message") {
+            records.push(args[2])
+            if (records.length > 1) return Promise.resolve({ kind: "refused" as const, reason: "turn_conflict" })
+          }
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    // Subscribed before the send: the re-send's failure line is written once it settled.
+    const log: string[] = []
+    let failed: () => void = () => undefined
+    const failure = new Promise<void>((resolve) => {
+      failed = resolve
+    })
+    const { relay } = transport(remote, {
+      log: (line) => {
+        log.push(line)
+        if (line.startsWith("relay_delivery_failed:")) failed()
+      },
+    })
+    const steer: OutboundDelivery = { ...delivery("steer me", "s9"), mode: "steer", expected_turn_id: "3" }
+    expect(await relay.deliver(steer)).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", queue_position: 1 },
+      effective_mode: "steer",
+    })
+    let breaker: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      failure,
+      new Promise<never>((_, reject) => {
+        breaker = setTimeout(
+          () => reject(new Error(`waited 5 s for the re-send's failure line; log: ${log.join(" | ")}`)),
+          5_000,
+        )
+      }),
+    ]).finally(() => clearTimeout(breaker))
+    expect(records.map((record) => record["deliverAs"])).toEqual(["steer", "steer"])
+    expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+    const deliveryId = String(records[0]?.["deliveryId"])
+    expect(await relay.deliver(steer)).toMatchObject({
+      kind: "error",
+      error: { code: "turn_conflict", details: { device: "b", delivery_id: deliveryId } },
+    })
+    expect(records).toHaveLength(2)
+    expect(log.filter((line) => line.startsWith("relay_receipt_unrevised:"))).toEqual([])
   })
 })
 
@@ -354,5 +560,122 @@ describe("a person's waiting send names its prompt so its follow can anchor on t
     const { relay } = transport(a.remote)
     expect(await relay.deliver(personSend("p2"))).toMatchObject({ kind: "ok" })
     expect(prompts(a.sent).map((record) => "clientMessageId" in record)).toEqual([false])
+  })
+})
+
+describe("a receiver whose engine holds the delivery answers the hold, never an uncertain admission", () => {
+  // senpi#7014: an idle held receiver answers admit_external_message with `held` and its hold kinds; the engine keeps the
+  // delivery as a held notice. The sender must read that typed wait, not idempotency_uncertain (a re-send would duplicate).
+  test("#given b's engine answers held (a person's Stop) #when a message is sent #then the send is queued waiting on that hold on b", async () => {
+    const a = account({
+      engine: { ...ENGINE, pending: 0 },
+      admitOutcome: {
+        kind: "ok" as const,
+        response: {
+          type: "response",
+          command: "admit_external_message",
+          success: true,
+          data: { kind: "held", holds: ["session_hold"], turnId: "4" },
+        },
+      },
+    })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("to a held b", "k-held"))).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "b" } },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+})
+
+describe("a listing row whose device left the roster is refused, never resolved onto another device", () => {
+  // #14305 follow-up: the send paths hold the row's exact device id, and that id alone decides: without exact-id
+  // resolution the id falls through to name and prefix matching, so a different device that shares its prefix or
+  // carries its text as a name passes the online check for a device the row never named.
+  const rowOf = (device: string): RemoteSessionRow => ({
+    device,
+    session_id: "rk-stale",
+    durable_id: "dur-stale",
+    title: "stale row",
+    project: "/work/stale",
+    path: "/work/stale",
+    state: "idle",
+    updated_ms: 1_700_000_000_000,
+  })
+  const staleDelivery = (row: RemoteSessionRow, key: string): OutboundDelivery => ({
+    ...delivery("stale row send", key),
+    target: { kind: "remote", row },
+  })
+
+  test.each([
+    ["another device's id starts with the row's device id", "b7c41e09", "b7c41e09d2a64f1e", "other lab"],
+    ["another device's name is the row's device id", "b7c41e09d2a64f1e", "c1a50e0000000001", "b7c41e09d2a64f1e"],
+  ])(
+    "#given %s #when the row's thread is delivered to #then not_found as for an unknown device and nothing is sent",
+    async (_case, gone, otherId, otherName) => {
+      const a = account({
+        rows: [rowOf(gone)],
+        removed: [gone],
+        devices: [{ device: otherId, label: otherName, online: true }],
+      })
+      const { relay } = transport(a.remote)
+      const sent = await relay.deliver(staleDelivery(rowOf(gone), "k-stale"))
+      expect(sent).toMatchObject({
+        kind: "error",
+        error: { code: "not_found", details: { kind: "device", device: gone } },
+      })
+      // The refusal carries the account's devices as candidates, exactly as an unknown device does.
+      const candidates =
+        sent.kind === "error" ? ((sent.error.details?.["candidates"] ?? []) as readonly { device: string }[]) : []
+      expect(candidates.map((candidate) => candidate.device)).toEqual(["here", "b", otherId])
+      expect(a.sent).toEqual([])
+    },
+  )
+})
+
+// #14358: b refuses the admission engine_capability_missing and names attach_required (the port already re-attached and
+// sent it once more): the send answers host_unavailable naming the cause, never "update omo and senpi".
+describe("an admission refused engine_capability_missing that names its cause", () => {
+  function refusing(detail: string | undefined) {
+    const a = account({ engine: { ...ENGINE, pending: 0 } })
+    const refusal = {
+      kind: "refused" as const,
+      reason: "engine_capability_missing",
+      ...(detail === undefined ? {} : { detail }),
+    }
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) =>
+          args[2]["type"] === "admit_external_message"
+            ? Promise.resolve(refusal)
+            : a.remote.sessions.sessionCommand(...args),
+      },
+    }
+    return transport(remote).relay
+  }
+
+  test("#given b refuses the admission naming attach_required #when a message is sent #then it answers host_unavailable naming the cause", async () => {
+    const relay = refusing("attach_required")
+    expect(await relay.deliver(delivery("to a session b serves from a terminal", "cm-attach"))).toMatchObject({
+      kind: "error",
+      error: {
+        code: "host_unavailable",
+        details: { device: "b", reason: "engine_capability_missing", cause: "attach_required" },
+      },
+    })
+    relay.dispose()
+  })
+
+  test("#given b refuses the admission naming no cause #when a message is sent #then it stays unsupported", async () => {
+    const relay = refusing(undefined)
+    expect(await relay.deliver(delivery("to an old engine", "cm-old"))).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported" },
+    })
+    relay.dispose()
   })
 })

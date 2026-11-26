@@ -68,7 +68,7 @@ describe("Hephaestus bundled rule model variants", () => {
 		expect(paths).not.toContain(GPT_55_VARIANT_PATH);
 	});
 
-	it.each(["gpt-6-astra", "gpt-6-astra-fast"])(
+	it.each(["gpt-6.2-astra", "gpt-6-astra", "gpt-6-astra-fast"])(
 		"#given packaged bundled rules #when discovering with %s #then only the gpt-6 variant is included",
 		(model) => {
 			const candidates = findPluginBundledCandidates({ pluginRoot: process.cwd(), model });
@@ -78,7 +78,7 @@ describe("Hephaestus bundled rule model variants", () => {
 		},
 	);
 
-	it.each(["gpt-6-astra", "gpt-6-astra-fast"])(
+	it.each(["gpt-6.2-astra", "gpt-6-astra", "gpt-6-astra-fast"])(
 		"#given a %s session #when SessionStart runs #then the shipped gpt-6 body is injected in full",
 		async (model) => {
 			const { root, pluginData } = makeProject();

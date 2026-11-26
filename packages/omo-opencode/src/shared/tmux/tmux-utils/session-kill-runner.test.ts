@@ -4,14 +4,12 @@ import type { TmuxCommandResult } from "../runner"
 
 const sessionKillSpecifier = import.meta.resolve("./session-kill")
 const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
 const runnerSpecifier = import.meta.resolve("../runner")
 const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 // Complete module mocks: once bun has built a module from a mock factory, that module keeps the factory's export names
 // for the rest of the process, so a partial mock hides the real exports from every later test file even after the
 // restore (#13331). Each factory spreads the real module and overrides only what this file controls.
 const actualEnvironment = await import(environmentSpecifier)
-const actualLogger = await import(loggerSpecifier)
 const actualRunner = await import(runnerSpecifier)
 const actualTmuxPathResolver = await import(tmuxPathResolverSpecifier)
 
@@ -25,7 +23,6 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 const isInsideTmuxMock = mock((): boolean => true)
 const isNativeTmuxMock = mock((): boolean => true)
 const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
-const logMock = mock(() => undefined)
 
 async function loadKillTmuxSessionIfExists(): Promise<typeof import("./session-kill").killTmuxSessionIfExists> {
   const module = await import(`${sessionKillSpecifier}?test=${crypto.randomUUID()}`)
@@ -39,7 +36,6 @@ function registerModuleMocks(): void {
     isNativeTmux: isNativeTmuxMock,
     isTmuxPaneCompatible: isInsideTmuxMock,
   }))
-  mock.module(loggerSpecifier, () => ({ ...actualLogger, log: logMock }))
   mock.module(runnerSpecifier, () => ({ ...actualRunner, runTmuxCommand: runTmuxCommandMock }))
   mock.module(tmuxPathResolverSpecifier, () => ({ ...actualTmuxPathResolver, getTmuxPath: getTmuxPathMock }))
 }
@@ -51,7 +47,6 @@ describe("killTmuxSessionIfExists runner integration", () => {
     isInsideTmuxMock.mockClear()
     isNativeTmuxMock.mockClear()
     getTmuxPathMock.mockClear()
-    logMock.mockClear()
 
     runTmuxCommandMock
       .mockResolvedValueOnce({ success: true, output: "", stdout: "", stderr: "", exitCode: 0 })

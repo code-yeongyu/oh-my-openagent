@@ -8,6 +8,7 @@ import { createTaskRecordStore } from "../store"
 import { fixture, fixtureHandle, poolInput } from "../workpool/__fixtures__/admission"
 import { buildWorkpoolExecute } from "./workpool"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 test("#given host inspect after a new manager on the same state dir #when the kernel is reset #then the persisted pool is observed", async () => {
   const f = fixture()
@@ -28,7 +29,7 @@ test("#given host inspect after a new manager on the same state dir #when the ke
     global_concurrency: 1,
     residency_max_children: 4,
   })
-  const store = createTaskRecordStore({ project_dir: f.root })
+  const store = createTaskRecordStore(ownedTaskState(f.root))
   const concurrency = new TaskConcurrency(config)
   const runner = { start: async (spec: { taskId: string }) => fixtureHandle(spec.taskId).handle }
   const registry: ResidencyRegistry = {

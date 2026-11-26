@@ -15,7 +15,7 @@ import { COMMANDCODE_PROVIDER_ID } from "./setup-commandcode.js"
 // bare `bun add -g omo-ai` user never runs an installer, so setup is where they see it.
 export const TELEMETRY_NOTICE = [
   "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.",
-  "The data goes to PostHog in the United States.",
+  "The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).",
   "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).",
   "Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md",
 ].join("\n")

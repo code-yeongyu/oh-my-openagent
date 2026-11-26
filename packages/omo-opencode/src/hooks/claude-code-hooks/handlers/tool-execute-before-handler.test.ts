@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
-import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 import type { PreToolUseContext } from "../pre-tool-use"
+import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 type PreToolUseMockResult = {
   readonly decision?: "deny" | "allow"
@@ -16,14 +17,6 @@ let preToolUseResult: PreToolUseMockResult = { decision: "allow" }
 let preToolUseContexts: PreToolUseContext[] = []
 const mockGetWorkForSession = mock(() => null)
 
-mock.module("../config", () => ({
-  loadClaudeHooksConfig: async () => ({}),
-}))
-
-mock.module("../config-loader", () => ({
-  loadPluginExtendedConfig: async () => ({}),
-}))
-
 mock.module("../pre-tool-use", () => ({
   executePreToolUseHooks: async (context: PreToolUseContext) => {
     preToolUseContexts.push(context)
@@ -34,6 +27,7 @@ mock.module("../pre-tool-use", () => ({
 mock.module("../../../features/boulder-state", () => ({
   getWorkForSession: mockGetWorkForSession,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
@@ -43,6 +37,8 @@ afterAll(() => {
 const { createToolExecuteBeforeHandler } = await import("./tool-execute-before-handler")
 
 describe("createToolExecuteBeforeHandler", () => {
+  useEmptyHookConfig()
+
   beforeEach(() => {
     preToolUseResult = { decision: "allow" }
     preToolUseContexts = []

@@ -1,4 +1,5 @@
 import { MEMORY_STATUS_KEY } from "./status"
+import { sequencedStatus } from "./wiring-context"
 
 const FRAME_INTERVAL_MS = 320
 
@@ -55,6 +56,8 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
   let activeUi: MemoryFooterUi | undefined
   let disposed = false
   let lastFingerprint: string | undefined
+  /** Bumped by every recompute; only the newest one may record a fingerprint (#14837). */
+  let generation = 0
   let pending: Promise<void> = Promise.resolve()
 
   function publishFrame(): void {
@@ -79,15 +82,23 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
   }
 
   async function recompute(identity: string, ui: MemoryFooterUi): Promise<void> {
+    // Taken before the first read, so this recompute cannot replace a line a later refresh already published.
+    const status = sequencedStatus(ui)
+    generation += 1
+    const mine = generation
     try {
       const fingerprint = await options.fingerprint?.(identity)
+      // A newer recompute started while this one was reading: its result, fingerprint included, is stale. Recording
+      // the fingerprint here would make the newer recompute skip as unchanged although this line is never shown.
+      if (mine !== generation) return
       // An absent probe means "always recompute"; a stable probe short-circuits the git work.
       if (fingerprint !== undefined && fingerprint === lastFingerprint) return
       const text = await options.refreshSegments?.(identity)
+      if (mine !== generation) return
       lastFingerprint = fingerprint
       // The run may have started animating while the recompute was in flight; the spinner wins.
       if (disposed || text === undefined || activeIdentity !== undefined) return
-      ui.setStatus(MEMORY_STATUS_KEY, text)
+      status.setStatus(MEMORY_STATUS_KEY, text)
     } catch {
       // A footer refresh is decoration: a failed probe must never surface as a session error.
     }

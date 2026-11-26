@@ -67,15 +67,15 @@ function stripRetiredCodegraph(document: Readonly<Record<string, unknown>>): Ret
   const strip = (value: unknown, path: readonly string[]): void => {
     if (!isPlainObject(value)) return
     if (Object.prototype.hasOwnProperty.call(value, "codegraph")) {
-      delete value.codegraph
+      delete value["codegraph"]
       removedPaths.push([...path, "codegraph"])
     }
   }
 
   strip(stripped, [])
   for (const harness of OMO_HARNESS_BLOCKS) strip(stripped[harness], [harness])
-  if (isPlainObject(stripped.profiles)) {
-    for (const [profileName, profile] of Object.entries(stripped.profiles)) {
+  if (isPlainObject(stripped["profiles"])) {
+    for (const [profileName, profile] of Object.entries(stripped["profiles"])) {
       strip(profile, ["profiles", profileName])
       if (!isPlainObject(profile)) continue
       for (const harness of OMO_HARNESS_BLOCKS) strip(profile[harness], ["profiles", profileName, harness])

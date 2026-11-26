@@ -1,0 +1,680 @@
+{
+  "domain": "daemon",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "daemon.ensure/authority-base",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure"
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/authority-launch-spec",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "launch_spec": "x-launch_spec"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "launch_spec": "x-launch_spec"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/authority-mcp-presenter-enforcement",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "mcp_presenter_enforcement": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "mcp_presenter_enforcement": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/authority-base",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff"
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/authority-launch-spec",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "launch_spec": "x-launch_spec"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "launch_spec": "x-launch_spec"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.status/host-read-refuses-connector",
+      "row": "daemon.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/host-change-refuses-connector",
+      "row": "daemon.ensure",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/host-change-refuses-session",
+      "row": "daemon.ensure",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/host-change-refuses-service",
+      "row": "daemon.ensure",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/host-change-refuses-connector",
+      "row": "daemon.stop",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/host-change-refuses-session",
+      "row": "daemon.stop",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/host-change-refuses-service",
+      "row": "daemon.stop",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/host-change-refuses-connector",
+      "row": "daemon.stopAll",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/host-change-refuses-session",
+      "row": "daemon.stopAll",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stopAll/host-change-refuses-service",
+      "row": "daemon.stopAll",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/host-change-refuses-connector",
+      "row": "daemon.handoff",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/host-change-refuses-session",
+      "row": "daemon.handoff",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/host-change-refuses-service",
+      "row": "daemon.handoff",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/host-change-refuses-connector",
+      "row": "daemon.gc",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/host-change-refuses-session",
+      "row": "daemon.gc",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.gc/host-change-refuses-service",
+      "row": "daemon.gc",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "gc",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/host-change-refuses-connector",
+      "row": "daemon.rollbackPrepare",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/host-change-refuses-session",
+      "row": "daemon.rollbackPrepare",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.rollbackPrepare/host-change-refuses-service",
+      "row": "daemon.rollbackPrepare",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/endpoint-refuses-connector",
+      "row": "daemon.ensure",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/endpoint-refuses-session",
+      "row": "daemon.ensure",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/endpoint-refuses-service",
+      "row": "daemon.ensure",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/endpoint-refuses-connector",
+      "row": "daemon.stop",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/endpoint-refuses-session",
+      "row": "daemon.stop",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.stop/endpoint-refuses-service",
+      "row": "daemon.stop",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "stop",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/endpoint-refuses-connector",
+      "row": "daemon.handoff",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/endpoint-refuses-session",
+      "row": "daemon.handoff",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/endpoint-refuses-service",
+      "row": "daemon.handoff",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "root": {
+        "endpoint": {
+          "socket": "/run/omo-test/host.sock"
+        }
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/presenter-refuses-connector",
+      "row": "daemon.ensure",
+      "input": {
+        "mcp_presenter_enforcement": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/presenter-refuses-session",
+      "row": "daemon.ensure",
+      "input": {
+        "mcp_presenter_enforcement": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/presenter-refuses-service",
+      "row": "daemon.ensure",
+      "input": {
+        "mcp_presenter_enforcement": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

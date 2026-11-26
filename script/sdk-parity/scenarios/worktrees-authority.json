@@ -1,0 +1,100 @@
+{
+  "domain": "worktrees",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "worktrees.sweep/sweep-apply-refuses-connector",
+      "row": "worktrees.sweep",
+      "input": {
+        "apply": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/sweep-apply-refuses-session",
+      "row": "worktrees.sweep",
+      "input": {
+        "apply": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/sweep-apply-refuses-service",
+      "row": "worktrees.sweep",
+      "input": {
+        "apply": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/opencode-read-refuses-connector",
+      "row": "worktrees.sweep",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/opencode-read-refuses-service",
+      "row": "worktrees.sweep",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

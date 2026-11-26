@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -24,6 +25,33 @@ const BASE = {
 }
 
 describe("local omo launcher", () => {
+  describe("#given a launch through the generated launcher", () => {
+    test("#then the brand names exactly the plugin it prepends with --extension (#14465)", () => {
+      const home = makeHome()
+      try {
+        const cli = join(home, "capture-cli.mjs")
+        const out = join(home, "capture.json")
+        writeFileSync(
+          cli,
+          `import { writeFileSync } from "node:fs"\nwriteFileSync(${JSON.stringify(out)}, JSON.stringify({ argv: process.argv.slice(2), brand: process.env.SENPI_BRAND }))\n`,
+        )
+        const launcher = join(home, "omo.mjs")
+        writeFileSync(launcher, renderLocalLauncher({ ...BASE, senpiCliPath: cli }))
+        const plugin = join(home, "plugin-override")
+        const result = spawnSync(process.execPath, [launcher, "say", "hi"], {
+          env: { ...process.env, OMO_PLUGIN_ROOT: plugin, OMO_SENPI_CLI_PATH: cli },
+          encoding: "utf8",
+        })
+        expect(result.status).toBe(0)
+        const captured = JSON.parse(readFileSync(out, "utf8")) as { argv: string[]; brand: string }
+        expect(captured.argv).toEqual(["--extension", plugin, "say", "hi"])
+        expect(JSON.parse(captured.brand).extensions).toEqual([plugin])
+      } finally {
+        rmSync(home, { recursive: true, force: true })
+      }
+    })
+  })
+
   describe("#given a sibling-store install", () => {
     describe("#when the launcher is rendered", () => {
       test("#then it hands the engine the same product identity as the published launcher", () => {

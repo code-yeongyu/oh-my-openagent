@@ -13,6 +13,7 @@ import { runTaskOutput } from "../output/output"
 import { runTaskCancel } from "../control/cancel"
 import { buildTaskExecute } from "./execute"
 import { TaskToolParams } from "./params"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const roots: string[] = []
 afterEach(() => {
@@ -44,7 +45,7 @@ async function bounded(event: Promise<void>): Promise<void> {
 function tree(levels: number, holdLeaf = false, batch = false, promote = false) {
   const project = mkdtempSync(join(tmpdir(), "lease-parking-"))
   roots.push(project)
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const concurrency = new TaskConcurrency({ default_concurrency: 1, global_concurrency: 1 })
   const begin = deferred()
   const leafEntered = deferred()

@@ -23,6 +23,7 @@ import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/compon
 import { runTaskSend } from "../../tools/control/send"
 import type { ColdReviveTrace } from "./cold-revive-trace"
 import { NO_HOST_ENDPOINT } from "../host-session"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 // A source-graph Bun child started in a sandbox writes Bun's runtime transpiler cache into a cold
 // location. On Windows those writes block the child for seconds (measured: 13-14 s with ~2.4 s CPU, 2 of 20
@@ -107,7 +108,7 @@ export async function realColdRevive(
   assert(model)
   const events = new EventEmitter()
   const transitions: string[] = []
-  const backing = createTaskRecordStore({ project_dir: root })
+  const backing = createTaskRecordStore(ownedTaskState(root))
   const store = {
     ...backing,
     mutate: (id: string, update: Parameters<typeof backing.mutate>[1]) => {

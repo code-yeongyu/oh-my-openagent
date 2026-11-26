@@ -194,7 +194,7 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     expect(specs[0]?.prompt).not.toContain("SKILLBLOCK")
   })
 
-  test("#given a model override and task summary #when spawning plan-reviewer #then they survive the prompt substitution", async () => {
+  test("#given a task summary #when spawning plan-reviewer #then it survives the prompt substitution", async () => {
     // given
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
@@ -205,7 +205,6 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
       {
         prompt: `review ${PLAN_A}`,
         subagent_type: "plan-reviewer",
-        model: "openai/gpt-5.6-sol",
         task_summary: "round 2",
         run_in_background: true,
       },
@@ -215,7 +214,6 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     )
 
     // then
-    expect(specs[0]?.model).toBe("openai/gpt-5.6-sol")
     expect(specs[0]?.task_summary).toBe("round 2")
   })
 

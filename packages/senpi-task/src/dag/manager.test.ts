@@ -10,6 +10,7 @@ import { createDagJournal } from "./journal"
 import { applyDagRunMutation, DagManagerError, createDagManager, type DagRunRecordV1 } from "./manager"
 import { createDagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "ses_parent"
@@ -40,7 +41,7 @@ function definition(overrides: Partial<DagDefinition> = {}): DagDefinition {
 }
 
 function manager(projectDir: string, options: { readonly now?: () => number } = {}) {
-  const store = createDagFileStore({ project_dir: projectDir }, options.now === undefined ? {} : { now: options.now })
+  const store = createDagFileStore(ownedTaskState(projectDir), options.now === undefined ? {} : { now: options.now })
   return {
     store,
     dag: createDagManager({
@@ -68,7 +69,7 @@ function raceWorkerSource(projectDir: string, prompt: string, barrierDir: string
     `const { createDagManager } = await import(${JSON.stringify(managerPath)})`,
     `const { createDagFileStore } = await import(${JSON.stringify(join(import.meta.dir, "store.ts"))})`,
     `const { existsSync, watch } = await import("node:fs")`,
-    `const store = createDagFileStore({ project_dir: ${JSON.stringify(projectDir)} })`,
+    `const store = createDagFileStore(${JSON.stringify(ownedTaskState(projectDir))})`,
     `const dag = createDagManager({ store })`,
     `const releasePath = ${JSON.stringify(join(barrierDir, "release"))}`,
     `const waitForRelease = () => new Promise((resolve, reject) => {`,
@@ -276,7 +277,7 @@ describe("createDagManager start", () => {
 
   test("#given a configured node ceiling #when a definition exceeds it #then invalid_definition names the configured bound", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const dag = createDagManager({ store, settings: { max_nodes_per_run: 1 } })
 
     // when
@@ -309,7 +310,7 @@ describe("createDagManager start", () => {
 describe("createDagManager skill materialization seam", () => {
   test("#given a materializeSkills hook #when a run is created #then per node effectivePrompt slots are persisted without entering the fingerprint", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const plain = createDagManager({ store })
     const withSkills = createDagManager({
       store,
@@ -614,7 +615,7 @@ describe("createDagManager amend", () => {
 
   test("#given a materialized run #when changed and added nodes are amended #then skills rematerialize once for only those nodes", async () => {
     const project = tempProject()
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
     const calls: string[][] = []
     const dag = createDagManager({
       store,
@@ -727,7 +728,7 @@ describe("createDagManager concurrent starts", () => {
     const outcomes = await raceStarts(projectDir, ["draft the plan", "draft the plan"])
 
     // then
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     expect(runFiles(store)).toHaveLength(1)
     expect(outcomes).toEqual(
       expect.arrayContaining([expect.objectContaining({ ok: true }), expect.objectContaining({ ok: true })]),
@@ -745,11 +746,19 @@ describe("createDagManager concurrent starts", () => {
     const outcomes = await raceStarts(projectDir, ["draft the plan", "draft a different plan"])
 
     // then
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const runs = runFiles(store)
     expect(runs).toHaveLength(1)
-    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1)
-    expect(outcomes.filter((outcome) => outcome.code === "definition_conflict")).toHaveLength(1)
+    // Every child outcome rides the failure message, so a loser that neither won nor conflicted names itself.
+    const seen = JSON.stringify(outcomes)
+    expect(
+      outcomes.filter((outcome) => outcome.ok),
+      seen,
+    ).toHaveLength(1)
+    expect(
+      outcomes.filter((outcome) => outcome.code === "definition_conflict"),
+      seen,
+    ).toHaveLength(1)
     const winner = outcomes.find((outcome) => outcome.ok)?.runId as DagRunId
     const checkpoint = store.readCheckpoint<{ readonly definitionFingerprint: string }>(winner)
     expect(store.readKey(parentSessionId, "release-plan")).toMatchObject({

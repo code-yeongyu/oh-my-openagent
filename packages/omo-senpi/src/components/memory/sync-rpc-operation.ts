@@ -29,7 +29,8 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
-const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
+/** The shape of a code that is safe to log: an identifier, never free text. */
+export const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
 
 /**
  * Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code.
@@ -221,16 +222,21 @@ export async function runSyncRpcOperation(
       const result = await options.runtime.enableSync(input)
       auth.admit(() => undefined)
       switch (result.kind) {
-        case "joined":
+        case "joined": {
+          const rootNotice = {
+            ...(result.rootChanged && { rootChanged: true as const }),
+            ...(result.rootCheck && { rootCheck: result.rootCheck }),
+          }
           record.enable =
             result.created === true
-              ? { kind: "first_device_created", ...(result.rootChanged && { rootChanged: true }) }
+              ? { kind: "first_device_created", ...rootNotice }
               : {
                   kind: "joined",
-                  ...(result.rootChanged && { rootChanged: true }),
+                  ...rootNotice,
                   ...(result.phraseVoid !== undefined ? { phraseVoid: result.phraseVoid } : {}),
                 }
           break
+        }
         case "method_required":
         case "acknowledge_required":
         case "passkey_unavailable":
@@ -259,6 +265,9 @@ export async function runSyncRpcOperation(
           break
         }
       }
+      const notice = record.enable
+      if (notice !== null && "rootCheck" in notice && notice.rootCheck !== undefined)
+        options.warn?.("memory sync root-change check skipped", { path: "enable", code: notice.rootCheck.reason })
     } else {
       record.approval = await options.runtime.approveDevice({
         ...input,
@@ -324,4 +333,7 @@ export async function runSyncRpcOperation(
       }
     }
   }
+  // Sync is on for this device again (after a Turn off, or for the first time): engines this process parked for its
+  // repos start now instead of waiting for every session to release and rebind (#14093).
+  if (record.enable?.kind === "joined" || record.enable?.kind === "first_device_created") await options.resumeSync?.()
 }
