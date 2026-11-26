@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync, rmSync } from "node:fs"
 
 import { dirname, join } from "node:path"
 
@@ -32,7 +33,18 @@ afterEach(async () => {
   host = undefined
   await harness?.dispose()
   harness = undefined
+  for (const dir of made.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+    expect(existsSync(dir)).toBe(false)
+  }
 })
+
+const made: string[] = []
+function tempDir(prefix: string): string {
+  const dir = shortTempDir(prefix)
+  made.push(dir)
+  return dir
+}
 
 function offlineHost(): ThreadHost {
   const unused = async (): Promise<never> => {
@@ -233,7 +245,7 @@ describe("the same-device wake through the registered thread component", () => {
   // The default answer with no configuration override: nothing is set, so the schema default decides and the send
   // wakes its target exactly as an explicit opt-in would.
   test("#given an omo configuration with no session_wake setting at all #when thread_send names a session that is not running #then the carrier opens it and its drain admits the delivery once", async () => {
-    const noConfigHome = shortTempDir("omo-wake-no-config-")
+    const noConfigHome = tempDir("omo-wake-no-config-")
     const w = await wire({ ...ENGINE_AT_MINIMUM, env: { HOME: noConfigHome } })
     const pi = await w.start()
     const woken = w.woken()
@@ -271,7 +283,7 @@ describe("the same-device wake through the registered thread component", () => {
     "#given %s loads the thread component with no session open #when the component registers #then the delivery consumer is declared only on the operator daemon",
     async (_what, operatorDaemon) => {
       const service = createFakeDeliveryService({ admitted: true })
-      const daemonSocket = join(shortTempDir("omo-wake-daemon-"), "rpc.sock")
+      const daemonSocket = join(tempDir("omo-wake-daemon-"), "rpc.sock")
       const w = await wire({
         ...ENGINE_AT_MINIMUM,
         env: { OMO_RPC_SOCKET_PATH: daemonSocket },
