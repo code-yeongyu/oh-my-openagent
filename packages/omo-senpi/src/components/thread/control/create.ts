@@ -196,10 +196,13 @@ export async function createThread(
       if (found.kind === "live") return { kind: "ok", thread: found.thread }
       return found.kind === "file" ? await plan.host.open(fileOpen(found)) : undefined
     }
-    const openNew = () =>
-      plan.host.open(
+    // #15002: `kept` is the worktree an earlier run under this key made on the far device: the open starts in it, as
+    // that run's would have, and makes none of its own, so the create keeps one worktree and one session.
+    const openNew = async (kept?: ThreadWorktree): Promise<SessionOpenOutcome> => {
+      const { worktree: _asked, ...request } = plan.request
+      const outcome = await plan.host.open(
         {
-          ...plan.request,
+          ...(kept === undefined ? plan.request : { ...request, cwd: kept.path }),
           ...(openName === undefined ? {} : { name: openName }),
           ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
           ...(preset === undefined ? {} : { permissionPreset: preset }),
@@ -209,6 +212,10 @@ export async function createThread(
         // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
         { confirmReach: plan.creates },
       )
+      return kept === undefined || outcome.kind !== "ok"
+        ? outcome
+        : { ...outcome, thread: { ...outcome.thread, worktree: kept } }
+    }
     // #15002: a create on another device left uncertain names the thread its key derives, and, when the caller gave the
     // key, that a retry under it is safe: the retry adopts a session an earlier run made, or opens one only where the
     // device proves none exists (`unopened`), so it never makes a second.
@@ -250,14 +257,10 @@ export async function createThread(
               { confirmReach: true },
             )
       // #15002: the earlier open made nothing the device holds (it was lost on the way): open it now under the same id.
-      // A worktree the earlier run made stays its own, so that create is never opened a second time elsewhere.
+      // A worktree the earlier run made is its own: the open starts in it, so the create is never opened elsewhere.
       if (found !== undefined) outcome = found
-      else if (
-        createdId !== undefined &&
-        firstWorktree === undefined &&
-        (await plan.host.unopened?.(createdId)) === true
-      )
-        outcome = await openNew()
+      else if (createdId !== undefined && (await plan.host.unopened?.(createdId)) === true)
+        outcome = await openNew(firstWorktree)
       else return keyedUncertain(stillUncertain())
     } else
       try {

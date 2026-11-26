@@ -325,6 +325,55 @@ describe("thread_create on another device whose open was lost on the way (#15002
     expect((await a.remote.sessions.sessions({ device: "b" })).filter((row) => row.durable_id === id)).toHaveLength(1)
     expect(toSession(a.sent, `rk-${id}`, "admit_external_message") + toSession(a.sent, `rk-${id}`, "prompt")).toBe(1)
   })
+
+  // The first run made a worktree on b and kept it in its uncertain answer: the retry opens in that worktree, never a second.
+  test.each([
+    ["b made nothing", "none", { count: 1 }],
+    ["the lost open reaches b just before the retry's open", "late", { count: 1, landsLate: true }],
+  ] as const)(
+    "#given a create with a worktree whose open was lost on the way and %s #when it is retried under the same key #then the retry answers the thread in the kept worktree and opens no second session",
+    async (_label, landing, openRequestGone) => {
+      const repo = kit.repository()
+      const a = account({ openRequestGone })
+      const { run } = surface(withFarWorktrees(a, kit.folder("thread-wt-gone-")))
+      const key = `remote-gone-wt-${landing}`
+      const args = {
+        device: "studio",
+        name: "gone-wt",
+        prompt: "build it",
+        cwd: repo,
+        worktree: { branch: "far-gone" },
+        idempotency_key: key,
+      }
+      const id = createdThreadId("dur-caller", key)
+
+      const first = await run("thread_create", args)
+      if (first.kind !== "error") throw new Error(`the first create did not fail: ${JSON.stringify(first)}`)
+      const kept = (first.error.details as { worktree: { path: string } }).worktree
+      expect(first).toMatchObject({
+        error: { code: "idempotency_uncertain", details: { thread: id, worktree: { branch: "far-gone" } } },
+      })
+      const setups = opens(a.sent).length - 1
+
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "ok",
+        thread: id,
+        device: "b",
+        worktree: { branch: "far-gone", path: kept.path },
+      })
+      // No second worktree's setup session: the retry's one open is the create's, in the kept worktree.
+      const creates = opens(a.sent).filter((entry) => entry.rpc?.["durableSessionId"] !== undefined)
+      expect(opens(a.sent).length - creates.length).toBe(setups)
+      expect(creates.map((entry) => [entry.rpc?.["durableSessionId"], entry.rpc?.["cwd"]])).toEqual([
+        [id, kept.path],
+        [id, kept.path],
+      ])
+      const admits = [id, `rk-${id}`].map(
+        (session) => toSession(a.sent, session, "admit_external_message") + toSession(a.sent, session, "prompt"),
+      )
+      expect(admits.reduce((sum, count) => sum + count, 0)).toBe(1)
+    },
+  )
 })
 
 // #14569: a same-key recovery answers what the first create would have, keeps the first uncertain cause, and an

@@ -64,7 +64,7 @@ export type LocalPlacement = {
  * for an existing thread's file); `done` is a refusal, or an existing thread that is live already and needs no open
  * (`deduplicated`), with the device that holds it.
  */
-type OpenFields = Pick<SessionOpenRequest, "cwd" | "sessionPath" | "forkFrom">
+type OpenFields = Pick<SessionOpenRequest, "cwd" | "sessionPath" | "forkFrom" | "worktree">
 
 /**
  * Why an alias stays the thread's name on its own device (#13104): no account holds it - the registry asks for a sign-in
