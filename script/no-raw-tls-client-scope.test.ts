@@ -33,6 +33,50 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
     expect(connectHits(sample)).toBe(0)
   })
 
+  // A TypeScript ambient declaration describes a type and binds nothing at runtime, so it never hides the real Bun.
+  test.each([
+    ["a declared const", "declare const Bun: any; Bun.connect({ hostname, port, tls: true })"],
+    ["a declared let", "declare let Bun: any; Bun.connect(options)"],
+    ["a declared var", "declare var Bun: any; Bun.connect(options)"],
+    ["a declared function", "declare function Bun(): void; Bun.connect(options)"],
+    ["a declared class", "declare class Bun {} Bun.connect(options)"],
+    ["a var inside declare global", "export {}; declare global { var Bun: any } Bun.connect(options)"],
+    ["a const inside a declared module", 'declare module "m" { const Bun: any } Bun.connect(options)'],
+    ["a declared parameter name", "declare function f(Bun: any): void; Bun.connect(options)"],
+    ["a declared const inside a function", "function f() { declare const Bun: any; return Bun.connect(options) }"],
+  ])("%s: still a hit", (_name, sample) => {
+    expect(connectHits(sample)).toBe(1)
+  })
+
+  test.each([
+    ["a const enum", "const enum Bun { A } Bun.connect(options)"],
+    [
+      "an ambient declaration inside a function whose module has a real alias",
+      "var t = globalThis.Bun; function f() { declare const t: any; return t.connect(options) }",
+    ],
+    [
+      "an ambient module declaration above a real alias in a function",
+      "declare const t: any; function f() { var t = globalThis.Bun; return t.connect(options) }",
+    ],
+  ])("%s: still a hit", (_name, sample) => {
+    expect(connectHits(sample)).toBe(1)
+  })
+
+  test.each([
+    [
+      "a real const in a function, ambient at module level",
+      "declare const Bun: any; function f() { const Bun = o; return Bun.connect(options) }",
+    ],
+    [
+      "a real module const, ambient in a function",
+      "const Bun = o; function f() { declare const Bun: any; return Bun.connect(options) }",
+    ],
+    ["a real const beside an ambient one", "declare const Bun: any; { const Bun = o; Bun.connect(options) }"],
+    ["a real parameter in a function that is not declared", "function f(Bun: any) { return Bun.connect(options) }"],
+  ])("%s: no hit", (_name, sample) => {
+    expect(connectHits(sample)).toBe(0)
+  })
+
   test.each([
     ["scope form 1", "var t = globalThis.Bun; t.connect"],
     ["scope form 2", "var t = globalThis.Bun; function f() { return t.connect }"],
