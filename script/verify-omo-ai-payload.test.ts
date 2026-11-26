@@ -180,6 +180,19 @@ describe("omo-ai payload verifier", () => {
       expect(run.exitCode).toBe(0)
     })
 
+    test.skipIf(process.platform === "win32")(
+      "#when the helper is packed empty with mode 0755 #then it fails as empty",
+      () => {
+        const run = runVerifierOnPayload(
+          [...complete, KEYCHAIN_HELPER],
+          { [KEYCHAIN_HELPER]: "" },
+          { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } },
+        )
+        expect(run.output).toContain(`empty artifact: ${KEYCHAIN_HELPER}`)
+        expect(run.exitCode).toBe(1)
+      },
+    )
+
     test("#when the PR lane verifies without --release #then the helper is not required", () => {
       const run = runVerifierOnPayload(complete)
       expect(run.output).not.toContain(KEYCHAIN_HELPER)

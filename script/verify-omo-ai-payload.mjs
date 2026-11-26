@@ -116,6 +116,8 @@ for (const artifact of REQUIRED_ARTIFACTS) {
 for (const artifact of releaseMode ? RELEASE_EXECUTABLE_ARTIFACTS : []) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
+  } else if (sizes.get(artifact) === 0) {
+    errors.push(`empty artifact: ${artifact}`)
   } else if ((statSync(resolve(pkgDir, artifact)).mode & 0o100) === 0) {
     errors.push(`not executable (u+x): ${artifact}`)
   }
