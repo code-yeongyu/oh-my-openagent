@@ -164,6 +164,7 @@ const FORMS: Record<string, readonly (Form | Program)[]> = {
 const RECEIVERS = [
   { binding: "Bun", setup: "", call: "Bun.connect(o);" },
   { binding: "t", setup: "var t = globalThis.Bun;", call: "t.connect(o);" },
+  { binding: "globalThis", setup: "", call: "globalThis.Bun.connect(o);" },
 ] as const
 
 function programs(form: Form | Program, receiver: (typeof RECEIVERS)[number]): string[] {
@@ -249,31 +250,31 @@ describe("declaration kinds and the runtime bindings they create (#15071)", () =
     for (const reason of NEVER_SHADOWS.values()) expect(reason.length).toBeGreaterThan(0)
   })
 
-  test("every row and condition branch is generated, and no call that runs goes unreported", () => {
+  test("every row and condition branch of the table has generated forms", () => {
     const branches = [...BINDING_KINDS].flatMap(([kind, rule]) =>
       rule.branches.map((b) => `${ts.SyntaxKind[kind]}: ${b}`),
     )
     expect(Object.keys(FORMS).sort()).toEqual(branches.sort())
-    const unjudged: string[] = []
+  })
+
+  // One case per branch keeps each case well inside the default limit on a loaded host.
+  test.each(Object.entries(FORMS))("%s: no call that runs goes unreported", (branch, forms) => {
+    let judged = 0
     const missed: string[] = []
-    for (const [branch, forms] of Object.entries(FORMS)) {
-      let judged = 0
-      for (const source of forms.flatMap((form) => RECEIVERS.flatMap((receiver) => programs(form, receiver)))) {
-        const isModule = ts.isExternalModule(ts.createSourceFile("x.ts", source, ts.ScriptTarget.Latest))
-        const run = (module: boolean) => Object.values(TRANSPILERS).map((transpile) => transpile(source, module))
-        const asModule = run(true)
-        const asWritten = isModule ? asModule : run(false)
-        if ([...asModule, ...asWritten].some((result) => result !== undefined)) judged += 1
-        const files = [
-          ...(asWritten.includes(true) ? ["x.ts"] : []),
-          ...(asModule.includes(true) ? ["x.mts", "x.cts"] : []),
-        ]
-        for (const file of [...files, "x.d.ts", "x.d.mts", "x.d.cts"])
-          if (findRawTlsClients(source, file).length === 0) missed.push(`${branch} in ${file}:\n${source}`)
-      }
-      if (judged === 0) unjudged.push(branch)
+    for (const source of forms.flatMap((form) => RECEIVERS.flatMap((receiver) => programs(form, receiver)))) {
+      const isModule = ts.isExternalModule(ts.createSourceFile("x.ts", source, ts.ScriptTarget.Latest))
+      const run = (module: boolean) => Object.values(TRANSPILERS).map((transpile) => transpile(source, module))
+      const asModule = run(true)
+      const asWritten = isModule ? asModule : run(false)
+      if ([...asModule, ...asWritten].some((result) => result !== undefined)) judged += 1
+      const files = [
+        ...(asWritten.includes(true) ? ["x.ts"] : []),
+        ...(asModule.includes(true) ? ["x.mts", "x.cts"] : []),
+      ]
+      for (const file of [...files, "x.d.ts", "x.d.mts", "x.d.cts"])
+        if (findRawTlsClients(source, file).length === 0) missed.push(`${branch} in ${file}:\n${source}`)
     }
-    expect(unjudged).toEqual([])
+    expect(judged).toBeGreaterThan(0)
     expect(missed).toEqual([])
   })
 })
