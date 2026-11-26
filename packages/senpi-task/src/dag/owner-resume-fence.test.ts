@@ -120,3 +120,22 @@ test("#11381 #given an old attempt's and a removed node's finished children #whe
   expect((await reentry.run).status).toBe("completed")
   expect(liveOwned(fixture, runId)).toEqual([])
 })
+
+test("#11381 #given a settled run #when a finished child it owns resumes on its own #then the resume is refused and the run owes no stop", async () => {
+  // given
+  const { fixture, runner, resume } = fencedFixture()
+  const started = await fixture.start(definition("fence-settled", [categoryNode("A")]))
+  const runId = started.snapshot.runId
+  await runner.whenStarted(1)
+  runner.settle("A", completed("A"))
+  expect((await fixture.wait(runId)).status).toBe("completed")
+  const taskA = taskOf(fixture, runId, "A")
+
+  // when
+  const answer = await resume("A", taskA)
+
+  // then
+  expect(answer).toBe("refused")
+  expect(fixture.taskStore.load(taskA)?.status).toBe("completed")
+  expect((await fixture.wait(runId)).snapshot.outstandingStop).toBeUndefined()
+})
