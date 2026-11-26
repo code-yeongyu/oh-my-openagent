@@ -22,17 +22,28 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
     await whenAdmissionIdle(context)
     // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
     for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
-    // A completed node's child can resume on its own until the run is journaled cancelled; its
-    // reopen attaches the task (#12134), so drain until every attached task was cancelled once.
+    // A node's child can resume on its own until the run is journaled cancelled (#12134): a
+    // completed node's reopen attaches its task, and a finished child whose cancel was a noop can
+    // start a new run. Each request is fenced to the run epoch it names, and the drain repeats
+    // until every attached task's current run was asked once.
     const requested = new Set<string>()
     const cancellationResults: PromiseSettledResult<unknown>[] = []
     for (;;) {
-      const targets = [...context.attachedTaskIds.values()].filter((taskId) => !requested.has(taskId))
+      const targets = [...context.attachedTaskIds.values()].flatMap((taskId) => {
+        const runEpoch = context.taskManager.get(taskId)?.notification.run_epoch
+        const asked = `${taskId}@${runEpoch ?? "unknown"}`
+        return requested.has(asked) ? [] : [{ taskId, runEpoch, asked }]
+      })
       if (targets.length === 0) break
-      for (const taskId of targets) requested.add(taskId)
+      for (const { asked } of targets) requested.add(asked)
       cancellationResults.push(
         ...(await Promise.allSettled(
-          targets.map((taskId) => context.taskManager.cancelTask(taskId, reason, { abort: "skip" })),
+          targets.map(({ taskId, runEpoch }) =>
+            context.taskManager.cancelTask(taskId, reason, {
+              abort: "skip",
+              ...(runEpoch === undefined ? {} : { expectedRunEpoch: runEpoch }),
+            }),
+          ),
         )),
       )
     }

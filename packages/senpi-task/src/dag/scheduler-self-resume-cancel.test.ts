@@ -50,6 +50,36 @@ describe("DAG cancellation while a completed node's child resumes on its own (#1
     }
   })
 
+  test("#given an attached child that finished before its fold so its cancel was a noop #when it resumes under a new run epoch during another child's cancel #then the new run is cancelled too", async () => {
+    let resumed = false
+    const manager = new SelfResumingTaskManager({
+      onCancel: (nodeId) => {
+        if (nodeId !== "D" || resumed) return
+        resumed = true
+        manager.selfResume("A")
+      },
+    })
+    const fixture = startFixture(recordFor([node("A"), node("D")]), manager)
+    try {
+      const running = fixture.scheduler.run()
+      await within(manager.whenStarted("A"))
+      await within(manager.whenStarted("D"))
+      // Same turn: the cancel starts before the scheduler can fold A's settlement.
+      manager.complete("A")
+      const cancelled = fixture.scheduler.cancel(runId)
+      await within(cancelled)
+      const result = await within(running)
+
+      expect(manager.cancellations).toEqual(["A", "D", "A"])
+      expect(manager.taskOf("A").status).toBe("cancelled")
+      expect(manager.taskOf("A").notification.run_epoch).toBe(2)
+      expect(result.status).toBe("cancelled")
+      expect(result.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual(["A:cancelled", "D:cancelled"])
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
   test("#given cancellation is already cancelling the attached children #when a completed node's child resumes #then the resumed child is cancelled too", async () => {
     const manager = new SelfResumingTaskManager({
       onCancel: (nodeId) => {

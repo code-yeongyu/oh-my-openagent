@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
-import type { SendInput, SendOutcome } from "../steering"
+import type { CancelOptions, CancelOutcome, SendInput, SendOutcome } from "../steering"
 import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
@@ -177,17 +177,22 @@ export class SelfResumingTaskManager implements TaskManager {
     return task.completion.promise
   }
 
-  async cancelTask(
-    taskId: string,
-  ): Promise<{ readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }> {
-    const task = this.#tasks.get(taskId)
-    if (task === undefined) throw new Error(`unknown fake task ${taskId}`)
-    const nodeId = String(task.record.owner?.nodeId)
-    this.cancellations.push(nodeId)
-    this.hooks.onCancel?.(nodeId)
-    const previous = task.record.status
-    this.complete(nodeId, "cancelled")
-    return { kind: "cancelled", task_id: taskId, previous_status: previous }
+  // Answers as steering/controls.ts cancelTask does for the DAG's abort "skip": a fence naming an
+  // earlier run is stale, and a finished child is a noop that stays resident and reopenable.
+  async cancelTask(taskId: string, _reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
+    const record = this.get(taskId)
+    if (record === undefined) throw new Error(`unknown fake task ${taskId}`)
+    this.cancellations.push(String(record.owner?.nodeId))
+    this.hooks.onCancel?.(String(record.owner?.nodeId))
+    const { status, task_id } = record
+    if (options?.expectedRunEpoch !== undefined && options.expectedRunEpoch !== record.notification.run_epoch) {
+      return { kind: "stale", task_id, status, run_epoch: record.notification.run_epoch, reason: "earlier run" }
+    }
+    if (status !== "pending" && status !== "running" && status !== "paused") {
+      return { kind: "noop", task_id, status, reason: `Task ${task_id} is ${status}, not running.` }
+    }
+    this.complete(String(record.owner?.nodeId), "cancelled")
+    return { kind: "cancelled", task_id, previous_status: status }
   }
 
   sendToTask(input: SendInput): Promise<SendOutcome> {
