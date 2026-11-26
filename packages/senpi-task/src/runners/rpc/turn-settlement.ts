@@ -75,6 +75,14 @@ export type TurnSettlement = {
   // A wake source the handle tracks just dropped: re-offer the held error a confirmation chance.
   // No-op when nothing is held, a confirmation is already armed, or no probe was wired.
   readonly reconfirmHeld: () => void
+  // An outcome read outside the event stream (a re-joined session's reconciliation, a finished
+  // transcript) ends the turn exactly as an `agent_end` then `agent_idle` would: a completed outcome
+  // is held while the engine still reports the child's own async work (omo#10487). Re-offering the
+  // note a hold already keeps back leaves that hold alone.
+  readonly adopt: (outcome: RunnerOutcome) => void
+  // The session that owned the held turn's work is gone (reopened from its file): the turn ends as
+  // that abandoned work. `false` when no turn is held on async work.
+  readonly abandon: () => boolean
 }
 
 /**
@@ -198,6 +206,21 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     disarmConfirmation()
   }
 
+  const atIdle = (): void => {
+    // A turn already held on its pending work ends only by a new run, the hold's own confirmation,
+    // or teardown: a repeated idle record carries no answer (omo#10487).
+    if (asyncWork?.holding() === true) return
+    clearConfirmation()
+    const outcome = held
+    const work = outcome?.status === "completed" ? input.pendingAsyncWork?.() : undefined
+    if (asyncWork !== undefined && outcome?.status === "completed" && work !== undefined) {
+      asyncWork.begin(outcome, work)
+      return
+    }
+    held = undefined
+    if (outcome !== undefined) input.settle(outcome)
+  }
+
   return {
     observe: (event) => {
       asyncWork?.activity()
@@ -221,21 +244,9 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           if (outcome.status === "error") rearm()
           return
         }
-        case "agent_idle": {
-          // A turn already held on its pending work ends only by a new run, the hold's own
-          // confirmation, or teardown: a repeated idle record carries no answer (omo#10487).
-          if (asyncWork?.holding() === true) return
-          clearConfirmation()
-          const outcome = held
-          const work = outcome?.status === "completed" ? input.pendingAsyncWork?.() : undefined
-          if (asyncWork !== undefined && outcome?.status === "completed" && work !== undefined) {
-            asyncWork.begin(outcome, work)
-            return
-          }
-          held = undefined
-          if (outcome !== undefined) input.settle(outcome)
+        case "agent_idle":
+          atIdle()
           return
-        }
         default:
           return
       }
@@ -247,5 +258,24 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
       disarmConfirmation()
     },
     reconfirmHeld: rearm,
+    adopt: (outcome) => {
+      const keptBack =
+        asyncWork?.holding() === true &&
+        held?.status === "completed" &&
+        outcome.status === "completed" &&
+        outcome.finalResponse === held.finalResponse
+      if (keptBack) return
+      clearConfirmation()
+      held = outcome
+      atIdle()
+    },
+    abandon: () => {
+      const outcome = asyncWork?.abandoned()
+      if (outcome === undefined) return false
+      clearConfirmation()
+      held = undefined
+      input.settle(outcome)
+      return true
+    },
   }
 }

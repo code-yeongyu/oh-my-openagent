@@ -100,9 +100,10 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const reconciliation = createHandleReconciliation({
     lastInputId: () => options.inputStore?.load(taskId)?.last_effect_id,
     port: () => client,
+    observeState: tracking.observeState,
     settle: (settled) => {
       if (settled.status === "completed") finalText = settled.finalResponse
-      settleTurn(settled)
+      settlement.adopt(settled)
     },
     continuing: () => {
       continuationState = "pending_delivery"
@@ -274,8 +275,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       bindHostSessionPort(client, clientBinding)
     },
     turnResumed: () => listeners.emitTurnResumed(),
-    reconcile: (reopened: boolean) =>
-      reconciliation.reconcile(identity.current().sessionPath, undefined, true, reopened),
+    // A session reopened from its file runs nothing the old one started: a turn held on its own async
+    // work lost that work (omo#10487).
+    reconcile: async (reopened: boolean) =>
+      reopened && settlement.abandon()
+        ? "failed"
+        : reconciliation.reconcile(identity.current().sessionPath, undefined, true, reopened),
     beginContinuation: () => beginTurn(),
     endLost: () => endSession({ kind: "transport_gone" }),
     // Transport failures park in recovery; a prompt rejection keeps its own actionable cause.
@@ -414,8 +419,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       // A state read that fails is not proof of idleness, and must never cost the reattach: stay busy.
       const state = await client.getState().catch(() => undefined)
       if (state === undefined || !sessionIsIdle(state)) return
+      tracking.observeState(state)
       if (turnOutcome === undefined && settlement.pending() === undefined)
-        settleTurn({ status: "completed", finalResponse })
+        settlement.adopt({ status: "completed", finalResponse })
     },
     waitForIdle: () => waiters.waitForIdle(reachedIdle || outcome !== undefined),
     hasExited: () => outcome !== undefined,

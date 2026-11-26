@@ -272,8 +272,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
         !sessionIsIdle(response.data)
       )
         return
+      tracking.observeState(response.data)
       if (turnOutcome === undefined && settlement.pending() === undefined)
-        settleTurn({ status: "completed", finalResponse })
+        settlement.adopt({ status: "completed", finalResponse })
     },
     onSelfResumed: (listener) => {
       resumedListeners.add(listener)

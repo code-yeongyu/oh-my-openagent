@@ -8,6 +8,8 @@ import { reconcileHostTurn, type ReconciledTurnNotice } from "./reconcile-turn"
 export function createHandleReconciliation(input: {
   readonly lastInputId: () => string | undefined
   readonly port: () => HostSessionPort
+  // Every state the reconciliation reads also reports the engine's lifecycle (omo#10487).
+  readonly observeState: (state: unknown) => void
   readonly settle: (outcome: RunnerOutcome) => void
   readonly continuing: () => void
 }) {
@@ -36,7 +38,11 @@ export function createHandleReconciliation(input: {
       const lastInputEffect = effectId === undefined ? undefined : await readInputReceipt(sessionPath, effectId)
       const result = await reconcileHostTurn(
         {
-          getState: () => client.getState(),
+          getState: async () => {
+            const state = await client.getState()
+            input.observeState(state)
+            return state
+          },
           ...(lastInputEffect === undefined ? {} : { lastInputEffect }),
           reopened,
           get adoptedEntryId() {
