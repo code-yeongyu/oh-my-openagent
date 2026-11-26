@@ -6,6 +6,7 @@ import type { DagRunEventPayload } from "./types"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagManager, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
 import { controlJournal, DagNodeControlError, ownedRecord, readRecord } from "./node-control-context"
+import { outstandingStopRefusal } from "./outstanding-stop"
 import { createDagScheduler, type DagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { TERMINAL_DAG_RUN_STATUSES, type DagNode, type DagNodeId, type DagNodeState, type DagRunId } from "./types"
 
@@ -45,6 +46,7 @@ export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
       runId: current.runId,
     })
   }
+  assertNoOutstandingStop(options, current)
   const record = withRevivalCapacity(options, current, () => resumeIfSettled(options, current))
   return startReentry(options, record)
 }
@@ -70,6 +72,14 @@ function startReentry(options: DagSchedulerOptions, record: DagRunRecordV1): Dag
   return { record, scheduler, run: scheduler.run() }
 }
 
+// Re-entry of a settled run that still owns a live child would admit work beside it (#11381): every
+// re-entry verb refuses until a repeated cancel has drained the run, before it journals anything.
+function assertNoOutstandingStop(options: DagSchedulerOptions, record: DagRunRecordV1): void {
+  const owed = outstandingStopRefusal(options.taskManager, record)
+  if (owed !== undefined)
+    throw new DagNodeControlError({ code: "run_still_active", message: owed, runId: record.runId })
+}
+
 /**
  * Returns the named nodes to a fresh pending attempt and re-enters the run. Journal writes happen
  * outside any run lock: the journal takes that lock itself and it is not reentrant.
@@ -88,6 +98,7 @@ export function retryDagNodes(
       runId,
     })
   }
+  assertNoOutstandingStop(options, record)
   if (retryOptions?.prompt !== undefined && (nodeIds === undefined || nodeIds.length !== 1)) {
     throw new DagNodeControlError({
       code: "invalid_arguments",

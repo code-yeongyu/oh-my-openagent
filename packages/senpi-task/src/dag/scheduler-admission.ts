@@ -1,13 +1,15 @@
 import type { ResidencyDenied } from "../manager/types"
 import type { OwnedStartResult } from "./owner"
 import { errorMessage, failNode, transition, type SchedulerContext } from "./scheduler-context"
-import { resolveAdmissionIdle } from "./scheduler-cancellation"
+import { fenceStaleChildren, resolveAdmissionIdle, supersededChildren } from "./scheduler-cancellation"
 import { emitCompletedWaves, emitWaveAdmissions } from "./scheduler-frontier"
 import { startSpec, owner, isRunnable } from "./scheduler-start"
 import { attachStarted, foldSettlement, nextOwnSettlement, settleOne } from "./scheduler-task-attachment"
+import { settleOwnerConflict, stopSupersededClaims, type SupersededStop } from "./scheduler-owner-conflict"
 import type { DagNodeId, DagNodeErrorCode } from "./types"
 
 type ResidencyPark = "queued" | "lease" | "failed"
+type SupersededStops = ReadonlyMap<string, SupersededStop>
 // One admission pass over the frontier: the ordered residency-denied queue first (oldest denial
 // gets the first freed slot), then every newly ready node. The pass stays open while any start is
 // in flight; a fold during it re-probes the parked denials first, then admits what it unblocked.
@@ -19,6 +21,15 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
   for (;;) {
     if (context.suspended || context.cancellationStarted) return false
     const denied = context.pendingAdmission.splice(0)
+    // No node is admitted in a pass after which a superseded or removed-node child is still live
+    // (#11381). The fence stops such children under the admission latch, before this batch takes it.
+    const stale = supersededChildren(context)
+    if (stale.length > 0) {
+      const admitting = [...denied, ...readyNodes(context, new Map())]
+      if (admitting.length > 0 && (await fenceStaleChildren(context, stale, admitting)).length === 0) {
+        return !(context.suspended || context.cancellationStarted)
+      }
+    }
     // Armed BEFORE the probe: the wake is edge-triggered, and a sibling child that settles while
     // this batch is in flight must still be seen, or a run whose last chance passed in that gap
     // parks until an unrelated resident settles.
@@ -32,6 +43,14 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     const inFlight = new Map<DagNodeId, Promise<void>>()
     let leaseDenied = false
     let folded = false
+    // A child that went stale mid-batch (an infrastructure retry raised its node's attempt) holds
+    // every further admission back to the next pass, whose fence stops it first (#11381).
+    let fenceDue = false
+    const fenceClear = (): boolean => {
+      if (supersededChildren(context).length === 0) return true
+      fenceDue = true
+      return false
+    }
     // The batch's first processing error (a journal or attachment fault while a start is handled, a
     // fold fault while it waits). Every handling step runs through `handle`, so the error is kept
     // here whichever event the batch was waiting on, and from then on the batch only retires: no
@@ -47,7 +66,11 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
         failure = { error }
       }
     }
-    const admitOne = (nodeId: DagNodeId, settled: PromiseSettledResult<OwnedStartResult>): void => {
+    const admitOne = (
+      nodeId: DagNodeId,
+      settled: PromiseSettledResult<OwnedStartResult>,
+      supersededStops: SupersededStops,
+    ): void => {
       // The task owner record is durable even when admission finishes after suspension. Recovery
       // resolves it by owner; this retired controller must not attach, fail, or promote the node.
       if (context.suspended && !context.cancellationStarted) return
@@ -67,7 +90,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
         return
       }
       context.residencyQueued.delete(nodeId)
-      attachOrFail(context, nodeId, result)
+      attachOrFail(context, nodeId, result, supersededStops)
     }
     const launch = (nodeIds: readonly DagNodeId[]): void => {
       for (const nodeId of nodeIds) {
@@ -94,10 +117,20 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
           } catch (reason) {
             settled = { status: "rejected", reason }
           }
+          // An automatic infrastructure retry raises execAttempt mid-run, so the failed attempt's
+          // child can resume before re-admission (#11381). Its stop belongs to this start, so the
+          // batch, which cancel and suspend wait for, holds its latch until the stop has answered.
+          let stops: SupersededStops | { readonly error: unknown } = new Map()
+          if (settled.status === "fulfilled" && settled.value.kind === "owner_conflict") {
+            stops = await stopSupersededClaims(context, [nodeId]).catch((error: unknown) => ({ error }))
+          }
           // Leaves the in-flight set in the same step that parks, attaches or fails the node, so a
           // fold can never see it both parked and still in flight.
           inFlight.delete(nodeId)
-          handle(() => admitOne(nodeId, settled))
+          handle(() => {
+            if ("error" in stops) throw stops.error
+            admitOne(nodeId, settled, stops)
+          })
         })()
         // The start removes itself in the step that admits it; a later delete here would remove a
         // re-launched start's entry instead (#10057 review D4-H1).
@@ -105,17 +138,8 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
       }
     }
     const admitReady = (): void => {
-      const snapshot = context.journal.snapshot()
-      const runnable = snapshot.nodes
-        .filter(
-          (node) =>
-            (node.state === "pending" || node.state === "blocked") &&
-            !inFlight.has(node.id) &&
-            !context.infrastructureRetries.pending(node.id) &&
-            isRunnable(snapshot, node.id),
-        )
-        .map((node) => node.id)
-      if (runnable.length === 0) return
+      const runnable = readyNodes(context, inFlight)
+      if (runnable.length === 0 || !fenceClear()) return
       for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
       emitWaveAdmissions(context, runnable)
       launch(runnable)
@@ -144,8 +168,10 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
             // A node parked a microtask ago may still be in flight until its start settles; it stays
             // parked and is retried on the next fold or at the end of the pass.
             const retry = admissionOrder.filter((nodeId) => parked.has(nodeId) && !inFlight.has(nodeId))
-            for (const nodeId of retry) parked.delete(nodeId)
-            launch(retry)
+            if (retry.length > 0 && fenceClear()) {
+              for (const nodeId of retry) parked.delete(nodeId)
+              launch(retry)
+            }
           }
           if (next.kind !== "start") admitReady()
         })
@@ -161,14 +187,28 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     if (context.suspended || context.cancellationStarted) return false
     const nextDenied = admissionOrder.filter((nodeId) => parked.has(nodeId))
     context.pendingAdmission.push(...nextDenied)
-    // A fold during the batch may have freed a slot for a parked node: probe again at once.
-    if (folded) continue
+    // A fold during the batch may have freed a slot for a parked node, and a held-back admission
+    // waits for the next pass's fence: probe again at once.
+    if (folded || fenceDue) continue
     if (nextDenied.length === 0) return true
     // A contended or displaced admission lease is a bounded wait inside acquisition itself, so the
     // next probe is already paced; only a cap denial has to wait for a slot to free.
     if (leaseDenied) continue
     if (!(await settleOne(context, residencyReleased))) return false
   }
+}
+
+function readyNodes(context: SchedulerContext, inFlight: ReadonlyMap<DagNodeId, unknown>): DagNodeId[] {
+  const snapshot = context.journal.snapshot()
+  return snapshot.nodes
+    .filter(
+      (node) =>
+        (node.state === "pending" || node.state === "blocked") &&
+        !inFlight.has(node.id) &&
+        !context.infrastructureRetries.pending(node.id) &&
+        isRunnable(snapshot, node.id),
+    )
+    .map((node) => node.id)
 }
 
 function parkResidencyDenied(context: SchedulerContext, nodeId: DagNodeId, denial: ResidencyDenied): ResidencyPark {
@@ -216,6 +256,7 @@ function attachOrFail(
   context: SchedulerContext,
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
+  supersededStops: SupersededStops,
 ): void {
   if (result.kind === "held") {
     context.journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq: result.pauseSeq })
@@ -224,13 +265,7 @@ function attachOrFail(
     return
   }
   if (result.kind === "owner_conflict") {
-    attachStarted(context, nodeId, {
-      kind: "started",
-      reused: true,
-      task_id: result.task_id,
-      status: "running",
-      name: result.task_id,
-    })
+    settleOwnerConflict(context, nodeId, result, supersededStops)
     return
   }
   if (result.kind !== "started") {

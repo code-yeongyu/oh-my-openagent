@@ -7,7 +7,7 @@ import type { ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import type { DagTaskOwner, DagTaskOwnerScope, OwnedStartResult } from "./owner"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunEvent, DagRunId } from "./types"
@@ -232,6 +232,18 @@ export class FrontierFakeManager implements TaskManager {
 
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
     return this.recordOf(String(owner.nodeId))
+  }
+
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
+    if (owner.nodeId === undefined) {
+      return [...this.#tasks.values()].map((entry) => entry.record).filter((task) => task.owner?.runId === owner.runId)
+    }
+    const record = this.findOwnedTask({
+      kind: owner.kind,
+      runId: owner.runId ?? ("*" as DagRunId),
+      nodeId: owner.nodeId,
+    })
+    return record === undefined ? [] : [record]
   }
 
   waitFor(taskId: string): Promise<TaskRecord> {

@@ -1,4 +1,4 @@
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { DagTaskOwner, DagTaskOwnerKey, DagTaskOwnerScope, OwnedStartResult } from "../dag/owner"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { PauseParticipant } from "../pause/registry"
 import type { LiveRunStats, TaskRecord, TaskRunStats } from "../state"
@@ -30,6 +30,13 @@ export type TaskManager = {
   settleLaunchesForShutdown?(boundMs: number): Promise<void>
   startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
+  /**
+   * Every record the owner key ever claimed, oldest first; without a nodeId, every record of the run,
+   * nodes an amendment removed included.
+   */
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[]
+  /** A refused self-started turn of this task is not confirmed stopped yet: the task still counts as live. */
+  selfResumeStopPending?(taskId: string): boolean
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
