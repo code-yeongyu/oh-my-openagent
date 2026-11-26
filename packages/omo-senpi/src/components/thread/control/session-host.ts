@@ -113,4 +113,9 @@ export type SessionHost = {
     request: { readonly durableSessionId: string; readonly name?: string; readonly worktree?: ThreadWorktree },
     options?: { readonly confirmReach?: boolean },
   ) => Promise<SessionOpenOutcome | undefined>
+  /**
+   * #14648: removes the worktree and branch an open of this host made, once the session in it ended (a create that rolls
+   * back); answers what was left behind, if anything. Only this device's host has it.
+   */
+  readonly discard?: (worktree: ThreadWorktree) => Promise<ThreadDataError | undefined>
 }

@@ -23,3 +23,18 @@ export async function settleClosedIntake(
   }
   return remaining
 }
+
+/**
+ * #14648: takes every row still `queued` for `durableId` out of the gateway, refused `target_closed` (its sender reads
+ * "not delivered"), so no later wake opens the session for it. Answers the ids it refused; a row another path took out
+ * of `queued` first (a drain claimed it) is not among them.
+ */
+export async function withdrawQueued(store: GatewayStore, durableId: string): Promise<readonly string[]> {
+  const withdrawn: string[] = []
+  for (const row of await store.list({ target_durable_id: durableId })) {
+    if (row.state !== "queued") continue
+    if (await store.refuseQueued({ now: store.now(), delivery_id: row.delivery_id, reason: "target_closed" }))
+      withdrawn.push(row.delivery_id)
+  }
+  return withdrawn
+}

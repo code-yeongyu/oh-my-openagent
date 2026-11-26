@@ -38,5 +38,7 @@ export function createLocalSessionHost(
     forks: async () => (await host.capabilities?.())?.includes(OPEN_SESSION_FORK) === true,
     open: async (request) =>
       await (await import("#omo-thread-client-runtime")).openLocally(host, request, worktreeRoot),
+    discard: async (worktree) =>
+      await (await import("#omo-thread-client-runtime")).discardOpenedWorktree(worktree, worktreeRoot),
   }
 }

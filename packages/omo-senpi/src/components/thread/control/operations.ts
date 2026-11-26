@@ -1,4 +1,6 @@
 import type { ThreadModel, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
+import type { GatewayStore } from "../gateway/store"
+import { withdrawQueued } from "../wake/closed-intake"
 import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
 import type { ThreadCloseOptions } from "../tools/ports"
@@ -51,10 +53,7 @@ export function closeOptions(value: {
   }
 }
 
-export async function closeThread(
-  control: SessionControl,
-  options: ThreadCloseOptions = {},
-): Promise<ThreadToolResult> {
+function closeOptionsFailure(options: ThreadCloseOptions): ThreadToolResult | undefined {
   if (options.graceful === true && options.force === true)
     return failure(
       "invalid_arguments",
@@ -67,6 +66,49 @@ export async function closeThread(
       "wait_ms only bounds a graceful close: a close without graceful does not wait for the turn.",
       "Pass graceful: true with wait_ms, or drop wait_ms.",
     )
+  return undefined
+}
+
+/**
+ * A close of a thread nothing live holds (#14648). The thread stays resumable from its session file; what can still be
+ * pending for it is the messages this device's gateway holds for it (stored for a wake that never ran it). As a live
+ * close never drops an unread message unless asked (omo#14234), a plain close names them and is refused; `force` or
+ * `graceful` takes them out of the gateway, so no later wake opens the thread for them, and lists them in
+ * `dropped_deliveries`. A thread on another device holds its messages in that device's gateway: answered as before.
+ */
+export async function closeNotLive(
+  store: GatewayStore,
+  located: { readonly thread_id: string; readonly title: string; readonly device?: string },
+  options: ThreadCloseOptions = {},
+): Promise<ThreadToolResult> {
+  const invalid = closeOptionsFailure(options)
+  if (invalid !== undefined) return invalid
+  const notLive = (dropped: readonly string[]): ThreadToolResult => ({
+    kind: "ok",
+    ...controlIdentity(located),
+    closed: false,
+    reason: "not_live",
+    dropped_deliveries: [...dropped],
+  })
+  if (located.device !== undefined) return notLive([])
+  const held = (await store.list({ target_durable_id: located.thread_id })).filter((row) => row.state === "queued")
+  if (held.length === 0) return notLive([])
+  if (options.force !== true && options.graceful !== true)
+    return failure(
+      "turn_active",
+      `Thread ${located.thread_id} is not running, but this device holds ${held.length} message(s) for it that it has not read (${held.map((row) => row.delivery_id).join(", ")}); they wait for it to wake, and closing it would drop them.`,
+      "Close it with force: true to drop them (the result lists dropped_deliveries), or open it with thread_create (tool.thread_create({ thread }) in an eval cell) so it reads them.",
+      { pending_deliveries: held.map((row) => row.delivery_id), retry_with: { force: true } },
+    )
+  return notLive(await withdrawQueued(store, located.thread_id))
+}
+
+export async function closeThread(
+  control: SessionControl,
+  options: ThreadCloseOptions = {},
+): Promise<ThreadToolResult> {
+  const invalid = closeOptionsFailure(options)
+  if (invalid !== undefined) return invalid
   const { outcome, dropped_deliveries, graceful } = await control.close(options)
   if (outcome === "held_elsewhere")
     return failure(

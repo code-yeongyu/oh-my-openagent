@@ -5,6 +5,7 @@ import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { RuntimePhase } from "./gateway/adapter"
+import type { SameDeviceWake } from "./gateway/same-device-wake"
 import { createInboxDrain } from "./gateway/drain"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
@@ -220,6 +221,8 @@ export function createRemoteThreadFixture() {
       failSessionsList?: boolean
       failAliasesOf?: boolean
       failClaim?: boolean
+      /** The alias registry answers the first N resolves, then every later one fails as a network outage would. */
+      resolveFailsAfter?: number
       otherHolders?: number
       unwritten?: boolean
       unloadReason?: string
@@ -761,6 +764,18 @@ export function createRemoteThreadFixture() {
       resolve: async (alias) => {
         registryCalls.push("resolve")
         if (options.registryDown !== undefined) return await down()
+        if (
+          options.resolveFailsAfter !== undefined &&
+          registryCalls.filter((call) => call === "resolve").length > options.resolveFailsAfter
+        )
+          return {
+            kind: "error",
+            error: {
+              code: "alias_registry_unavailable",
+              message: "the alias registry did not answer",
+              details: { reason: "network" },
+            },
+          }
         const held = aliases.get(alias)
         return held === undefined
           ? { kind: "error", error: { code: "alias_not_found", message: "no such alias" } }
@@ -1051,6 +1066,8 @@ export function createRemoteThreadFixture() {
        * registered); with this set it never does, so a delivery to it stays queued (the held-thread report).
        */
       createdNeverDrains?: boolean
+      /** With `createdNeverDrains`: the host still registers the session with the gateway (an endpoint that never drains). */
+      createdRegisters?: boolean
       /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
       localDrainsIn?: RuntimePhase
       /**
@@ -1067,6 +1084,10 @@ export function createRemoteThreadFixture() {
       onListing?: () => void
       /** #13426: this device's listing answers only once this settles (a call still building its view). */
       listingGate?: Promise<void>
+      /** A session this device's host closes leaves its listing, as a real host's unloaded session does. */
+      closeUnlists?: boolean
+      /** This process's same-device wake (its carrier), which answers a send to a session no endpoint drains. */
+      sameDeviceWake?: SameDeviceWake
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -1182,6 +1203,10 @@ export function createRemoteThreadFixture() {
         closed.push([sessionId, durableId])
         if (options?.force === true) forcedCloses.push(sessionId)
         closeRequests.push(options ?? {})
+        if (extra.closeUnlists === true && (extra.closeOutcome ?? "closed") === "closed") {
+          const index = sessions.findIndex((session) => session.sessionId === sessionId)
+          if (index !== -1) sessions.splice(index, 1)
+        }
         return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
       },
       ...(extra.archive === "absent" ? {} : { setSessionArchived }),
@@ -1246,6 +1271,12 @@ export function createRemoteThreadFixture() {
             ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
                 enqueued.push(request)
                 const outcome = await target.enqueue(request)
+                if (createdIds.has(request.target_durable_id) && extra.createdRegisters === true)
+                  await target.registerIncarnation({
+                    durable_id: request.target_durable_id,
+                    incarnation: "runtime-created",
+                    endpoint: { socket: join(agentDir, "created-endpoint.sock"), kind: "rpc_host" },
+                  })
                 if (
                   outcome.kind === "inserted" &&
                   createdIds.has(request.target_durable_id) &&
@@ -1278,6 +1309,7 @@ export function createRemoteThreadFixture() {
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
       firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
+      ...(extra.sameDeviceWake === undefined ? {} : { sameDeviceWake: extra.sameDeviceWake }),
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)

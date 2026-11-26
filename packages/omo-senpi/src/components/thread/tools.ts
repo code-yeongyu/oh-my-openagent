@@ -59,6 +59,7 @@ import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import {
+  closeNotLive,
   closeOptions,
   closeThread,
   interruptThread,
@@ -67,7 +68,7 @@ import {
   setThinkingLevelOn,
 } from "./control/operations"
 import { renameThread } from "./control/rename"
-import { controlIdentity, controlRefusalOf } from "./control/port"
+import { controlRefusalOf } from "./control/port"
 import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 import { createMonitorTargetResolver, installMonitorTargetResolution } from "./tools/monitor-target"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -700,15 +701,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         async (current, value, _operationId, callerId) => {
           const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
           if (located.kind === "error") return located.result
-          // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-          if (located.kind === "not_live")
-            return {
-              kind: "ok",
-              ...controlIdentity(located),
-              closed: false,
-              reason: "not_live",
-              dropped_deliveries: [],
-            }
+          // Nothing live holds it: it stays resumable from its session file; what the gateway holds for it is answered there.
+          if (located.kind === "not_live") return await closeNotLive(store, located, closeOptions(value))
           return await closeThread(located.control, closeOptions(value))
         },
         signal,
