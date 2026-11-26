@@ -172,4 +172,23 @@ describe("createChildHandle pending async work from the engine lifecycle (omo#10
     expect(outcome.failure.message).toContain("senpi-codemode: 1 [eval cell]")
     await h.handle.dispose()
   })
+
+  test("#given a held turn whose work woke the child #when the child is disposed before the wake turn answers #then the outcome is async_work_pending, never the held note", async () => {
+    // given - the cell finished and its notification started the wake turn
+    const h = harness()
+    await h.endTurnWithDetachedCell()
+    h.setWaits(undefined)
+    h.emit({ type: "agent_start" })
+
+    // when - teardown lands before that turn's agent_end (delta review HIGH 2 on #15137)
+    await h.handle.dispose()
+    await flushSettlement()
+
+    // then
+    const outcome = h.settled()
+    expect(outcome?.status).toBe("error")
+    if (outcome?.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+    expect(outcome.failure.message).toContain("senpi-codemode: 1 [eval cell]")
+  })
 })

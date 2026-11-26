@@ -66,19 +66,23 @@ export function createInProcessAsyncWork(input: {
         intervalMs: input.options?.intervalMs ?? DEFAULT_INTERVAL_MS,
         staleLimitMs: input.options?.staleLimitMs,
       })
+      // While this release is installed the hold still holds (begin runs first; a wake turn only
+      // disarms it), so an abandon always answers the abandoned work, never the held note.
       const own: Release = (value) => {
         if (release !== own) return
         release = undefined
-        const abandoned = hold.abandoned()
+        const abandoned = hold.abandoned() ?? { status: "cancelled" }
         hold.cancel()
         unsubscribe()
-        resolve(value === "abandoned" ? (abandoned ?? outcome) : value)
+        resolve(value === "abandoned" ? abandoned : value)
       }
       const unsubscribe = session.subscribe((event) => {
         hold.activity()
         if (event.type === "agent_start" && !engineTurn) {
           engineTurn = true
-          hold.cancel()
+          // The work's wake turn answers now: stop confirming, but keep the work it answers for
+          // until that turn ends, so a teardown meanwhile is still the abandoned work (omo#10487).
+          hold.disarm()
           input.engineTurnStarted()
         } else if (engineTurn && endsTurn(event)) {
           const next = input.engineTurnOutcome()
@@ -86,8 +90,8 @@ export function createInProcessAsyncWork(input: {
         }
       })
       release?.("abandoned")
-      release = own
       hold.begin(outcome, work)
+      release = own
     })
   }
 
