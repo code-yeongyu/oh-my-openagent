@@ -144,7 +144,8 @@ const AFFINITY_Q =
   "is a WS_EX_LAYERED overlay drawn with UpdateLayeredWindow and flagged WDA_EXCLUDEFROMCAPTURE excluded from capture"
 const overlay = (what: string) =>
   `overlay over an overlapped Notepad window; ${what}; magenta fraction inside the overlay rect`
-const ELEVATED = "medium-integrity process (runas /trustlevel:0x20000) against an elevated WinForms TextBox window"
+const ELEVATED =
+  "medium-integrity process (restricted copy of the run's token labelled Medium) against an elevated WinForms TextBox window"
 const chordQ = (what: string) =>
   `does a posted ctrl+a act as the chord in ${what} (negative leg win-posted-ctrl-chord-negative)`
 
@@ -457,15 +458,20 @@ function psCommand(dir: string, name: string, arg: Json, out: string): string {
   return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${HELPER}" -NativeDir "${nativeDir()}" -Leg ${name} -ArgFile "${argFile}" -Out "${out}"`
 }
 
-// A leg as a medium-integrity process (basic-user trust level of this account). It cannot write the
-// administrators-only shared directory, so its argument and result live in this user's run directory.
+// A leg as a medium-integrity process: the start-medium leg starts it from a restricted copy of this run's token
+// labelled Medium (runas /trustlevel keeps High when UAC is off, as on the hosted runner) and reads the label back.
+// It cannot write the administrators-only shared directory, so its argument and result live in this user's run
+// directory.
 async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json> {
   const out = join(ctx.tmp, `${name}.medium.json`)
   rmSync(out, { force: true })
   rmSync(`${out}.started`, { force: true })
-  await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx.tmp, name, arg, out)], ctx.live)
+  const started = await leg(ctx, "start-medium", { command: psCommand(ctx.tmp, name, arg, out) })
+  if (started.label !== MEDIUM_LABEL)
+    throw new Error(`the helper started with label ${str(started.label)}, not Medium (${MEDIUM_LABEL})`)
   return waitFile(out, 60_000, { started: `${out}.started`, alive: pidAlive })
 }
+const MEDIUM_LABEL = "S-1-16-8192"
 
 // A command as SYSTEM through a one-shot scheduled task (Session 0). The task runs a .cmd wrapper, because
 // schtasks refuses a /TR command longer than 261 characters.
@@ -2449,8 +2455,16 @@ const LOGIC_CHECKS: readonly Check[] = [
       const named = (self.match(/"-File",\s*HELPER,\s*\.\.\.nativeArgs\(\),/g) ?? []).length
       if (spawns === 0 || named !== spawns) bad.push(`${spawns - named} of ${spawns} helper spawns lack -NativeDir`)
       if (!/ -NativeDir "\$\{nativeDir\(\)\}"/.test(self)) bad.push("psCommand does not pass -NativeDir")
-      // packaging only: nothing in the helpers changes a token, an integrity level or a privilege
-      const files = [...LEG_FILES, "sp-n.ps1", "sp-n-target.ps1", "sp-n-native-win32.ps1", "sp-n-native-input.ps1"]
+      // no helper changes a token, an integrity level or a privilege, except sp-n-native-medium.ps1, which only
+      // lowers a restricted copy of the run's own token to Medium (MEDIUM lowering-only)
+      const files = [
+        ...LEG_FILES,
+        "sp-n.ps1",
+        "sp-n-target.ps1",
+        "sp-n-native-win32.ps1",
+        "sp-n-native-input.ps1",
+        "sp-n-native-capture.ps1",
+      ]
       const tok = files.filter((f) =>
         /AdjustTokenPrivileges|SetTokenInformation|OpenProcessToken|DuplicateToken|CreateProcessAsUser|CreateRestrictedToken/.test(
           source(f),
@@ -2476,6 +2490,43 @@ const LOGIC_CHECKS: readonly Check[] = [
         )
       )
         bad.push("the measure pass does not record the native assembly in the elevated rows' notes")
+      return bad.length ? bad.join("; ") : undefined
+    },
+  },
+  {
+    // #13885: runas /trustlevel:0x20000 kept the helper at High on the hosted runner (UAC off), so the five rows
+    // never met a Medium helper. The helper now starts from a restricted copy of the run's token labelled Medium.
+    finding: "MEDIUM lowering-only helper start (#13885)",
+    async run() {
+      const bad: string[] = []
+      const self = source("probe-sp-n.ts")
+      const fn = self.slice(self.indexOf("async function medium("), self.indexOf("const MEDIUM_LABEL"))
+      if (/runas/.test(fn.replace(/^\s*\/\/.*$/gm, ""))) bad.push("medium() still starts the helper through runas")
+      if (!/await leg\(ctx, "start-medium", \{ command: psCommand\(/.test(fn)) bad.push("medium() does not use the start-medium leg")
+      if (!/if \(started\.label !== MEDIUM_LABEL\)\s*throw /.test(fn)) bad.push("medium() does not refuse a label other than Medium")
+      if (!/const MEDIUM_LABEL = "S-1-16-8192"/.test(self)) bad.push("MEDIUM_LABEL is not S-1-16-8192")
+      if (/runas/.test(ELEVATED)) bad.push("the elevated rows' condition still names runas")
+      if (!/foreach \(\$f in [^)]*'medium'\)/.test(source("sp-n.ps1"))) bad.push("sp-n.ps1 does not compile sp-n-native-medium.ps1")
+      if (!/function Leg-start-medium\(\$a\) \{ Emit \(\[SpN\]::StartMedium\(/.test(source("sp-n-legs-delivery.ps1")))
+        bad.push("no start-medium leg")
+      // lowering only: a restricted copy of the run's own token, labelled Medium, and nothing else
+      const med = existsSync(join(HERE, "sp-n-native-medium.ps1")) ? source("sp-n-native-medium.ps1") : ""
+      if (!med) bad.push("sp-n-native-medium.ps1 is missing")
+      const code = med.replace(/^\s*(#|\/\/).*$/gm, "")
+      const banned = code.match(
+        /AdjustTokenPrivileges|DuplicateToken|ImpersonateLoggedOnUser|LogonUser|CreateProcessWithTokenW|SeTcbPrivilege|SeAssignPrimaryTokenPrivilege|SeDebugPrivilege|EnableLUA/g,
+      )
+      if (banned) bad.push(`sp-n-native-medium.ps1 calls ${[...new Set(banned)].join(",")}`)
+      const labels = [...new Set(code.match(/S-1-16-\d+/g) ?? [])]
+      if (labels.join() !== "S-1-16-8192") bad.push(`integrity labels named: ${labels.join(",") || "none"}, want only S-1-16-8192`)
+      const sets = code.replace(/"[^"\n]*"/g, '""').match(/SetTokenInformation\([^)]*\)/g) ?? []
+      const decl = "SetTokenInformation(IntPtr token, int cls, ref TOKEN_MANDATORY_LABEL info, int len)"
+      const calls = sets.filter((s) => s !== decl)
+      if (sets.length - calls.length !== 1 || calls.length === 0 || calls.some((s) => !/^SetTokenInformation\(lowered, TokenIntegrityLevel,/.test(s)))
+        bad.push(`SetTokenInformation sets other than the label of the lowered copy: ${sets.join(" | ")}`)
+      if (!/CreateRestrictedToken\(own, LUA_TOKEN,/.test(code)) bad.push("the helper token is not a LUA restricted copy of the run's own token")
+      if (!/OpenProcessToken\(GetCurrentProcess\(\),/.test(code)) bad.push("the token is not this process's own")
+      if (!/h\["label"\] = LabelOf\(pi\.hProcess\)/.test(code)) bad.push("the started process's label is not read back")
       return bad.length ? bad.join("; ") : undefined
     },
   },

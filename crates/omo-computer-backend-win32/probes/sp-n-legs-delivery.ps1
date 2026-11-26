@@ -83,6 +83,9 @@ function Leg-chord($a) {
   Emit @{ acquired = $true; route = $a.route; acquire = $how; consumed = $consumed; before = $before; after = $after; dstClass = [SpN]::Cls($dst) }
 }
 
+# Starts the uipi leg's helper at Medium (sp-n-native-medium.ps1) and returns its pid and read-back label.
+function Leg-start-medium($a) { Emit ([SpN]::StartMedium([string]$a.command)) }
+
 function Leg-uipi($a) {
   $top = [IntPtr][int64]$a.top
   $edit = [IntPtr][int64]$a.edit

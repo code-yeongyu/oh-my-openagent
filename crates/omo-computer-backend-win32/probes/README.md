@@ -49,11 +49,14 @@ runner temp dir; else `TEMP`; never inside the checkout, passed to every leg as 
 present. The elevated rows' notes record which one the run used. A setup failure
 in the helper is a `legError` ("setup failed: ..."), never a silent exit.
 
-The UIPI and elevated rows (`n-uipi-*`, `n-elevated-*`) need a helper at medium integrity. The hosted runner has
-UAC off, so the `runas /trustlevel:0x20000` helper keeps high integrity and these rows read
-`UNMEASURED: skipped: helper integrity is high, not medium`. Their hosted ledger rows are NOT-RUN (verdict
-`UNMEASURED`, no pass/fail claim) and are owed to #13885, which ports the medium-integrity helper setup into the
-workflow.
+The UIPI and elevated rows (`n-uipi-*`, `n-elevated-*`) need a helper at medium integrity beside the elevated
+fixture. `runas /trustlevel:0x20000` keeps high integrity when UAC is off, as on the hosted runner, so the
+`start-medium` leg (`sp-n-native-medium.ps1`, #13885) starts the helper from a restricted copy of the run's own
+token (`CreateRestrictedToken`, `LUA_TOKEN`) whose label is lowered to Medium (`SetTokenInformation`,
+`TokenIntegrityLevel`, `S-1-16-8192`), and reads the started process's label back; any other label fails the
+rows. Nothing raises a label, adjusts a privilege, takes another account's token or changes UAC; the self-test
+holds that file to lowering only. The rows record the OS's answer to a Medium sender, so they measure the
+boundary the engine answers with `PermissionDenied`, never a way around it.
 
 The second-monitor rows (`n-host-second-monitor`, `n-affinity-wgc-monitor-secondary`)
 are measured on H6 and on any host whose facts report two or more monitors (each

@@ -170,7 +170,7 @@ function WaitCount($t, [char]$c, [int]$want, [int]$ms) {
 # start marker lets the probe tell a helper that never started from one that exited without a result.
 try {
   if ($Out) { [IO.File]::WriteAllText("$Out.started", (@{ pid = $PID } | ConvertTo-Json -Compress)) }
-  foreach ($f in 'win32', 'input', 'capture') { . (Join-Path $PSScriptRoot "sp-n-native-$f.ps1") }
+  foreach ($f in 'win32', 'input', 'capture', 'medium') { . (Join-Path $PSScriptRoot "sp-n-native-$f.ps1") }
   foreach ($f in 'delivery', 'capture', 'session') { . (Join-Path $PSScriptRoot "sp-n-legs-$f.ps1") }
   $a = if ($ArgFile) { Get-Content -Raw $ArgFile | ConvertFrom-Json } else { [pscustomobject]@{} }
   if ($Leg -eq 'build-native') { BuildNative; exit 0 }
