@@ -22,6 +22,7 @@ export function resolveRecoveredNodeTask(
   taskManager: TaskManager,
   record: DagRunRecordV1,
   node: DagNode,
+  staleLive?: string,
 ): RecoveredNodeTask | Promise<RecoveredNodeTask> {
   const owned = taskManager.findOwnedTasks({ kind: "dag", runId: record.runId, nodeId: node.id })
   const retained = node.taskId === undefined ? undefined : taskManager.get(node.taskId)
@@ -33,10 +34,10 @@ export function resolveRecoveredNodeTask(
   // Stale claims are stopped BEFORE a current one is returned, so reconciliation never attaches or
   // folds the current record beside one. Synchronous unless a stale child must be stopped: reconcile
   // hands live children to the scheduler without yielding, so a racing settle is never folded twice.
-  if (live.length === 0) return afterStops(taskManager, node, stale, current)
+  if (live.length === 0) return afterStops(taskManager, node, stale, current, staleLive)
   const reason = `superseded by attempt ${node.execAttempt ?? 0} of DAG node "${node.id}"`
   return Promise.allSettled(live.map((task) => taskManager.cancelTask(task.task_id, reason))).then(() =>
-    afterStops(taskManager, node, stale, current),
+    afterStops(taskManager, node, stale, current, staleLive),
   )
 }
 
@@ -45,6 +46,7 @@ function afterStops(
   node: DagNode,
   stale: readonly TaskRecord[],
   current: TaskRecord | undefined,
+  staleLive: string | undefined,
 ): RecoveredNodeTask {
   const alive = stale.filter((task) => isLiveOwnedTask(taskManager, taskManager.get(task.task_id)))
   if (alive.length > 0) {
@@ -56,7 +58,12 @@ function afterStops(
     }
   }
   if (current !== undefined) return { kind: "task", task: current }
-  if (node.state === "scheduled" && (node.taskId === undefined || stale.length > 0)) return { kind: "start" }
+  if (node.state === "scheduled" && (node.taskId === undefined || stale.length > 0)) {
+    // A run-wide stale child survived recovery's fence: fail closed rather than spawn beside it.
+    return staleLive === undefined
+      ? { kind: "start" }
+      : { kind: "fail", code: "stale_attempt_alive", message: staleLive }
+  }
   if (stale.length > 0) {
     return {
       kind: "fail",

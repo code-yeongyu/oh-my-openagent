@@ -7,9 +7,9 @@ import {
   TERMINAL_NODE_STATES,
   type SchedulerContext,
 } from "./scheduler-context"
-import { ownedClaimAge } from "./owned-attempt"
 import { disposePromotionWatch } from "./scheduler-task-attachment"
-import { liveRunChildren, stopRunChildren, stopSettledRunChildren } from "./run-children-stop"
+import { stopRunChildren, stopSettledRunChildren } from "./run-children-stop"
+import { staleLiveChildren, type StaleLiveChild } from "./child-gate"
 import type { DagNodeId, DagRunId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
@@ -63,20 +63,11 @@ export async function cancelledSnapshot(context: SchedulerContext): Promise<DagR
   return context.journal.snapshot()
 }
 
-type SupersededChild = { readonly nodeId: DagNodeId; readonly taskId: string }
+type SupersededChild = StaleLiveChild
 
-/**
- * Live children the run owns that no longer belong to any current attempt: an earlier attempt of a
- * node (an amend or a retry bumped its execAttempt), the newest record or not, or a node an amendment
- * removed. An older attempt's child can resume after the next attempt's task exists.
- */
+/** Rule 1 of the child gate, for this scheduler's run. */
 export function supersededChildren(context: SchedulerContext): readonly SupersededChild[] {
-  const record = context.journal.snapshot()
-  return liveRunChildren(context.taskManager, record).flatMap((task) =>
-    task.owner === undefined || ownedClaimAge(task, record) !== "superseded"
-      ? []
-      : [{ nodeId: task.owner.nodeId, taskId: task.task_id }],
-  )
+  return staleLiveChildren(context.taskManager, context.journal.snapshot())
 }
 
 // One stop attempt per stale task id per scheduler: the re-entry sweep and every admission fence share
