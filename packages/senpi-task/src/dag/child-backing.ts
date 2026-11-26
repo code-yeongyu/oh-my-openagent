@@ -15,16 +15,18 @@ export type ChildBacking =
 // either one would pin its node at `running` in every future checkpoint. So:
 // - live: this host holds the child (the resident-handle map that feeds those waiters; never a pid
 //   probe - a pid can be alive while the session it hosted is gone);
-// - revival_pending: this host's lifecycle still owes the child a revival or an end by its persisted
-//   recovery deadline (a capacity deferral, an unreachable task host) - session-start reconcile ran
-//   first but could not revive it yet, so the node waits for that answer (#15150);
-// - orphaned: no host will ever settle it here.
+// - revival_pending: this host's lifecycle still has an open revival obligation for the child (a
+//   capacity deferral, an unreachable task host, the final attempt past its deadline) - session-start
+//   reconcile ran first but could not revive it yet, so the node waits for the lifecycle's own end;
+//   a lifecycle stopping for shutdown answers the same, so a teardown never fails the node (#15150);
+// - orphaned: the lifecycle has no obligation for it, so no host will ever settle it here.
 export function childBacking(
   context: { readonly taskManager: TaskManager; readonly pendingRevivals?: PendingRevivals },
   task: TaskRecord,
 ): ChildBacking {
   if (context.taskManager.getResidentHandle(task.task_id) !== undefined) return { kind: "live" }
-  if (context.pendingRevivals?.pending(task.task_id) === true) return { kind: "revival_pending" }
+  const obligation = context.pendingRevivals?.obligation(task.task_id)
+  if (obligation === "owed" || obligation === "stopped") return { kind: "revival_pending" }
   return { kind: "orphaned", reason: orphanedTaskReason(task) }
 }
 

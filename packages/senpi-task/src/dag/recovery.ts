@@ -404,6 +404,12 @@ async function reconcileNodes(
       )
       continue
     }
+    // The lifecycle gave up a revival before recovery read the child: fold it in the scheduler, exactly as
+    // when that end lands after recovery, so the run's infrastructure retry applies either way (#15150).
+    if (context.pendingRevivals !== undefined && task.failure_kind === "suspended_unresumable") {
+      awaitingRevival.set(observed.id, task.task_id)
+      continue
+    }
     foldTaskOutcome(context, journal, observed.id, task, pendingErrors, pendingTerminalResults)
   }
 }

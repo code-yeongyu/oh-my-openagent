@@ -26,6 +26,8 @@ export type AttachedTaskSettlement =
   | { readonly nodeId: DagNodeId; readonly kind: "error"; readonly error: unknown }
   // A child whose pending revival ended without bringing it back (#15150).
   | { readonly nodeId: DagNodeId; readonly kind: "orphaned"; readonly message: string }
+  // A waiting node let go unjournaled because its lifecycle stopped; the run parks for the next recovery.
+  | { readonly nodeId: DagNodeId; readonly kind: "released" }
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId

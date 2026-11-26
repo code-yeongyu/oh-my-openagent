@@ -17,10 +17,11 @@ export type AwaitingRevival = {
 
 /**
  * A recovered node whose child this host's lifecycle still owes a revival (#15150) sits in the settle
- * loop like an attached child, so its dependents wait and the run never parks as unattached. It settles
- * when the pending state ends: the child is revived (the node follows its outcome), its record turns
- * terminal (the node folds that outcome), or the lifecycle no longer owes it a revival - its recovery
- * deadline passed or its owner is gone - and the node fails as orphaned. Each lifecycle pass wakes it.
+ * loop like an attached child, so its dependents wait and the run never parks as unattached. It ends
+ * only on the lifecycle's own end, never on a clock of its own: the child is revived (the node follows
+ * it), its record turns terminal (the node folds that record - the lifecycle's expiry included), the
+ * lifecycle has no obligation left (the node fails as orphaned), or the lifecycle stopped for shutdown
+ * or was disposed (the node is released unjournaled and the run parks). Each lifecycle pass wakes it.
  */
 export function followPendingRevivals(context: SchedulerContext, awaiting: AwaitingRevival): void {
   for (const [nodeId, taskId] of awaiting.tasks) {
@@ -54,7 +55,9 @@ async function revivalSettlement(
         (error: unknown): AttachedTaskSettlement => ({ nodeId, kind: "error", error }),
       )
     }
-    if (record === undefined || !revivals.pending(taskId)) {
+    const obligation = record === undefined ? "none" : revivals.obligation(taskId)
+    if (obligation === "stopped") return { nodeId, kind: "released" }
+    if (record === undefined || obligation === "none") {
       const message = record === undefined ? `task ${taskId} has no record left to revive` : orphanedTaskReason(record)
       return { nodeId, kind: "orphaned", message }
     }

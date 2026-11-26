@@ -6,7 +6,7 @@ import { PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { isHostSessionRecord } from "./host-session"
 import type { IdleReclaimerTimer, LifecycleDeps } from "./port"
 import { reconcileScopedRevival } from "./reconcile-revival"
-import { awaitsLiveParentRecovery } from "./revival-pending"
+import { awaitsLiveParentRecovery, revivalObligation } from "./revival-pending"
 import { isSuspendedResidency } from "./revival-selection"
 import { newestSessionPath } from "./session-path"
 import { suspendHandle } from "./shutdown"
@@ -147,7 +147,6 @@ export function startLiveParentRecovery(
         error: String(error),
       })
     } finally {
-      inspected()
       episode.busy = false
       const fresh = context.store.load(record.task_id)
       if (fresh === null || !eligible(fresh) || fresh.notification.run_epoch !== episode.epoch)
@@ -159,6 +158,7 @@ export function startLiveParentRecovery(
         context.registry.get(record.task_id) === undefined
       )
         scan()
+      inspected()
     }
   }
 
@@ -209,6 +209,7 @@ export function startLiveParentRecovery(
           )
           .finally(() => {
             currentEpisode.expiring = false
+            inspected()
           })
         continue
       }
@@ -280,11 +281,14 @@ export function startLiveParentRecovery(
         scan()
       }
     },
+    obligation: (taskId: string) =>
+      revivalObligation(context, taskId, { disposed, episode: episodes.get(taskId), eligible, scan }),
     dispose: () => {
       disposed = true
       unsubscribe?.()
       episodes.clear()
       if (timer !== undefined) context.idleReclaimerScheduler.clearInterval(timer)
+      inspected()
     },
   }
 }

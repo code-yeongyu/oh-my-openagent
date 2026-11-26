@@ -117,7 +117,7 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
       failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
     } else if (settled.kind === "orphaned") {
       failNode(context, settled.nodeId, "resume_task_orphaned", settled.message)
-    } else {
+    } else if (settled.kind === "record") {
       foldTaskOutcome(context, settled.nodeId, settled.record)
     }
   } finally {

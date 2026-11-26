@@ -96,6 +96,25 @@ describe("ends of a pending revival under a waiting workflow node (#15150)", () 
     expect(nodeStates(store)).toEqual(["k-hang:completed", "k-after:completed"])
   })
 
+  test("#given the lifecycle cannot confirm its stop at the deadline #when its close attempt is over #then the node fails as orphaned instead of waiting on the close retries", async () => {
+    // given - a child-process child whose pid survives every signal
+    const f = liveParentFixture("child-process", { residency_max_children: 1, default_concurrency: 2 })
+    fixtures.push(f)
+    const { hang, store } = await reopenOverCapacity(f)
+    const run = await recoverRun(f, store)
+    expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
+    f.state.stopConfirmed = false
+    f.alivePids.add(f.store.load(hang)?.pid ?? 0)
+
+    // when - the deadline's final attempt defers, and the expiry's close leaves the child unconfirmed
+    f.advance(300_000)
+
+    // then - the lifecycle's revival obligation ended with its close attempt; only its close retries remain
+    expect((await bounded(run.settled)).record?.status).toBe("failed")
+    expect(nodeStates(store)).toEqual(["k-hang:failed:resume_task_orphaned", "k-after:skipped"])
+    expect(f.store.load(hang)).toMatchObject({ status: "running", killed: true, failure_kind: "suspended_unresumable" })
+  })
+
   for (const [teardown, stop] of [
     ["the lifecycle is disposed", (f: ReturnType<typeof overCapacity>) => f.lifecycle.dispose?.()],
     [

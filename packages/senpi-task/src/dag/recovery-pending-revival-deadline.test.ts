@@ -62,7 +62,12 @@ async function expectGaveUpOutcome(
       return [`retried:${event.priorTaskId}:${event.automatic?.failureKind ?? "manual"}`]
     return []
   })
-  expect(hangEvents).toEqual(["running->failed", `retried:${hang}:suspended_unresumable`, "pending->scheduled"])
+  expect(hangEvents).toEqual([
+    "running->failed",
+    `retried:${hang}:suspended_unresumable`,
+    "pending->scheduled",
+    "scheduled->running",
+  ])
   expect(journal(store).some((event) => event.type === "dag.node.transitioned" && event.to === "skipped")).toBe(false)
   return freshChild
 }
