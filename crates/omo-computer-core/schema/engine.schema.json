@@ -2622,13 +2622,22 @@
       "description": "A cut container the skeleton did not open; `drill(ref)` opens it."
     },
     "DeafReason": {
-      "type": "string",
-      "enum": [
-        "secure-input-active",
-        "portal-unavailable",
-        "xi2-raw-unavailable",
-        "hook-install-failed",
-        "listener-parked"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "secure-input-active",
+            "portal-unavailable",
+            "xi2-raw-unavailable",
+            "hook-install-failed",
+            "listener-parked"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "chord-unarmable",
+          "description": "A-IS-62: the configured stop chord cannot be armed or read back (A-IS-63)."
+        }
       ]
     },
     "DefaultDelivery": {
@@ -2733,6 +2742,13 @@
         },
         "observation": {
           "$ref": "#/$defs/UntrustedText"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProbeCheck"
+          },
+          "description": "R62: a backend's own doctor checks that are not permissions (an X11 display, the\naccessibility bus, MPX, the compositor). They never feed `ok`; absent when there are none."
         }
       },
       "required": [
@@ -5425,6 +5441,37 @@
       },
       "required": [
         "chord"
+      ]
+    },
+    "ProbeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ProbeState"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "description": "R62: one backend doctor check, e.g. `{name: \"ax_bus\", state: \"unavailable\", reason: \"unreachable\"}`."
+    },
+    "ProbeState": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "unavailable",
+        "unknown"
       ]
     },
     "RaiseWindowParams": {
