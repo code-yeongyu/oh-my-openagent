@@ -98,6 +98,16 @@ impl FakeBackend {
         self.lock().scenario.remote_screens.get(&pid).copied()
     }
 
+    /// The core's view of `window`'s remote-screen client: its pid's scripted forwarding.
+    #[must_use]
+    pub fn remote_screen_of(&self, window: &str) -> Option<omo_computer_core::keys::unresolvable::RemoteForwarding> {
+        let pid = self.lock().windows.iter().find(|listed| listed.id == window)?.pid;
+        self.remote_screen(pid).map(|forwarding| match forwarding {
+            RemoteForwarding::KeyEvents => omo_computer_core::keys::unresolvable::RemoteForwarding::KeyEvents,
+            RemoteForwarding::HidReports => omo_computer_core::keys::unresolvable::RemoteForwarding::HidReports,
+        })
+    }
+
     /// Captures carry the legacy frame geometry.
     #[must_use]
     pub fn legacy_capture(&self) -> bool {
