@@ -6980,7 +6980,8 @@
         },
         {
           "port": "remote",
-          "op": "sessions.list"
+          "op": "sessions.list",
+          "count": 2
         }
       ],
       "answer": {
@@ -7003,7 +7004,8 @@
         },
         {
           "port": "remote",
-          "op": "sessions.list"
+          "op": "sessions.list",
+          "count": 2
         },
         {
           "port": "remote",
@@ -7015,10 +7017,6 @@
           "args": {
             "alias": "t-2"
           }
-        },
-        {
-          "port": "remote",
-          "op": "sessions.list"
         }
       ],
       "answer": {
@@ -7041,7 +7039,8 @@
         },
         {
           "port": "remote",
-          "op": "sessions.list"
+          "op": "sessions.list",
+          "count": 2
         },
         {
           "port": "remote",
@@ -7053,16 +7052,158 @@
           "args": {
             "alias": "lane t-2"
           }
-        },
-        {
-          "port": "remote",
-          "op": "sessions.list"
         }
       ],
       "answer": {
         "thread": "b/t-2"
       },
       "target": "other_device"
+    },
+    {
+      "id": "threads.resolve/this-device",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "t-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "thread": "t-1"
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/other-workspace",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "address": "t-1",
+        "workspace": "/w/app"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/out-of-workspace",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "address": "t-3"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "t-3"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/out-of-workspace-all-scope",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "t-3",
+        "all_scope": true
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "thread": "t-3"
+      },
+      "target": "this_device"
     }
   ]
 }

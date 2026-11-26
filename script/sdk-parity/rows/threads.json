@@ -1965,7 +1965,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The workspace input (and all_scope) act on this device's names only: they scope which of this device's threads a bare name or id may resolve to (scope_denied outside it), and change nothing for an address on another device, whose rows the account listing names whatever the caller's workspace."
     },
     {
       "id": "threads.runToCompletion",

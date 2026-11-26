@@ -53,8 +53,18 @@ export function remotePort(recorder: Recorder): {
     state: "idle",
     updated_ms: 1_700_000_000_000,
   }
+  // `given: {port: "remote", state: {here: [threads]}}` lists those threads of this device in the account listing too, as
+  // the service lists every device's rows; without it the listing holds b's thread only.
+  const here = Array.isArray(given["here"]) ? (given["here"] as readonly string[]) : []
+  const hereRows = here.map((thread): RemoteSessionRow => ({
+    ...row,
+    device: "here",
+    session_id: thread,
+    durable_id: thread,
+    title: `lane ${thread}`,
+  }))
   const fixture = createRemoteThreadFixture()
-  const { remote } = fixture.account({ rows: [row], online, live: [STUDIO_THREAD] })
+  const { remote } = fixture.account({ rows: [row, ...hereRows], online, live: [STUDIO_THREAD] })
   const label = (device: unknown): string => (device === STUDIO.id ? STUDIO.label : String(device))
   const address = (device: unknown, session: unknown): string => `${label(device)}/${String(session)}`
   const refusalOf = (result: unknown): string | undefined => {
