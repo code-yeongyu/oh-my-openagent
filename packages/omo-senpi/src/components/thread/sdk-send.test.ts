@@ -104,18 +104,27 @@ describe("a steer without expected_turn_id, by principal and by leg", () => {
     },
   )
 
-  test("#given a script steering a session here that runs turn 7, with no turn id #then it steers that turn, as naming turn 7 does", async () => {
-    // given
-    const td = createTwoDevices()
-    cleanups.push(td.cleanup)
-    const sdk = sdkOn(td, cleanups, { runningTurn: "7" })
+  // Held (thread/remote/held-answers.ts send-steer-fill-local, owner T1b): dev refuses a script's unnamed steer on this
+  // device whether the target runs a turn or is idle (the security reviewer's rows (a) and (b)); naming the turn steers.
+  test.each([
+    ["runs turn 7", { runningTurn: "7" }],
+    ["is idle", {}],
+  ] as const)(
+    "#given a script steering a session here that %s, with no turn id #then it is refused as dev refuses it",
+    async (_state, here) => {
+      // given
+      const td = createTwoDevices()
+      cleanups.push(td.cleanup)
+      const sdk = sdkOn(td, cleanups, here)
 
-    // when
-    const unnamed = (await sdk.send({ thread: T.hereSlash, text: "x", mode: "steer" })) as Answer
-    const named = (await sdk.send({ thread: T.hereSlash, text: "y", mode: "steer", expected_turn_id: 7 })) as Answer
+      // when
+      const unnamed = (await sdk.send({ thread: T.hereSlash, text: "x", mode: "steer" })) as Answer
 
-    // then
-    expect(outcome(unnamed)).not.toBe("invalid_arguments")
-    expect(outcome(unnamed)).toBe(outcome(named))
-  })
+      // then
+      expect(unnamed.error).toMatchObject({
+        code: "invalid_arguments",
+        message: "A steer needs expected_turn_id (the target's current turn_epoch).",
+      })
+    },
+  )
 })

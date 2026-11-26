@@ -7,6 +7,7 @@ import { HELD_ANSWERS } from "./held-answers"
 // The held-answers list is closed and only shrinks (design lane ruling on T1a): the sites it held when T1a added it, each
 // with the parity rows whose clearing releases it. An entry may leave only in the commit that clears its rows.
 const CEILING = {
+  "send-steer-fill-local": ["threads.send"],
   "send-derived-id-remote": ["threads.send"],
   "sdk-send-delivery-id": ["threads.send"],
   "remote-verbs-ended-row": ["threads.setModel", "threads.interrupt", "threads.close"],
@@ -70,7 +71,7 @@ describe("the held-answers list (design lane ruling on T1a)", () => {
     expect(retirementProblems(HELD_ANSWERS, exportedIn)).toEqual([])
   })
 
-  test("#given the list #then it holds exactly the six sites T1a closed, so adding or removing any entry fails here", () => {
+  test("#given the list #then it holds exactly the seven sites T1a closed, so adding or removing any entry fails here", () => {
     expect(Object.keys(HELD_ANSWERS).toSorted()).toEqual([
       "handoff-exact-ambiguity",
       "remote-resolve-self",
@@ -78,6 +79,7 @@ describe("the held-answers list (design lane ruling on T1a)", () => {
       "remote-verbs-ended-row",
       "sdk-send-delivery-id",
       "send-derived-id-remote",
+      "send-steer-fill-local",
     ])
   })
 

@@ -4,6 +4,12 @@
 // with the row's before/after scenario and its SDK-Parity-Changed line. An entry no parity row names carries `retiredWith`,
 // the export its slice removes. The list only shrinks (held-answers.test.ts).
 export const HELD_ANSWERS = {
+  "send-steer-fill-local": {
+    keeps:
+      "a person's or script's steer to a thread on this device with no expected_turn_id is refused, as dev refuses it",
+    rows: ["threads.send"],
+    slice: "T1b",
+  },
   "send-derived-id-remote": {
     keeps:
       "a keyed send to another device is named by a random delivery id (relay) or the caller-derived id (remote module), as dev names it",

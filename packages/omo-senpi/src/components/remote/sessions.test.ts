@@ -17,6 +17,7 @@ import { createLiveThreadSurface } from "../thread/live-surface"
 import { DEADLINES } from "./deadlines"
 import { createLocalSessions } from "./local-sessions"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { clientMessageIdOf } from "../thread/remote/client-message-id"
 import { personIdentity } from "./sessions"
 import {
   clientOn,
@@ -635,6 +636,20 @@ describe("#13756 review", () => {
     })
   })
 
+  // Held (thread/remote/held-answers.ts send-derived-id-remote, owner T1b): a keyed send through the relay names its
+  // prompt by the caller and the key, as dev does, until T1b derives the id from the thread on both legs.
+  test("#given a person's keyed send to another device #then its prompt and answer carry the caller-and-key id dev names it by", async () => {
+    const { owner, sent } = await onWorld()
+    const answer = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k-held" }),
+    )
+    const dev = clientMessageIdOf(personIdentity("user-1").caller, "k-held")
+    expect({ prompt: sent("prompt").map((record) => record["clientMessageId"]), answer: answer.delivery_id }).toEqual({
+      prompt: [dev],
+      answer: dev,
+    })
+  })
+
   test("#15011 (b) #given a keyed send #when a fresh client sends the same key #then the repeat reaches the holder under the same client message id", async () => {
     const { owner, sent } = await onWorld()
     const first = await valueOf(
@@ -1031,6 +1046,20 @@ describe("an open on this device", () => {
         failureOf(await session.sessions.open({ device: SELF, workspace: host.root, first: { text: "go" } })).code,
       ).toBe("local_only")
       expect(opensOn(host)).toEqual([])
+    })
+  })
+
+  // Held (thread/remote/held-answers.ts send-derived-id-remote, owner T1b): this device's leg names the prompt by the
+  // caller and the key too, as dev does.
+  test("#given a person's keyed send on this device #then its prompt and answer carry the caller-and-key id dev names it by", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host)
+      const answer = await valueOf(client.sessions.send(SELF_SESSION, { text: "once", idempotency_key: "lk-held" }))
+      const dev = clientMessageIdOf(personIdentity("user-1").caller, "lk-held")
+      const prompts = host.mutations
+        .filter((frame) => frame["type"] === "prompt")
+        .map((frame) => frame["clientMessageId"])
+      expect({ prompts, answer: answer.delivery_id }).toEqual({ prompts: [dev], answer: dev })
     })
   })
 

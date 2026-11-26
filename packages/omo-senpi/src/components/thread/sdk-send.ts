@@ -86,7 +86,9 @@ async function steerTurn(
     target.kind === "local" &&
     (value.delivery ?? DEFAULT_THREAD_DELIVERY) === "steer" &&
     value.expected_turn_id === undefined
-  if (!unnamed) return { kind: "ok", value }
+  // Held (held-answers.ts send-steer-fill-local): dev refuses this steer (the gateway asks for expected_turn_id) until
+  // slice T1b clears threads.send.
+  if (!unnamed || held("send-steer-fill-local")) return { kind: "ok", value }
   const book =
     current === PUBLISHED_SEND_VIEW ? addressBook(options, await hostView(options)) : addressBook(options, current)
   const routing = book.find((entry) => entry.durable_id === target.thread_id)?.endpoint?.routing_id ?? null
