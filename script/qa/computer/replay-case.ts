@@ -161,6 +161,13 @@ export async function casesIn(dir: string): Promise<string[]> {
     .map((name) => join(dir, name))
 }
 
+// A case as its result lines and the parity ledgers name it: the repository-relative path with
+// forward slashes on every OS, else the path given.
+export function caseName(casePath: string): string {
+  const rel = relative(ROOT, casePath).replaceAll("\\", "/")
+  return rel.startsWith("..") ? casePath : rel
+}
+
 type Superseded = { readonly old: string; readonly by: string }
 
 // The old cases the listed cases supersede, keyed by path; a named file that does not exist is an input error.

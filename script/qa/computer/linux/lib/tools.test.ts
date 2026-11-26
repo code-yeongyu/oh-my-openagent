@@ -34,12 +34,20 @@ test("a tool absent from PATH is found in a libexec directory of the layout", ()
   })
 })
 
-test("PATH wins over a libexec copy, and a non-executable file is not a tool", () => {
+test("PATH wins over a libexec copy", () => {
+  layout((root) => {
+    const libexec = join(root, "usr/libexec")
+    place(join(libexec, "xfwm4"), 0o755)
+    expect(resolveTool("xfwm4", { which: () => "/opt/bin/xfwm4", libexecDirs: [libexec] })).toBe("/opt/bin/xfwm4")
+  })
+})
+
+// Linux only: Windows has no exec bit (X_OK there only checks that the file exists).
+test.skipIf(process.platform === "win32")("a non-executable file is not a tool", () => {
   layout((root) => {
     const libexec = join(root, "usr/libexec")
     place(join(libexec, "xfwm4"), 0o644)
     expect(resolveTool("xfwm4", { which: () => null, libexecDirs: [libexec] })).toBeNull()
-    expect(resolveTool("xfwm4", { which: () => "/opt/bin/xfwm4", libexecDirs: [libexec] })).toBe("/opt/bin/xfwm4")
   })
 })
 

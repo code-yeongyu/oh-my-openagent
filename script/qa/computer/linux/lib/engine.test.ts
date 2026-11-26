@@ -12,7 +12,9 @@ echo "OMO_COMPUTER_RUNTIME_DIR is honoured only with OMO_COMPUTER_BACKEND=fake" 
 exit 2
 `
 
-test("an engine that exits at once fails fast with its stderr", async () => {
+// Linux only: the stand-in engine is a /bin/sh script run by its exec bit, which Windows cannot
+// spawn (ENOENT).
+test.skipIf(process.platform === "win32")("an engine that exits at once fails fast with its stderr", async () => {
   const dir = mkdtempSync(join(tmpdir(), "r47-engine-"))
   try {
     const binary = join(dir, "engine")
