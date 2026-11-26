@@ -28,23 +28,24 @@ export function resolveRecoveredNodeTask(
   const claims =
     retained === undefined || owned.some((task) => task.task_id === retained.task_id) ? owned : [...owned, retained]
   const current = claims.findLast((task) => ownedClaimAge(task, record) === "current")
-  if (current !== undefined) return { kind: "task", task: current }
   const stale = claims.filter((task) => ownedClaimAge(task, record) === "superseded")
   const live = stale.filter(isLiveTask)
-  // Synchronous unless a stale child must be stopped: reconcile hands live children to the scheduler
-  // without yielding, so a settle racing the restart is never folded twice.
-  if (live.length === 0) return afterStops(taskManager, node, stale)
-  return Promise.all(
-    live.map((task) =>
-      taskManager.cancelTask(task.task_id, `superseded by attempt ${node.execAttempt ?? 0} of DAG node "${node.id}"`),
-    ),
-  ).then(
-    () => afterStops(taskManager, node, stale),
-    () => afterStops(taskManager, node, stale),
+  // Stale claims are stopped BEFORE a current one is returned, so reconciliation never attaches or
+  // folds the current record beside one. Synchronous unless a stale child must be stopped: reconcile
+  // hands live children to the scheduler without yielding, so a racing settle is never folded twice.
+  if (live.length === 0) return afterStops(taskManager, node, stale, current)
+  const reason = `superseded by attempt ${node.execAttempt ?? 0} of DAG node "${node.id}"`
+  return Promise.allSettled(live.map((task) => taskManager.cancelTask(task.task_id, reason))).then(() =>
+    afterStops(taskManager, node, stale, current),
   )
 }
 
-function afterStops(taskManager: TaskManager, node: DagNode, stale: readonly TaskRecord[]): RecoveredNodeTask {
+function afterStops(
+  taskManager: TaskManager,
+  node: DagNode,
+  stale: readonly TaskRecord[],
+  current: TaskRecord | undefined,
+): RecoveredNodeTask {
   const alive = stale.filter((task) => isLiveTask(taskManager.get(task.task_id)))
   if (alive.length > 0) {
     const ids = alive.map((task) => task.task_id).join(", ")
@@ -54,6 +55,7 @@ function afterStops(taskManager: TaskManager, node: DagNode, stale: readonly Tas
       message: `task ${ids} of a superseded attempt could not be stopped`,
     }
   }
+  if (current !== undefined) return { kind: "task", task: current }
   if (node.state === "scheduled" && (node.taskId === undefined || stale.length > 0)) return { kind: "start" }
   if (stale.length > 0) {
     return {

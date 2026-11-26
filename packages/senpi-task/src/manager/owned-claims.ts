@@ -13,21 +13,21 @@ export function ownedClaims(records: readonly TaskRecord[], scope: DagTaskOwnerS
 
 /** The owned start's answer from the owner key's claims, oldest first; undefined starts a fresh child. */
 export function ownedStartResult(claims: readonly TaskRecord[], owner: DagTaskOwner): OwnedStartResult | undefined {
-  const record = claims.at(-1)
-  if (record === undefined) return undefined
-  if (record.owner?.fingerprint !== owner.fingerprint) {
-    // A settled newest claim is a retry and ownership moves to a fresh task, unless ANY claim is
-    // still live: an older attempt's child can resume on its own behind a newer one (#11381).
-    const live = claims.findLast((claim) => !isTerminalRecord(claim))
-    if (live === undefined) return undefined
-    // Which live claim this is - same attempt, earlier, or newer - the DAG layer decides (#11381).
+  // Every live claim is checked before any reuse, not only the newest: an older attempt's child can
+  // be live behind a newer claim, settled or not, and must never run beside it (#11381). Which live
+  // claim this is - same attempt, earlier, or newer - the DAG layer decides.
+  const other = claims.findLast((claim) => !isTerminalRecord(claim) && claim.owner?.fingerprint !== owner.fingerprint)
+  if (other !== undefined) {
     return {
       kind: "owner_conflict",
-      task_id: live.task_id,
-      existing_fingerprint: live.owner?.fingerprint ?? "",
+      task_id: other.task_id,
+      existing_fingerprint: other.owner?.fingerprint ?? "",
       requested_fingerprint: owner.fingerprint,
     }
   }
+  // A settled newest claim with another fingerprint is a retry: ownership moves to a fresh task.
+  const record = claims.at(-1)
+  if (record === undefined || record.owner?.fingerprint !== owner.fingerprint) return undefined
   return {
     kind: "started",
     reused: true,

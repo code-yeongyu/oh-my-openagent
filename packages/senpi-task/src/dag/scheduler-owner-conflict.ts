@@ -1,7 +1,7 @@
 import type { TaskRecord } from "../state"
 import { ownedClaimAge, type OwnedClaimAge } from "./owned-attempt"
 import type { OwnedStartResult } from "./owner"
-import { errorMessage, failNode, liveOwnedTasks, type SchedulerContext } from "./scheduler-context"
+import { errorMessage, failNode, isLiveTask, liveOwnedTasks, type SchedulerContext } from "./scheduler-context"
 import { attachStarted } from "./scheduler-task-attachment"
 import type { DagNodeId } from "./types"
 
@@ -54,14 +54,20 @@ export function settleOwnerConflict(
     failNode(context, nodeId, "stale_attempt_alive", message)
     return
   }
-  // The named claim can settle between the manager's check and this pass; its outcome is still ours.
-  const named = context.taskManager.get(conflict.task_id)
-  const current =
-    liveClaims(context, nodeId, "current").at(-1) ??
-    (named !== undefined && ownedClaimAge(named, context.journal.snapshot()) === "current" ? named : undefined)
+  // The newest claim of this attempt, settled or live: once no stale one is live, its outcome is ours.
+  const record = context.journal.snapshot()
+  const current = context.taskManager
+    .findOwnedTasks({ kind: "dag", runId: record.runId, nodeId })
+    .findLast((task) => ownedClaimAge(task, record) === "current")
   if (current !== undefined) {
-    const adopted = { kind: "started", reused: true, task_id: current.task_id, status: "running" } as const
-    attachStarted(context, nodeId, { ...adopted, name: current.task_id })
+    const status = isLiveTask(current) ? "running" : current.status
+    attachStarted(context, nodeId, {
+      kind: "started",
+      reused: true,
+      task_id: current.task_id,
+      status,
+      name: current.task_id,
+    })
     return
   }
   const stopped = [...stops].filter(([, stop]) => stop.nodeId === nodeId).map(([taskId]) => taskId)
