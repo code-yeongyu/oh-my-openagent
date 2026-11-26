@@ -1,7 +1,10 @@
 /**
  * The human summary `omo thread` prints without `--json`: one line per thread, device or transcript
- * item. Scripts use `--json`; these lines are for a person and may change.
+ * item. Scripts use `--json`; these lines are for a person and may change. Every value is shown through
+ * `escapeForDisplay`; transcript content keeps its line feeds.
  */
+
+import { escapeForDisplay } from "./display-escape.js"
 
 function deviceLine(device) {
   const state = device.this_device ? "this device" : device.online ? "online" : "offline"
@@ -31,8 +34,11 @@ const RENDER = {
     `${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread}${result.deduplicated ? " (already sent)" : ""}`,
   ],
   read: (result) => [
-    ...result.items.map((item) => `[${item.role}] ${item.content}`),
-    ...(result.truncated ? [`(truncated; older messages: --cursor ${result.next_cursor})`] : []),
+    ...result.items.map(
+      (item) =>
+        `[${escapeForDisplay(String(item.role))}] ${escapeForDisplay(String(item.content), { keepLineFeeds: true })}`,
+    ),
+    ...(result.truncated ? [escapeForDisplay(`(truncated; older messages: --cursor ${result.next_cursor})`)] : []),
   ],
   close: (result) => [
     result.closed
@@ -45,5 +51,6 @@ const RENDER = {
 }
 
 export function humanLines(name, result) {
-  return RENDER[name](result)
+  const lines = RENDER[name](result)
+  return name === "read" ? lines : lines.map((line) => escapeForDisplay(line))
 }

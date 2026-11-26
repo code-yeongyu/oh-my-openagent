@@ -1,4 +1,6 @@
 import { type BaselineEntry, sha256 } from "./baseline"
+import { type Goldens, type PresentationRow, presentationProblems, presentationRowProblems } from "./presentation"
+import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
@@ -24,12 +26,24 @@ export type GateInput = {
   readonly changedFiles: readonly string[]
   readonly body: string
   readonly headSha: string
+  // presentation.json at the merge base (undefined when it has none) and at the head; only the rows the pull request
+  // adds take part, so a row already on the base neither clears nor fails a later pull request.
+  readonly presentation: {
+    readonly base: readonly PresentationRow[] | undefined
+    readonly head: readonly PresentationRow[]
+  }
+  readonly goldens: Goldens
+  // Each tree's declared omo and engine versions (version-mask.ts); the merge base's is undefined when it has no manifest.
+  readonly versions: { readonly base: DeclaredVersions | undefined; readonly head: DeclaredVersions }
 }
 
 export type GateReport = {
   readonly failures: readonly string[]
   readonly candidates: readonly string[]
   readonly liveSchema: readonly string[]
+  readonly presentation: readonly string[]
+  readonly presentationRows: readonly string[]
+  readonly versionMasked: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -75,11 +89,16 @@ export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
 export function gateReport(input: GateInput): GateReport {
-  const failures: string[] = []
+  const baseRowsText = new Set((input.presentation.base ?? []).map((row) => JSON.stringify(row)))
+  const added = input.presentation.head.filter((row) => !baseRowsText.has(JSON.stringify(row)))
+  const failures: string[] = [...presentationRowProblems(added, input.scenarios)]
   const unresolved = new Set(input.head.unresolved.map((entry) => entry.id))
   const initialization = input.base.rows === undefined
   const baseRows = new Map((input.base.rows ?? []).map((row) => [row.id, row]))
   const flagged = new Set<string>()
+  const presentation: string[] = []
+  const presentationRows: string[] = []
+  const versionMasked: string[] = []
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
@@ -112,9 +131,28 @@ export function gateReport(input: GateInput): GateReport {
     }
     // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
     if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
+    const baseVersions = input.versions.base
+    if (
+      baseVersions !== undefined &&
+      equalUnderVersionMask(before, after, { base: baseVersions, head: input.versions.head })
+    ) {
+      versionMasked.push(`${scenario.id}#version-mask`)
+      continue
+    }
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
+      const matched = new Set<string>()
+      const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
+      if (notPresentation.length === 0) {
+        presentation.push(scenario.id)
+        presentationRows.push(`${scenario.id}#presentation=${[...matched].toSorted().join("+")}`)
+        continue
+      }
+      const why =
+        "usage" in scenario && scenario.usage !== undefined
+          ? `; it is not presentation-only: ${notPresentation.join("; ")}`
+          : ""
       failures.push(
-        `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}`,
+        `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}${why}`,
       )
       flagged.add(scenario.capability)
     }
@@ -150,8 +188,18 @@ export function gateReport(input: GateInput): GateReport {
     failures,
     candidates,
     liveSchema,
+    presentation: presentation.toSorted(),
+    presentationRows: presentationRows.toSorted(),
+    versionMasked: versionMasked.toSorted(),
     head: input.headSha,
-    digest: candidateDigest(input.headSha, [...candidates, ...liveSchema.map((id) => `${id}#live-schema`)]),
+    // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
+    // added later appends after these, so a merge that keeps both tiers keeps one order.
+    digest: candidateDigest(input.headSha, [
+      ...candidates,
+      ...liveSchema.map((id) => `${id}#live-schema`),
+      ...presentationRows,
+      ...versionMasked,
+    ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
   }
@@ -173,10 +221,13 @@ export function goldenProblems(
     )
 }
 
-// The ids a reviewer's line covers: the candidates and the built rows marked for the live-schema check.
+// The ids a reviewer's line covers: the candidates, the built rows marked for the live-schema check and the scenarios
+// passed as presentation-only.
 const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
+  ...report.presentationRows,
+  ...report.versionMasked,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -194,6 +245,16 @@ export function renderReport(report: GateReport): string {
   if (report.liveSchema.length > 0)
     lines.push(
       `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer confirms against the live schema that the set of accepted inputs is the same in both directions (nothing newly refused, nothing newly accepted) before CLEAR.`,
+      "",
+    )
+  if (report.presentation.length > 0)
+    lines.push(
+      `PRESENTATION ONLY: ${report.presentationRows.map((entry) => entry.replace("#presentation=", " (row ") + ")").join(", ")}: the usage text of an existing verb changed with the exit code, the structure and every other line equal, as named in script/sdk-parity/presentation.json; the reviewer confirms the change is wording, not a capability, before CLEAR.`,
+      "",
+    )
+  if (report.versionMasked.length > 0)
+    lines.push(
+      `VERSION MASK: ${report.versionMasked.map((entry) => entry.replace("#version-mask", "")).join(", ")}: equal only once each tree's own declared omo package version and engine pin (packages/omo-native/package.json) are replaced by placeholders; the reviewer confirms the version is the only difference before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

@@ -37,6 +37,7 @@
     "README.md: omo doctor x2",
     "README.ru.md: omo doctor",
     "README.zh-cn.md: omo doctor",
+    "crates/omo-computer-core/parity/DEFERRED-LEGS.tsv: omo doctor",
     "docs/guide/binary-install.md: /bin/omo",
     "docs/guide/computer-use.md: omo doctor",
     "docs/guide/install.md: /bin/omo x5",
@@ -154,6 +155,10 @@
     "packages/omo-native/test/remote-background.test.ts: /bin/omo x2",
     "packages/omo-native/test/remote-bootstrap-published-release.test.ts: /bin/omo",
     "packages/omo-native/test/remote-cli-harness.ts: /bin/omo",
-    "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo"
+    "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo",
+    "packages/device-service-core/test/cold-wake/refresh.test.ts: /bin/omo x2",
+    "packages/omo-native/bin/lib/service-auth.generated.js: /bin/omo",
+    "packages/omo-native/remote-bootstrap.ts: /bin/omo",
+    "packages/omo-native/test/remote-binary-path.test.ts: /bin/omo x2"
   ]
 }
