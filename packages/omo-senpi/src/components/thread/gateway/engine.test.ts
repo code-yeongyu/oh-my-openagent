@@ -322,6 +322,9 @@ describe("lost_ack_and_durable_recovery", () => {
     h.session("A")
     h.session("B")
     const first = await send(h, "A", "B", "hello", { idempotency_key: "k1" })
+    // "Completed" is established, not assumed: the applied transition is recorded after the send returns.
+    await h.quiesce()
+    expect(await stateOf(h, okId(first))).toBe("applied")
     const again = await send(h, "A", "B", "hello", { idempotency_key: "k1" })
     const changed = await send(h, "A", "B", "hello!", { idempotency_key: "k1" })
     expect(again).toEqual({
@@ -332,6 +335,25 @@ describe("lost_ack_and_durable_recovery", () => {
     expect(h.get("B").runtime.transcriptEntries(okId(first))).toBe(1)
     expect(summary(changed)).toBe("error:idempotency_conflict")
     expect(await h.get("B").store.list({ target_durable_id: "B" })).toHaveLength(1)
+  })
+
+  test("#given a delivery the target still holds unapplied #when the same key is retried before and after it is applied #then each replay answers the delivery's state at that moment", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    const first = await send(h, "A", "B", "hello", { idempotency_key: "k2", mode: "follow_up" })
+    const id = okId(first)
+    await b.drain.drain({ reason: "command" })
+    expect(await stateOf(h, id)).toBe("admitted")
+    const held = await send(h, "A", "B", "hello", { idempotency_key: "k2", mode: "follow_up" })
+    expect(held).toMatchObject({ kind: "ok", deduplicated: true, outcome: { kind: "admitted" } })
+    b.runtime.endTurn()
+    await h.quiesce()
+    expect(await stateOf(h, id)).toBe("applied")
+    const done = await send(h, "A", "B", "hello", { idempotency_key: "k2", mode: "follow_up" })
+    expect(done).toMatchObject({ kind: "ok", deduplicated: true, outcome: { kind: "applied" } })
+    expect(b.runtime.enqueueCount(id)).toBe(1)
   })
 
   test("#given the sender dies after COMMIT and before its receipt completes #when another process retries #then an unadmitted row answers idempotency_uncertain forever and an admitted one replays its outcome", async () => {
