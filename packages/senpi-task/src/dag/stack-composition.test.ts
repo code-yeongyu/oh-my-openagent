@@ -162,7 +162,10 @@ describe("recovery of an interrupted run asks the child gate before it starts or
     expect(installed.map((entry) => entry.runId)).toEqual([run.runId])
     expect(reattached).toEqual([])
     const nodes = run.read()?.nodes ?? []
-    expect(nodes.find((node) => node.id === "C")).toMatchObject({ state: "failed", error: { code: "stale_attempt_alive" } })
+    expect(nodes.find((node) => node.id === "C")).toMatchObject({
+      state: "failed",
+      error: { code: "stale_attempt_alive" },
+    })
     expect(nodes.find((node) => node.id === "B")?.state).not.toBe("running")
     for (const entry of installed) await entry.scheduler.suspend()
   })

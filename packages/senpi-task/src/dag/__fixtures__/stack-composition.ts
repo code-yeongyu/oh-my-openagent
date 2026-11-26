@@ -28,7 +28,10 @@ export async function unscheduledRun(
   const runner = new ControlledRunner(undefined, { connectable: setup.connectable === true })
   const fixture = createE2eFixture({ project: root, runner, materializeSkills: identityMaterializer })
   const started = await fixture.manager.start({
-    definition: definition("stack", nodeIds.map((id) => categoryNode(id))),
+    definition: definition(
+      "stack",
+      nodeIds.map((id) => categoryNode(id)),
+    ),
     parentSessionId,
     rootSessionId: parentSessionId,
   })
@@ -37,7 +40,10 @@ export async function unscheduledRun(
   const tasks = new Map<string, string>()
   const toStart = setup.start ?? nodeIds
   for (const id of toStart) {
-    const result = await fixture.taskManager.startOwned(startSpec(created, id as DagNodeId, 0), taskOwner(created, id as DagNodeId))
+    const result = await fixture.taskManager.startOwned(
+      startSpec(created, id as DagNodeId, 0),
+      taskOwner(created, id as DagNodeId),
+    )
     if (result.kind !== "started") throw new Error(`node ${id} did not start: ${result.kind}`)
     tasks.set(id, result.task_id)
   }

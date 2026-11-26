@@ -68,9 +68,11 @@ async function failedRunWithRevivedA() {
   const read = () => fixture.store.readCheckpoint<Leased>(runId)
   const nodeA = () => read()?.nodes.find((node) => node.id === "A")
   const otherRetry = () =>
-    retryDagNodes({ ...options, hostPid: OTHER_HOST, initialRecord: fixture.manager.record(runId, parentSessionId) }, runId, [
-      "B" as DagNodeId,
-    ])
+    retryDagNodes(
+      { ...options, hostPid: OTHER_HOST, initialRecord: fixture.manager.record(runId, parentSessionId) },
+      runId,
+      ["B" as DagNodeId],
+    )
   return { fixture, runner, runId: runId as DagRunId, taskA, revived, cancelRun, read, nodeA, otherRetry }
 }
 
