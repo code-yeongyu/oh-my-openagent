@@ -58,9 +58,9 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
   }
 
   async function attempt(record: TaskRecord, episode: Episode): Promise<void> {
+    const attemptable = () => eligible(record) && context.registry.get(record.task_id) === undefined
     try {
-      if (!eligible(record)) return
-      if (context.registry.get(record.task_id) !== undefined) return
+      if (!attemptable()) return
       const expired = context.now() >= episode.deadline
       if (
         isSuspensionExpiry(record) ||
@@ -75,7 +75,11 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
       // A live foreign owner may release its claim within the budget. Do not start a second run
       // beside it; at expiry the normal stop/close path must end it (or disclose unconfirmed close).
       const observing = observeRecordOwners(context.ownerProcesses, [record], context.hostPid)
-      if (observing !== undefined) await observing
+      if (observing !== undefined) {
+        await observing
+        // Reading the owner's start identity is a wait: a shutdown or handle that landed meanwhile ends this attempt.
+        if (!attemptable()) return
+      }
       if (record.host_pid !== undefined && record.host_pid !== context.hostPid && claimantAlive(context, record)) {
         if (expired) await expireSuspendedChild(context, record, () => owned(record))
         return

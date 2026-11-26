@@ -53,11 +53,12 @@ export async function retryDeferredScopedChild(
   let expected = context.store.load(taskId)
   for (const backoffMs of context.hostRetry.deferredRetryBackoffMs) {
     await context.hostRetry.wait(backoffMs)
-    if (retriesStopped(context, parentSessionId)) return
+    // Reading the owner's start identity is a second wait: the stop check follows the last one.
     const observedOwner = context.store.load(taskId)
     const observing =
       observedOwner === null ? undefined : observeRecordOwners(context.ownerProcesses, [observedOwner], context.hostPid)
     if (observing !== undefined) await observing
+    if (retriesStopped(context, parentSessionId)) return
     const fresh = context.store.load(taskId)
     if (!canRetry(context, fresh, parentSessionId)) return
     // Another revival can claim a child before it installs its handle. The claim/epoch fence,

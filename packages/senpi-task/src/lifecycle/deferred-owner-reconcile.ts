@@ -91,6 +91,11 @@ async function retryOwner(
 ): Promise<ReconcileOutcome | undefined> {
   for (const backoffMs of options.backoffMs) {
     await context.hostRetry.wait(backoffMs)
+    // Reading the owner's start identity is a second wait: the stop check follows the last one.
+    const current = context.store.load(observed.task_id)
+    const observing =
+      current === null ? undefined : observeRecordOwners(context.ownerProcesses, [current], context.hostPid)
+    if (observing !== undefined) await observing
     if (
       !reconciliationActive(context) ||
       retriesStopped(context, options.parentSessionId ?? observed.parent_session_id)
@@ -107,8 +112,6 @@ async function retryOwner(
       context.registry.get(fresh.task_id) !== undefined
     )
       return
-    const observing = observeRecordOwners(context.ownerProcesses, [fresh], context.hostPid)
-    if (observing !== undefined) await observing
     if (claimantAlive(context, fresh)) continue
     // Reclamation revalidates the owner under the record lock. Terminal writes that win before
     // that claim or while destruction awaits are preserved by the normal reconciliation reducer.
