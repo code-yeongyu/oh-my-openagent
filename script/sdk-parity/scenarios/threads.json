@@ -5277,6 +5277,82 @@
       "target": "this_device"
     },
     {
+      "id": "threads.unload/all-scope",
+      "row": "threads.unload",
+      "kind": "effect",
+      "input": {
+        "thread": "t-3",
+        "all_scope": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "args": {
+            "thread": "t-3"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.unload/outside-workspace",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-3"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.unload/idempotent-repeat",
+      "row": "threads.unload",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "idempotency_key": "k1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "host",
+              "op": "unload_session",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "unloaded": true
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.setReasoning/level-off",
       "row": "threads.setReasoning",
       "kind": "effect",
@@ -6824,6 +6900,31 @@
         {
           "port": "host",
           "op": "close_session",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 0
+      }
+    },
+    {
+      "id": "threads.unload/caller-cancels",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
           "count": 0
         },
         {

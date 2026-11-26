@@ -7,4 +7,5 @@ export const runs = scenarioRuns([
   "threads.release",
   "threads.rename",
   "threads.send",
+  "threads.unload",
 ])

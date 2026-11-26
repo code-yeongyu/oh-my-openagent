@@ -7,7 +7,9 @@ import type { DeliveryLedger } from "./store"
 
 // The engine host port (ThreadHost) over one recorder, shaped as the live surface is: `listView` lists every endpoint
 // (host.list_sessions, with the view request the core passed), the per-session methods act on the session the core
-// addressed (host.rename_session {thread, name}, host.release_session {thread, reason, ...}). Each thread it holds has a
+// addressed (host.rename_session {thread, name}, host.release_session {thread, reason, ...}, host.abort {thread} for the
+// engine's interrupt, host.unload_session {thread, ...the unload's options}; host.get_state answers the turn a scenario
+// states, `result: {turn: "running"}`). Each thread it holds has a
 // session file under the agent dir, so a thread the scenario gives as ended is resumable from disk and not live. The
 // host spans two workspaces: t-1 runs in the caller's cwd and t-3 in another folder; a scenario moves a thread to that
 // other workspace with `given: {thread, workspace: "elsewhere"}`, so a call finds it only with all_scope.
@@ -89,11 +91,18 @@ export function hostPort(
       return []
     },
     getState: async (sessionId, durable) => {
-      recorder.record("host", "get_state", { thread: durableOf(sessionId, durable) })
-      return { isStreaming: false }
+      const { result } = recorder.record("host", "get_state", { thread: durableOf(sessionId, durable) })
+      return { isStreaming: Reflect.get(Object(result), "turn") === "running" }
     },
     prompt: unused("prompt"),
-    interrupt: unused("interrupt"),
+    interrupt: async (sessionId, _request, durable) => {
+      recorder.record("host", "abort", { thread: durableOf(sessionId, durable) })
+      return { interrupted: true }
+    },
+    unloadSession: async (sessionId, durable, options = {}) => {
+      recorder.record("host", "unload_session", { thread: durableOf(sessionId, durable), ...options })
+      return { outcome: "unloaded", dropped_deliveries: [], dropped_user_messages: [] }
+    },
     setSessionName: async (sessionId, name, durable) => {
       recorder.record("host", "rename_session", { thread: durableOf(sessionId, durable), name })
     },
