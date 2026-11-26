@@ -572,11 +572,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (isCancelled(signal)) return await notStarted()
     }
     if (receipted)
-      await store
-        .toolReceiptSettle({ ...scope, now: now(), ...settlement(result) })
-        .then((settled) => {
-          if (!settled) unrecorded("the call ran")(new Error("this call no longer held its receipt"))
-        }, unrecorded("the call ran"))
+      await store.toolReceiptSettle({ ...scope, now: now(), ...settlement(result) }).then((settled) => {
+        if (!settled) unrecorded("the call ran")(new Error("this call no longer held its receipt"))
+      }, unrecorded("the call ran"))
     running.delete(receiptKey(scope))
     return output(result)
   }
