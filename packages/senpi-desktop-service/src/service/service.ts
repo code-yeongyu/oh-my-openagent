@@ -144,15 +144,20 @@ export class DesktopService {
     return this.#stopPath(await this.#live(), "stopPath.status", {})
   }
 
-  /** Viewer metadata is best effort. Never revive a dead child just to paint the app. */
-  async viewerStatus(): Promise<unknown> {
+  /**
+   * Viewer metadata is best effort. Never revive a dead child just to paint the app, and never hold an
+   * aborted tool call for it: `signal` cancels the read and the call then has no status.
+   */
+  async viewerStatus(signal?: AbortSignal): Promise<unknown> {
     const connection = this.#connection
-    if (connection?.rpc.alive !== true) return undefined
+    if (connection?.rpc.alive !== true || signal?.aborted === true) return undefined
+    const options: CallOptions = { timeoutMs: CAPABILITIES_TIMEOUT_MS, ...(signal && { signal }) }
     try {
-      const result = await connection.rpc.request("session.viewerStatus", {}, { timeoutMs: CAPABILITIES_TIMEOUT_MS })
+      const result = await connection.rpc.request("session.viewerStatus", {}, options)
       return this.#connection === connection ? result : undefined
     } catch (error) {
       if (error instanceof DesktopEngineRpcError && error.rpcCode === -32601) return undefined
+      if (error instanceof DesktopServiceError && error.code === "Cancelled" && signal !== undefined) return undefined
       throw error
     }
   }
