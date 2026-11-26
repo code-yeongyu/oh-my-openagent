@@ -5,6 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
+use omo_computer_session::grant::HostCallError;
 use omo_computer_session::{Refused, Session, Unresolved};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
@@ -70,7 +71,7 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
     let method = Method::from_name(name).ok_or_else(not_found)?;
     let value = match method {
         Method::SessionOpen => json!(session.open(parse(params)?).map_err(|r| refused(&r))?),
-        Method::StopPathStart => json!(session.stop_path_start(parse(params)?)),
+        Method::StopPathStart => json!(session.stop_path_start_checked(parse(params)?).map_err(|r| refused(&r))?),
         Method::StopPathStop => json!(session.stop_path_stop(parse(params)?)),
         Method::StopPathStatus => {
             parse::<omo_computer_core::params::EmptyParams>(params)?;
@@ -90,15 +91,33 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             json!(session.capabilities())
         }
+        Method::Displays => {
+            parse::<omo_computer_core::params::EmptyParams>(params)?;
+            json!(session.displays().map_err(|r| refused(&r))?)
+        }
+        Method::Capture => json!(session.capture(parse(params)?).map_err(|r| refused(&r))?),
         Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
         Method::Observe => json!(session.observe(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxDrill => json!(session.drill(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxNode => json!(session.ax_node(parse(params)?).map_err(|u| unresolved(&u))?),
         Method::AxChildren => json!(session.ax_children(parse(params)?).map_err(|u| unresolved(&u))?),
-        _ => return Err(not_found()),
+        _ => {
+            return session.host_call(method, params).map_or_else(|| Err(not_found()), |r| r.map_err(host_failure))
+        }
     };
     Ok(value)
+}
+
+// --- Rows 21-27: the session's host calls (R31); row 28 moves this into the engine router. ---
+
+fn host_failure(error: HostCallError) -> Failure {
+    match error {
+        HostCallError::Params(error) => {
+            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
+        }
+        HostCallError::Refused(refused) => refused_call(&refused),
+    }
 }
 
 /// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
@@ -133,11 +152,26 @@ fn refused_call(refused: &Refused) -> Failure {
         if let Some(disposition) = refused.interrupted {
             data["disposition"] = json!(disposition);
         }
+        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
+            for (key, value) in detail {
+                data.entry(key.clone()).or_insert_with(|| value.clone());
+            }
+        }
         if let Some(warning) = &refused.warning {
             data["warning"] = json!(warning);
         }
     }
+    busy_data(refused, &mut failure);
     failure
+}
+
+/// `InputBusy{target_busy}`: the busy wait's `indicator`, `waitedMs` and `retryAfterMs`.
+fn busy_data(refused: &Refused, failure: &mut Failure) {
+    if let (Some(busy), Some(data)) = (&refused.busy, failure.data.as_mut()) {
+        data["indicator"] = json!(busy.indicator);
+        data["waitedMs"] = json!(busy.waited_ms);
+        data["retryAfterMs"] = json!(busy.retry_after_ms);
+    }
 }
 
 /// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
@@ -228,6 +262,8 @@ mod tests {
             call_id: Some("k-1".to_owned()),
             receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
+            detail: None,
+            busy: None,
             warning: Some("write_failed".to_owned()),
         };
         let Failure { data, .. } = refused_call(&interrupted);

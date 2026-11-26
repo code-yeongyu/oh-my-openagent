@@ -57,6 +57,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(InputBusy, Window => InputBusy, NDS, Yes, INSPECT, "computer.windows()"),
     e!(InputBusy, Budget => Busy, NDS, Yes, INSPECT, "the same call after retryAfterMs"),
     e!(InputBusy, TargetBusy => InputBusy, NDS, Yes, INSPECT, "win.waitFor({ settle: {} })"),
+    e!(InputBusy, InteractionLock => InputBusy, NDS, Yes, INSPECT, "observe() then the same call after retryAfterMs"),
     e!(CaptureUnavailable, _ => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(CaptureUnavailable, Minimized => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
     e!(CaptureUnavailable, OffscreenUnsupported => CaptureUnavailable, NDS, Yes, INSPECT, "win.observe()"),
