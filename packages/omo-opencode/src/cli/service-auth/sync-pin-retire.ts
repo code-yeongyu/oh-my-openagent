@@ -17,22 +17,34 @@ export function retireSyncPinOnDiscard(options: {
   /** The caller's own logger; one line per pin it could not retire. */
   readonly log: (line: string) => void
 }): BeforeKeysDiscarded {
+  const livePin = () => hasLiveTrustAnchor(options.pinDir()).catch(() => false)
   const hook = async (discarded: DiscardedCredential) => {
     if (discarded.kind === "unreadable") {
-      options.log(
-        "memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place",
-      )
+      // Nothing is left in place when this machine holds no live pin, so nothing is reported.
+      if (await livePin())
+        options.log(
+          "memory sync: a stored sign-in could not be read when its keys were discarded; its sync pin was left in place",
+        )
       return
     }
-    // A sign-in that names no account never ran `omo sync` here (the usual case): nothing to retire, silently.
     const account = discarded.owner?.accountId ?? discarded.accountId
-    if (account === undefined) return
+    if (account === undefined) {
+      // A sign-in that names no account usually never ran `omo sync` here: no live pin, nothing to say. A live pin left
+      // here (a legacy sign-in whose account the service could not be asked for) is kept, and the user is told how to
+      // clear it, since `omo account show` keeps answering `joined` for it (#13662). The live pin may as well belong to
+      // another account still signed in here (the desktop's), which only the user can tell apart, so the line says so.
+      if (await livePin())
+        options.log(
+          "memory sync: the account of this sign-in is unknown, so a sync pin was kept; if it belongs to this sign-in's account, clear it with `omo account retire-sync --account <id>`. Do not retire the pin of an account that is still signed in here, such as the desktop's.",
+        )
+      return
+    }
     try {
       await retireSyncDevice({ pinDir: options.pinDir(), account })
     } catch (error) {
       options.log(`memory sync: the sync pin could not be retired (${reason(error)}); it was left in place`)
     }
   }
-  // A pin earned before the account was stamped on the credential: logout reads the account first.
-  return Object.assign(hook, { wantsAccount: () => hasLiveTrustAnchor(options.pinDir()).catch(() => false) })
+  // A pin earned before the account was stamped on the credential: every discard reads the account from the service first.
+  return Object.assign(hook, { wantsAccount: livePin })
 }

@@ -7,6 +7,7 @@
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
+import { logCycleFailure, type SyncStage } from "./failure-cause"
 import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
@@ -23,7 +24,11 @@ export const LOCAL_DEBOUNCE_MS = 2_000
 
 export type EngineStatus =
   | { readonly kind: "never_synced" }
-  | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline: number }
+  /**
+   * `updatedWhileOffline`: the memories the catch-up after this device's latest offline gap updated (`gap` in
+   * SyncEngine says what a gap is). Absent when the latest entries it received came in with no gap before them.
+   */
+  | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline?: number }
   | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: Failing }
   /** Pushes are frozen by the service until a key rotation lands (sync-design section 7). */
   | { readonly kind: "frozen"; readonly reason: FreezeReason; readonly since: number }
@@ -50,6 +55,8 @@ export class SyncEngine {
   readonly journal: SyncJournal
   cyclesRun = 0
   private loaded = false
+  /** The step the running cycle is in, named by its failure (#13635). */
+  private stage: SyncStage = "load"
   private running: Promise<CycleReport> | null = null
   /** A local commit, poll or startup request arrived while a cycle ran: it always gets its own cycle. */
   private rerun = false
@@ -73,6 +80,15 @@ export class SyncEngine {
   private heldKey: string | null = null
   /** The held key the running cycle recorded, adopted when it succeeds. */
   private nextHeldKey: string | null = null
+  /**
+   * An offline gap, open until a refusal-free cycle closes it; `applied` adds up the memories the cycles since it
+   * opened updated from received entries. A gap opens in exactly two cases, both read from what the engine records:
+   * the engine starts over a journal that has synced before (`lastSyncedAt` is set, so no engine ran for this memory
+   * since that sync: OmO was closed, or the computer was asleep or off), or the engine's own status shows this
+   * device as offline (OFFLINE_SHOWN_AFTER_ATTEMPTS cycles in a row could not reach the service). A device's first
+   * sync ever, failed cycles below that threshold and a dropped event stream (the engine polls instead) are not gaps.
+   */
+  private gap: { applied: number } | null = null
 
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
@@ -98,7 +114,11 @@ export class SyncEngine {
       return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
     if (held !== null) return { kind: "failing", ...held }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
-    return { kind: "synced", at: s.lastSyncedAt, updatedWhileOffline: s.updatedWhileOffline }
+    return {
+      kind: "synced",
+      at: s.lastSyncedAt,
+      ...(s.updatedWhileOffline === null ? {} : { updatedWhileOffline: s.updatedWhileOffline }),
+    }
   }
 
   start(): void {
@@ -167,7 +187,8 @@ export class SyncEngine {
         if (rerun) this.request()
       },
       (error: unknown) => {
-        this.tracker.failed(error)
+        const stage = this.stage
+        const shownChanged = this.tracker.failed(error, stage)
         this.announceIfChanged(keyAtStart)
         for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
@@ -176,6 +197,8 @@ export class SyncEngine {
         this.rerun = false
         this.rerunOnEvent = false
         if (rerun) this.request()
+        // Logged last, once the cycle is settled: nothing the log does can leave it running.
+        logCycleFailure(this.deps.log, stage, error, shownChanged)
       },
     )
     return run
@@ -205,32 +228,8 @@ export class SyncEngine {
       else this.rerun = true
       return
     }
-    void this.runCycle().catch((error: unknown) => this.deps.log?.(`sync cycle failed: ${String(error)}`))
-  }
-
-  /**
-   * A journal names the device peer it was created under. One from another peer arrived with a
-   * copied repo: its pending ops are that device's to push, so it is retired, never resumed.
-   * A journal also names the space it syncs: the account feed carries every space, so its cursor,
-   * outbox and item docs mean nothing in another one. After the repository moves to a new space
-   * (#13720) the journal is retired and the item store reloaded empty, so the next capture adopts
-   * the whole working tree into the new space. Answers whether the store must be reloaded.
-   */
-  private async claimJournal(): Promise<boolean> {
-    const { space, legacySpace } = this.deps
-    const peer = this.deps.store.peer()
-    const state = await this.journal.state()
-    const owner = state.peer
-    const otherSpace = state.space !== null ? state.space !== space : owner !== null && legacySpace !== undefined
-    if (owner !== null && owner !== peer) {
-      this.deps.log?.(`sync: journal belongs to peer ${owner}, this device is ${peer}; retiring it`)
-      await this.journal.retire()
-    } else if (otherSpace) {
-      this.deps.log?.("sync: journal belongs to another memory space; retiring it and adopting the working tree")
-      await this.journal.retire()
-    }
-    if (owner !== peer || state.space !== space || otherSpace) await this.journal.updateState({ peer, space })
-    return otherSpace && !(owner !== null && owner !== peer)
+    // runCycle logs and reports every failure itself.
+    void this.runCycle().catch(() => undefined)
   }
 
   private sleep(ms: number): Promise<void> {
@@ -253,14 +252,18 @@ export class SyncEngine {
 
   private async cycle(): Promise<CycleReport> {
     const { deps, journal } = this
+    this.stage = "load"
     if (!this.loaded) {
       await deps.store.load()
-      if (await this.claimJournal()) await deps.store.load()
+      if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
+      if ((await journal.state()).lastSyncedAt !== null) this.gap = { applied: 0 }
       this.loaded = true
     }
+    if (this.tracker.offline()) this.gap ??= { applied: 0 }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
     let holds: CaptureHolds = { held: new Map(), withheld: new Set(), joining: new Set() }
     if (before.cycle !== null) {
+      this.stage = "resume"
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
@@ -274,37 +277,61 @@ export class SyncEngine {
     let refused = 0
     let snapshot: number | null = null
     const inbound = async () => {
+      this.stage = "receive"
       const got = await receive(deps, journal)
       refused += got.refused
       snapshot = got.snapshot ?? snapshot
+      this.stage = "capture"
       const done = await deps.lock.withLock(async () => {
         holds = await capture(deps, journal)
+        this.stage = "apply"
         const appliedNow = await applyVerified(deps, journal, notRenderedNow(holds))
         // A joining file adopts the space's state in this same cycle, so its edit goes out with this push.
-        if (holds.joining.size > 0) holds = await capture(deps, journal)
+        if (holds.joining.size > 0) {
+          this.stage = "capture"
+          holds = await capture(deps, journal)
+        }
         return appliedNow
       })
       applied += done.batches
       memories += done.memories
+      if (this.gap !== null) this.gap.applied += done.memories
     }
     await inbound()
     const settleFirst = this.settleNext
     this.settleNext = false
+    this.stage = "push"
     const pushedCycle = await pushCycle({
       deps,
       journal,
-      inbound,
+      inbound: async () => {
+        await inbound()
+        this.stage = "push"
+      },
       sleep: (ms) => this.sleep(ms),
       settleFirst,
       frozen: this.tracker.frozen,
       withheld: () => holds.withheld,
     })
     this.tracker.frozen = pushedCycle.frozen
+    this.stage = "finish"
     const pushed = pushedCycle.pushed
     const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld)
     const heldNow = (await journal.state()).held
     this.nextHeldKey = heldNow === null ? null : failureKey(heldShown(heldNow, batchBound(deps)).failure)
-    if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
+    if (refused === 0) {
+      // The offline count describes the latest entries this device received: the cycle that closes a gap records what
+      // the gap's cycles updated, entries received with no gap before them end an older count, and a cycle that
+      // received nothing leaves it as it is (the cycle right after a start would otherwise erase it unread).
+      const count =
+        this.gap !== null
+          ? { updatedWhileOffline: this.gap.applied }
+          : memories > 0
+            ? { updatedWhileOffline: null }
+            : {}
+      await journal.updateState({ lastSyncedAt: deps.clock.now(), ...count })
+      this.gap = null
+    }
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1
     const rejectedItems = (await journal.state()).rejectedItems - before.rejectedItems

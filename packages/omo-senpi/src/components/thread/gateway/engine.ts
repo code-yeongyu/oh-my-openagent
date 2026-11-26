@@ -1,15 +1,16 @@
 import { createHash, randomUUID } from "node:crypto"
 
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
-import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import { pairLoopGuardNextAction, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
+import { DEFAULT_THREAD_DELIVERY } from "../contracts/fields"
 import { TARGET_MAX_BYTES } from "./constants"
 import { decideDelivery } from "./decision"
 import { senderFacts } from "./envelope"
 import { resultFromRow } from "./result"
 import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
+import type { DeliveryAuthority, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -36,9 +37,13 @@ export type GatewayDeliverRequest = {
   readonly expected_turn_id?: number
   readonly all_scope?: boolean
   readonly idempotency_key?: string
+  /** Replaces the sender's earlier undelivered delivery to this target under the same key (#14428). */
+  readonly collapse_key?: string
   readonly root_id?: string
   /** The highest chain hop an input of the caller's current run arrived with from another device (K8): the row continues it. */
   readonly inbound_hop?: number
+  /** Set only by thread_create's first prompt to the thread it made (#14045). */
+  readonly authority?: DeliveryAuthority
 }
 
 export type GatewayEngine = {
@@ -48,7 +53,10 @@ export type GatewayEngine = {
 export type GatewayEngineOptions = {
   /** Sender-owned context, kept outside every delivery/tool request. */
   readonly senderProvenance?: () => Promise<Provenance>
-  readonly store: Pick<GatewayStore, "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt">
+  readonly store: Pick<
+    GatewayStore,
+    "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt" | "receiptOutcome"
+  >
   readonly endpoints: GatewayEndpointPort
   readonly resolve: GatewayResolve
   readonly now?: () => number
@@ -76,12 +84,16 @@ export function resolveFromEntries(
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   loop_detected: "A session cannot message itself through the gateway; address another thread.",
   overloaded: "Wait before sending to this session again.",
-  queue_full: "Wait for the target to take its queued messages, then send again.",
+  queue_full:
+    "Read details.reason: the target is not taking its queue. A steer has its own reserve; send repeats with one collapse_key so each replaces the last.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_in_progress: "Wait for the earlier call to settle, then retry.",
   idempotency_uncertain: "Read the target transcript before deciding whether to send again; the gateway never resends.",
   invalid_arguments: "Fix the arguments and send again.",
 }
+
+const QUEUE_FULL_NOT_RUNNING =
+  "The target is not running, so nothing takes its queue until it resumes. Resume it, or send again after details.frees_at, when its oldest queued message expires and frees a slot."
 
 function fail(
   code: ThreadErrorCode,
@@ -93,7 +105,12 @@ function fail(
     error: threadToolFailure(
       code,
       message,
-      NEXT_ACTION[code] ?? "Call thread_list and retry after checking the target.",
+      code === "pair_loop_guard"
+        ? pairLoopGuardNextAction(Number(details?.["retry_after_ms"]))
+        : code === "queue_full" && details?.["target_running"] === false
+          ? QUEUE_FULL_NOT_RUNNING
+          : (NEXT_ACTION[code] ??
+            "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target."),
       details,
     ),
   }
@@ -103,22 +120,25 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
-/** The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. */
-export function deliveryArgsHash(fields: {
+/**
+ * The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. The hash
+ * keeps the `binding: null` every send carried before the binding removal (#14312), so a receipt written by an older
+ * build still replays its unchanged retry instead of answering idempotency_conflict (#14623 review M1).
+ */
+function deliveryArgsHash(fields: {
   readonly target: string
   readonly text: string
   readonly mode: GatewayDeliveryMode
   readonly expected_turn_id: number | null
-  readonly binding: { readonly binding_id: string; readonly revision: number } | null
-  readonly author: ExternalAuthor | undefined
+  readonly collapse_key?: string
 }): string {
   return argsHash({
     target: fields.target,
     text: fields.text,
     mode: fields.mode,
     expected_turn_id: fields.expected_turn_id,
-    binding: fields.binding,
-    author: fields.author,
+    binding: null,
+    ...(fields.collapse_key === undefined ? {} : { collapse_key: fields.collapse_key }),
   })
 }
 
@@ -133,7 +153,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
   const now = options.now ?? store.now
 
   async function deliver(request: GatewayDeliverRequest): Promise<GatewayDeliveryResult> {
-    const mode = request.mode ?? "auto"
+    const mode = request.mode ?? DEFAULT_THREAD_DELIVERY
     if (mode === "steer" && request.expected_turn_id === undefined)
       return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).")
     const bytes = Buffer.byteLength(request.text)
@@ -147,7 +167,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       endpoint === null &&
       decideDelivery("offline", mode, request.expected_turn_id ?? null, null).kind === "refuse"
     ) {
-      return fail("turn_conflict", "The target has no live turn to steer.", { target: target.durable_id })
+      return fail("turn_conflict", "The target has no live turn to steer.", { thread: target.durable_id })
     }
     const facts = senderFacts(
       request.sender,
@@ -166,13 +186,14 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       sender_turn: facts.turn,
       cause_delivery_id: facts.cause,
       ...(request.inbound_hop === undefined ? {} : { inbound_hop: request.inbound_hop }),
+      ...(request.authority === undefined ? {} : { authority: request.authority }),
       claimed_root_id: request.root_id ?? null,
       origin: facts.origin(deliveryId),
       actor: facts.actor,
       body: request.text,
       mode,
       expected_turn_id: request.expected_turn_id ?? null,
-      binding: facts.binding,
+      binding: null,
       receipt: {
         idempotency_key: idempotencyKey,
         args_hash: deliveryArgsHash({
@@ -180,11 +201,11 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
           text: request.text,
           mode,
           expected_turn_id: request.expected_turn_id ?? null,
-          binding: facts.binding,
-          author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
+          ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
         }),
       },
       endpoint_kind: endpoint?.kind ?? null,
+      ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
     })
     if (outcome.kind === "busy")
       return fail("overloaded", "The gateway store is locked by a suspended writer; nothing was sent.", {
@@ -193,11 +214,25 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     if (outcome.kind === "refused") return fail(outcome.code, outcome.message, outcome.details)
     if (outcome.kind === "replay") {
       const replayed = outcome.result as GatewayDeliveryResult
-      return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
+      if (replayed.kind !== "ok") return replayed
+      return {
+        ...replayed,
+        deduplicated: true,
+        outcome: await store.receiptOutcome({
+          now: now(),
+          principal: facts.principal,
+          delivery_id: replayed.delivery_id,
+          target_durable_id: replayed.thread_id,
+        }),
+      }
     }
     const settle = async (result: GatewayDeliveryResult): Promise<GatewayDeliveryResult> => {
       await store.completeReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, result })
       return result
+    }
+    if (outcome.kind === "collapsed") {
+      const absorbed = resultFromRow(outcome.row, outcome.queue_position, endpoint?.kind ?? null, true, false)
+      return await settle(absorbed.kind === "ok" ? { ...absorbed, collapsed: true } : absorbed)
     }
     try {
       if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))

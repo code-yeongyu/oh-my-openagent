@@ -60,6 +60,7 @@ If any of these fails, the change is not done. Period. The bundle is set up so a
 
 Read these per-file references for the canonical patterns:
 
+- **Library choice** → `libraries.md` — the 2026 stack with the reasoning for each pick (gin vs chi, sqlc, slog) and the data, analytics, and LLM defaults.
 - **Types & data** → `type-patterns.md`, `data-modeling.md` — branded named types, smart constructors with unexported fields, sealed interfaces as sum types.
 - **Errors** → `error-handling.md` — sentinel vs typed struct, `errors.Is/As`, `%w` wrapping, no panic in libraries, the `errorlint` ruleset.
 - **Concurrency** → `concurrency.md` — `context.Context` discipline, `errgroup`, `sync.OnceValue`, `goleak`, `-race`, channel selection rules.

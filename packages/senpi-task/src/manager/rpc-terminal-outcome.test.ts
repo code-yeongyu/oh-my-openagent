@@ -8,12 +8,13 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const children: ChildProcess[] = []
 
 function createManager() {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const processRunner = new RpcProcessRunner({
     modelAdmission: async () => {},
     spawnChild: (descriptor) => {

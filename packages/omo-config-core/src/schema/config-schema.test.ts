@@ -153,7 +153,7 @@ describe("omo config schema", () => {
           caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
           family: "daily",
           tier: "normal",
-          models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
+          models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6.2-astra", reasoning: "high" }],
         },
       },
       model_profile: "capable",
@@ -181,7 +181,7 @@ describe("omo config schema", () => {
       caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
       family: "daily",
       tier: "normal",
-      models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
+      models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6.2-astra", reasoning: "high" }],
     })
   })
 
@@ -230,7 +230,7 @@ describe("omo config schema", () => {
     const fixture = makeConfigFixture()
     writeFileSync(
       join(fixture.homeDir, ".omo", "omo.json"),
-      `{"model_profile":"simple-work","[native]":{"model_profile":"deep-work","model_profiles":{"deep-work":{"models":["openai/gpt-6-astra"]}}}}`,
+      `{"model_profile":"simple-work","[native]":{"model_profile":"deep-work","model_profiles":{"deep-work":{"models":["openai/gpt-6.2-astra"]}}}}`,
     )
 
     try {
@@ -245,7 +245,7 @@ describe("omo config schema", () => {
       // then
       expect(result.diagnostics).toEqual([])
       expect(result.config.model_profile).toBe("deep-work")
-      expect(result.config.model_profiles?.["deep-work"]?.models).toEqual(["openai/gpt-6-astra"])
+      expect(result.config.model_profiles?.["deep-work"]?.models).toEqual(["openai/gpt-6.2-astra"])
     } finally {
       rmSync(fixture.root, { force: true, recursive: true })
     }

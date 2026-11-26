@@ -29,6 +29,7 @@ import {
 import { createTaskManager } from "./manager"
 import type { ChildPlanner, ManagedRunner, SpawnAdmission, TaskManager } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const RENDERER_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
@@ -52,7 +53,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
 
 function makeLifecycleManager(runner: ManagedRunner, config = settings({ default_concurrency: 1, max_depth: 1 })) {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   let managerRef: TaskManager | undefined
   const getManager = (): TaskManager => {
     if (managerRef === undefined) throw new Error("manager accessed before test composition finished")
@@ -631,7 +632,7 @@ describe("TaskManager pending cancellation", () => {
   test("#given a grant whose start transition loses to cancel w2pend #when the slot transfers #then the runner is skipped and the slot is released", async () => {
     // given
     const project = tempProject()
-    const backing = createTaskRecordStore({ project_dir: project })
+    const backing = createTaskRecordStore(ownedTaskState(project))
     let cancelBeforeStartTaskId: string | undefined
     const store = {
       ...backing,

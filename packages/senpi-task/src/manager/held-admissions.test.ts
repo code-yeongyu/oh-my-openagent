@@ -12,6 +12,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -27,7 +28,7 @@ function bounded<T>(promise: Promise<T>): Promise<T> {
 
 function fixture() {
   const cwd = tempProject()
-  const store = createTaskRecordStore({ project_dir: cwd })
+  const store = createTaskRecordStore(ownedTaskState(cwd))
   const make = (barrier: AdmissionBarrier, runner: FakeRunner) =>
     createTaskManager({
       cwd,

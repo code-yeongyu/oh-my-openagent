@@ -17,7 +17,7 @@ import {
 const RELAYD_SYSTEMD_UNIT = "omo-relay-daemon.service"
 const COLD_WAKE_DROP_IN = "50-omo-cold-wake.conf"
 
-const unitDir = (home: string): string => join(home, ".config", "systemd", "user")
+export const unitDir = (home: string): string => join(home, ".config", "systemd", "user")
 const dropInPath = (home: string): string => join(unitDir(home), `${RELAYD_SYSTEMD_UNIT}.d`, COLD_WAKE_DROP_IN)
 
 const ESCAPES: Readonly<Record<string, string>> = { n: "\n", t: "\t", r: "\r", "\\": "\\", '"': '"' }
@@ -108,8 +108,8 @@ const showFields = (output: string): Readonly<Record<string, string>> =>
       .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1).trim()]),
   )
 
-// Always on: enabled for the user's manager and running. A changed unit is restarted onto its new text; between reruns
-// a running unit reads `activating` (auto-restart), which is running too.
+// Enabled for the user's manager and started: each start runs the ensure once (oneshot). A changed unit is restarted
+// onto its new text; an unchanged one is started again, which only reuses a running host.
 async function runSessionHost(host: ColdWakeHost, unitChanged: boolean): Promise<ColdWakeOutcome | undefined> {
   const shown = await systemctl(host, "show", SESSION_HOST_SYSTEMD_UNIT, "-p", "UnitFileState", "-p", "ActiveState")
   if (shown.exitCode !== 0) return failed("unit_show", shown.output)

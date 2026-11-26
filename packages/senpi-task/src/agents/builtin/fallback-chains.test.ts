@@ -52,8 +52,10 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["opencode"], model: "kimi-k3", variant: "max" },
       ],
       "plan-reviewer": [
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.2-astra", variant: "xhigh" },
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "xhigh" },
         { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
+        { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6.2-astra", variant: "high" },
         { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6-astra", variant: "high" },
         {
           providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],

@@ -13,6 +13,7 @@ import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
 import type { ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
 import { categoryPlanner, makeHandle, type FakeHandle } from "./manager-fakes"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const roots: string[] = []
 
@@ -122,7 +123,7 @@ export function makeIsolationManager(options: {
   readonly store?: TaskRecordStore
 }) {
   const { fixture } = options
-  const store = options.store ?? createTaskRecordStore({ project_dir: fixture.projectDir })
+  const store = options.store ?? createTaskRecordStore(ownedTaskState(fixture.projectDir))
   const isolation = options.isolation ?? createIsolationRuntime({ homeDir: fixture.homeDir })
   const manager = createTaskManager({
     store,

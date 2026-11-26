@@ -31,7 +31,7 @@ const fields = (output: string): Readonly<Record<string, string>> =>
       .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1).trim()]),
   )
 
-// `activating` is the session host between two runs of its ensure (auto-restart): the unit is up.
+// `activating` is the session host's ensure running: the unit is up.
 const systemdState = (shown: Readonly<Record<string, string>>): UnitState => {
   if (shown["LoadState"] === "not-found") return "not_installed"
   if (shown["ActiveState"] === "active" || shown["ActiveState"] === "activating") return "running"
@@ -70,6 +70,8 @@ async function readLinux(host: ColdWakeHost) {
       state: systemdState(sessionHost),
       enabled: sessionHost["UnitFileState"] === "enabled",
     },
+    // A unit whose latest ensure failed stays reported as such, even with a host up.
+    ensureFailed: sessionHost["ActiveState"] === "failed",
     deviceService: { unit: RELAYD_SYSTEMD_UNIT, state: systemdState(relayd) },
     coldWakeEntry:
       environment.exitCode === 0
@@ -84,9 +86,11 @@ async function readDarwin(host: ColdWakeHost) {
     if (!existsSync(join(agents, `${label}.plist`))) return { loaded: false, state: "not_installed" as const }
     const printed = await host.run(["launchctl", "print", `gui/${host.uid}/${label}`])
     if (printed.exitCode !== 0) return { loaded: false, state: "stopped" as const }
+    const lastExit = /^\s*last exit code = (\d+)$/m.exec(printed.output)?.[1]
     return {
       loaded: true,
       state: /^\s*state = running$/m.test(printed.output) ? ("running" as const) : ("stopped" as const),
+      exitedNonZero: lastExit !== undefined && lastExit !== "0",
     }
   }
   const sessionHost = await job(SESSION_HOST_LAUNCHD_LABEL)
@@ -102,19 +106,22 @@ async function readDarwin(host: ColdWakeHost) {
   ])
   const raw = table.exitCode === 0 ? table.output.replace(/\n$/, "") : undefined
   return {
-    // A loaded KeepAlive job is between runs of its ensure while launchd waits out the throttle: it is up.
-    sessionHost: {
-      unit: SESSION_HOST_LAUNCHD_LABEL,
-      state: sessionHost.loaded ? ("running" as const) : sessionHost.state,
-      enabled: sessionHost.loaded,
-    },
+    // The job runs its ensure and exits: running only while that ensure runs, else readColdWake asks the host.
+    sessionHost: { unit: SESSION_HOST_LAUNCHD_LABEL, state: sessionHost.state, enabled: sessionHost.loaded },
+    ensureFailed: sessionHost.loaded && sessionHost.exitedNonZero,
     deviceService: { unit: RELAYD_LAUNCHD_LABEL, state: relayd.state },
     coldWakeEntry: relayd.state === "not_installed" ? false : withColdWake(raw, "darwin").kind === "unchanged",
   }
 }
 
 export async function readColdWake(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeStatus> {
-  const units = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
+  const { ensureFailed, ...units } = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
   const pinned = await readPinnedHost(host, launch)
-  return { ...units, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }
+  // The unit is one ensure per start, so between starts it is not active; the host its ensure started or reused runs.
+  // When the host cannot be read, neither can that.
+  const between = units.sessionHost.state === "stopped" && units.sessionHost.enabled && !ensureFailed
+  const hostState: UnitState =
+    typeof pinned !== "string" ? "unknown" : pinned === "none" ? units.sessionHost.state : "running"
+  const sessionHost = between ? { ...units.sessionHost, state: hostState } : units.sessionHost
+  return { ...units, sessionHost, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }
 }

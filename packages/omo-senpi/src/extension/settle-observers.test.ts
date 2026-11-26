@@ -57,54 +57,82 @@ test("#given required status delivery #when its read exceeds the observer budget
 })
 
 test.each(["observer", "unrelated"] as const)(
-  "#given concurrent settles sharing work (%s) #when it rejects #then only a known observer cancellation is absorbed",
+  "#given a settle handler rejection (%s) #when it is not a known observer cancellation #then it propagates to the host",
   async (kind) => {
     const pi = new FakeExtensionAPI()
-    const entered = Promise.withResolvers<SettleObserver | undefined>()
-    const joined = Promise.withResolvers<SettleObserver | undefined>()
-    const shared = Promise.withResolvers<void>()
-    const failure = new DOMException("independent timeout", "TimeoutError")
-    let calls = 0
+    const failure =
+      kind === "observer" ? new DOMException("independent timeout", "TimeoutError") : new Error("independent failure")
     await composeOmoSenpiExtension(
       [
         {
           name: "fixture",
           register(api) {
-            api.on("agent_settled", (_payload, _ctx, observer) => {
-              if (calls++ === 0) {
-                observer?.signal.addEventListener("abort", () => shared.reject(observer.signal.reason), { once: true })
-                entered.resolve(observer)
-              } else joined.resolve(observer)
-              return shared.promise
-            })
+            api.on("agent_settled", () => Promise.reject(failure))
           },
         },
       ],
       { logger: { info() {}, warn() {}, error() {} } },
     )(pi)
-    jest.useFakeTimers()
-    const first = pi
-      .dispatch("agent_settled", {}, { sessionManager: { getSessionId: () => "session" } })
-      .catch((error: unknown) => error)
-    await entered.promise
-    jest.advanceTimersByTime(1_000)
-    const second = pi
-      .dispatch("agent_settled", {}, { sessionManager: { getSessionId: () => "session" } })
-      .catch((error: unknown) => error)
-    const joiner = await joined.promise
-    try {
-      if (kind === "observer") jest.advanceTimersByTime(1_000)
-      else shared.reject(failure)
-      const results = await Promise.all([first, second])
-      expect(joiner?.signal.aborted).toBe(false)
-      if (kind === "observer") expect(results.every((result) => !(result instanceof Error))).toBe(true)
-      else expect(results).toEqual([failure, failure])
-    } finally {
-      shared.resolve()
-      await pi.dispatch("session_shutdown", {})
-    }
+    const result = await pi.dispatch("agent_settled", {}).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(result).toBe(failure)
   },
 )
+
+test("#given concurrent settles of one session #when the newer settle supersedes the older #then the known cancellation is absorbed and the joiner completes", async () => {
+  const pi = new FakeExtensionAPI()
+  const entered = Promise.withResolvers<SettleObserver | undefined>()
+  const joined = Promise.withResolvers<SettleObserver | undefined>()
+  const shared = Promise.withResolvers<void>()
+  const supersedeLogs: unknown[] = []
+  let calls = 0
+  await composeOmoSenpiExtension(
+    [
+      {
+        name: "fixture",
+        register(api) {
+          api.on("agent_settled", (_payload, _ctx, observer) => {
+            if (calls++ === 0) {
+              observer?.signal.addEventListener("abort", () => shared.reject(observer.signal.reason), { once: true })
+              entered.resolve(observer)
+            } else joined.resolve(observer)
+            return shared.promise
+          })
+        },
+      },
+    ],
+    {
+      logger: {
+        info() {},
+        error() {},
+        warn: (_message, details) => {
+          if ((details as { stage?: string } | undefined)?.stage === "superseded") supersedeLogs.push(details)
+        },
+      },
+    },
+  )(pi)
+  const first = pi
+    .dispatch("agent_settled", {}, { sessionManager: { getSessionId: () => "session" } })
+    .catch((error: unknown) => error)
+  await entered.promise
+  const second = pi.dispatch("agent_settled", {}, { sessionManager: { getSessionId: () => "session" } }).then(
+    (value) => value,
+    (error: unknown) => error,
+  )
+  const joiner = await joined.promise
+  try {
+    shared.resolve()
+    const results = await Promise.all([first, second])
+    expect(joiner?.signal.aborted).toBe(false)
+    expect(results.every((result) => !(result instanceof Error))).toBe(true)
+    expect(supersedeLogs).toHaveLength(1)
+  } finally {
+    shared.resolve()
+    await pi.dispatch("session_shutdown", {})
+  }
+})
 
 test("#given a named subscriber that never resolves #when its budget expires #then observation aborts and the next subscriber executes", async () => {
   const pi = withInertSenpiSeams(new FakeExtensionAPI())

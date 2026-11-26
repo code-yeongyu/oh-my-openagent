@@ -10,6 +10,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The runtime-fallback handoff is committed before the failed rung's session finishes closing. Every
 // way that window can end - another owner winning the handoff, an interrupt, a cancel - must leave
@@ -80,7 +81,7 @@ function interceptableStore(base: TaskRecordStore, hook: { current?: MutateHook 
 function lane(kind: "host-session" | "in-process" = "host-session") {
   const runner = new SlowCloseRunner(kind)
   const mutateHook: { current?: MutateHook } = {}
-  const store = interceptableStore(createTaskRecordStore({ project_dir: tempProject() }), mutateHook)
+  const store = interceptableStore(createTaskRecordStore(ownedTaskState(tempProject())), mutateHook)
   const config = settings({ default_execution_mode: "process", default_concurrency: 1, global_concurrency: 1 })
   const concurrency = new TaskConcurrency(config)
   const manager = createTaskManager({

@@ -18,7 +18,7 @@ const migrations = [
   [
     "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
     "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-    "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+    "CREATE TABLE gw_items (item_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
     "CREATE TABLE gw_leads (item TEXT PRIMARY KEY, lead TEXT NOT NULL)",
   ],
 ]

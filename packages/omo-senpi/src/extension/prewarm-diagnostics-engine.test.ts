@@ -14,12 +14,34 @@ import {
 import { composeOmoSenpiExtension } from "./compose"
 import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
+const SETTLED_LOG = ["agent/logs", "agent/logs/.fallback-log-v2"]
+// What the engine itself may write under the HOME while the session is created and its extensions bind: the
+// seeded agent layout, the bundled extensions it stages, and its fallback log. Anything else written before
+// the baseline (a builtin's store taken at session_start) fails the bind-delta allowlist (#10933 review LOW).
+const ENGINE_ARTIFACTS = [
+  "agent/auth.json",
+  "agent/extensions",
+  "agent/extensions/diff.js",
+  "agent/extensions/files.js",
+  "agent/extensions/prompt-url-widget.js",
+  "agent/extensions/tps.js",
+  ...SETTLED_LOG,
+]
+
+/** Every path under the HOME, backslash-normalized so windows-latest listings match. */
+function homeListing(root: string): string[] {
+  return readdirSync(root, { recursive: true })
+    .map((entry) => String(entry).replaceAll("\\", "/"))
+    .sort()
+}
+
 test("#given a real session with a late unsafe component #when draft prewarm skips #then the recorded result warns once with component attribution", async () => {
   useTestTimeout(30_000)
   // given
   const root = mkdtempSync(join(tmpdir(), "omo-prewarm-diagnostic-"))
   const agentDir = join(root, "agent")
   mkdirSync(agentDir)
+  const beforeBind = homeListing(root)
   const overrides = {
     HOME: root,
     OMO_CODING_AGENT_DIR: agentDir,
@@ -91,6 +113,9 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
   const manager = SessionManager.inMemory(root)
   let session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined
   let unsubscribe: (() => void) | undefined
+  // The HOME as the initialized fixture leaves it, before the activity under test. The engine may stage its
+  // bundled extensions under agent/ while the session starts; only what appears after this point is checked.
+  let baseline: readonly string[] = []
   const signal = testBudgetSignal("the prewarm diagnostics entry")
   const recorded = Promise.withResolvers<void>()
   const onAbort = () => recorded.reject(new Error("prewarm did not append its entry"))
@@ -111,6 +136,8 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
       tools: [],
     }))
     await session.bindExtensions({ mode: "print" })
+    baseline = homeListing(root)
+    expect(baseline.filter((entry) => !beforeBind.includes(entry) && !ENGINE_ARTIFACTS.includes(entry))).toEqual([])
     expect(warnings).toHaveLength(1)
     warnings.length = 0
     unsubscribe = session.subscribe((event) => {
@@ -155,9 +182,13 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
-    // No builtin left a store under this HOME that could still be written after it is removed.
-    const homeEntries = readdirSync(root, { recursive: true }).map(String)
+    // No builtin left a store under this HOME: past the initialized fixture, only the settled fallback log may
+    // appear, so a store any builtin writes during the activity or teardown fails this allowlist (#10933).
+    const homeEntries = homeListing(root)
     rmSync(root, { recursive: true, force: true })
     expect(homeEntries.filter((entry) => entry.includes("goal"))).toEqual([])
+    // A run that failed before the fixture finished initializing has no baseline; its own failure stands.
+    if (baseline.length > 0)
+      expect(homeEntries.filter((entry) => !baseline.includes(entry) && !SETTLED_LOG.includes(entry))).toEqual([])
   }
 }, 30_000)

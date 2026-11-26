@@ -1,10 +1,12 @@
+import { rowKey } from "@oh-my-opencode/thread-address-core"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
-import { rowThreadId } from "./ports"
-import type * as RemoteOps from "./remote-ops"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
+import type * as Receipt from "./receipt"
+import type * as ReopenParked from "./reopen-parked"
 import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
 import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
@@ -13,10 +15,11 @@ type Runtime = Pick<
   typeof CrossDevice,
   "claimCreatedAlias" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"
 > &
-  Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl"> &
-  Pick<typeof MonitorSource, "createRemoteMonitorSource">
+  Pick<typeof Receipt, "readReceipt"> &
+  Pick<typeof ReopenParked, "reopenParkedRow"> &
+  Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
 // operation already loads for the live host, so `omo.js` carries none of it.
@@ -24,6 +27,8 @@ const runtime = (): Promise<Runtime> => import("#omo-thread-client-runtime")
 
 export const listAcross = async (...args: Parameters<Runtime["listAcross"]>) =>
   await (await runtime()).listAcross(...args)
+export const readReceipt = async (...args: Parameters<Runtime["readReceipt"]>) =>
+  await (await runtime()).readReceipt(...args)
 export const planCreate = async (...args: Parameters<Runtime["planCreate"]>) =>
   await (await runtime()).planCreate(...args)
 export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =>
@@ -31,8 +36,10 @@ export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =
 export const withAlias = async (...args: Parameters<Runtime["withAlias"]>) => await (await runtime()).withAlias(...args)
 export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreatedAlias"]>) =>
   await (await runtime()).claimCreatedAlias(...args)
-export const deviceOnline = async (...args: Parameters<Runtime["deviceOnline"]>) =>
-  await (await runtime()).deviceOnline(...args)
+export const reopenParkedRow = async (...args: Parameters<Runtime["reopenParkedRow"]>) =>
+  await (await runtime()).reopenParkedRow(...args)
+export const resolveMonitorTarget = async (...args: Parameters<Runtime["resolveMonitorTarget"]>) =>
+  await (await runtime()).resolveMonitorTarget(...args)
 
 /** The relay transport lives in the sidecar too; it is built once per composition, on the first delivery, and keeps its state. */
 export const createRelayTransport = (
@@ -57,23 +64,29 @@ export const createRelayTransport = (
   }
 }
 
-/** The control of a thread on another device, from the sidecar; its identity is the listing row's, read with no load. */
+/** The control of a thread on another device, from the sidecar; its identity is the listing row's key (as the sidecar's), read with no load. */
 export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessionRow): SessionControl => {
   const built = runtime().then((loaded) => loaded.createRelayControl(remote, row))
   return {
-    thread_id: rowThreadId(row),
+    thread_id: rowKey(row),
     device: row.device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => await (await built).visible(),
     interrupt: async (turnId) => await (await built).interrupt(turnId),
-    close: async () => await (await built).close(),
+    close: async (options) => await (await built).close(options),
     setName: async (name) => await (await built).setName(name),
     getAvailableModels: async (options) => await (await built).getAvailableModels(options),
+    getModelState: async () => await (await built).getModelState(),
     setModel: async (provider, id) => await (await built).setModel(provider, id),
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
-    setThinkingLevel: async (level, scope) => await (await built).setThinkingLevel(level, scope),
+    setThinkingLevel: async (level) => await (await built).setThinkingLevel(level),
     getMessages: async () => await (await built).getMessages(),
+    readEntryPage: async (read) => await (await built).readEntryPage(read),
     waitSettled: async (timeoutMs, signal) => await (await built).waitSettled(timeoutMs, signal),
+    running: async () => await (await built).running(),
+    setArchived: async (archived) => await (await built).setArchived(archived),
+    listed: async (archived) => await (await built).listed(archived),
   }
 }
 
