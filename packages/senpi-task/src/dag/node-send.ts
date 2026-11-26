@@ -5,7 +5,7 @@ import { dagNodeSteeredEvent, dagNodeTransitionedEvent } from "./events"
 import { guidePausedDag } from "./paused-controls"
 import type { DagRunRecordV1 } from "./manager"
 import { controlJournal, DagNodeControlError, ownedRecord } from "./node-control-context"
-import { decideSend, watchRevivedTask } from "./node-send-revive"
+import { decideSend, steerRecordRefused, watchRevivedTask } from "./node-send-revive"
 import { releaseDagRunLease } from "./run-lease"
 import type { DagSchedulerOptions } from "./scheduler"
 import type { DagNode, DagNodeId, DagRunId } from "./types"
@@ -109,7 +109,9 @@ function foldSendOutcome(
       // The node's run is stopped: the child holds the message and the run's Resume delivers it.
       return { nodeId, taskId, delivery: "held" }
     case "steered":
-      controlJournal(options, record).append(dagNodeSteeredEvent({ nodeId, taskId, delivery: "steer" }))
+      controlJournal(options, record, undefined, steerRecordRefused(options, nodeId)).append(
+        dagNodeSteeredEvent({ nodeId, taskId, delivery: "steer" }),
+      )
       return { nodeId, taskId, delivery: "steer" }
     case "revived": {
       const journal = controlJournal(options, record)

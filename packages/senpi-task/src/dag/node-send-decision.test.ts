@@ -128,4 +128,28 @@ describe("DAG send decided on one fresh record under one run lock", () => {
     run.manager.complete("task-a")
     await result.settled
   })
+
+  test("#given a steer into a parked run #when a live process claims the run while the message is being delivered #then the steer is not recorded on the run it now holds", async () => {
+    // given - a running run no scheduler holds, its node's child running
+    const run: ReturnType<typeof sendRun> = sendRun(cleanupRoots, ["a"], {
+      record: (failed) => ({
+        ...failed,
+        status: "running",
+        nodes: failed.nodes.map((entry) => ({ ...entry, state: "running" as const })),
+      }),
+      answer: () => {
+        const record = run.read()
+        if (record) run.base.writeCheckpoint(runId, { ...record, leaseHolderPid: LIVE_THIRD_HOST })
+        return "steered"
+      },
+    })
+
+    // when
+    const result = await run.send("a")
+
+    // then
+    expect(result.delivery).toBe("steer")
+    expect(run.events()).toEqual([])
+    expect(run.read()?.leaseHolderPid).toBe(LIVE_THIRD_HOST)
+  })
 })

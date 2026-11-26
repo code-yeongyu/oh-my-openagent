@@ -20,7 +20,7 @@ export const OTHER_HOST = 202
 export const LIVE_THIRD_HOST = 303
 
 export type Leased = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
-export type SendAnswer = "revived" | "refused"
+export type SendAnswer = "revived" | "refused" | "steered"
 
 export function sendRun(
   cleanupRoots: string[],
@@ -52,6 +52,8 @@ export function sendRun(
       sends.push(input)
       leaseAtSend.push(base.readCheckpoint<Leased>(runId)?.leaseHolderPid)
       const answer = (await options.answer?.(input.idOrName)) ?? "revived"
+      if (answer === "steered")
+        return { kind: "steered", task_id: input.idOrName, status: "running", delivered: "steer" }
       if (answer === "refused")
         return { kind: "not_continuable", task_id: input.idOrName, reason: "refused", suggestion: "retry" }
       const record = manager.get(input.idOrName)

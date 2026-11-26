@@ -13,7 +13,7 @@ import {
   runBusy,
 } from "./node-control-context"
 import { persistDagNodeResult } from "./results"
-import { acquireDagRun, classifySend, dagRunEligibility, type DagSendClass } from "./run-acquisition"
+import { acquireDagRun, classifySend, dagRunEligibility, decideDagRun, type DagSendClass } from "./run-acquisition"
 import { reserveWhenFree } from "./run-reservations"
 import type { DagSchedulerOptions } from "./scheduler"
 import { type DagNodeError, type DagNodeErrorCode, type DagNodeId, type DagRunId } from "./types"
@@ -59,6 +59,24 @@ export function decideSend(options: DagSchedulerOptions, runId: DagRunId, nodeId
       throw sendRefusal(runId, nodeId, decision)
     }
   }
+}
+
+/**
+ * The steer record is written after the child took the message; decided again at that write under
+ * the journal's run lock (the send rule and the holder rule, no lease): a run another live process
+ * claimed meanwhile, or the user stopped, gets no record of it (#15125).
+ */
+export function steerRecordRefused(
+  options: DagSchedulerOptions,
+  nodeId: DagNodeId,
+): (fresh: DagRunRecordV1) => boolean {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  const eligible = dagRunEligibility.send(options.initialRecord.parentSessionId, nodeId)
+  return (fresh) => decideDagRun(fresh, { probe, eligible }).kind !== "free"
 }
 
 function sendRefusal(runId: DagRunId, nodeId: DagNodeId, decision: DagSendClass): DagNodeControlError {
