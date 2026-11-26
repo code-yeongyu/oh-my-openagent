@@ -401,7 +401,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 
 ## CI/CD
 
-Adding the `ci:full-matrix` label (the only opt-in label for macOS/Windows on a pull request, in every workflow) launches `ci-full-matrix-label.yml`, which calls `ci.yml` with the caller's pull-request payload. Its `full-matrix / <ci job>` checks are optional and do not gate merge. To run the full matrix in the required checks, keep the label and push a commit or reopen the PR. Normal CI ignores label events. The label job has separate concurrency behind its exact label gate, so bot labels cannot cancel either the active full-matrix job or required CI, or replace a required failure with skipped checks.
+Adding the `ci:full-matrix` label (the only opt-in label for macOS/Windows on a pull request, in every workflow) is honored only when the diff touches a platform path, the diff is too long to list (over 3000 files), or the PR body has a line `Platform-reason: <why this change needs macOS/Windows on the pull request>`. That one decision (`script/ci-fast-path.mjs`, exposed to every PR workflow by `.github/workflows/pr-platform-decision.yml` and to `ci.yml` by `ci-mode`) gates every macOS/Windows job; a refused label fails the label gate in seconds and every workflow stays on Linux. An honored label launches `ci-full-matrix-label.yml`, which calls `ci.yml` with the caller's pull-request payload. Its `full-matrix / <ci job>` checks are optional and do not gate merge. To run the full matrix in the required checks, keep the label and push a commit or reopen the PR. Normal CI ignores label events. The label job has separate concurrency behind its exact label gate, so bot labels cannot cancel either the active full-matrix job or required CI, or replace a required failure with skipped checks.
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
@@ -410,11 +410,13 @@ Adding the `ci:full-matrix` label (the only opt-in label for macOS/Windows on a 
 | `publish-platform.yml` | called by publish.yml | 12 generated Node launcher packages for darwin/linux/windows |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
 | `refresh-model-capabilities.yml` | weekly cron / dispatch | Refresh model capabilities from models.dev API |
-| `cla.yml` | issue_comment / PR | CLA assistant for contributors |
+| `cla.yml` | issue_comment (signing / `recheck`) | Records CLA signatures; every run keeps its own never-cancelled group |
+| `pr-automation-signal.yml` | PR events (read-only, no secrets) | Signal that wakes the privileged PR consumer; one run per PR (newer event cancels the older) |
+| `pr-automation.yml` | workflow_run on PR Automation Signal / dispatch (`pr_number`) | ONE job per PR event: CLA check (`cla`), review-claim reconcile (`Review claim gate`), package labels; each part posts its own check and the job fails if any part failed |
 | `lint-workflows.yml` | push/PR touching `.github/workflows/**` | actionlint only (`shellcheck=""` disables shellcheck) |
 | `web-ci.yml` | push/PR to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
 | `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v4` to the Sisyphus Labs account (`omo-production` environment, `CLOUDFLARE_API_TOKEN` scoped to Workers scripts + omo.dev zone routes) |
-| `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
+| `package-labels.yml` | issues opened/edited | Auto-applies package labels to issues (PR labels: `pr-automation.yml`) |
 | `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 
 ## CHANGELOG FRAGMENTS
@@ -455,7 +457,7 @@ Never edit `CHANGELOG.md`, the root `changes.md` or any `packages/<name>/changes
 - **Process cleanup:** Background-agent error handlers are now log-only — no force-exit on transient errors. Opt out entirely via `OMO_DISABLE_PROCESS_CLEANUP=1` env var.
 - **models.dev has two distinct consumers:** `bun run build:model-capabilities` (shared model-capabilities cache) and `packages/omo-opencode/scripts/` (OpenGateway catalog generator → tracked `opengateway-models.json`, shape-pinned by test). Do not conflate.
 - **The scheduled model-capabilities refresh overwrites hand-scoped entries today:** feature PRs add single entries to `packages/omo-opencode/src/generated/model-capabilities.generated.json` for models `models.dev` does not carry yet, but `bun run build:model-capabilities` rewrites the whole file, so a refresh PR drops them. Changing the refresh to merge is tracked in #10665; until then, check a refresh PR's removed entries before merging. See [`docs/model-capabilities-maintenance.md`](docs/model-capabilities-maintenance.md).
-- **shared-skills sub-projects:** 17 skills; `ultimate-browsing/engine` and `coding-agent-sessions` are Python sub-projects with own tests; `visual-qa` ships a zero-dep bundled CLI (`scripts/visual-qa.mjs`) - regenerate the bundle after TS fixes.
+- **shared-skills sub-projects:** 19 skills; `ultimate-browsing/engine` and `coding-agent-sessions` are Python sub-projects with own tests; `visual-qa` ships a zero-dep bundled CLI (`scripts/visual-qa.mjs`) - regenerate the bundle after TS fixes.
 - **First-prompt watchdog:** `packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts` detects subagent sessions producing no progress within `runtime_fallback.first_prompt_timeout_seconds` (300s default, 0 disables) and triggers fallback / abort.
 - **ParentWakeNotifier:** Background-agent parent-wake state in `packages/omo-opencode/src/features/background-agent/parent-wake-notifier.ts` with dependency-injected client and enqueue callback.
 - **Agent state directory:** ONE canonical location, `~/.omo/agent`, resolved through `canonicalAgentDir()` in [`packages/omo-native/bin/lib/agent-dir.js`](packages/omo-native/bin/lib/agent-dir.js) (and its adapter-side twin `resolveAgentHome()` in `packages/omo-senpi/src/components/agent-home/`). EVERY omo entry point - the spawned engine, `omo doctor`, `omo setup`, the local launcher, the local installer - MUST resolve the directory through that helper instead of composing its own default; an explicit `OMO_CODING_AGENT_DIR` (or the legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins. Composing a private default is what made settings look erased on update.
@@ -464,7 +466,7 @@ Never edit `CHANGELOG.md`, the root `changes.md` or any `packages/<name>/changes
 
 ## Review claim labels (merge-gating)
 
-Three PR labels drive the review workflow; automation lives in `.github/workflows/review-claims.yml`:
+Three PR labels drive the review workflow; per-PR automation runs in `.github/workflows/pr-automation.yml`, and the stale sweep and merge-group gate live in `.github/workflows/review-claims.yml`:
 
 - `will-review` — a reviewer claims the PR ("I will review this"). Applying it auto-requests the labeler as reviewer and BLOCKS merge via the required `Review claim gate` check.
 - `in-review` — the claimer is actively reviewing. Same merge-blocking + auto-reviewer-request effects.

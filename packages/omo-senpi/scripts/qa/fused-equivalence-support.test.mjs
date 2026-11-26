@@ -9,6 +9,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -18,6 +19,7 @@ import {
   dropTimestampOffsets,
   goldenHostLeaks,
   pinEnginePackage,
+  resolveTmpdirSymlinks,
   splitStatusChannels,
   statusCounts,
   stopSandboxProcesses,
@@ -27,6 +29,26 @@ const status = (key, text) => ({ type: "extension_ui_request", method: "setStatu
 const turnEvent = (type) => ({ type })
 
 describe("splitStatusChannels", () => {
+  test("#given a channel compared at its settled point #when the last line before the final clear differs #then the compared value differs", () => {
+    // #13046: a settled-point channel must still fail the compare when the session settles on the wrong line.
+    const settledOn = (last) =>
+      splitStatusChannels(
+        {
+          turn: [
+            status("memory", undefined),
+            status("memory", "just now"),
+            status("memory", last),
+            status("memory", undefined),
+          ],
+          surfaces: [],
+        },
+        ["setStatus:memory"],
+      ).status["setStatus:memory"]
+
+    expect(settledOn("just now (+1)")).toEqual({ settled: "just now (+1)" })
+    expect(settledOn("just now")).not.toEqual(settledOn("just now (+1)"))
+  })
+
   test("#given a channel that published twice #when split #then both snapshots are kept in order and counted", () => {
     const client = {
       turn: [turnEvent("agent_start"), status("memory", "a"), turnEvent("turn_end"), status("memory", "b")],
@@ -166,6 +188,29 @@ describe("pinEnginePackage", () => {
       writeFileSync(`${root}.lock`, `${process.ppid}\n`)
 
       expect(() => pinEnginePackage(join(modules, "@code-yeongyu/senpi"), { root })).toThrow(/owns/)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("resolveTmpdirSymlinks", () => {
+  test("#given a TMPDIR that is a symlink #when resolved #then TMPDIR names the directory behind it", () => {
+    // given: macOS spells its temp dir through a symlink into /private
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "eq-tmpdir-test-")))
+    try {
+      const physical = join(base, "physical")
+      const link = join(base, "link")
+      mkdirSync(physical)
+      symlinkSync(physical, link, "junction")
+      const env = { TMPDIR: link }
+
+      // when
+      const resolved = resolveTmpdirSymlinks(env)
+
+      // then
+      expect(resolved).toBe(physical)
+      expect(env.TMPDIR).toBe(physical)
     } finally {
       rmSync(base, { recursive: true, force: true })
     }

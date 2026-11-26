@@ -4,7 +4,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { assembleAddressBook, type DiskSession } from "./address-book"
-import { readSessionFacts, SESSION_FACTS_LAST_LINE_MAX_BYTES, SESSION_FACTS_WINDOW_BYTES } from "./session-facts"
+import {
+  readSessionFacts,
+  readSessionFactsAsync,
+  SESSION_FACTS_LAST_LINE_MAX_BYTES,
+  SESSION_FACTS_WINDOW_BYTES,
+} from "./session-facts"
 import { summary } from "./tools/internals"
 
 const directories: string[] = []
@@ -155,6 +160,44 @@ describe("readSessionFacts newest timestamp", () => {
     const facts = Reflect.apply(readSessionFacts, undefined, [path, appendDuringRead])
 
     expect(facts?.updated_at).toBeNull()
+  })
+})
+
+describe("readSessionFactsAsync (a dead endpoint's listing, #13579)", () => {
+  function written(content: string): string {
+    const path = sessionPath()
+    writeFileSync(path, content)
+    return path
+  }
+
+  test("#given sessions the synchronous reader handles #when the async reader reads them #then it applies the same window rules", async () => {
+    // given: a header-only file, a small session, a final entry past one window, a truncated final line, and no header
+    const paths = [
+      written(`${line(HEADER)}\n`),
+      written(`${[HEADER, OLD, { ...OLD, id: "new", timestamp: NEW_TIMESTAMP }].map(line).join("\n")}\n`),
+      written(
+        `${[HEADER, OLD, { ...OLD, id: "big", timestamp: NEW_TIMESTAMP, message: { role: "assistant", content: "x".repeat(160 * 1024) } }].map(line).join("\n")}\n`,
+      ),
+      written(
+        `${[HEADER, OLD].map(line).join("\n")}\n{"type":"message","timestamp":"${NEW_TIMESTAMP}","message":{"role":"assistant","content":"partial`,
+      ),
+      written(`${line(OLD)}\n`),
+      join(tmpdir(), "omo-session-facts-missing", "session.jsonl"),
+    ]
+
+    // when
+    const facts = await Promise.all(paths.map((path) => readSessionFactsAsync(path)))
+
+    // then
+    expect(facts).toEqual(paths.map((path) => readSessionFacts(path)))
+    expect(facts.map((entry) => (entry === null ? "no facts" : entry.updated_at))).toEqual([
+      HEADER.timestamp,
+      NEW_TIMESTAMP,
+      NEW_TIMESTAMP,
+      null,
+      "no facts",
+      "no facts",
+    ])
   })
 })
 

@@ -18,6 +18,7 @@ const ENTRY_POINT = join(import.meta.dir, "index.ts")
 const BINARY_DOWNLOADER_ENTRY_POINT = join(import.meta.dir, "..", "shared", "binary-downloader.ts")
 // omo#10630: the Senpi memory sync resolver reads the CLI sign-in through this third public subpath.
 const SERVICE_AUTH_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "index.ts")
+const ACCOUNT_HOME_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "account-home.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(
@@ -214,6 +215,10 @@ describe("config-migration public subpath", () => {
         import: "./src/cli/service-auth/index.ts",
         types: "./src/cli/service-auth/index.ts",
       },
+      "./account-home": {
+        import: "./src/cli/service-auth/account-home.ts",
+        types: "./src/cli/service-auth/account-home.ts",
+      },
     })
   })
 
@@ -242,6 +247,18 @@ describe("config-migration public subpath", () => {
       expect(offenders).toEqual([])
     },
   )
+
+  test("#given the account-home entry point #when its local module graph is audited #then it is that one module, importing only node builtins", () => {
+    // given: the subpath omo-senpi's source-build guard imports into the gateway store worker (#14622)
+    const modules = moduleGraph(ACCOUNT_HOME_ENTRY_POINT)
+
+    // when
+    const specifiers = importSpecifiers(readFileSync(ACCOUNT_HOME_ENTRY_POINT, "utf-8"))
+
+    // then
+    expect(modules).toEqual([ACCOUNT_HOME_ENTRY_POINT])
+    expect(specifiers.filter((specifier) => !specifier.startsWith("node:"))).toEqual([])
+  })
 
   test("#given the config-migration entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {
     // given

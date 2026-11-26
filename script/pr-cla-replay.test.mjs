@@ -5,7 +5,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const cla = Bun.YAML.parse(readFileSync(new URL("../.github/workflows/cla.yml", import.meta.url), "utf8"))
+const automation = Bun.YAML.parse(
+  readFileSync(new URL("../.github/workflows/pr-automation.yml", import.meta.url), "utf8"),
+).jobs.automation
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
 
 async function replay({ signed = false, allowlisted = false, existing = false, advanced = false } = {}) {
@@ -96,14 +98,14 @@ async function replay({ signed = false, allowlisted = false, existing = false, a
     const execute = async (step) => {
       await new AsyncFunction("github", "context", "core", step.with.script)(github, context, core)
     }
-    await execute(cla.jobs.cla.steps.find((step) => step.id === "pr"))
+    await execute(automation.steps.find((step) => step.id === "pr"))
     expect(JSON.parse(await readFile(join(dir, "cla-pr-event.json"), "utf8")).number).toBe(42)
-    await execute(cla.jobs.cla.steps.find((step) => step.id === "cla_state"))
+    await execute(automation.steps.find((step) => step.id === "cla_state"))
     process.env.PR_NUMBER = outputs.get("pr_number")
     process.env.EXPECTED_SHA = outputs.get("head_sha")
     process.env.RESULT = "success"
     process.env.UNSIGNED = outputs.get("needs_cla_action")
-    await execute(cla.jobs.cla.steps.find((step) => step.name === "Report CLA result on the current PR head"))
+    await execute(automation.steps.find((step) => step.name === "Report CLA result on the current PR head"))
     return { comments, checks, outputs }
   } finally {
     for (const key of Object.keys(process.env)) if (!(key in oldEnv)) delete process.env[key]

@@ -1,0 +1,3584 @@
+{
+  "domain": "engine",
+  "rows": [
+    {
+      "id": "engine.auth.apiKey",
+      "kind": "capability",
+      "sdk": "engine.auth.apiKey",
+      "today": "no",
+      "slices": [
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "auth",
+            "print-api-key"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: section 4"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.auth.bearerToken",
+      "kind": "capability",
+      "sdk": "engine.auth.bearerToken",
+      "today": "no",
+      "slices": [
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "min_expiry_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "auth",
+            "print-bearer-token"
+          ],
+          "flags": {
+            "--min-expiry": "min_expiry_ms"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: section 4"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.auth.check",
+      "kind": "capability",
+      "sdk": "engine.auth.check",
+      "today": "no",
+      "slices": [
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "auth",
+            "check"
+          ],
+          "flags": {
+            "--provider": "provider",
+            "--model": "model",
+            "--json": "render",
+            "--no-refresh": "refresh=false"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: provider credentials"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.auth.credentials",
+      "kind": "capability",
+      "sdk": "engine.auth.credentials",
+      "today": "no",
+      "slices": [
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "auth",
+            "check"
+          ],
+          "flags": {
+            "--credentials": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: section 4"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.config.agentDir",
+      "kind": "capability",
+      "sdk": "engine.config.agentDir",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "config",
+            "agent-dir"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: a host integration's lookup"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.config.resources",
+      "kind": "capability",
+      "sdk": "engine.config.resources",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "local": {
+            "type": "boolean"
+          },
+          "trust": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "config"
+          ],
+          "flags": {
+            "-l": "local=true",
+            "--local": "local=true",
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: #14366 decides what a session may edit"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.config.setResource",
+      "kind": "capability",
+      "sdk": "engine.config.setResource",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "local": {
+            "type": "boolean",
+            "const": true
+          },
+          "trust": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resource": {
+            "type": "object",
+            "required": [
+              "type",
+              "path"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "inherit"
+              },
+              {
+                "type": "string",
+                "const": "load"
+              },
+              {
+                "type": "string",
+                "const": "unload"
+              }
+            ]
+          }
+        },
+        "required": [
+          "resource",
+          "source"
+        ]
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: #14366 decides what a session may edit",
+        "cli": "CLI omitted: the omo config TUI sets a resource after it lists them through engine.config.resources"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.launch.hand",
+      "kind": "capability",
+      "sdk": "engine.launch.hand",
+      "today": "no",
+      "slices": [
+        "E1a-s",
+        "E1c"
+      ],
+      "input": {
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "gated": {
+            "type": "object",
+            "properties": {
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "api_key": {
+            "type": "object"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--continue": "session.continue=true",
+            "--session": "session.path",
+            "--session-id": "session.id",
+            "--fork": "session.fork",
+            "--rebind": "session.rebind",
+            "--no-session": "session.ephemeral=true",
+            "--session-dir": "session.dir",
+            "--spawned-by": "session.spawned_by",
+            "--name": "session.name",
+            "--model": "setup.model",
+            "--provider": "setup.provider",
+            "--models": "setup.model_patterns",
+            "--thinking": "setup.reasoning",
+            "--system-prompt": "setup.system_prompt",
+            "--append-system-prompt": "setup.append_system_prompt",
+            "--tools": "setup.tools.allow",
+            "--exclude-tools": "setup.tools.deny",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
+            "--extension": "setup.extensions.paths",
+            "--no-extensions": "setup.extensions.none=true",
+            "--skill": "setup.skills.names",
+            "--no-skills": "setup.skills.none=true",
+            "--prompt-template": "setup.prompt_templates.paths",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
+            "--theme": "setup.themes.paths",
+            "--no-themes": "setup.themes.none=true",
+            "--use-theme": "setup.themes.use",
+            "--no-context-files": "setup.context_files=false",
+            "--approve": "setup.project_trust=true",
+            "--no-approve": "setup.project_trust=false",
+            "--offline": "setup.offline=true",
+            "--session-runtime": "setup.session_runtime",
+            "--tool-runtime": "setup.tool_runtime",
+            "--auto-title-sessions": "setup.auto_title=true",
+            "--mcp-presenter-fd": "presenter.bootstrap_fd",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
+            "--api-key": "api_key",
+            "--hand": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "omitted, same reason"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
+    },
+    {
+      "id": "engine.launch.headless",
+      "kind": "capability",
+      "sdk": "engine.launch.headless",
+      "today": "no",
+      "slices": [
+        "E1a-s",
+        "E1c"
+      ],
+      "input": {
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "listen": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "gated": {
+            "type": "object",
+            "properties": {
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "api_key": {
+            "type": "object"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--continue": "session.continue=true",
+            "--session": "session.path",
+            "--session-id": "session.id",
+            "--fork": "session.fork",
+            "--rebind": "session.rebind",
+            "--no-session": "session.ephemeral=true",
+            "--session-dir": "session.dir",
+            "--spawned-by": "session.spawned_by",
+            "--name": "session.name",
+            "--model": "setup.model",
+            "--provider": "setup.provider",
+            "--models": "setup.model_patterns",
+            "--thinking": "setup.reasoning",
+            "--system-prompt": "setup.system_prompt",
+            "--append-system-prompt": "setup.append_system_prompt",
+            "--tools": "setup.tools.allow",
+            "--exclude-tools": "setup.tools.deny",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
+            "--extension": "setup.extensions.paths",
+            "--no-extensions": "setup.extensions.none=true",
+            "--skill": "setup.skills.names",
+            "--no-skills": "setup.skills.none=true",
+            "--prompt-template": "setup.prompt_templates.paths",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
+            "--theme": "setup.themes.paths",
+            "--no-themes": "setup.themes.none=true",
+            "--use-theme": "setup.themes.use",
+            "--no-context-files": "setup.context_files=false",
+            "--approve": "setup.project_trust=true",
+            "--no-approve": "setup.project_trust=false",
+            "--offline": "setup.offline=true",
+            "--session-runtime": "setup.session_runtime",
+            "--tool-runtime": "setup.tool_runtime",
+            "--auto-title-sessions": "setup.auto_title=true",
+            "--mcp-presenter-fd": "presenter.bootstrap_fd",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
+            "--api-key": "api_key",
+            "--headless": "when",
+            "--listen": "listen"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "omitted, same reason"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
+    },
+    {
+      "id": "engine.launch.interactive",
+      "kind": "capability",
+      "sdk": "engine.launch.interactive",
+      "today": "no",
+      "slices": [
+        "E1a-s",
+        "E1c"
+      ],
+      "input": {
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "gated": {
+            "type": "object",
+            "properties": {
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "tui_mode": {
+            "enum": [
+              "regular",
+              "fullscreen"
+            ]
+          },
+          "verbose": {
+            "type": "boolean"
+          },
+          "attach": {
+            "type": "object",
+            "required": [
+              "socket"
+            ],
+            "properties": {
+              "socket": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "api_key": {
+            "type": "object"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--continue": "session.continue=true",
+            "--session": "session.path",
+            "--session-id": "session.id",
+            "--fork": "session.fork",
+            "--rebind": "session.rebind",
+            "--no-session": "session.ephemeral=true",
+            "--session-dir": "session.dir",
+            "--spawned-by": "session.spawned_by",
+            "--name": "session.name",
+            "--model": "setup.model",
+            "--provider": "setup.provider",
+            "--models": "setup.model_patterns",
+            "--thinking": "setup.reasoning",
+            "--system-prompt": "setup.system_prompt",
+            "--append-system-prompt": "setup.append_system_prompt",
+            "--tools": "setup.tools.allow",
+            "--exclude-tools": "setup.tools.deny",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
+            "--extension": "setup.extensions.paths",
+            "--no-extensions": "setup.extensions.none=true",
+            "--skill": "setup.skills.names",
+            "--no-skills": "setup.skills.none=true",
+            "--prompt-template": "setup.prompt_templates.paths",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
+            "--theme": "setup.themes.paths",
+            "--no-themes": "setup.themes.none=true",
+            "--use-theme": "setup.themes.use",
+            "--no-context-files": "setup.context_files=false",
+            "--approve": "setup.project_trust=true",
+            "--no-approve": "setup.project_trust=false",
+            "--offline": "setup.offline=true",
+            "--session-runtime": "setup.session_runtime",
+            "--tool-runtime": "setup.tool_runtime",
+            "--auto-title-sessions": "setup.auto_title=true",
+            "--mcp-presenter-fd": "presenter.bootstrap_fd",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
+            "--api-key": "api_key",
+            "--tui-mode": "tui_mode",
+            "--verbose": "verbose=true",
+            "--attach": "attach.socket"
+          },
+          "positionals": {
+            "messages": "input.messages",
+            "@file": "input.files",
+            "-": "input.stdin"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "omitted: a session has no terminal to give it"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Also serves the internal __kill-guard. The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
+    },
+    {
+      "id": "engine.launch.print",
+      "kind": "capability",
+      "sdk": "engine.launch.print",
+      "today": "no",
+      "slices": [
+        "E1a-s",
+        "E1c"
+      ],
+      "input": {
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "gated": {
+            "type": "object",
+            "properties": {
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "mode": {
+            "enum": [
+              "text",
+              "json"
+            ]
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "api_key": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "input",
+          "mode"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--continue": "session.continue=true",
+            "--session": "session.path",
+            "--session-id": "session.id",
+            "--fork": "session.fork",
+            "--rebind": "session.rebind",
+            "--no-session": "session.ephemeral=true",
+            "--session-dir": "session.dir",
+            "--spawned-by": "session.spawned_by",
+            "--name": "session.name",
+            "--model": "setup.model",
+            "--provider": "setup.provider",
+            "--models": "setup.model_patterns",
+            "--thinking": "setup.reasoning",
+            "--system-prompt": "setup.system_prompt",
+            "--append-system-prompt": "setup.append_system_prompt",
+            "--tools": "setup.tools.allow",
+            "--exclude-tools": "setup.tools.deny",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
+            "--extension": "setup.extensions.paths",
+            "--no-extensions": "setup.extensions.none=true",
+            "--skill": "setup.skills.names",
+            "--no-skills": "setup.skills.none=true",
+            "--prompt-template": "setup.prompt_templates.paths",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
+            "--theme": "setup.themes.paths",
+            "--no-themes": "setup.themes.none=true",
+            "--use-theme": "setup.themes.use",
+            "--no-context-files": "setup.context_files=false",
+            "--approve": "setup.project_trust=true",
+            "--no-approve": "setup.project_trust=false",
+            "--offline": "setup.offline=true",
+            "--session-runtime": "setup.session_runtime",
+            "--tool-runtime": "setup.tool_runtime",
+            "--auto-title-sessions": "setup.auto_title=true",
+            "--mcp-presenter-fd": "presenter.bootstrap_fd",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
+            "--api-key": "api_key",
+            "--print": "when",
+            "-p": "when",
+            "--mode": "mode"
+          },
+          "positionals": {
+            "messages": "input.messages",
+            "@file": "input.files",
+            "-": "input.stdin"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "omitted: a session delegates through its task tools"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
+    },
+    {
+      "id": "engine.launch.rpc",
+      "kind": "capability",
+      "sdk": "engine.launch.rpc",
+      "today": "no",
+      "slices": [
+        "E1a-s",
+        "E1c"
+      ],
+      "input": {
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "gated": {
+            "type": "object",
+            "properties": {
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "listen": {
+            "type": "string",
+            "minLength": 1
+          },
+          "multi_session": {
+            "type": "boolean"
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "api_key": {
+            "type": "object"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--continue": "session.continue=true",
+            "--session": "session.path",
+            "--session-id": "session.id",
+            "--fork": "session.fork",
+            "--rebind": "session.rebind",
+            "--no-session": "session.ephemeral=true",
+            "--session-dir": "session.dir",
+            "--spawned-by": "session.spawned_by",
+            "--name": "session.name",
+            "--model": "setup.model",
+            "--provider": "setup.provider",
+            "--models": "setup.model_patterns",
+            "--thinking": "setup.reasoning",
+            "--system-prompt": "setup.system_prompt",
+            "--append-system-prompt": "setup.append_system_prompt",
+            "--tools": "setup.tools.allow",
+            "--exclude-tools": "setup.tools.deny",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
+            "--extension": "setup.extensions.paths",
+            "--no-extensions": "setup.extensions.none=true",
+            "--skill": "setup.skills.names",
+            "--no-skills": "setup.skills.none=true",
+            "--prompt-template": "setup.prompt_templates.paths",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
+            "--theme": "setup.themes.paths",
+            "--no-themes": "setup.themes.none=true",
+            "--use-theme": "setup.themes.use",
+            "--no-context-files": "setup.context_files=false",
+            "--approve": "setup.project_trust=true",
+            "--no-approve": "setup.project_trust=false",
+            "--offline": "setup.offline=true",
+            "--session-runtime": "setup.session_runtime",
+            "--tool-runtime": "setup.tool_runtime",
+            "--auto-title-sessions": "setup.auto_title=true",
+            "--mcp-presenter-fd": "presenter.bootstrap_fd",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
+            "--api-key": "api_key",
+            "--mode": "when",
+            "--listen": "listen",
+            "--multi-session": "multi_session=true"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "omitted: the host a session runs on is not the session's to start"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
+    },
+    {
+      "id": "engine.models.discover",
+      "kind": "capability",
+      "sdk": "engine.models.discover",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "provider"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "models",
+            "discover"
+          ],
+          "flags": {},
+          "positionals": {
+            "provider": "provider"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has (as for engine.models.update)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.models.list",
+      "kind": "capability",
+      "sdk": "engine.models.list",
+      "today": "no",
+      "slices": [
+        "E1a",
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "minLength": 1
+          },
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--list-models": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has (as for engine.models.update)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.models.update",
+      "kind": "capability",
+      "sdk": "engine.models.update",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "update"
+          ],
+          "flags": {
+            "--models": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.packages.install",
+      "kind": "capability",
+      "sdk": "engine.packages.install",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "local": {
+            "type": "boolean"
+          },
+          "trust": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "install"
+          ],
+          "flags": {
+            "-l": "local=true",
+            "--local": "local=true",
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {
+            "source": "source"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installs code into the engine"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.packages.list",
+      "kind": "capability",
+      "sdk": "engine.packages.list",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "trust": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "list"
+          ],
+          "flags": {
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.packages.remove",
+      "kind": "capability",
+      "sdk": "engine.packages.remove",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "local": {
+            "type": "boolean"
+          },
+          "trust": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "remove"
+          ],
+          "flags": {
+            "-l": "local=true",
+            "--local": "local=true",
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {
+            "source": "source"
+          },
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "uninstall"
+          ],
+          "flags": {
+            "-l": "local=true",
+            "--local": "local=true",
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {
+            "source": "source"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.packages.update",
+      "kind": "capability",
+      "sdk": "engine.packages.update",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trust": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "update"
+          ],
+          "flags": {
+            "--extensions": "when",
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "update"
+          ],
+          "flags": {
+            "--extension": "source",
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "update"
+          ],
+          "flags": {
+            "--approve": "trust=true",
+            "--no-approve": "trust=false"
+          },
+          "positionals": {
+            "source": "source"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.promptSizes",
+      "kind": "capability",
+      "sdk": "engine.promptSizes",
+      "today": "no",
+      "slices": [
+        "E1a",
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--print-prompt-sizes": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installation diagnostics"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.schedule.cancel",
+      "kind": "capability",
+      "sdk": "engine.schedule.cancel",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "schedule",
+            "cancel"
+          ],
+          "flags": {},
+          "positionals": {
+            "id": "id"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one (as for engine.schedule.list)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.schedule.list",
+      "kind": "capability",
+      "sdk": "engine.schedule.list",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "schedule",
+            "list"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.schedule.run",
+      "kind": "capability",
+      "sdk": "engine.schedule.run",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "watch": {
+            "type": "boolean"
+          },
+          "exec": {
+            "type": "string",
+            "minLength": 1
+          },
+          "poll_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "concurrency": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "signal": {}
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "schedule",
+            "run"
+          ],
+          "flags": {
+            "--watch": "watch=true",
+            "--exec": "exec",
+            "--poll-seconds": "poll_seconds",
+            "--timeout-seconds": "timeout_seconds",
+            "--concurrency": "concurrency"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it resumes sessions headlessly on this machine, an operator's runner"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.sessionOfPid",
+      "kind": "capability",
+      "sdk": "engine.sessionOfPid",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "pid"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "session-of-pid"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {
+            "pid": "pid"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: a host integration's lookup"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.sessions.exportHtml",
+      "kind": "capability",
+      "sdk": "engine.sessions.exportHtml",
+      "today": "no",
+      "slices": [
+        "E1a"
+      ],
+      "input": {
+        "properties": {
+          "session": {
+            "type": "string",
+            "minLength": 1
+          },
+          "out": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "session"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--export": "when"
+          },
+          "positionals": {
+            "file": "session",
+            "out": "out"
+          },
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: writes a file for a person"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.tips",
+      "kind": "capability",
+      "sdk": "engine.tips",
+      "today": "no",
+      "slices": [
+        "E1a",
+        "E1a-s"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--list-tips": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: installation diagnostics"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "engine.trust.ensure",
+      "kind": "capability",
+      "sdk": "engine.trust.ensure",
+      "today": "no",
+      "slices": [
+        "C1a",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "wait": {
+            "type": "boolean"
+          },
+          "lease_pid": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "trust",
+            "ensure"
+          ],
+          "flags": {
+            "--json": "render",
+            "--wait": "wait=true",
+            "--lease-pid": "lease_pid"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: a host integration's call that writes the trust store"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Answers the JSON record the verb prints. Security-gated: the security design (S0) covers it before any slice clears it (amendment 2, D1)."
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.7",
+      "position": 5,
+      "ids": [
+        "engine.trust.ensure"
+      ],
+      "cells": [
+        "`engine.trust.ensure({ wait?, lease_pid? })` answering the JSON record the command prints: it imports the engine's trust material within the launch budget, writes the private generation and leases it, for the caller or for another process",
+        "`omo trust ensure --json [--wait] [--lease-pid <pid>]` (`N/trust-stage.ts:68-91`, `N/compile-args.ts:41-42`)",
+        "none",
+        "**no**",
+        "Tool omitted: a host integration's call that writes the trust store",
+        "C1a, after S0"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 1,
+      "ids": [
+        "engine.packages.install"
+      ],
+      "cells": [
+        "`engine.packages.install({ source, local?, trust? })`",
+        "`omo install <source> [-l\\|--local] [--approve\\|--no-approve]`",
+        "none",
+        "**no**",
+        "Tool omitted: installs code into the engine",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 2,
+      "ids": [
+        "engine.packages.remove"
+      ],
+      "cells": [
+        "`engine.packages.remove({ source, local?, trust? })`",
+        "`omo remove\\|uninstall <source> [-l\\|--local] [--approve\\|--no-approve]`",
+        "none",
+        "**no**",
+        "Same reason",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 3,
+      "ids": [
+        "engine.packages.list"
+      ],
+      "cells": [
+        "`engine.packages.list({ trust? })`",
+        "`omo list [--approve\\|--no-approve]`",
+        "none",
+        "**no**",
+        "Same reason",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 4,
+      "ids": [
+        "engine.packages.update"
+      ],
+      "cells": [
+        "`engine.packages.update({ source?, trust? })`: every installed package, or one",
+        "`omo update --extensions`; `omo update --extension <source>`; `omo update <source>`; each with `[--approve\\|--no-approve]`",
+        "none",
+        "**no**",
+        "Same reason. These are the engine targets the launcher forwards today. `omo update --all` is not one of them: the launcher takes it as a product update with an unknown flag and refuses it, and that refusal is kept",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 5,
+      "ids": [
+        "engine.models.update"
+      ],
+      "cells": [
+        "`engine.models.update()`",
+        "`omo update --models`",
+        "none",
+        "**no**",
+        "Tool omitted: `thread_set_model` resolves against the catalog the target already has",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 6,
+      "ids": [
+        "engine.models.discover"
+      ],
+      "cells": [
+        "`engine.models.discover({ provider })`: fetches one provider's model list and adds it to that provider's entry; a call without a provider is refused, as the command refuses it (`E/cli/models-command.ts:13, 84-88`)",
+        "`omo models discover <provider>`",
+        "none",
+        "**no**",
+        "Same reason",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 7,
+      "ids": [
+        "engine.models.list"
+      ],
+      "cells": [
+        "`engine.models.list({ pattern?, setup? })`. `setup` is the launch setup of 6.9, because the command builds its model runtime from the launch flags given with it (`E/main.ts:1431-1456`)",
+        "`omo --list-models [pattern]` with any launch setup flags",
+        "none",
+        "**no**",
+        "Same reason",
+        "E1a for the call over the default runtime; E1a-s for `setup`"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 8,
+      "ids": [
+        "engine.config.agentDir"
+      ],
+      "cells": [
+        "`engine.config.agentDir()` answering the versioned record the command prints",
+        "`omo config agent-dir --json`",
+        "none",
+        "**no**",
+        "Tool omitted: a host integration's lookup",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 9,
+      "ids": [
+        "engine.config.resources",
+        "engine.config.setResource"
+      ],
+      "cells": [
+        "`engine.config.resources({ local?, trust? })` answering the resolved package resources with whether each is enabled; `engine.config.setResource(...)` answering the changed entry, with two typed forms, because the two settings files do not hold the same thing. Global: `{ source, resource: { type, path }, enabled: boolean }`. Project-local: `{ local: true, trust?, source, resource: { type, path }, state: \"inherit\" \\| \"load\" \\| \"unload\" }`, the three states the project override has (`E/modes/interactive/components/config-selector.ts:30, 671-740`); a boolean cannot express `inherit`. The resource type is the engine's own (`E/core/package-manager.ts:82-97`)",
+        "`omo config [-l\\|--local] [--approve\\|--no-approve]` (a TUI)",
+        "none",
+        "**no**",
+        "Tool omitted: #14366 decides what a session may edit. The TUI is a renderer over the two calls",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 10,
+      "ids": [
+        "engine.auth.check"
+      ],
+      "cells": [
+        "`engine.auth.check({ provider?, model?, refresh? })` answering status only",
+        "`omo auth check --provider <p> [--model] [--json] [--no-refresh]`",
+        "none",
+        "**no**",
+        "Tool omitted: provider credentials",
+        "E1a-s"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 11,
+      "ids": [
+        "engine.auth.credentials",
+        "engine.auth.apiKey",
+        "engine.auth.bearerToken"
+      ],
+      "cells": [
+        "`engine.auth.credentials({ provider?, model?, refresh? })`, `engine.auth.apiKey({ provider?, model? })`, `engine.auth.bearerToken({ provider?, model?, min_expiry_ms? })`; where the credential goes is fixed by S0",
+        "`omo auth check --credentials`; `omo auth print-api-key`; `omo auth print-bearer-token [--min-expiry]`",
+        "none",
+        "**no**; custody (S0)",
+        "Tool omitted: section 4.5",
+        "E1a-s"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 12,
+      "ids": [
+        "engine.schedule.list"
+      ],
+      "cells": [
+        "`engine.schedule.list()`",
+        "`omo schedule list [--json]`",
+        "none",
+        "**no**",
+        "Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 13,
+      "ids": [
+        "engine.schedule.cancel"
+      ],
+      "cells": [
+        "`engine.schedule.cancel({ id })`",
+        "`omo schedule cancel <id>`",
+        "none",
+        "**no**",
+        "Same reason",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 14,
+      "ids": [
+        "engine.schedule.run"
+      ],
+      "cells": [
+        "`engine.schedule.run({ watch?, exec?, poll_seconds?, timeout_seconds?, concurrency?, signal? })`, a stream of deliveries when watching",
+        "`omo schedule run [--watch] [--exec] [--poll-seconds] [--timeout-seconds] [--concurrency]`",
+        "none",
+        "**no**",
+        "Tool omitted: it resumes sessions headlessly on this machine, an operator's runner",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 15,
+      "ids": [
+        "engine.sessionOfPid"
+      ],
+      "cells": [
+        "`engine.sessionOfPid({ pid })`",
+        "`omo session-of-pid <pid> --json`",
+        "none",
+        "**no**",
+        "Tool omitted: a host integration's lookup",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 16,
+      "ids": [
+        "engine.sessions.exportHtml"
+      ],
+      "cells": [
+        "`engine.sessions.exportHtml({ session, out? })` answering the written path; `out` omitted lets the engine choose it, as today",
+        "`omo --export <file> [<out>]`",
+        "none",
+        "**no**",
+        "Tool omitted: writes a file for a person",
+        "E1a"
+      ]
+    },
+    {
+      "table": "6.8",
+      "position": 17,
+      "ids": [
+        "engine.promptSizes",
+        "engine.tips"
+      ],
+      "cells": [
+        "`engine.promptSizes({ setup? })`, taking the same `setup` object as a launch (6.9) and answering the size of each prompt part; `engine.tips()`",
+        "`omo --print-prompt-sizes` with any launch setup flags; `omo --list-tips`",
+        "none",
+        "**no**",
+        "Tool omitted: installation diagnostics",
+        "E1a for the calls over the default runtime; E1a-s for `setup`"
+      ]
+    },
+    {
+      "table": "6.9",
+      "position": 1,
+      "ids": [
+        "engine.launch.interactive"
+      ],
+      "cells": [
+        "`engine.launch.interactive({ session?, setup?, input?, gated?, tui_mode?, verbose?, attach?: { socket, session } })`: starts the terminal UI on the caller's terminal",
+        "`omo [flags] [messages] [@files] [-]`, `--tui-mode regular\\|fullscreen`, `--verbose`, `--attach <socket>` (what `omo remote attach` launches over `threads.attach().serveEndpoint`)",
+        "Resolves when the process exits: `{ exit_code, session? }`. `session` is the id the caller named; an ephemeral launch answers none; with no selector it is absent, because the engine has no channel that tells a parent which session a child opened",
+        "none; omitted: a session has no terminal to give it",
+        "**no**",
+        "E1a-s, E1c"
+      ]
+    },
+    {
+      "table": "6.9",
+      "position": 2,
+      "ids": [
+        "engine.launch.print"
+      ],
+      "cells": [
+        "`engine.launch.print({ session?, setup?, input, gated?, mode: \"text\" \\| \"json\" })`: runs the input to the end in a new process",
+        "`omo --print [flags] [messages] [@files] [-]`, `--mode text\\|json`",
+        "A stream of the run's events, then `{ exit_code, session? }`: the id the caller named, else the id in the json stream's session header, else absent; an ephemeral launch answers none",
+        "none; omitted: a session delegates through its task tools",
+        "**no**",
+        "E1a-s, E1c"
+      ]
+    },
+    {
+      "table": "6.9",
+      "position": 3,
+      "ids": [
+        "engine.launch.rpc"
+      ],
+      "cells": [
+        "`engine.launch.rpc({ session?, setup?, gated?, listen?, multi_session?, presenter? })`: starts an engine that serves its RPC on stdio or on an address",
+        "`omo --mode rpc`, `--listen <address>`, `--multi-session`, `--mcp-presenter-fd`, `--mcp-presenter-enforcement`",
+        "`{ address, pid }` and a handle whose `stop()` ends it; on stdio the handle is the duplex stream",
+        "none; omitted: the host a session runs on is not the session's to start",
+        "**no**",
+        "E1a-s, E1c"
+      ]
+    },
+    {
+      "table": "6.9",
+      "position": 4,
+      "ids": [
+        "engine.launch.hand"
+      ],
+      "cells": [
+        "`engine.launch.hand({ session?, setup? })`: starts a hand that runs tool calls for a remote loop, on its own endpoint, in RPC mode. It refuses `input`, print, a mode other than `rpc`, `listen` and `multi_session`, and is never combined with headless (`E/cli/engine-mode-args.ts:8-24`)",
+        "`omo --hand [setup flags]`",
+        "`{ socket, pid }` and a stop handle",
+        "none; omitted, same reason",
+        "**no**",
+        "E1a-s, E1c"
+      ]
+    },
+    {
+      "table": "6.9",
+      "position": 5,
+      "ids": [
+        "engine.launch.headless"
+      ],
+      "cells": [
+        "`engine.launch.headless({ session?, setup?, listen? })`: starts the machine-owned session host, in RPC mode and always multi-session. It refuses `input`, print and a mode other than `rpc`, and is never combined with hand (`E/cli/engine-mode-args.ts:8-24`)",
+        "`omo --headless [setup flags] [--listen]`",
+        "`{ socket, pid }` and a stop handle",
+        "none; omitted, same reason",
+        "**no**",
+        "E1a-s, E1c"
+      ]
+    }
+  ]
+}

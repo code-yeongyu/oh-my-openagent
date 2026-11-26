@@ -174,6 +174,20 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
 // #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
 // 1,140-byte margin instead of failing it by 860 bytes.
+// Train omo-5173 (#13627, 22 members) on dev 71cc3ecf70 (1,481,163 B): the train-top regen measures 1,485,337 B (+4,174);
+// budget = measured + 4 KiB (lead rule) = 1,489,433.
+// Remerged on dev 050c1879cb (dev ceiling 1,493,600): the regenerated train-top omo.js measures 1,497,747 B;
+// budget = measured + 4 KiB (lead rule) = 1,501,843.
+// Release train #14077 (senpi 2026.11.15-4, device-service 0.1.40, thread paging/wait/one-field) on dev fe95296518:
+// the regenerated train-top omo.js measures 1,505,934 B; budget = measured + 4 KiB (lead rule) = 1,510,030.
+// Train omotrain2-20261118 (#14141, 10 thread cars) on dev e79f804ce0 (1,506,330 B): the train-top regen measures
+// 1,515,915 B (+9,585; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,520,011.
+// A4 memory-sync train (#14097, 6 members) remerged on dev 9b94b6f3dd: the train-top regen measures 1,522,653 B
+// (linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,526,749.
+// Thread-sweep train (32 thread members) remerged on dev 5d290d8119 (dev ceiling 1,526,749): the train-top regen
+// measures 1,537,619 B (+10,870; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,541,715.
+// Thread train 4 (8 members) on dev abfb5be796 (dev omo.js 1,540,734 B, ceiling 1,541,715): the train-top regen
+// measures 1,541,622 B (+888; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,545,718.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {

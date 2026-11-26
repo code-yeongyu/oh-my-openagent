@@ -1,8 +1,10 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { load } from "js-yaml"
 
@@ -17,6 +19,8 @@ interface FullMatrixMode {
   readonly runHeavy: boolean
   readonly fullMatrix: boolean
   readonly runtimeTouching: boolean
+  readonly labelRefused: boolean
+  readonly labelHonoredOverFileCap: boolean
 }
 
 interface ClassifyInput {
@@ -27,6 +31,9 @@ interface ClassifyInput {
   readonly mergeParents?: number
   readonly headRef?: string
   readonly labels?: readonly string[]
+  readonly body?: string
+  readonly changedFiles?: number
+  readonly basePlatformGreen?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,6 +58,9 @@ function classify(input: ClassifyInput): FullMatrixMode {
       input.headRef ?? "",
       "--labels",
       JSON.stringify(input.labels ?? []),
+      ...(input.body === undefined ? [] : ["--body-file", writeBody(input.body)]),
+      ...(input.changedFiles === undefined ? [] : ["--changed-files", String(input.changedFiles)]),
+      ...(input.basePlatformGreen === undefined ? [] : ["--base-platform-green", String(input.basePlatformGreen)]),
     ],
     {
       encoding: "utf8",
@@ -64,7 +74,11 @@ function classify(input: ClassifyInput): FullMatrixMode {
   const runHeavy = parsed["runHeavy"]
   const fullMatrix = parsed["fullMatrix"]
   const runtimeTouching = parsed["runtimeTouching"]
+  const labelRefused = parsed["labelRefused"]
+  const labelHonoredOverFileCap = parsed["labelHonoredOverFileCap"]
   if (
+    typeof labelHonoredOverFileCap !== "boolean" ||
+    typeof labelRefused !== "boolean" ||
     typeof generatedReleasePush !== "boolean" ||
     typeof webOnly !== "boolean" ||
     typeof runHeavy !== "boolean" ||
@@ -73,7 +87,16 @@ function classify(input: ClassifyInput): FullMatrixMode {
   ) {
     throw new Error("classifier output must contain boolean CI mode fields including fullMatrix")
   }
-  return { generatedReleasePush, webOnly, runHeavy, fullMatrix, runtimeTouching }
+  return { generatedReleasePush, webOnly, runHeavy, fullMatrix, runtimeTouching, labelRefused, labelHonoredOverFileCap }
+}
+
+const bodyDir = mkdtempSync(join(tmpdir(), "ci-fast-path-body-"))
+afterAll(() => rmSync(bodyDir, { recursive: true, force: true }))
+let bodies = 0
+function writeBody(body: string): string {
+  const path = join(bodyDir, `body-${bodies++}.md`)
+  writeFileSync(path, body)
+  return path
 }
 
 function workflowJobs(): Record<string, unknown> {
@@ -134,6 +157,8 @@ describe("full-matrix classification", () => {
         runHeavy: false,
         fullMatrix: true,
         runtimeTouching: true,
+        labelRefused: false,
+        labelHonoredOverFileCap: false,
       })
       expect(classify({ ...input, message: "fix: normal push", eventName: "push" }).runHeavy).toBe(true)
       expect(classify({ ...input, eventName: "merge_group" }).runHeavy).toBe(true)
@@ -230,34 +255,146 @@ describe("full-matrix classification", () => {
         expect(mode.fullMatrix).toBe(true)
       },
     )
+
+    // The paths of the real v5.1.80 stamp (f23e7ad390), one per kind prepare-release-state writes.
+    const stampPaths = [
+      "CHANGELOG.md",
+      "changes/unreleased/14255.md",
+      "packages/omo-native/changes.md",
+      "package.json",
+      "bun.lock",
+      "packages/oh-my-opencode-windows-x64/package.json",
+      "packages/omo-codex/plugin/package-lock.json",
+      "packages/omo-codex/plugin/components/bootstrap/hooks/hooks.json",
+      "packages/omo-senpi/plugin/extensions/gateway-store-worker.mjs",
+      "packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js",
+      "packages/omo-codex/scripts/install-dist/install-local.mjs",
+      "packages/omo-native/bin/lib/service-auth.generated.js",
+    ]
+    const releaseState = { eventName: "pull_request", headRef: "release/v5.1.80-source-state" }
+
+    test("#then a stamp on a base whose macOS/Windows legs ran green stays on Linux and still runs heavy", () => {
+      const mode = classify({ ...releaseState, changedPaths: stampPaths, basePlatformGreen: true })
+      expect(mode.fullMatrix).toBe(false)
+      expect(mode.runHeavy).toBe(true)
+    })
+
+    test.each([
+      ["the base was not proven green on macOS/Windows", { changedPaths: stampPaths, basePlatformGreen: false }],
+      ["the base's proof is not passed at all", { changedPaths: stampPaths }],
+      [
+        "the pull request also changes source the stamp never writes",
+        { changedPaths: [...stampPaths, "packages/omo-native/sync-status-cli.ts"], basePlatformGreen: true },
+      ],
+      ["the diff could not be read", { changedPaths: [], diffAvailable: false, basePlatformGreen: true }],
+    ])("#then it keeps the full matrix when %s", (_name, input) => {
+      expect(classify({ ...releaseState, ...input }).fullMatrix).toBe(true)
+    })
+
+    test("#then a green base never takes another branch off the full matrix", () => {
+      const mode = classify({
+        eventName: "pull_request",
+        headRef: "feature/bump",
+        labels: ["ci:full-matrix"],
+        changedPaths: ["packages/oh-my-opencode-windows-x64/package.json"],
+        basePlatformGreen: true,
+      })
+      expect(mode.fullMatrix).toBe(true)
+    })
   })
 
+  // The label costs macOS/Windows runners, so it is honored only when the diff touches a platform path or the PR body
+  // carries an explicit 'Platform-reason: <text>' line (#13802 follow-up). Anything else is refused, never guessed.
   describe("#given the opt-in label", () => {
-    test("#then ci:full-matrix forces the full matrix on a pull request", () => {
-      // given / when
+    const labelled = { eventName: "pull_request", headRef: "feature/runtime-change", labels: ["bug", "ci:full-matrix"] }
+
+    test("#then it is refused on a diff with no platform path and no Platform-reason line", () => {
+      const mode = classify({ ...labelled, changedPaths: ["changes.md", "script/foo.test.ts", "script/map.json"] })
+      expect(mode.fullMatrix).toBe(false)
+      expect(mode.labelRefused).toBe(true)
+      expect(mode.runHeavy).toBe(true)
+    })
+
+    test("#then a body that only mentions platforms is not a reason", () => {
+      const mode = classify({
+        ...labelled,
+        changedPaths: ["packages/utils/src/index.ts"],
+        body: "This could affect Windows and macOS.\nplatform-reason: lower case is not the syntax",
+      })
+      expect(mode.labelRefused).toBe(true)
+      expect(mode.fullMatrix).toBe(false)
+    })
+
+    test("#then a diff that cannot be fully listed honors the label (fails toward the full matrix)", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], diffAvailable: false })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    // The pulls/files API lists at most 3000 files, so every caller decides the same way above that (#13891).
+    test("#then a pull request over the API file cap honors the label even when its listed paths are complete", () => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], changedFiles: 3500 })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    // The workflow's truncation warning reads this field, so the cap lives in one place (#13903 review).
+    test.each([
+      [3000, false],
+      [3001, true],
+    ])("#then %i changed files report labelHonoredOverFileCap %p", (changedFiles, overCap) => {
+      const mode = classify({ ...labelled, changedPaths: ["packages/utils/src/index.ts"], changedFiles })
+      expect(mode.labelHonoredOverFileCap).toBe(overCap)
+      expect(mode.labelRefused).toBe(!overCap)
+    })
+
+    test("#then an unlabelled pull request over the cap reports no label honored", () => {
       const mode = classify({
         eventName: "pull_request",
         headRef: "feature/runtime-change",
         changedPaths: ["packages/utils/src/index.ts"],
-        labels: ["bug", "ci:full-matrix"],
+        labels: [],
+        changedFiles: 3500,
       })
+      expect(mode.labelHonoredOverFileCap).toBe(false)
+      expect(mode.fullMatrix).toBe(false)
+    })
 
-      // then
+    test("#then it runs the full matrix when the diff touches a platform path", () => {
+      const mode = classify({
+        ...labelled,
+        changedPaths: ["README.md", "crates/omo-computer-backend-win32/src/lib.rs"],
+      })
       expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    test("#then it runs the full matrix when the body carries a Platform-reason line", () => {
+      const mode = classify({
+        ...labelled,
+        changedPaths: ["packages/utils/src/index.ts"],
+        body: "Summary\n\nPlatform-reason: path handling differs on Windows drive letters\n",
+      })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
+    })
+
+    test("#then a release source-state pull request keeps the full matrix and its label is not reported refused", () => {
+      const mode = classify({ ...labelled, headRef: "release/v5.2.0-source-state", changedPaths: ["package.json"] })
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.labelRefused).toBe(false)
     })
 
     // run-full-ci was a second name for the label; one opt-in label is the contract (#13802).
-    test.each(["run-full-ci", "bug"])("#then %s alone keeps the pull request on Linux", (label) => {
-      // given / when
+    test.each(["run-full-ci", "bug"])("#then %s alone keeps the pull request on Linux without a refusal", (label) => {
       const mode = classify({
         eventName: "pull_request",
         headRef: "feature/runtime-change",
-        changedPaths: ["packages/utils/src/index.ts"],
+        changedPaths: ["crates/x/src/lib.rs"],
         labels: [label],
       })
-
-      // then
       expect(mode.fullMatrix).toBe(false)
+      expect(mode.labelRefused).toBe(false)
     })
   })
 

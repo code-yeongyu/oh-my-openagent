@@ -12,6 +12,7 @@ import { join } from "node:path"
 import { loadLoroRuntime, type LoroDoc } from "../../../crdt/loro-runtime"
 import { readdir, readFile } from "../../../fs/resilient"
 import {
+  activeRegisters,
   captureOnDevice,
   createDeviceItemDoc,
   deleteItem,
@@ -23,6 +24,7 @@ import {
   renderForDisk,
   renderItem,
 } from "../../item"
+import { planAdoption } from "../../space/adopt"
 import { readJson, writeAtomic, writeJson } from "../atomic"
 import type { BatchPayload, ItemStore } from "../ports"
 import { type Baseline, createItemRecovery } from "./device-item-recovery"
@@ -97,6 +99,22 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     },
     peer: () => theDevice().peer,
     keys: () => [...new Set([...docs.keys(), ...baselines.keys()])].sort(),
+    async firstCapture(key, ops) {
+      const oldest = ops[0]
+      if (oldest === undefined) return "no"
+      const { decodeImportBlobMeta } = await loadLoroRuntime()
+      let start: Map<string, number>
+      try {
+        start = decodeImportBlobMeta(oldest, false).partialStartVersionVector.toJSON()
+      } catch {
+        return "no"
+      }
+      if (![...start.values()].every((counter) => counter === 0)) return "no"
+      const doc = docs.get(key)
+      const peers = doc === undefined ? [] : [...doc.oplogVersion().toJSON().keys()]
+      if (peers.length === 0) return "rewound"
+      return peers.every((peer) => peer === theDevice().peer) ? "first" : "no"
+    },
     async capture(key, workingText) {
       const doc = await docOf(key)
       const base = baselines.get(key) ?? { text: null, frontier: [] }
@@ -109,6 +127,28 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         return doc.export({ mode: "update", from })
       }
       if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return recovery.revive(key, doc, workingText)
+      // #13725: the space holds this item and this device never materialised it (it joined the space with
+      // its own copy of the file), so the working text has no shared history with the doc. Adopt it
+      // insert-only (sync-design section 3): text the space already holds is not sent again.
+      if (base.text === null && doc.oplogVersion().toJSON().size > 0) {
+        const current = renderItem(doc) ?? ""
+        const plan = planAdoption([{ path: key, text: workingText }], {
+          currentText: current,
+          tombstoned: false,
+          lastMaterialised: null,
+          registers: activeRegisters(doc),
+        })
+        if (plan.action !== "capture") return null
+        return captureOnDevice(
+          theDevice(),
+          key,
+          doc,
+          current,
+          itemFrontier(doc),
+          plan.workingText,
+          plan.extraRegisterValues,
+        )
+      }
       return captureOnDevice(theDevice(), key, doc, base.text ?? "", base.frontier, workingText)
     },
     async apply(key, ops) {
