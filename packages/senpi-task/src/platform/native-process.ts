@@ -126,25 +126,40 @@ const PROC_BSDINFO_SIZE = 136
 /** Byte offset of `pbi_start_tvsec` inside struct proc_bsdinfo. */
 const START_TVSEC_OFFSET = 120
 
-/** A start identity that changes when a pid is reused, or null when it cannot be read. */
-export function readProcessStartIdentity(pid: number): string | null {
+/**
+ * When the process started, in a platform unit that orders processes by creation (Linux boot clock ticks, darwin epoch
+ * seconds, Windows FILETIME), or null when it cannot be read.
+ */
+export function readProcessStartTime(pid: number): bigint | null {
   if (!Number.isSafeInteger(pid) || pid <= 0) return null
+  let start: bigint | undefined
   switch (process.platform) {
     case "linux": {
-      const startTicks = linuxStatFields(pid)?.[19]
-      return startTicks === undefined ? null : `linux-proc-start-ticks:${startTicks}`
+      const ticks = linuxStatFields(pid)?.[19]
+      start = ticks !== undefined && /^\d+$/.test(ticks) ? BigInt(ticks) : undefined
+      break
     }
-    case "darwin": {
-      const seconds = darwinPidInfo(pid, PROC_PIDTBSDINFO, PROC_BSDINFO_SIZE)?.getBigUint64(START_TVSEC_OFFSET, true)
-      return seconds === undefined || seconds === 0n ? null : `proc-start-epoch:${seconds}`
-    }
-    case "win32": {
-      const creation = win32ProcessTimes(pid)?.creation
-      return creation === undefined || creation === 0n ? null : `win32-creation-filetime:${creation}`
-    }
-    default:
-      return null
+    case "darwin":
+      start = darwinPidInfo(pid, PROC_PIDTBSDINFO, PROC_BSDINFO_SIZE)?.getBigUint64(START_TVSEC_OFFSET, true)
+      break
+    case "win32":
+      start = win32ProcessTimes(pid)?.creation
+      break
   }
+  return start === undefined || start === 0n ? null : start
+}
+
+const START_IDENTITY_PREFIX: Partial<Record<NodeJS.Platform, string>> = {
+  linux: "linux-proc-start-ticks",
+  darwin: "proc-start-epoch",
+  win32: "win32-creation-filetime",
+}
+
+/** A start identity that changes when a pid is reused, or null when it cannot be read. */
+export function readProcessStartIdentity(pid: number): string | null {
+  const start = readProcessStartTime(pid)
+  const prefix = START_IDENTITY_PREFIX[process.platform]
+  return start === null || prefix === undefined ? null : `${prefix}:${start}`
 }
 
 const PROC_PIDTASKINFO = 4
@@ -219,7 +234,7 @@ const ENTRY_PID_OFFSET = 8
 const ENTRY_PARENT_PID_OFFSET = 32
 
 /** Every live process's parent pid, or null when the process table cannot be read. */
-function parentPids(): Map<number, number> | null {
+export function readParentPids(): Map<number, number> | null {
   const parents = new Map<number, number>()
   switch (process.platform) {
     case "linux": {
@@ -272,33 +287,4 @@ function parentPids(): Map<number, number> | null {
     default:
       return null
   }
-}
-
-/**
- * CPU seconds of the process rooted at `pid` plus every live descendant, or null when the root cannot be read. A
- * launcher that spawns the real engine as its own child (an npm shim, a wrapper script) stays CPU-flat while the
- * engine works, so a progress bound on the launcher alone would call a booting engine stalled (#14820).
- */
-export function readProcessTreeCpuSeconds(pid: number): number | null {
-  const root = readProcessCpuSeconds(pid)
-  if (root === null) return null
-  const parents = parentPids()
-  if (parents === null) return root
-  const children = new Map<number, number[]>()
-  for (const [child, parent] of parents) {
-    if (child === parent) continue
-    const siblings = children.get(parent)
-    if (siblings === undefined) children.set(parent, [child])
-    else siblings.push(child)
-  }
-  let total = root
-  const seen = new Set([pid])
-  const pending = [...(children.get(pid) ?? [])]
-  for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
-    if (seen.has(next)) continue
-    seen.add(next)
-    total += readProcessCpuSeconds(next) ?? 0
-    pending.push(...(children.get(next) ?? []))
-  }
-  return total
 }

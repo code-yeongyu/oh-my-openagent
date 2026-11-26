@@ -6,6 +6,7 @@ import {
   normalizeRendererText,
   stripTerminalControls,
 } from "@oh-my-opencode/senpi-task/renderer-text"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 import type { ThreadToolName, ThreadToolResult } from "../contracts"
 import type { AnyTool } from "./internals"
@@ -32,6 +33,9 @@ const LINK = /^\[((?:\\.|[^\]\\])*)\]\(omo-thread:\/\/v1\/[^)]*\)$/
 const UNNAMED_LINK_LABEL = "thread"
 
 /** Installs the thread family's call and result renderers on one tool definition. */
+/** A line shown to a person: terminal sequences removed, then the shared display escaping (the result itself is untouched). */
+const shownLine = (line: string): string => escapeForDisplay(stripTerminalControls(line))
+
 export function withThreadRenderers(tool: AnyTool): AnyTool {
   const name = tool.name as ThreadToolName
   return { ...tool, renderCall: renderThreadCall(name), renderResult: renderThreadResult(name) }
@@ -39,7 +43,7 @@ export function withThreadRenderers(tool: AnyTool): AnyTool {
 
 export function renderThreadCall(name: ThreadToolName) {
   return (args: unknown, theme: Theme, _context?: unknown): RenderComponent => {
-    const tail = stripTerminalControls(callTail(name, argsOf(args)))
+    const tail = shownLine(callTail(name, argsOf(args)))
     const head = theme.fg("toolTitle", theme.bold(name))
     return new Text(tail.length === 0 ? head : `${head} ${theme.fg("accent", tail)}`, 0, 0)
   }
@@ -57,14 +61,14 @@ export function renderThreadResult(name: ThreadToolName) {
     // Every printed field can come from a peer, a device or the model's own arguments: a row is cleaned whole, so no
     // field that skipped `text()` can carry a terminal escape to the screen.
     const lines = [
-      theme.fg(view.tone, stripTerminalControls(view.headline)),
-      ...view.details.map((line) => theme.fg("muted", `  ${stripTerminalControls(line)}`)),
+      theme.fg(view.tone, shownLine(view.headline)),
+      ...view.details.map((line) => theme.fg("muted", `  ${shownLine(line)}`)),
     ]
     if (options.expanded && result !== undefined)
       lines.push(
         ...JSON.stringify(result, null, 2)
           .split("\n")
-          .map((line) => theme.fg("dim", line)),
+          .map((line) => theme.fg("dim", escapeForDisplay(line))),
       )
     return new Text(lines.join("\n"), 0, 0)
   }
