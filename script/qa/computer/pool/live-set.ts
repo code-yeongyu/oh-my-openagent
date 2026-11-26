@@ -4,8 +4,6 @@
 // while it ran (R-S4-1): a pass under a load above the core count, or under a load that could not be read, is DEGRADED,
 // never a green pass, and a set whose passes are all degraded exits as red as one where nothing ran.
 
-import { availableParallelism, loadavg } from "node:os"
-
 export const MACOS_SCENARIOS = [
   "two-window-typing",
   "chrome-two-window-typing",
@@ -32,20 +30,6 @@ export type ScenarioReceipt = {
   readonly durationMs: number
   readonly hostLoad: number
   readonly outcome: ScenarioOutcome
-}
-
-export type HostReadings = {
-  readonly load: number
-  readonly cores: number
-}
-
-// The runner boundary's reader of the pool host (R-S4-1); the verdicts below take its readings as values, so tests
-// inject them. A reading that is not a finite number is refused rather than recorded.
-export function readHostLoad(): HostReadings {
-  const readings = { load: loadavg()[0] ?? Number.NaN, cores: availableParallelism() }
-  if (!Number.isFinite(readings.load) || !Number.isFinite(readings.cores))
-    throw new Error(`host load is not readable: load=${readings.load} cores=${readings.cores}`)
-  return readings
 }
 
 function oneLine(text: string): string {

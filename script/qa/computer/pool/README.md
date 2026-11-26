@@ -72,9 +72,9 @@ under the ruling's conditions: the guest is started headless with `--no-graphics
 host-input legs (no events into the host session, no GUI app launched in the console session), and the SET line
 records the highest leg load, the core count and the set's p99; a leg run while the host load exceeds the core count
 is reported `DEGRADED`, never `PASS`. Zero host-input legs holds by construction, not by a check: every leg runs on
-the runner inside the guest, and no route targets the host. The host reader is `readHostLoad()` in `live-set.ts`
-(`os.loadavg()[0]` and `os.availableParallelism()`, refusing a non-finite reading); the scenario runner that calls it
-for each leg lands with part 2 of this row.
+the runner inside the guest, and no route targets the host. The verdicts in `live-set.ts` take each leg's load and the
+core count as values; the scenario runner that samples them on the pool host for each leg lands with part 2 of this
+row.
 
 The first setup of a base image is a hands-on step, done once per major by a person at that Mac: sign in,
 then allow Accessibility and Screen Recording for the QA identity. Every later guest is a headless clone.
