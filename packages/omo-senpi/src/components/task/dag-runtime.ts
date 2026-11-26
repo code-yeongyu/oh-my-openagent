@@ -574,7 +574,15 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     )
   }
 
-  const recoverPausedRuns = async (scope: RecoveryScope): Promise<void> => {
+  // A claimed run belongs to no scheduler of this runtime until its installation is adopted, so a
+  // shutdown waits for every sweep still installing before it retires and pauses what it holds.
+  const recoveries = new Set<Promise<void>>()
+  const recoverPausedRuns = (scope: RecoveryScope): Promise<void> => {
+    const sweep = sweepPausedRuns(scope).finally(() => recoveries.delete(sweep))
+    recoveries.add(sweep)
+    return sweep
+  }
+  const sweepPausedRuns = async (scope: RecoveryScope): Promise<void> => {
     let outcomes: readonly DagRecoveryOutcome[]
     try {
       outcomes = await recovery.installPausedRuns(scope.sessionId, adoptInstalled, scope.forkSourceSessionId)
@@ -706,6 +714,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     },
     async pauseForShutdown() {
       cancelLeaseWatches()
+      await Promise.allSettled([...recoveries])
       // #8020: a committed shutdown RETIRES the schedulers instead of cancelling them (that is what
       // `detach` does, and doing it here is what used to destroy a run on every session switch).
       // The frontier loop must have exited before the pause is persisted, otherwise a late admission

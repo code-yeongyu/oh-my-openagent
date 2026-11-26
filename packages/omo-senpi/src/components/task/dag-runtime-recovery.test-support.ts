@@ -1,9 +1,13 @@
 // Shared stand-ins for the DAG runtime recovery tests: a runner whose children settle only when the
 // test says so, and lease-watch timers the test ticks by hand.
+import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { ManagedChildHandle, ManagedRunner, ManagedStartSpec, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import type { DagLeaseWatchTimerHandle, DagLeaseWatchTimers } from "@oh-my-opencode/senpi-task/dag"
 
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
+import type { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { composeTaskEngine, type TaskEngine } from "./engine"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 
 // Above every reachable pid, so it can only ever be "alive" through the injected probe.
 export const FOREIGN_HOST_PID = 2_147_483_647
@@ -14,6 +18,37 @@ function deferred<T>() {
     resolve = done
   })
   return { promise, resolve }
+}
+
+export function dagNode(id: string, dependsOn?: readonly string[]) {
+  return {
+    id,
+    prompt: id,
+    subagent_type: "explore",
+    model: "omo-mock/mock-1",
+    ...(dependsOn === undefined ? {} : { dependsOn }),
+  }
+}
+
+/** A task engine for `sessionId` in `cwd` whose children are the runner's to settle. */
+export function recoveryEngine(
+  cwd: string,
+  sessionId: string,
+  pi: FakeExtensionAPI,
+  runner: ScriptedRunner,
+): TaskEngine {
+  const engine = composeTaskEngine({
+    pi,
+    omoConfig: loadOmoConfig({ cwd }).config,
+    cwd,
+    sharedParentTools: () => [],
+    runnerFactories: { inProcess: () => runner, process: () => runner },
+  })
+  engine.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
+    sessionManager: { getSessionId: () => sessionId },
+  })
+  return engine
 }
 
 export function within<T>(promise: Promise<T>, step: string): Promise<T> {
