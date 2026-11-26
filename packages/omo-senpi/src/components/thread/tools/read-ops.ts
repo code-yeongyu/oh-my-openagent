@@ -1,12 +1,6 @@
 import { toThreadAddressEntries } from "../address-book"
 import { workspaceDirectories, workspaceEntries } from "../addressing"
-import {
-  THREAD_READ_MAX_LIMIT,
-  type ThreadReadInput,
-  type ThreadState,
-  type ThreadToolResult,
-  type ThreadWaitOutcome,
-} from "../contracts"
+import type { ThreadReadInput, ThreadState, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
 import { listDiskSessions } from "../disk-list"
 import { locateControl } from "../control/locate"
 import { createRelayControl, reopenParkedRow } from "../remote/lazy-ops"
@@ -97,30 +91,6 @@ export function listThreads(
   }
 }
 
-/** A listing cut to the rows whose thread value, name, alias or folder contains `query` (ignoring case), then to `limit` rows. */
-export function narrowListing(
-  listed: ThreadToolResult,
-  query: string | undefined,
-  limit: number | undefined,
-): ThreadToolResult {
-  if ((query === undefined && limit === undefined) || listed.kind !== "ok" || !("threads" in listed)) return listed
-  const needle = query?.toLowerCase()
-  const matching =
-    needle === undefined
-      ? listed.threads
-      : listed.threads.filter((row) =>
-          [row.thread, row.name, row.alias, row.cwd].some(
-            (field) => typeof field === "string" && field.toLowerCase().includes(needle),
-          ),
-        )
-  const shown = limit === undefined ? matching : matching.slice(0, limit)
-  return {
-    ...listed,
-    threads: shown,
-    ...(shown.length < matching.length ? { rows_omitted: matching.length - shown.length } : {}),
-  }
-}
-
 /** Names each listed thread's undelivered messages from this device's gateway store (#14428): how many, where, since when. */
 export async function withBacklog(
   store: Pick<ThreadToolSurfaceOptions["store"], "backlogs">,
@@ -172,10 +142,7 @@ function readWindow(value: ThreadReadInput): {
   }
 }
 
-/**
- * `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint
- * here is dead. A `limit` above THREAD_READ_MAX_LIMIT is read as that many, and the answer's `reduced.limit` says so.
- */
+/** `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint here is dead. */
 export async function readThread(
   options: ThreadToolSurfaceOptions,
   current: ThreadHostView,
@@ -183,35 +150,6 @@ export async function readThread(
   callerId: string,
   signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
-  const clamped = value.limit !== undefined && value.limit > THREAD_READ_MAX_LIMIT
-  const result = await readThreadWithin(
-    options,
-    current,
-    clamped ? { ...value, limit: THREAD_READ_MAX_LIMIT } : value,
-    callerId,
-    signal,
-  )
-  if (result.kind !== "ok" || !("items" in result)) return result
-  return {
-    ...result,
-    ...(clamped ? { reduced: { limit: { requested: value.limit as number, used: THREAD_READ_MAX_LIMIT } } } : {}),
-    ...(value.wait_ms === 0 ? { wait: { outcome: "not_waited", status: "wait_ms_zero", waited_ms: 0 } } : {}),
-  }
-}
-
-async function readThreadWithin(
-  options: ThreadToolSurfaceOptions,
-  current: ThreadHostView,
-  value: ThreadReadInput,
-  callerId: string,
-  signal?: AbortSignal,
-): Promise<ThreadToolResult> {
-  if (value.limit !== undefined && value.cursor !== undefined)
-    return failure(
-      "invalid_arguments",
-      "limit sets the window of a first read, and a cursor continues an earlier window. Nothing was done.",
-      `Follow the cursor without limit: tool.thread_read(${JSON.stringify({ thread: value.thread, cursor: value.cursor })}).`,
-    )
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live" && located.row !== undefined && options.remote !== undefined) {

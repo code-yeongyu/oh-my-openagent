@@ -41,7 +41,9 @@ import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
 import { modelWithReasoning } from "./tools/model-match"
-import { listThreads, narrowListing, readThread, withBacklog } from "./tools/read-ops"
+import { narrowListing } from "./tools/list-narrowing"
+import { readThreadWithLimits, receiptLimitRefusal } from "./tools/read-limits"
+import { listThreads, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { threadToolPermission } from "./tools/local-permission"
@@ -195,15 +197,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       typeof value.thread === "string"
     ) {
       // This branch precedes view()/ensureHost and the read tool's own receipt admission.
-      if ("limit" in value && value.limit !== undefined)
-        return output({
-          kind: "error",
-          error: threadToolFailure(
-            "invalid_arguments",
-            "limit sets how many messages a read returns, and delivery_id reads one delivery's receipt, which has no messages. Nothing was done.",
-            `Read the receipt without limit: tool.thread_read(${JSON.stringify({ thread: value.thread, delivery_id: value.delivery_id })}).`,
-          ),
-        })
+      const refused = receiptLimitRefusal({ ...value, thread: value.thread, delivery_id: value.delivery_id })
+      if (refused !== undefined) return output(refused)
       return output(await readReceipt(store, options.remote, callerId, value.thread, value.delivery_id, now()))
     }
     const explicitKey =
@@ -457,7 +452,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_read,
     execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
       execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
-        readThread(options, current, value, callerId, signal),
+        readThreadWithLimits(options, current, value, callerId, signal),
       ),
   }
   const send: AnyTool = {

@@ -12,7 +12,33 @@ import { schemaDifferences } from "./tool-check"
 
 type Params = { readonly properties?: Readonly<Record<string, FieldSchema>>; readonly required?: readonly string[] }
 
-export function freshAhead(entry: BaselineEntry | undefined, base: readonly BaselineEntry[] | undefined) {
+export function freshAheadEntries(
+  head: readonly BaselineEntry[],
+  base: readonly BaselineEntry[] | undefined,
+): ReadonlyMap<string, ToolAhead> {
+  return new Map(
+    head.flatMap((entry) => {
+      const ahead = freshAhead(entry, base)
+      return ahead === undefined ? [] : [[entry.id, ahead] as const]
+    }),
+  )
+}
+
+// An alias scenario is exempt from the base/head comparison only when the base rows lack what it exercises: its alias,
+// or for the field-only scenario, a branch reading the field. A scenario exercising what the base has is compared.
+export function aliasNewOnHead(scenario: Scenario, baseRows: ReadonlyMap<string, Row>): boolean {
+  if (scenario.surface !== "tool") return false
+  const mark = scenario.alias
+  if (mark?.field === undefined || mark.row !== scenario.capability) return false
+  const row = baseRows.get(mark.row)
+  if (row === undefined || !Object.hasOwn(scenario.args, mark.name ?? mark.field)) return false
+  const entries = row.tool.filter((entry) => entry.name === scenario.tool)
+  if (entries.length === 0) return false
+  if (mark.name !== undefined) return !entries.some((entry) => entry.aliases?.[mark.name as string] !== undefined)
+  return !entries.some((entry) => entry.reads.includes(mark.field as string))
+}
+
+function freshAhead(entry: BaselineEntry | undefined, base: readonly BaselineEntry[] | undefined) {
   if (entry?.toolAhead === undefined) return undefined
   const before = base?.find((candidate) => candidate.id === entry.id)
   return before?.toolAhead === undefined ? entry.toolAhead : undefined

@@ -4,14 +4,9 @@ import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
-import {
-  aliasScenarioProblems,
-  descriptorAheadProblems,
-  freshAhead,
-  toolSchemaAheadProblems,
-  withoutAhead,
-} from "./tool-ahead"
-import { schemaDifferences, type DiscoveredTool } from "./tool-check"
+import { judgeUnresolvedRow } from "./row-judgement"
+import { aliasNewOnHead, aliasScenarioProblems, freshAheadEntries } from "./tool-ahead"
+import type { DiscoveredTool } from "./tool-check"
 
 // The changed-capability gate of design 7.4 (amendments 2 and 3). A demonstrated change fails it: a descriptor or tool-schema
 // change, or a base-versus-head outcome difference, under an unresolved entry, and a security-gated entry cleared without
@@ -61,32 +56,6 @@ export type GateReport = {
 const UNCHANGED_LINE = /^SDK-Parity-Unchanged:\s*yes\s*$/im
 const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
 
-// Design 7.4 (amendment 5): a row has two parts. Its DESCRIPTOR is what a surface accepts or calls: the sdk member, each
-// cli entry, each tool binding, which input fields exist and which are required, plus its kind, today
-// value, surfaces, projection and modules. Any change there under an unresolved entry fails. Everything else (a named
-// field's type, enum, nested schema, scenario ids, notes) is CONTRACT ANNOTATION: its change alone makes a candidate.
-function descriptorOf(row: Row): string {
-  const shape = [
-    ...Object.keys(row.input.properties).map((name) => `field ${name}`),
-    ...row.input.required.map((name) => `required ${name}`),
-  ]
-  const { id, kind, sdk, today, slices, cli, tool, planned, omitted, projection, modules } = row
-  return JSON.stringify({
-    id,
-    kind,
-    sdk,
-    today,
-    slices,
-    cli,
-    tool,
-    planned,
-    omitted,
-    projection,
-    modules,
-    shape: [...new Set(shape)].toSorted(),
-  })
-}
-
 // Design 7.4 (amendment 3): the candidates' digest binds the head and the sorted ids, so a verdict from another head or
 // over another list cannot carry it. The reviewer copies it into `SDK-Parity-Reviewed: <digest>`; nobody types the ids.
 export function candidateDigest(head: string, ids: readonly string[]): string {
@@ -95,33 +64,6 @@ export function candidateDigest(head: string, ids: readonly string[]): string {
 
 export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
-
-// An alias scenario is exempt from the base/head comparison only when the base rows lack what it exercises: its alias,
-// or for the field-only scenario, a branch reading the field. A scenario exercising what the base has is compared.
-function aliasNewOnHead(scenario: Scenario & { surface: "tool" }, baseRows: ReadonlyMap<string, Row>): boolean {
-  const mark = scenario.alias
-  if (mark?.field === undefined || mark.row !== scenario.capability) return false
-  const row = baseRows.get(mark.row)
-  const has = (key: string) => Object.hasOwn(scenario.args, key)
-  if (row === undefined || !has(mark.name ?? mark.field)) return false
-  const entries = row.tool.filter((entry) => entry.name === scenario.tool)
-  if (entries.length === 0) return false
-  if (mark.name !== undefined) return !entries.some((entry) => entry.aliases?.[mark.name as string] !== undefined)
-  return !entries.some((entry) => entry.reads.includes(mark.field as string))
-}
-
-// A row answers for the fields its tool branch reads or is chosen by; a tool field no branch reads is toolProblems' to
-// refuse, so another branch's new field does not change this row.
-function branchSchema(
-  parameters: DiscoveredTool["parameters"],
-  fields: ReadonlySet<string>,
-): DiscoveredTool["parameters"] {
-  return {
-    ...parameters,
-    properties: Object.fromEntries(Object.entries(parameters.properties ?? {}).filter(([name]) => fields.has(name))),
-    required: (parameters.required ?? []).filter((name) => fields.has(name)),
-  }
-}
 
 export function gateReport(input: GateInput): GateReport {
   const baseRowsText = new Set((input.presentation.base ?? []).map((row) => JSON.stringify(row)))
@@ -134,48 +76,15 @@ export function gateReport(input: GateInput): GateReport {
   const presentation: string[] = []
   const presentationRows: string[] = []
   const versionMasked: string[] = []
-  const aheadOf = new Map(
-    input.head.unresolved.flatMap((entry) => {
-      const ahead = freshAhead(entry, input.base.unresolved)
-      return ahead === undefined ? [] : [[entry.id, ahead] as const]
-    }),
-  )
+  const aheadOf = freshAheadEntries(input.head.unresolved, input.base.unresolved)
   const toolAhead: string[] = []
+  const tools = { base: input.base.tools, head: input.head.tools }
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
-    const before = baseRows.get(row.id)
-    const ahead = aheadOf.get(row.id)
-    const admitted =
-      ahead !== undefined &&
-      before !== undefined &&
-      descriptorAheadProblems(before, row, ahead).length === 0 &&
-      descriptorOf(withoutAhead(before, ahead)) === descriptorOf(withoutAhead(row, ahead))
-    if (admitted && descriptorOf(before) !== descriptorOf(row)) toolAhead.push(row.id)
-    if (!initialization && !admitted && (before === undefined || descriptorOf(before) !== descriptorOf(row))) {
-      failures.push(
-        `${row.id}: its descriptor changed under an unresolved gap; add the SDK call ${row.sdk} and its scenarios in this pull request`,
-      )
-      flagged.add(row.id)
-    }
-    for (const entry of row.tool) {
-      const branchFields = new Set([...entry.reads, ...entry.when.present, ...entry.when.absent])
-      const [a, b] = [input.base.tools, input.head.tools].map((tools) => {
-        const parameters = tools.find((tool) => tool.name === entry.name)?.parameters
-        return parameters === undefined ? undefined : branchSchema(parameters, branchFields)
-      })
-      const moved = a !== undefined && b !== undefined ? schemaDifferences(a, b, entry.name) : []
-      const beyond =
-        ahead !== undefined && a !== undefined && b !== undefined
-          ? toolSchemaAheadProblems(a, b, ahead, entry.name)
-          : moved
-      if (moved.length > 0 && beyond.length === 0 && !toolAhead.includes(row.id)) toolAhead.push(row.id)
-      if (moved.length > 0 && beyond.length > 0) {
-        failures.push(
-          `${row.id}: tool ${entry.name} changed its input schema under an unresolved gap (${beyond[0]}); add the SDK call ${row.sdk}`,
-        )
-        flagged.add(row.id)
-      }
-    }
+    const judged = judgeUnresolvedRow(row, baseRows.get(row.id), aheadOf.get(row.id), tools, initialization)
+    failures.push(...judged.failures)
+    if (judged.failures.length > 0) flagged.add(row.id)
+    if (judged.ahead) toolAhead.push(row.id)
   }
   for (const scenario of input.scenarios) {
     const [before, after] = [input.base.outcomes[scenario.id], input.head.outcomes[scenario.id]]
@@ -195,12 +104,7 @@ export function gateReport(input: GateInput): GateReport {
       versionMasked.push(`${scenario.id}#version-mask`)
       continue
     }
-    if (
-      scenario.surface === "tool" &&
-      aliasNewOnHead(scenario, baseRows) &&
-      aheadOf.get(scenario.capability)?.aliases === true
-    )
-      continue
+    if (aliasNewOnHead(scenario, baseRows) && aheadOf.get(scenario.capability)?.aliases === true) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
       const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
