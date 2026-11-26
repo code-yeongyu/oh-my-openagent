@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { tmpdir } from "node:os"
-import type { Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import type { Credentials } from "@oh-my-opencode/account-core"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 
 // Public API contract of the shipped omo SDK (OMO_SDK_ROOT, first-party design 4.1): P1b extends createOmoSdk into the

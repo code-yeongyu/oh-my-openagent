@@ -12,7 +12,6 @@
         "src/cli/index.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
-        "src/cli/service-auth/test-support.ts",
         "src/features/team-mode/team-tasklist/test-support.ts",
         "src/hooks/runtime-fallback/test-timeout-clock.test-support.ts",
         "src/tools/skill/zauc-mocks-skill-tools/test-support.ts",
@@ -139,16 +138,12 @@
         "src/cli/install-codex/toml-section-editor.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/types.ts",
-        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
-        "src/cli/service-auth/account-home.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/cli-keystore.fixture.ts",
         // a --preload fixture: closed-device-login.test.ts runs it in a launcher child, nothing imports it (#12639)
         "src/cli/service-auth/closed-device-login.fixture.ts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "src/cli/service-auth/refresh-child.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/features/claude-code-agent-loader/agent-definitions-loader.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -349,7 +344,7 @@
         "src/tools/hashline-edit/hashline-edit-diff.ts",
       ],
       // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
-      "ignoreBinaries": ["dbus-run-session", "gdbus", "nonexistent-binary-that-does-not-exist-12345", "sips"],
+      "ignoreBinaries": ["gdbus", "nonexistent-binary-that-does-not-exist-12345", "sips"],
       "ignoreIssues": {
         // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
         "src/cli/doctor/checks/dependencies.ts": ["unlisted"],
@@ -415,8 +410,6 @@
     "packages/omo-opencode/src/cli/run/index.ts": ["resolveRunAgent", "resolveRunModel", "createServerConnection", "resolveSession", "createJsonOutputManager", "executeOnCompleteHook", "createEventState", "processEvents", "serializeError"],
     // pre-existing at origin dev 4686e425b5: unused export(s) UnknownRunAgentError
     "packages/omo-opencode/src/cli/run/runnable-agent-resolver.ts": ["UnknownRunAgentError"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
-    "packages/omo-opencode/src/cli/service-auth/protocol.ts": ["platformSchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) expandHome
     "packages/omo-opencode/src/cli/worktree-sweep/classify.ts": ["expandHome"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runGit

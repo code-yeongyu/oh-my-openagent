@@ -1,19 +1,12 @@
 import { z } from "zod"
-import { DeviceSignInRefused, loginDevice } from "../omo-opencode/src/cli/service-auth/device-flow"
-import { deviceName, devicePlatform } from "../omo-opencode/src/cli/service-auth/device-name"
-import {
-  CredentialStoreError,
-  KeychainLockedError,
-  type CredentialStore,
-} from "../omo-opencode/src/cli/service-auth/keystore"
-import { AccountsUnreachable, beginLogin } from "../omo-opencode/src/cli/service-auth/login-prelude"
-import {
-  MachineAlreadySignedIn,
-  MachineCredentialUnreadable,
-} from "../omo-opencode/src/cli/service-auth/machine-device"
-import { advertisesMachineIdentity, readMachineDigest } from "../omo-opencode/src/cli/service-auth/machine-digest"
-import { ApiRefusal, type ListedDevice, RequestFailure } from "../omo-opencode/src/cli/service-auth/protocol"
-import type { DeviceServiceHandoff, Session } from "../omo-opencode/src/cli/service-auth/session"
+import { DeviceSignInRefused, loginDevice } from "../account-core/src/device-flow"
+import { deviceName, devicePlatform } from "../account-core/src/device-name"
+import { CredentialStoreError, KeychainLockedError, type CredentialStore } from "../account-core/src/keystore"
+import { AccountsUnreachable, beginLogin } from "../account-core/src/login-prelude"
+import { MachineAlreadySignedIn, MachineCredentialUnreadable } from "../account-core/src/machine-device"
+import { advertisesMachineIdentity, readMachineDigest } from "../account-core/src/machine-digest"
+import { ApiRefusal, type ListedDevice, RequestFailure } from "../account-core/src/protocol"
+import type { DeviceServiceHandoff, Session } from "../account-core/src/session"
 import { ACCOUNT_EXIT } from "./account-show"
 
 // `omo account sign-in`: the device-code sign-in as a machine interface for programs that drive it (the omo SDK, and an

@@ -10,7 +10,7 @@ import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
-import { offenderGrowth } from "../remote-import-guard-adapter"
+import { ACCOUNT_CORE_MOVES, moveListProblems, moveTrees, offenderBaseGrowth } from "../remote-import-guard-moves"
 import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
 import { loadScenarioRuns, PORT_CONTEXT, runEffectScenarios } from "./conformance-run"
@@ -29,6 +29,18 @@ const arg = (flag: string): string | undefined => {
 }
 const git = (...args: string[]): string =>
   execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 256 << 20 })
+const gitReader = (args: readonly string[]): string | undefined => {
+  try {
+    return execFileSync("git", args, {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 256 << 20,
+    })
+  } catch {
+    return undefined
+  }
+}
 const show = (ref: string, path: string): string | undefined => {
   try {
     return execFileSync("git", ["show", `${ref}:${path}`], {
@@ -159,7 +171,13 @@ try {
   const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
   const baseFailures = [
     ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, PORT_CONTEXT),
-    ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
+    ...offenderBaseGrowth(
+      recorded === undefined ? undefined : JSON.parse(recorded),
+      ADAPTER_OFFENDERS,
+      moveTrees(gitReader, mergeBase, REPO_ROOT),
+    ),
+    // Required here, never skipped: this job has full history, so an absent move commit fails instead of passing silently.
+    ...moveListProblems(ACCOUNT_CORE_MOVES, gitReader),
   ]
   const baselineFailures = baselineProblems({
     rows,

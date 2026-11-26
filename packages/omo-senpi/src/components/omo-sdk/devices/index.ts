@@ -1,4 +1,4 @@
-import { ApiRefusal, type LiveDevice, listLiveDevices, renameDevice } from "@oh-my-opencode/omo-opencode/service-auth"
+import { ApiRefusal, type LiveDevice, listLiveDevices, renameDevice } from "@oh-my-opencode/account-core"
 import type { AccountAccess } from "../access"
 import type { OmoResult } from "../result"
 

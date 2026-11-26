@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { keychainProcessState } from "../../omo-opencode/src/cli/service-auth/keychain-helper/process-state"
+import { keychainProcessState } from "../../account-core/src/keychain-helper/process-state"
 import { compiledKeychainHelper, runCompiledLauncher } from "../compile-entry"
 
 const execDir = mkdtempSync(join(tmpdir(), "compiled-exec-"))

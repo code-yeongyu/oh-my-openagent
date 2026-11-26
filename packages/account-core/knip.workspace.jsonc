@@ -1,0 +1,30 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/account-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/test-support.ts",
+      ],
+      // secret-service-lock.test.ts runs dbus-run-session (moved from omo-opencode with the test; pre-existing there)
+      "ignoreBinaries": ["dbus-run-session"],
+      "ignoreFiles": [
+        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
+        "src/account-home.fixture.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/refresh-child.fixture.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
+    "packages/account-core/src/protocol.ts": ["platformSchema"],
+  },
+}

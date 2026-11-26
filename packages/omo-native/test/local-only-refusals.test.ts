@@ -10,17 +10,11 @@ import { deviceServiceEndpointPath } from "../../device-service-core/src/device-
 import { LocalOnlyNetworkRefused, markLocalOnlyProcess } from "../../device-service-core/src/local-only.ts"
 import { acquireDeviceService } from "../../device-service-core/src/release/acquire.ts"
 import { ENGINE_VERSION, PIN_VERSION, RELEASE_ORIGIN } from "../../device-service-core/test/release-fixture.ts"
-import type { CredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
-import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
-import { requestApi } from "../../omo-opencode/src/cli/service-auth/protocol-request"
-import { createSession } from "../../omo-opencode/src/cli/service-auth/session"
-import {
-  fakeApi,
-  grant,
-  noOwnDevice,
-  privateKeys,
-  temporaryHome,
-} from "../../omo-opencode/src/cli/service-auth/test-support"
+import type { CredentialStore } from "../../account-core/src/keystore"
+import type { Credentials } from "../../account-core/src/protocol"
+import { requestApi } from "../../account-core/src/protocol-request"
+import { createSession } from "../../account-core/src/session"
+import { fakeApi, grant, noOwnDevice, privateKeys, temporaryHome } from "../../account-core/src/test-support"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
 
 const dirs: string[] = []

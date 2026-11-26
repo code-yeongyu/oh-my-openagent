@@ -6,6 +6,22 @@ import { dirname, join, relative, sep } from "node:path"
 // node builtins) answers undefined: the guard only reasons about files in this repository.
 export type Resolver = (fromFile: string, specifier: string) => string | undefined
 
+/** The file reads the resolver makes, by absolute path: the disk by default, a git tree for a revision's resolution. */
+export type ResolverFiles = {
+  readonly isFile: (path: string) => boolean
+  readonly readText: (path: string) => string
+  readonly directories: (path: string) => readonly string[]
+}
+
+const DISK: ResolverFiles = {
+  isFile: (path) => existsSync(path) && statSync(path).isFile(),
+  readText: (path) => readFileSync(path, "utf8"),
+  directories: (path) =>
+    readdirSync(path, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name),
+}
+
 type PackageManifest = {
   readonly dir: string
   readonly name: string | undefined
@@ -23,9 +39,8 @@ const CONDITIONS = ["bun", "import", "default", "require", "types"]
 
 const toPosix = (path: string): string => path.split(sep).join("/")
 
-const isFile = (path: string): boolean => existsSync(path) && statSync(path).isFile()
-
-function probe(base: string): string | undefined {
+function probe(files: ResolverFiles, base: string): string | undefined {
+  const isFile = files.isFile
   if (isFile(base)) return base
   for (const extension of SOURCE_EXTENSIONS) if (isFile(base + extension)) return base + extension
   for (const [js, tsExtensions] of Object.entries(JS_TO_TS)) {
@@ -70,10 +85,10 @@ function mapTarget(map: unknown, key: string): string | undefined {
   return undefined
 }
 
-function readManifest(dir: string): PackageManifest | undefined {
+function readManifest(files: ResolverFiles, dir: string): PackageManifest | undefined {
   const path = join(dir, "package.json")
-  if (!isFile(path)) return undefined
-  const json = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
+  if (!files.isFile(path)) return undefined
+  const json = JSON.parse(files.readText(path)) as Record<string, unknown>
   return {
     dir,
     name: typeof json.name === "string" ? json.name : undefined,
@@ -82,18 +97,17 @@ function readManifest(dir: string): PackageManifest | undefined {
   }
 }
 
-export function createResolver(repoRoot: string): Resolver {
+export function createResolver(repoRoot: string, files: ResolverFiles = DISK): Resolver {
   const packagesRoot = join(repoRoot, "packages")
   const workspace = new Map<string, PackageManifest>()
-  for (const entry of readdirSync(packagesRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue
-    const manifest = readManifest(join(packagesRoot, entry.name))
+  for (const name of files.directories(packagesRoot)) {
+    const manifest = readManifest(files, join(packagesRoot, name))
     if (manifest?.name !== undefined) workspace.set(manifest.name, manifest)
   }
   const nearest = new Map<string, PackageManifest | undefined>()
   const nearestManifest = (dir: string): PackageManifest | undefined => {
     if (nearest.has(dir)) return nearest.get(dir)
-    const own = readManifest(dir)
+    const own = readManifest(files, dir)
     const parent = dirname(dir)
     const found = own ?? (dir === repoRoot || parent === dir ? undefined : nearestManifest(parent))
     nearest.set(dir, found)
@@ -105,12 +119,14 @@ export function createResolver(repoRoot: string): Resolver {
   return (fromFile, specifier) => {
     const fromDir = dirname(join(repoRoot, fromFile))
     if (specifier.startsWith("./") || specifier.startsWith("../") || specifier === "." || specifier === "..") {
-      return inRepo(probe(join(fromDir, specifier)))
+      return inRepo(probe(files, join(fromDir, specifier)))
     }
     if (specifier.startsWith("#")) {
       const manifest = nearestManifest(fromDir)
       const target = manifest === undefined ? undefined : mapTarget(manifest.imports, specifier)
-      return manifest === undefined || target === undefined ? undefined : inRepo(probe(join(manifest.dir, target)))
+      return manifest === undefined || target === undefined
+        ? undefined
+        : inRepo(probe(files, join(manifest.dir, target)))
     }
     const parts = specifier.split("/")
     const nameLength = specifier.startsWith("@") ? 2 : 1
@@ -118,6 +134,6 @@ export function createResolver(repoRoot: string): Resolver {
     if (manifest === undefined) return undefined
     const subpath = parts.length > nameLength ? `./${parts.slice(nameLength).join("/")}` : "."
     const target = mapTarget(manifest.exports, subpath)
-    return inRepo(probe(join(manifest.dir, target ?? subpath)))
+    return inRepo(probe(files, join(manifest.dir, target ?? subpath)))
   }
 }

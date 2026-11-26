@@ -1,6 +1,6 @@
 import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { z } from "zod"
-import { accountHome, credentialLockPaths, withCredentialLock } from "@oh-my-opencode/omo-opencode/service-auth"
+import { accountHome, credentialLockPaths, withCredentialLock } from "@oh-my-opencode/account-core"
 import type { DesktopSyncDescriptor } from "@oh-my-opencode/memory-core/sync-engine"
 import { DesktopSyncRefused } from "./desktopSyncProtocol"
 

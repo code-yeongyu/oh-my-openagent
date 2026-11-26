@@ -1,3 +1,4 @@
+import { ACCOUNT_CORE } from "./remote-import-guard-account-rules"
 import type { AdapterRules } from "./remote-import-guard-adapter"
 import type { GuardRules } from "./remote-import-guard-check"
 import adapterOffenders from "./remote-import-guard-adapter-offenders.json"
@@ -97,6 +98,7 @@ export const ADAPTER_RULES: AdapterRules = {
     BUNSHIN_TS_RELAY,
     `${OPENCODE_CLI}service-auth/`,
     `${OPENCODE_CLI}account-keys/`,
+    ACCOUNT_CORE,
     `${NATIVE}device-service-handoff.ts`,
   ],
   forbiddenBuiltins: ["net", "tls", "http", "https", "http2", "dgram", "ws"],

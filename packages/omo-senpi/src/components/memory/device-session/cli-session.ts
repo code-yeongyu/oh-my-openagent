@@ -13,7 +13,7 @@ import {
   quietNotice,
   retireSyncPinOnDiscard,
   type Session,
-} from "@oh-my-opencode/omo-opencode/service-auth"
+} from "@oh-my-opencode/account-core"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import type { HeldCredentialRelay } from "./account-source"
 

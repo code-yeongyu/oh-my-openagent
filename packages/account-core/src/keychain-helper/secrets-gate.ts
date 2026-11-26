@@ -3,7 +3,7 @@
 // interaction off would see -25308 and report "locked". So calls run one at a time, each to completion, and a silent
 // call turns interaction off only for its own duration.
 
-import { loadBunFfi } from "../../../shared/bun-ffi-shim"
+import { loadBunFfi } from "@oh-my-opencode/utils/bun-ffi"
 import { keychainProcessState } from "./process-state"
 
 type InteractionSwitch = (allowed: boolean) => void

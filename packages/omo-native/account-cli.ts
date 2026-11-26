@@ -5,16 +5,16 @@ import {
   type CredentialStore,
   INTERACTIVE_READ_WAIT,
   InvalidCredentialState,
-} from "../omo-opencode/src/cli/service-auth/keystore"
-import { type Credentials, credentialSchema, serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
-import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
+} from "../account-core/src/keystore"
+import { type Credentials, credentialSchema, serviceOrigin } from "../account-core/src/protocol"
+import { registerHelperCandidates } from "../account-core/src/keychain-helper/darwin-backend"
 import {
   type BeforeKeysDiscarded,
   createSession,
   type DeviceServiceHandoff,
   type Session,
-} from "../omo-opencode/src/cli/service-auth/session"
-import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
+} from "../account-core/src/session"
+import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
 import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"

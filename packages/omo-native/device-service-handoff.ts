@@ -10,8 +10,8 @@ import {
 import { connectOrNotRunning } from "../device-service-core/src/hand-device-keys.ts"
 import { refuseIfLocalOnly } from "../device-service-core/src/local-only.ts"
 import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
-import type { Credentials } from "../omo-opencode/src/cli/service-auth/protocol"
-import type { DeviceServiceHandoff } from "../omo-opencode/src/cli/service-auth/session"
+import type { Credentials } from "../account-core/src/protocol"
+import type { DeviceServiceHandoff } from "../account-core/src/session"
 import packageJson from "./package.json" with { type: "json" }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null

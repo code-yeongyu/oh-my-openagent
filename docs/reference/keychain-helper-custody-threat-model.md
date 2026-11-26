@@ -4,7 +4,7 @@ This is the security design that has to pass review before any change to where o
 
 The trigger is #13757. In a GUI session, `omo logout` failed with "Cannot access macOS Keychain. Unlock or enable the OS credential store" after a successful `omo login`, and the keychain was unlocked. A separate change names that refusal correctly; it doesn't change custody and is out of scope here.
 
-Paths are relative to the repository root. `KH` stands for `packages/omo-opencode/src/cli/service-auth/keychain-helper` and `NKH` for `packages/omo-native/keychain-helper`.
+Paths are relative to the repository root. `KH` stands for `packages/account-core/src/keychain-helper` and `NKH` for `packages/omo-native/keychain-helper`.
 
 ## 1. Current custody
 

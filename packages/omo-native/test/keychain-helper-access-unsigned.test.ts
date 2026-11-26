@@ -2,10 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { buildKeychainHelper } from "../../../../../omo-native/keychain-helper/build"
-import { resolveHelperAccess } from "./access"
-import type { HelperSpawner } from "./client"
-import { bundleCandidates, machineCandidates } from "./location"
+import { buildKeychainHelper } from "../keychain-helper/build"
+import { resolveHelperAccess } from "../../account-core/src/keychain-helper/access"
+import type { HelperSpawner } from "../../account-core/src/keychain-helper/client"
+import { bundleCandidates, machineCandidates } from "../../account-core/src/keychain-helper/location"
 
 // The gate for unsigned development copies (#11580 builds one for its parity leg and the dev omob builder): every such
 // copy, wherever it sits, fails the real designated-requirement check and is never spawned.

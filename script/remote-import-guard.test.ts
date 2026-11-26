@@ -67,6 +67,18 @@ describe("adapter import family A (#14943 design 7.5)", () => {
     expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
   })
 
+  test("#given a layer whose code moved #then a base row naming it also admits the new layer, and nothing else does", () => {
+    const base = { "a.ts": { uses: ["old/", "L1"] } }
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "L1"] } }, { "old/": "new/" })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "old/"] } }, { "old/": "new/" })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "L2"] } }, { "old/": "new/" })).toEqual([
+      "a.ts gained L2, which the merge base's record does not list; route it through the SDK",
+    ])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/"] } })).toEqual([
+      "a.ts gained new/, which the merge base's record does not list; route it through the SDK",
+    ])
+  })
+
   test("#given a record that drops a reach #then it passes; one that adds a file or a layer #then each is named", () => {
     const base = { "a.ts": { uses: ["L1", "L2"] }, "b.ts": { uses: ["L1"] } }
     expect(offenderGrowth(base, { "a.ts": { uses: ["L1"] } })).toEqual([])

@@ -1,7 +1,7 @@
 import type { Command } from "commander"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
-import { initializeDeviceKeyring, loadDeviceKeyring } from "./keyring"
-import { createOsKeyStore, type KeyStore } from "./keystore"
+import { initializeDeviceKeyring, loadDeviceKeyring } from "@oh-my-opencode/account-core/keyring/keyring"
+import { createOsKeyStore, type KeyStore } from "@oh-my-opencode/account-core/keyring/keystore"
 
 export const ACCOUNT_KEYS_RECORD_NAME = "device-keys-v1"
 

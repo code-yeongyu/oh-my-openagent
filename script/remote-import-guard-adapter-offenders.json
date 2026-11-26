@@ -2,9 +2,9 @@
   "packages/omo-native/account-cli.ts": {
     "uses": [
       "node:net",
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
-      "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
       "packages/omo-senpi/src/components/thread/control/",
       "packages/omo-senpi/src/components/thread/gateway/",
@@ -15,37 +15,38 @@
   },
   "packages/omo-native/account-devices.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/service-auth/",
+      "packages/account-core/src/",
       "packages/thread-address-core/"
     ],
     "removedBy": "#14943 A1b (account verbs onto the SDK)"
   },
   "packages/omo-native/account-session-outcome.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A1b (account verbs onto the SDK)"
   },
   "packages/omo-native/account-show.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A1b (account verbs onto the SDK)"
   },
   "packages/omo-native/account-sign-in.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A1b (account verbs onto the SDK)"
   },
   "packages/omo-native/account-store.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A1b (account verbs onto the SDK)"
   },
   "packages/omo-native/compile-args.ts": {
     "uses": [
+      "packages/account-core/src/",
       "packages/omo-opencode/src/cli/service-auth/"
     ],
     "removedBy": "#14943 C1a, C1c and E1c (launcher verbs onto the SDK)"
@@ -54,6 +55,7 @@
     "uses": [
       "node:net",
       "node:tls",
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
@@ -68,6 +70,7 @@
   "packages/omo-native/launcher-commands.ts": {
     "uses": [
       "node:net",
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
@@ -107,8 +110,8 @@
   "packages/omo-native/remote-cli.ts": {
     "uses": [
       "node:net",
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
-      "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
       "packages/omo-senpi/src/components/thread/control/",
       "packages/omo-senpi/src/components/thread/gateway/",
@@ -125,9 +128,9 @@
   "packages/omo-native/remote-entry.ts": {
     "uses": [
       "node:net",
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
-      "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
       "packages/omo-senpi/src/components/thread/control/",
       "packages/omo-senpi/src/components/thread/gateway/",
@@ -137,8 +140,8 @@
   },
   "packages/omo-native/remote-local.ts": {
     "uses": [
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
-      "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
       "packages/omo-senpi/src/components/thread/control/",
       "packages/omo-senpi/src/components/thread/gateway/",
@@ -158,6 +161,7 @@
   "packages/omo-native/service-auth-command.ts": {
     "uses": [
       "node:net",
+      "packages/account-core/src/",
       "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
@@ -171,13 +175,13 @@
   "packages/omo-native/sync-cli.ts": {
     "uses": [
       "node:net",
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A2b (sync verbs onto the SDK)"
   },
   "packages/omo-native/sync-context.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A2b (sync verbs onto the SDK)"
   },
@@ -190,13 +194,13 @@
   "packages/omo-native/sync-recover-cli.ts": {
     "uses": [
       "node:net",
-      "packages/omo-opencode/src/cli/service-auth/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 A2b (sync verbs onto the SDK)"
   },
   "packages/omo-opencode/src/cli/account-keys/commands.ts": {
     "uses": [
-      "packages/omo-opencode/src/cli/account-keys/"
+      "packages/account-core/src/"
     ],
     "removedBy": "#14943 OC1a and OC1c (OpenCode-edition verbs onto the SDK)"
   },
@@ -204,6 +208,7 @@
     "uses": [
       "node:http",
       "node:net",
+      "packages/account-core/src/",
       "packages/omo-opencode/src/cli/account-keys/",
       "packages/omo-opencode/src/cli/service-auth/"
     ],
@@ -224,6 +229,7 @@
   },
   "packages/omo-opencode/src/cli/service-auth/commands.ts": {
     "uses": [
+      "packages/account-core/src/",
       "packages/omo-opencode/src/cli/service-auth/"
     ],
     "removedBy": "#14943 OC1a and OC1c (OpenCode-edition verbs onto the SDK)"

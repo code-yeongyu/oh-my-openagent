@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises"
 
-import { loadBunFfi } from "../../../shared/bun-ffi-shim"
-import { spawn } from "../../../shared/bun-spawn-shim"
+import { loadBunFfi } from "@oh-my-opencode/utils/bun-ffi"
+import { spawn } from "@oh-my-opencode/utils/runtime"
 
 export const KEYCHAIN_HELPER_REQUIREMENT =
   'identifier "com.mengmota.omo-keychain-helper" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] ' +

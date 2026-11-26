@@ -20,7 +20,7 @@ import {
   PEER,
   SESSION_ID,
 } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
+import { createCredentialStore } from "../../account-core/src/keystore"
 import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"

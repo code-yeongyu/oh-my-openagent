@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { ACCOUNT_CORE_MOVES, movedLayerRenames } from "../remote-import-guard-moves"
 import { type GitPort, offenderBaseProblems, probeBase, registryBaseProblems } from "./base-probe"
 import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
@@ -22,9 +23,10 @@ const head = {
 
 // A checkout that has the base: merge-base answers it, its tree exists, and show answers the base's files.
 const readable =
-  (files: Readonly<Record<string, string>>): GitPort =>
+  (files: Readonly<Record<string, string>>, listed: readonly string[] = []): GitPort =>
   (args) => {
     if (args[0] === "merge-base") return "b".repeat(40) + "\n"
+    if (args[0] === "ls-tree") return args.includes("HEAD") ? listed.join("\n") : ""
     if (args[0] === "cat-file") return ""
     const path = String(args[1]).split(":")[1] ?? ""
     if (files[path] === undefined) throw new Error(`fatal: path '${path}' does not exist`)
@@ -80,6 +82,22 @@ describe("the merge-base probe and the checks it gates", () => {
     )
     expect(check).toEqual({
       problems: ["a.ts gained L2, which the merge base's record does not list; route it through the SDK"],
+    })
+  })
+
+  test("#given a base row naming a layer a moved file left #then the moved-to layer is admitted only while it holds nothing but moved files", () => {
+    const [movedFrom, movedTo] = Object.entries(movedLayerRenames(ACCOUNT_CORE_MOVES))[0] ?? ["", ""]
+    const record = {
+      "script/remote-import-guard-adapter-offenders.json": JSON.stringify({ "a.ts": { uses: [movedFrom] } }),
+    }
+    const extra = `${movedTo}extra.ts`
+    expect(offenderBaseProblems(readable(record), { "a.ts": { uses: [movedTo] } }, "origin/dev")).toEqual({
+      problems: [],
+    })
+    expect(offenderBaseProblems(readable(record, [extra]), { "a.ts": { uses: [movedTo] } }, "origin/dev")).toEqual({
+      problems: [
+        `${extra} is new in ${movedTo} and is not one of the files moved by ${ACCOUNT_CORE_MOVES.commit.slice(0, 10)}`,
+      ],
     })
   })
 })

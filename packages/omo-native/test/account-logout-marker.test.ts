@@ -3,10 +3,10 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { credentialId, type CredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
-import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
-import { createSession } from "../../omo-opencode/src/cli/service-auth/session"
-import { signedOutMarkerPath } from "../../omo-opencode/src/cli/service-auth/signed-out-marker"
+import { credentialId, type CredentialStore } from "../../account-core/src/keystore"
+import type { Credentials } from "../../account-core/src/protocol"
+import { createSession } from "../../account-core/src/session"
+import { signedOutMarkerPath } from "../../account-core/src/signed-out-marker"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 const homes: string[] = []

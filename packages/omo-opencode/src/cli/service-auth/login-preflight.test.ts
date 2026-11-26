@@ -1,6 +1,6 @@
 import { expect, onTestFinished, test } from "bun:test"
 import { join, resolve } from "node:path"
-import { fakeApi, minted, temporaryHome } from "./test-support"
+import { fakeApi, minted, temporaryHome } from "@oh-my-opencode/account-core/test-support"
 
 const launcher = join(resolve(import.meta.dir, "../../../../.."), "packages", "omo-native", "bin", "omo.js")
 

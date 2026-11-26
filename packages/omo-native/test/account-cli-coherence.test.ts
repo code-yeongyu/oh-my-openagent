@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import type { CredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
-import { grant, privateKeys, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
+import type { CredentialStore } from "../../account-core/src/keystore"
+import { grant, privateKeys, temporaryHome } from "../../account-core/src/test-support"
 import { runAccountVerb } from "../account-cli"
 
 test("account token never labels a captured token with a later credential read", async () => {

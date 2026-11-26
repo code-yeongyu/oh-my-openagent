@@ -5,9 +5,9 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { Command } from "commander"
 import { createMcpOAuthCommand } from "../mcp-oauth"
-import { signInHint, signInRoute } from "./accounts-gate"
+import { signInHint, signInRoute } from "@oh-my-opencode/account-core/accounts-gate"
 import { CLOSED_LOGIN_MESSAGE, configureServiceAuthCommands } from "./commands"
-import { fakeApi, temporaryHome } from "./test-support"
+import { fakeApi, temporaryHome } from "@oh-my-opencode/account-core/test-support"
 import { buildServiceAuth } from "../../../../../script/build-service-auth"
 
 const root = resolve(import.meta.dir, "../../../../..")

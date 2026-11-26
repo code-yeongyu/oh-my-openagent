@@ -25,6 +25,10 @@
       "types": "./runtime.d.ts",
       "import": "./src/runtime/index.ts"
     },
+    "./bun-ffi": {
+      "types": "./src/bun-ffi.ts",
+      "import": "./src/bun-ffi.ts"
+    },
     "./xdg-data-dir": {
       "types": "./src/xdg-data-dir.ts",
       "import": "./src/xdg-data-dir.ts"

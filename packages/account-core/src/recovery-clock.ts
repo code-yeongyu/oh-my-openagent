@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises"
-import { loadBunFfi } from "../../shared/bun-ffi-shim"
+import { loadBunFfi } from "@oh-my-opencode/utils/bun-ffi"
 
 export interface RecoveryClockReading {
   readonly wallTimeMs: number

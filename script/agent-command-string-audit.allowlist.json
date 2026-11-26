@@ -148,7 +148,7 @@
     "docs/reference/omo-sdk-first-party-design.md: omo ulw-loop"
   ],
   "literal-label": [
-    "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",
+    "packages/account-core/src/keyring/keystore.ts: =omo",
     "packages/device-service-core/test/cold-wake/session-host-unit.test.ts: /bin/omo x8",
     "packages/device-service-core/test/local-api/conformance/fixtures/refresher.register.json: /bin/omo x2",
     "packages/omo-native/test/remote-background.test.ts: /bin/omo x2",

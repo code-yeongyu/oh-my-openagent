@@ -183,25 +183,43 @@ describe("the provisioned SDK root runtime's cold import (P1b decision)", () => 
     expect(statics.reached.filter((path) => DEFERRED.some((part) => path.includes(part)))).toEqual([])
     // The static modules that import a schema library, exactly: a new one fails here by name.
     expect({ zod: statics.zod, typebox: statics.typebox }).toEqual({
-      zod: [
-        "packages/omo-opencode/src/cli/service-auth/credential-owner.ts",
-        "packages/omo-opencode/src/cli/service-auth/devices.ts",
-        "packages/omo-opencode/src/cli/service-auth/keychain-helper/client.ts",
-        "packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities.ts",
-        "packages/omo-opencode/src/cli/service-auth/machine-reconcile.ts",
-        "packages/omo-opencode/src/cli/service-auth/protocol-request.ts",
-        "packages/omo-opencode/src/cli/service-auth/protocol.ts",
-        "packages/omo-opencode/src/cli/service-auth/refresh-attempt.ts",
-        "packages/omo-opencode/src/cli/service-auth/signed-out-marker.ts",
-        "packages/omo-senpi/src/components/memory/device-session/cli-account-operation.ts",
-        "packages/omo-senpi/src/components/omo-sdk/account/index.ts",
-        "packages/omo-senpi/src/components/omo-sdk/account/sign-in.ts",
-        "packages/team-core/src/team-state-store/lock-worker-lifetime.ts",
-      ],
+      zod: await decidedAfterMoves(DECIDED_ZOD),
       typebox: ["packages/omo-senpi/src/components/omo-sdk/contract/principal.ts"],
     })
   })
+
+  test("#given the committed move list #then it renames decided paths one for one, and an unlisted static module still fails", async () => {
+    const renamed = await decidedAfterMoves(DECIDED_ZOD)
+    expect(new Set(renamed).size).toBe(DECIDED_ZOD.length)
+    expect(renamed.filter((path) => path.includes("/cli/service-auth/"))).toEqual([])
+    expect([...renamed, "packages/account-core/src/not-decided.ts"].sort()).not.toEqual(renamed)
+  })
 })
+
+// The static zod users P1b decided (#14950), at the paths they had then. A1a (#14364) moved some of them into
+// packages/account-core; the committed move list renames those one for one, so the decided set keeps its members
+// and its count, and a module the list does not name is still a new static user.
+const DECIDED_ZOD = [
+  "packages/omo-opencode/src/cli/service-auth/credential-owner.ts",
+  "packages/omo-opencode/src/cli/service-auth/devices.ts",
+  "packages/omo-opencode/src/cli/service-auth/keychain-helper/client.ts",
+  "packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities.ts",
+  "packages/omo-opencode/src/cli/service-auth/machine-reconcile.ts",
+  "packages/omo-opencode/src/cli/service-auth/protocol-request.ts",
+  "packages/omo-opencode/src/cli/service-auth/protocol.ts",
+  "packages/omo-opencode/src/cli/service-auth/refresh-attempt.ts",
+  "packages/omo-opencode/src/cli/service-auth/signed-out-marker.ts",
+  "packages/omo-senpi/src/components/memory/device-session/cli-account-operation.ts",
+  "packages/omo-senpi/src/components/omo-sdk/account/index.ts",
+  "packages/omo-senpi/src/components/omo-sdk/account/sign-in.ts",
+  "packages/team-core/src/team-state-store/lock-worker-lifetime.ts",
+]
+
+async function decidedAfterMoves(decided) {
+  const movesPath = fileURLToPath(new URL("../../../../script/remote-import-guard-account-moves.json", import.meta.url))
+  const { pairs } = await Bun.file(movesPath).json()
+  return decided.map((path) => pairs[path] ?? path).sort()
+}
 
 describe("thread SDK runtime", () => {
   test("#given the thread SDK build #when its inputs and exports are inspected #then it is a standalone entry that inlines no package but the contracts' typebox", async () => {

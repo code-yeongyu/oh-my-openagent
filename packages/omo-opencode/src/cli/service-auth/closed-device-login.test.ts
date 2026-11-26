@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { trustLaunchKind } from "../../../../omo-native/compile-args"
-import { fakeApi, grant, minted, temporaryHome } from "./test-support"
+import { fakeApi, grant, minted, temporaryHome } from "@oh-my-opencode/account-core/test-support"
 import { buildServiceAuth } from "../../../../../script/build-service-auth"
 
 // #12639: while accounts are closed, the device-code sign-in (`login --device`, `login --no-browser`) is the one terminal

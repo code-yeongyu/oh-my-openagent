@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } fro
 import { createConnection } from "node:net"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
-import { systemAccountFacts, useAccountFacts } from "./packages/omo-opencode/src/cli/service-auth/account-home"
+import { systemAccountFacts, useAccountFacts } from "@oh-my-opencode/account-core/account-home"
 import { markTestInfrastructureDir, runTestTempRootTeardown } from "./test-temp-root"
 
 const AGENT_DIR_ENV_NAMES = ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"] as const

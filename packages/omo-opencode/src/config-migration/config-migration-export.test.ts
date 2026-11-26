@@ -17,8 +17,8 @@ const ENTRY_POINT = join(import.meta.dir, "index.ts")
 // omo#8247: the Senpi adapter reuses the release-download primitives through this second public subpath.
 const BINARY_DOWNLOADER_ENTRY_POINT = join(import.meta.dir, "..", "shared", "binary-downloader.ts")
 // omo#10630: the Senpi memory sync resolver reads the CLI sign-in through this third public subpath.
-const SERVICE_AUTH_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "index.ts")
-const ACCOUNT_HOME_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "account-home.ts")
+const SERVICE_AUTH_ENTRY_POINT = join(import.meta.dir, "..", "..", "..", "account-core", "src", "index.ts")
+const ACCOUNT_HOME_ENTRY_POINT = join(import.meta.dir, "..", "..", "..", "account-core", "src", "account-home.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(
@@ -210,14 +210,6 @@ describe("config-migration public subpath", () => {
       "./binary-downloader": {
         import: "./src/shared/binary-downloader.ts",
         types: "./src/shared/binary-downloader.ts",
-      },
-      "./service-auth": {
-        import: "./src/cli/service-auth/index.ts",
-        types: "./src/cli/service-auth/index.ts",
-      },
-      "./account-home": {
-        import: "./src/cli/service-auth/account-home.ts",
-        types: "./src/cli/service-auth/account-home.ts",
       },
     })
   })

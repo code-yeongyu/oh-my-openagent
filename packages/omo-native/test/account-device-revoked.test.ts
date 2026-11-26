@@ -1,13 +1,6 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
-import {
-  fakeApi,
-  grant,
-  memorySecrets,
-  privateKeys,
-  refusal,
-  temporaryHome,
-} from "../../omo-opencode/src/cli/service-auth/test-support"
+import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../account-core/src/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 for (const code of ["device_revoked", "unknown_refusal"]) {

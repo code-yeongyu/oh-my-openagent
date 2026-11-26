@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { PlatformFacts } from "@oh-my-opencode/omo-opencode/account-home"
+import type { PlatformFacts } from "@oh-my-opencode/account-core/account-home"
 
 import { isDevBuildRuntime, isSharedAgentDir, isUnlaunchedSourceRun } from "./dev-build-runtime"
 
