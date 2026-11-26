@@ -74,7 +74,7 @@ describe("HostSessionClient connection lifetime", () => {
 
       // then
       expect(outcome).toBeInstanceOf(HostSessionDetachedError)
-      expect(await observedWithin(host.waitForConnections(0))).toBe(true)
+      await host.waitForConnections(0)
       expect(host.commands.filter((command) => command.type === "open_session")).toHaveLength(0)
     } finally {
       continueDial.resolve()
