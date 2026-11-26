@@ -211,6 +211,52 @@ export async function createThread(
         : null
     // Only a session file this open made new is this call's to remove; a file an earlier run made, found again, is kept.
     let madeNew = false
+    // #15002: `kept` is the worktree an earlier run under this key made on the far device: the open starts in it, as
+    // that run's would have, and makes none of its own, so the create keeps one worktree and one session.
+    const openNew = async (kept?: ThreadWorktree): Promise<SessionOpenOutcome> => {
+      const { worktree: _asked, ...request } = plan.request
+      const outcome = await plan.host.open(
+        {
+          ...(kept === undefined ? plan.request : { ...request, cwd: kept.path }),
+          refuseApprovals: true,
+          ...(openName === undefined ? {} : { name: openName }),
+          ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+          ...(preset === undefined ? {} : { permissionPreset: preset }),
+          ...(plan.creates ? launch.profile : {}),
+          ...(createdId === undefined ? {} : { durableSessionId: createdId }),
+        },
+        // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
+        { confirmReach: plan.creates },
+      )
+      return kept === undefined || outcome.kind !== "ok"
+        ? outcome
+        : { ...outcome, thread: { ...outcome.thread, worktree: kept } }
+    }
+    // #15002: a create on another device left uncertain names the thread its key derives, and, when the caller gave the
+    // key, that a retry under it is safe: the retry adopts a session an earlier run made, or opens one only where the
+    // device proves none exists (`unopened`), so it never makes a second.
+    const keyedUncertain = (result: ThreadToolResult): ThreadToolResult => {
+      const device = plan.host.device
+      if (result.kind !== "error" || result.error.code !== "idempotency_uncertain") return result
+      if (createdId === undefined || device === undefined) return result
+      const key = value.idempotency_key
+      return {
+        kind: "error",
+        error: {
+          ...result.error,
+          next_action:
+            key === undefined
+              ? `Read thread ${createdId} on device ${device} (tool.thread_read({ thread }) in an eval cell) once tool.thread_list({ all_scope: true }) lists it, before creating it again.`
+              : `Retry tool.thread_create() in an eval cell with the same idempotency_key (${key}): a thread an earlier run made under it is answered as this create's (named, its prompt sent once), and none is opened twice.`,
+          details: {
+            ...result.error.details,
+            device,
+            thread: createdId,
+            ...(key === undefined ? {} : { retry_same_key_safe: true }),
+          },
+        },
+      }
+    }
     let outcome: SessionOpenOutcome
     if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
@@ -226,30 +272,22 @@ export async function createThread(
               },
               { confirmReach: true },
             )
-      if (found === undefined) return stillUncertain()
-      outcome = found
+      // #15002: the earlier open made nothing the device holds (it was lost on the way): open it now under the same id.
+      // A worktree the earlier run made is its own: the open starts in it, so the create is never opened elsewhere.
+      if (found !== undefined) outcome = found
+      else if (createdId !== undefined && (await plan.host.unopened?.(createdId)) === true)
+        outcome = await openNew(firstWorktree)
+      else return keyedUncertain(stillUncertain())
     } else
       try {
-        outcome = await plan.host.open(
-          {
-            ...plan.request,
-            refuseApprovals: true,
-            ...(openName === undefined ? {} : { name: openName }),
-            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-            ...(preset === undefined ? {} : { permissionPreset: preset }),
-            ...(plan.creates ? launch.profile : {}),
-            ...(createdId === undefined ? {} : { durableSessionId: createdId }),
-          },
-          // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
-          { confirmReach: plan.creates },
-        )
+        outcome = await openNew()
         madeNew = plan.creates
       } catch (error) {
         const found = await reopened()
         if (found === undefined) throw error
         outcome = found
       }
-    if (outcome.kind === "error") return outcome
+    if (outcome.kind === "error") return keyedUncertain(outcome)
     opened = outcome.thread
     if (earlier?.kind !== "live" && plan.host.device === undefined)
       openedHere = {

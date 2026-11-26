@@ -7,6 +7,7 @@ import { openContext } from "../open-context"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
+import { deviceHolderView } from "../remote/find-session"
 import { resolveTypedDevice } from "../address/device"
 import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
 import { openedEngineId, openRefusal } from "./open-reply"
@@ -15,6 +16,7 @@ import type { ThreadHostSession } from "../tools/ports"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
 import { holderVersion, retryWait, rowState, threadModel } from "../tools/thread-state"
 import {
+  DURABLE_SESSION_ID,
   OPEN_SESSION_FORK,
   openedThread,
   type HostedThread,
@@ -25,6 +27,8 @@ import {
 
 /** The device service's own refusal: its route lists no such session, so nothing was dispatched to an engine. */
 const ROUTE_UNLISTED = "route_unlisted"
+/** senpi's refusal of a create under a durable id a live session already holds there (#15002: an earlier open landed). */
+const SESSION_ID_IN_USE = "session_id_in_use"
 
 const nonEmpty = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined
@@ -344,6 +348,12 @@ export function createRelaySessionHost(
     )
     return observed || done.kind !== "ok" ? done : undefined
   }
+  // Asked of the device's engine endpoint, as every capability is (an observing read); none when it does not answer.
+  const capabilities = async (): Promise<readonly unknown[]> => {
+    const info = await remote.sessions.endpointCommand(device, { type: "get_protocol_info", observe: true })
+    const names = info.kind === "ok" ? replyData(info.response)["capabilities"] : undefined
+    return Array.isArray(names) ? names : []
+  }
   return {
     device,
     visible: async (): Promise<readonly ThreadSummary[]> =>
@@ -352,11 +362,7 @@ export function createRelaySessionHost(
         .map(listedThread),
     // Asked of the device's engine endpoint, as every capability is (an observing read); an engine that does not answer
     // is taken not to fork, so the create refuses fork_from rather than open a blank session there.
-    forks: async () => {
-      const info = await remote.sessions.endpointCommand(device, { type: "get_protocol_info", observe: true })
-      const names = info.kind === "ok" ? replyData(info.response)["capabilities"] : undefined
-      return Array.isArray(names) && names.includes(OPEN_SESSION_FORK)
-    },
+    forks: async () => (await capabilities()).includes(OPEN_SESSION_FORK),
     open: async (request: SessionOpenRequest, options): Promise<SessionOpenOutcome> => {
       // The device resolved as the address module resolves one with need "online": unknown is not_found, offline is
       // device_offline (A3: nothing is queued for it), and a roster that cannot be read is host_unavailable.
@@ -384,7 +390,12 @@ export function createRelaySessionHost(
         ...(permissionPreset === undefined ? {} : { permissionPreset }),
       }
       const reopens = request.sessionPath !== undefined
-      const outcome = await remote.sessions.endpointCommand(device, frame, { locate: true })
+      const answered = await remote.sessions.endpointCommand(device, frame, { locate: true })
+      // #15002: b refused a create under the id a live session already holds there: an earlier open under this call's
+      // key landed. That session is the create's own, adopted below; one b does not list yet leaves the create uncertain.
+      const inUse =
+        answered.kind === "refused" && answered.reason === SESSION_ID_IN_USE && asked.durableSessionId !== undefined
+      const outcome: RemoteCommandOutcome = inUse ? { kind: "uncertain", reason: SESSION_ID_IN_USE } : answered
       if (outcome.kind !== "ok") {
         // A create's open b may have run though its reply was lost: the session b lists under the id the create asked
         // for is answered as the create's own, never uncertain once b lists it.
@@ -423,5 +434,8 @@ export function createRelaySessionHost(
         ...(request.name === undefined ? {} : { name: request.name }),
         ...(request.worktree === undefined ? {} : { worktree: request.worktree }),
       }),
+    unopened: async (durableSessionId) =>
+      (await capabilities()).includes(DURABLE_SESSION_ID) &&
+      (await deviceHolderView(remote, device, durableSessionId)) === "absent",
   }
 }

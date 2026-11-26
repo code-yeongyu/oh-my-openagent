@@ -343,6 +343,12 @@ export function createRemoteThreadFixture() {
       /** With openLosesReply: the next listing of b after a lost reply fails too, so the create cannot recover on the spot. */
       listFailsAfterLostReply?: boolean
       /**
+       * #15002: the first `count` creates are lost on the way (the channel to b closed while they were in flight): the
+       * device service answers uncertain request_gone and b made nothing. `landsLate`: b's engine takes each such open
+       * after all, just before the next open under the same id reaches it, which senpi refuses `session_id_in_use`.
+       */
+      openRequestGone?: { readonly count: number; readonly landsLate?: boolean }
+      /**
        * #13031: b's engine forks on `open_session { forkFrom }` (senpi#7085, capability `open_session_fork`): a session
        * file it holds (`sessionFiles`) becomes `dur-fork-on-b`; any other source is refused `fork_source_not_local`.
        */
@@ -446,6 +452,18 @@ export function createRemoteThreadFixture() {
     const held = new Map<string, string>()
     // The sessions b's engine made for opens whose reply was lost (openLosesReply), as b lists them.
     const made: RemoteSessionRow[] = []
+    // Every id a lost open made a session under: its file stays on b after the session ends (senpi unloads only a
+    // session with a file).
+    const madeIds = new Set<string>()
+    // #15002: ids of opens lost on the way that b's engine takes later (openRequestGone.landsLate).
+    const landingLate = new Set<string>()
+    // #15002: ids whose create was lost on the way; a later create under one is made under it, as senpi's is.
+    const goneIds = new Set<string>()
+    let goneOpens = options.openRequestGone?.count ?? 0
+    const makeSession = (id: string) => {
+      made.push({ ...B_ROW, session_id: `rk-${id}`, durable_id: id, title: "" })
+      madeIds.add(id)
+    }
     let lostReplies = options.openLosesReply ?? 0
     let failNextList = false
     const listed = (): readonly RemoteSessionRow[] => {
@@ -490,6 +508,8 @@ export function createRemoteThreadFixture() {
           capabilities: [
             ...(capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"]),
             ...(options.forks === true ? ["open_session_fork"] : []),
+            // senpi's host capability for creating a session under the asked durableSessionId.
+            ...(options.ignoresDurableSessionId === true ? [] : ["durable_session_id"]),
           ],
         })
       }
@@ -563,7 +583,9 @@ export function createRemoteThreadFixture() {
       if (rpc["type"] === "find_session") {
         if (sessionFiles === "none")
           return { kind: "refused", reason: options.findSessionRefuse ?? "Unknown command: find_session" }
-        const file = sessionFiles[String(rpc["durableSessionId"])]
+        const asked = String(rpc["durableSessionId"])
+        const file =
+          sessionFiles[asked] ?? (madeIds.has(asked) ? `/home/b/.omo/agent/sessions/${asked}.jsonl` : undefined)
         if (file === undefined) return ok({ unknown: true })
         if (typeof file !== "string") return ok({ ambiguous: true })
         // `open`: an engine of b holds the session now, under the key its listing row names (or under its id).
@@ -576,6 +598,27 @@ export function createRemoteThreadFixture() {
           live.has(durable) || keys.some((key) => live.has(key)) || (relayKey !== undefined && live.has(relayKey))
         return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
       }
+      const createsUnder =
+        rpc["type"] === "open_session" &&
+        rpc["sessionPath"] === undefined &&
+        typeof rpc["durableSessionId"] === "string"
+          ? rpc["durableSessionId"]
+          : undefined
+      // #15002: an open lost on the way earlier reaches b's engine now, just before this one.
+      if (createsUnder !== undefined && landingLate.delete(createsUnder)) {
+        makeSession(createsUnder)
+        live.add(`rk-${createsUnder}`)
+        live.add(createsUnder)
+      }
+      // senpi's registry: two live sessions never share a durable id, so a second create under it is refused.
+      if (createsUnder !== undefined && options.ignoresDurableSessionId !== true && live.has(`rk-${createsUnder}`))
+        return { kind: "refused", reason: "session_id_in_use" }
+      if (createsUnder !== undefined && goneOpens > 0) {
+        goneOpens -= 1
+        goneIds.add(createsUnder)
+        if (options.openRequestGone?.landsLate === true) landingLate.add(createsUnder)
+        return { kind: "uncertain", reason: "request_gone" }
+      }
       // Only a create's open (it asks for its derived id) loses its reply, never a worktree's short-lived setup session.
       if (
         rpc["type"] === "open_session" &&
@@ -586,7 +629,7 @@ export function createRemoteThreadFixture() {
         lostReplies -= 1
         const asked = rpc["durableSessionId"]
         const id = options.ignoresDurableSessionId !== true && typeof asked === "string" ? asked : "dur-made-on-b"
-        made.push({ ...B_ROW, session_id: `rk-${id}`, durable_id: id, title: "" })
+        makeSession(id)
         if (options.lostUnrouted === true) {
           unrouted.add(`rpc-lost-${id}`)
           held.set(`rpc-lost-${id}`, id)
@@ -607,7 +650,9 @@ export function createRemoteThreadFixture() {
         // A reopened file resumes under the id it carries, as senpi's does.
         const opened =
           rpc["sessionPath"] === undefined
-            ? "dur-new-on-b"
+            ? createsUnder !== undefined && goneIds.has(createsUnder)
+              ? createsUnder
+              : "dur-new-on-b"
             : ((sessionFiles === "none"
                 ? undefined
                 : Object.entries(sessionFiles).find(([, file]) => file === rpc["sessionPath"])?.[0]) ?? "dur-on-b")
