@@ -1,7 +1,12 @@
 export type SkippedTestRoot = {
   readonly root: string
   readonly code: string
-  readonly holders: readonly { readonly pid: number; readonly image: string; readonly parentPid: number | null }[]
+  readonly holders: readonly {
+    readonly pid: number
+    readonly image: string
+    readonly parentPid: number | null
+    readonly startTime: string | null
+  }[]
   readonly diagnosticErrors: readonly string[]
 }
 export const skippedTestRoots: Map<string, SkippedTestRoot>
