@@ -8,6 +8,7 @@ as in the terminal. The app adds one more option:
 | `connectBuiltinBrowser()` | OmO's built-in browser for this thread: the tab the user sees beside the chat, which they can watch, take over and share | the user should see the page while you work, the task is QA of something in the app, or a sign-in the user should do themselves in a visible tab |
 
 ```js
+// given: omowright, url
 const browser = await omowright.connectBuiltinBrowser()
 const [tab] = await browser.listTargets()
 const page = await browser.attachPage(tab.id)
