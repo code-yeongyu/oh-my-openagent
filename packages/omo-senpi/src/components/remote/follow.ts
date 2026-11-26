@@ -4,14 +4,7 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
-import {
-  answerEvents,
-  expectSend,
-  preSendOf,
-  SEND_TAIL,
-  type TranscriptFallback,
-  transcriptFallback,
-} from "./send-transcript"
+import { answerEvents, expectSend, fallbackFor, SEND_TAIL, type TranscriptFallback } from "./send-transcript"
 import type {
   AttachEvent,
   AttachHandle,
@@ -798,12 +791,11 @@ export function streamMembers(core: ClientCore): StreamMembers {
       from = known.value
       send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
       turn = new SessionTurn()
-      const view = from === undefined ? undefined : preSendOf(from)
       const attached = watch
       const answered = from
-      if (send !== undefined && view !== undefined && answered !== undefined)
-        fallback = transcriptFallback(
-          view,
+      if (send !== undefined && answered !== undefined)
+        fallback = fallbackFor(
+          answered,
           () => attached.handle.read({ tail: SEND_TAIL }),
           (answer) => {
             const { text, end } = answerEvents(answer, answered)
@@ -841,11 +833,14 @@ export function streamMembers(core: ClientCore): StreamMembers {
       // "No run" is believed only once the fresh read came back: the snapshot's idle can be stale (#13753).
       let confirmed = false
       let settled = false
+      // An engine that stamps no id: the transcript at a run's settle decides the send's turn (send-transcript.ts).
+      let fallback: TranscriptFallback | undefined
       const done = (outcome: Awaited<R<WaitResult>>): void => {
         if (settled) return
         settled = true
         cancelTimer()
         resyncEnd?.()
+        fallback?.stop()
         opts?.signal?.removeEventListener("abort", onAbort)
         watch?.stop()
         resolve(outcome)
@@ -873,8 +868,10 @@ export function streamMembers(core: ClientCore): StreamMembers {
       // From one send: settled on its turn's end (idle) or on the next input taking over (running), nothing else. Its
       // receipt may still be pending (F1), as for follow.
       let send: SendTurn | undefined
+      const awaitedSend = opts?.from === undefined ? undefined : expectSend(core, thread)
       const receipt = settledReceipt(opts?.from)
       void receipt.then((known) => {
+        awaitedSend?.()
         if (known.kind === "error") done(known)
       })
       let resyncEnd: (() => void) | undefined
@@ -882,8 +879,11 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (turn === undefined || send === undefined) return
         if (event.kind !== "record") return check(turn.apply(event))
         if (send.started && sessionClosed(event.record)) return result("ended", "closed")
+        const seen = send.started
         const verdict = send.classify(event.record)
+        if (verdict === "other" && !seen && event.record["type"] === "agent_settled") fallback?.settled()
         if (verdict !== "other") {
+          fallback?.stop()
           resyncEnd?.()
           resyncEnd = undefined
         }
@@ -915,7 +915,15 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (settled || known.kind === "error") return
         send = known.value?.delivery_id === undefined ? undefined : new SendTurn(known.value.delivery_id)
         turn = new SessionTurn()
-        if (send !== undefined) return watch.start()
+        if (send !== undefined) {
+          const attached = watch
+          fallback = fallbackFor(
+            known.value,
+            () => attached.handle.read({ tail: SEND_TAIL }),
+            () => result("settled", "idle"),
+          )
+          return watch.start()
+        }
         turn.resync(opened.value.initial)
         const atOpen = snapshotLease(opened.value.initial)
         const anchored = new FollowAnchor(atOpen)

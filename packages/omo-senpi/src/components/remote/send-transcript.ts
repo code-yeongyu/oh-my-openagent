@@ -7,8 +7,11 @@ import type { FollowEvent, FollowOutcome, JsonObject, R, ReadPage, SendReceipt, 
 // decides instead: the user entries carrying the send's text that the session held before the send went out are earlier
 // sends', and at a run's settle the first such entry not among them anchors this send's answer.
 
-/** How many trailing transcript entries the pre-send view and each settle's check read (remote-ops' READ_TAIL). */
-export const SEND_TAIL = 256
+/**
+ * How many trailing transcript entries the pre-send view and each settle's check read: the most one history read may
+ * ask the device service for (device-service-core spec-proto.ts SESSION_READ_TAIL_MAX; a larger tail is refused).
+ */
+export const SEND_TAIL = 200
 
 /** The send's text and the entries carrying it before it went out; `earlier` is undefined when that read failed. */
 export type PreSend = { readonly text: string; readonly earlier: ReadonlySet<string> | undefined }
@@ -57,7 +60,6 @@ export async function preSendView(text: string, read: () => R<ReadPage>): Promis
 // The pre-send view rides with the receipt object the send answers, never inside it: the receipt is the --json answer.
 const views = new WeakMap<SendReceipt, PreSend>()
 export const attachPreSend = (receipt: SendReceipt, view: PreSend): void => void views.set(receipt, view)
-export const preSendOf = (receipt: SendReceipt): PreSend | undefined => views.get(receipt)
 
 type Answer = { readonly texts: readonly string[]; readonly interrupted: boolean }
 
@@ -118,8 +120,18 @@ export function answerEvents(answer: Answer, from: SendReceipt): { text: FollowE
 
 export type TranscriptFallback = { readonly settled: () => void; readonly stop: () => void }
 
+/** The transcript check for a follow or wait from `from`, when its send read the session before it went out. */
+export const fallbackFor = (
+  from: SendReceipt | undefined,
+  read: () => R<ReadPage>,
+  onAnswer: (answer: Answer) => void,
+): TranscriptFallback | undefined => {
+  const view = from === undefined ? undefined : views.get(from)
+  return view === undefined ? undefined : transcriptFallback(view, read, onAnswer)
+}
+
 /** Checks the transcript at each settle, one read at a time, until it answers once (`onAnswer`) or is stopped. */
-export function transcriptFallback(
+function transcriptFallback(
   view: PreSend,
   read: () => R<ReadPage>,
   onAnswer: (answer: Answer) => void,

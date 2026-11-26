@@ -184,7 +184,11 @@ async function send(script: Script) {
         return {
           ...attached,
           command: (rpc, options) => answer(rpc, attached.command(rpc, options)),
-          read: async () => transcript(),
+          // The read still goes over the wire, so the service refuses what it would refuse; the page is the transcript.
+          read: async (options) => {
+            await attached.read(options)
+            return transcript()
+          },
         } as RemoteAttach
       },
       sessionCommand: ((device, key, rpc, options) =>
