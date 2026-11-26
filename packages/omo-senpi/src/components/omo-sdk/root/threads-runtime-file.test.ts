@@ -335,37 +335,58 @@ describe("a thread core that cannot be built from a loaded file", () => {
 // Design lane ruling on the security note (A): a file on disk is a system boundary. A thread file from another build (its
 // stamp differs from the root's) or one without the three exports the root takes answers a typed refusal on every member,
 // never a TypeError; the port gets a fixed diagnostic, never the file's contents; nothing of it is kept.
-const MISMATCHES: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
-  "a stamp from another build": { RUNTIME_STAMP: "another-build" },
-  "no stamp": { RUNTIME_STAMP: undefined },
-  "no createThreadCore": { createThreadCore: undefined },
-  "no fail": { fail: undefined },
-  "no threadToolParamSchemas": { threadToolParamSchemas: undefined },
-  "a createThreadCore that is not a function": { createThreadCore: {} },
-  "threadToolParamSchemas that are not an object": { threadToolParamSchemas: "schemas" },
-  "threadToolParamSchemas that are null": { threadToolParamSchemas: null },
-  "threadToolParamSchemas that are an array": { threadToolParamSchemas: [] },
-  "no thread_create schema": { threadToolParamSchemas: {} },
-  "a thread_create schema without properties": { threadToolParamSchemas: { thread_create: {} } },
-  "a fail that answers nothing": { fail: () => undefined },
-  "a fail that throws": {
-    fail: () => {
-      throw new Error("the fail of another build")
+// Each case with the one fixed line the logger port gets (security review 6078171033 S1-S3): the line names the check that
+// failed, so a check that stops working shows as another line, never as the same refusal for a different reason.
+const MISMATCHES: Readonly<Record<string, readonly [Readonly<Record<string, unknown>>, string]>> = {
+  "a stamp from another build": [{ RUNTIME_STAMP: "another-build" }, "its build stamp is not this root's"],
+  "no stamp": [{ RUNTIME_STAMP: undefined }, "its build stamp is not this root's"],
+  "no createThreadCore": [{ createThreadCore: undefined }, "it has no createThreadCore function"],
+  "no fail": [{ fail: undefined }, "it has no fail function"],
+  "no threadToolParamSchemas": [{ threadToolParamSchemas: undefined }, "it has no threadToolParamSchemas object"],
+  "a createThreadCore that is not a function": [{ createThreadCore: {} }, "it has no createThreadCore function"],
+  "threadToolParamSchemas that are not an object": [
+    { threadToolParamSchemas: "schemas" },
+    "it has no threadToolParamSchemas object",
+  ],
+  "threadToolParamSchemas that are null": [{ threadToolParamSchemas: null }, "it has no threadToolParamSchemas object"],
+  "threadToolParamSchemas that are an array": [
+    { threadToolParamSchemas: [] },
+    "it has no threadToolParamSchemas object",
+  ],
+  "no thread_create schema": [{ threadToolParamSchemas: {} }, "its thread_create schema has no properties"],
+  "a thread_create schema without properties": [
+    { threadToolParamSchemas: { thread_create: {} } },
+    "its thread_create schema has no properties",
+  ],
+  "a fail that answers nothing": [{ fail: () => undefined }, "its fail does not answer a failure"],
+  "a fail whose failure has no code or message": [
+    { fail: () => ({ kind: "error", error: {} }) },
+    "its fail does not answer a failure",
+  ],
+  "a fail that throws": [
+    {
+      fail: () => {
+        throw new Error("the fail of another build")
+      },
     },
-  },
-  "a core without the calls the root makes": { createThreadCore: () => ({}) },
-  "an export whose getter throws": Object.defineProperty({}, "createThreadCore", {
-    enumerable: true,
-    get() {
-      throw new Error("the getter of another build")
-    },
-  }),
+    "reading its exports threw",
+  ],
+  "a core without the calls the root makes": [{ createThreadCore: () => ({}) }, "its core has no list function"],
+  "an export whose getter throws": [
+    Object.defineProperty({}, "createThreadCore", {
+      enumerable: true,
+      get() {
+        throw new Error("the getter of another build")
+      },
+    }),
+    "reading its exports threw",
+  ],
 }
 
 describe("a thread runtime file that loads but does not match the root", () => {
   const members = Object.keys(namespace(() => Promise.resolve(runtimeWith(() => undefined))).members)
 
-  for (const [mismatch, change] of Object.entries(MISMATCHES))
+  for (const [mismatch, [change, line]] of Object.entries(MISMATCHES))
     for (const member of members)
       test(`#given ${mismatch} #when ${member} runs #then it answers runtime_file_mismatch and the port gets a fixed diagnostic`, async () => {
         const seen: unknown[] = []
@@ -392,8 +413,7 @@ describe("a thread runtime file that loads but does not match the root", () => {
         })
         expect(answer.error.message.endsWith(UNEXPECTED_LOG_UNWRITTEN)).toBe(true)
         expect(JSON.stringify(answer)).not.toContain("another-build")
-        expect(seen).toHaveLength(1)
-        expect(JSON.stringify(String(seen[0]))).not.toContain("another-build")
+        expect(seen.map(String)).toEqual([`Error: The thread runtime file does not match this root: ${line}.`])
       })
 
   test("#given a mismatched file #when the next call finds a matching one #then it reaches the thread core", async () => {
