@@ -93,7 +93,8 @@ export function createDagRuntimeControls(ports: {
       refuseUnheldActiveNodes(current)
       // An amend that re-enters the run owns it (lease and reservation) before the amendment is written.
       const options = { ...schedulerOptions, initialRecord: current, reservation }
-      const abandon = current.pause?.reason === "user_stop" ? () => undefined : acquireReentryLease(options, runId)
+      const { abandon } =
+        current.pause?.reason === "user_stop" ? { abandon: () => undefined } : acquireReentryLease(options, runId)
       try {
         const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
         clearAdmissionLatch(runId)

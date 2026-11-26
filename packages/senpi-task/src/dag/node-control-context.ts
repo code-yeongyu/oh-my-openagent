@@ -107,9 +107,13 @@ export function refuseUnheldActiveNodes(record: DagRunRecordV1): void {
  * the run must still be this session's and settled, or paused (not by the user) with no active node;
  * no other live process may hold it; and no other operation of this process may be installing or
  * mutating it (the caller passes the reservation it holds in `options.reservation`). Returns the
- * release for a re-entry that fails before its scheduler takes over.
+ * acquired record, which the re-entry must decide and write from, and the release for a re-entry
+ * that fails before its scheduler takes over.
  */
-export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunId): () => void {
+export function acquireReentryLease(
+  options: DagSchedulerOptions,
+  runId: DagRunId,
+): { readonly record: DagRunRecordV1; readonly abandon: () => void } {
   const probe = {
     taskManager: options.taskManager,
     hostPid: options.hostPid ?? process.pid,
@@ -124,7 +128,11 @@ export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunI
     eligible: dagRunEligibility.reentry(parentSessionId),
   })
   if (acquired.kind !== "acquired") throw reentryRefusal(runId, acquired, parentSessionId)
-  return heldBefore ? () => undefined : () => releaseDagRunLease(options.store, runId, probe.hostPid)
+  // The re-entry decides and writes from this record: the one acquired, never an earlier read.
+  return {
+    record: acquired.record,
+    abandon: heldBefore ? () => undefined : () => releaseDagRunLease(options.store, runId, probe.hostPid),
+  }
 }
 
 function reentryRefusal(

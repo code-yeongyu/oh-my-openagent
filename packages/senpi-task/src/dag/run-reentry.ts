@@ -28,19 +28,20 @@ export type DagRunReentry = {
  * (`task.dag.max_runs_per_session`); a refusal throws before anything is journaled.
  */
 export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
-  const current = readRecord(options.store, options.initialRecord.runId) ?? options.initialRecord
-  if (current.pause?.reason === "user_stop") {
+  const observed = readRecord(options.store, options.initialRecord.runId) ?? options.initialRecord
+  // A fast refusal only: the acquisition decides it again on the fresh record.
+  if (observed.pause?.reason === "user_stop") {
     throw new DagNodeControlError({
       code: "run_paused_by_user",
       message: "only the user's Resume may restart this run",
-      runId: current.runId,
+      runId: observed.runId,
     })
   }
-  const abandon = acquireReentryLease(options, current.runId)
+  const { record, abandon } = acquireReentryLease(options, observed.runId)
   try {
     return startReentry(
       options,
-      withRevivalCapacity(options, current, () => resumeIfSettled(options, current)),
+      withRevivalCapacity(options, record, () => resumeIfSettled(options, record)),
     )
   } catch (error) {
     abandon()
