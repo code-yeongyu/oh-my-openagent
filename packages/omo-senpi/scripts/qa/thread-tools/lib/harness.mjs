@@ -26,11 +26,26 @@ import { fileURLToPath } from "node:url"
 const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
-export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-export const DESKTOP_ROOT =
-  process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
+// These scenarios load sources from a senpi checkout and a desktop checkout, so both must be named; a scenario run
+// directly (not through run-all.mjs, which checks the same) says what is missing instead of failing at import time.
+const checkoutRoot = (name, what) => {
+  const value = process.env[name]
+  if (value === undefined || value === "") {
+    console.error(`NOT RUN: ${name} is unset; set it to the path of ${what}`)
+    process.exit(2)
+  }
+  return value
+}
+export const SENPI_ROOT = checkoutRoot("THREAD_QA_SENPI_ROOT", "a senpi source checkout")
+export const DESKTOP_ROOT = checkoutRoot("THREAD_QA_DESKTOP_ROOT", "a desktop checkout")
 
 const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-shared", "lib")
+if (!existsSync(join(SENPI_QA_LIB, "env.mjs"))) {
+  console.error(
+    `NOT RUN: THREAD_QA_SENPI_ROOT=${SENPI_ROOT} is not a senpi source checkout (no scripts/qa-shared/lib/env.mjs)`,
+  )
+  process.exit(2)
+}
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")
 const THREAD_COMPONENTS = join(OMO_ROOT, "packages", "omo-senpi", "src", "components", "thread")
 
