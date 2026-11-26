@@ -1,6 +1,6 @@
 import type { ResidencyDenied } from "../manager/types"
 import type { OwnedStartResult } from "./owner"
-import { errorMessage, failNode, transition, type SchedulerContext } from "./scheduler-context"
+import { errorMessage, failNode, nodeById, transition, type SchedulerContext } from "./scheduler-context"
 import { resolveAdmissionIdle } from "./scheduler-cancellation"
 import { emitWaveAdmissions } from "./scheduler-frontier"
 import { startSpec, owner, isRunnable } from "./scheduler-start"
@@ -11,7 +11,7 @@ type ResidencyPark = "queued" | "lease" | "failed"
 export async function admitFrontier(context: SchedulerContext): Promise<boolean> {
   for (;;) {
     if (context.suspended || context.cancellationStarted) return false
-    const denied = context.pendingAdmission.splice(0)
+    const denied = stillAdmissible(context, context.pendingAdmission.splice(0))
     const deniedIds = new Set(denied)
     const snapshot = context.journal.snapshot()
     const runnable = snapshot.nodes
@@ -88,6 +88,27 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     if (leaseDenied) continue
     if (!(await settleOne(context, residencyReleased))) return false
   }
+}
+
+// A residency-denied node was scheduled but never admitted. If a dependency stopped being completed
+// meanwhile (its child resumed on its own, #12134), it returns to the frontier and waits for that
+// dependency's resumed outcome like any pending node; it is skipped if that outcome fails.
+function stillAdmissible(context: SchedulerContext, denied: readonly DagNodeId[]): DagNodeId[] {
+  const admissible: DagNodeId[] = []
+  for (const nodeId of denied) {
+    const snapshot = context.journal.snapshot()
+    const ready = nodeById(snapshot, nodeId).dependsOn.every(
+      (dependencyId) => nodeById(snapshot, dependencyId).state === "completed",
+    )
+    if (ready) {
+      admissible.push(nodeId)
+      continue
+    }
+    context.residencyQueued.delete(nodeId)
+    // Same shape recovery uses for a scheduled node it could not admit (recovery.ts).
+    transition(context, nodeId, "pending", { kind: "resumed" })
+  }
+  return admissible
 }
 
 function parkResidencyDenied(context: SchedulerContext, nodeId: DagNodeId, denial: ResidencyDenied): ResidencyPark {

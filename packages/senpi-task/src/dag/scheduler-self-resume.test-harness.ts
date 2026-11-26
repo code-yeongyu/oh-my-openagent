@@ -96,7 +96,6 @@ export class SelfResumingTaskManager implements TaskManager {
   readonly hooks: FakeHooks
   readonly #tasks = new Map<string, Task>()
   readonly #started = new Map<string, Signal>()
-  readonly #denied = new Map<string, Signal>()
   readonly #selfResumed = new Map<string, Set<() => void>>()
 
   constructor(hooks: FakeHooks = {}) {
@@ -108,7 +107,6 @@ export class SelfResumingTaskManager implements TaskManager {
     await this.hooks.startGate?.(nodeId)
     if (this.hooks.denyResidency?.(nodeId) === true) {
       this.denials.push(nodeId)
-      this.#signal(this.#denied, nodeId).resolve()
       const residents = [{ task_id: "task-elsewhere", name: "elsewhere", status: "running" as const }]
       return { kind: "residency_denied", reason: "cap", cause: "residents", max_children: 1, residents }
     }
@@ -129,10 +127,6 @@ export class SelfResumingTaskManager implements TaskManager {
 
   whenStarted(nodeId: string): Promise<void> {
     return this.#signal(this.#started, nodeId).promise
-  }
-
-  whenDenied(nodeId: string): Promise<void> {
-    return this.#signal(this.#denied, nodeId).promise
   }
 
   taskOf(nodeId: string): TaskRecord {
@@ -290,11 +284,12 @@ export function startFixture(
   const scheduler = createDagScheduler({ store, taskManager, initialRecord, ...options, now: () => eventTime++ })
   const events = (): readonly DagRunEvent[] => store.readEvents(runId, 0, { limit: 500 }).events
   const cleanup = (): void => fs.rmSync(root, { recursive: true, force: true })
-  // Subscribe before the trigger: resolves on the node's next transition into `to`.
-  const reaches = (nodeId: string, to: DagNodeState): Promise<void> => {
+  // Subscribe before the trigger: resolves on the node's next transition into `to` (for `reason`, if named).
+  const reaches = (nodeId: string, to: DagNodeState, reason?: string): Promise<void> => {
     const reached = deferred()
     const unsubscribe = scheduler.subscribe((event) => {
       if (event.type !== "dag.node.transitioned" || String(event.nodeId) !== nodeId || event.to !== to) return
+      if (reason !== undefined && event.reason.kind !== reason) return
       unsubscribe()
       reached.resolve()
     })

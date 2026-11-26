@@ -70,6 +70,8 @@ export function flagConsumedDependents(context: SchedulerContext, nodeId: DagNod
     for (const node of nodes) {
       if (invalidated.has(node.id) || !node.dependsOn.includes(dependencyId)) continue
       if (node.state === "pending" || node.state === "blocked" || node.state === "skipped") continue
+      // Scheduled without an attached task: denied residency, never admitted, consumed nothing.
+      if (node.state === "scheduled" && !context.attachedTaskIds.has(node.id)) continue
       invalidated.add(node.id)
       if (flagged.has(node.id)) continue
       context.journal.append({
