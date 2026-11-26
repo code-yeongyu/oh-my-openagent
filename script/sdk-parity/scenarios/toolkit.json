@@ -1,0 +1,22 @@
+{
+  "domain": "toolkit",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "toolkit.help/answers-without-a-child",
+      "row": "toolkit.help",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "value": {}
+      }
+    }
+  ]
+}
