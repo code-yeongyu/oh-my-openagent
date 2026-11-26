@@ -3,12 +3,10 @@ import {
   type ComputerCallStep,
   type ComputerDisplay,
   type ComputerScreenshot,
-  type EngineMethod,
   isReadOnlyComputerCall,
 } from "@oh-my-opencode/senpi-desktop-protocol"
 import type { ActionReport } from "@oh-my-opencode/senpi-desktop-sdk"
 import {
-  type ComputerRunHost,
   type ComputerRunSandbox,
   DesktopEngineRpcError,
   DesktopLaunchContextError,
@@ -22,13 +20,12 @@ import { ComputerActionBranches, ComputerActionShape, type ComputerToolParams, D
 import { type ComputerHostContext, runSnapshot } from "./session"
 import { computerToolDefinition } from "./tool-definition"
 import { computerFailure, launchContextFailure } from "./cua-errors"
+import { reportingService } from "./run-channel"
 import {
-  captureGeometry,
-  framePoint,
-  withSessionResult,
-  type ComputerSessionCapture,
+  type ComputerRunResult,
   type ComputerSessionMetadata,
-  type ComputerSessionPoint,
+  FrameRecorder,
+  withSessionResult,
 } from "./session-result"
 
 /** One `desktop.control.acquire` confirmation request, carried to the host component (#9651 B5b). */
@@ -51,8 +48,6 @@ export interface ComputerToolDeps {
 /** `details` of every `computer` result; `value` is what the eval-kernel `computer` facade returns. */
 export interface ComputerToolDetails {
   readonly computerSession?: ComputerSessionMetadata
-  readonly computerPoint?: ComputerSessionPoint
-  readonly computerCapture?: ComputerSessionCapture
   readonly value?: unknown
   readonly readOnly?: boolean
   readonly screenshots?: readonly ComputerScreenshot[]
@@ -114,103 +109,6 @@ function valueResult(value: unknown, fallback: string): ComputerToolResult {
   return { content: [{ type: "text", text }], details: { value } }
 }
 
-/** Engine methods whose reply is `null` or an `ActionReport` (`ax.typeText`: the reply's `report` member). */
-const EXEC_REPLY_METHODS: ReadonlySet<EngineMethod> = new Set<EngineMethod>([
-  "click",
-  "moveMouse",
-  "drag",
-  "scroll",
-  "typeText",
-  "keyChord",
-  "holdKeys",
-  "holdMouse",
-  "raiseWindow",
-  "menus.select",
-  "clipboard.write",
-  "ax.perform",
-  "ax.setValue",
-  "ax.focus",
-  "ax.click",
-  "ax.typeText",
-])
-
-/** The SDK report of an engine that replied `null`: sent, unverified, never safe to resend (SDK `legacyReport`). */
-const LEGACY_REPORT: ActionReport = {
-  disposition: { delivery: "delivered_unverified", retry: "unsafe" },
-  delivered: null,
-  effect: "unverifiable",
-  route: null,
-  hit: null,
-  focusRestoration: "not_confirmed",
-  openedSurfaces: [],
-  nextCall: null,
-  note: null,
-  warning: null,
-  auditIds: [],
-  timings: null,
-  legacy: true,
-}
-
-/** An engine `ActionReport` as the wire carries it: the four required members, the rest optional. */
-type EngineReport = Pick<ActionReport, "disposition" | "effect" | "focusRestoration" | "auditIds"> &
-  Partial<Pick<ActionReport, "delivered" | "route" | "openedSurfaces" | "nextCall" | "note" | "warning">> & {
-    readonly hit?: { readonly role: NonNullable<ActionReport["hit"]>["role"]; readonly label?: string | null } | null
-  }
-
-/**
- * An exec reply in the SDK's `ActionReport` shape, member for member as the SDK maps it. Nothing has checked the
- * reply yet: `reportingService` sits under the run facade and records each reply as the engine sent it, before the
- * facade validates it (`expectResult` with `isExecResult`). A malformed reply is recorded here and only then fails
- * that check, and even a reply that passes it carries `effect`, `route` and `focusRestoration` checked only as strings,
- * not as members of the SDK's unions.
- */
-function actionReportOf(reply: unknown): ActionReport {
-  if (reply === null || reply === undefined) return LEGACY_REPORT
-  const report = reply as EngineReport
-  return {
-    disposition: report.disposition,
-    delivered: report.delivered ?? null,
-    effect: report.effect,
-    route: report.route ?? null,
-    hit: report.hit == null ? null : { role: report.hit.role, label: report.hit.label ?? null },
-    focusRestoration: report.focusRestoration,
-    openedSurfaces: report.openedSurfaces ?? [],
-    nextCall: report.nextCall ?? null,
-    note: report.note ?? null,
-    warning: report.warning ?? null,
-    auditIds: report.auditIds,
-    timings: null,
-    legacy: false,
-  }
-}
-
-/** The run's engine channel, recording the report of every input action it carries. */
-function reportingService(
-  service: ComputerHandle["service"],
-  reports: ActionReport[],
-  metadata: {
-    point: ComputerSessionPoint | undefined
-    capture: ComputerSessionCapture | undefined
-  },
-): ComputerRunHost["service"] {
-  return {
-    call: async (method, params, options) => {
-      const reply = await service.call(method, params, options)
-      if (EXEC_REPLY_METHODS.has(method)) {
-        metadata.point = framePoint(method, params)
-        reports.push(actionReportOf(method === "ax.typeText" ? Reflect.get(Object(reply), "report") : reply))
-      }
-      if (method === "capture" || method === "observe" || method === "captureRegion") {
-        metadata.capture = captureGeometry(reply)
-      }
-      return reply
-    },
-    onAudit: (listener) => service.onAudit(listener),
-    revokeControl: () => service.revokeControl(),
-    reportError: (error) => service.reportError(error),
-  }
-}
-
 function assertNever(value: never): never {
   throw new TypeError(`unhandled computer action ${JSON.stringify(value)}`)
 }
@@ -227,7 +125,7 @@ export async function runComputer(
     readonly origin: "host" | "model"
   },
   signal: AbortSignal | undefined,
-): Promise<ComputerToolResult> {
+): Promise<ComputerRunResult> {
   const { handle, executeTool } = deps
   await handle.activate(context)
   const settings = handle.settings()
@@ -235,10 +133,7 @@ export async function runComputer(
   const timeoutMs = request.timeoutSeconds * 1000
   const confirmControl = deps.confirmControl
   const reports: ActionReport[] = []
-  const metadata: { point: ComputerSessionPoint | undefined; capture: ComputerSessionCapture | undefined } = {
-    point: undefined,
-    capture: undefined,
-  }
+  const frames = new FrameRecorder()
   const outcome = await runComputerCode(
     {
       code: request.code,
@@ -249,7 +144,7 @@ export async function runComputer(
       ...(signal === undefined ? {} : { signal }),
     },
     {
-      service: reportingService(handle.service, reports, metadata),
+      service: reportingService(handle.service, reports, frames),
       executeTool,
       ...(confirmControl === undefined
         ? {}
@@ -264,24 +159,12 @@ export async function runComputer(
   if (outcome.returnValue !== undefined)
     content.push({ type: "text", text: stringifyReturn(outcome.returnValue, shown) })
   if (content.length === 0) content.push({ type: "text", text: "Done." })
-  // The legacy facade omits frameId to use the target's latest frame. Only the engine's
-  // audit of that input can say which frame it actually resolved.
-  const audit = outcome.audit.at(-1)
-  let computerPoint = metadata.point
-  if (
-    computerPoint !== undefined &&
-    computerPoint.frameId === undefined &&
-    audit?.target === computerPoint.target &&
-    audit.frameId != null
-  ) {
-    computerPoint = { ...computerPoint, frameId: audit.frameId }
-  }
+  const frame = frames.frame(outcome.audit)
   return {
     content,
+    ...(frame === undefined ? {} : { frame }),
     details: {
       value: outcome.returnValue,
-      ...(computerPoint === undefined ? {} : { computerPoint }),
-      ...(metadata.capture === undefined ? {} : { computerCapture: metadata.capture }),
       readOnly: request.readOnly,
       screenshots: outcome.screenshots,
       audit: outcome.audit,
@@ -304,6 +187,8 @@ export function createComputerTool(deps: ComputerToolDeps) {
     request: Parameters<typeof runComputer>[2],
     signal: AbortSignal | undefined,
   ) => runComputer(deps, context, request, signal)
+  const sessionResult = async (result: Promise<ComputerRunResult>, signal: AbortSignal | undefined) =>
+    withSessionResult(handle, await permissionResult(result, handle), { signal })
 
   return {
     ...computerToolDefinition,
@@ -320,44 +205,35 @@ export function createComputerTool(deps: ComputerToolDeps) {
           // Classifies (and rejects unknown or unchainable methods) before anything reaches the engine.
           const readOnly = isReadOnlyComputerCall(params.chain)
           const code = renderCallChain(params.chain)
-          return withSessionResult(
-            handle,
-            await permissionResult(
-              run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS, origin: "host" }, signal),
-              handle,
-            ),
+          return sessionResult(
+            run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS, origin: "host" }, signal),
+            signal,
           )
         }
         case "run": {
           const timeoutSeconds = params.timeout ?? DEFAULT_TIMEOUT_SECONDS
-          return withSessionResult(
-            handle,
-            await permissionResult(
-              run(
-                context,
-                { code: params.code, readOnly: params.read_only === true, timeoutSeconds, origin: "model" },
-                signal,
-              ),
-              handle,
+          return sessionResult(
+            run(
+              context,
+              { code: params.code, readOnly: params.read_only === true, timeoutSeconds, origin: "model" },
+              signal,
             ),
+            signal,
           )
         }
         case "capabilities":
           // Like call/run, activation and capability-query permission failures are structured tool results.
-          return withSessionResult(
-            handle,
-            await permissionResult(
-              (async () => {
-                await handle.activate(context)
-                return valueResult(await handle.service.capabilities(), "capabilities unavailable")
-              })(),
-              handle,
-            ),
+          return sessionResult(
+            (async () => {
+              await handle.activate(context)
+              return valueResult(await handle.service.capabilities(), "capabilities unavailable")
+            })(),
+            signal,
           )
         case "close": {
           const endedId = handle.computerSessionId
           await handle.close()
-          return withSessionResult(handle, valueResult(undefined, "Closed the desktop session."), endedId)
+          return withSessionResult(handle, valueResult(undefined, "Closed the desktop session."), { endedId })
         }
         default:
           return assertNever(params)
@@ -377,9 +253,9 @@ const STRUCTURED_ENGINE_CODES: ReadonlySet<string> = new Set([
 ])
 
 async function permissionResult(
-  result: Promise<ComputerToolResult>,
+  result: Promise<ComputerRunResult>,
   handle: ComputerHandle,
-): Promise<ComputerToolResult> {
+): Promise<ComputerRunResult> {
   try {
     return await result
   } catch (error) {

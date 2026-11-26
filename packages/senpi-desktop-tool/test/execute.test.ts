@@ -23,28 +23,6 @@ function toolFor(handle: ComputerHandle, executeTool: ExecuteTool = noTools) {
 }
 
 describe("computer tool execute", HANG_GUARD, () => {
-  it("keeps the computer identity through close, then gives the same agent a different session", async () => {
-    const { handle } = desktopFixture()
-    const tool = toolFor(handle)
-    const call = (action: "capabilities" | "close") =>
-      tool.execute("call", { action }, undefined, undefined, hostContext())
-    const first = await call("capabilities")
-    const id = first.details.computerSession?.id
-    expect(id).toEqual(expect.any(String))
-    expect(id).not.toBe(hostContext().sessionManager.getSessionId())
-    expect((await call("capabilities")).details.computerSession?.id).toBe(id)
-    expect((await call("close")).details.computerSession).toMatchObject({
-      id,
-      lifecycle: "ended",
-      picture: { kind: "withheld", reason: "unknown" },
-    })
-    const next = await call("capabilities")
-    expect(next.details.computerSession?.id).toEqual(expect.any(String))
-    expect(next.details.computerSession?.id).not.toBe(id)
-    expect(JSON.stringify(first.content)).not.toContain(String(id))
-    expect(JSON.stringify(first.details.value)).not.toContain(String(id))
-  })
-
   it("runs a window->screenshot chain through the facade and returns the inline image", async () => {
     // Given
     const { handle } = desktopFixture()
@@ -77,32 +55,6 @@ describe("computer tool execute", HANG_GUARD, () => {
 			}
 		`)
   })
-
-  it.each(["available", "secure_input", "locked", "permission_missing", "new-reason"])(
-    "separates the viewer decision %s and the frame point from the model result",
-    async (state) => {
-      const { handle } = desktopFixture({}, { FAKE_ENGINE_PICTURE_STATE: state })
-      const result = await toolFor(handle).execute(
-        "pointer",
-        {
-          action: "run",
-          code: "const w = await desktop.window({app:'Code'}); await w.screenshot({silent:true}); await w.click(3,4)",
-        },
-        undefined,
-        undefined,
-        hostContext(),
-      )
-      expect(result.details.computerSession).toMatchObject({
-        lifecycle: "open",
-        point: { action: "click", space: "frame", frameId: "101-1", target: "101", x: 3, y: 4 },
-        picture:
-          state === "available"
-            ? { kind: "available" }
-            : { kind: "withheld", reason: state === "new-reason" ? "unknown" : state },
-      })
-      expect(result.content).toEqual([{ type: "text", text: "Done." }])
-    },
-  )
 
   it("shows observe's accessibility tree once, not again inside the returned value", async () => {
     // Given

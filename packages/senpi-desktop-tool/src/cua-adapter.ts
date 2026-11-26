@@ -14,7 +14,7 @@ import { computerFailure, launchContextFailure } from "./cua-errors"
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS } from "./params"
 import type { ComputerHostContext } from "./session"
 import { type ComputerToolDeps, type ComputerToolResult, runComputer } from "./tool"
-import { withSessionResult } from "./session-result"
+import { type ComputerRunResult, withSessionResult } from "./session-result"
 
 interface StepOutcome {
   readonly index: number
@@ -52,13 +52,14 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
       context: ComputerHostContext,
     ): Promise<ComputerToolResult & { isError?: boolean }> {
       const stopHotkey = deps.handle.settings().stopHotkey
+      const finish = (result: ComputerRunResult) => withSessionResult(deps.handle, result, { signal })
       let params: ComputerActionsInput
       try {
         params = parseComputerActions(input)
       } catch (error) {
         if (!(error instanceof ComputerArgumentsError)) throw error
         const failure = computerFailure(error.code, error.reason, stopHotkey)
-        return withSessionResult(deps.handle, {
+        return finish({
           content: [{ type: "text", text: failure.message }],
           details: { value: failure, isError: true },
           isError: true,
@@ -67,14 +68,14 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
       const timeoutSeconds = Math.min(params.timeout ?? DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS)
       const readOnly = isReadOnlyActions(params)
       const code = actionsScript(actionsOf(params), bounds)
-      let result: ComputerToolResult
+      let result: ComputerRunResult
       try {
         result = await runComputer(deps, context, { code, readOnly, timeoutSeconds, origin: "host" }, signal)
       } catch (error) {
         if (!(error instanceof Error)) throw error
         if (error instanceof DesktopLaunchContextError) {
           const failure = launchContextFailure(error)
-          return withSessionResult(deps.handle, {
+          return finish({
             content: [{ type: "text", text: failure.message }],
             details: { value: failure, isError: true },
             isError: true,
@@ -84,20 +85,20 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
           error instanceof DesktopEngineRpcError && error.data !== null && "code" in error.data ? error.data : undefined
         const reason = data?.code ?? Reflect.get(error, "reason") ?? Reflect.get(error, "code") ?? error.name
         const failure = computerFailure(String(reason), error.message, stopHotkey, data?.permission, data?.reason)
-        return withSessionResult(deps.handle, {
+        return finish({
           content: [{ type: "text", text: failure.message }],
           details: { value: failure, isError: true },
           isError: true,
         })
       }
       const outcome = result.details.value
-      if (!isActionsOutcome(outcome)) return withSessionResult(deps.handle, result)
+      if (!isActionsOutcome(outcome)) return finish(result)
       bounds = outcome.bounds
       const images = result.content.filter((part) => part.type === "image")
       const failed = outcome.failedIndex === null ? undefined : outcome.steps[outcome.failedIndex]
       if (failed === undefined) {
         const text = `${outcome.steps.length} action(s) done: ${outcome.steps.map((step) => step.action).join(", ")}.`
-        return withSessionResult(deps.handle, { ...result, content: [...images, { type: "text", text }] })
+        return finish({ ...result, content: [...images, { type: "text", text }] })
       }
       const failure = computerFailure(
         failed.code ?? "Error",
@@ -109,7 +110,8 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
       const text = `Action ${failed.index + 1} (${failed.action}) failed. ${
         failure.permission === undefined ? failure.message : JSON.stringify(failure)
       }`
-      return withSessionResult(deps.handle, {
+      return finish({
+        ...result,
         content: [...images, { type: "text", text }],
         details: { ...result.details, value: { ...outcome, failure }, isError: true },
         isError: true,

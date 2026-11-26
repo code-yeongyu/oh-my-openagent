@@ -53,5 +53,4 @@ export {
   type ControlConfirmRequest,
   createComputerTool,
   parseComputerParams,
-  runComputer,
 } from "./tool"
