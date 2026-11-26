@@ -3,16 +3,6 @@ import { describe, expect, test } from "bun:test"
 import { startFakeHost } from "./fake-host"
 import { connectFakeHost, fakeHostTransport } from "./fake-host-transport"
 
-async function settledWithin(signal: Promise<unknown>): Promise<boolean> {
-  const deadline = Promise.withResolvers<boolean>()
-  const timer = setTimeout(() => deadline.resolve(false), 1_000)
-  try {
-    return await Promise.race([signal.then(() => true), deadline.promise])
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 describe("fake host stop", () => {
   test("#given a connection still in its transport handshake #when the host stops #then stop ends it instead of waiting on its client (#14906)", async () => {
     // given: on win32 a connection is admitted only once its secret arrives; this transport never finishes that step,
@@ -28,11 +18,11 @@ describe("fake host stop", () => {
       await handshaking.promise
 
       // when
-      const stopped = await settledWithin(host.stop())
+      await host.stop()
 
       // then
-      expect(stopped).toBe(true)
-      expect(await settledWithin(clientClosed)).toBe(true)
+      await clientClosed
+      expect(client.destroyed).toBe(true)
     } finally {
       client.destroy()
     }
