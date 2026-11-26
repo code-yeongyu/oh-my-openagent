@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { namespaceOf, p1aRows, type Contract } from "./contract-check"
-import { decodeFixtures } from "./bytes-fixtures"
+import { answerFields, boundaryInput } from "./bytes-fixtures"
 import type { Row } from "./schema"
 import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-table"
 
@@ -40,11 +42,11 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
   const at = `scenario ${scenario.id}`
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
-  const marked = answerMarkers(scenario.input)
   // A marked field's value is an earlier call's answer, supplied at run time: only that value is exempt; every other
   // field is checked against the call's schema as usual.
+  const marked = answerFields(scenario.input)
   const accepted =
-    contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at), marked) &&
+    contract.accepts(row.sdk, boundaryInput(scenario.input, problems, at), marked) &&
     marked.every((field) => Object.hasOwn(row.input.properties, field))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
@@ -199,10 +201,21 @@ function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): str
   )
 }
 
+/**
+ * Which slice fills each row's `scenarios` (row id to slice): each slice adds its own rows in its own pull request, and
+ * the check holds both ways: a filled row must be mapped, and a mapped row must be filled.
+ */
+export const SCENARIO_FILL_OWNERS: Readonly<Record<string, string>> = (
+  JSON.parse(readFileSync(join(import.meta.dir, "scenario-fill-owners.json"), "utf8")) as {
+    readonly rows: Readonly<Record<string, string>>
+  }
+).rows
+
 export function scenarioProblems(
   rows: readonly Row[],
   contract: Contract,
   files: readonly ScenarioTableFile[],
+  owners: Readonly<Record<string, string>> = SCENARIO_FILL_OWNERS,
 ): string[] {
   const problems: string[] = []
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
@@ -221,6 +234,11 @@ export function scenarioProblems(
       }
       problems.push(...scenarioShapeProblems(scenario, row, file.domain, contract))
       problems.push(...beforeProblems(scenario, inScope, contract))
+      for (const [field, value] of Object.entries((scenario.input ?? {}) as Readonly<Record<string, unknown>>))
+        if (value === "$callback" && !Object.hasOwn(Object(row.input.properties[field]), "x-callback"))
+          problems.push(
+            `scenario ${scenario.id}: ${field} is passed a callback, but row ${row.id} does not type it as one; type it with the contract's callback helper (its argument and answer shapes)`,
+          )
       if (scenario.invalid !== true) byRow.set(row.id, [...(byRow.get(row.id) ?? []), scenario])
     }
   const inert = new Map(files.flatMap((file) => Object.entries(file.inert)))
@@ -228,10 +246,21 @@ export function scenarioProblems(
     problems.push(...coverageProblems(row, byRow.get(row.id) ?? [], inert, contract))
     problems.push(...targetStateProblems(row, byRow.get(row.id) ?? []))
     const named = [...row.scenarios.effect, ...row.scenarios.refusal]
-    if (named.length > 0)
-      problems.push(`row ${row.id}: scenarios stays empty in P1a; P1b fills it once its drivers ran`)
+    const owner = owners[row.id]
+    if (named.length > 0 && owner === undefined)
+      problems.push(
+        `row ${row.id}: scenarios stays empty in P1a until the slice that fills it maps the row to itself in scenario-fill-owners.json`,
+      )
+    if (named.length === 0 && owner !== undefined)
+      problems.push(
+        `row ${row.id}: scenario-fill-owners.json maps it to slice ${owner}, which has not filled its scenarios`,
+      )
     for (const id of named)
       if (!seen.has(id)) problems.push(`row ${row.id}: scenario ${id} is not in the scenario table`)
+  }
+  for (const [id, slice] of Object.entries(owners)) {
+    if (!inScope.has(id)) problems.push(`scenario-fill-owners.json names ${id}, which is not a P1a row`)
+    if (slice === "") problems.push(`scenario-fill-owners.json maps ${id} to no slice`)
   }
   for (const key of inert.keys()) {
     const cut = key.lastIndexOf(".")
@@ -245,10 +274,6 @@ export function scenarioProblems(
 // `$answer:<n>` names the answer of the scenario's n-th before-call; the runner substitutes it before the call, so the
 // table check only requires each marked field to be one the call takes. It is a general form, not an install case.
 const MARKER = /^\$answer:([1-9][0-9]*)$/
-const answerMarkers = (input: Readonly<Record<string, unknown>>): string[] =>
-  Object.entries(input)
-    .filter(([, value]) => typeof value === "string" && MARKER.test(value))
-    .map(([field]) => field)
 
 function beforeProblems(scenario: TableScenario, rows: ReadonlyMap<string, Row>, contract: Contract): string[] {
   const at = `scenario ${scenario.id}`
@@ -259,11 +284,11 @@ function beforeProblems(scenario: TableScenario, rows: ReadonlyMap<string, Row>,
     if (row === undefined) problems.push(`${at}: before[${index}] names ${call.row}, which is not a P1a row`)
     else if (namespaceOf(row.sdk) !== namespaceOf(scenario.row))
       problems.push(`${at}: before[${index}] calls ${call.row}, outside the scenario's namespace`)
-    else if (answerMarkers(call.input).length > 0 || !contract.accepts(row.sdk, call.input))
+    else if (answerFields(call.input).length > 0 || !contract.accepts(row.sdk, call.input))
       problems.push(`${at}: before[${index}]'s input is not one ${row.sdk}'s schema accepts`)
   }
   for (const input of [scenario.input, ...(scenario.then ?? []).map((step) => step.input)])
-    for (const field of answerMarkers(input)) {
+    for (const field of answerFields(input)) {
       const n = Number(MARKER.exec(String(input[field]))?.[1])
       if (n > before.length)
         problems.push(`${at}: ${field} names $answer:${n}, but the scenario has ${before.length} before-call(s)`)

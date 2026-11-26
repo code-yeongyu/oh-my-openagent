@@ -96,8 +96,26 @@
       ],
       "input": {
         "properties": {
-          "onCode": {},
-          "confirm": {},
+          "onCode": {
+            "x-callback": {
+              "args": [
+                {
+                  "type": "string"
+                }
+              ],
+              "answer": {
+                "x-nothing": true
+              }
+            }
+          },
+          "confirm": {
+            "x-callback": {
+              "args": [],
+              "answer": {
+                "type": "boolean"
+              }
+            }
+          },
           "signal": {}
         },
         "required": [
@@ -140,7 +158,14 @@
       ],
       "input": {
         "properties": {
-          "confirm": {},
+          "confirm": {
+            "x-callback": {
+              "args": [],
+              "answer": {
+                "type": "boolean"
+              }
+            }
+          },
           "signal": {}
         },
         "required": [

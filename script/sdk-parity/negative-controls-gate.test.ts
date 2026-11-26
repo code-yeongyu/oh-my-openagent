@@ -207,4 +207,38 @@ describe("a built call's nested schema change (design 7.4 amendments 5 and 7, re
       expect(output).toContain("count=1 ids=threads.locate#live-schema")
       expect(verifyReview(output, "SDK-Parity-Unchanged: yes\n", "").decision).toBe("withheld")
     })
+
+  // SDK-Parity-Changed (design lane ruling): a declared change must have left unresolved.json; the digest covers it.
+  test("#given an SDK-Parity-Changed line #then a row still unresolved fails, a cleared row passes into the digest, and an unknown id fails", () => {
+    const cleared = unresolved.entries.filter((entry) => entry.id !== "threads.locate")
+    const stillOpen = gateReport(input({ body: "SDK-Parity-Changed: threads.locate" }))
+    expect(stillOpen.failures).toContain(
+      "SDK-Parity-Changed names threads.locate, which is still in unresolved.json; a declared change leaves it with its run evidence",
+    )
+    const declared = gateReport(
+      input({ body: "SDK-Parity-Changed: threads.locate", head: { ...input().head, unresolved: cleared } }),
+    )
+    expect(declared.failures.filter((failure) => failure.startsWith("SDK-Parity-Changed"))).toEqual([])
+    expect(declared.changed).toEqual(["threads.locate"])
+    const silent = gateReport(input({ head: { ...input().head, unresolved: cleared } }))
+    expect(declared.digest).not.toBe(silent.digest)
+    // Equal outcomes on both trees (the fixture's s1): the declared id still reaches the digest the reviewer signs.
+    expect(declared.digest).toBe(candidateDigest(HEAD, [...declared.candidates, "threads.locate#changed"]))
+    // The two lines speak about disjoint sets (candidates are unresolved rows; a declared id has left that record), so a
+    // body may need both: no failure, and the digest covers the candidates and the declared id.
+    const withCandidate = gateReport(
+      input({
+        body: "SDK-Parity-Unchanged: yes\nSDK-Parity-Changed: threads.locate",
+        head: { ...input().head, unresolved: cleared },
+        changedFiles: ["packages/omo-native/bin/lib/thread.js"],
+      }),
+    )
+    expect(withCandidate.candidates).toEqual(["threads.send"])
+    expect(withCandidate.failures).toEqual([])
+    expect(withCandidate.digest).toBe(candidateDigest(HEAD, ["threads.send", "threads.locate#changed"]))
+    expect(renderReport(withCandidate)).toContain("DECLARED CHANGE: threads.locate:")
+    expect(gateReport(input({ body: "SDK-Parity-Changed: threads.teleport" })).failures).toContain(
+      "SDK-Parity-Changed names threads.teleport, which is not a registry row",
+    )
+  })
 })

@@ -8,11 +8,11 @@ import { createOmoSdk } from "../sdk.ts"
 const env = { OMO_SERVICE_API_URL: "https://accounts.example.test" }
 
 describe("omo-ai/sdk", () => {
-  test("#given the entry, whose manifest has no ./sdk export yet #when install.sdkRoot runs #then it answers not_implemented naming the entry", async () => {
+  test("#given install.sdkRoot, a call no shipped entry serves and no matrix line names yet #when it runs #then the root refuses it by default, before its core", async () => {
     const sdk = createOmoSdk({ env, cwd: "/work" })
     expect(await sdk.install.sdkRoot()).toMatchObject({
       kind: "error",
-      error: { code: "not_implemented", details: { entry: "omo-ai/sdk" } },
+      error: { code: "sender_not_allowed", details: { principal: "script", reason: "no_matrix_cell" } },
     })
   })
 

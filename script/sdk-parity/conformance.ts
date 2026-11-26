@@ -6,6 +6,7 @@ import {
   type ObservedCall,
   type PortOperations,
 } from "./expectation"
+import { normalizer } from "./normalize"
 import type { Row } from "./schema"
 
 // Design 7.2, "a row's call is real" (reviews 6061267823 H3, 6061624223 H1, 6061874518 H1/H2; amendment 5): a row is built
@@ -20,6 +21,12 @@ export type EffectEvidence = {
   readonly kind: "effect" | "refusal"
   readonly member: string
   readonly input: Readonly<Record<string, unknown>>
+  /** The state the scenario's fakes start from; every producer states it, an empty list when the scenario gives none. */
+  readonly given: readonly unknown[]
+  /** The scenario's other fixture forms (`before` calls, a `callbacks` script), when it uses them. */
+  readonly setup?: Readonly<Record<string, unknown>>
+  /** Set when the call's answer differed between two runs of the same input after the goldens' normalisation. */
+  readonly unstableAnswer?: true
   readonly expect: readonly Expectation[]
   readonly target?: "this_device" | "other_device"
   readonly observed: readonly ObservedCall[]
@@ -125,6 +132,8 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
       problems.push(
         `${where}: effect ${call.port}.${call.op} ${JSON.stringify(call.args)} happened but the scenario does not state it`,
       )
+  if (record.unstableAnswer === true)
+    return [`${where}: its answer differs between two runs of the same input; an unstable answer proves no effect`]
   if (record.refusalDetails !== undefined) {
     const details = Reflect.get(Object(Reflect.get(Object(record.answered), "error")), "details")
     if (!isSubsetOf(record.refusalDetails, details))
@@ -171,8 +180,17 @@ const effectOf = (record: EffectEvidence): string =>
     ),
   )
 
-// Coverage is computed, never declared: an optional input is covered by two passing records of the row whose inputs
-// differ in that field alone and that differ in kind or stated effect. Required inputs and inert fields are exempt.
+// Coverage is computed, never declared: an optional input is covered by two passing records of the row that start from
+// the same given state, whose inputs differ in that field alone, and that differ in kind, in stated effect or in the
+// answer both state (design lane ruling: an effect is a different trace or a different answer). Required inputs and
+// inert fields are exempt.
+const normalizeAnswer = normalizer([])
+const answerOf = (record: EffectEvidence): string | undefined =>
+  record.answer === undefined ? undefined : normalizeAnswer(JSON.stringify(canonical(record.answer)))
+const answersDiffer = (a: EffectEvidence, b: EffectEvidence): boolean => {
+  const [left, right] = [answerOf(a), answerOf(b)]
+  return left !== undefined && right !== undefined && left !== right
+}
 function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: ReadonlySet<string>): string[] {
   const same = (a: EffectEvidence, b: EffectEvidence, field: string): boolean =>
     [...new Set([...Object.keys(a.input), ...Object.keys(b.input)])]
@@ -188,7 +206,9 @@ function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: R
               a !== b &&
               JSON.stringify(a.input[field]) !== JSON.stringify(b.input[field]) &&
               same(a, b, field) &&
-              (a.kind !== b.kind || effectOf(a) !== effectOf(b)),
+              JSON.stringify(canonical([a.given, fixtureOf(a.setup, field)])) ===
+                JSON.stringify(canonical([b.given, fixtureOf(b.setup, field)])) &&
+              (a.kind !== b.kind || effectOf(a) !== effectOf(b) || answersDiffer(a, b)),
           ),
         ),
     )
@@ -243,6 +263,19 @@ export const isBuilt = (row: Row, evidence: readonly EffectEvidence[], context: 
   row.today === "yes" && evidenceProblems(row, evidence, context).length === 0
 
 // Every capability row not in unresolved.json counts as built and must carry that evidence.
+// A scenario's fixture beyond its given state, for a pair proving `field`: every `before` call and every `callbacks`
+// entry, except the callbacks entry keyed by `field` itself (only the scenario that has a callback input can script
+// it, so it is part of what differs, not of where the pair starts).
+function fixtureOf(setup: Readonly<Record<string, unknown>> | undefined, field: string): unknown {
+  const callbacks = setup?.["callbacks"]
+  const kept =
+    typeof callbacks === "object" && callbacks !== null
+      ? Object.fromEntries(Object.entries(callbacks).filter(([key]) => key !== field))
+      : {}
+  const rest = Object.fromEntries(Object.entries(setup ?? {}).filter(([key]) => key !== "callbacks"))
+  return Object.keys(kept).length === 0 ? rest : { ...rest, callbacks: kept }
+}
+
 export function conformanceProblems(
   rows: readonly Row[],
   unresolved: ReadonlySet<string>,
