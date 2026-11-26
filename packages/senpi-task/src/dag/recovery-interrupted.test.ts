@@ -87,7 +87,12 @@ describe("DAG recovery of a run its host left running", () => {
 
       // when - the claim must be journaled while the child is still running, not when recovery returns
       const resume = recovery.resumePausedRuns(parentSessionId)
-      const first = await Promise.race([resumed.missing.then(() => "resumed"), resume.then(() => "returned")])
+      const first = await Promise.race([
+        resumed.missing.then((missing) =>
+          missing.length === 0 ? "resumed" : `deadline: missing ${missing.join(", ")}`,
+        ),
+        resume.then(() => "returned"),
+      ])
       resumed.stop()
 
       // then
