@@ -102,7 +102,12 @@ async function loadExactSkillFromRoot(
   return null
 }
 
-async function loadConfiguredGitMasterSkill(options?: SkillResolutionOptions): Promise<LoadedSkill | null> {
+async function loadConfiguredGitMasterSkill(
+  requestedName: string,
+  options?: SkillResolutionOptions,
+): Promise<LoadedSkill | null> {
+  // The exact requested name wins within a root: a custom skill kept under the retired name stays its own.
+  const names = [requestedName, ...skillNamesResolvingTo(GIT_SKILL_NAME).filter((name) => name !== requestedName)]
   const directory = options?.directory ?? process.cwd()
   const rootGroups: Array<{
     readonly roots: readonly (string | DiscoveredProjectDirectory)[]
@@ -118,7 +123,7 @@ async function loadConfiguredGitMasterSkill(options?: SkillResolutionOptions): P
 
   for (const group of rootGroups) {
     for (const root of group.roots) {
-      for (const name of skillNamesResolvingTo(GIT_SKILL_NAME)) {
+      for (const name of names) {
         const skill = await loadExactSkillFromRoot(root, group.scope, name)
         if (skill) return skill
       }
@@ -136,7 +141,7 @@ async function resolveBuiltinSkillTemplate(
   if (skillName !== GIT_SKILL_NAME) return null
   if (options?.disabledSkills?.has(skillName)) return null
 
-  const configuredSkill = await loadConfiguredGitMasterSkill(options)
+  const configuredSkill = await loadConfiguredGitMasterSkill(requestedName, options)
   if (configuredSkill)
     return injectGitMasterConfig(
       await extractSkillTemplate(configuredSkill),

@@ -49,10 +49,16 @@ export function resolveBareSkillCommand(
   bundledSkillNames: ReadonlySet<string>,
   hostCommands: readonly HostCommandInfo[] | undefined,
 ): BareSkillCommandResolution {
+  const hasHostCommand = (name: string): boolean =>
+    hostCommands?.some((entry) => entry.name === name) ?? false
   const retired = SKILL_COMMAND_PATTERN.exec(text)?.[1]
   if (retired !== undefined) {
     const name = resolveSkillAlias(retired)
     if (name === retired || !bundledSkillNames.has(name)) return { kind: "not-bare-skill" }
+    // A live skill installed under the exact retired name keeps it.
+    if (hasHostCommand(`${SKILL_COMMAND_PREFIX}${retired}`)) return { kind: "not-bare-skill" }
+    if (hostCommands !== undefined && !hasHostCommand(`${SKILL_COMMAND_PREFIX}${name}`))
+      return { kind: "unavailable", name }
     return {
       kind: "expand",
       text: `/${SKILL_COMMAND_PREFIX}${name}${text.slice(SKILL_COMMAND_PREFIX.length + retired.length + 1)}`,
@@ -62,7 +68,10 @@ export function resolveBareSkillCommand(
   if (command === undefined) return { kind: "not-bare-skill" }
   if (hostCommands !== undefined) {
     // A user prompt template or another extension's command with the same name owns that name.
-    if (hostCommands.some((entry) => entry.name === command.typed)) return { kind: "shadowed" }
+    if (hasHostCommand(command.typed)) return { kind: "shadowed" }
+    // A live skill installed under the exact retired name wins over the skill that replaced it.
+    if (command.typed !== command.name && hasHostCommand(`${SKILL_COMMAND_PREFIX}${command.typed}`))
+      return { kind: "expand", text: `/${SKILL_COMMAND_PREFIX}${command.typed}${command.rest}` }
     const skillCommand = `${SKILL_COMMAND_PREFIX}${command.name}`
     if (!hostCommands.some((entry) => entry.name === skillCommand)) return { kind: "unavailable", name: command.name }
   }
