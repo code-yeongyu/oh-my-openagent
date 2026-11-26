@@ -2755,7 +2755,6 @@
         "refusal": []
       },
       "modules": [],
-      "addressScope": "this_device",
       "addressReason": "the host command unloads a session of this device's session host only. On another device the host answers its generic unknown_session (not_found): the call cannot tell another device from a mistyped reference (engine dist/modes/rpc/session-registry.js:141,147)"
     },
     {

@@ -5907,24 +5907,42 @@
     {
       "id": "threads.unload/on-other-device",
       "row": "threads.unload",
-      "kind": "refusal",
-      "refusal": "not_found",
-      "target": "other_device",
+      "kind": "effect",
       "input": {
         "thread": "studio/t-2"
       },
       "expect": [
         {
-          "port": "host",
-          "op": "unload_session",
+          "port": "remote",
+          "op": "sessions.close",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.unload/unknown-on-other-device",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.close",
           "args": {
             "thread": "studio/t-2"
           },
           "result": {
-            "error": "unknown_session"
+            "code": "unknown_session"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.release/on-other-device",

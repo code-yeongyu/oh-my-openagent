@@ -100,7 +100,7 @@ async function judged(changed: TableScenario): Promise<string[]> {
 describe("P1b scenario drivers over the real omo SDK root", () => {
   test("#given the three runs modules #then every table scenario of the run rows has exactly one run", () => {
     expect(RUNS.map((run) => run.scenario.id).toSorted()).toEqual(scenarios.map((s) => s.id).toSorted())
-    expect(RUNS).toHaveLength(122)
+    expect(RUNS).toHaveLength(123)
   })
 
   test("#given the differences record #then it is sorted, complete per entry, and names only rows still unresolved", () => {

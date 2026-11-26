@@ -198,12 +198,6 @@
       "differs": "A steer's expected turn on this device is the engine's turn number; turn-1 is refused turn_conflict before get_state is read (gateway/local-transport.ts).",
       "owner": "T1b",
       "retires_with": "T1b"
-    },
-    {
-      "id": "threads.unload/on-other-device",
-      "differs": "The SDK unloads a thread on another device through that device's service (relay leg, design lane ruling for T1b: control/relay-control.ts unload over close-ladder.ts unloadOver), so studio/t-2 is unloaded on studio (remote sessions.close, answered unloaded) instead of this device's host answering unknown_session; the table and the row's addressScope this_device model the host-only CLI command. Another device's unknown_session is not_found (sdk-unload.test.ts).",
-      "owner": "P1a",
-      "retires_with": "P1a"
     }
   ]
 }
