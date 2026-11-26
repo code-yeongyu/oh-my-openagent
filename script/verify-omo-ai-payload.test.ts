@@ -37,6 +37,7 @@ const PACKED_ARTIFACTS = [
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
   "plugin/runtime/bunshin-ts/sdk.js",
   "plugin/runtime/thread-sdk/sdk.js",
+  "plugin/runtime/omo-sdk/sdk.js",
   "plugin/runtime/category-coverage/index.js",
   "plugin/runtime/category-coverage/assets.generated.json",
   "plugin/runtime/task-config/index.js",
@@ -119,6 +120,23 @@ describe("omo-ai payload verifier", () => {
     ])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
+  })
+
+  test("#given a payload missing only the omo SDK #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/runtime/omo-sdk/sdk.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("missing artifact: plugin/runtime/omo-sdk/sdk.js")
+  })
+
+  test("#given a payload whose thread SDK is packed empty #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)], {
+      "plugin/runtime/thread-sdk/sdk.js": "",
+    })
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("empty artifact: plugin/runtime/thread-sdk/sdk.js")
   })
 
   test("#given a payload missing only the device-account extension #when verified #then it fails naming that artifact", () => {
