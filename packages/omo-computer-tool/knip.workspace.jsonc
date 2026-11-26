@@ -10,6 +10,7 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "scripts/generate-cursor-tables.ts",
         "vitest.config.ts",
       ],
     }

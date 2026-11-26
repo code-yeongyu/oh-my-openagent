@@ -8,6 +8,7 @@ pub mod lock;
 pub mod marker;
 pub mod mutate;
 pub mod observe;
+pub mod presence;
 pub mod refs;
 mod session;
 #[cfg(test)]

@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "arrow": {
+    "viewBox": [0, 0, 24, 24],
+    "hotspot": [3, 2],
+    "path": "M3 2 L3 19.5 L7.6 15.3 L10.7 22.3 L13.6 21 L10.5 14.1 L16.8 14.1 Z",
+    "stroke": "#ffffff",
+    "strokeWidth": 1.5
+  },
+  "halo": {
+    "radiusPt": 28,
+    "opacity": 0.11
+  },
+  "footprintPt": 42,
+  "sessionColours": ["#155dfc", "#7f22fe", "#009689", "#e60076"],
+  "badges": ["idle", "navigate", "click", "drag", "scroll", "text", "key"],
+  "idleOpacity": 0.35,
+  "idleAfterMs": 700
+}
