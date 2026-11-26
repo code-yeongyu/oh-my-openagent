@@ -8,12 +8,41 @@ import type {
   InstalledDagRun,
 } from "@oh-my-opencode/senpi-task/dag"
 
-import type { DagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
+import { reserveWhenFree, type DagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 import { createDagRunPauseSource, type DagGuidanceDelivery } from "./dag-run-pause-source"
 import type { OwnedScheduler } from "./dag-scheduler-registry"
 import type { TaskEngine } from "./engine"
 import type { ComponentLogger } from "../../extension/types"
 import { ownedSubtree } from "./engine-run-pause"
+
+/**
+ * A user Stop's retirement of one run's scheduler in this runtime. It holds the run's reservation from
+ * before retirement until the Stop's pause is written (the caller releases it), so no installation
+ * or verb of this process can take the run in between (#15125).
+ */
+export function createStopRetirement(ports: {
+  readonly schedulers: Map<DagRunId, OwnedScheduler>
+  readonly reservations: DagRunReservations
+  readonly stoppedAdmissions: Set<DagRunId>
+}) {
+  const { schedulers } = ports
+  return async (runId: DagRunId): Promise<() => void> => {
+    const reservation = await reserveWhenFree(ports.reservations, runId, "stop")
+    try {
+      ports.stoppedAdmissions.add(runId)
+      const owned = schedulers.get(runId)
+      if (owned !== undefined) {
+        await owned.scheduler.suspend()
+        await Promise.allSettled([owned.running])
+        if (schedulers.get(runId) === owned) schedulers.delete(runId)
+      }
+    } catch (error) {
+      reservation.release()
+      throw error
+    }
+    return reservation.release
+  }
+}
 
 /** The runtime's ports for the user Stop / Resume run-pause source (`dag-run-pause-source.ts`). */
 export function registerDagPauseSource(ports: {
@@ -51,16 +80,7 @@ export function registerDagPauseSource(ports: {
         )
       },
       options: (record) => ({ ...ports.schedulerOptions, initialRecord: record }),
-      retire: async (runId) => {
-        // A Stop waits for any installation or verb of this process still taking the run.
-        await ports.reservations.whenFree(runId)
-        ports.stoppedAdmissions.add(runId)
-        const owned = schedulers.get(runId)
-        if (owned === undefined) return
-        await owned.scheduler.suspend()
-        await Promise.allSettled([owned.running])
-        if (schedulers.get(runId) === owned) schedulers.delete(runId)
-      },
+      retire: createStopRetirement(ports),
       prepareResume: (runId) => ports.clearAdmissionLatch(runId),
       warn: (message, fields) => deps.logger.warn(message, fields),
       recovery: ports.recovery,

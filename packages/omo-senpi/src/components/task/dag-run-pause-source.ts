@@ -49,11 +49,32 @@ function stopUnderHolderRule(
   return refusedBy
 }
 
+type StopPorts = {
+  options(record: DagRunRecordV1): DagSchedulerOptions
+  warn?(message: string, fields?: Record<string, unknown>): void
+}
+
+function stopRuns(ports: StopPorts, records: readonly DagRunRecordV1[], pauseSeq: number): void {
+  for (const initial of records) {
+    const options = ports.options(initial)
+    const record = options.store.readCheckpoint<DagRunRecordV1>(initial.runId)
+    if (record === null) continue
+    const refusedBy = stopUnderHolderRule(options, record, pauseSeq)
+    if (refusedBy !== undefined) {
+      ports.warn?.("omo-senpi DAG Stop left a run to the live process that is scheduling it", {
+        runId: record.runId,
+        holderPid: refusedBy,
+      })
+    }
+  }
+}
+
 export function createDagRunPauseSource(ports: {
   readonly barrier: AdmissionBarrier
   records(parentSessionId: string): readonly DagRunRecordV1[]
   options(record: DagRunRecordV1): DagSchedulerOptions
-  retire(runId: DagRunId): Promise<void>
+  // Retires the run and returns the release of the reservation it holds until the pause is written.
+  retire(runId: DagRunId): Promise<(() => void) | void>
   prepareResume(runId: DagRunId): void
   readonly recovery: DagRecovery
   adopt(installed: InstalledDagRun): void
@@ -69,18 +90,16 @@ export function createDagRunPauseSource(ports: {
     refs: (parent) => active(parent).map((record) => ({ kind: "dag", id: record.runId })),
     async quiesce(parent, pauseSeq) {
       const records = active(parent)
-      await Promise.all(records.map((record) => ports.retire(record.runId)))
-      for (const initial of records) {
-        const options = ports.options(initial)
-        const record = options.store.readCheckpoint<DagRunRecordV1>(initial.runId)
-        if (record === null) continue
-        const refusedBy = stopUnderHolderRule(options, record, pauseSeq)
-        if (refusedBy !== undefined) {
-          ports.warn?.("omo-senpi DAG Stop left a run to the live process that is scheduling it", {
-            runId: record.runId,
-            holderPid: refusedBy,
-          })
-        }
+      const retired = await Promise.allSettled(records.map((record) => ports.retire(record.runId)))
+      const releases = retired.flatMap((outcome) =>
+        outcome.status === "fulfilled" && outcome.value !== undefined ? [outcome.value] : [],
+      )
+      try {
+        const failure = retired.find((outcome) => outcome.status === "rejected")
+        if (failure?.status === "rejected") throw failure.reason
+        stopRuns(ports, records, pauseSeq)
+      } finally {
+        for (const release of releases) release()
       }
     },
     async dispatchGuidance(parent) {

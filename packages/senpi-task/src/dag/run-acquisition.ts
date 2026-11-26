@@ -51,6 +51,19 @@ export function createDagRunReservations(): DagRunReservations {
   }
 }
 
+/** Waits until no other operation of this process holds the run, then reserves it for `operation`. */
+export async function reserveWhenFree(
+  reservations: DagRunReservations,
+  runId: DagRunId,
+  operation: string,
+): Promise<DagRunReservation> {
+  for (;;) {
+    const reservation = reservations.reserve(runId, operation)
+    if (reservation !== undefined) return reservation
+    await reservations.whenFree(runId)
+  }
+}
+
 type LeasedRecord = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
 type Eligibility = (fresh: LeasedRecord) => boolean
 

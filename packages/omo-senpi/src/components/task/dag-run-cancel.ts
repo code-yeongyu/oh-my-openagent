@@ -4,6 +4,7 @@ import { DagNodeControlError } from "../../../../senpi-task/src/dag/node-control
 import {
   acquireDagRun,
   dagRunEligibility,
+  reserveWhenFree,
   type DagRunReservations,
 } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
@@ -29,16 +30,8 @@ export function createDagRunCancel(ports: {
   readonly closure: PausedNodeHoldPort
   holdsRun(runId: DagRunId): boolean
 }) {
-  const reserveWhenFree = async (runId: DagRunId) => {
-    for (;;) {
-      const reservation = ports.reservations.reserve(runId, "cancel")
-      if (reservation !== undefined) return reservation
-      await ports.reservations.whenFree(runId)
-    }
-  }
-
   return async (runId: DagRunId, parentSessionId: string, reason?: string): Promise<DagRunRecordV1 | undefined> => {
-    const reservation = await reserveWhenFree(runId)
+    const reservation = await reserveWhenFree(ports.reservations, runId, "cancel")
     try {
       const held = ports.holdsRun(runId) ? ports.schedulers.get(runId) : undefined
       if (held !== undefined) {
