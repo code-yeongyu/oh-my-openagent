@@ -1409,8 +1409,15 @@ export async function recordOutcome(ctx: StoreContext, request: RecordOutcomeReq
     else {
       write(
         ctx,
-        "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?",
-        [outcome.admission_kind, outcome.wait_kind ?? null, outcome.turn_epoch, request.now, row.delivery_id],
+        "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, turn_epoch = ?, mode_effective = COALESCE(?, mode_effective), updated_at = ? WHERE delivery_id = ?",
+        [
+          outcome.admission_kind,
+          outcome.wait_kind ?? null,
+          outcome.turn_epoch,
+          outcome.mode_effective ?? null,
+          request.now,
+          row.delivery_id,
+        ],
       )
       if (row.state !== outcome.kind) transition(ctx, row, outcome.kind, request.now)
     }
