@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto"
 import { addGuidance, changeGuidance, type Guidance } from "../pause/guidance"
 import type { DagRunRecordV1 } from "./manager"
+import { defaultSignaller } from "../lifecycle/context"
+import type { DagJournal } from "./journal"
 import { controlJournal, DagNodeControlError, ownedRecord } from "./node-control-context"
+import { dagRunEligibility, decideDagRun } from "./run-acquisition"
 import type { DagSchedulerOptions } from "./scheduler"
 import type { DagNodeId, DagRunEventPayload, DagRunId } from "./types"
 
@@ -43,25 +46,44 @@ export function applyPausedDagGuidance(
 }
 
 /**
- * Writes for a user-stopped-run control only while the run is still stopped by the same Stop,
- * re-decided on the fresh record under the journal's run lock (#15125); otherwise nothing is written
- * and the control is refused. The journal's own duplicate-transition skip stays silent.
+ * The one write path for a user-stopped run (guidance, node cancel, retry staging, guidance delivery).
+ * Decided at the write, under the journal's run lock, on the fresh record by both facts (#15125):
+ * still stopped by the same Stop (`stoppedWrite`) and not held by another live process (the one
+ * holder rule): a successor claiming the run for a Resume writes its lease under the same Stop.
+ * Otherwise nothing is written and the write is refused (`run_not_owned` naming the holder, or
+ * `run_not_user_paused`). The journal's own duplicate-transition skip stays silent.
  */
-function appendWhileStopped(options: DagSchedulerOptions, record: DagRunRecordV1, payload: DagRunEventPayload): void {
-  const pauseSeq = record.pause?.pauseSeq
-  let resumed = false
+export function appendWhileStopped(
+  options: DagSchedulerOptions,
+  record: DagRunRecordV1,
+  payload: DagRunEventPayload,
+): DagJournal<DagRunRecordV1> {
+  const probe = {
+    taskManager: options.taskManager,
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  const eligible = dagRunEligibility.stoppedWrite(record.pause?.pauseSeq)
+  let refusal: DagNodeControlError | undefined
   const journal = controlJournal(options, record, undefined, (fresh) => {
-    resumed = fresh.status !== "paused" || fresh.pause?.reason !== "user_stop" || fresh.pause.pauseSeq !== pauseSeq
-    return resumed
+    const decision = decideDagRun(fresh, { probe, eligible })
+    if (decision.kind === "held")
+      refusal = new DagNodeControlError({
+        code: "run_not_owned",
+        message: `dag run "${record.runId}" is held by live process ${decision.holderPid}`,
+        runId: record.runId,
+      })
+    else if (decision.kind === "not_eligible")
+      refusal = new DagNodeControlError({
+        code: "run_not_user_paused",
+        message: "the run is no longer stopped by the user",
+        runId: record.runId,
+      })
+    return refusal !== undefined
   })
   journal.append(payload)
-  if (resumed) {
-    throw new DagNodeControlError({
-      code: "run_not_user_paused",
-      message: "the run is no longer stopped by the user",
-      runId: record.runId,
-    })
-  }
+  if (refusal !== undefined) throw refusal
+  return journal
 }
 
 export function requireUserPaused(record: DagRunRecordV1): void {

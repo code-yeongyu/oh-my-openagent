@@ -3,6 +3,7 @@ import type { DagRecovery, InstalledDagRun } from "../../../../senpi-task/src/da
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunId } from "../../../../senpi-task/src/dag/types"
 import { controlJournal } from "../../../../senpi-task/src/dag/node-control-context"
+import { appendWhileStopped } from "../../../../senpi-task/src/dag/paused-controls"
 import { dagRunEligibility, decideDagRun } from "../../../../senpi-task/src/dag/run-acquisition"
 import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 import { dispatchGuidance } from "../../../../senpi-task/src/pause/guidance"
@@ -92,7 +93,6 @@ export function createDagRunPauseSource(ports: {
   const dispatchRunGuidance = async (listed: DagRunRecordV1): Promise<void> => {
     const options = ports.options(listed)
     const record = options.store.readCheckpoint<DagRunRecordV1>(listed.runId) ?? listed
-    const journal = controlJournal(options, record)
     const guidance = [...(record.guidance ?? [])].sort(
       (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
     )
@@ -106,7 +106,8 @@ export function createDagRunPauseSource(ports: {
       await dispatchGuidance([entry], targets, {
         save: (entries) => {
           for (const guidance of entries)
-            journal.append({
+            // The one stopped-run write: same Stop and no other live holder, decided at the write.
+            appendWhileStopped(options, options.store.readCheckpoint<DagRunRecordV1>(record.runId) ?? record, {
               type: guidance.state === "delivered" ? "dag.guidance.delivered" : "dag.guidance.dispatching",
               guidance,
             })

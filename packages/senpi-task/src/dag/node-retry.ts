@@ -12,6 +12,7 @@ import {
   readRecord,
   refuseUnheldActiveNodes,
 } from "./node-control-context"
+import { appendWhileStopped } from "./paused-controls"
 import { assertRetryable, defaultRetryTargets, skippedDependentsOf } from "./retry-targets"
 import { resumeIfSettled, startReentry, withRevivalCapacity, type DagRunReentry } from "./run-reentry"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
@@ -72,18 +73,11 @@ function stageRetry(
   if (retryOptions?.prompt !== undefined) {
     for (const target of targets) current = amendRetryPrompt(options, observed, target, retryOptions.prompt)
   }
-  const pauseSeq = observed.pause?.pauseSeq
-  const stillStopped = (fresh: DagRunRecordV1): boolean =>
-    fresh.status === "paused" && fresh.pause?.reason === "user_stop" && fresh.pause.pauseSeq === pauseSeq
-  const journal = controlJournal(options, current, undefined, (fresh) => !stillStopped(fresh))
-  if (journal.append({ type: "dag.node.retry-staged", nodeIds: [...targets] }) === undefined) {
-    throw new DagNodeControlError({
-      code: "run_not_user_paused",
-      message: `dag run "${observed.runId}" is no longer stopped by the user; retry it once it settles`,
-      runId: observed.runId,
-    })
-  }
-  const staged = journal.snapshot()
+  // The one stopped-run write: same Stop and no other live holder, decided at the write.
+  const staged = appendWhileStopped(options, current, {
+    type: "dag.node.retry-staged",
+    nodeIds: [...targets],
+  }).snapshot()
   // Staging starts no run: the scheduler only fills the return shape, so it stops listening at once.
   const scheduler = createDagScheduler({ ...options, initialRecord: staged })
   void scheduler.suspend()

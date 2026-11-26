@@ -88,6 +88,11 @@ export const dagRunEligibility = {
       const decision = classifySend(fresh, parentSessionId, nodeId)
       return decision === "steer" || decision === "revive"
     },
+  /** A write to a user-stopped run (guidance, node cancel, staging, delivery): still under that exact Stop. */
+  stoppedWrite:
+    (pauseSeq: number | undefined): Eligibility =>
+    (fresh) =>
+      fresh.status === "paused" && stoppedByUser(fresh) && fresh.pause?.pauseSeq === pauseSeq,
   /** The user's Stop: live or paused, not already under this Stop or a newer one. */
   userStop:
     (pauseSeq: number): Eligibility =>
