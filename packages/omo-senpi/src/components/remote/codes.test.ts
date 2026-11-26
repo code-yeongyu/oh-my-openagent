@@ -24,7 +24,7 @@ describe("the remote code list", () => {
       "session_ended",
       "sender_not_allowed",
       "local_only",
-      // #13414 W3, silent devices (relay-daemon#1137, omo#13406): who did not answer, and whether the call may have run.
+      // #13414 W3, silent devices (#13406): who did not answer, and whether the call may have run.
       "host_not_answering",
       "no_transport",
       "undelivered",

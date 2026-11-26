@@ -106,9 +106,9 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown" | "silent"
 /**
  * The holder's own answer for a row this surface reads as not live, asked before any send path is chosen (#14184): the
  * listing and this surface's closed mark lag a reopen made elsewhere (#14179 review L4), and a wake of a session the
- * holder holds no file for waits out its deadline. An engine without the lookup, or one that does not answer, is
- * `unknown`, which the send treats as on disk: an ended row is woken when this device can, anything else is
- * `not_resumable`.
+ * holder holds no file for waits out its deadline. An engine without the lookup is `unknown`, which the send treats as
+ * on disk: an ended row is woken when this device can, anything else is `not_resumable`. A holder that does not answer
+ * (refused `route_unlisted` or timed out) is `silent`: a busy host, answered `host_unavailable` with a retry (#15004).
  */
 export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
   // find_session looks a session up by its durable id; a row without one cannot be looked up.
