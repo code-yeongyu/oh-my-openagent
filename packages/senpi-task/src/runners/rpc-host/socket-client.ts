@@ -160,7 +160,7 @@ const HOST_DROPS: ReadonlySet<string> = new Set(["ECONNRESET", "EPIPE"])
 
 async function converse<T>(
   endpoint: string,
-  options: Parameters<typeof withRpcSocket<T>>[1],
+  { connect = createConnection, ...options }: Parameters<typeof withRpcSocket<T>>[1],
   operation: (request: RpcRequest) => Promise<T>,
   meter: CallerStallMeter,
   diagnostic: ReturnType<typeof readRpcDiagnostic>,
@@ -173,7 +173,7 @@ async function converse<T>(
   let wrote = false
   let socket: Socket
   try {
-    socket = (options.connect ?? createConnection)(endpoint)
+    socket = connect(endpoint)
   } catch (error) {
     if (error instanceof Error) transportFailures.add(error)
     throw error

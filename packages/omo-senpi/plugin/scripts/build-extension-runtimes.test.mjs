@@ -331,6 +331,42 @@ describe("omo SDK runtime", () => {
     })
   })
 
+  // #14950 QA: the shipped root's store started its worker at runtime/omo-sdk/store-worker.ts, which only the source tree
+  // has, so every store-backed call answered internal_error from the built file while the source answered losslessly.
+  test("#given the built omo SDK two levels below the extensions directory #when plain node calls a store-backed member #then the store runs on the emitted worker sidecar", async () => {
+    // given: the plugin layout, runtime/omo-sdk/sdk.js beside extensions/gateway-store-worker.mjs
+    const outputs = await sharedOutputs()
+    const plugin = await mkdtemp(join(tmpdir(), "omo-sdk-built-layout-"))
+    perTestRoots.push(plugin)
+    await mkdir(join(plugin, "runtime", "omo-sdk"), { recursive: true })
+    await mkdir(join(plugin, "extensions"), { recursive: true })
+    await cp(outputs.omoSdkOutputPath, join(plugin, "runtime", "omo-sdk", "sdk.js"))
+    await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
+    const probe = [
+      `const { createOmoSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "omo-sdk", "sdk.js")).href)})`,
+      `const root = createOmoSdk({ env: { HOME: ${JSON.stringify(plugin)} }, cwd: ${JSON.stringify(plugin)}, home: ${JSON.stringify(plugin)}, agentDir: ${JSON.stringify(join(plugin, "agent"))} })`,
+      "const called = await root.threads.extensions.call({ name: 'probe.ext', op: 'ping', args: {} })",
+      "await root.dispose()",
+      "console.log(JSON.stringify(called.kind === 'error' ? { code: called.error.code, refusal: called.error.details?.code } : { kind: called.kind }))",
+    ].join("\n")
+
+    // when
+    const child = spawn("node", ["--input-type=module", "-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
+    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+
+    // then: the store answered the unknown extension itself, losslessly, as it does from source
+    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
+    expect(JSON.parse(stdout.trim())).toEqual({ code: "not_found", refusal: "extension_unknown_name" })
+  })
+
   test("#given the built extension without the omo SDK #when freshness is checked #then it reports that output missing", async () => {
     const outputs = await mutableOutputs()
     await rm(outputs.omoSdkOutputPath)

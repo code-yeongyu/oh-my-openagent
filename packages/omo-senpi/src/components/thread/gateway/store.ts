@@ -9,6 +9,7 @@ import type { GatewayStore } from "./store-api"
 export type { DeliveryView, GatewayStore, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
 import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
+import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "./store-worker-sidecar"
 export type {
   DeclaredSessionOp,
   SessionCallableOp,
@@ -49,8 +50,7 @@ export type GatewayStoreOptions = {
   }
 }
 
-/** The store worker's file name beside the built extension bundle (`plugin/extensions/`). */
-export const GATEWAY_STORE_WORKER_BUNDLE_NAME = "gateway-store-worker.mjs"
+export { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "./store-worker-sidecar"
 
 /**
  * Where the worker thread's module is, seen from the module the store facade runs in: inside the

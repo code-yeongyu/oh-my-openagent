@@ -18,11 +18,10 @@ import {
   resolveTypedDevice,
 } from "../omo-senpi/src/components/remote/index"
 import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
 import { join } from "node:path"
-import { pathToFileURL } from "node:url"
-import { createGatewayStore, GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../omo-senpi/src/components/thread/gateway/store"
+import { createGatewayStore } from "../omo-senpi/src/components/thread/gateway/store"
+import { storeWorkerAnchor } from "../omo-senpi/src/components/thread/gateway/store-worker-sidecar"
 import { resolveProvenance } from "../omo-senpi/src/components/thread/gateway/provenance-resolver"
 import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/relay-transport"
 import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/components/thread/gateway/engine"
@@ -50,8 +49,7 @@ import type { SessionArgs } from "./remote-session-args"
  * the store resolves `store-worker.ts` itself. Returns the anchor the store resolves the sidecar from, or undefined.
  */
 export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined {
-  const anchor = pathToFileURL(join(root, "plugin", "extensions", "omo.js"))
-  return existsSync(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, anchor)) ? anchor : undefined
+  return storeWorkerAnchor(join(root, "plugin", "extensions"))
 }
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
