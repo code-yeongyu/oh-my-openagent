@@ -247,59 +247,44 @@ jobs:
             echo "Retarget the pull request to \`dev\`; release automation owns \`master\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  test:
+  # Windows root shard 2 as two parallel jobs (#15096). One job ran it for 35.7 min (run 45838358449); its remainder
+  # carries ~132 min of per-file load (median of four dev runs, run in parallel in 24-27 min). The cut is by directory,
+  # the only shape a filter or bunfig expresses: part a runs the top-level script/ tree and packages/senpi-task (~54% of
+  # the load) plus the rpc-host suite; part b runs every other remainder package through
+  # bunfig.win2.parallel.windows-rest.toml after the serial quarantine (3.6 min), with the DACL user and the LSP daemon
+  # tests its packages use. Each test invocation writes a Bun timing record; windows-test-2-status checks that the
+  # records run every shard-2 file exactly once.
+  test-windows-2:
+    name: test-windows-2 (${{ matrix.part }})
     needs: [ci-mode]
-    # Preserve required matrix check names during the Ubuntu image migration.
-    # Outside the full matrix a macOS/Windows leg still reports its required context, from an ubuntu
-    # runner with every heavy step skipped, so it never waits for a hosted macOS/Windows slot (#10856).
-    runs-on: ${{ (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix != 'true') && 'ubuntu-26.04' || matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
+    if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
-      # merge_group uses these same matrix contexts (the macOS ones come from the
-      # macos-combined-1/-2 status jobs, the Linux ones from linux-test-status), without PR labels.
-      # Queue commits always run heavy validation on every OS leg, including
-      # docs/web-only groups; the fast path remains a pull-request optimization.
-      # Windows shard 1/2 runs as the parallel test-windows-1 jobs, whose required context comes from
-      # windows-test-1-status (#14942); shard 2/2 still runs here.
       matrix:
-        include:
-          - os: windows-latest
-            shard: "2/2"
+        part: [a, b]
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
-          # and 1.3.12 hangs on windows-latest in the ast-grep install-script
-          # timeout race.
           bun-version: "1.4.4"
 
-
-      - uses: actions/cache@v6
-        if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
-
       - name: Install dependencies
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun install --frozen-lockfile
 
       - name: Remove stale self-package test copies
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
 
       # device-service-core's LA17 DACL tests prove that a second local user cannot read the
       # protected token file, so the Windows leg creates that user with a fresh random password.
       - name: Create the second local user for the DACL tests
-        if: runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: matrix.part == 'b'
         shell: pwsh
         run: |
           # Every character comes from the random bytes (no literal prefix), one per Windows complexity class.
@@ -320,79 +305,145 @@ jobs:
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Run vendored lsp-daemon tests
         id: lsp-daemon-tests
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: matrix.part == 'b'
         run: npm test
         working-directory: packages/lsp-daemon
 
-      # Windows shard 2 runs the shared serial quarantine first and then the remainder; shard 1 (omo-opencode +
-      # memory-core) runs in the test-windows-1 jobs. Linux runs the same groups as the four test-linux parts below.
-      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
-      # tests observe sh instead of the native PowerShell/cmd execution path.
-      - name: Run tests
-        id: root-tests-windows-2
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform tests observe sh instead of the native
+      # PowerShell/cmd execution path, so both parts run under pwsh.
+      - name: Run root test shard 2a with Windows telemetry
+        id: root-tests-windows-2a
+        if: matrix.part == 'a'
         shell: pwsh
         env:
-          WINDOWS_TEST_SHARD: ${{ matrix.shard }}
+          WINDOWS_TEST_SHARD: 2/2
+        run: |
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
+          # Bun 1.4.2 and 1.4.3-canary.1 intermittently segfault a test worker in the rpc-host suite
+          # (oven-sh/bun#44390, #9219). It runs in its own required invocation, which
+          # script/bun-panic-retry.ts re-runs once only when Bun itself crashed; a second crash or
+          # any real test failure fails this step. The remainder configs exclude the directory.
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-2-rpc-host" `
+            -TimingRecord `
+            -TestArguments @("script/bun-panic-retry.ts", "--config=bunfig.win2.parallel.toml", "test", "--parallel", "./packages/senpi-task/src/runners/rpc-host")
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-2a" `
+            -TimingRecord `
+            -TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel", "./script", "./packages/senpi-task")
+          exit $LASTEXITCODE
+
+      - name: Run root test shard 2b with Windows telemetry
+        id: root-tests-windows-2b
+        if: matrix.part == 'b'
+        shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: 2/2
         run: |
           $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
             -Invocation "shard-2-quarantine" `
+            -TimingRecord `
             -TestArguments @("test", "packages/senpi-task/src/runners/rpc-process.windows.test.ts", "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts", "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts", "script/codex-installer-version.test.ts", "packages/shared-skills/provenance-gate.test.ts", "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts", "packages/senpi-task/src/dag/scheduler.test.ts", "packages/omo-native/test/payload.test.ts", "script/build-omo-binary.test.ts", "packages/senpi-task/src/team/member-extension/residency.test.ts", "script/omob-refresh.test.ts", "script/release-version.test.ts", "packages/senpi-task/src/store/record-lock.test.ts", "packages/senpi-task/src/store/record-lock-reap-window.test.ts", "packages/senpi-task/src/runners/rpc-host/durable-json.test.ts")
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Bun 1.4.2 and 1.4.3-canary.1 intermittently segfault a test worker in the rpc-host suite
-          # (oven-sh/bun#44390, #9219). It runs in its own required invocation, which
-          # script/bun-panic-retry.ts re-runs once only when Bun itself crashed; a second crash or
-          # any real test failure fails this step. The remainder config excludes the directory.
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
-            -Invocation "shard-2-rpc-host" `
-            -TestArguments @("script/bun-panic-retry.ts", "--config=bunfig.win2.parallel.toml", "test", "--parallel", "./packages/senpi-task/src/runners/rpc-host")
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & .github/scripts/windows-ci-telemetry.ps1 `
-            -ArtifactDirectory $telemetryDirectory `
-            -Invocation "shard-2-remainder" `
-            -TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")
+            -Invocation "shard-2b" `
+            -TimingRecord `
+            -TestArguments @("--config=bunfig.win2.parallel.windows-rest.toml", "test", "--parallel")
           exit $LASTEXITCODE
 
       - name: Upload Windows post-test telemetry
-        if: always() && runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-shard-2
+          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-shard-2${{ matrix.part }}
           path: |
             ${{ runner.temp }}/windows-root-test-telemetry/*.json
             ${{ runner.temp }}/windows-root-test-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
 
+      # The coverage record, apart from the per-attempt telemetry: a re-run of one failed part overwrites only its own.
+      - name: Upload Windows shard record
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-shard-record-root-2${{ matrix.part }}
+          path: ${{ runner.temp }}/windows-root-test-telemetry/*.timings.json
+          if-no-files-found: error
+          overwrite: true
+
       # A leg whose test steps were all skipped must never look like a pass.
       - name: Check that this leg ran its tests
         if: always()
         shell: bash
         env:
-          LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ job.status }}
-          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-2.outcome }}
+          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-2a.outcome }} ${{ steps.root-tests-windows-2b.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
-        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
+        run: node script/ci-leg-tests-guard.mjs --os windows-latest --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
 
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Root test suite (${{ matrix.os }}${{ matrix.shard && format(', shard {0}', matrix.shard) || '' }})
+          JOB_SUMMARY_TITLE: Root test shard 2${{ matrix.part }} (windows-latest)
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Builds vendored LSP packages before tests.
-            - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs Windows root shard 2: the shared serial quarantine first, then the remainder with `--parallel`. Shard 1 (omo-opencode + memory-core) runs in the two test-windows-1 jobs.
-            - Splits by the same package groups as the Linux parts so global zauc mock bootstraps stay with their consumers.
-          JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
+            - Part a runs the rpc-host suite, then the top-level script/ tree and packages/senpi-task with `--parallel`.
+            - Part b runs the vendored lsp-daemon tests, the shared serial quarantine, then every other remainder package with `--parallel`.
+            - Uploads the JUnit report, telemetry and the Bun timing records that `test (windows-latest, 2/2)` checks for coverage.
+          JOB_SUMMARY_NEXT: Open the first failing test; `test (windows-latest, 2/2)` reports both parts.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The required test (windows-latest, 2/2) context, reported from Linux like windows-test-1-status: passes only when
+  # both test-windows-2 parts passed and their timing records run every shard-2 file exactly once, and fails closed when
+  # the parts did not run although the classifier asked for the full matrix.
+  windows-test-2-status:
+    name: test
+    needs: [ci-mode, test-windows-2]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            shard: "2/2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.test-windows-2.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download Windows shard 2 records
+        if: needs.test-windows-2.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: windows-shard-record-root-2*
+          path: ${{ runner.temp }}/windows-shard-records
+      - name: Verify Windows shard 2 coverage
+        id: coverage
+        if: needs.test-windows-2.result == 'success'
+        run: bun script/ci-shard-coverage.ts windows-root-2 "$RUNNER_TEMP/windows-shard-records"
+      - name: Write job summary
+        if: always()
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.test-windows-2.result }}
+          TEST_OUTCOMES: ${{ needs.test-windows-2.result }} ${{ steps.coverage.outcome || 'missing' }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
 
   # The Linux root suite as four parallel parts (#14573), each test command one serial bun process: `bun test --parallel`
   # is not used on POSIX (--isolate re-runs the heavy preload per file and OOM-kills the 7 GB runners, --no-isolate leaks
@@ -1022,7 +1073,7 @@ jobs:
         if: needs.test-windows-1.result == 'success'
         uses: actions/download-artifact@v8
         with:
-          pattern: windows-shard-record-root-*
+          pattern: windows-shard-record-root-1*
           path: ${{ runner.temp }}/windows-shard-records
       - name: Verify Windows shard 1 coverage
         id: coverage
@@ -2004,7 +2055,7 @@ jobs:
   auto-commit-schema:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, lint-ratchet, test, windows-test-1-status, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, windows-senpi-status, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, windows-test-1-status, windows-test-2-status, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, windows-senpi-status, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -2055,7 +2106,7 @@ jobs:
   draft-release:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, lint-ratchet, test, windows-test-1-status, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, windows-senpi-status, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, windows-test-1-status, windows-test-2-status, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, windows-senpi-status, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/dev' &&

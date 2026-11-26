@@ -158,11 +158,11 @@ describe("CI fast-path workflow wiring", () => {
     const jobs = workflowJobs(ciWorkflowPath)
     const contexts: string[] = []
     for (const id of [
-      "test",
       "typecheck",
       "build",
       "codex-compatibility",
       "windows-test-1-status",
+      "windows-test-2-status",
       "windows-senpi-status",
       "linux-test-status",
       "linux-senpi-status",
@@ -227,10 +227,10 @@ describe("CI fast-path workflow wiring", () => {
     if (!isRecord(mode)) throw new Error("CI must define ci-mode")
 
     for (const jobName of [
-      "test",
       "typecheck",
       "codex-compatibility",
       "test-windows-1",
+      "test-windows-2",
       "senpi-tests-windows",
       "lazycodex-published-smoke",
       "build",

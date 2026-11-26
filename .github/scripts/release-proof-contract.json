@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "7116e54ac5b2f09b5c7b4039b9068145275081ec3c6894b310edac1fabfa9f12",
+  "workflowSha256": "ff8368c1524ecb270ce0b97c2952d9a62ef5e8a3740b32dae3c8ef3acff8f09f",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
@@ -20,18 +20,42 @@
       "Check PR target branch",
       "Write job summary"
     ],
-    "test (windows-latest, 2/2)": [
+    "test-windows-2 (a)": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
       "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
-      "Run actions/cache@v6",
       "Install dependencies",
       "Remove stale self-package test copies",
       "Create the second local user for the DACL tests",
       "Run vendored lsp-daemon tests",
-      "Run tests",
+      "Run root test shard 2a with Windows telemetry",
+      "Run root test shard 2b with Windows telemetry",
       "Upload Windows post-test telemetry",
+      "Upload Windows shard record",
       "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test-windows-2 (b)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Create the second local user for the DACL tests",
+      "Run vendored lsp-daemon tests",
+      "Run root test shard 2a with Windows telemetry",
+      "Run root test shard 2b with Windows telemetry",
+      "Upload Windows post-test telemetry",
+      "Upload Windows shard record",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test (windows-latest, 2/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download Windows shard 2 records",
+      "Verify Windows shard 2 coverage",
       "Write job summary"
     ],
     "test-linux (omo-opencode)": [
@@ -492,11 +516,20 @@
       "reason": "Part b runs only shard 1b; part a runs shard 1a."
     },
     {
-      "job": "test (windows-latest, 2/2)",
+      "job": "test-windows-2 (a)",
       "steps": [
-        "Run actions/cache@v6"
+        "Create the second local user for the DACL tests",
+        "Run vendored lsp-daemon tests",
+        "Run root test shard 2b with Windows telemetry"
       ],
-      "reason": "Windows does not use the POSIX cache."
+      "reason": "Part a runs only shard 2a; part b runs shard 2b with the DACL user and the LSP daemon tests its packages use."
+    },
+    {
+      "job": "test-windows-2 (b)",
+      "steps": [
+        "Run root test shard 2a with Windows telemetry"
+      ],
+      "reason": "Part b runs only shard 2b; part a runs shard 2a."
     },
     {
       "job": "test-linux (memory-core)",
