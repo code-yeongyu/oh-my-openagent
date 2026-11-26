@@ -76,6 +76,7 @@ describe("DAG scheduler registry acquisition of a pending run", () => {
         isProcessAlive,
         reservations: createDagRunReservations(),
         recover: async () => undefined,
+        closure: { closeHold: async () => undefined },
       })
       const eventsBefore = base.readEvents(runId, 0, { limit: 500 }).events.length
 

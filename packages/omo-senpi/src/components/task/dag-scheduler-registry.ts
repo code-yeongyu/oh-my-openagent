@@ -15,6 +15,7 @@ import {
 } from "../../../../senpi-task/src/dag/run-acquisition"
 import { releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
+import type { PausedNodeHoldPort } from "./dag-paused-cancel"
 import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
 
 export type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
@@ -35,6 +36,8 @@ export function createDagSchedulerRegistry(ports: {
   readonly reservations: DagRunReservations
   // Re-runs this session's recovery: a run whose scheduler here failed is handed to it.
   recover(sessionId: string): Promise<void>
+  // Confirms a parked run's stopped children closed their holds (bookkeeping on the one drain's result).
+  readonly closure: PausedNodeHoldPort
 }) {
   const { schedulers, store, schedulerOptions, logger } = ports
   const lease = {
@@ -51,6 +54,8 @@ export function createDagSchedulerRegistry(ports: {
     probe: lease,
     logger,
     holdsRun,
+    children: schedulerOptions.taskManager,
+    closure: ports.closure,
     recover: (sessionId) => ports.recover(sessionId),
   })
 

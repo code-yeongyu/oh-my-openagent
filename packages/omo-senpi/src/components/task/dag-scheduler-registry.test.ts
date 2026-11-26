@@ -59,6 +59,7 @@ describe("DAG scheduler registry lease across a shutdown retirement", () => {
       isProcessAlive,
       reservations: createDagRunReservations(),
       recover: async () => undefined,
+      closure: { closeHold: async () => undefined },
     })
     let unsubscribe = (): void => undefined
     const attached = new Promise<void>((resolve) => {

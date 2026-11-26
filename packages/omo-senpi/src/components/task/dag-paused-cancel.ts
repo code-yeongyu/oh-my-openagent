@@ -6,7 +6,7 @@ import { isTerminalRecord } from "../../../../senpi-task/src/manager/manager-hel
 import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 
 export type PausedNodeHoldPort = {
-  closeHold(taskId: string, cause: "node_cancelled"): Promise<void>
+  closeHold(taskId: string, cause: "node_cancelled" | "run_cancelled"): Promise<void>
 }
 
 type ChildLookup = Pick<TaskManager, "get" | "getResidentHandle">

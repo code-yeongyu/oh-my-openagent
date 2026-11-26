@@ -4,6 +4,7 @@ import * as fs from "node:fs"
 import { parentSessionId } from "../../../../senpi-task/src/dag/__fixtures__/controlled-dag-e2e"
 import { DEAD_HOST, THIS_HOST, unscheduledRun } from "../../../../senpi-task/src/dag/__fixtures__/stack-composition"
 import { DAG_SCHEDULER_FAILED_PAUSE_REASON } from "../../../../senpi-task/src/dag/events"
+import { endedChildClosure } from "./dag-paused-cancel"
 import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
@@ -21,6 +22,7 @@ async function runLeftRunningByAFailedScheduler(
 ) {
   const run = await unscheduledRun(roots, ["A", "X"], options)
   const errors: string[] = []
+  const state = { held: false }
   const taskManager = new Proxy(run.options.taskManager, {
     get(target, property) {
       const value: unknown = Reflect.get(target, property, target)
@@ -38,11 +40,17 @@ async function runLeftRunningByAFailedScheduler(
     reservations: run.reservations,
     probe: { taskManager: run.fixture.taskManager, hostPid: THIS_HOST, isProcessAlive: run.options.isProcessAlive },
     logger: { info: () => undefined, warn: () => undefined, error: (message: string) => void errors.push(message) },
-    holdsRun: () => false,
-    recover: async () => undefined,
+    holdsRun: () => state.held,
+    children: taskManager,
+    closure: endedChildClosure(taskManager),
+    // This session's recovery takes the run; its scheduler then fails too (the second of one sequence).
+    recover: async () => {
+      state.held = true
+    },
   })
   const failTwice = async () => {
     await handler.failed(run.runId, parentSessionId, "fault")
+    state.held = false
     await handler.failed(run.runId, parentSessionId, "fault")
   }
   const taskStatus = (id: string) => run.fixture.taskStore.load(run.taskOf(id))?.status
