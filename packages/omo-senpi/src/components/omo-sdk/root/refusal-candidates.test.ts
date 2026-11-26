@@ -42,40 +42,71 @@ const candidatesOf = (answer: unknown): readonly Record<string, unknown>[] => {
   return (Reflect.get(Object(details), "candidates") as readonly Record<string, unknown>[] | undefined) ?? []
 }
 
-describe("refusal candidates are the caller's list rows (ruling B2)", () => {
-  for (const [kind, principal] of Object.entries(PRINCIPALS))
-    for (const [row, input] of [
-      ["threads.resolve", { address: "lane t-1", all_scope: true }],
-      ["threads.locate", { thread: "lane t-1", all_scope: true }],
-    ] as const)
-      test(`#given a ${kind} #when ${row} is ambiguous #then every candidate field is a field its list returns for that row, or the preview`, async () => {
-        const refused = await call(row, principal, input)
-        expect(Reflect.get(Object(Reflect.get(Object(refused), "error")), "code")).toBe("ambiguous_target")
-        const candidates = candidatesOf(refused)
+const AMBIGUOUS = [
+  ["threads.resolve", { address: "lane t-1", all_scope: true }],
+  ["threads.locate", { thread: "lane t-1", all_scope: true }],
+] as const
+// What the shipped SDK answers a script today (base 08c03295c9), which a person and a script keep (design lane ruling on
+// the 180-cell locate capture): B2 is the session's projection only.
+const SHIPPED_THREAD_CANDIDATE = [
+  "address",
+  "cwd",
+  "device",
+  "device_name",
+  "name",
+  "preview",
+  "state",
+  "thread",
+  "updatedAt",
+]
+
+describe("a person's and a script's refusal candidates keep the shipped shape", () => {
+  for (const kind of ["person", "script"] as const) {
+    for (const [row, input] of AMBIGUOUS)
+      test(`#given a ${kind} #when ${row} is ambiguous #then every candidate carries the shipped fields`, async () => {
+        const candidates = candidatesOf(await call(row, PRINCIPALS[kind], input))
         expect(candidates.length).toBe(2)
-        // The list rows under the same scope; a session's list cells equal a script's in 4.1, which its root does not
-        // serve yet, so the script's list stands for the caller's.
-        const listed = (Reflect.get(Object(await call("threads.list", undefined, { all_scope: true })), "threads") ??
-          []) as readonly Record<string, unknown>[]
-        for (const candidate of candidates) {
-          const own = listed.find((listRow) => listRow["thread"] === candidate["thread"])
-          expect(own).toBeDefined()
-          const { preview, ...rest } = candidate
-          expect(sameHome(rest)).toEqual(sameHome({ ...own }))
-          expect(typeof preview).toBe("string")
-        }
+        for (const candidate of candidates) expect(Object.keys(candidate).toSorted()).toEqual(SHIPPED_THREAD_CANDIDATE)
       })
+    test(`#given a ${kind} #when devices.resolve names no device #then every candidate keeps device, name and online`, async () => {
+      const candidates = candidatesOf(await call("devices.resolve", PRINCIPALS[kind], { device: "nowhere" }))
+      expect(candidates.length).toBeGreaterThan(0)
+      for (const candidate of candidates)
+        expect(Object.keys(candidate).toSorted()).toEqual(["device", "name", "online"])
+    })
+  }
 })
 
-describe("device refusal candidates (ruling B2)", () => {
-  for (const [kind, principal] of Object.entries(PRINCIPALS))
-    test(`#given a ${kind} #when devices.resolve names no device #then every candidate keeps its device id and name only`, async () => {
-      const refused = await call("devices.resolve", principal, { device: "nowhere" })
-      expect(Reflect.get(Object(Reflect.get(Object(refused), "error")), "code")).toBe("not_found")
+describe("a session's refusal candidates are its list rows (ruling B2)", () => {
+  const principal = PRINCIPALS.session
+  for (const [row, input] of AMBIGUOUS)
+    test(`#given a session #when ${row} is ambiguous #then every candidate field is a field its list returns for that row, or the preview`, async () => {
+      const refused = await call(row, principal, input)
+      expect(Reflect.get(Object(Reflect.get(Object(refused), "error")), "code")).toBe("ambiguous_target")
       const candidates = candidatesOf(refused)
-      expect(candidates.length).toBeGreaterThan(0)
-      for (const candidate of candidates) expect(Object.keys(candidate).toSorted()).toEqual(["device", "name"])
+      expect(candidates.length).toBe(2)
+      // The list rows under the same scope; a session's list cells equal a script's in 4.1, which its root does not
+      // serve yet, so the script's list stands for the caller's.
+      const listed = (Reflect.get(Object(await call("threads.list", undefined, { all_scope: true })), "threads") ??
+        []) as readonly Record<string, unknown>[]
+      for (const candidate of candidates) {
+        const own = listed.find((listRow) => listRow["thread"] === candidate["thread"])
+        expect(own).toBeDefined()
+        const { preview, ...rest } = candidate
+        expect(sameHome(rest)).toEqual(sameHome({ ...own }))
+        expect(typeof preview).toBe("string")
+      }
     })
+})
+
+describe("a session's device refusal candidates (ruling B2)", () => {
+  test(`#given a session #when devices.resolve names no device #then every candidate keeps its device id and name only`, async () => {
+    const refused = await call("devices.resolve", PRINCIPALS.session, { device: "nowhere" })
+    expect(Reflect.get(Object(Reflect.get(Object(refused), "error")), "code")).toBe("not_found")
+    const candidates = candidatesOf(refused)
+    expect(candidates.length).toBeGreaterThan(0)
+    for (const candidate of candidates) expect(Object.keys(candidate).toSorted()).toEqual(["device", "name"])
+  })
 })
 
 describe("the projection itself", () => {

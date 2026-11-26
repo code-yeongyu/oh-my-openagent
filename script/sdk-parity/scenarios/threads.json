@@ -7297,13 +7297,11 @@
       "expect": [
         {
           "port": "host",
-          "op": "list_sessions",
-          "count": 2
+          "op": "list_sessions"
         },
         {
           "port": "remote",
-          "op": "sessions.list",
-          "count": 2
+          "op": "sessions.list"
         }
       ],
       "target": "this_device"

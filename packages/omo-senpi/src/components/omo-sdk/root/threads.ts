@@ -172,8 +172,9 @@ export function threadsNamespace(options: {
   // identifiers for resolve, the located thread without its endpoint and session file path for locate. Every other
   // allowed cell of a session or another principal is slice T2's or X1b's (design lane ruling), and the refused cells are
   // answered before this at the root's boundary.
-  // Ruling B (the owner's, T1a review LOW 1): a resolution call's refusal candidates are the caller's own list rows for
-  // the same threads under the call's scope, plus the preview of a row it may read.
+  // Ruling B (the owner's, T1a review LOW 1): a SESSION's resolution refusal candidates are its own list rows for the
+  // same threads under the call's scope, plus the preview of a row it may read. A person and a script keep the
+  // candidates the shipped SDK answers today (design lane ruling on the 180-cell locate capture).
   const candidateRefusal = (failure: OmoFailure, allScope?: boolean) =>
     projectedCandidates(failure, options.principal.kind, async () => {
       const listed = await (await thread()).list(allScope === true ? { all_scope: true } : {})
@@ -228,16 +229,13 @@ export function threadsNamespace(options: {
     },
     "threads.locate": async (input) => {
       const located = await (await thread()).locate(input)
-      if (located.kind === "error") return await candidateRefusal(threadFailure(located.error), input.all_scope)
+      if (located.kind === "error") return threadFailure(located.error)
       return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
     },
-    "devices.resolve": async (input) => {
-      const resolved = await resolveDevice(options.ports?.remote, input.device)
-      return resolved.kind === "error" ? await candidateRefusal(resolved) : resolved
-    },
+    "devices.resolve": async (input) => await resolveDevice(options.ports?.remote, input.device),
     "threads.resolve": async (input) => {
       const decided = await (await thread()).resolveThread(input)
-      if (decided.kind === "error") return await candidateRefusal(threadFailure(decided.error), input.all_scope)
+      if (decided.kind === "error") return threadFailure(decided.error)
       const remote = options.ports?.remote
       if (remote === undefined) return NO_ACCOUNT
       // Design lane ruling A: the row is the account listing's row for the id the one resolver decided, read by that id.

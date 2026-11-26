@@ -1,0 +1,3020 @@
+{
+  "captured_from": "08c03295c9cdc4b85306d355c4e120051a43b00c",
+  "by": "this file's cells, run in the base branch tip's tree (origin/fix/thread-host-reachability-2124d = 08c03295c9), the working directory written <cwd>",
+  "answers": {
+    "[{},null,\"self\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "[{},null,\"nobody\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nobody\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"here/alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"Studio Laptop/beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"b7c41e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"a11ce0de5e1f0123/0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"x/y\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No device named x is signed in to this account.",
+        "next_action": "Pass a device name or id from candidates, or call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        "details": {
+          "kind": "device",
+          "device": "x",
+          "candidates": [
+            {
+              "device": "a11ce0de5e1f0123",
+              "name": "this mac",
+              "online": true
+            },
+            {
+              "device": "b",
+              "name": "studio",
+              "online": true
+            },
+            {
+              "device": "b7c41e09d2a64f1e",
+              "name": "Studio Laptop",
+              "online": true
+            },
+            {
+              "device": "c0ffee5a1d2b3c4d",
+              "name": "attic",
+              "online": false
+            }
+          ]
+        }
+      }
+    },
+    "[{},null,\"0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"0aa00002-0000-4000-8000-000000000002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002-0000-4000-8000-000000000002\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0aa00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"0aa00004-0000-4000-8000-000000000004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"0bb00002-0000-4000-8000-000000000002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},null,\"0bb00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{},null,\"0bb00004-0000-4000-8000-000000000004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004-0000-4000-8000-000000000004\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0ee00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0dd00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"0ff00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0bb00001-ffff-4000-8000-00000000000f\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00001-ffff-4000-8000-00000000000f\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"beta old\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},null,\"shared\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    "[{},null,\"fix/login\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"lane-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"lane-here\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"rk-b-live\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"rk-b-ended\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},null,\"rk-b-shared\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{},null,\"rk-b-probe\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-b-probe\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"rk-stale-on-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"rk-fix-login\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-fix-login\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"rk-b-prefix-twin\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-b-prefix-twin\" in this workspace. \"rk-b-prefix-twin\" is a session id, not a thread value. Pass the thread value thread_list (tool.thread_list() in an eval cell) shows, or omit thread / pass self for this session. Visible thread values: 0aa00001-0000-4000-8000-000000000001, 0aa00003-0000-4000-8000-000000000003, 0aa00004-0000-4000-8000-000000000004, 0bb00001-0000-4000-8000-000000000001, 0bb00002-0000-4000-8000-000000000002.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0aa00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"0aa00002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0aa00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"0aa00004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},null,\"0bb00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"0bb00002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},null,\"0bb00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{},null,\"0bb00004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0ee00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},null,\"0dd00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},null,\"0ff00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"self\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "[{},true,\"nobody\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nobody\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"here/alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"Studio Laptop/beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"b7c41e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"a11ce0de5e1f0123/0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"x/y\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No device named x is signed in to this account.",
+        "next_action": "Pass a device name or id from candidates, or call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        "details": {
+          "kind": "device",
+          "device": "x",
+          "candidates": [
+            {
+              "device": "a11ce0de5e1f0123",
+              "name": "this mac",
+              "online": true
+            },
+            {
+              "device": "b",
+              "name": "studio",
+              "online": true
+            },
+            {
+              "device": "b7c41e09d2a64f1e",
+              "name": "Studio Laptop",
+              "online": true
+            },
+            {
+              "device": "c0ffee5a1d2b3c4d",
+              "name": "attic",
+              "online": false
+            }
+          ]
+        }
+      }
+    },
+    "[{},true,\"0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"0aa00002-0000-4000-8000-000000000002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002-0000-4000-8000-000000000002\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0aa00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"0aa00004-0000-4000-8000-000000000004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"0bb00002-0000-4000-8000-000000000002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},true,\"0bb00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{},true,\"0bb00004-0000-4000-8000-000000000004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004-0000-4000-8000-000000000004\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0ee00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0dd00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"0ff00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001-0000-4000-8000-000000000001\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0bb00001-ffff-4000-8000-00000000000f\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00001-ffff-4000-8000-00000000000f\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"beta old\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},true,\"shared\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    "[{},true,\"fix/login\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"lane-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"lane-here\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"rk-b-live\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"rk-b-ended\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},true,\"rk-b-shared\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{},true,\"rk-b-probe\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-b-probe\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"rk-stale-on-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"rk-fix-login\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-fix-login\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"rk-b-prefix-twin\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-b-prefix-twin\" in the daemon-wide scope. \"rk-b-prefix-twin\" is a session id, not a thread value. Pass the thread value thread_list (tool.thread_list() in an eval cell) shows, or omit thread / pass self for this session. Visible thread values: 0aa00001-0000-4000-8000-000000000001, 0aa00003-0000-4000-8000-000000000003, 0aa00004-0000-4000-8000-000000000004, 0bb00001-0000-4000-8000-000000000001, 0bb00002-0000-4000-8000-000000000002.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0aa00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"0aa00002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0aa00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"0aa00004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{},true,\"0bb00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"0bb00002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{},true,\"0bb00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{},true,\"0bb00004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0ee00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{},true,\"0dd00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{},true,\"0ff00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"self\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"nobody\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nobody\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"here/alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"Studio Laptop/beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"b7c41e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"a11ce0de5e1f0123/0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"x/y\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No device named x is signed in to this account.",
+        "next_action": "Pass a device name or id from candidates, or call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        "details": {
+          "kind": "device",
+          "device": "x",
+          "candidates": [
+            {
+              "device": "a11ce0de5e1f0123",
+              "name": "this mac",
+              "online": true
+            },
+            {
+              "device": "b",
+              "name": "studio",
+              "online": true
+            },
+            {
+              "device": "b7c41e09d2a64f1e",
+              "name": "Studio Laptop",
+              "online": true
+            },
+            {
+              "device": "c0ffee5a1d2b3c4d",
+              "name": "attic",
+              "online": false
+            }
+          ]
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00002-0000-4000-8000-000000000002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002-0000-4000-8000-000000000002\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00004-0000-4000-8000-000000000004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00002-0000-4000-8000-000000000002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00004-0000-4000-8000-000000000004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004-0000-4000-8000-000000000004\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0ee00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0dd00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0ff00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00001-ffff-4000-8000-00000000000f\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-ffff-4000-8000-00000000000f",
+        "title": "beta twin",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"beta old\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"shared\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"fix/login\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"lane-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"lane-here\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-b-live\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-b-ended\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-b-shared\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-b-probe\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-b-probe\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-stale-on-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-fix-login\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-fix-login\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"rk-b-prefix-twin\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-ffff-4000-8000-00000000000f",
+        "title": "beta twin",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0aa00004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 threads have an id starting with \"0bb00001\".",
+        "next_action": "Pass a longer prefix or the exact thread value from the candidates.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0bb00001-0000-4000-8000-000000000001",
+              "name": "beta",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001",
+              "device_name": "Studio Laptop"
+            },
+            {
+              "thread": "0bb00001-ffff-4000-8000-00000000000f",
+              "name": "beta twin",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0bb00001-0000-4000-8000-000000000001",
+            "name": "beta",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001",
+            "device_name": "Studio Laptop"
+          },
+          {
+            "thread": "0bb00001-ffff-4000-8000-00000000000f",
+            "name": "beta twin",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0bb00004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0ee00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0dd00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},null,\"0ff00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"self\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"nobody\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nobody\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"here/alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"Studio Laptop/beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"b7c41e/0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"a11ce0de5e1f0123/0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"x/y\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No device named x is signed in to this account.",
+        "next_action": "Pass a device name or id from candidates, or call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        "details": {
+          "kind": "device",
+          "device": "x",
+          "candidates": [
+            {
+              "device": "a11ce0de5e1f0123",
+              "name": "this mac",
+              "online": true
+            },
+            {
+              "device": "b",
+              "name": "studio",
+              "online": true
+            },
+            {
+              "device": "b7c41e09d2a64f1e",
+              "name": "Studio Laptop",
+              "online": true
+            },
+            {
+              "device": "c0ffee5a1d2b3c4d",
+              "name": "attic",
+              "online": false
+            }
+          ]
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00002-0000-4000-8000-000000000002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002-0000-4000-8000-000000000002\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00004-0000-4000-8000-000000000004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00002-0000-4000-8000-000000000002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00003-0000-4000-8000-000000000003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00004-0000-4000-8000-000000000004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004-0000-4000-8000-000000000004\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0ee00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0dd00001-0000-4000-8000-000000000001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0ff00001-0000-4000-8000-000000000001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001-0000-4000-8000-000000000001\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00001-ffff-4000-8000-00000000000f\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-ffff-4000-8000-00000000000f",
+        "title": "beta twin",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"alpha\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"beta\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"beta old\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"shared\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"fix/login\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"lane-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"lane-here\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-b-live\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-0000-4000-8000-000000000001",
+        "title": "beta",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-b-ended\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-b-shared\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-b-probe\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-b-probe\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-stale-on-b\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-fix-login\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"rk-fix-login\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"rk-b-prefix-twin\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00001-ffff-4000-8000-00000000000f",
+        "title": "beta twin",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00001-0000-4000-8000-000000000001",
+        "title": "alpha",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-live",
+          "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00002\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0aa00002\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-shared",
+          "durable_session_id": "0aa00003-0000-4000-8000-000000000003"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0aa00004\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0aa00004-0000-4000-8000-000000000004",
+        "title": "fix/login",
+        "cwd": "<cwd>",
+        "status": "live",
+        "session_path": null,
+        "endpoint": {
+          "kind": "rpc_host",
+          "socket": "/tmp/i-0123456789abcdef.sock",
+          "routing_id": "route-here-slash",
+          "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+        },
+        "surface": "desktop",
+        "alive": true
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 threads have an id starting with \"0bb00001\".",
+        "next_action": "Pass a longer prefix or the exact thread value from the candidates.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0bb00001-0000-4000-8000-000000000001",
+              "name": "beta",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001",
+              "device_name": "Studio Laptop"
+            },
+            {
+              "thread": "0bb00001-ffff-4000-8000-00000000000f",
+              "name": "beta twin",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "2023-11-14T22:13:20.000Z",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0bb00001-0000-4000-8000-000000000001",
+            "name": "beta",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001",
+            "device_name": "Studio Laptop"
+          },
+          {
+            "thread": "0bb00001-ffff-4000-8000-00000000000f",
+            "name": "beta twin",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "2023-11-14T22:13:20.000Z",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00001-ffff-4000-8000-00000000000f",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00002\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00002-0000-4000-8000-000000000002",
+        "title": "beta old",
+        "cwd": "/work/b",
+        "status": "resumable",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": false,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00003\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0bb00003-0000-4000-8000-000000000003",
+        "title": "shared",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0bb00004\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0bb00004\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0ee00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0dd00001\"]": {
+      "kind": "ok",
+      "thread": {
+        "thread_id": "0dd00001-0000-4000-8000-000000000001",
+        "title": "stale live",
+        "cwd": "/work/b",
+        "status": "live",
+        "session_path": null,
+        "endpoint": null,
+        "surface": null,
+        "alive": true,
+        "device": "b7c41e09d2a64f1e",
+        "address": "b7c41e09d2a64f1e/0dd00001-0000-4000-8000-000000000001"
+      }
+    },
+    "[{\"prefixTwin\":true},true,\"0ff00001\"]": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ff00001\" in the daemon-wide scope.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  }
+}
