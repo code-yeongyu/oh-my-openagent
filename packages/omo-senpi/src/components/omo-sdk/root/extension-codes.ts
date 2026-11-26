@@ -1,5 +1,6 @@
 import type { StoreExtensionRefusal, StoreExtensionRefusalCode } from "../../thread/gateway/store-extensions"
-import { OMO_CODE_REGISTRY, type OmoCode, type OmoFailure } from "../contract"
+import type { OmoFailure } from "../contract"
+import { OMO_CODE_REGISTRY, type OmoCode } from "../contract/codes"
 
 // A store extension's refusal in the root's one code registry (design 4.4). The store's own code is kept in `details.code`
 // and its message as it is, so the thread SDK facade answers exactly the refusal the store gave.

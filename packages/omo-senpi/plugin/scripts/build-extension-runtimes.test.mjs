@@ -124,6 +124,85 @@ describe("gateway store worker sidecar", () => {
   })
 })
 
+// The node packages a shipped SDK runtime inlines, by name (LEAD ruling on the P1b regression that widened the thread SDK
+// runtime from 1 package to 29): a new import that widens either bundle fails here naming the package.
+const inlinedPackages = (inputs) =>
+  [...new Set(inputs.flatMap((input) => /.*node_modules\/((?:@[^/]+\/)?[^/]+)/.exec(input)?.[1] ?? []))].sort()
+
+describe("shipped SDK runtimes inline a pinned set of packages", () => {
+  test("#given the thread SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
+    expect(inlinedPackages((await sharedOutputs()).threadSdkInputs)).toEqual(["typebox"])
+  })
+
+  test("#given the omo SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
+    expect(inlinedPackages((await sharedOutputs()).omoSdkInputs)).toEqual(["jsonc-parser", "typebox", "zod"])
+  })
+})
+
+// The provisioned SDK root runtime's cold-import decision (design lane and owner, P1b #14950): the call table, the thread
+// contracts and the thread core load on first use and the file may not grow. Raising the ceiling or adding a static path
+// reopens that decision; the split into a second runtime file is the next SDK slice's.
+const OMO_SDK_RUNTIME_BYTES = 933_161
+const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
+
+async function staticModules(entry) {
+  const built = await Bun.build({ entrypoints: [entry], target: "node", format: "esm", metafile: true })
+  if (!built.success) throw new Error(built.logs.map(String).join("\n"))
+  const inputs = built.metafile.inputs
+  const start = Object.keys(inputs).find((path) => path.endsWith("src/extension/omo-sdk.ts"))
+  const reached = new Set([start])
+  const queue = [start]
+  while (queue.length > 0)
+    for (const edge of inputs[queue.shift()]?.imports ?? [])
+      if (edge.kind !== "dynamic-import" && inputs[edge.path] !== undefined && !reached.has(edge.path)) {
+        reached.add(edge.path)
+        queue.push(edge.path)
+      }
+  const users = (library) =>
+    [...reached]
+      .filter((path) => !path.includes("node_modules"))
+      .filter((path) =>
+        inputs[path].imports.some((edge) => new RegExp(`node_modules/(.*/)?${library}/`).test(edge.path)),
+      )
+      .map((path) => path.replace(/^.*?packages\//, "packages/"))
+      .sort()
+  return { reached: [...reached], zod: users("zod"), typebox: users("typebox") }
+}
+
+describe("the provisioned SDK root runtime's cold import (P1b decision)", () => {
+  test("#given the built runtime #then it is no larger than the decided ceiling, and the deferred modules are on no static import path", async () => {
+    const outputs = await sharedOutputs()
+    const bytes = Bun.file(outputs.omoSdkOutputPath).size
+    if (bytes > OMO_SDK_RUNTIME_BYTES)
+      throw new Error(
+        `the omo SDK runtime is ${bytes} bytes, over its ceiling of ${OMO_SDK_RUNTIME_BYTES}: growth reopens the P1b cold-import decision (#14950); split the thread core into its own runtime file first (the next SDK slice)`,
+      )
+    const statics = await staticModules(
+      join(fileURLToPath(new URL("../..", import.meta.url)), "src", "extension", "omo-sdk.ts"),
+    )
+    expect(statics.reached.filter((path) => DEFERRED.some((part) => path.includes(part)))).toEqual([])
+    // The static modules that import a schema library, exactly: a new one fails here by name.
+    expect({ zod: statics.zod, typebox: statics.typebox }).toEqual({
+      zod: [
+        "packages/omo-opencode/src/cli/service-auth/credential-owner.ts",
+        "packages/omo-opencode/src/cli/service-auth/devices.ts",
+        "packages/omo-opencode/src/cli/service-auth/keychain-helper/client.ts",
+        "packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities.ts",
+        "packages/omo-opencode/src/cli/service-auth/machine-reconcile.ts",
+        "packages/omo-opencode/src/cli/service-auth/protocol-request.ts",
+        "packages/omo-opencode/src/cli/service-auth/protocol.ts",
+        "packages/omo-opencode/src/cli/service-auth/refresh-attempt.ts",
+        "packages/omo-opencode/src/cli/service-auth/signed-out-marker.ts",
+        "packages/omo-senpi/src/components/memory/device-session/cli-account-operation.ts",
+        "packages/omo-senpi/src/components/omo-sdk/account/index.ts",
+        "packages/omo-senpi/src/components/omo-sdk/account/sign-in.ts",
+        "packages/team-core/src/team-state-store/lock-worker-lifetime.ts",
+      ],
+      typebox: ["packages/omo-senpi/src/components/omo-sdk/contract/principal.ts"],
+    })
+  })
+})
+
 describe("thread SDK runtime", () => {
   test("#given the thread SDK build #when its inputs and exports are inspected #then it is a standalone entry that inlines no package but the contracts' typebox", async () => {
     const outputs = await sharedOutputs()

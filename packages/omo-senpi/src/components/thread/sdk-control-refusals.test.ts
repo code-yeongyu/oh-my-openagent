@@ -6,136 +6,16 @@ import { createGatewayStore } from "./gateway/store"
 import { createThreadSdk } from "./sdk"
 import type { ThreadHost } from "./tools"
 
-// Design 4.1: createThreadSdk is a compatibility facade that answers exactly what it shipped. The expected answers below
-// are the shipped code's own, captured at the base before the facade moved over the root (design lane ruling on the
-// regression slice T1b found): every self and not_found refusal of the controls keeps its nested kind, field for field
-// and in its key order. The existing self-address test compared with toMatchObject, which ignores extra fields.
-const SHIPPED = {
-  interrupt: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "caller_context_missing",
-      message: "The caller's durable session id is not in the thread address book.",
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
-    },
-  },
-  closeSelf: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "caller_context_missing",
-      message: "The caller's durable session id is not in the thread address book.",
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
-    },
-  },
-  closeDefault: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "caller_context_missing",
-      message: "The caller's durable session id is not in the thread address book.",
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
-    },
-  },
-  renameSelf: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "caller_context_missing",
-      message: "The caller's durable session id is not in the thread address book.",
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
-    },
-  },
-  renameDefault: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "caller_context_missing",
-      message: "The caller's durable session id is not in the thread address book.",
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
-    },
-  },
-  setModel: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "caller_context_missing",
-      message: "The caller's durable session id is not in the thread address book.",
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
-    },
-  },
-  interruptMissing: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "not_found",
-      message: 'No visible thread matches "nope-thread" in this workspace.',
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
-      details: {
-        kind: "thread",
-      },
-    },
-  },
-  closeMissing: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "not_found",
-      message: 'No visible thread matches "nope-thread" in this workspace.',
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
-      details: {
-        kind: "thread",
-      },
-    },
-  },
-  renameMissing: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "not_found",
-      message: 'No visible thread matches "nope-thread" in this workspace.',
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
-      details: {
-        kind: "thread",
-      },
-    },
-  },
-  setModelMissing: {
-    kind: "error",
-    error: {
-      kind: "error",
-      code: "not_found",
-      message: 'No visible thread matches "nope-thread" in this workspace.',
-      next_action:
-        "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
-      details: {
-        kind: "thread",
-      },
-    },
-  },
-  interruptBogus: {
-    kind: "error",
-    error: {
-      code: "invalid_arguments",
-      message: 'This tool takes no field "bogus" Nothing was done.',
-      next_action: 'Call the tool again without "bogus"; it takes: thread, turn_id, all_scope, idempotency_key.',
-      details: {
-        field: "bogus",
-        accepted: ["thread", "turn_id", "all_scope", "idempotency_key"],
-      },
-    },
-  },
-} as const
+// Design 4.1: createThreadSdk is a compatibility facade that answers exactly what it shipped. The expected answers are
+// the shipped code's own, written by `bun script/capture-shipped-thread-refusals.ts` at dev cab771c006 into the fixture
+// beside this file (its base, command and count are in it); every self and not_found refusal of the controls keeps its
+// nested kind, field for field and in key order. The older self-address test compares with toMatchObject, which cannot
+// see an extra field.
+const SHIPPED = (await Bun.file(join(import.meta.dir, "sdk-control-refusals.shipped.json")).json()) as {
+  readonly base: string
+  readonly count: number
+  readonly answers: Readonly<Record<string, unknown>>
+}
 
 test("#given a script with no session of its own and an unknown thread #when each control is called #then every answer equals the shipped one, nested fields and key order included", async () => {
   const unused = async (): Promise<never> => {
@@ -180,9 +60,26 @@ test("#given a script with no session of its own and an unknown thread #when eac
     renameMissing: await sdk.rename({ thread: "nope-thread", name: "mine" }),
     setModelMissing: await sdk.set_model({ thread: "nope-thread", model: "opus" }),
     interruptBogus: await sdk.interrupt({ thread: "self", bogus: 1 } as never),
+    releaseNoEndpoint: await sdk.release(
+      {
+        thread_id: "dur-x",
+        title: "x",
+        cwd: "/w",
+        status: "live",
+        session_path: null,
+        endpoint: null,
+        surface: null,
+        alive: true,
+        device: "studio",
+        address: "studio/dur-x",
+      },
+      { interrupt: false } as never,
+    ),
   }
   await sdk.dispose()
   await store.dispose()
   rmSync(agentDir, { recursive: true, force: true })
-  expect(JSON.stringify(answers)).toBe(JSON.stringify(SHIPPED))
+  expect(SHIPPED.base).toBe("cab771c00642b969d229869d2312996450ce1bf3")
+  expect(Object.keys(answers).length).toBe(SHIPPED.count)
+  expect(JSON.stringify(answers)).toBe(JSON.stringify(SHIPPED.answers))
 })

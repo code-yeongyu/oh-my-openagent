@@ -72,6 +72,139 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     ])
   })
 
+  // Design lane ruling: a pair proves an input's effect by a different trace OR a different answer, from the same given.
+  test("#given a pair with the same trace #when their stated answers differ, are equal, or their given state differs #then only the different answers cover the input", async () => {
+    const evidence = await runEffectScenarios(builtRows, pair)
+    const [a, b] = evidence
+    if (a === undefined || b === undefined) throw new Error("no pair")
+    type Answer = Readonly<Record<string, unknown>>
+    const stated = (value: Answer) => ({ answer: { value }, answered: { kind: "ok", value } })
+    const sameTrace = (answerA: Answer, answerB: Answer, givenB: readonly unknown[] = []): EffectEvidence[] => [
+      { ...a, ...stated(answerA) },
+      { ...b, expect: a.expect, observed: a.observed, ...stated(answerB), given: givenB },
+    ]
+    const uncovered =
+      "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one"
+    const problems = (records: EffectEvidence[]) => conformanceProblems(builtRows, open, records, CONTEXT)
+    expect(problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }))).not.toContain(uncovered)
+    expect(problems(sameTrace({ thread: "t-1" }, { thread: "t-1" }))).toContain(uncovered)
+    expect(
+      problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }, [{ port: "host", state: { moved: true } }])),
+    ).toContain(uncovered)
+    const [setupA, setupB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
+    if (setupA === undefined || setupB === undefined) throw new Error("no pair")
+    expect(problems([setupA, { ...setupB, setup: { before: [{ row: "threads.create" }] } }])).toContain(uncovered)
+    // A callbacks entry keyed by the input that differs is part of the difference; any other callbacks entry is fixture.
+    const [cbA, cbB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
+    if (cbA === undefined || cbB === undefined) throw new Error("no pair")
+    expect(problems([cbA, { ...cbB, setup: { callbacks: { all_scope: "answers yes" } } }])).not.toContain(uncovered)
+    expect(problems([cbA, { ...cbB, setup: { callbacks: { other: "answers yes" } } }])).toContain(uncovered)
+    const [answeredA, silentB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
+    if (answeredA === undefined || silentB === undefined) throw new Error("no pair")
+    const { answer: _dropped, ...withoutAnswer } = silentB
+    expect(problems([answeredA, withoutAnswer])).toContain(uncovered)
+  })
+
+  // Slices C1c and A1b rely on this for consent-style inputs: a refusal and an ok answer from the same given, differing in
+  // one input, cover that input (the kinds differ); with a different given they do not.
+  test("#given an ok scenario and a refusal scenario that differ in one input #when their given is the same #then the input is covered, and not when the given differs", async () => {
+    const split = builtRows.map((row) =>
+      row.id === "threads.locate"
+        ? {
+            ...built,
+            scenarios: {
+              effect: ["threads.locate/by-id", "threads.locate/other-device"],
+              refusal: ["threads.locate/all-scope"],
+            },
+          }
+        : row,
+    )
+    const refused = (given: readonly { readonly port: string; readonly state: Record<string, unknown> }[]) =>
+      run(
+        {
+          ...scenario("all-scope", true),
+          kind: "refusal",
+          refusal: "scope_denied",
+          ...(given.length === 0 ? {} : { given }),
+        },
+        { kind: "error", error: { code: "scope_denied" } },
+      )
+    const uncovered =
+      "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one"
+    const problems = async (refusal: ScenarioRun) =>
+      conformanceProblems(
+        split,
+        open,
+        await runEffectScenarios(split, [pair[0], refusal, pair[2]] as ScenarioRun[]),
+        CONTEXT,
+      )
+    expect(await problems(refused([]))).not.toContain(uncovered)
+    expect(await problems(refused([{ port: "host", state: { moved: true } }]))).toContain(uncovered)
+  })
+
+  test("#given a scenario with before calls #when the runner records it #then its record carries them as its setup", async () => {
+    const withBefore = {
+      ...scenario("by-id", undefined),
+      before: [{ row: "threads.create", input: {} }],
+    } as TableScenario
+    const [record] = await runEffectScenarios(builtRows, [run(withBefore)])
+    expect(record?.setup).toEqual({ before: [{ row: "threads.create", input: {} }] })
+    const [plain] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
+    expect(plain?.setup).toBeUndefined()
+  })
+
+  test("#given a scenario whose answer carries a value generated per run #when it is run twice #then it fails by name and covers nothing", async () => {
+    let generated = 0
+    const unstable = run(
+      { ...scenario("by-id", undefined), answer: { value: { thread: "t1" } } },
+      undefined,
+      (calls, input) => {
+        calls.push({
+          port: "host",
+          op: "listSessions",
+          args: { allScope: Reflect.get(Object(input), "all_scope") === true },
+        })
+        generated += 1
+        return { kind: "ok", value: { thread: "t1", request: `r-${generated}` } }
+      },
+    )
+    const steady = run(
+      { ...scenario("by-id", undefined), answer: { value: { thread: "t1" } } },
+      {
+        kind: "ok",
+        value: { thread: "t1", request: "r-1" },
+      },
+    )
+    const [shaky] = await runEffectScenarios(builtRows, [unstable])
+    const [stable] = await runEffectScenarios(builtRows, [steady])
+    expect(shaky?.unstableAnswer).toBe(true)
+    expect(stable?.unstableAnswer).toBeUndefined()
+    expect(conformanceProblems(builtRows, open, shaky === undefined ? [] : [shaky], CONTEXT)).toContainEqual(
+      "row threads.locate: scenario threads.locate/by-id: its answer differs between two runs of the same input; an unstable answer proves no effect",
+    )
+  })
+
+  test("#given an evidence record #then it must state its given state (a producer cannot leave it absent)", async () => {
+    const [record] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
+    if (record === undefined) throw new Error("no record")
+    expect(record.given).toEqual([])
+    const { given: _given, ...withoutGiven } = record
+    // @ts-expect-error given is required on every evidence record
+    const absent: EffectEvidence = withoutGiven
+    expect(absent.given).toBeUndefined()
+  })
+
+  test("#given a row resolved and filled by another slice #when no run carries its evidence #then it still fails by name (fixture scoping leaves no hole)", () => {
+    const filled = builtRows.map((row) =>
+      row.id === "devices.list" ? { ...row, scenarios: { effect: ["devices.list/plain"], refusal: [] } } : row,
+    )
+    const resolved = new Set([...open].filter((id) => id !== "devices.list"))
+    expect(open.has("devices.list")).toBe(true)
+    expect(conformanceProblems(filled, resolved, [], CONTEXT)).toContainEqual(
+      "row devices.list: scenario devices.list/plain has no run record at the head",
+    )
+  })
+
   test("#given the matching rules #then args are a subset, count 0 means never, result is never compared", () => {
     const observed: ObservedCall[] = [{ port: "store", op: "read", args: { id: "a", extra: 1 } }]
     expect(
