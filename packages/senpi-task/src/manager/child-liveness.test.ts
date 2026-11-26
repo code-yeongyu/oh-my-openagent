@@ -12,6 +12,7 @@ import {
   tempProject,
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 let clock: ReturnType<typeof fakeClock>
 afterEach(() => {
@@ -40,7 +41,7 @@ async function observedChild() {
     }),
   }
   const manager = createTaskManager({
-    store: createTaskRecordStore({ project_dir: project }),
+    store: createTaskRecordStore(ownedTaskState(project)),
     runners: { "in-process": runner, process: runner },
     planner: categoryPlanner(),
     config: settings(),

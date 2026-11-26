@@ -5,6 +5,7 @@ import {
   ColdWakeUnitError,
   installColdWake,
   readColdWake,
+  refreshColdWake,
   runCommand,
   SessionHostLaunch,
   uninstallColdWake,
@@ -38,18 +39,24 @@ const UNSUPPORTED: ColdWakeOutcome = { kind: "unsupported" }
 
 const pause = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
-/** This device's cold wake: the unit runs `binaryPath daemon run` for `agentDir`. Linux and macOS only. */
-export function coldWakeSetup(options: {
+type ColdWakeOptions = {
   readonly binaryPath: string
   readonly agentDir: string
   readonly platform?: NodeJS.Platform
   readonly env?: Readonly<Record<string, string | undefined>>
-}): ColdWake {
-  const platform = options.platform ?? process.platform
+}
+
+/** This user's service manager; undefined off Linux and macOS. */
+function coldWakeHost(platform: NodeJS.Platform, home = homedir()) {
   const uid = typeof process.getuid === "function" ? process.getuid() : undefined
-  if ((platform !== "linux" && platform !== "darwin") || uid === undefined)
-    return { install: async () => UNSUPPORTED, uninstall: async () => UNSUPPORTED, status: async () => undefined }
-  const host = { platform, home: homedir(), uid, run: runCommand, pause }
+  if ((platform !== "linux" && platform !== "darwin") || uid === undefined) return undefined
+  return { platform, home, uid, run: runCommand, pause }
+}
+
+/** This device's service manager and the session host start for `binaryPath`; undefined off Linux and macOS. */
+function deviceColdWake(options: ColdWakeOptions) {
+  const host = coldWakeHost(options.platform ?? process.platform)
+  if (host === undefined) return undefined
   const launchOf = (): SessionHostLaunch | ColdWakeOutcome => {
     try {
       return SessionHostLaunch.from({
@@ -63,6 +70,15 @@ export function coldWakeSetup(options: {
       throw error
     }
   }
+  return { host, launchOf }
+}
+
+/** This device's cold wake: the unit runs `binaryPath daemon run` for `agentDir`. Linux and macOS only. */
+export function coldWakeSetup(options: ColdWakeOptions): ColdWake {
+  const device = deviceColdWake(options)
+  if (device === undefined)
+    return { install: async () => UNSUPPORTED, uninstall: async () => UNSUPPORTED, status: async () => undefined }
+  const { host, launchOf } = device
   const withLaunch = async (apply: (launch: SessionHostLaunch) => Promise<ColdWakeOutcome>) => {
     const launch = launchOf()
     return launch instanceof SessionHostLaunch ? apply(launch) : launch
@@ -97,6 +113,31 @@ function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
       return `Cold wake is not set up: the device service's OMO_RELAYD_SERVICES table cannot be read (${outcome.reason}). Fix or remove it, then run omo remote bootstrap.`
     case "failed":
       return `Cold wake could not be set up (${outcome.step}: ${outcome.detail}). Messages to this device's sessions need a running omo until it is.`
+  }
+}
+
+/**
+ * omo#14191: a launch of `runtime` (release `version`) brings an installed session host unit an older runtime wrote to
+ * this runtime's program and shape; `omo update` cannot, because the new runtime copy only exists once the new launcher
+ * has run. Every other launch costs one file read. A failure is one line on `error` and never blocks the launch.
+ */
+export async function refreshColdWakeAtLaunch(
+  options: {
+    readonly runtime: string
+    readonly isOlder: (installedRuntimeVersion: string) => boolean
+    readonly platform?: NodeJS.Platform
+    readonly home?: string
+  },
+  error: (line: string) => void,
+): Promise<void> {
+  const host = coldWakeHost(options.platform ?? process.platform, options.home)
+  if (host === undefined) return
+  try {
+    const outcome = await refreshColdWake(host, { runtime: options.runtime, isOlder: options.isOlder })
+    const notice = outcome === undefined ? undefined : coldWakeNotice(outcome)
+    if (notice !== undefined) error(notice)
+  } catch (cause) {
+    error(`Cold wake could not be refreshed (${cause instanceof Error ? cause.message : String(cause)}).`)
   }
 }
 

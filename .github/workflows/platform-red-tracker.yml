@@ -1,8 +1,10 @@
 name: Platform red tracker
 
 # Pull requests run Linux only (#13802), so a macOS/Windows regression first shows on the dev push run.
-# When a macOS/Windows job of such a run fails, this files ONE open `ci:platform-red` issue naming the merged
-# pull request, or comments on the open one. publish.yml refuses to cut a release while that issue is open.
+# When a macOS/Windows job of such a run fails, this files ONE open `ci:platform-red` issue, or comments on the open
+# one, naming for each failed job the merge whose run first turned it red (a later merge only inherits the red).
+# publish.yml refuses to cut a release while that issue is open, so any green dev push run re-checks the issue and
+# closes it once every tracked job passed again on its own workflow's latest dev push run (close-when-green).
 on:
   workflow_run:
     workflows: [CI, Computer conformance fixtures, Computer engine, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
@@ -22,12 +24,13 @@ jobs:
     timeout-minutes: 5
     outputs:
       failed: ${{ steps.failed.outputs.failed }}
+      introduced: ${{ steps.failed.outputs.introduced }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - name: List the failed macOS/Windows jobs
+      - name: List the failed macOS/Windows jobs and the run each first went red in
         id: failed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,13 +38,10 @@ jobs:
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          failed="$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --jq '
-            [.jobs[]
-              | select(.conclusion == "failure")
-              | select(((.labels | join(" ")) + " " + .name) | test("macos|windows"; "i"))
-              | "- [\(.name)](\(.html_url)) on `\(.labels | join(", "))`"]
-            | join("\n")')"
+          OUT_DIR="$RUNNER_TEMP/platform-red" bash .github/scripts/platform-red-first-red.sh
+          failed="$(cat "$RUNNER_TEMP/platform-red/failed.md")"
           {
+            echo "introduced=$(cat "$RUNNER_TEMP/platform-red/introduced")"
             echo "failed<<PLATFORM_RED_EOF"
             echo "$failed"
             echo "PLATFORM_RED_EOF"
@@ -78,18 +78,25 @@ jobs:
           RUN_NAME: ${{ github.event.workflow_run.name }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           FAILED: ${{ needs.detect.outputs.failed }}
+          INTRODUCED: ${{ needs.detect.outputs.introduced }}
         run: |
           set -euo pipefail
           merged="$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.merged_at != null) | "#\(.number)"] | join(", ")')"
           body="$RUNNER_TEMP/platform-red.md"
           {
-            echo "A macOS/Windows job failed on \`dev\` after merging ${merged:-a direct push} at \`$HEAD_SHA\`."
+            if [ "$INTRODUCED" = true ]; then
+              echo "A macOS/Windows job turned red on \`dev\` after merging ${merged:-a direct push} at \`$HEAD_SHA\`."
+            else
+              echo "A macOS/Windows job is still red on \`dev\` after merging ${merged:-a direct push} at \`$HEAD_SHA\`; that merge did not turn it red."
+            fi
             echo
             echo "Workflow run: [$RUN_NAME]($RUN_URL)"
             echo
+            echo "Each failed job names the merge whose dev push run first failed it:"
+            echo
             echo "$FAILED"
             echo
-            echo "Pull requests run Linux only (#13802), so this is the first platform signal for that change."
+            echo "Pull requests run Linux only (#13802), so a dev push run is the first platform signal for a change."
             echo "Fix it in a pull request that says \`Fixes #<this issue>\`; releases are refused while this issue is open."
           } > "$body"
           oldest_open() { gh issue list --label ci:platform-red --state open --json number --jq 'map(.number) | min // empty'; }
@@ -122,4 +129,31 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Files or comments on the one open `ci:platform-red` issue for `${{ github.event.workflow_run.name }}` at `${{ github.event.workflow_run.head_sha }}`.
           JOB_SUMMARY_NEXT: Fix the listed macOS/Windows job; publish.yml refuses a release while the issue is open.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  close-when-green:
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Close the platform-red issue when every tracked job is green on its own workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: OUT_DIR="$RUNNER_TEMP/platform-red-close" bash .github/scripts/platform-red-close.sh
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Platform red tracker - close when green
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - After `${{ github.event.workflow_run.name }}` passed on `dev` at `${{ github.event.workflow_run.head_sha }}`, checks every job of the open `ci:platform-red` issue on its own workflow's latest dev push run.
+          JOB_SUMMARY_NEXT: If the issue stayed open, the step log names the job that is still red, skipped its tests, or has not re-run since its red commit.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

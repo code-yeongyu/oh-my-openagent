@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "Questa documentazione è in inglese.",
     "mobileHeader": "Docs di OmO",
     "searchPlaceholder": "Cerca nei docs...",
     "searchLabel": "Filtra le sezioni della documentazione",
@@ -545,7 +546,6 @@
       "accent": "Ma è un agente.",
       "sub": "Trasforma i tuoi token in risultati che contano: ricerche su diecimila fonti, una presentazione che si capisce davvero, backend, frontend e codice.",
       "start": "Inizia",
-      "beta": "Scarica la beta desktop",
       "download": "Scarica l'app desktop",
       "makers": "Da <team>Sisyphus Labs</team>, chi ha creato <dori>Dori</dori> e <term>doriterm</term>."
     },

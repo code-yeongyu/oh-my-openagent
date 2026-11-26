@@ -45,6 +45,7 @@ pub struct Session {
     pub(crate) guard: Guard,
     pub(crate) opened: Option<Opened>,
     pub(crate) funnel: Funnel,
+    pub(crate) refs: crate::refs::RefRegistry,
 }
 
 impl Session {
@@ -70,6 +71,7 @@ impl Session {
             guard,
             opened: None,
             funnel: Funnel::in_memory(),
+            refs: crate::refs::RefRegistry::default(),
         }
     }
 

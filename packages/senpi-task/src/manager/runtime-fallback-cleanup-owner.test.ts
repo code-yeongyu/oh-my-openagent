@@ -4,6 +4,7 @@ import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import type { ManagedRunner } from "./types"
 import { baseSpec, cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { inProcessChild, managerWithLifecycle, PRIMARY } from "./__fixtures__/fallback-launch-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -12,7 +13,7 @@ describe("runtime fallback: an in-process child whose cleanup rejects keeps a cl
 
   test("#given the failed in-process rung's teardown rejects #when the task is failed #then the child stays resident and idle reclaim retries its teardown", async () => {
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const state = { closable: false, disposals: 0 }
     const starts: string[] = []
     let first: ReturnType<typeof makeHandle> | undefined
@@ -64,7 +65,7 @@ describe("runtime fallback: an in-process child whose cleanup rejects keeps a cl
 
   test("#given a stale in-process next-rung child whose cleanup rejects #when the task was interrupted mid-start #then task_send is refused and the child is never messaged", async () => {
     const project = tempProject()
-    const backing = createTaskRecordStore({ project_dir: project })
+    const backing = createTaskRecordStore(ownedTaskState(project))
     // The late child's cleanup owner is decided in the first record write after its start resolves.
     const kept = Promise.withResolvers<void>()
     let armed = false
@@ -118,7 +119,7 @@ describe("runtime fallback: an in-process child whose cleanup rejects keeps a cl
 
   test("#given a stale in-process next-rung child whose cleanup rejects #when the task was cancelled mid-start #then it stays resident and idle reclaim retries its teardown", async () => {
     const project = tempProject()
-    const backing = createTaskRecordStore({ project_dir: project })
+    const backing = createTaskRecordStore(ownedTaskState(project))
     const keptResident = Promise.withResolvers<void>()
     const store: TaskRecordStore = {
       ...backing,

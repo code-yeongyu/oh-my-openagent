@@ -279,6 +279,8 @@ const cases = [
     id: "E23",
     title: "memory",
     observables: WITHOUT_O8,
+    // #13046: the memory footer is compared at its settled value; its refresh ordering is pinned by status.test.ts.
+    settledStatus: ["setStatus:memory"],
     spec: () => ({
       settings: SETTINGS,
       turns: [
@@ -404,13 +406,20 @@ const sha256File = async (path) => {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`
 }
 
+// Two long strings that share a prefix used to print as the same 160 characters (#14969): show where they part.
+function diffExcerpt(golden, actual, width = 160) {
+  const left = JSON.stringify(golden) ?? "undefined"
+  const right = JSON.stringify(actual) ?? "undefined"
+  let at = 0
+  while (at < left.length && at < right.length && left[at] === right[at]) at++
+  const from = Math.max(0, at - 40)
+  const cut = (text) =>
+    `${from > 0 ? "…" : ""}${text.slice(from, from + width)}${text.length > from + width ? "…" : ""}`
+  return `golden=${cut(left)} actual=${cut(right)}${from > 0 ? ` (first difference at char ${at})` : ""}`
+}
+
 function summarizeDiffs(diffs) {
-  return diffs
-    .slice(0, 12)
-    .map(
-      (row) =>
-        `    ${row.path}: golden=${JSON.stringify(row.golden)?.slice(0, 160)} actual=${JSON.stringify(row.actual)?.slice(0, 160)}`,
-    )
+  return diffs.slice(0, 12).map((row) => `    ${row.path}: ${diffExcerpt(row.golden, row.actual)}`)
 }
 
 const SANDBOX_MCP_CONFIG = { mcpServers: { context7: { enabled: false }, grep_app: { enabled: false } } }
@@ -487,7 +496,7 @@ async function main() {
               if (error instanceof Error) error.message = `${error.message}\n${tails.join("\n")}`
               throw error
             }
-            const observations = observeOmo(run, testCase.observables, harness)
+            const observations = observeOmo(run, testCase.observables, harness, testCase.settledStatus)
             result.statusCounts.push(statusCounts(observations))
             runs.push({ observations, witness: readWitness(run.sessionFile) })
           } finally {

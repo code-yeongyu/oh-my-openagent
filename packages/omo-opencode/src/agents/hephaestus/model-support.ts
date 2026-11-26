@@ -34,6 +34,13 @@ export function isHephaestusSupportedModel(model: string | undefined): boolean {
   )
 }
 
+/** Native presets that are the whole deep-work prompt on their own: Hephaestus appends no role after them (#14186). */
+const STANDALONE_PRESETS: ReadonlySet<string> = new Set(["gpt-6.2"])
+
+export function isStandaloneHephaestusPreset(preset: string | undefined): boolean {
+  return preset !== undefined && STANDALONE_PRESETS.has(preset)
+}
+
 export function assertHephaestusSupportedModel(model: string | undefined): void {
   if (!isHephaestusSupportedModel(model)) {
     throw new UnsupportedHephaestusModelError(model)

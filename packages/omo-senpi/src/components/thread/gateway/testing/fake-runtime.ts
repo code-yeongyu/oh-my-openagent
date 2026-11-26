@@ -23,6 +23,8 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   phaseValue: RuntimePhase = "idle"
   epoch = 0
   editorHold: "draft" | undefined = undefined
+  /** senpi#7014: an idle session under these holds keeps a delivery as a held notice and answers `held`. */
+  sessionHolds: readonly string[] = []
   editorRevision = 0
   closedReason: string | undefined
   readonly enqueueCalls: { readonly lane: Lane; readonly delivery_id: string }[] = []
@@ -66,12 +68,23 @@ export class FakeSessionRuntime implements SessionRuntimePort {
       return { kind: "turn_conflict", turn_epoch: turnEpoch }
     this.texts.set(id, input.text)
     this.inputs.set(id, input)
-    if (!this.isBusy()) {
+    if (!this.isBusy() && this.sessionHolds.length > 0) {
+      this.pending.set(id, "followUp")
+      return { kind: "held", turn_epoch: turnEpoch }
+    }
+    if (!this.isBusy() && input.whenIdle !== "queue") {
       this.pending.set(id, "start")
       this.enqueueCalls.push({ lane: "start", delivery_id: id })
       this.beginTurn()
       queueMicrotask(() => this.persist(id))
       return { kind: "started", turn_epoch: turnEpoch }
+    }
+    if (!this.isBusy()) {
+      const lane = input.deliverAs === "steer" ? "steer" : "followUp"
+      this.pending.set(id, lane)
+      ;(lane === "steer" ? this.steering : this.followUps).push(id)
+      this.enqueueCalls.push({ lane, delivery_id: id })
+      return { kind: "queued", turn_epoch: turnEpoch }
     }
     if (input.deliverAs === "steer") {
       if (input.expected_turn_id === undefined) return { kind: "turn_conflict", turn_epoch: turnEpoch }

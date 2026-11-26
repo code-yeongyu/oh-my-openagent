@@ -102,6 +102,18 @@ export function desktopSyncAccountPorts(
         if (deviceId !== descriptor.serviceDeviceId) throw new DesktopSyncServiceError("refused", 403)
         await json({ op: "setDeviceSync", enabled })
       },
+      // One request (#14093): desktop main asks the service for its typed confirmation and spends the token on the
+      // switch itself, so the token never crosses this channel. A main that does not know the op fails the request.
+      async disableDeviceSync(deviceId: string) {
+        if (deviceId !== descriptor.serviceDeviceId) throw new DesktopSyncServiceError("refused", 403)
+        try {
+          await json({ op: "disableDeviceSync" })
+          return { ok: true as const }
+        } catch (error) {
+          if (!(error instanceof DesktopSyncServiceError) || error.status >= 500) throw error
+          return { ok: false as const, code: error.code }
+        }
+      },
     },
     devices: async () => SyncDevices.parse(await json({ op: "devices" })).devices,
     // The rotator reads the raw reply: the strict SyncDevices schema refuses a row of an unknown kind or platform.

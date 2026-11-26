@@ -1,0 +1,353 @@
+{
+  "domain": "sync",
+  "rows": [
+    {
+      "id": "sync.approve",
+      "kind": "capability",
+      "sdk": "sync.approve",
+      "today": "no",
+      "slices": [
+        "A2b"
+      ],
+      "input": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirmCode": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "confirmCode"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "sync",
+            "approve"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the approval is the comparison a person makes"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "sync.disable",
+      "kind": "capability",
+      "sdk": "sync.disable",
+      "today": "no",
+      "slices": [
+        "A2b"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "sync",
+            "disable"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: a person's choice about this device's memory"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "sync.enable",
+      "kind": "capability",
+      "sdk": "sync.enable",
+      "today": "no",
+      "slices": [
+        "A2b"
+      ],
+      "input": {
+        "properties": {
+          "onCode": {},
+          "confirm": {},
+          "signal": {}
+        },
+        "required": [
+          "onCode",
+          "confirm"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "sync",
+            "enable"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: the ceremony has a person compare codes on two screens and keep a phrase"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "sync.recover",
+      "kind": "capability",
+      "sdk": "sync.recover",
+      "today": "no",
+      "slices": [
+        "A2c"
+      ],
+      "input": {
+        "properties": {
+          "confirm": {},
+          "signal": {}
+        },
+        "required": [
+          "confirm"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "sync",
+            "recover"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: takes the recovery phrase"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "sync.retirePin",
+      "kind": "capability",
+      "sdk": "sync.retirePin",
+      "today": "no",
+      "slices": [
+        "A2b"
+      ],
+      "input": {
+        "properties": {
+          "account": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "account"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "account",
+            "retire-sync"
+          ],
+          "flags": {
+            "--account": "account"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: called by the desktop app when it discards its own sealed session"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "sync.status",
+      "kind": "capability",
+      "sdk": "sync.status",
+      "today": "no",
+      "slices": [
+        "A2b"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "sync",
+            "status"
+          ],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: read from the SDK in an eval cell"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.6",
+      "position": 1,
+      "ids": [
+        "sync.enable"
+      ],
+      "cells": [
+        "`sync.enable({ onCode, confirm, signal? })`, eligibility checked before a phrase exists; the phrase's surface is fixed by S0",
+        "`omo sync enable`",
+        "none",
+        "**no**; custody (S0)",
+        "Tool omitted: the ceremony has a person compare codes on two screens and keep a phrase",
+        "A2b"
+      ]
+    },
+    {
+      "table": "6.6",
+      "position": 2,
+      "ids": [
+        "sync.disable"
+      ],
+      "cells": [
+        "`sync.disable()`",
+        "`omo sync disable`",
+        "none",
+        "**no**",
+        "Tool omitted: a person's choice about this device's memory",
+        "A2b"
+      ]
+    },
+    {
+      "table": "6.6",
+      "position": 3,
+      "ids": [
+        "sync.status"
+      ],
+      "cells": [
+        "`sync.status()`",
+        "`omo sync status [--json]`",
+        "none",
+        "**no**",
+        "Tool omitted: read from the SDK in an eval cell",
+        "A2b"
+      ]
+    },
+    {
+      "table": "6.6",
+      "position": 4,
+      "ids": [
+        "sync.approve"
+      ],
+      "cells": [
+        "`sync.approve({ id?, confirmCode })`",
+        "`omo sync approve [id]`",
+        "none",
+        "**no**",
+        "Tool omitted: the approval is the comparison a person makes",
+        "A2b"
+      ]
+    },
+    {
+      "table": "6.6",
+      "position": 5,
+      "ids": [
+        "sync.recover"
+      ],
+      "cells": [
+        "`sync.recover({ confirm, signal? })`, over the one recovery engine of #14464; the phrase's surface is fixed by S0",
+        "`omo sync recover`",
+        "none",
+        "**no**; custody (S0); built in the memory-sync lane's pull requests",
+        "Tool omitted: takes the recovery phrase",
+        "A2c"
+      ]
+    },
+    {
+      "table": "6.6",
+      "position": 6,
+      "ids": [
+        "sync.retirePin"
+      ],
+      "cells": [
+        "`sync.retirePin({ account })`",
+        "`omo account retire-sync --account <id>`",
+        "none",
+        "**no**",
+        "Tool omitted: called by the desktop app when it discards its own sealed session",
+        "A2b"
+      ]
+    }
+  ]
+}

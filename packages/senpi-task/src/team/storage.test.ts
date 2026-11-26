@@ -12,6 +12,7 @@ import {
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
 } from "./storage"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const created: string[] = []
 
@@ -32,7 +33,7 @@ describe("team storage layout", () => {
   test("#given a project state dir config #when the base dir is resolved #then it lands under the senpi-task state dir", () => {
     // given
     const projectDir = makeProjectDir()
-    const config: StateDirConfig = { project_dir: projectDir }
+    const config: StateDirConfig = ownedTaskState(projectDir)
 
     // when
     const baseDir = teamStorageBaseDir(config)
@@ -44,7 +45,7 @@ describe("team storage layout", () => {
   test("#given a team run id #when runtime dirs are resolved #then runtime and tasks dirs live under the base dir", () => {
     // given
     const projectDir = makeProjectDir()
-    const config: StateDirConfig = { project_dir: projectDir }
+    const config: StateDirConfig = ownedTaskState(projectDir)
     const teamRunId = "11111111-1111-1111-1111-111111111111"
 
     // when
@@ -74,7 +75,7 @@ describe("team storage layout", () => {
   test("#given a team run #when runtime dirs are ensured #then the directories are created at the right paths", async () => {
     // given
     const projectDir = makeProjectDir()
-    const config: StateDirConfig = { project_dir: projectDir }
+    const config: StateDirConfig = ownedTaskState(projectDir)
     const teamRunId = "22222222-2222-2222-2222-222222222222"
 
     // when

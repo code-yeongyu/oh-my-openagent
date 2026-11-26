@@ -10,6 +10,21 @@ export type SessionWaitState = {
   readonly written_at: number
 }
 
+/**
+ * Holds the engine itself releases when a delivery is admitted: a host restart stamps `unattended` on the sessions it
+ * restores, and a delivery to such a session lifts it. A stored held state made only of these keeps nothing waiting.
+ */
+const RELEASED_BY_DELIVERY: ReadonlySet<string> = new Set(["unattended"])
+
+/**
+ * Whether a stored state keeps a delivery from the session: a person's wait, or a hold that a delivery does not release.
+ * A held state made only of `unattended` holds blocks no wake (the carrier opens the session again) and is not what a
+ * queued row waits on (it waits on the wake).
+ */
+export function waitBlocksDelivery(state: SessionWaitState): boolean {
+  return state.wait !== "held" || state.hold_kinds.some((kind) => !RELEASED_BY_DELIVERY.has(kind))
+}
+
 /** What a queued row of the session waits on (A2.6, A2.11): a hold, a person's answer, or its wake. */
 export type QueuedWaitingOn = { readonly kind: "hold" | "approval" | "wake" }
 

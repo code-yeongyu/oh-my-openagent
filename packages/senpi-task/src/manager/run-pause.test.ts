@@ -11,13 +11,14 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
 describe("manager run pause capacity and turn ownership", () => {
   test("#given a refused parent pause #when the child completes during the request #then ordinary completion is not trapped behind a pause intent", async () => {
     const cwd = tempProject()
-    const store = createTaskRecordStore({ project_dir: cwd })
+    const store = createTaskRecordStore(ownedTaskState(cwd))
     const runner = new FakeRunner()
     const refusal = Promise.withResolvers<{ readonly refused: "wrong_parent" }>()
     const manager = createTaskManager({
@@ -60,7 +61,7 @@ describe("manager run pause capacity and turn ownership", () => {
 
   test("#given a running child #when paused then immediately resumed #then the same epoch settles only its new turn", async () => {
     const cwd = tempProject()
-    const store = createTaskRecordStore({ project_dir: cwd })
+    const store = createTaskRecordStore(ownedTaskState(cwd))
     const runner = new FakeRunner()
     let resumes = 0
     const childPausePort: ChildPausePort = {
@@ -109,7 +110,7 @@ describe("manager run pause capacity and turn ownership", () => {
 
   test("#given a newer child hold #when parent resumes with an older cutoff #then park capacity and leave the child paused", async () => {
     const cwd = tempProject()
-    const store = createTaskRecordStore({ project_dir: cwd })
+    const store = createTaskRecordStore(ownedTaskState(cwd))
     const runner = new FakeRunner()
     const childPausePort: ChildPausePort = {
       pauseForRun: async (child) => {

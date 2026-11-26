@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -11,9 +11,10 @@ import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import { createThreadTools } from "./tools"
 import { createThreadSdk } from "./sdk"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 export async function publishedWorld() {
-  const dir = mkdtempSync("/tmp/sgown-test-")
+  const dir = shortTempDir("sgown-test-")
   const store = createGatewayStore({ agentDir: dir })
   const releases: Array<() => Promise<void>> = []
   const calls: string[] = []
@@ -54,11 +55,17 @@ export async function publishedWorld() {
   }
   const tools = createThreadTools(options)
   let sequence = 0
-  async function send(thread = "target") {
+  async function send(thread = "target", extra: Readonly<Record<string, unknown>> = {}) {
     const tool = tools.find((entry) => entry.name === "thread_send")
     if (tool === undefined) throw new Error("missing send")
     return (
-      await tool.execute(`send-${++sequence}`, { thread, message: "hello" }, undefined, undefined, undefined as never)
+      await tool.execute(
+        `send-${++sequence}`,
+        { thread, message: "hello", ...extra },
+        undefined,
+        undefined,
+        undefined as never,
+      )
     ).details.result
   }
   async function owner(name: string, cwd = dir, durableId = "target", terminal = false) {

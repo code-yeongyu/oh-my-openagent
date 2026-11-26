@@ -1,51 +1,24 @@
-import { spawn } from "node:child_process"
-
 import { LocalApiError } from "../local-api/errors.ts"
 import type { SecureFile } from "../local-api/access.ts"
-import { APPLY_DACL_SCRIPT, type DaclDescription, describeDacl, exactDaclVerdict } from "../local-api/dacl.ts"
+import {
+  applyExactDacl,
+  type DaclDescription,
+  describeDacl,
+  exactDaclVerdict,
+  type PowerShellRunner,
+  runPowerShell,
+} from "../local-api/dacl.ts"
 
 // omo's Windows exact-DACL writer for the files it installs (#12023), over the vendored dacl.ts. The vendored verdict
 // compares against the literal SID only, but SDDL prints some users by an alias (the built-in Administrator, RID 500,
 // as LA, the windows-latest runner user), so a DACL written for that user would never verify. This accepts exactly the
-// alias Windows prints for the user SID, and a failed apply names the first line of the script's error.
+// alias Windows prints for the user SID. The apply itself (icacls /setowner, then SetAccessControl with the DACL only)
+// and the error line a failed apply names are the vendored ones since relay-daemon#1452 took them from #14101.
 
 const SID_TOKEN_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
 (New-Object System.Security.AccessControl.RawSecurityDescriptor("O:$env:LA_SID")).GetSddlForm('Owner')
 `
-
-// The vendored runner's contract plus the script's stderr, which the vendored runPowerShell reads and drops.
-export type PowerShellRunner = (
-  script: string,
-  env: { readonly [name: string]: string },
-) => Promise<{ readonly code: number; readonly out: string; readonly err?: string }>
-
-const runPowerShell: PowerShellRunner = async (script, env) => {
-  const encoded = Buffer.from(script, "utf16le").toString("base64")
-  const proc = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
-    { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
-  )
-  const chunks: Buffer[] = []
-  const errChunks: Buffer[] = []
-  proc.stdout.on("data", (chunk: Buffer) => chunks.push(chunk))
-  proc.stderr.on("data", (chunk: Buffer) => errChunks.push(chunk))
-  const code = await new Promise<number>((resolve, reject) => {
-    proc.once("error", reject)
-    proc.once("close", (exitCode) => resolve(exitCode ?? -1))
-  })
-  return { code, out: Buffer.concat(chunks).toString("utf8"), err: Buffer.concat(errChunks).toString("utf8") }
-}
-
-const firstErrorLine = (err: string | undefined): string => {
-  const line =
-    (err ?? "")
-      .split(/\r?\n/)
-      .find((text) => text.trim() !== "" && !text.startsWith("#< CLIXML"))
-      ?.trim() ?? ""
-  return line === "" ? "" : `: ${line.slice(0, 300)}`
-}
 
 // The SDDL token for userSid on this machine (an alias such as "LA", or the SID itself); undefined when it cannot be
 // read, so the verdict then accepts the literal SID only.
@@ -73,17 +46,6 @@ export const aliasedDaclVerdict = (
   )
 }
 
-export const applyExactDacl = async (
-  path: string,
-  userSid: string,
-  kind: "dir" | "file",
-  run: PowerShellRunner = runPowerShell,
-): Promise<void> => {
-  const { code, err } = await run(APPLY_DACL_SCRIPT, { LA_PATH: path, LA_SID: userSid, LA_KIND: kind })
-  if (code !== 0)
-    throw new LocalApiError("insecure_state_dir", `the exact DACL could not be applied${firstErrorLine(err)}`)
-}
-
 // Fails closed: a DACL that cannot be read back is not exact.
 export const verifyExactDacl = async (
   path: string,
@@ -101,6 +63,8 @@ export const verifyExactDacl = async (
   return aliasedDaclVerdict(dacl, userSid, kind, await userSidToken(userSid, run))
 }
 
+// Applies and verifies over every entry it is given, whatever its origin, as before relay-daemon#1480's vendor; the
+// vendored windowsSecureFile's refusal of a planted "existing" entry is not adopted for the release dirs here.
 export const windowsSecureFile =
   (userSid: string, run: PowerShellRunner = runPowerShell): SecureFile =>
   async (path, kind) => {
