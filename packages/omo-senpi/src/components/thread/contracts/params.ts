@@ -1,4 +1,6 @@
-import { type Static, Type } from "typebox"
+import { type Static, type TObject, type TSchema, Type } from "typebox"
+
+import { THREAD_PARAM_ALIASES } from "./aliases"
 
 import {
   AllScope,
@@ -275,3 +277,22 @@ export const threadToolParamSchemas = {
 } as const
 
 export type ThreadToolName = keyof typeof threadToolParamSchemas
+
+/**
+ * The schema a thread tool declares to its host (#15073). The host validates a call against it before the tool runs, so a
+ * required field that has an alias is optional there: a call naming the alias (`thread_send` `text`) reaches
+ * parseThreadParams, which maps it and still requires the field against the full schema.
+ */
+export function declaredThreadParams(tool: ThreadToolName): TObject {
+  const schema: TObject = threadToolParamSchemas[tool]
+  const aliased = new Set(Object.values(THREAD_PARAM_ALIASES[tool] ?? {}))
+  const required = new Set(schema.required ?? [])
+  if (![...aliased].some((field) => required.has(field))) return schema
+  const properties: Record<string, TSchema> = Object.fromEntries(
+    Object.entries(schema.properties as Record<string, TSchema>).map(([field, property]) => [
+      field,
+      aliased.has(field) && required.has(field) ? Type.Optional(property) : property,
+    ]),
+  )
+  return Type.Object(properties)
+}

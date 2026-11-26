@@ -24,21 +24,31 @@ const report = createReport("familiar-args")
 installCleanupHooks()
 const scratch = makeScratch("familiar-args")
 const CELL = `
-const j = async (p) => { const r = await p; try { return JSON.parse(r.text) } catch { return { raw: r.text } } }
-const out = {}
+const j = async (p) => { try { const r = await p; try { return JSON.parse(r.text) } catch { return { raw: String(r.text).slice(0, 800) } } } catch (e) { return { threw: String(e).slice(0, 800) } } }
+const outcome = (v) => v.kind === "ok" ? "ok" : (v.error?.code ?? v.threw ?? v.raw ?? "?")
 const peer = await j(tool.thread_create({ name: "qa-15073-peer" }))
-out.create = peer.kind
-const thread = peer.thread ?? peer.thread?.thread_id
-out.query = await j(tool.thread_list({ query: "QA-15073" }))
-out.limit = await j(tool.thread_list({ limit: 1 }))
-out.send = await j(tool.thread_send({ thread, text: "QA-15073-TEXT reply with exactly PEER_OK." }))
-out.readLimit = await j(tool.thread_read({ thread: "self", limit: 2 }))
-out.readTail = await j(tool.thread_read({ thread: "self", tail: 2 }))
-out.readBoth = await j(tool.thread_read({ thread: "self", limit: 2, cursor: "t1.x" }))
-out.unknown = await j(tool.thread_list({ bogus: 1 }))
-const fixed = out.unknown?.error?.details?.corrected_call
-out.fixed = fixed === undefined ? null : await j(eval(fixed))
-print("QA15073=" + JSON.stringify(out))
+const thread = peer.thread
+const query = await j(tool.thread_list({ query: "QA-15073" }))
+const limit = await j(tool.thread_list({ limit: 1 }))
+const send = await j(tool.thread_send({ thread, text: "QA-15073-TEXT reply with exactly PEER_OK." }))
+const readLimit = await j(tool.thread_read({ thread: "self", limit: 2 }))
+const readTail = await j(tool.thread_read({ thread: "self", tail: 2 }))
+const readBoth = await j(tool.thread_read({ thread: "self", limit: 2, cursor: "t1.x" }))
+const unknown = await j(tool.thread_list({ bogus: 1 }))
+const corrected = unknown.error?.details?.corrected_call
+const fixed = corrected === undefined ? { kind: "none" } : await j(eval(corrected))
+print("QA15073=" + JSON.stringify({
+  create: outcome(peer),
+  query: outcome(query), queryNames: (query.threads ?? []).map((row) => row.name),
+  limit: outcome(limit), limitRows: limit.threads?.length, limitOmitted: limit.rows_omitted,
+  send: outcome(send),
+  readLimit: outcome(readLimit), readLimitN: readLimit.items?.length,
+  readTail: outcome(readTail), readTailN: readTail.items?.length,
+  readBoth: outcome(readBoth),
+  unknown: outcome(unknown), unknownField: unknown.error?.details?.field, corrected,
+  nextShowsCorrected: corrected !== undefined && String(unknown.error?.next_action).includes(corrected),
+  fixed: outcome(fixed),
+}))
 `
 const CALL = { name: "eval", args: { language: "js", summary: "QA: thread tools under familiar argument names", code: CELL } }
 const textOf = (message) =>
@@ -80,49 +90,53 @@ const client = await HostClient.connect(host.socket, "familiar-args")
 const caller = await client.openSession({ cwd: scratch.cwd })
 await client.promptAndSettle(caller.routingId, "Run the familiar calls.", { streamingBehavior: "followUp" })
 
+// The cell's printed line sits in whichever string field of the tool result carries the cell output.
+const strings = (value) =>
+  typeof value === "string"
+    ? [value]
+    : Array.isArray(value)
+      ? value.flatMap(strings)
+      : value !== null && typeof value === "object"
+        ? Object.values(value).flatMap(strings)
+        : []
 let out
 for (const message of await client.messages(caller.routingId)) {
-  const text = JSON.stringify(message.content ?? null)
-  const at = text.indexOf("QA15073=")
-  if (at === -1) continue
-  // The cell printed one JSON line; it arrives JSON-escaped inside the tool result's text.
-  const line = JSON.parse(`"${text.slice(at + "QA15073=".length).split("\\n")[0]}"`)
-  out = JSON.parse(line)
+  if (message.role !== "toolResult" && message.role !== "tool") continue
+  for (const text of strings(message)) {
+    const at = text.indexOf("QA15073=")
+    if (at === -1) continue
+    const line = text.slice(at + "QA15073=".length).split("\n")[0]
+    try {
+      out = JSON.parse(line)
+    } catch (error) {
+      report.log(`unparsed_cell_line=${line.slice(0, 2000)} error=${String(error)}`)
+    }
+  }
 }
 report.log(`cell_output=${JSON.stringify(out ?? null).slice(0, 4000)}`)
-const names = (listing) => (listing?.threads ?? []).map((row) => row.name)
 report.assert("cell-ran", out !== undefined, "the eval cell printed its QA15073 line")
+report.assert("thread_create-ok", out?.create === "ok", `create=${out?.create}`)
 report.assert(
   "thread_list-query-narrows",
-  out?.query?.kind === "ok" && names(out.query).length === 1 && names(out.query)[0] === "qa-15073-peer",
-  `names=${JSON.stringify(names(out?.query))}`,
+  out?.query === "ok" && JSON.stringify(out.queryNames) === JSON.stringify(["qa-15073-peer"]),
+  `query=${out?.query} names=${JSON.stringify(out?.queryNames)}`,
 )
 report.assert(
   "thread_list-limit-cuts-and-counts",
-  out?.limit?.kind === "ok" && out.limit.threads.length === 1 && out.limit.rows_omitted >= 1,
-  `rows=${out?.limit?.threads?.length} omitted=${out?.limit?.rows_omitted}`,
+  out?.limit === "ok" && out.limitRows === 1 && out.limitOmitted >= 1,
+  `limit=${out?.limit} rows=${out?.limitRows} omitted=${out?.limitOmitted}`,
 )
-report.assert("thread_send-text-is-message", out?.send?.kind === "ok", `send=${JSON.stringify(out?.send).slice(0, 300)}`)
+report.assert("thread_send-text-is-message", out?.send === "ok", `send=${out?.send}`)
 report.assert(
   "thread_read-limit-and-tail-take-the-newest",
-  out?.readLimit?.kind === "ok" &&
-    out.readLimit.items.length <= 2 &&
-    out?.readTail?.kind === "ok" &&
-    out.readTail.items.length === out.readLimit.items.length,
-  `limit=${out?.readLimit?.items?.length} tail=${out?.readTail?.items?.length}`,
+  out?.readLimit === "ok" && out.readLimitN >= 1 && out.readLimitN <= 2 && out?.readTail === "ok" && out.readTailN === out.readLimitN,
+  `limit=${out?.readLimit}/${out?.readLimitN} tail=${out?.readTail}/${out?.readTailN}`,
 )
-report.assert(
-  "thread_read-limit-with-cursor-refused",
-  out?.readBoth?.kind === "error" && out.readBoth.error.code === "invalid_arguments",
-  `readBoth=${JSON.stringify(out?.readBoth).slice(0, 300)}`,
-)
+report.assert("thread_read-limit-with-cursor-refused", out?.readBoth === "invalid_arguments", `readBoth=${out?.readBoth}`)
 report.assert(
   "unknown-field-refused-with-a-runnable-corrected-call",
-  out?.unknown?.error?.code === "invalid_arguments" &&
-    out.unknown.error.details.field === "bogus" &&
-    out.unknown.error.next_action.includes(out.unknown.error.details.corrected_call) &&
-    out?.fixed?.kind === "ok",
-  `unknown=${JSON.stringify(out?.unknown?.error).slice(0, 500)} fixed=${out?.fixed?.kind}`,
+  out?.unknown === "invalid_arguments" && out.unknownField === "bogus" && out.nextShowsCorrected === true && out?.fixed === "ok",
+  `unknown=${out?.unknown} field=${out?.unknownField} corrected=${out?.corrected} fixed=${out?.fixed}`,
 )
 const shardSockets = stopOwnedShardHosts(scratch.dir)
 await cleanupAllAndWait()

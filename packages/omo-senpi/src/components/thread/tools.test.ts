@@ -337,10 +337,10 @@ describe("thread tools under the argument names agents predict", () => {
     async (field) => {
       // given
       const f = fixture()
-      f.host.getMessages = async () => tenMessages()
+      const withTen = { ...f, host: { ...f.host, getMessages: async () => tenMessages() } }
 
       // when
-      const read = (await runner(f)("thread_read", { thread: "peer", [field]: 3 })) as unknown as {
+      const read = (await runner(withTen)("thread_read", { thread: "peer", [field]: 3 })) as unknown as {
         kind: string
         items: unknown[]
       }

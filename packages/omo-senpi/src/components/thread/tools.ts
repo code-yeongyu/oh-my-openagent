@@ -12,6 +12,7 @@ import { toThreadAddressEntries } from "./address-book"
 import { type ThreadAddressEntry } from "./addressing"
 import { resolveAddress } from "./address/lazy"
 import {
+  declaredThreadParams,
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadCloseInput,
@@ -403,7 +404,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
    */
   const create: AnyTool = {
     ...metadata("thread_create"),
-    parameters: threadToolParamSchemas.thread_create,
+    parameters: declaredThreadParams("thread_create"),
     promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES],
     execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) =>
       execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) =>
@@ -428,7 +429,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const list: AnyTool = {
     ...metadata("thread_list"),
-    parameters: threadToolParamSchemas.thread_list,
+    parameters: declaredThreadParams("thread_list"),
     execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) =>
       execute(
         "thread_list",
@@ -450,7 +451,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const read: AnyTool = {
     ...metadata("thread_read"),
-    parameters: threadToolParamSchemas.thread_read,
+    parameters: declaredThreadParams("thread_read"),
     execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
       execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
         readThread(options, current, value, callerId, signal),
@@ -459,7 +460,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   const send: AnyTool = {
     ...metadata("thread_send"),
     permissionParser: threadSendPermission(options),
-    parameters: threadToolParamSchemas.thread_send,
+    parameters: declaredThreadParams("thread_send"),
     execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) =>
       execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) =>
         deliver(current, value.thread, value, operationId, callerId),
@@ -477,7 +478,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const interrupt: AnyTool = {
     ...metadata("thread_interrupt"),
-    parameters: threadToolParamSchemas.thread_interrupt,
+    parameters: declaredThreadParams("thread_interrupt"),
     execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) =>
       execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => {
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
@@ -488,7 +489,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const close: AnyTool = {
     ...metadata("thread_close"),
-    parameters: threadToolParamSchemas.thread_close,
+    parameters: declaredThreadParams("thread_close"),
     execute: (id: string, args: ThreadCloseInput, _signal, _onUpdate, ectx) =>
       execute("thread_close", id, args, ectx, async (current, value, _operationId, callerId) => {
         const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
@@ -501,7 +502,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const handoff: AnyTool = {
     ...metadata("thread_handoff"),
-    parameters: threadToolParamSchemas.thread_handoff,
+    parameters: declaredThreadParams("thread_handoff"),
     execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) =>
       execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) =>
         deliver(current, value.thread, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name"),
@@ -509,7 +510,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
-    parameters: threadToolParamSchemas.thread_rename,
+    parameters: declaredThreadParams("thread_rename"),
     execute: (id: string, args: ThreadRenameInput, _signal, _onUpdate, ectx) =>
       execute("thread_rename", id, args, ectx, async (current, value, operationId, callerId) =>
         renameThread(options, current, value, operationId, callerId),
@@ -517,7 +518,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const setModel: AnyTool = {
     ...metadata("thread_set_model"),
-    parameters: threadToolParamSchemas.thread_set_model,
+    parameters: declaredThreadParams("thread_set_model"),
     execute: (id: string, args: ThreadSetModelInput, _signal, _onUpdate, ectx) =>
       execute("thread_set_model", id, args, ectx, async (current, value, _operationId, callerId) => {
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
@@ -530,7 +531,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const setReasoning: AnyTool = {
     ...metadata("thread_set_reasoning"),
-    parameters: threadToolParamSchemas.thread_set_reasoning,
+    parameters: declaredThreadParams("thread_set_reasoning"),
     execute: (id: string, args: ThreadSetReasoningInput, _signal, _onUpdate, ectx) =>
       execute("thread_set_reasoning", id, args, ectx, async (current, value, _operationId, callerId) => {
         const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
@@ -541,7 +542,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   }
   const archive: AnyTool = {
     ...metadata("thread_archive"),
-    parameters: threadToolParamSchemas.thread_archive,
+    parameters: declaredThreadParams("thread_archive"),
     execute: (id: string, args: ThreadArchiveInput, _signal, _onUpdate, ectx) =>
       execute("thread_archive", id, args, ectx, async (current, value, _operationId, callerId) =>
         archiveThread(options, current, value, callerId),
