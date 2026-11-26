@@ -2206,6 +2206,7 @@
     "packages/senpi-task/src/pause/registry.ts",
     "packages/senpi-task/src/pause/run-controller.ts",
     "packages/senpi-task/src/platform/native-process.ts",
+    "packages/senpi-task/src/platform/process-tree-cpu.ts",
     "packages/senpi-task/src/progress.ts",
     "packages/senpi-task/src/renderer-text.ts",
     "packages/senpi-task/src/run-stats.ts",
