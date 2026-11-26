@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import {
   BEHAVIOUR_CHANGES,
@@ -14,7 +16,9 @@ import {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   behaviourChangeProblems,
+  type AwaitingOwnerRow,
   documentRowProblems,
+  sectionFourRows,
   matrixProblems,
   refusalScenarioProblems,
   inventoryProblems,
@@ -237,6 +241,56 @@ describe("negative controls of custody and the held table (#14949)", () => {
     const noField = { row: "engine.auth.check", field: "destination", reason: "control", retires_with: "none" }
     expect(check([...TYPED_AHEAD_INPUTS, noField])).toContain(
       "typed-ahead engine.auth.check.destination: the contract of engine.auth.check has no input destination",
+    )
+  })
+
+  // The awaiting record against revision 22 as a fixture (design lane ruling): an entry needs its row and, where the
+  // table has an Owner slice column, that exact slice; it goes stale once a line covers the row; a row dropped from the
+  // record without a line fails.
+  test("#given revision 22 #then an awaiting entry needs its exact slice, fails once lined, and a listed row dropped from the list fails", () => {
+    const revision = readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8")
+    const awaiting = (
+      JSON.parse(readFileSync(join(import.meta.dir, "awaiting-owner-rows.json"), "utf8")) as {
+        rows: AwaitingOwnerRow[]
+      }
+    ).rows
+    const withoutSixth = revision.replace(/^### 4\.6 [\s\S]*?(?=^### |^## )/m, "")
+    expect(sectionFourRows(withoutSixth).some((row) => row.section === "4.6")).toBe(false)
+    expect(documentRowProblems(PRINCIPAL_MATRIX, revision, awaiting, true)).toEqual([])
+    const sdkRoot = sectionFourRows(revision).find((row) => row.capability.startsWith("`install.sdkRoot`"))
+    if (sdkRoot === undefined) throw new Error("no install.sdkRoot row")
+    const lined = [
+      ...PRINCIPAL_MATRIX,
+      {
+        ...(PRINCIPAL_MATRIX[0] as MatrixLine),
+        section: "4.6" as const,
+        capability: sdkRoot.capability,
+        docRow: undefined,
+      },
+    ]
+    expect(documentRowProblems(lined, revision, awaiting).join("\n")).toContain(
+      "awaiting row install.sdkRoot: stale, a line now covers it; delete the entry",
+    )
+    expect(
+      documentRowProblems(
+        PRINCIPAL_MATRIX,
+        revision,
+        awaiting.filter((entry) => entry.row !== "daemon.run"),
+      ).join("\n"),
+    ).toContain('row "`daemon.run`, `daemon.shardPath`": no line of the matrix')
+    expect(
+      documentRowProblems(
+        PRINCIPAL_MATRIX,
+        revision,
+        awaiting.map((entry) => (entry.row === "daemon.run" ? { ...entry, slice: "T1a" } : entry)),
+      ).join("\n"),
+    ).toContain('awaiting row daemon.run: slice "T1a" is not the document\'s "C1a"')
+    const typo = [...awaiting, { section: "4.6", row: "threads.teleport", slice: "T1a" }]
+    expect(documentRowProblems(PRINCIPAL_MATRIX, revision, typo, true)).toContain(
+      "awaiting row 4.6 threads.teleport: not a row of the document",
+    )
+    expect(documentRowProblems(PRINCIPAL_MATRIX, withoutSixth, typo)).not.toContain(
+      "awaiting row 4.6 threads.teleport: not a row of the document",
     )
   })
 })

@@ -10,7 +10,8 @@ export type Cell =
   | { readonly outcome: "n/a" }
 
 export type MatrixLine = {
-  readonly section: "4.1" | "4.2" | "4.3" | "4.4"
+  /** A subsection of the security design's section 4 that holds a capability table (read from the document). */
+  readonly section: `4.${number}`
   /** The capability: the document's first column verbatim, or for a line derived from a row with an input or a split
    * the document names, what it covers, with `docRow` naming that row verbatim. */
   readonly capability: string
