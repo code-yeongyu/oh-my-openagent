@@ -24,6 +24,8 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Testing | `bun test` or vitest | jest |
 | ORM | Drizzle | TypeORM, Prisma (unless already in project) |
 
+The CI gate is one command: `bunx oxlint --type-aware --deny-warnings && bunx oxfmt --check && bunx tsc --noEmit && bun test`.
+
 ### The iron list
 
 1. **Readonly by default** — all `type`/`interface` properties are `readonly`. Arrays are `readonly T[]`. Mutable only when mutation is the documented purpose.
@@ -40,6 +42,8 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`.
 13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.).
 14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch` on the `catch` line.
+15. **`using` for resources** — files, connections, and locks are released by `using` / `await using`. Cancellation and timeouts travel as an `AbortSignal`.
+16. **Parameters are never reassigned** — produce a new value.
 
 ### Data modeling — which construct, when
 
@@ -110,11 +114,13 @@ async function main(): Promise<void> {
 | ORM | Drizzle | Type-safe SQL, no codegen |
 | HTTP client | `ky` | Thin fetch wrapper (5KB); auto-throw on non-2xx, retry, timeout, hooks, prefixUrl. Browser + Node + Bun + Deno |
 | HTTP client (perf) | `undici` (direct API) | When a Node backend needs connection pooling, HTTP/2, or pipelining |
-
-> **HTTP client rule** - production code must not use bare `fetch()`. It has no retry, timeout, or error-handling policy and causes silent failures during incidents. Install **`ky`** by default, and use the **`undici`** direct API when a Node backend needs high-volume requests, connection pooling, HTTP/2, or pipelining. ~~`axios`~~ is forbidden after the supply-chain compromise (2026-03). `node-fetch` is unnecessary because Node 18+ includes built-in fetch.
 | Testing | `bun test` / vitest | Fast, ESM-native |
 | Logging | `pino` | Structured JSON, fast |
-| CLI | `@clack/prompts` + `commander` | Interactive + parsing |
+| CLI / TUI | `@clack/prompts` + `commander`; ink for a full TUI | Interactive + parsing |
+| LLM / agent | Vercel AI SDK | Typed tools, streaming, provider-neutral |
+| Config from env | Zod schema over `process.env` | Parsed once at startup |
+
+> **HTTP client rule** - production code must not use bare `fetch()`. It has no retry, timeout, or error-handling policy and causes silent failures during incidents. Install **`ky`** by default, and use the **`undici`** direct API when a Node backend needs high-volume requests, connection pooling, HTTP/2, or pipelining. ~~`axios`~~ is forbidden after the supply-chain compromise (2026-03). `node-fetch` is unnecessary because Node 18+ includes built-in fetch.
 
 ## tsconfig — the one true config
 

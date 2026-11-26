@@ -1,6 +1,6 @@
 ---
 name: mass-ulw
-description: "Drives dependency-ordered child work through the native workflow tool: a graph sized to the request, one run per phase, with retry/amend/send recovery. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others."
+description: "Drives dependency-ordered child work through the native workflow tool: a graph sized to the request, one run per phase, with retry/amend/send recovery, plus a library that stores a definition once and re-runs it by name. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others, and when the user wants to save a DAG, run a saved DAG, re-run a graph by name, or schedule the same multi-agent graph repeatedly."
 argument-hint: "<task>"
 metadata:
   short-description: Dependency-graph orchestration of child agents
@@ -49,6 +49,11 @@ const result = await sdk.wait(run.run_id)
 `define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` drive a run; `retry`, `send`, and `amend` (below) recover its nodes.
 
 Python cells cannot import the ESM SDK; call `tool.workflow({...})` directly with the same payload shape. A blocking Python wait passes `detach: False` (`tool.workflow({"action": "wait", "run_id": run_id, "detach": False})`); without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell for anything beyond a single `start` + `wait`.
+
+## Which mode
+
+- Authoring a new graph: this body plus `references/planning.md`.
+- Saving a graph, running a saved one, re-running or scheduling a named graph: read `references/library.md` (relative to this skill's own directory) before acting. A saved graph rotates its key on every load, because re-starting the same key reuses the old run.
 
 ## Run lifecycle
 
