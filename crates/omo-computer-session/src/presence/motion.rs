@@ -45,13 +45,38 @@ impl MotionTable {
     /// `clamp(minMs, maxMs, baseMs + perDoublingMs * log2(1 + d / distanceUnitPoints))`, `d` in points.
     #[must_use]
     pub fn glide_ms(&self, distance_points: f64) -> f64 {
-        todo!("row 52 glide duration for {distance_points}")
+        let ms = self.base_ms + self.per_doubling_ms * (1.0 + distance_points / self.distance_unit_points).log2();
+        ms.clamp(self.min_ms, self.max_ms)
     }
 
     /// The eased progress at the time fraction `t` in `0..=1`.
     #[must_use]
     pub fn ease(&self, t: f64) -> f64 {
-        todo!("row 52 easing at {t}")
+        let [x1, y1, x2, y2] = self.easing;
+        let bezier = |p1: f64, p2: f64, s: f64| {
+            let r = 1.0 - s;
+            3.0 * r * r * s * p1 + 3.0 * r * s * s * p2 + s * s * s
+        };
+        // x(s) and y(s) both rise on 0..=1 when every control point is in 0..=1, so bisection on
+        // x with a fixed interval and step count gives a parameter, and a progress, that never
+        // goes back as t grows.
+        let target = t.clamp(0.0, 1.0);
+        let (mut low, mut high) = (0.0_f64, 1.0_f64);
+        for _ in 0..48 {
+            let middle = (low + high) / 2.0;
+            if bezier(x1, x2, middle) < target {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+        if target >= 1.0 {
+            return 1.0;
+        }
+        if target <= 0.0 {
+            return 0.0;
+        }
+        bezier(y1, y2, (low + high) / 2.0)
     }
 }
 
@@ -110,7 +135,23 @@ pub struct Plan {
 impl Plan {
     #[must_use]
     pub fn new(from: Point, report: &Report, display: &Display) -> Self {
-        todo!("row 52 plan {from:?} {report:?} {display:?}")
+        let table = MotionTable::shipped();
+        let distance_points = (report.to.x - from.x).hypot(report.to.y - from.y) / display.scale;
+        let travel = if display.reduced_motion {
+            Travel::Fade { duration_ms: table.fade_ms }
+        } else if distance_points < CursorLook::shipped().footprint_pt {
+            Travel::Place
+        } else {
+            Travel::Glide { duration_ms: table.glide_ms(distance_points) }
+        };
+        Self {
+            from,
+            to: report.to,
+            action: report.action,
+            start_ms: report.at_ms,
+            travel,
+            frame_ms: 1_000.0 / display.refresh_hz,
+        }
     }
 
     /// A newer report: the next path starts where this one has reached at the report's time.
@@ -122,13 +163,47 @@ impl Plan {
     /// Where the cursor is drawn at `now_ms`.
     #[must_use]
     pub fn at(&self, now_ms: f64) -> Sample {
-        todo!("row 52 sample at {now_ms}")
+        let elapsed = (now_ms - self.start_ms).max(0.0);
+        let drawn = |position: Point, opacity: f64| Sample { at_ms: now_ms, position, opacity };
+        match self.travel {
+            Travel::Place => drawn(self.to, 1.0),
+            Travel::Fade { duration_ms } => {
+                drawn(self.to, MotionTable::shipped().ease(elapsed / duration_ms))
+            }
+            Travel::Glide { duration_ms } => {
+                let progress = MotionTable::shipped().ease(elapsed / duration_ms);
+                let position = Point {
+                    x: self.from.x + (self.to.x - self.from.x) * progress,
+                    y: self.from.y + (self.to.y - self.from.y) * progress,
+                };
+                drawn(position, 1.0)
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn end_ms(&self) -> f64 {
+        match self.travel {
+            Travel::Place => self.start_ms,
+            Travel::Glide { duration_ms } | Travel::Fade { duration_ms } => self.start_ms + duration_ms,
+        }
     }
 
     /// Every frame from the report to the end of the travel, at the display's refresh rate.
     #[must_use]
     pub fn samples(&self) -> Vec<Sample> {
-        todo!("row 52 samples")
+        let end = self.end_ms();
+        let mut samples = Vec::new();
+        let mut frame = 0_u32;
+        loop {
+            let at = self.start_ms + f64::from(frame) * self.frame_ms;
+            if at >= end {
+                samples.push(self.at(end));
+                return samples;
+            }
+            samples.push(self.at(at));
+            frame += 1;
+        }
     }
 }
 
