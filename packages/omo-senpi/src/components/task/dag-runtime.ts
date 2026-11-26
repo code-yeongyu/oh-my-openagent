@@ -211,7 +211,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     scheduler.subscribe(publishSchedulerEvent)
   })
 
-  const { controller, ensureScheduled, adoptReentry, adoptInstalled } = createDagSchedulerRegistry({
+  const { holdsRun, controller, ensureScheduled, adoptReentry, adoptInstalled } = createDagSchedulerRegistry({
     schedulers,
     store,
     coreManager,
@@ -229,7 +229,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     // A run no scheduler here holds (user-stopped, parked, or left by a dead host) has its children
     // ended first; a user-stopped run then lets the parent's fence for the run go.
     const userStopped = record.status === "paused" && record.pause?.reason === "user_stop"
-    if (!schedulers.has(runId)) await endUnheldRunChildren(deps.engine.manager, record, childClosure, holders)
+    if (!holdsRun(runId)) await endUnheldRunChildren(deps.engine.manager, record, childClosure, holders)
     await controller(runId, sessionId).scheduler.cancel(runId, reason)
     if (!userStopped) return
     const runRef = { kind: "dag" as const, id: runId }
@@ -443,7 +443,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
     // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
     // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
-    isRunHeldInProcess: (runId) => schedulers.has(runId),
+    isRunHeldInProcess: holdsRun,
     ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),

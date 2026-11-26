@@ -32,14 +32,17 @@ export function createDagSchedulerRegistry(ports: {
   const { schedulers, store, coreManager, schedulerOptions, logger } = ports
   const lease = { hostPid: process.pid, isProcessAlive: ports.isProcessAlive }
 
-  const controller = (runId: DagRunId, parentSessionId: string): OwnedScheduler => {
-    const existing = schedulers.get(runId)
-    if (existing !== undefined) return existing
-    const initialRecord = coreManager.record(runId, parentSessionId)
-    const created: OwnedScheduler = { scheduler: createDagScheduler({ ...schedulerOptions, initialRecord }) }
-    schedulers.set(runId, created)
-    return created
-  }
+  /** "This host holds the run": a scheduler of this runtime is running it (started or installed here). */
+  const holdsRun = (runId: DagRunId): boolean => schedulers.get(runId)?.running !== undefined
+
+  const schedulerFor = (runId: DagRunId, parentSessionId: string): OwnedScheduler => ({
+    scheduler: createDagScheduler({ ...schedulerOptions, initialRecord: coreManager.record(runId, parentSessionId) }),
+  })
+
+  // A verb on a run this host does not hold gets a throwaway carrier that never enters `schedulers`,
+  // so a refused or non-adopting verb can never make the run read as held here.
+  const controller = (runId: DagRunId, parentSessionId: string): OwnedScheduler =>
+    holdsRun(runId) ? (schedulers.get(runId) as OwnedScheduler) : schedulerFor(runId, parentSessionId)
 
   const track = (runId: DagRunId, owned: OwnedScheduler, run: Promise<DagRunRecordV1>): void => {
     const running = run
@@ -64,13 +67,13 @@ export function createDagSchedulerRegistry(ports: {
 
   /** Returns false for a `running` run this runtime does not hold: it is recovery's to claim or leave. */
   const ensureScheduled = (runId: DagRunId, parentSessionId: string): boolean => {
-    const held = schedulers.get(runId)
-    if (held?.running !== undefined) return true
+    if (holdsRun(runId)) return true
     const record = coreManager.record(runId, parentSessionId)
-    if (held === undefined && record.status === "running") return false
-    if (record.status !== "pending" && record.status !== "running") return true
+    if (record.status === "running") return false
+    if (record.status !== "pending") return true
     if (takeDagRunLease(store, runId, lease) === undefined) return true
-    const owned = held ?? controller(runId, parentSessionId)
+    const owned = schedulerFor(runId, parentSessionId)
+    schedulers.set(runId, owned)
     track(runId, owned, owned.scheduler.run())
     return true
   }
@@ -103,5 +106,5 @@ export function createDagSchedulerRegistry(ports: {
     })
   }
 
-  return { controller, ensureScheduled, adoptReentry, adoptInstalled }
+  return { holdsRun, controller, ensureScheduled, adoptReentry, adoptInstalled }
 }

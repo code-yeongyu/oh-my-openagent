@@ -28,7 +28,7 @@ const definition = (sideNote = "") => ({
 })
 
 /** A run whose `first` child is alive in this engine while the run is parked with no scheduler. */
-async function parkedRun(name: string) {
+async function parkedRun(name: string, pausedBy: "nobody" | "this host" = "nobody") {
   const cwd = fs.mkdtempSync(join(tmpdir(), `omo-senpi-dag-parked-${name}-`))
   cleanupRoots.push(cwd)
   const sessionId = `session-parked-${name}`
@@ -54,8 +54,10 @@ async function parkedRun(name: string) {
   // A scheduler built over the run holds none of its children, so it parks the run.
   const checkpoint = store.readCheckpoint<DagRunRecordV1>(runId)
   if (checkpoint === null) throw new Error("expected a paused checkpoint")
-  // A parked scheduler releases its lease when it settles, so the parked run names no holder.
-  const { previousLeaseHolderPid: _previous, ...paused } = checkpoint
+  // The park write drops any lease, so a parked run names no holder unless a shutdown pause of this
+  // host had recorded itself as the previous one.
+  const { previousLeaseHolderPid: previous, ...unheld } = checkpoint
+  const paused = pausedBy === "this host" ? { ...unheld, previousLeaseHolderPid: previous } : unheld
   const nodes = paused.nodes.map((entry) => (entry.id === "side" ? { ...entry, state: "failed" as const } : entry))
   store.writeCheckpoint(runId, { ...paused, nodes, status: "running" })
   const parked = await createDagScheduler({
@@ -65,7 +67,15 @@ async function parkedRun(name: string) {
   }).run()
   expect(parked.status).toBe("paused")
   const eventCount = (): number => store.readEvents(runId, 0, { limit: 500 }).events.length
-  return { runId, sessionId, runtime, runner, engine, store, firstTask, eventCount }
+  const refusedRetry = (): Promise<unknown> =>
+    within(
+      runtime.retry(runId, ["side"]).then(
+        () => undefined,
+        (error: unknown) => error,
+      ),
+      "runtime.retry",
+    )
+  return { runId, sessionId, runtime, runner, engine, store, firstTask, eventCount, refusedRetry }
 }
 
 describe("DAG runtime verbs on a parked run", () => {
@@ -111,4 +121,35 @@ describe("DAG runtime verbs on a parked run", () => {
       runtime.dispose()
     })
   }
+
+  test("#given a retry refused on a parked run #when the run is cancelled #then the refused verb left no scheduler behind and the child is really ended", async () => {
+    // given
+    const { runId, runtime, runner, engine, store, firstTask, refusedRetry } = await parkedRun("retry-then-cancel")
+    expect(await refusedRetry()).toEqual(expect.objectContaining({ code: "run_still_active" }))
+
+    // when
+    await within(runtime.cancel(runId), "runtime.cancel")
+
+    // then
+    expect(runner.aborted).toContain(firstTask)
+    expect(engine.manager.get(firstTask)?.status).toBe("cancelled")
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("cancelled")
+    runtime.dispose()
+  })
+
+  test("#given a retry refused on a run this host paused and parked #when the session reattaches #then recovery still claims the run", async () => {
+    // given
+    const { runId, runtime, store, refusedRetry } = await parkedRun("retry-then-recover", "this host")
+    expect(await refusedRetry()).toEqual(expect.objectContaining({ code: "run_still_active" }))
+    const resumedBefore = store.readEvents(runId, 0, { limit: 500 }).events.filter((e) => e.type === "dag.run.resumed")
+
+    // when
+    await within(runtime.attach(), "re-attach")
+
+    // then
+    const resumedAfter = store.readEvents(runId, 0, { limit: 500 }).events.filter((e) => e.type === "dag.run.resumed")
+    expect(resumedAfter).toHaveLength(resumedBefore.length + 1)
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("running")
+    runtime.dispose()
+  })
 })
