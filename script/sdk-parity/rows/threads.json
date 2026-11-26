@@ -11,7 +11,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
+          "thread": {
+            "type": "string"
+          },
           "interrupt": {
             "type": "boolean"
           },
@@ -66,7 +68,10 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "thread"
@@ -97,7 +102,11 @@
       ],
       "input": {
         "properties": {
-          "alias": {}
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
         },
         "required": [
           "alias"
@@ -528,8 +537,14 @@
               },
               {
                 "type": "object",
+                "required": [
+                  "message"
+                ],
                 "properties": {
-                  "message": {},
+                  "message": {
+                    "type": "string",
+                    "maxLength": 32768
+                  },
                   "delivery": {
                     "anyOf": [
                       {
@@ -547,14 +562,59 @@
                     ],
                     "default": "auto"
                   },
-                  "expected_turn_id": {},
-                  "summary": {},
-                  "attachments": {},
+                  "expected_turn_id": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "path"
+                          ],
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "mime": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "bytes",
+                            "name"
+                          ],
+                          "properties": {
+                            "bytes": {},
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "mime": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1
+                  },
                   "author": {}
-                },
-                "required": [
-                  "message"
-                ]
+                }
               }
             ]
           },
@@ -674,12 +734,29 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "since": {},
-          "before": {},
-          "tail": {},
-          "limit": {},
-          "max_bytes": {}
+          "thread": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string",
+            "minLength": 1
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tail": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "thread"
@@ -727,8 +804,14 @@
       ],
       "input": {
         "properties": {
-          "name": {},
-          "op": {},
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
           "args": {}
         },
         "required": [
@@ -762,11 +845,28 @@
       ],
       "input": {
         "properties": {
-          "name": {},
-          "migrations": {},
-          "moduleUrl": {},
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "migrations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "moduleUrl": {
+            "type": "string",
+            "minLength": 1
+          },
           "sessionCallable": {},
-          "wakeDir": {}
+          "wakeDir": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "migrations",
@@ -860,8 +960,31 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "from": {}
+          "thread": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "required": [
+              "thread",
+              "delivery_id"
+            ],
+            "properties": {
+              "thread": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delivery_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turn_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": [
           "thread"
@@ -892,7 +1015,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string"
+          }
         },
         "required": [
           "thread"
@@ -1150,11 +1275,25 @@
           "idempotency_key": {
             "type": "string"
           },
-          "workspace": {},
-          "device": {},
-          "project": {},
-          "name": {},
-          "archived": {}
+          "workspace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "archived": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -1237,8 +1376,12 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "all_scope": {}
+          "thread": {
+            "type": "string"
+          },
+          "all_scope": {
+            "type": "boolean"
+          }
         },
         "required": [
           "thread"
@@ -1268,7 +1411,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {}
+          "thread": {
+            "type": "string"
+          }
         },
         "required": [
           "thread"
@@ -1331,7 +1476,10 @@
           "idempotency_key": {
             "type": "string"
           },
-          "limit": {}
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "thread"
@@ -1525,10 +1673,33 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "interrupt": {},
-          "force": {},
-          "move": {}
+          "thread": {
+            "type": "string"
+          },
+          "interrupt": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "move": {
+            "type": "object",
+            "required": [
+              "id",
+              "target"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": [
           "thread"
@@ -1634,9 +1805,17 @@
       ],
       "input": {
         "properties": {
-          "address": {},
-          "all_scope": {},
-          "workspace": {}
+          "address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "all_scope": {
+            "type": "boolean"
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "address"
@@ -1783,7 +1962,50 @@
           "all_scope": {
             "type": "boolean"
           },
-          "attachments": {},
+          "attachments": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "path"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "name"
+                  ],
+                  "properties": {
+                    "bytes": {},
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
           "author": {}
         },
         "required": [
@@ -1944,9 +2166,55 @@
           "all_scope": {
             "type": "boolean"
           },
-          "attachments": {},
+          "attachments": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "path"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "name"
+                  ],
+                  "properties": {
+                    "bytes": {},
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
           "author": {},
-          "deadline_ms": {}
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "message",
@@ -2185,7 +2453,9 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
+          "thread": {
+            "type": "string"
+          },
           "interrupt": {
             "type": "boolean"
           },
@@ -2195,7 +2465,18 @@
           "clear_queue": {
             "type": "boolean"
           },
-          "children": {}
+          "children": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "refuse"
+              },
+              {
+                "type": "string",
+                "const": "detach"
+              }
+            ]
+          }
         },
         "required": [
           "thread"
@@ -2246,10 +2527,47 @@
       ],
       "input": {
         "properties": {
-          "thread": {},
-          "from": {},
-          "until": {},
-          "deadline_ms": {}
+          "thread": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "required": [
+              "thread",
+              "delivery_id"
+            ],
+            "properties": {
+              "thread": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delivery_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turn_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "idle"
+              },
+              {
+                "type": "string",
+                "const": "done"
+              }
+            ]
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "thread"
