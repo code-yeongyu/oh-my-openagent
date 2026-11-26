@@ -6,12 +6,12 @@ import { SCENARIOS } from "./scenarios"
 
 // The shared fixture of the presentation controls, built from the real case: train 12 changes one usage line of omo
 // remote, `send <session> <text>` to `send <session> <text|->`, with exit codes 0/2/2 unchanged. Base outcomes are the
-// committed goldens of the three remote scenarios; both capabilities are unresolved, so without the attribution each
-// delta fails.
+// pre-change goldens of the three remote scenarios, frozen independently of the live golden registry; both
+// capabilities are unresolved, so without the attribution each delta fails.
 
 export const IDS = ["native-remote-help", "native-remote-unknown", "native-remote-open-no-device"]
 const scenarios = SCENARIOS.filter((scenario) => IDS.includes(scenario.id))
-const committed = JSON.parse(text("script/sdk-parity/goldens.json")) as Record<string, Outcome>
+const committed = JSON.parse(text("script/sdk-parity/presentation-before.fixture.json")) as Record<string, Outcome>
 export const base = Object.fromEntries(IDS.map((id) => [id, committed[id] ?? {}]))
 export const BEFORE = "  send <session> <text> [--steer|--follow-up] [--no-wait]"
 export const AFTER = "  send <session> <text|-> [--steer|--follow-up] [--no-wait]"

@@ -210,7 +210,7 @@ export function sessionVerbLines(
     const dropped =
       "dropped_deliveries" in result && Array.isArray(result.dropped_deliveries) ? result.dropped_deliveries : []
     return [
-      result.closed ? `Closed ${label}.` : `${label} was not open.`,
+      `Closed ${label}.`,
       ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
     ]
   }
