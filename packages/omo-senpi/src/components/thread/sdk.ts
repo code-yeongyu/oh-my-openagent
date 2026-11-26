@@ -1,4 +1,4 @@
-import { attachmentsRefused } from "./sdk-core/failures"
+import { attachmentsRefused } from "./attachments-refusal"
 import type { WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
 import { assembleThreadFacade } from "../omo-sdk/thread-assembly"

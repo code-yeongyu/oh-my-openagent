@@ -124,7 +124,8 @@ describe("the located-row release stays internal", () => {
   })
 
   // Architecture contract (design 7.5 and the ruling): the facade's runtime imports reach the root's thread-only assembly,
-  // the root's failure conversions and the thread contract only, never a thread-core module; type-only imports are erased.
+  // the root's failure conversions, the thread contract and the attachments refusal (a leaf over the refusal registry)
+  // only, never a thread-core module; type-only imports are erased.
   test("#given the thread facade's source #when its value imports are listed #then none reaches a thread-core module", () => {
     const source = readFileSync(join(import.meta.dir, "sdk.ts"), "utf8")
     const valueImports = [...source.matchAll(/^import\s+(?!type\b)[^;]*?from\s+"([^"]+)"/gms)].map((match) => match[1])
@@ -132,6 +133,7 @@ describe("the located-row release stays internal", () => {
       "../omo-sdk/root/extension-codes",
       "../omo-sdk/root/thread-failures",
       "../omo-sdk/thread-assembly",
+      "./attachments-refusal",
       "./contracts",
     ])
   })

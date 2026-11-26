@@ -1,7 +1,6 @@
 import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../../call-budget/call-deadline"
 import { controlRefusalOf } from "../control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "../errors"
-import { refusal } from "../refusal-texts"
 
 export type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 
@@ -111,17 +110,4 @@ export async function guarded<T>(body: () => Promise<T>, onUnexpected?: Unexpect
   }
 }
 
-/**
- * No leg carries an attachment yet: the gateway delivery on this device has no field for one, and neither has the relay
- * record a send to another device becomes. So a send or a create's first prompt naming attachments (top level or in the
- * object prompt) is refused with this one typed refusal on every surface, before any effect, never sent without them. It sits with the failure helper, one of the three things the
- * root takes across the core's boundary, so the refusal registry stays behind that boundary (P1c decision 7).
- */
-export function attachmentsRefused(input: unknown): ThreadToolFailure | undefined {
-  const field = (from: unknown, name: string): unknown =>
-    typeof from === "object" && from !== null ? Reflect.get(from, name) : undefined
-  const attachments = field(input, "attachments") ?? field(field(input, "prompt"), "attachments")
-  if (attachments === undefined) return undefined
-  const count = Array.isArray(attachments) ? attachments.length : 1
-  return refusal("control.send_attachments_unsupported", { count: String(count) }, { field: "attachments", count })
-}
+export { attachmentsRefused } from "../attachments-refusal"
