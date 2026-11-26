@@ -3,14 +3,8 @@ import type { CallOutcome } from "@oh-my-opencode/account-core/calls/outcome"
 import type { CustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 import type { AccountAccess } from "../access"
 import type { AccountApi, SignedIn, SignInOptions } from "../account"
-import {
-  OMO_CODE_REGISTRY,
-  type CallOptions,
-  type OmoFailure,
-  type OmoPrincipal,
-  type OmoValue,
-  type RootCallInput,
-} from "../contract"
+import type { CallOptions, OmoFailure, OmoPrincipal, OmoValue, RootCallInput } from "../contract"
+import { OMO_CODE_REGISTRY } from "../contract/codes"
 import type { OmoResult } from "../result"
 import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
 import { launchBlocked } from "./account"
