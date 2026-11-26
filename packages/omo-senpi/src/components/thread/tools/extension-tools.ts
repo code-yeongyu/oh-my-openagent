@@ -6,6 +6,7 @@
  * inside the op's transaction. There is never an argument fallback for the caller.
  */
 import type { AgentToolResult } from "@code-yeongyu/senpi"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 import type { ThreadToolResult } from "../contracts"
 import type { DeclaredSessionOp, StoreExtensionResult } from "../gateway/store"
@@ -120,7 +121,7 @@ export function registerExtensionTools(
   const skip = (name: string, why: string): void => {
     if (reported.has(name)) return
     reported.add(name)
-    log(`thread gateway: extension session tool ${name} was not registered: ${why}`)
+    log(`thread gateway: extension session tool ${escapeForDisplay(name)} was not registered: ${why}`)
   }
   pi.on("session_start", () => {
     void buildExtensionTools(options).then(
