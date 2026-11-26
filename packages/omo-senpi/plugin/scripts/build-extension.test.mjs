@@ -833,6 +833,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-wake-runtime": "./extensions/omo-wake.js",
+      "#omo-sdk-threads-runtime": "./runtime/omo-sdk/threads.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",

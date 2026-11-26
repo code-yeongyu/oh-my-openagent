@@ -53,7 +53,8 @@ describe("the SDK runtime file table", () => {
 
 describe("the boundary between the files carries data and functions only", () => {
   test("#given the thread file's entry module #then every export is a plain function or plain data, never a class", async () => {
-    const entry = await import(join(packageRoot, row("threads").entry))
+    const entry = await import("../../src/components/thread/sdk-core/runtime-entry.ts")
+    expect(row("threads").entry).toBe("src/components/thread/sdk-core/runtime-entry.ts")
     for (const [name, value] of Object.entries(entry)) {
       const kind = typeof value
       expect({ name, kind: kind === "function" || kind === "object" ? kind : "other" }).toEqual({
