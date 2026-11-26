@@ -289,6 +289,99 @@ describe("negative controls: the tool-ahead rule", () => {
     expect(report.failures).toContainEqual(expect.stringContaining("scenario marked answers differently"))
   })
 
+  const judge = (base: readonly Row[], head: readonly Row[], entries = unresolved.entries) =>
+    gateReport(
+      input({
+        base: { ...input().base, rows: base, unresolved: withoutAhead(unresolved.entries) },
+        head: { ...input().head, rows: head, unresolved: entries },
+      }),
+    ).failures
+  const withAliasesOnBase = baseRows.map((row): Row => {
+    const head = rows.find((candidate) => candidate.id === row.id) as Row
+    return {
+      ...row,
+      tool: row.tool.map((entry, i) => ({
+        ...entry,
+        ...(head.tool[i]?.aliases === undefined ? {} : { aliases: head.tool[i]?.aliases }),
+      })),
+    }
+  })
+  const editRow = (source: readonly Row[], id: string, edit: (row: Row) => Row) =>
+    source.map((row) => (row.id === id ? edit(row) : row))
+
+  test("#given a listed name the base branch already reads, where only an alias changes #then it fails", () => {
+    const entries = unresolved.entries.map((entry) =>
+      entry.id === "threads.read" && entry.toolAhead !== undefined
+        ? { ...entry, toolAhead: { ...entry.toolAhead, fields: [...(entry.toolAhead.fields ?? []), "cursor"] } }
+        : entry,
+    )
+    expect(
+      judge(baseRows, rows, entries).filter((line) => line.startsWith("threads.read: its descriptor")),
+    ).toHaveLength(1)
+  })
+
+  test.each([
+    [
+      "removed",
+      (aliases: Record<string, string>) =>
+        Object.fromEntries(Object.entries(aliases).filter(([name]) => name !== "search")),
+    ],
+    [
+      "remapped to another field the branch reads",
+      (aliases: Record<string, string>) => ({ ...aliases, search: "state" }),
+    ],
+  ])("#given a base alias %s #then it fails", (_how, change) => {
+    const head = editRow(rows, "threads.list", (row) => ({
+      ...row,
+      tool: row.tool.map((entry) => ({ ...entry, aliases: change({ ...(entry.aliases ?? {}) }) })),
+    }))
+    expect(
+      judge(withAliasesOnBase, head).filter((line) => line.startsWith("threads.list: its descriptor")),
+    ).toHaveLength(1)
+  })
+
+  const marked = (
+    args: Record<string, unknown>,
+    alias: NonNullable<Extract<Scenario, { surface: "tool" }>["alias"]>,
+    base: readonly Row[] = baseRows,
+  ) =>
+    gateReport(
+      input({
+        scenarios: [{ id: "x", capability: "threads.read", surface: "tool", tool: "thread_read", args, alias }],
+        base: {
+          ...input().base,
+          rows: base,
+          outcomes: { x: { result: { kind: "ok" } } },
+          unresolved: withoutAhead(unresolved.entries),
+        },
+        head: { ...input().head, outcomes: { x: { result: { kind: "error", error: { code: "invalid_arguments" } } } } },
+      }),
+    ).failures.some((line) => line.includes("scenario x answers differently"))
+
+  test.each([
+    ["an alias that exists nowhere", { row: "threads.read", field: "limit", name: "no-such-alias" }],
+    ["a field that exists nowhere", { row: "threads.read", field: "no-such-field" }],
+    ["a row that does not exist", { row: "no.such.row", field: "max_bytes" }],
+    ["another row whose tool is not this one", { row: "threads.send", field: "max_bytes" }],
+    ["an alias the args do not contain", { row: "threads.read", field: "limit", name: "tail" }],
+    ["a field the base branch already reads", { row: "threads.read", field: "max_bytes" }],
+  ])(
+    "#given a scenario exercising an existing field whose mark names %s #then base and head are compared",
+    (_name, alias) => {
+      expect(marked({ thread: "t", max_bytes: 4096 }, alias)).toBe(true)
+    },
+  )
+
+  test("#given a generated alias scenario whose alias the base already declares #then it is compared", () => {
+    expect(
+      marked({ thread: "t", tail: 3 }, { row: "threads.read", field: "limit", name: "tail" }, withAliasesOnBase),
+    ).toBe(true)
+  })
+
+  test("#given a generated alias scenario whose alias is new on the head #then it is exempt", () => {
+    expect(marked({ thread: "t", tail: 3 }, { row: "threads.read", field: "limit", name: "tail" })).toBe(false)
+  })
+
   test("#given an alias to a field its branch does not read #then the row is refused", () => {
     const row = { ...list, tool: list.tool.map((entry) => ({ ...entry, aliases: { search: "device" } })) }
     expect(registryProblems(file(row))).toContainEqual(expect.stringContaining('alias "search" maps to "device"'))

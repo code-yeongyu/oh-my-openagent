@@ -100,8 +100,12 @@ export const CANDIDATES_LINE =
 // or for the field-only scenario, a branch reading the field. A scenario exercising what the base has is compared.
 function aliasNewOnHead(scenario: Scenario & { surface: "tool" }, baseRows: ReadonlyMap<string, Row>): boolean {
   const mark = scenario.alias
-  if (mark?.field === undefined) return false
-  const entries = (baseRows.get(mark.row)?.tool ?? []).filter((entry) => entry.name === scenario.tool)
+  if (mark?.field === undefined || mark.row !== scenario.capability) return false
+  const row = baseRows.get(mark.row)
+  const has = (key: string) => Object.hasOwn(scenario.args, key)
+  if (row === undefined || !has(mark.name ?? mark.field)) return false
+  const entries = row.tool.filter((entry) => entry.name === scenario.tool)
+  if (entries.length === 0) return false
   if (mark.name !== undefined) return !entries.some((entry) => entry.aliases?.[mark.name as string] !== undefined)
   return !entries.some((entry) => entry.reads.includes(mark.field as string))
 }
