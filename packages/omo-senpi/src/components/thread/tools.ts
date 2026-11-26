@@ -26,7 +26,6 @@ import { threadLink } from "./thread-link"
 import { sentThreadLink } from "./tools/send-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { resolveAddress } from "./address/lazy"
-import type * as SdkSend from "./sdk-send"
 import type { DeliveryOutcome, DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
@@ -35,7 +34,7 @@ import { rowState, threadModel } from "./tools/thread-state"
 import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { threadSendPermission } from "./tools/reply-permission"
-import { listAcross, readReceipt } from "./remote/lazy-ops"
+import { listAcross, readReceipt, sendThread, sendToTarget, viewForSend } from "./remote/lazy-ops"
 import { rowCreatedAt, rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
@@ -77,10 +76,6 @@ import { createReceipts } from "./control/receipts"
 import { thrown, type ThrownWording } from "./sdk-core/failures"
 
 export { RECEIPT_RECOVERY_MAX_KEYS } from "./control/receipts"
-
-// The send path ships in the thread client sidecar, which a send loads for its live host anyway: omo.js carries none of it.
-const sendRuntime = (): Promise<Pick<typeof SdkSend, "sendThread" | "sendToTarget" | "viewForSend">> =>
-  import("#omo-thread-client-runtime")
 
 /** The thread tools' wording of the one thrown-failure mapping (sdk-core/failures.ts `thrown`). */
 const TOOL_WORDING: ThrownWording = {
@@ -174,7 +169,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       result = await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, async () => {
         const current =
           sendTo !== ""
-            ? await (await sendRuntime()).viewForSend(options, sendTo, () => view({ offline: true }))
+            ? await viewForSend(options, sendTo, () => view({ offline: true }))
             : await view(receipted ? undefined : { offline: true })
         return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
       })
@@ -211,9 +206,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
               options,
               prompted,
               target,
-              await (
-                await sendRuntime()
-              ).sendToTarget(options, pipeline, target, send, key, { kind: "session", id: callerId }, send, "creator"),
+              await sendToTarget(
+                options,
+                pipeline,
+                target,
+                send,
+                key,
+                { kind: "session", id: callerId },
+                send,
+                "creator",
+              ),
             ),
           awaitPromptStart: (deliveryId) =>
             awaitPromptStart(
@@ -364,9 +366,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     callerId: string,
     resolvedBy?: "exact_name" | "fuzzy",
   ): Promise<ThreadToolResult> {
-    const routed = await (
-      await sendRuntime()
-    ).sendThread(
+    const routed = await sendThread(
       options,
       pipeline,
       resolveAddress,

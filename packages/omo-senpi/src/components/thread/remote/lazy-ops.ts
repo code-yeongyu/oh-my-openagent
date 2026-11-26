@@ -8,6 +8,7 @@ import type * as RelayControl from "../control/relay-control"
 import type * as Receipt from "./receipt"
 import type * as ReopenParked from "./reopen-parked"
 import type * as TranscriptTail from "./transcript-tail"
+import type * as SdkSend from "../sdk-send"
 import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
 import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
@@ -21,6 +22,7 @@ type Runtime = Pick<
   Pick<typeof Receipt, "readReceipt"> &
   Pick<typeof ReopenParked, "reopenParkedRow"> &
   Pick<typeof TranscriptTail, "readTailPage"> &
+  Pick<typeof SdkSend, "sendThread" | "sendToTarget" | "viewForSend"> &
   Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
@@ -38,6 +40,13 @@ export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =
 export const withAlias = async (...args: Parameters<Runtime["withAlias"]>) => await (await runtime()).withAlias(...args)
 export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreatedAlias"]>) =>
   await (await runtime()).claimCreatedAlias(...args)
+// The send path ships in the sidecar too: a send loads it for its live host anyway.
+export const sendThread = async (...args: Parameters<Runtime["sendThread"]>) =>
+  await (await runtime()).sendThread(...args)
+export const sendToTarget = async (...args: Parameters<Runtime["sendToTarget"]>) =>
+  await (await runtime()).sendToTarget(...args)
+export const viewForSend = async (...args: Parameters<Runtime["viewForSend"]>) =>
+  await (await runtime()).viewForSend(...args)
 export const readTailPage = async (...args: Parameters<Runtime["readTailPage"]>) =>
   await (await runtime()).readTailPage(...args)
 export const reopenParkedRow = async (...args: Parameters<Runtime["reopenParkedRow"]>) =>
