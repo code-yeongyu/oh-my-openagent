@@ -11,8 +11,14 @@
       ],
       "input": {
         "properties": {
-          "directory": {},
-          "work_id": {}
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "work_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },

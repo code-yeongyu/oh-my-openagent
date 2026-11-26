@@ -40,6 +40,7 @@
 | Engine trust under a user namespace (bwrap sandbox, inode attestation) | [docs/reference/engine-trust-user-namespaces.md](reference/engine-trust-user-namespaces.md) |
 | Desktop engine attach and `--serve` multi-connection threat model | [docs/reference/desktop-attach-threat-model.md](reference/desktop-attach-threat-model.md) |
 | macOS keychain helper custody threat model (where the helper runs, what the item's ACL trusts) | [docs/reference/keychain-helper-custody-threat-model.md](reference/keychain-helper-custody-threat-model.md) |
+| omo SDK authority and credential custody: principals by capability, custody, revocation, audit (security design) | [docs/reference/omo-sdk-authority-and-custody.md](reference/omo-sdk-authority-and-custody.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |

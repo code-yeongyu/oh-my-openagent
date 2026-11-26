@@ -7,7 +7,7 @@ opposite of the attached engine: no user logins, full control.
 const { omowright } = await loadOmowright()
 const profile = mkdtempSync(join(tmpdir(), "omowright-"))
 const browser = await omowright.connectPipe({
-  browserPath: "<CloakBrowser or chrome-headless-shell binary>",
+  browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary,   // or omowright.findCloakBrowserPath(); never a guessed path
   browserArgs: ["--headless", "--no-first-run", `--user-data-dir=${profile}`],
   storageRoot: profile,
   dialogPolicy: { accept: true },
@@ -49,7 +49,10 @@ blocked URL, neither: use the `ultimate-browsing` skill.
 
 `OmOPage` is Playwright-shaped: `goto`, `snapshot`, `locator(ref | css)`, `click`, `fill`,
 `press`, `hover`, `check`, `selectOption`, `dragTo`, `setInputFiles`, `screenshot`, `pdf`,
-`evaluate`, `waitForURL`, `keyboard`, `mouse`, `frameLocator`. A snapshot is an accessibility tree
+`evaluate`, `keyboard`, `mouse`, `frameLocator`, `getByRole` / `getByText` / `getByLabel`, and the
+waits `waitForFunction(fn, arg, { timeout })`, `waitForResponse` / `waitForRequest`, `waitForURL`,
+`waitForLoadState`, `locator.waitFor`. `page.emulateMedia({ colorScheme, reducedMotion })` sets
+media features; raw `Emulation.*` CDP is never needed. A snapshot is an accessibility tree
 with virtual refs (`[ref=e3]`, cross-origin frames as `f1e3`); `compactSnapshot()` drops the refs
 map, about half the bytes. Readiness is a content probe (body plus interactive elements, landmarks
 or text), not a timer; `goto(url, { waitUntil: "commit" })` is the escape hatch for empty pages.

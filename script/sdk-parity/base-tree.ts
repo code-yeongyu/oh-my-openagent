@@ -1,15 +1,25 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs"
-import { join, relative } from "node:path"
+import path, { join } from "node:path"
 
 // The merge-base tree the gate builds shares the head's installed external packages (when bun.lock is unchanged), but
 // never its workspace packages (review 6061267823 H2): a workspace link points at a package's own source, so the base's
 // links are rebuilt to point into the base tree. isolationProblems checks every workspace package resolves inside the
 // tree it serves before any outcome is compared.
 
-const isInside = (path: string, root: string): boolean => {
-  const rel = relative(root, path)
-  return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/"))
+// Real paths use the platform's separator (backslashes on Windows, issue #15052), and a path on another Windows drive
+// comes back from relative() as an absolute path, so both tests go through one path dialect: the running platform's by
+// default, path.posix or path.win32 when named. On POSIX a backslash is an ordinary file-name character, not a separator.
+type PathApi = Pick<typeof path, "relative" | "isAbsolute" | "normalize" | "sep">
+
+export const isInside = (target: string, root: string, api: PathApi = path): boolean => {
+  const rel = api.relative(root, target)
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${api.sep}`) && !api.isAbsolute(rel))
 }
+
+// An installed (external) package: some directory on its real path is a node_modules. normalize() turns win32's
+// alternative separator into its own and leaves a POSIX backslash in the name it belongs to.
+export const isInstalled = (real: string, api: PathApi = path): boolean =>
+  api.normalize(real).split(api.sep).includes("node_modules")
 
 // A workspace package is linked by NAME to the base tree's own package directory, however the head reaches it: a
 // workspace link into packages/, or a copy in bun's store (a `file:` dependency), which holds the head's source too.
@@ -32,7 +42,7 @@ function linkEntries(
     const own = workspaces.get(scope === "" ? entry.name : `${scope}/${entry.name}`)
     const real = realpathSync(from)
     if (own !== undefined) symlinkSync(own, to)
-    else if (!isInside(real, headRoot) || real.split("/").includes("node_modules")) symlinkSync(real, to)
+    else if (!isInside(real, headRoot) || isInstalled(real)) symlinkSync(real, to)
   }
 }
 

@@ -69,8 +69,14 @@
       ],
       "input": {
         "properties": {
-          "id": {},
-          "name": {}
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "id",
@@ -102,7 +108,10 @@
       ],
       "input": {
         "properties": {
-          "device": {}
+          "device": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "device"
@@ -132,8 +141,14 @@
       ],
       "input": {
         "properties": {
-          "device": {},
-          "confirm_name": {}
+          "device": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirm_name": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "confirm_name",
