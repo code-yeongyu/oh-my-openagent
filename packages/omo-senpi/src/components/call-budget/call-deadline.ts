@@ -136,8 +136,11 @@ export function callWait(
   }
   const scoped = <T>(call: () => Promise<T>): Promise<T> => {
     if (deadlineAt === undefined) return call()
+    // The scope's deadlines are system time (commandWaitMs reads Date.now()): what is left on this call's own clock is
+    // carried over, so an injected clock and the remote commands' budget agree.
+    const own = Date.now() + (deadlineAt - clock.now())
     const outer = scope.getStore()
-    return withCallDeadline(outer === undefined ? deadlineAt : Math.min(outer, deadlineAt), call)
+    return withCallDeadline(outer === undefined ? own : Math.min(outer, own), call)
   }
   return { read: (port) => waited(port, false), write: (port) => waited(port, true), scoped, lost }
 }
