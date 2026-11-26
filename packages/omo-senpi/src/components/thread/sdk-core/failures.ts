@@ -13,6 +13,12 @@ export function fail(
   return { kind: "error", error: threadToolFailure(code, message, next, details) }
 }
 
+/**
+ * The thread client sidecar (`#omo-thread-client-runtime`) could not be loaded. Its own error names a file or a module
+ * specifier, so the answer is fixed text and the cause stays out of it.
+ */
+export const THREAD_CLIENT_UNAVAILABLE = "thread_client_unavailable"
+
 /** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
 export function thrown(error: unknown): Failure {
   // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
@@ -21,6 +27,12 @@ export function thrown(error: unknown): Failure {
   const schema = gatewaySchemaRefusal(error)
   if (schema !== undefined) return { kind: "error", error: schema }
   const message = error instanceof Error ? error.message : String(error)
+  if (message === THREAD_CLIENT_UNAVAILABLE)
+    return fail(
+      "internal_error",
+      "The thread client of this omo install could not be loaded.",
+      "Reinstall omo, then call it again.",
+    )
   if (message.startsWith("host_unavailable:"))
     return fail(
       "host_unavailable",

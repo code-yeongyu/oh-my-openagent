@@ -423,9 +423,11 @@ export function resolveOutputs(options) {
 
 export const omoSenpiBuildDefines = (version) => ({ OMO_SENPI_PACKAGE_VERSION: version, OMO_SENPI_BUNDLED: true })
 
-// The root SDK runtime's externals: node builtins, and the wake sidecar the root's thread core carries like the thread
-// SDK below (#14972). plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
-const OMO_SDK_EXTERNALS = [...sdkExternalSpecifiers, "#omo-wake-runtime"]
+// The root SDK runtime's externals: node builtins, the wake sidecar the root's thread core carries like the thread SDK
+// below (#14972), and the thread client sidecar, which the root's thread core loads on its first host operation (P1b
+// size ruling: an external file takes bytes out, a dynamic import inside this file does not). The plugin manifest maps
+// both to their shipped extensions. plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
+const OMO_SDK_EXTERNALS = [...sdkExternalSpecifiers, "#omo-wake-runtime", "#omo-thread-client-runtime"]
 
 export async function buildExtension(options = {}) {
   const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"))

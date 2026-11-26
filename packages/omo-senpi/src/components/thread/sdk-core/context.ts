@@ -3,12 +3,13 @@ import { join } from "node:path"
 import type { ThreadAddressEntry } from "../addressing"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { ProvenanceWorkspaces } from "../gateway/provenance-resolver"
-import { createLiveThreadSurface, parseHostStatusAll } from "../live-surface"
+import { createLazyLiveThreadSurface } from "../lazy-live-surface"
 import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayServices } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "../tools/ports"
 import { lazySameDeviceWake } from "../wake/lazy-same-device-wake"
+import { THREAD_CLIENT_UNAVAILABLE } from "./failures"
 
 export type ThreadCoreOptions = {
   readonly agentDir: string
@@ -46,11 +47,19 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
   const principal = `cli:${options.uid}`
   const env = { ...(options.env ?? process.env), OMO_CODING_AGENT_DIR: options.agentDir }
   const engineStatusAll = options.engineStatusAll
+  // The thread client loads from its sidecar (`#omo-thread-client-runtime`) on the first host operation, the same file
+  // the agent's thread component and the thread SDK load, so a bundle of this core keeps it out (P1b size ruling).
   const host =
     options.host ??
-    createLiveThreadSurface(undefined, {
+    createLazyLiveThreadSurface(undefined, {
       env,
-      ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
+      loadFailure: () => new Error(THREAD_CLIENT_UNAVAILABLE),
+      ...(engineStatusAll === undefined
+        ? {}
+        : {
+            statusAll: async () =>
+              (await import("#omo-thread-client-runtime")).parseHostStatusAll(await engineStatusAll()),
+          }),
     })
   const store =
     options.store ??
