@@ -185,22 +185,27 @@ export function findRawTlsClients(content: string, file = "source.ts"): RawTlsHi
           bindings.declare(spec.name, name === "default" ? { module, specifier } : { module, member: name, specifier })
       }
   }
-  const flows = list.flatMap(flowTargets)
-  const initialized = list.filter(
-    (node): node is ts.VariableDeclaration | ts.ParameterDeclaration =>
-      (ts.isVariableDeclaration(node) || ts.isParameter(node)) && node.initializer !== undefined,
-  )
+  type Step =
+    | { readonly flow: ReturnType<typeof flowTargets>[number] }
+    | { readonly declaration: ts.VariableDeclaration | ts.ParameterDeclaration }
+  const steps: Step[] = list.flatMap((node): Step[] => [
+    ...flowTargets(node).map((flow) => ({ flow })),
+    ...((ts.isVariableDeclaration(node) || ts.isParameter(node)) && node.initializer ? [{ declaration: node }] : []),
+  ])
   let changed: boolean
   do {
     changed = false
     const bind = (name: ts.Identifier, value: Binding): void => {
       if (bindings.declare(name, value)) changed = true
     }
-    for (const [name, flow, how] of flows) {
-      const value = kind(flow)
-      if (value && (how === "assign" ? bindings.assign(name, value) : bindings.declare(name, value))) changed = true
-    }
-    for (const node of initialized) {
+    for (const step of steps) {
+      if ("flow" in step) {
+        const [name, flow, how] = step.flow
+        const value = kind(flow)
+        if (value && (how === "assign" ? bindings.assign(name, value) : bindings.declare(name, value))) changed = true
+        continue
+      }
+      const node = step.declaration
       if (!node.initializer) continue
       const init = unwrap(node.initializer),
         value = kind(init)

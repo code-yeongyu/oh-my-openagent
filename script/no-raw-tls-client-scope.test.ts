@@ -118,6 +118,18 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
     expect(connectHits(sample)).toBe(0)
   })
 
+  test.each([
+    ['let a = Bun; let b = a; a = require("node:https"); b.connect({ tls: true });', "Bun.connect("],
+    [
+      'let a = Bun; if (c) a = require("node:https"); a.connect({ hostname: "h", port: 1, tls: true });',
+      "Bun.connect(",
+    ],
+    ['let a = require("node:https"); if (c) a = Bun; a.request(o);', "https.request("],
+    ['let a = require("node:tls"); if (c) a = require("node:http2"); a.connect(o);', "tls.connect("],
+  ])("a variable given two clients keeps the one bound first in source order: %s", (sample, call) => {
+    expect(findRawTlsClients(sample).map((hit) => hit.id)).toContain(call)
+  })
+
   test("a sibling shadow does not hide, and does not duplicate, the real reference", () => {
     expect(
       connectHits("var t = globalThis.Bun; function f(t) { return t.connect } function g() { return t.connect }"),
