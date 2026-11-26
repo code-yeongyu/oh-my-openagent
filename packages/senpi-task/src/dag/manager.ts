@@ -8,7 +8,6 @@ import { liveLeaseHolder, pausedAmendmentUnsafe } from "./amend-safety"
 export { applyDagRunMutation } from "./run-mutation"
 import { countDagNodes as countNodes } from "./counts"
 
-import { defaultSignaller } from "../lifecycle/context"
 import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } from "./events"
 import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprintInputV1 } from "./fingerprint"
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
@@ -497,9 +496,9 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
       runId: selectedRunId,
     })
   }
-  if (oldRecord.status === "paused" && oldRecord.pause?.reason !== "user_stop" && liveLeaseHolder(oldRecord)) {
+  if (oldRecord.status === "paused" && liveLeaseHolder(oldRecord)) {
     throw new DagManagerError({
-      code: "invalid_amendment",
+      code: oldRecord.pause?.reason === "user_stop" ? "run_not_owned" : "invalid_amendment",
       message: `dag run "${selectedRunId}" is paused by another live lease`,
       runId: selectedRunId,
     })
@@ -624,12 +623,12 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
       message: `unknown dag run "${selectedRunId}"`,
       runId: selectedRunId,
     })
-  // The reducer no-ops instead of throwing (see applyDagRunMutation), so an unadvanced fingerprint is
-  // how a lost race surfaces. Report it here, where the WAL is already durable and consistent.
+  // The reducer no-ops on a lost race (see applyDagRunMutation): the unadvanced fingerprint reports it here.
   if (amended.definitionFingerprint !== definitionFingerprint) {
+    const held = amended.status === "paused" && liveLeaseHolder(amended)
     throw new DagManagerError({
-      code: "run_still_active",
-      message: `dag run "${selectedRunId}" changed before the amendment could be applied`,
+      code: held ? "run_not_owned" : "run_still_active",
+      message: `dag run "${selectedRunId}" ${held ? "is held by another live process" : "changed before the amendment could be applied"}`,
       runId: selectedRunId,
     })
   }

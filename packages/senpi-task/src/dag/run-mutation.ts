@@ -58,7 +58,8 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
   })
   if (unsafeIds.length > 0) return record
   if (record.status === "running") return record
-  if (record.status === "paused" && record.pause?.reason !== "user_stop" && liveLeaseHolder(record)) return record
+  // Any paused run, a user-stopped one included: a successor claiming it for its Resume holds it (#15125).
+  if (record.status === "paused" && liveLeaseHolder(record)) return record
   return {
     ...record,
     name: mutation.definition.name,
