@@ -78,12 +78,12 @@ export function createDagSchedulerRegistry(ports: {
   /**
    * The single re-entry seam for the control verbs. The settled scheduler deleted itself from
    * `schedulers` on settle, so the fresh instance the verb built must be re-registered here or the
-   * next cancel/wait would silently build a THIRD scheduler over a live run.
+   * next cancel/wait would silently build a THIRD scheduler over a live run. Ownership is decided
+   * before this: the re-entry took the run's lease ahead of its first write.
    */
   const adoptReentry = (runId: DagRunId, reentry: DagRunReentry): void => {
     const owned: OwnedScheduler = { scheduler: reentry.scheduler }
     schedulers.set(runId, owned)
-    takeDagRunLease(store, runId, lease)
     track(runId, owned, reentry.run)
   }
 

@@ -3,6 +3,7 @@
 import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
+import { releaseDagRunLease, takeDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
@@ -90,6 +91,28 @@ export function refuseUnheldActiveNodes(record: DagRunRecordV1): void {
     runId: record.runId,
     nodeIds: active.map((node) => node.id),
   })
+}
+
+/**
+ * Takes the run's lease for a re-entry (retry, amend) before its first write, so no other process can
+ * claim the run this host is about to revive and no child starts under another live process's lease
+ * (#15125). Refuses with `run_not_owned` while another live process holds the lease. Returns the
+ * release for a re-entry that fails before its scheduler takes over.
+ */
+export function acquireReentryLease(options: DagSchedulerOptions, runId: DagRunId): () => void {
+  const probe = {
+    hostPid: options.hostPid ?? process.pid,
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+  }
+  const heldBefore = readRecord(options.store, runId)?.leaseHolderPid === probe.hostPid
+  if (takeDagRunLease(options.store, runId, probe) === undefined) {
+    throw new DagNodeControlError({
+      code: "run_not_owned",
+      message: `dag run "${runId}" is leased by live process ${readRecord(options.store, runId)?.leaseHolderPid}`,
+      runId,
+    })
+  }
+  return heldBefore ? () => undefined : () => releaseDagRunLease(options.store, runId, probe.hostPid)
 }
 
 export function readRecord(store: DagFileStore, runId: DagRunId): DagRunRecordV1 | null {

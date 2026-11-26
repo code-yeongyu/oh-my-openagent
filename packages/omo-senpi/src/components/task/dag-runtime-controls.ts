@@ -11,7 +11,7 @@ import {
 import { retryDagNodes } from "../../../../senpi-task/src/dag/node-retry"
 import { sendToDagNode } from "../../../../senpi-task/src/dag/node-send"
 import { applyPausedDagGuidance, type PausedDagGuideCommand } from "../../../../senpi-task/src/dag/paused-controls"
-import { refuseUnheldActiveNodes } from "../../../../senpi-task/src/dag/node-control-context"
+import { acquireReentryLease, refuseUnheldActiveNodes } from "../../../../senpi-task/src/dag/node-control-context"
 
 type OwnedScheduler = { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }
 
@@ -59,12 +59,21 @@ export function createDagRuntimeControls(ports: {
 
   const amend = async (runId: DagRunId, definition: DagDefinition): Promise<DagRunSnapshot> => {
     const sessionId = ports.sessionId()
-    refuseUnheldActiveNodes(coreManager.record(runId, sessionId))
-    const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
-    clearAdmissionLatch(runId)
-    schedulers.delete(runId)
-    if (amended.pause?.reason !== "user_stop")
-      adoptReentry(runId, reenterDagRun({ ...schedulerOptions, initialRecord: amended }))
+    const current = coreManager.record(runId, sessionId)
+    refuseUnheldActiveNodes(current)
+    // An amend that re-enters the run owns its lease before the amendment is written.
+    const options = { ...schedulerOptions, initialRecord: current }
+    const abandon = current.pause?.reason === "user_stop" ? () => undefined : acquireReentryLease(options, runId)
+    try {
+      const amended = await coreManager.amend({ runId, definition, parentSessionId: sessionId })
+      clearAdmissionLatch(runId)
+      schedulers.delete(runId)
+      if (amended.pause?.reason !== "user_stop")
+        adoptReentry(runId, reenterDagRun({ ...schedulerOptions, initialRecord: amended }))
+    } catch (error) {
+      abandon()
+      throw error
+    }
     return coreManager.snapshot(runId, sessionId)
   }
 

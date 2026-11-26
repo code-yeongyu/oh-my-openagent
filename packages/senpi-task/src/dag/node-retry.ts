@@ -6,6 +6,7 @@ import type { DagRunEventPayload } from "./types"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagManager, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
 import {
+  acquireReentryLease,
   controlJournal,
   DagNodeControlError,
   ownedRecord,
@@ -51,8 +52,16 @@ export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
       runId: current.runId,
     })
   }
-  const record = withRevivalCapacity(options, current, () => resumeIfSettled(options, current))
-  return startReentry(options, record)
+  const abandon = acquireReentryLease(options, current.runId)
+  try {
+    return startReentry(
+      options,
+      withRevivalCapacity(options, current, () => resumeIfSettled(options, current)),
+    )
+  } catch (error) {
+    abandon()
+    throw error
+  }
 }
 
 // A settled run counts against the cap again the moment it resumes, so the journal writes that revive
@@ -113,25 +122,34 @@ export function retryDagNodes(
   }
   assertRetryable(record, runId, targets)
 
-  // A prompt override is a definition amendment: it is recorded even when the cap then refuses the retry.
-  let current = record
-  if (retryOptions?.prompt !== undefined) {
-    for (const target of targets) current = amendRetryPrompt(options, record, target, retryOptions.prompt)
+  // A user-stopped run only stages the retry for its Resume; every other retry re-enters the run and
+  // owns its lease before the first write below.
+  const staging = record.status === "paused" && record.pause?.reason === "user_stop"
+  const abandon = staging ? () => undefined : acquireReentryLease(options, runId)
+  try {
+    // A prompt override is a definition amendment: it is recorded even when the cap then refuses the retry.
+    let current = record
+    if (retryOptions?.prompt !== undefined) {
+      for (const target of targets) current = amendRetryPrompt(options, record, target, retryOptions.prompt)
+    }
+    if (staging) {
+      const journal = controlJournal(options, current)
+      journal.append({ type: "dag.node.retry-staged", nodeIds: targets })
+      const staged = journal.snapshot()
+      const scheduler = createDagScheduler({ ...options, initialRecord: staged })
+      return { record: staged, scheduler, run: Promise.resolve(staged) }
+    }
+    // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.
+    const resumed = withRevivalCapacity(options, current, () => {
+      const journal = controlJournal(options, current)
+      resetDagNodes(journal, targets, retryOptions?.prompt !== undefined)
+      return resumeIfSettled(options, journal.snapshot())
+    })
+    return startReentry(options, resumed)
+  } catch (error) {
+    abandon()
+    throw error
   }
-  if (record.status === "paused" && record.pause?.reason === "user_stop") {
-    const journal = controlJournal(options, current)
-    journal.append({ type: "dag.node.retry-staged", nodeIds: targets })
-    const staged = journal.snapshot()
-    const scheduler = createDagScheduler({ ...options, initialRecord: staged })
-    return { record: staged, scheduler, run: Promise.resolve(staged) }
-  }
-  // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.
-  const resumed = withRevivalCapacity(options, current, () => {
-    const journal = controlJournal(options, current)
-    resetDagNodes(journal, targets, retryOptions?.prompt !== undefined)
-    return resumeIfSettled(options, journal.snapshot())
-  })
-  return startReentry(options, resumed)
 }
 
 /** Shared reset for manual run re-entry and infrastructure retries inside the live scheduler. */
