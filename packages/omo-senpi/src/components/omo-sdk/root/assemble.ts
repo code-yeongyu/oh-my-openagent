@@ -113,14 +113,17 @@ async function accepts(key: RootCallKey, input: unknown): Promise<boolean> {
   return inputAccepts(key, await checkedInput(key, input))
 }
 
+// An omitted input is the empty input; any other value, null included, is checked as given.
+const inputOf = (args: readonly unknown[]): unknown => (args[0] === undefined ? {} : args[0])
+
 function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[]): Call {
   const refuse = refusing(key, invalidInput(key), servings)
   if (ROOT_CALL_ANSWERS[key] === "stream")
     return (...args) =>
       lazyStream(
-        async () => ((await accepts(key, args[0] ?? {})) ? member(...args) : refuse()) as OmoStream<unknown, unknown>,
+        async () => ((await accepts(key, inputOf(args))) ? member(...args) : refuse()) as OmoStream<unknown, unknown>,
       )
-  return async (...args) => ((await accepts(key, args[0] ?? {})) ? member(...args) : refuse())
+  return async (...args) => ((await accepts(key, inputOf(args))) ? member(...args) : refuse())
 }
 
 function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | undefined {

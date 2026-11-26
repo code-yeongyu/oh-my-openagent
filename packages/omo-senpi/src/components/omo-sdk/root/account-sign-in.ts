@@ -22,6 +22,9 @@ export function accountSignIn(account: AccountApi, origin: string): SignIn {
     input: SignInOptions | RootInput,
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
+    // Bad input answers a refusal and never throws: the object-shape check comes before the `method` read.
+    if (typeof input !== "object" || input === null || Array.isArray(input))
+      return { kind: "error", error: invalidInput("account.signIn") }
     if (!isRootInput(input)) return account.signIn(input)
     if (!(await import("../contract/validate")).inputAccepts("account.signIn", input))
       return { kind: "error", error: invalidInput("account.signIn") }

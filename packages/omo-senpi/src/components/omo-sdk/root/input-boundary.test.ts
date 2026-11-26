@@ -42,6 +42,30 @@ const root = () =>
   )
 
 describe("the root's input boundary", () => {
+  test("#given a string, a number, null or an array #when account.signIn is called with it #then it answers invalid_arguments and starts no sign-in", async () => {
+    touched.length = 0
+    const started: unknown[] = []
+    const sdk = assembleOmoSdk(
+      {
+        env: { OMO_SERVICE_API_URL: "https://accounts.example.test" },
+        cwd: tmpdir(),
+        agentDir: tmpdir(),
+        ports: {
+          desktopLaunch: () => false,
+          session: { accessToken: async () => "t", request: async (path: string) => touched.push(path) },
+          signInProcess: (...args: unknown[]) => started.push(args),
+        } as never,
+      },
+      {},
+    )
+    for (const input of ["device_code", 42, null, [{ method: "device_code" }]])
+      expect(await sdk.account.signIn(input as never)).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments" },
+      })
+    expect([touched, started]).toEqual([[], []])
+  })
+
   test("#given devices.rename without its name #when it is called #then it answers invalid_arguments and no request leaves", async () => {
     touched.length = 0
     expect(await root().devices.rename({ id: "dev-2" } as never)).toMatchObject({
