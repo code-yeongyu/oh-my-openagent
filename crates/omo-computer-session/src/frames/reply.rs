@@ -20,6 +20,9 @@ pub const ARTIFACT_TTL_MS: u64 = 43_200_000;
 /// What an artifact-only frame tells the model.
 const OVER_BUDGET_NOTE: &str = "over the inline budget";
 
+/// The call that brings a window whose frame may show its occluders to the front.
+const RAISE_FOR_A_CLEAN_FRAME: &str = "win.raise()";
+
 /// An artifact written for a frame over the inline budget.
 struct Written {
     path: String,
@@ -102,8 +105,10 @@ impl Session {
             target,
             bytes,
             cursor,
+            occluders_visible,
             ..
         } = frame;
+        let occluders_visible = occluders_visible.filter(|visible| *visible);
         let (width, height) = (bytes.width, bytes.height);
         Ok(match mode {
             ReportMode::Null => CaptureReply::Legacy(Box::new(LegacyFrame {
@@ -144,6 +149,8 @@ impl Session {
                     mime,
                     ttl_ms: ARTIFACT_TTL_MS,
                 }),
+                occluders_visible,
+                next_call: occluders_visible.map(|_| RAISE_FOR_A_CLEAN_FRAME.to_owned()),
                 session: self.backend.capabilities().session,
                 observation: UntrustedText,
             })),
@@ -164,5 +171,63 @@ mod base64_tests {
         ] {
             assert_eq!(super::base64(input.as_bytes()), encoded);
         }
+    }
+}
+
+#[cfg(test)]
+mod occluder_tests {
+    use omo_computer_backend_fake::{FakeBackend, FakeScenario};
+    use omo_computer_core::backend::FrameBytes;
+    use omo_computer_core::capabilities::CaptureRoute;
+    use omo_computer_core::frame::{Delivery, FrameGeometry};
+    use omo_computer_core::observation::{CursorMode, ImageMime};
+    use omo_computer_core::params::ReportMode;
+    use omo_computer_core::results::CaptureReply;
+
+    use super::super::CapturedFrame;
+    use crate::Session;
+
+    const SCENARIO: &str =
+        include_str!("../../../omo-computer-backend-fake/fixtures/two-displays-one-window.json");
+
+    fn reply(route: CaptureRoute, occluders_visible: bool) -> serde_json::Value {
+        let scenario = FakeScenario::from_json(SCENARIO).expect("scenario");
+        let mut session = Session::new(Box::new(FakeBackend::new(scenario)));
+        let bytes = FrameBytes {
+            width: 4,
+            height: 2,
+            mime: ImageMime::Png,
+            bytes: Vec::new(),
+            route: Some(route),
+            occluders_visible: Some(occluders_visible),
+            cursor: None,
+        };
+        let frame = CapturedFrame {
+            frame_id: "f1".to_owned(),
+            target: "101".to_owned(),
+            geometry: FrameGeometry::pixels_only("no_logical_geometry", 4, 2, 0),
+            bytes,
+            cursor: CursorMode::None,
+            route: Some(route),
+            occluders_visible: Some(occluders_visible),
+        };
+        match session.capture_reply(ReportMode::Object, frame, Delivery::InlinePng(Vec::new())) {
+            Ok(CaptureReply::Object(frame)) => serde_json::to_value(*frame).expect("serializes"),
+            other => panic!("an object reply, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_root_crop_frame_says_occluders_may_show_and_names_raise() {
+        let frame = reply(CaptureRoute::RootCrop, true);
+        assert_eq!(frame["occludersVisible"], true);
+        assert_eq!(frame["nextCall"], "win.raise()");
+    }
+
+    #[test]
+    fn a_composite_frame_omits_both_members() {
+        let frame = reply(CaptureRoute::Composite, false);
+        assert!(frame.get("occludersVisible").is_none());
+        assert!(frame.get("nextCall").is_none());
     }
 }

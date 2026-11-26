@@ -1,4 +1,7 @@
 {
+  "consent": {
+    "stopHotkey": null
+  },
   "displays": [
     {
       "id": "1",
