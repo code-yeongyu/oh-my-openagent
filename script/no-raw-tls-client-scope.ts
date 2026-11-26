@@ -1,4 +1,5 @@
 import ts from "@typescript/typescript6"
+import { bodyOf, type Declaration, declarationsOf, isFunctionScope } from "./no-raw-tls-client-bindings"
 
 // Lexical scopes for the TLS guard's name bindings (#15071), modelled on JavaScript's own rules and leaning toward a
 // hit wherever a rule is uncertain:
@@ -12,53 +13,6 @@ import ts from "@typescript/typescript6"
 // assignment, an immediately invoked function's argument or a for-of over an array literal is tracked through
 // flowTargets and declare/assign. Other data flow is out of scope for this guard.
 
-type Declaration = { readonly name: ts.Identifier; readonly scope: ts.Node; readonly shadows: boolean }
-
-function isFunctionScope(node: ts.Node): boolean {
-  return (
-    ts.isSourceFile(node) ||
-    ts.isFunctionDeclaration(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isConstructorDeclaration(node) ||
-    ts.isGetAccessorDeclaration(node) ||
-    ts.isSetAccessorDeclaration(node) ||
-    ts.isClassStaticBlockDeclaration(node)
-  )
-}
-
-function isScope(node: ts.Node): boolean {
-  return (
-    isFunctionScope(node) ||
-    ts.isBlock(node) ||
-    ts.isModuleBlock(node) ||
-    ts.isCaseBlock(node) ||
-    ts.isCatchClause(node) ||
-    ts.isForStatement(node) ||
-    ts.isForInStatement(node) ||
-    ts.isForOfStatement(node) ||
-    ts.isClassLike(node)
-  )
-}
-
-function bodyOf(fn: ts.Node): ts.Block | undefined {
-  if (ts.isSourceFile(fn) || !isFunctionScope(fn)) return undefined
-  const body: unknown = Reflect.get(fn, "body")
-  return body !== undefined && ts.isBlock(body as ts.Node) ? (body as ts.Block) : undefined
-}
-
-function enclosing(node: ts.Node, test: (candidate: ts.Node) => boolean): ts.Node {
-  let current = node.parent
-  while (!test(current)) current = current.parent
-  return current
-}
-
-function bindingNames(name: ts.BindingName): ts.Identifier[] {
-  if (ts.isIdentifier(name)) return [name]
-  return name.elements.flatMap((element) => (ts.isBindingElement(element) ? bindingNames(element.name) : []))
-}
-
 function argumentsUsers(nodes: readonly ts.Node[]): Set<ts.Node> {
   const users = new Set<ts.Node>()
   for (const node of nodes) {
@@ -67,53 +21,6 @@ function argumentsUsers(nodes: readonly ts.Node[]): Set<ts.Node> {
       if (isFunctionScope(scope)) users.add(scope)
   }
   return users
-}
-
-function declarationsOf(node: ts.Node, argumentsUsers: Set<ts.Node>): Declaration[] {
-  // A declaration that creates no runtime value never shadows a runtime name: everything in an ambient context
-  // (including a whole declaration file) and every type-only import. It still carries a client alias it is given.
-  // Interfaces and type aliases are not listed below at all. A const enum also never shadows: whether it leaves a
-  // runtime object depends on emit settings, and when unsure the scanner reports.
-  const runtimeless = isAmbient(node) || isTypeOnlyImport(node) || isConstEnum(node)
-  const at = (names: ts.Identifier[], scope: ts.Node, shadows = true): Declaration[] =>
-    names.map((name) => ({ name, scope, shadows: shadows && !runtimeless }))
-  if (ts.isVariableDeclaration(node) && ts.isVariableDeclarationList(node.parent)) {
-    if ((node.parent.flags & ts.NodeFlags.BlockScoped) !== 0)
-      return at(bindingNames(node.name), enclosing(node.parent, isScope))
-    const fn = enclosing(node.parent, isFunctionScope)
-    return at(bindingNames(node.name), bodyOf(fn) ?? fn)
-  }
-  if (ts.isParameter(node)) return at(bindingNames(node.name), node.parent, !argumentsUsers.has(node.parent))
-  if (ts.isCatchClause(node) && node.variableDeclaration) return at(bindingNames(node.variableDeclaration.name), node)
-  if ((ts.isFunctionExpression(node) || ts.isClassExpression(node)) && node.name) return at([node.name], node)
-  if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)) && node.name)
-    return ts.isIdentifier(node.name) ? at([node.name], enclosing(node, isScope)) : []
-  if (ts.isImportClause(node) && node.name) return at([node.name], node.getSourceFile())
-  if (ts.isNamespaceImport(node) || ts.isImportSpecifier(node) || ts.isImportEqualsDeclaration(node))
-    return at([node.name], node.getSourceFile())
-  return []
-}
-
-function isAmbient(node: ts.Node): boolean {
-  if (node.getSourceFile().isDeclarationFile) return true
-  for (let current: ts.Node | undefined = node; current; current = current.parent) {
-    const modifiers = ts.canHaveModifiers(current) ? ts.getModifiers(current) : undefined
-    if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)) return true
-  }
-  return false
-}
-
-function isConstEnum(node: ts.Node): boolean {
-  return (
-    ts.isEnumDeclaration(node) && (ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ConstKeyword) ?? false)
-  )
-}
-
-function isTypeOnlyImport(node: ts.Node): boolean {
-  if (ts.isImportClause(node) || ts.isImportEqualsDeclaration(node)) return node.isTypeOnly
-  if (ts.isImportSpecifier(node)) return node.isTypeOnly || node.parent.parent.isTypeOnly
-  if (ts.isNamespaceImport(node)) return node.parent.isTypeOnly
-  return false
 }
 
 function isDirectEval(node: ts.Node): boolean {

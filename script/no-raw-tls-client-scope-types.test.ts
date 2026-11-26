@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { findRawTlsClients } from "./no-raw-tls-client-scan"
 
-// Security contract (#15071): a declaration that creates no runtime value never hides a client. The oracle is the
-// language after type erasure: each generated TypeScript program is transpiled, run against a fake runtime that records
-// every connect call, and a program that made one must be reported in every TypeScript file kind. A declaration file
-// is never executed, so it must report whatever its executable twin reports.
+// Security contract (#15071): a declaration that creates no runtime value never hides a client. Twin check: adding such a
+// declaration to a program that is reported never changes its report, for every way of reaching a client and every
+// TypeScript file kind. The transpile-and-run oracle over every declaration kind is no-raw-tls-client-bindings.test.ts.
 
 type Placement = "module" | "body" | "nested block"
 type TypeForm = { readonly name: string; readonly at: readonly Placement[]; readonly declare: (name: string) => string }
@@ -36,57 +35,7 @@ const TYPE_FORMS: readonly TypeForm[] = [
   { name: "import type equals", at: ["module"], declare: (n) => `import type ${n} = require("m");` },
 ]
 
-const CLIENTS = [
-  { name: "an alias", binding: "t", alias: "var t = globalThis.Bun;" },
-  { name: "the Bun global", binding: "Bun", alias: "" },
-] as const
-
 const FILE_KINDS = ["x.ts", "x.mts", "x.cts", "x.d.ts"] as const
-
-function program(form: TypeForm, placement: Placement, client: (typeof CLIENTS)[number]): string {
-  const shadow = form.declare(client.binding)
-  const call = `${client.binding}.connect(o);`
-  const inside =
-    placement === "body" ? `${shadow}\n${call}` : placement === "nested block" ? `{ ${shadow} }\n${call}` : call
-  const top = placement === "module" ? shadow : ""
-  return `${top}\n${client.alias}\nfunction f() {\n${inside}\n}\ntry { f() } catch {}\n`
-}
-
-const transpiler = new Bun.Transpiler({ loader: "ts" })
-
-function connectsAtRuntime(source: string): boolean | undefined {
-  let erased: string
-  try {
-    erased = transpiler
-      .transformSync(source)
-      .split("\n")
-      .filter((line) => !/^\s*(import|export)\b/.test(line))
-      .join("\n")
-  } catch {
-    return undefined
-  }
-  let calls = 0
-  const runtime = { Bun: { connect: () => (calls += 1) } }
-  let run: (globalThis: unknown, Bun: unknown, o: unknown) => void
-  try {
-    run = new Function("globalThis", "Bun", "o", erased) as typeof run
-  } catch {
-    return undefined
-  }
-  try {
-    run(runtime, runtime.Bun, {})
-  } catch {}
-  return calls > 0
-}
-
-const programs = TYPE_FORMS.flatMap((form) =>
-  form.at.flatMap((placement) =>
-    CLIENTS.map((client) => ({
-      label: `${form.name} at ${placement}, ${client.name}`,
-      source: program(form, placement, client),
-    })),
-  ),
-)
 
 const RECEIVERS = [
   { name: "the Bun global", binding: "Bun", setup: "", call: "Bun.connect(o);" },
@@ -133,14 +82,5 @@ describe("declarations that create no runtime value never hide a client (#15071)
           }
     expect(compared).toBeGreaterThan(1000)
     expect(changed).toEqual([])
-  })
-
-  test("every transpiled program that calls the runtime's connect is reported in every TypeScript file kind", () => {
-    const calling = programs.filter(({ source }) => connectsAtRuntime(source) === true)
-    const missed = calling.flatMap(({ label, source }) =>
-      FILE_KINDS.filter((file) => findRawTlsClients(source, file).length === 0).map((file) => `${label} in ${file}`),
-    )
-    expect(calling.length).toBe(programs.length)
-    expect(missed).toEqual([])
   })
 })

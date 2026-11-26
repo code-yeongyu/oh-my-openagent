@@ -49,6 +49,19 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
   })
 
   test.each([
+    ["a lone function signature", "function Bun(): void; Bun.connect(options)"],
+    ["a lone function signature after the call", "Bun.connect(options); function Bun(): void;"],
+    ["a lone signature inside a function", "function f() { function Bun(): void; return Bun.connect(options) }"],
+    ["a lone signature inside a block", "{ function Bun(): void; Bun.connect(options) }"],
+    ["an exported lone signature", "export function Bun(): void; Bun.connect(options)"],
+    ["a default-exported lone signature", "export default function Bun(): void; Bun.connect(options)"],
+    ["an async lone signature", "async function Bun(): Promise<void>; Bun.connect(options)"],
+    ["an entity-name import alias", "namespace NS { export type T = number } import Bun = NS.T; Bun.connect(options)"],
+    [
+      "an exported entity-name import alias",
+      "namespace NS { export type T = number } export import Bun = NS.T; Bun.connect(options)",
+    ],
+    ["an entity-name import alias in a namespace", "namespace N { import Bun = NS.T; Bun.connect(options) }"],
     ["a const enum", "const enum Bun { A } Bun.connect(options)"],
     [
       "an ambient declaration inside a function whose module has a real alias",
@@ -62,7 +75,16 @@ describe("Bun.connect reference rule is scope-aware (#15071)", () => {
     expect(connectHits(sample)).toBe(1)
   })
 
+  test.each([".d.ts", ".d.mts", ".d.cts"])(
+    "a declaration without the declare keyword in a %s file never hides a client",
+    (extension) => {
+      expect(findRawTlsClients("const Bun: any; Bun.connect(options)", "x" + extension)).toHaveLength(1)
+    },
+  )
+
   test.each([
+    ["a signature followed by its implementation", "function Bun(): void; function Bun() {} Bun.connect(options)"],
+    ["a require import alias", 'import Bun = require("m"); Bun.connect(options)'],
     [
       "a real const in a function, ambient at module level",
       "declare const Bun: any; function f() { const Bun = o; return Bun.connect(options) }",
