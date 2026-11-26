@@ -131,7 +131,8 @@ function Leg-uipi($a) {
 # oracle is proven able to see a wheel; 'dwmflush' and 'delay' wheel right after raising the target over a cover.
 function Leg-wheel($a) {
   $top = [IntPtr][int64]$a.top; $cover = [IntPtr][int64]$a.cover
-  $delivered = 0; $runs = [int]$a.n; $acq = @(); $notFg = 0
+  $delivered = 0; $runs = [int]$a.n; $acq = @(); $notFg = 0; $route = @()
+  $box = [IntPtr][int64](ReadState $a.state).state.editHwnd
   $wr = New-Object SpN+RECT; [void][SpN]::GetWindowRect($top, [ref]$wr)
   $px = [int](($wr.Left + $wr.Right) / 2); $py = [int](($wr.Top + $wr.Bottom) / 2)
   for ($i = 0; $i -lt $runs; $i++) {
@@ -150,11 +151,15 @@ function Leg-wheel($a) {
     }
     # recorded so a lost wheel can be told apart from a wheel sent to another window
     if ([SpN]::GetForegroundWindow() -ne $top) { $notFg++ }
-    [void][SpN]::Wheel(-1)
+    $at = [SpN]::WheelRoute($top, $box)
+    $err = 0
+    $at['sent'] = [SpN]::Wheel(-1, [ref]$err); $at['sendError'] = $err
     $sw = [Diagnostics.Stopwatch]::StartNew(); $got = $false
     # break, never return: return inside a loop leaves Leg-wheel without its Emit.
     while ($sw.ElapsedMilliseconds -lt 1000) { if ((WheelCount $a.state) -gt $before) { $got = $true; break }; Start-Sleep -Milliseconds 20 }
     if ($got) { $delivered++ }
+    $at['delivered'] = $got; $route += $at
   }
-  Emit @{ mode = $a.mode; delivered = $delivered; runs = $runs; acquire = ($acq | Select-Object -Unique); notForegroundAtWheel = $notFg }
+  $routing = [Microsoft.Win32.Registry]::GetValue('HKEY_CURRENT_USER\Control Panel\Desktop', 'MouseWheelRouting', $null)
+  Emit @{ mode = $a.mode; delivered = $delivered; runs = $runs; acquire = ($acq | Select-Object -Unique); notForegroundAtWheel = $notFg; route = $route; mouseWheelRouting = $routing; mousePresent = [SpN]::GetSystemMetrics(19); wheelPresent = [SpN]::GetSystemMetrics(75) }
 }

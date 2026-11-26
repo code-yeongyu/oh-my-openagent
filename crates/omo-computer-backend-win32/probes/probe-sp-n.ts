@@ -959,9 +959,16 @@ const wheel: Group = {
       acquire: str(j.acquire),
       notFg: num(j.notForegroundAtWheel),
     })
-    const control = await leg(ctx, "wheel", { ...base, mode: "settled", n: 6 })
-    const flush = await leg(ctx, "wheel", { ...base, mode: "dwmflush", n: 18 })
-    const delay = await leg(ctx, "wheel", { ...base, mode: "delay", delayMs: 5, n: 6 })
+    // where each wheel was routed, printed so a lost wheel names the window that received it
+    const routed = (j: Json): Json => {
+      console.error(
+        `wheel route ${str(j.mode)}: routing=${str(j.mouseWheelRouting)} mouse=${str(j.mousePresent)} wheel=${str(j.wheelPresent)} ${JSON.stringify(j.route)}`,
+      )
+      return j
+    }
+    const control = routed(await leg(ctx, "wheel", { ...base, mode: "settled", n: 6 }))
+    const flush = routed(await leg(ctx, "wheel", { ...base, mode: "dwmflush", n: 18 }))
+    const delay = routed(await leg(ctx, "wheel", { ...base, mode: "delay", delayMs: 5, n: 6 }))
     return wheelResults(tally(control), tally(flush), tally(delay))
   },
 }

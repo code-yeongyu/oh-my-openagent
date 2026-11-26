@@ -167,7 +167,19 @@ public static partial class SpN {
     return SendInput(4, a, INPUT_SIZE);
   }
   public static void ZeroMotion() { var a = new INPUT[] { Mouse(0, 0, 0, MOUSEEVENTF_MOVE) }; SendInput(1, a, INPUT_SIZE); }
-  public static uint Wheel(int notches) { var a = new INPUT[] { Mouse(0, 0, (uint)(notches * 120), MOUSEEVENTF_WHEEL) }; return SendInput(1, a, INPUT_SIZE); }
+  public static uint Wheel(int notches, out int err) { var a = new INPUT[] { Mouse(0, 0, (uint)(notches * 120), MOUSEEVENTF_WHEEL) }; uint n = SendInput(1, a, INPUT_SIZE); err = Marshal.GetLastWin32Error(); return n; }
+  // Where a wheel sent now would land: the cursor, the window under it (and its top-level), and the focus of the
+  // target's thread, so a lost wheel can be told apart from a wheel the system routed to another window.
+  public static Hashtable WheelRoute(IntPtr top, IntPtr box) {
+    var h = H(); POINT p; GetCursorPos(out p); h["cursor"] = p.X + "," + p.Y;
+    IntPtr hit = WindowFromPoint(p); IntPtr root = GetAncestor(hit, 2);
+    h["hitIsTarget"] = root == top; h["hitIsBox"] = hit == box; h["hitClass"] = Cls(hit); h["hitTop"] = Text(root);
+    uint pid; uint tid = GetWindowThreadProcessId(top, out pid);
+    var g = new GUITHREADINFO(); g.cbSize = Marshal.SizeOf(typeof(GUITHREADINFO));
+    if (GetGUIThreadInfo(tid, ref g)) { h["focusIsBox"] = g.hwndFocus == box; h["focusClass"] = Cls(g.hwndFocus); h["capture"] = g.hwndCapture == IntPtr.Zero ? "" : Cls(g.hwndCapture); }
+    else h["focusError"] = Marshal.GetLastWin32Error();
+    return h;
+  }
 
   // Foreground: plain SetForegroundWindow, retried after a zero-motion input
   // (the engine's rule); then, probe-only, an attached-input fallback. The

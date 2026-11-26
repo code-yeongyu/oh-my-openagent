@@ -77,6 +77,9 @@ public static partial class SpN {
   [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr ctx);
   [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT p);
+  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);
+  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
   [DllImport("user32.dll")] public static extern bool LockWorkStation();
   [DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleDC(IntPtr dc);
   [DllImport("gdi32.dll")] public static extern bool DeleteDC(IntPtr dc);
