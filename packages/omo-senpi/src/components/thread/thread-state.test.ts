@@ -591,6 +591,11 @@ describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished 
       ])
     const read = await run("thread_read", { thread: "dur-a" })
     expect(read).toMatchObject({ kind: "ok", thread: "dur-a", source: "session_jsonl" })
+    expect(await run("thread_read", { thread: "dur-a", wait_ms: 0 })).toMatchObject({
+      kind: "ok",
+      source: "session_jsonl",
+      wait: { outcome: "not_waited", waited_ms: 0 },
+    })
     expect(read.kind === "ok" && "items" in read ? read.items.map((item) => item.role) : []).toEqual([
       "user",
       "assistant",
