@@ -3,7 +3,8 @@
 import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
-import { acquireDagRun, dagRunEligibility, type DagRunAcquisition } from "./run-acquisition"
+import { acquireDagRun, dagRunEligibility } from "./run-acquisition"
+import { reentryRefusal } from "./reentry-refusal"
 import { liveForeignHolder, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
@@ -126,49 +127,12 @@ export function acquireReentryLease(
     ...(options.reservation === undefined ? {} : { reservation: options.reservation }),
     eligible: dagRunEligibility.reentry(parentSessionId),
   })
-  if (acquired.kind !== "acquired") throw reentryRefusal(runId, acquired, parentSessionId)
+  if (acquired.kind !== "acquired") throw reentryRefusal(runId, acquired, parentSessionId, foreignHolderOf(options))
   // The re-entry decides and writes from this record: the one acquired, never an earlier read.
   return {
     record: acquired.record,
     // Only a lease this acquisition wrote (decided under its lock) is given back.
     abandon: acquired.leaseTaken ? () => releaseDagRunLease(options.store, runId, probe.hostPid) : () => undefined,
-  }
-}
-
-function reentryRefusal(
-  runId: DagRunId,
-  outcome: Exclude<DagRunAcquisition<DagRunRecordV1>, { readonly kind: "acquired" }>,
-  parentSessionId: string,
-): DagNodeControlError {
-  switch (outcome.kind) {
-    case "missing":
-      return new DagNodeControlError({ code: "run_not_found", message: `unknown dag run "${runId}"`, runId })
-    case "held":
-      return new DagNodeControlError({
-        code: "run_not_owned",
-        message: `dag run "${runId}" is held by live process ${outcome.holderPid}`,
-        runId,
-      })
-    case "busy":
-      return runBusy(runId, outcome.operation)
-    case "not_eligible":
-      if (outcome.record.parentSessionId !== parentSessionId)
-        return new DagNodeControlError({
-          code: "run_not_owned",
-          message: `dag run "${runId}" belongs to another session`,
-          runId,
-        })
-      if (outcome.record.pause?.reason === "user_stop")
-        return new DagNodeControlError({
-          code: "run_paused_by_user",
-          message: "only the user's Resume may restart this run",
-          runId,
-        })
-      return new DagNodeControlError({
-        code: "run_still_active",
-        message: `dag run "${runId}" is ${outcome.record.status} with work in flight; it cannot be re-entered now`,
-        runId,
-      })
   }
 }
 

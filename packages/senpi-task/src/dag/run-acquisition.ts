@@ -37,13 +37,16 @@ export const dagRunEligibility = {
     (parentSessionId: string): Eligibility =>
     (fresh) =>
       fresh.parentSessionId === parentSessionId && fresh.status === "pending",
-  /** A retry or amend re-entry: of this session; settled, or paused (not by the user) with no active node. */
+  /**
+   * A retry or amend re-entry: of this session, with NO active node (a node revived by a send keeps
+   * running on a settled run until its fold), and settled or paused not by the user.
+   */
   reentry:
     (parentSessionId: string): Eligibility =>
     (fresh) =>
       fresh.parentSessionId === parentSessionId &&
-      (TERMINAL_DAG_RUN_STATUSES.has(fresh.status) ||
-        (fresh.status === "paused" && !stoppedByUser(fresh) && !hasActiveNode(fresh))),
+      !hasActiveNode(fresh) &&
+      (TERMINAL_DAG_RUN_STATUSES.has(fresh.status) || (fresh.status === "paused" && !stoppedByUser(fresh))),
   /**
    * Automatic recovery (session start, lease-watch re-sweep): of this session; paused but never by the
    * user and not held by a scheduler here, or left `running` with no scheduler here.
