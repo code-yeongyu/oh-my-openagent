@@ -54,6 +54,7 @@ function failingTests(output: string): string[] {
   const failures: string[] = []
   let file = ""
   for (const line of output.split("\n")) {
+    if (/^\d+ tests? failed:$/.test(line.trim())) break
     const header = /^(\S+\.test\.ts):$/.exec(line.trim())
     if (header?.[1]) file = header[1]
     const failed = /^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/.exec(line.trim())
