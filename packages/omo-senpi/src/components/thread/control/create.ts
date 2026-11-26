@@ -50,6 +50,7 @@ export type CreatePromptSend = {
   readonly thread: string
   readonly message: string
   readonly delivery?: ThreadCreateInput["delivery"]
+  readonly expected_turn_id?: string
 }
 
 /** What a create needs from the surface that runs it (the agent tools or the thread SDK). */
@@ -68,6 +69,8 @@ export type CreateContext = {
     send: CreatePromptSend,
     idempotencyKey: string,
   ) => Promise<ThreadToolResult>
+  /** The turn the first prompt names (the root's object prompt), checked by the send path as a send's own. */
+  readonly promptTurn?: string
   /** Waits, bounded by the call's budget, for the first prompt's gateway delivery on this device to start a turn. */
   readonly awaitPromptStart: (deliveryId: string) => Promise<PromptStart>
 }
@@ -359,6 +362,7 @@ async function firstPrompt(
     thread: thread.thread_id,
     message: value.prompt ?? "",
     ...(value.delivery === undefined ? {} : { delivery: value.delivery }),
+    ...(context.promptTurn === undefined ? {} : { expected_turn_id: context.promptTurn }),
   }
   // The thread exists from here on: a delivery that throws (a store or connection failure, not a typed refusal) is the
   // prompt's outcome, never the create's, so the caller still gets the thread it made (review L1 at 0571de8).

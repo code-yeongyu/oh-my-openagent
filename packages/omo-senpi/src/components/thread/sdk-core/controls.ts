@@ -65,6 +65,8 @@ export function createControls(context: ThreadCoreContext) {
     request: I,
     options: CallWaitOptions | undefined,
     body: (value: I, key: string, retrying: Retrying, wait: ControlWait) => Promise<ThreadToolResult>,
+    /** Inputs the root passes beside the tool schema's own (create's prompt turn): its receipt is bound to them too. */
+    beside?: Readonly<Record<string, unknown>>,
   ): Promise<ThreadToolResult> {
     return context.guard(async () => {
       const parsed = parseThreadParams(SCHEMAS[name], request)
@@ -75,7 +77,12 @@ export function createControls(context: ThreadCoreContext) {
       if (lost !== undefined) return failureResult(waitRefusal(lost).failure)
       const waited = controlWait(wait)
       return await wait.scoped(() =>
-        context.keyed(name, value, value.idempotency_key, (key, retrying) => body(value, key, retrying, waited)),
+        context.keyed(
+          name,
+          beside === undefined ? value : { ...value, ...beside },
+          value.idempotency_key,
+          (key, retrying) => body(value, key, retrying, waited),
+        ),
       )
     })
   }
@@ -83,40 +90,46 @@ export function createControls(context: ThreadCoreContext) {
     return await locateControl(controls, await wait.read(view), address, allScope, UNKNOWN_CALLER, wait)
   }
   return {
-    create: (request: ThreadCreateInput) =>
-      control("thread_create", request, undefined, async (value, key, retrying) =>
-        createThread(controls, await view(), value, {
-          operationId: key,
-          callerId: UNKNOWN_CALLER,
-          retrying,
-          view,
-          deliverPrompt: async (_current, target, send, key) => {
-            // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does,
-            // and goes the way every send of this SDK goes: on another device as the person's own prompt (#15006).
-            const sent = await sendToTarget(
-              controls,
-              pipeline,
-              target,
-              send,
-              key,
-              { kind: "operator", uid: options.uid, user: options.user },
-              send,
-              "creator",
-            )
-            if (sent.kind === "error") return { kind: "error", error: sent.error }
-            const { thread_id, ...facts } = sent
-            return { ...facts, thread: thread_id } as ThreadToolResult
-          },
-          awaitPromptStart: (deliveryId) =>
-            awaitPromptStart(
-              store,
-              deliveryId,
-              waitWithinCallBudget(
-                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
-                FIRST_PROMPT_START_RESERVE_MS,
+    create: (request: ThreadCreateInput, first?: { readonly expected_turn_id?: string }) =>
+      control(
+        "thread_create",
+        request,
+        undefined,
+        async (value, key, retrying) =>
+          createThread(controls, await view(), value, {
+            operationId: key,
+            callerId: UNKNOWN_CALLER,
+            retrying,
+            view,
+            ...(first?.expected_turn_id === undefined ? {} : { promptTurn: first.expected_turn_id }),
+            deliverPrompt: async (_current, target, send, key) => {
+              // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does,
+              // and goes the way every send of this SDK goes: on another device as the person's own prompt (#15006).
+              const sent = await sendToTarget(
+                controls,
+                pipeline,
+                target,
+                send,
+                key,
+                { kind: "operator", uid: options.uid, user: options.user },
+                send,
+                "creator",
+              )
+              if (sent.kind === "error") return { kind: "error", error: sent.error }
+              const { thread_id, ...facts } = sent
+              return { ...facts, thread: thread_id } as ThreadToolResult
+            },
+            awaitPromptStart: (deliveryId) =>
+              awaitPromptStart(
+                store,
+                deliveryId,
+                waitWithinCallBudget(
+                  options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
+                  FIRST_PROMPT_START_RESERVE_MS,
+                ),
               ),
-            ),
-        }),
+          }),
+        first,
       ),
     interrupt: (request: ThreadInterruptInput, options?: CallWaitOptions) =>
       control("thread_interrupt", request, options, async (value, _key, _retrying, wait) => {
