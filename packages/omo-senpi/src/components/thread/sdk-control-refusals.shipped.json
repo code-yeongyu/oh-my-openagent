@@ -1,0 +1,130 @@
+{
+  "base": "cab771c00642b969d229869d2312996450ce1bf3",
+  "command": "bun script/capture-shipped-thread-refusals.ts --base cab771c00642b969d229869d2312996450ce1bf3",
+  "count": 12,
+  "answers": {
+    "interrupt": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "closeSelf": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "closeDefault": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "renameSelf": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "renameDefault": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "setModel": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "caller_context_missing",
+        "message": "The caller's durable session id is not in the thread address book.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context."
+      }
+    },
+    "interruptMissing": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nope-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "closeMissing": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nope-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "renameMissing": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nope-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "setModelMissing": {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"nope-thread\" in this workspace.",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass a row's thread value or a unique name it returned.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    "interruptBogus": {
+      "kind": "error",
+      "error": {
+        "code": "invalid_arguments",
+        "message": "This tool takes no field \"bogus\" Nothing was done.",
+        "next_action": "Call the tool again without \"bogus\"; it takes: thread, turn_id, all_scope, idempotency_key.",
+        "details": {
+          "field": "bogus",
+          "accepted": [
+            "thread",
+            "turn_id",
+            "all_scope",
+            "idempotency_key"
+          ]
+        }
+      }
+    },
+    "releaseNoEndpoint": {
+      "success": false,
+      "error": "release_unsupported"
+    }
+  }
+}

@@ -5,6 +5,8 @@ import type { ThreadSessionPort } from "./tools/ports"
 
 export type LazyLiveThreadSurfaceOptions = LiveThreadSurfaceOptions & {
   readonly loadRuntime?: () => Promise<Pick<typeof import("./live-surface"), "createLiveThreadSurface">>
+  /** The error a failed load is answered with; absent, `host_unavailable:<socket>`, which the thread tools classify. */
+  readonly loadFailure?: (cause: unknown) => Error
 }
 
 /** Registration stays synchronous; the RPC client is constructed on the first async operation and rebuilt after a failed one. */
@@ -23,7 +25,7 @@ export function createLazyLiveThreadSurface(
       .then(({ createLiveThreadSurface }) => createLiveThreadSurface(pi, { ...options, socket }))
       .catch((error: unknown) => {
         runtime = undefined
-        throw new Error(`host_unavailable:${socket}`, { cause: error })
+        throw options.loadFailure?.(error) ?? new Error(`host_unavailable:${socket}`, { cause: error })
       }))
   const sessionPort = (endpoint?: string): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => {
     const target = async () => {

@@ -9,12 +9,13 @@ import { capabilityClosures, ImportGraph } from "./closures"
 import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { loadPresentation, parsePresentation } from "./presentation"
+import { readDeclaredVersions } from "./version-mask"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
 import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
-import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
+import { loadScenarioRuns, PORT_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
 import type { DiscoveredTool } from "./tool-check"
@@ -79,10 +80,38 @@ if (expectedHead !== undefined && git("rev-parse", "HEAD").trim() !== expectedHe
   process.exit(1)
 }
 const mergeBase = git("merge-base", arg("--base") ?? "origin/dev", "HEAD").trim()
-const scratch = mkdtempSync(join(tmpdir(), "sdk-parity-base-"))
+// A run stopped by a signal skips the finally below, which left the base worktree and its scratch directory behind; the
+// handler removes them and exits with the signal's code.
+// Idempotent: the signal handler and the finally may both run. prune clears a worktree record left half-created.
+// The cleanup is installed before anything is created, so a failure or a signal at any step leaves nothing behind. A
+// signal sent to the gate's pid alone is handled only after the synchronous child it is waiting on returns.
+let scratch: string | undefined
+let removed = false
+const removeBaseTree = (): void => {
+  if (removed) return
+  removed = true
+  if (scratch === undefined) return
+  try {
+    git("worktree", "remove", "--force", join(scratch, "tree"))
+  } catch {
+    // Not a worktree any more (already removed, or never fully added); prune below clears its record.
+  }
+  git("worktree", "prune")
+  rmSync(scratch, { recursive: true, force: true })
+}
+for (const [signal, code] of [
+  ["SIGINT", 130],
+  ["SIGTERM", 143],
+  ["SIGHUP", 129],
+] as const)
+  process.once(signal, () => {
+    removeBaseTree()
+    process.exit(code)
+  })
+scratch = mkdtempSync(join(tmpdir(), "sdk-parity-base-"))
 const baseTree = join(scratch, "tree")
-git("worktree", "add", "--detach", baseTree, mergeBase)
 try {
+  git("worktree", "add", "--detach", baseTree, mergeBase)
   const lockMoved = git("diff", "--name-only", mergeBase, "HEAD", "--", "bun.lock").trim() !== ""
   if (lockMoved)
     execFileSync(process.execPath, ["install", "--frozen-lockfile", "--ignore-scripts"], {
@@ -92,6 +121,10 @@ try {
   else prepareBaseTree(REPO_ROOT, baseTree)
   const isolation = [...isolationProblems(baseTree), ...isolationProblems(REPO_ROOT)]
   if (isolation.length > 0) throw new Error(isolation.join("\n"))
+  const baseVersions = readDeclaredVersions(baseTree)
+  const headVersions = readDeclaredVersions(REPO_ROOT)
+  if (headVersions === undefined)
+    throw new Error("the head has no packages/omo-native/package.json to read versions from")
   const baseSide = runSide(baseTree)
   const headSide = runSide(REPO_ROOT)
   const comparedMs = Date.now() - started
@@ -129,6 +162,7 @@ try {
     changedFiles,
     body,
     headSha: git("rev-parse", "HEAD").trim(),
+    versions: { base: baseVersions, head: headVersions },
     presentation: {
       base: baseRowsText === undefined ? undefined : parsePresentation(baseRowsText),
       head: loadPresentation(),
@@ -140,10 +174,10 @@ try {
   })
   // The checks that read the merge base's tree run here, in the dedicated job that fetches it, and nowhere else: the
   // ordinary test shards have a shallow checkout without the base ref (design 7.4; train review of 6871a012b9).
-  const evidence = await runEffectScenarios(rows)
+  const evidence = await runEffectScenarios(rows, await loadScenarioRuns())
   const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
   const baseFailures = [
-    ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
+    ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, PORT_CONTEXT),
     ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
   ]
   const baselineFailures = baselineProblems({
@@ -152,7 +186,7 @@ try {
     pinText: readFileSync(join(REPO_ROOT, PIN_PATH), "utf8"),
     unresolved,
     evidence,
-    context: P0_CONTEXT,
+    context: PORT_CONTEXT,
     atBase: {
       originalText: show(mergeBase, ORIGINAL_PATH),
       pinText: show(mergeBase, PIN_PATH),
@@ -171,6 +205,5 @@ try {
   if (summary !== undefined) appendFileSync(summary, text)
   process.exitCode = failures.length > 0 ? 1 : 0
 } finally {
-  git("worktree", "remove", "--force", baseTree)
-  rmSync(scratch, { recursive: true, force: true })
+  removeBaseTree()
 }

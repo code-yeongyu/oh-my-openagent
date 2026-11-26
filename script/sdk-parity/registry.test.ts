@@ -16,7 +16,7 @@ import {
 import { probeBase, registryBaseProblems, repoGit } from "./base-probe"
 import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { cellProblems } from "./cells"
-import { runEffectScenarios } from "./conformance-run"
+import { loadScenarioRuns, runEffectScenarios } from "./conformance-run"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
 import { NOT_ARGV } from "./not-argv"
@@ -115,7 +115,7 @@ describe("the head against the merge base's tree (runs whenever the merge base i
         originalText: repoFile(ORIGINAL_PATH),
         pinText: repoFile(PIN_PATH),
         unresolved: JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline,
-        evidence: await runEffectScenarios(rows),
+        evidence: await runEffectScenarios(rows, await loadScenarioRuns()),
       }
       expect(registryBaseProblems(repoGit, head)).toEqual({ problems: [] })
     },

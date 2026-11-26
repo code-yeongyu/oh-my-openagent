@@ -1,8 +1,7 @@
-import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { fileURLToPath, pathToFileURL } from "node:url"
+import { fileURLToPath } from "node:url"
 
-import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../components/thread/gateway/store"
+import { storeWorkerAnchor } from "../components/thread/gateway/store-worker-sidecar"
 import { createAccountRemoteSurface } from "../components/thread/remote/default-remote"
 import {
   assertThreadSdkOptions,
@@ -16,14 +15,11 @@ export type { LocatedThread, ThreadSdk, ThreadSdkOptions } from "../components/t
 export { readSessionFacts } from "../components/thread/session-facts"
 
 /**
- * Built to `plugin/runtime/thread-sdk/sdk.js`, two levels below the `extensions/` directory that
- * holds the store worker sidecar; a bundler cannot inline a Worker's entry, so the store is pointed
- * at that sidecar. From source no sidecar is there and the store resolves `store-worker.ts` itself.
- * The anchor is joined as a path: a literal `new URL("...", import.meta.url)` is an asset reference
- * to the bundler, which would emit it as a second output.
+ * Built to `plugin/runtime/thread-sdk/sdk.js`, two levels below the `extensions/` directory that holds the store worker
+ * sidecar. The directory is joined as a path: a literal `new URL("...", import.meta.url)` is an asset reference to the
+ * bundler, which would emit it as a second output.
  */
-const sidecarAnchor = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "extensions", "omo.js"))
-const sidecarPresent = existsSync(fileURLToPath(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, sidecarAnchor)))
+const workerAnchor = storeWorkerAnchor(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "extensions"))
 
 declare const OMO_SENPI_PACKAGE_VERSION: string
 const VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "undefined" ? "0.0.0" : OMO_SENPI_PACKAGE_VERSION
@@ -46,6 +42,6 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   return createSdk({
     ...options,
     remote,
-    ...(options.workerModuleUrl !== undefined || !sidecarPresent ? {} : { workerModuleUrl: sidecarAnchor }),
+    ...(options.workerModuleUrl !== undefined || workerAnchor === undefined ? {} : { workerModuleUrl: workerAnchor }),
   })
 }

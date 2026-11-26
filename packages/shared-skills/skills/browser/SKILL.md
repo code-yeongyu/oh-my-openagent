@@ -48,7 +48,8 @@ person, a deploy, a slow job) is **never awaited in a cell**. Subscribe first, s
 without `await`, and end the cell; the event wakes you on success and on timeout alike:
 
 ```js
-const flag = join(tmpdir(), `signed-in-${Date.now()}.flag`)
+// given: page
+const flag = `${(await import("node:os")).tmpdir()}/signed-in-${Date.now()}.flag`
 await tool.monitor({ description: "sign-in finished", path: flag, event: "create" })
 globalThis.wait = page.waitForFunction(() => !!document.querySelector("[data-user]"), undefined, { timeout: 600_000 })
   .then(() => Bun.write(flag, "ok"), (e) => Bun.write(flag, `failed: ${e.message}`))
@@ -67,6 +68,7 @@ owned (`{ interactive: true }` for controls only, `{ diff: true }` after an acti
 ## The loop (owned)
 
 ```js
+const { mkdtempSync, rmSync } = await import("node:fs"), { tmpdir } = await import("node:os"), { join } = await import("node:path")
 const profile = mkdtempSync(join(tmpdir(), "omowright-"))
 globalThis.browser = await omowright.connectPipe({
   browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary,   // bot-scored target: connectCloakProfile() instead
@@ -123,6 +125,7 @@ Every method, its options, the gated list and the failure codes: [references/com
 Login, CAPTCHA, OTP, a payment confirmation, a consent dialog:
 
 ```js
+const flag = `${(await import("node:os")).tmpdir()}/help-${Date.now()}.flag`
 await tool.monitor({ description: "help finished", path: flag, event: "create" })
 globalThis.help = session.requestHelp({ prompt: "<what you need done>", targets: ["@e4"], timeoutMs: 300_000 })
   .then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))

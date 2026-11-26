@@ -1,5 +1,6 @@
 import { type BaselineEntry, sha256 } from "./baseline"
 import { type Goldens, type PresentationRow, presentationProblems, presentationRowProblems } from "./presentation"
+import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
 import type { Row } from "./schema"
@@ -32,14 +33,19 @@ export type GateInput = {
     readonly head: readonly PresentationRow[]
   }
   readonly goldens: Goldens
+  // Each tree's declared omo and engine versions (version-mask.ts); the merge base's is undefined when it has no manifest.
+  readonly versions: { readonly base: DeclaredVersions | undefined; readonly head: DeclaredVersions }
 }
 
 export type GateReport = {
   readonly failures: readonly string[]
   readonly candidates: readonly string[]
   readonly liveSchema: readonly string[]
+  /** Rows the body declares changed on purpose (SDK-Parity-Changed): each has left unresolved.json with its evidence. */
+  readonly changed: readonly string[]
   readonly presentation: readonly string[]
   readonly presentationRows: readonly string[]
+  readonly versionMasked: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -48,6 +54,8 @@ export type GateReport = {
 
 const UNCHANGED_LINE = /^SDK-Parity-Unchanged:\s*yes\s*$/im
 const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
+// A deliberate change: `SDK-Parity-Changed: <row id> [<row id> ...]`, ids separated by spaces or commas.
+const CHANGED_LINE = /^SDK-Parity-Changed:\s*(.+?)\s*$/gim
 
 // Design 7.4 (amendment 5): a row has two parts. Its DESCRIPTOR is what a surface accepts or calls: the sdk member, each
 // cli entry, each tool binding, which input fields exist and which are required, plus its kind, today
@@ -94,6 +102,7 @@ export function gateReport(input: GateInput): GateReport {
   const flagged = new Set<string>()
   const presentation: string[] = []
   const presentationRows: string[] = []
+  const versionMasked: string[] = []
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
@@ -126,6 +135,14 @@ export function gateReport(input: GateInput): GateReport {
     }
     // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
     if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
+    const baseVersions = input.versions.base
+    if (
+      baseVersions !== undefined &&
+      equalUnderVersionMask(before, after, { base: baseVersions, head: input.versions.head })
+    ) {
+      versionMasked.push(`${scenario.id}#version-mask`)
+      continue
+    }
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
       const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
@@ -171,17 +188,39 @@ export function gateReport(input: GateInput): GateReport {
     })
     .map((row) => row.id)
     .toSorted()
+  // Design lane ruling: a row the body declares changed on purpose is a demonstrated change, so it must have left
+  // unresolved.json (its evidence is the run record that cleared it), and the reviewer's digest covers it.
+  const rowIds = new Set(input.head.rows.map((row) => row.id))
+  const declared = [
+    ...new Set(
+      [...input.body.matchAll(CHANGED_LINE)].flatMap((match) => (match[1] ?? "").split(/[\s,]+/).filter(Boolean)),
+    ),
+  ].toSorted()
+  for (const id of declared)
+    if (!rowIds.has(id)) failures.push(`SDK-Parity-Changed names ${id}, which is not a registry row`)
+    else if (unresolved.has(id))
+      failures.push(
+        `SDK-Parity-Changed names ${id}, which is still in unresolved.json; a declared change leaves it with its run evidence`,
+      )
+  const changedRows = declared.filter((id) => rowIds.has(id) && !unresolved.has(id))
   return {
     failures,
     candidates,
     liveSchema,
+    changed: changedRows,
     presentation: presentation.toSorted(),
     presentationRows: presentationRows.toSorted(),
+    versionMasked: versionMasked.toSorted(),
     head: input.headSha,
+    // Digest input order (design lane ruling, then #15079): candidates, live-schema, declared changes, presentation
+    // rows, then version-mask ids LAST; the reviewer's id list (reviewed()) prints the same groups in the same order. A
+    // tier added later appends after these, so a merge that keeps both tiers keeps one order.
     digest: candidateDigest(input.headSha, [
       ...candidates,
       ...liveSchema.map((id) => `${id}#live-schema`),
+      ...changedRows.map((id) => `${id}#changed`),
       ...presentationRows,
+      ...versionMasked,
     ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
@@ -209,7 +248,9 @@ export function goldenProblems(
 const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
+  ...report.changed.map((id) => `${id}#changed`),
   ...report.presentationRows,
+  ...report.versionMasked,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -229,9 +270,19 @@ export function renderReport(report: GateReport): string {
       `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer confirms against the live schema that the set of accepted inputs is the same in both directions (nothing newly refused, nothing newly accepted) before CLEAR.`,
       "",
     )
+  if (report.changed.length > 0)
+    lines.push(
+      `DECLARED CHANGE: ${report.changed.join(", ")}: rows the body declares changed on purpose; the reviewer confirms each change is the one intended before CLEAR.`,
+      "",
+    )
   if (report.presentation.length > 0)
     lines.push(
       `PRESENTATION ONLY: ${report.presentationRows.map((entry) => entry.replace("#presentation=", " (row ") + ")").join(", ")}: the usage text of an existing verb changed with the exit code, the structure and every other line equal, as named in script/sdk-parity/presentation.json; the reviewer confirms the change is wording, not a capability, before CLEAR.`,
+      "",
+    )
+  if (report.versionMasked.length > 0)
+    lines.push(
+      `VERSION MASK: ${report.versionMasked.map((entry) => entry.replace("#version-mask", "")).join(", ")}: equal only once each tree's own declared omo package version and engine pin (packages/omo-native/package.json) are replaced by placeholders; the reviewer confirms the version is the only difference before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

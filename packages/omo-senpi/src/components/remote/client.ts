@@ -179,7 +179,10 @@ const notPerson = (member: string): RemoteFailure =>
  * member that needs it and rebuilt after it closes. Every member settles with data under its deadline (deadlines.ts);
  * none throws. `sender` is fixed here, never taken from a member's parameters.
  */
-export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps): RemoteClient {
+export function createRemoteClient(
+  sender: RemoteSender,
+  { connect = connectDeviceService, ...deps }: RemoteClientDeps,
+): RemoteClient {
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
@@ -190,8 +193,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     localLeg ??= load()
     return await localLeg
   }
-  const dial = (): Promise<DeviceService> =>
-    (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
+  const dial = (): Promise<DeviceService> => connect({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
     if (service !== undefined) return service
     const opening = dial().then(

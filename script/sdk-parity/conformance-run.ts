@@ -1,10 +1,16 @@
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
+
+import { PORT_EFFECTS } from "../../packages/omo-senpi/src/components/omo-sdk/contract/ports"
 import type { ConformanceContext, EffectEvidence } from "./conformance"
 import type { ObservedCall, TableScenario } from "./expectation"
+import { normalizer } from "./normalize"
 import type { Row } from "./schema"
 
 // The effect-scenario runner of design 7.3. Each table scenario gets a root over fake ports (its setup), the runner calls
 // the row's SDK member through a forwarding proxy that records the member actually invoked, and the fakes report every
-// port call they observed. P0 ships no SDK call, so the list is empty; slice P1b's drivers supply one run per scenario.
+// port call they observed. Each slice keeps its drivers in its own module under runs/ (one per namespace), which the
+// collector below reads, so no two slices edit one list.
 //
 // The stream contract (review 6061874518 M3, design 4.4): a member that answers an AsyncIterable is consumed to its one
 // terminal event, `{ kind: "end", outcome | failure | cancelled }`; the run's answer is that event's outcome, a failure is
@@ -16,15 +22,39 @@ export type ScenarioSetup = {
   readonly calls: () => readonly ObservedCall[]
   /** The fakes' virtual clock: runs `fire` once `ms` of virtual time has passed. Needed only by an aborting scenario. */
   readonly after?: (ms: number, fire: () => void) => void
+  /** The fixture's own directory, fresh per setup: replaced by a fixed name when two runs' answers are compared. */
+  readonly sandbox?: string
 }
 
 export type ScenarioRun = { readonly scenario: TableScenario; readonly setup: () => ScenarioSetup }
 
-const SCENARIO_RUNS: readonly ScenarioRun[] = []
+const RUNS_DIR = join(import.meta.dir, "runs")
+
+/** Every run of every module under `dir` (each exports `runs`); a scenario id that two modules run is refused. */
+export async function loadScenarioRuns(dir: string = RUNS_DIR): Promise<ScenarioRun[]> {
+  if (!existsSync(dir)) return []
+  const modules = readdirSync(dir)
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .toSorted()
+  const owner = new Map<string, string>()
+  const runs: ScenarioRun[] = []
+  for (const name of modules) {
+    const loaded = (await import(join(dir, name))) as { readonly runs?: readonly ScenarioRun[] }
+    for (const run of loaded.runs ?? []) {
+      const first = owner.get(run.scenario.id)
+      if (first !== undefined)
+        throw new Error(`scenario ${run.scenario.id} is run by both runs/${first} and runs/${name}`)
+      owner.set(run.scenario.id, name)
+      runs.push(run)
+    }
+  }
+  return runs
+}
 
 // P0 has no run and no port list of its own: slice P1a's PORT_EFFECTS replaces this, and until then any observed call is
 // on an unclassified port and fails (conformance.ts), so an empty table can never pass a run silently.
-export const P0_CONTEXT: ConformanceContext = { effects: {} }
+/** Slice P1a's classification of every port operation (an effect or a read), which the gate and the base probe judge by. */
+export const PORT_CONTEXT: ConformanceContext = { effects: PORT_EFFECTS }
 
 function forwarding(target: unknown, path: readonly string[], invoked: string[]): unknown {
   return new Proxy(() => undefined, {
@@ -114,43 +144,79 @@ async function invoke(
 // before it left. Each call's evidence carries only the port calls observed during that call.
 export async function runEffectScenarios(
   rows: readonly Row[],
-  runs: readonly ScenarioRun[] = SCENARIO_RUNS,
+  runs: readonly ScenarioRun[],
 ): Promise<EffectEvidence[]> {
   const evidence: EffectEvidence[] = []
-  for (const { scenario, setup } of runs) {
-    const row = rows.find((candidate) => candidate.id === scenario.row)
-    const { root, calls, after } = setup()
-    const invoked: string[] = []
-    const memberOf = (): unknown => {
-      let member: unknown = forwarding(root, [], invoked)
-      for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
-      return member
-    }
-    const controller = new AbortController()
-    if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller.abort())
-    const sequence = [scenario, ...(scenario.then ?? [])]
-    const records: EffectEvidence[] = []
-    for (const [index, step] of sequence.entries()) {
-      const seen = calls().length
-      const before = invoked.length
-      const result = await invoke(memberOf(), step, controller.signal)
-      records.push({
-        scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
-        row: scenario.row,
-        kind: step.kind,
-        member: invoked.slice(before).join(","),
-        input: step.input,
-        expect: step.expect,
-        observed: calls().slice(seen),
-        ...(scenario.target === undefined ? {} : { target: scenario.target }),
-        ...(step.refusal === undefined ? {} : { refusal: step.refusal }),
-        ...(step.refusal_from === undefined ? {} : { refusalFrom: step.refusal_from }),
-        ...(step.answer === undefined ? {} : { answer: step.answer }),
-        ...result,
+  for (const run of runs) {
+    const { records, answers } = await runOnce(rows, run)
+    // An answer proves an effect only if it is stable (design lane ruling): a scenario that states an answer runs a
+    // second time on a fresh fixture, and a step whose answer differs after the goldens' normalisation is marked.
+    if (records.some((record) => record.answer !== undefined)) {
+      const again = await runOnce(rows, run)
+      records.forEach((record, index) => {
+        if (record.answer !== undefined && answers[index] !== again.answers[index])
+          records[index] = { ...record, unstableAnswer: true }
       })
     }
     const [first, ...steps] = records
     if (first !== undefined) evidence.push(steps.length === 0 ? first : { ...first, steps })
   }
   return evidence
+}
+
+// The scenario's other fixture forms (calls run before it, a scripted callback): part of where it starts, so two records
+// that differ in them never pair as proof of an input's effect.
+const SETUP_FIELDS = ["before", "callbacks"] as const
+const fixtureSetup = (scenario: TableScenario): { readonly setup?: Readonly<Record<string, unknown>> } => {
+  const setup = Object.fromEntries(
+    SETUP_FIELDS.flatMap((field) => {
+      const value: unknown = Reflect.get(scenario, field)
+      return value === undefined ? [] : [[field, value]]
+    }),
+  )
+  return Object.keys(setup).length === 0 ? {} : { setup }
+}
+
+// Each record's answer as the goldens normalise it: the fixture's own directory under a fixed name.
+const answerText = (answered: unknown, sandbox: string | undefined): string =>
+  normalizer(sandbox === undefined ? [] : [[sandbox, "<sandbox>"]])(JSON.stringify(answered ?? null))
+
+async function runOnce(
+  rows: readonly Row[],
+  { scenario, setup }: ScenarioRun,
+): Promise<{ readonly records: EffectEvidence[]; readonly answers: readonly string[] }> {
+  const row = rows.find((candidate) => candidate.id === scenario.row)
+  const { root, calls, after, sandbox } = setup()
+  const invoked: string[] = []
+  const memberOf = (): unknown => {
+    let member: unknown = forwarding(root, [], invoked)
+    for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
+    return member
+  }
+  const controller = new AbortController()
+  if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller.abort())
+  const sequence = [scenario, ...(scenario.then ?? [])]
+  const records: EffectEvidence[] = []
+  for (const [index, step] of sequence.entries()) {
+    const seen = calls().length
+    const before = invoked.length
+    const result = await invoke(memberOf(), step, controller.signal)
+    records.push({
+      scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
+      row: scenario.row,
+      kind: step.kind,
+      member: invoked.slice(before).join(","),
+      input: step.input,
+      given: scenario.given ?? [],
+      ...fixtureSetup(scenario),
+      expect: step.expect,
+      observed: calls().slice(seen),
+      ...(scenario.target === undefined ? {} : { target: scenario.target }),
+      ...(step.refusal === undefined ? {} : { refusal: step.refusal }),
+      ...(step.refusal_from === undefined ? {} : { refusalFrom: step.refusal_from }),
+      ...(step.answer === undefined ? {} : { answer: step.answer }),
+      ...result,
+    })
+  }
+  return { records, answers: records.map((record) => answerText(record.answered, sandbox)) }
 }
