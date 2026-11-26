@@ -65,6 +65,45 @@ describe("account.signIn", () => {
     expect(runs[0]?.env["OMO_SERVICE_API_URL"]).toBe(ORIGIN)
   })
 
+  // Code review 7202063494 (LOW) and the security read's M10: the shipped options never had to be enumerable, and the
+  // root reads each of them once, from its copy.
+  test("#given shipped options whose callback and signal are non-enumerable and whose deviceName counts its reads #when signIn runs #then the callback gets the code, the signal reaches the verb and each field is read once", async () => {
+    // given
+    const { process, runs } = scripted([
+      { event: "code", ...code },
+      { event: "signed_in", api: ORIGIN, device: { id: "dev-new", name: "device-b" }, deviceService: "on" },
+    ])
+    const shown: UserCode[] = []
+    const controller = new AbortController()
+    let nameReads = 0
+    const options = {}
+    Object.defineProperty(options, "onUserCode", { enumerable: false, value: (value: UserCode) => shown.push(value) })
+    Object.defineProperty(options, "signal", { enumerable: false, value: controller.signal })
+    Object.defineProperty(options, "deviceName", {
+      enumerable: true,
+      get() {
+        nameReads += 1
+        return "device-b"
+      },
+    })
+    const signals: AbortSignal[] = []
+    const watching: SignInProcess = async (input) => {
+      signals.push(input.signal)
+      return process(input)
+    }
+
+    // when
+    const result = await sdkWith({ signInProcess: watching }).account.signIn(options as never)
+
+    // then
+    expect(result.kind).toBe("ok")
+    expect(shown).toEqual([code])
+    expect(runs.map((run) => JSON.parse(run.stdin))).toEqual([{ deviceName: "device-b" }])
+    expect(nameReads).toBe(1)
+    controller.abort()
+    expect(signals.map((signal) => signal.aborted)).toEqual([true])
+  })
+
   test("#given the verb refuses with the device limit #when signIn runs #then device_limit carries the devices", async () => {
     const devices = [{ id: "dev-a", name: "device-a" }]
     const { process } = scripted([

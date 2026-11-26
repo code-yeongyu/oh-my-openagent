@@ -7,6 +7,7 @@ import { assembleOmoSdk } from "../assembly"
 import { ROOT_CALL_ANSWERS } from "../contract/call-answers"
 import type { RootCallKey } from "../contract"
 import { ROOT_DISPOSED } from "./assemble"
+import { threadsNamespace } from "./threads"
 
 // Design ruling on the disposed root (P1b): after dispose() every call is refused at the root's boundary with one answer,
 // before the principal's line, the input, any member and any port. close() keeps the shipped behavior: the account and
@@ -169,5 +170,38 @@ describe("a disposed or closed root", () => {
     await sdk.dispose()
     await sdk.dispose()
     expect(await errorOf(callOf(sdk, "config.status")({}))).toEqual(ROOT_DISPOSED)
+  })
+
+  // Code review 7202063494 (MEDIUM) and the security read's N2: dispose() while a call's input is still being checked.
+  test("#given every root call started and dispose() in the same tick #when the calls settle #then each answers the disposed refusal unless its line refused it before the input, and no port is used after dispose() resolved", async () => {
+    const beforeInput = new Set(["no_matrix_cell", "caller_context_missing", "sender_not_allowed"])
+    const wrong: [RootCallKey, unknown][] = []
+    for (const key of keys) {
+      const sdk = root(async () => "not_running")
+      const call = callOf(sdk, key)({})
+      await sdk.dispose()
+      used.length = 0
+      const failure = (await errorOf(call)) as { code?: string } | undefined
+      if (!beforeInput.has(failure?.code ?? "") && JSON.stringify(failure) !== JSON.stringify(ROOT_DISPOSED))
+        wrong.push([key, failure])
+      if (used.length > 0) wrong.push([key, used.splice(0)])
+    }
+    expect(wrong).toEqual([])
+  })
+
+  test("#given a threads member already running #when its namespace is disposed before it reaches the core #then it answers the disposed refusal and no core is created", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-sdk-disposed-ns-"))
+    dirs.push(dir)
+    const namespace = threadsNamespace({
+      agentDir: dir,
+      cwd: dir,
+      uid: 501,
+      user: "probe",
+      env: { HOME: dir },
+      principal: { kind: "script", uid: 501 },
+    })
+    const listing = (namespace.members["threads.list"] as (input: unknown) => Promise<unknown>)({})
+    await namespace.dispose?.()
+    expect(await listing).toEqual({ kind: "error", error: ROOT_DISPOSED })
   })
 })

@@ -170,7 +170,9 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // size (owner's rule): 748,709 since the thread client loads from its shipped sidecar (P1b size ruling; 933,161 before);
 // 748,976 with the disposed-root gate (root/assemble.ts ROOT_DISPOSED, +267 B, LEAD ruling (a)); 749,055 with the base
 // branch at 43ef159329 (utils/src/escape-for-display.ts +196, thread/addressing.ts -53 pre-minify; LEAD ruling).
-const OMO_SDK_RUNTIME_BYTES = 749_055
+// 751,102 with the root lifecycle and the nested input copy (code review 7202063494, the security read of b01f3fbdd4;
+// root/assemble.ts +2,995, root/threads.ts +353, root/account-sign-in.ts +35 pre-minify; LEAD ruling (a)).
+const OMO_SDK_RUNTIME_BYTES = 751_102
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,

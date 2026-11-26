@@ -5,6 +5,7 @@ import type { ThreadCore } from "../../thread/sdk-core"
 import type { ThreadHost } from "../../thread/tools/ports"
 import type { Endpoint, OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
 import type * as result from "../contract/results/threads"
+import { ROOT_DISPOSED } from "./assemble"
 import { extensionFailure } from "./extension-codes"
 import type { Members, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
@@ -111,9 +112,15 @@ export function threadsNamespace(options: {
   // slice T2's or X1b's (design lane ruling), and the refused cells are answered before this at the root's boundary.
   if (options.principal.kind !== "script" && options.principal.kind !== "person")
     return { members: {}, releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }) }
+  // The core is created only while the namespace is open: the pending creation is assigned before any await, so a
+  // dispose() that begins later awaits it and disposes what it built, and a call that arrives after dispose() builds
+  // nothing (review comment 7202063494).
+  let disposed = false
   let core: Promise<ThreadCore> | undefined
-  const thread = (): Promise<ThreadCore> =>
-    (core ??= import("../../thread/sdk-core").then(({ createThreadCore }) =>
+  const NOT_CREATED = new Error("root_disposed")
+  const thread = (): Promise<ThreadCore> => {
+    if (disposed && core === undefined) return Promise.reject(NOT_CREATED)
+    return (core ??= import("../../thread/sdk-core").then(({ createThreadCore }) =>
       createThreadCore({
         agentDir: options.agentDir,
         cwd: options.cwd,
@@ -124,6 +131,7 @@ export function threadsNamespace(options: {
         ...options.ports,
       }),
     ))
+  }
   const members: Members = {
     "threads.list": async (input = {}) =>
       (await unbuilt("threads.list", input, LIST)) ??
@@ -214,16 +222,34 @@ export function threadsNamespace(options: {
       }
     },
   }
+  // A member that reaches for the core after dispose() began answers the disposed refusal instead of building one.
+  const open = Object.fromEntries(
+    Object.entries(members).map(([key, member]) => [
+      key,
+      async (...args: unknown[]) => {
+        try {
+          return await (member as (...a: unknown[]) => Promise<unknown>)(...args)
+        } catch (error) {
+          if (error === NOT_CREATED) return { kind: "error", error: ROOT_DISPOSED }
+          throw error
+        }
+      },
+    ]),
+  ) as Members
   // The caller's remote sessions and store are the root's to release even when no thread call ever built the core.
   const disposePorts = async (): Promise<void> => {
     await options.ports?.remote?.sessions.close?.().catch(() => undefined)
     await options.ports?.store?.dispose()
   }
   return {
-    members,
+    members: open,
     // The thread facade's release (design lane ruling on threads.release): the row its caller located, released where
     // that row is served, with no second lookup. Reachable only through the internal assembly, never the public root.
     releaseLocated: async (located, request) => (await thread()).releaseRow(located, request),
-    dispose: async () => (core === undefined ? disposePorts() : (await core).dispose()),
+    dispose: async () => {
+      disposed = true
+      if (core === undefined) return disposePorts()
+      await (await core).dispose()
+    },
   }
 }

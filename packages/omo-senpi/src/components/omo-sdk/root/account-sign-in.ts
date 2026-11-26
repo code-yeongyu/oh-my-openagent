@@ -2,7 +2,7 @@ import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import type { CallOptions, OmoValue, RootCallInput } from "../contract"
 import type { OmoResult } from "../result"
 import type { MemberOf } from "./members"
-import { admitted, invalidInput, ownCopy } from "./assemble"
+import { admitted, inputShape, invalidInput, ownCopy } from "./assemble"
 import { notImplemented } from "./not-implemented"
 
 type RootSignedIn =
@@ -22,7 +22,7 @@ export function accountSignIn(account: AccountApi, origin: string): SignIn {
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
     // Bad input answers a refusal and never throws: the boundary copies the caller's object once (review 6075306724),
     // and both contracts read only that copy.
-    const own = ownCopy(input)
+    const own = ownCopy(input, await inputShape("account.signIn"))
     if (own === undefined) return { kind: "error", error: invalidInput("account.signIn") }
     if (!("method" in own)) return account.signIn(own as SignInOptions)
     const given = (await admitted("account.signIn", own)) as RootInput | undefined

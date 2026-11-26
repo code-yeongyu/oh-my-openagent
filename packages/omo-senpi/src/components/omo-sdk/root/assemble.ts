@@ -123,32 +123,132 @@ const isPlainInput = (input: unknown): input is Record<string, unknown> => {
 }
 
 /**
- * The boundary's one read of the caller's object: its own enumerable fields, copied, so no member reads the caller's
- * object again. Every read here may run the caller's code (a proxy trap, a getter); a throw makes the input malformed,
- * answered with the fixed refusal and never the thrown text (review 6075306724).
+ * The boundary's one read of the caller's object: its own string-keyed fields, enumerable or not (the shipped
+ * SignInOptions never required enumerable ones), and the plain objects and arrays inside them, each read once into a
+ * copy, so neither the schema nor a member reads the caller's object again. Below the top level the same rule as at it:
+ * a value where the schema asks for an object or array must be plain (or null-prototype) or an array; a non-plain value
+ * is kept as it is only where the schema accepts any value or describes nothing (`inputShape`). Every read here may run
+ * the caller's code (a proxy trap, a getter); a throw, a cycle or a nesting deeper than MAX_INPUT_DEPTH makes the input
+ * malformed, answered with the fixed refusal and never the thrown text (review 6075306724; the security read of
+ * b01f3fbdd4, N1).
  */
-export const ownCopy = (input: unknown): Record<string, unknown> | undefined => {
+export const ownCopy = (input: unknown, shape: InputShape): Record<string, unknown> | undefined => {
   if (!isPlainInput(input)) return undefined
   try {
-    return Object.fromEntries(Object.entries(input))
+    return copyFields(input, "", shape, new Set(), 0)
   } catch {
     return undefined
   }
+}
+
+/** The deepest plain nesting an input may have (the call table's schemas go 6 deep); deeper input is refused. */
+const MAX_INPUT_DEPTH = 32
+
+const childPath = (path: string, key: string) => (path === "" ? key : `${path}.${key}`)
+
+/**
+ * What the boundary needs of a call's input schema: the field paths it describes, and among them those that accept any
+ * value. A path is a field name, `a.b` below it, `a[]` for an array's items and `a.*` for a pattern's keys.
+ */
+export type InputShape = { readonly described: ReadonlySet<string>; readonly anyValue: ReadonlySet<string> }
+
+function copyFields(
+  value: object,
+  path: string,
+  shape: InputShape,
+  ancestors: Set<object>,
+  depth: number,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const pattern = `${path}.*`
+  for (const key of Object.getOwnPropertyNames(value)) {
+    const at =
+      shape.described.has(pattern) && !shape.described.has(childPath(path, key)) ? pattern : childPath(path, key)
+    // Defined, never assigned, so a field named __proto__ stays a field.
+    Object.defineProperty(out, key, {
+      value: copyValue((value as Record<string, unknown>)[key], at, shape, ancestors, depth + 1),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    })
+  }
+  return out
+}
+
+// A non-plain value is kept as it is where the schema accepts any value, and where the schema describes nothing (an
+// unknown key, which the schema or the call refuses by name, or a shipped convention such as deviceService.status's
+// first-argument signal); where the schema describes an object or array it must be plain or an array.
+function copyValue(value: unknown, path: string, shape: InputShape, ancestors: Set<object>, depth: number): unknown {
+  if (shape.anyValue.has(path) || typeof value !== "object" || value === null) return value
+  const array = Array.isArray(value)
+  if (!array && !isPlainInput(value)) {
+    if (shape.described.has(path)) throw new Error("input_shape")
+    return value
+  }
+  if (ancestors.has(value) || depth > MAX_INPUT_DEPTH) throw new Error("input_shape")
+  ancestors.add(value)
+  let copied: unknown
+  if (array) {
+    const items: unknown[] = []
+    const length = (value as unknown[]).length
+    for (let index = 0; index < length; index += 1)
+      items.push(copyValue((value as unknown[])[index], `${path}[]`, shape, ancestors, depth + 1))
+    copied = items
+  } else copied = copyFields(value, path, shape, ancestors, depth)
+  ancestors.delete(value)
+  return copied
+}
+
+// A field path of the call's input schema that accepts any value: no type, union, constant or structure of its own. The
+// list is closed and generated from the schemas (pinned by nested-input.test.ts), so a new one shows up in review.
+const isAnyValue = (schema: Record<string, unknown>): boolean =>
+  ["type", "anyOf", "oneOf", "allOf", "const", "enum", "properties", "items", "$ref", "not"].every(
+    (field) => schema[field] === undefined,
+  )
+
+function collectShape(schema: unknown, path: string, described: Set<string>, anyValue: Set<string>): void {
+  if (typeof schema !== "object" || schema === null) return
+  const node = schema as Record<string, unknown>
+  if (path !== "") described.add(path)
+  if (path !== "" && isAnyValue(node)) {
+    anyValue.add(path)
+    return
+  }
+  for (const [key, child] of Object.entries((node["properties"] ?? {}) as object))
+    collectShape(child, childPath(path, key), described, anyValue)
+  for (const child of Object.values((node["patternProperties"] ?? {}) as object))
+    collectShape(child, `${path}.*`, described, anyValue)
+  if (typeof node["additionalProperties"] === "object")
+    collectShape(node["additionalProperties"], `${path}.*`, described, anyValue)
+  if (node["items"] !== undefined) collectShape(node["items"], `${path}[]`, described, anyValue)
+  for (const branch of [node["anyOf"], node["oneOf"], node["allOf"]])
+    if (Array.isArray(branch)) for (const child of branch) collectShape(child, path, described, anyValue)
+}
+
+const shapes = new Map<RootCallKey, InputShape>()
+/** The input shape of a root call, from its schema: the paths it describes and those that accept any value. */
+export async function inputShape(key: RootCallKey): Promise<InputShape> {
+  const known = shapes.get(key)
+  if (known !== undefined) return known
+  const { ROOT_CALLS } = await import("../contract/calls")
+  const described = new Set<string>()
+  const anyValue = new Set<string>()
+  collectShape(ROOT_CALLS[key].input, "", described, anyValue)
+  const shape = { described, anyValue }
+  shapes.set(key, shape)
+  return shape
 }
 
 // The call table's schemas load on the first checked call, not when the root is built (design lane ruling on the
 // runtime's cold import); contract/eager-tables.test.ts builds them all so a bad schema still fails in CI.
 /** The copy a member receives, or undefined when the input is refused. */
 export async function admitted(key: RootCallKey, input: unknown): Promise<Record<string, unknown> | undefined> {
-  const own = ownCopy(input)
+  const own = ownCopy(input, await inputShape(key))
   if (own === undefined) return undefined
   const { inputAccepts } = await import("../contract/validate")
-  try {
-    // The schema also reads nested values the caller owns; a throw there is the same malformed input.
-    return inputAccepts(key, await checkedInput(key, own)) ? own : undefined
-  } catch {
-    return undefined
-  }
+  // The schema reads only the copy: what it describes is copied plain data, and it reads nothing inside a value it
+  // accepts as any, so no caller code runs here (the security read's M7).
+  return inputAccepts(key, await checkedInput(key, own)) ? own : undefined
 }
 
 // An omitted input is the empty input and stays omitted for the member; any other value, null included, is checked as
@@ -159,10 +259,33 @@ async function admittedArgs(key: RootCallKey, args: readonly unknown[]): Promise
   return args[0] === undefined ? args : [own, ...args.slice(1)]
 }
 
-function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[]): Call {
+// A call with a shipped convention checks its own input; the root loads its shape first, so a dispose() that begins
+// meanwhile answers the disposed refusal here too, before the member runs.
+function legacyChecked(key: RootCallKey, member: Call, lifecycle: Lifecycle): Call {
+  const disposed = refusing(key, ROOT_DISPOSED, [])
+  return async (...args) => {
+    const admission = inputShape(key)
+    lifecycle.admitting(admission)
+    await admission
+    return lifecycle.isDisposed() ? disposed() : member(...args)
+  }
+}
+
+/** The root's lifecycle as its calls see it: whether dispose() began, and the admissions still awaiting their input. */
+type Lifecycle = {
+  readonly isDisposed: () => boolean
+  readonly admitting: (admission: Promise<unknown>) => void
+}
+
+function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[], lifecycle: Lifecycle): Call {
   const refuse = refusing(key, invalidInput(key), servings)
+  const disposed = refusing(key, ROOT_DISPOSED, [])
   const run = async (args: readonly unknown[]) => {
-    const given = await admittedArgs(key, args)
+    const admission = admittedArgs(key, args)
+    lifecycle.admitting(admission)
+    const given = await admission
+    // dispose() may have begun while the input was checked: the call then builds and reaches nothing.
+    if (lifecycle.isDisposed()) return disposed()
     return given === undefined ? refuse() : member(...given)
   }
   if (ROOT_CALL_ANSWERS[key] === "stream")
@@ -215,6 +338,14 @@ export function assembleRoot(
   const tree: Node = {}
   const loads = namespaceLoads(loaders, context)
   let disposed = false
+  const pending = new Set<Promise<unknown>>()
+  const lifecycle: Lifecycle = {
+    isDisposed: () => disposed,
+    admitting: (admission) => {
+      pending.add(admission)
+      void admission.finally(() => pending.delete(admission)).catch(() => undefined)
+    },
+  }
   for (const key of Object.keys(ROOT_CALL_ANSWERS) as RootCallKey[]) {
     const refused = refusals.get(key)
     const serving = servings.find((candidate) => candidate.members[key] !== undefined)
@@ -225,10 +356,10 @@ export function assembleRoot(
       refused !== undefined
         ? refusing(key, refused, servings)
         : member === undefined
-          ? checked(key, notImplemented(key), servings)
+          ? checked(key, notImplemented(key), servings, lifecycle)
           : serving?.legacy?.includes(key) === true
-            ? (member as Call)
-            : checked(key, member as Call, servings)
+            ? legacyChecked(key, member as Call, lifecycle)
+            : checked(key, member as Call, servings, lifecycle)
     place(
       tree,
       key,
@@ -241,10 +372,14 @@ export function assembleRoot(
     for (const serving of servings) serving.close?.()
   }
   let disposing: Promise<void> | undefined
+  // dispose() marks the root first, so no admission that completes later reaches a member, then waits for the admissions
+  // still pending before it releases the namespaces' cores and ports.
   const dispose = (): Promise<void> => {
     disposed = true
     close()
-    disposing ??= Promise.all(servings.map((serving) => serving.dispose?.())).then(() => undefined)
+    disposing ??= Promise.allSettled([...pending])
+      .then(() => Promise.all(servings.map((serving) => serving.dispose?.())))
+      .then(() => undefined)
     return disposing
   }
   return Object.assign(tree, { close, dispose }) as unknown as OmoSdkRoot
