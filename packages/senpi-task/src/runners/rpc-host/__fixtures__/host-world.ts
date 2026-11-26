@@ -25,6 +25,7 @@ import type { ManualRecoveryClock } from "./manual-recovery-clock"
 import type { HostShardEvents } from "../handle-reattach"
 import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
 import type { hostWorldRecovery } from "./host-world-recovery"
+import { ownedTaskState } from "../../../store/__fixtures__/owned-task-state"
 
 /**
  * A daemon and the parent sessions that share it: one fake host on a private socket, one project
@@ -144,7 +145,7 @@ interface ConnectParentInput {
 
 function connectParent(input: ConnectParentInput): ParentSession {
   const { sessionId, projectDir, socketPath } = input
-  const backing = createTaskRecordStore({ project_dir: projectDir })
+  const backing = createTaskRecordStore(ownedTaskState(projectDir))
   const recovery = input.options.liveRecovery?.attach(backing, sessionId)
   const store = recovery?.store ?? backing
   const config = hostSuiteSettings(input.options.settings)

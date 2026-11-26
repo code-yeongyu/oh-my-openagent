@@ -1,0 +1,1684 @@
+{
+  "domain": "toolkit",
+  "inert": {
+    "toolkit.steer.proposals": "a callback the person's code supplies; JSON carries a placeholder, P1b's driver the function"
+  },
+  "scenarios": [
+    {
+      "id": "toolkit.forSession/authority-base",
+      "row": "toolkit.forSession",
+      "kind": "effect",
+      "input": {
+        "cwd": "x-cwd"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/authority-cwd",
+      "row": "toolkit.forSession",
+      "kind": "effect",
+      "input": {
+        "cwd": "x-cwd"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "args": {
+            "cwd": "x-cwd"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/authority-session-id",
+      "row": "toolkit.forSession",
+      "kind": "effect",
+      "input": {
+        "cwd": "x-cwd",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.addGoal/authority-base",
+      "row": "toolkit.addGoal",
+      "kind": "effect",
+      "input": {
+        "title": "x-title",
+        "objective": "x-objective"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "addGoal"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.addGoal/authority-title",
+      "row": "toolkit.addGoal",
+      "kind": "effect",
+      "input": {
+        "title": "x-title",
+        "objective": "x-objective"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "addGoal",
+          "args": {
+            "title": "x-title"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.addGoal/authority-objective",
+      "row": "toolkit.addGoal",
+      "kind": "effect",
+      "input": {
+        "title": "x-title",
+        "objective": "x-objective"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "addGoal",
+          "args": {
+            "objective": "x-objective"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.addGoal/authority-success-criteria",
+      "row": "toolkit.addGoal",
+      "kind": "effect",
+      "input": {
+        "title": "x-title",
+        "objective": "x-objective",
+        "successCriteria": [
+          {
+            "scenario": "x-scenario",
+            "expectedEvidence": "x-expectedEvidence"
+          }
+        ]
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "addGoal",
+          "args": {
+            "successCriteria": [
+              {
+                "scenario": "x-scenario",
+                "expectedEvidence": "x-expectedEvidence"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.addGoal/authority-session-id",
+      "row": "toolkit.addGoal",
+      "kind": "effect",
+      "input": {
+        "title": "x-title",
+        "objective": "x-objective",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "addGoal",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-base",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-goal-id",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "goalId": "x-goalId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-status",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "status": "complete"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-evidence",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "evidence": "x-evidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-codex-goal-json",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence",
+        "codexGoalJson": "x-codexGoalJson"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "codexGoalJson": "x-codexGoalJson"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-quality-gate-json",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence",
+        "qualityGateJson": "x-qualityGateJson"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "qualityGateJson": "x-qualityGateJson"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-print-template",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence",
+        "printTemplate": true
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "printTemplate": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-advance",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence",
+        "advance": true
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "advance": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-session-id",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "complete",
+        "evidence": "x-evidence",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-status-failed",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "failed",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "status": "failed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.checkpoint/authority-status-blocked",
+      "row": "toolkit.checkpoint",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "status": "blocked",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "checkpoint",
+          "args": {
+            "status": "blocked"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.completeGoals/authority-base",
+      "row": "toolkit.completeGoals",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "loop",
+          "op": "completeGoals"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.completeGoals/authority-retry-failed",
+      "row": "toolkit.completeGoals",
+      "kind": "effect",
+      "input": {
+        "retryFailed": true
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "completeGoals",
+          "args": {
+            "retryFailed": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.completeGoals/authority-session-id",
+      "row": "toolkit.completeGoals",
+      "kind": "effect",
+      "input": {
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "completeGoals",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-base",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-brief",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals",
+          "args": {
+            "brief": "x-brief"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-codex-goal-mode",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief",
+        "codexGoalMode": "aggregate"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals",
+          "args": {
+            "codexGoalMode": "aggregate"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-force",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief",
+        "force": true
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals",
+          "args": {
+            "force": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-validation-batches-json",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief",
+        "validationBatchesJson": "x-validationBatchesJson"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals",
+          "args": {
+            "validationBatchesJson": "x-validationBatchesJson"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-session-id",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.createGoals/authority-codex-goal-mode-per-story",
+      "row": "toolkit.createGoals",
+      "kind": "effect",
+      "input": {
+        "brief": "x-brief",
+        "codexGoalMode": "per_story"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "createGoals",
+          "args": {
+            "codexGoalMode": "per_story"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.criteria/authority-base",
+      "row": "toolkit.criteria",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "criteria"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.criteria/authority-goal-id",
+      "row": "toolkit.criteria",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "criteria",
+          "args": {
+            "goalId": "x-goalId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.criteria/authority-session-id",
+      "row": "toolkit.criteria",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "criteria",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-base",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-goal-id",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "goalId": "x-goalId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-criterion-id",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "criterionId": "x-criterionId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-status",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "status": "pass"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-evidence",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "evidence": "x-evidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-notes",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence",
+        "notes": "x-notes"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "notes": "x-notes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-artifacts",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence",
+        "artifacts": [
+          "x-artifacts"
+        ]
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "artifacts": [
+              "x-artifacts"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-session-id",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "pass",
+        "evidence": "x-evidence",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-status-fail",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "fail",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "status": "fail"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordEvidence/authority-status-blocked",
+      "row": "toolkit.recordEvidence",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "criterionId": "x-criterionId",
+        "status": "blocked",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordEvidence",
+          "args": {
+            "status": "blocked"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-base",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-goal-id",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers",
+          "args": {
+            "goalId": "x-goalId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-title",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers",
+          "args": {
+            "title": "x-title"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-objective",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers",
+          "args": {
+            "objective": "x-objective"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-evidence",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers",
+          "args": {
+            "evidence": "x-evidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-codex-goal-json",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence",
+        "codexGoalJson": "x-codexGoalJson"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers",
+          "args": {
+            "codexGoalJson": "x-codexGoalJson"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.recordReviewBlockers/authority-session-id",
+      "row": "toolkit.recordReviewBlockers",
+      "kind": "effect",
+      "input": {
+        "goalId": "x-goalId",
+        "title": "x-title",
+        "objective": "x-objective",
+        "evidence": "x-evidence",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "recordReviewBlockers",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.status/authority-base",
+      "row": "toolkit.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "loop",
+          "op": "status"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.status/authority-session-id",
+      "row": "toolkit.status",
+      "kind": "effect",
+      "input": {
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "status",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-base",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer"
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "add_subgoal"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-source",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "source": "finding"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-evidence",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "evidence": "x-evidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-rationale",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "rationale": "x-rationale"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-goal-id",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "goalId": "x-goalId"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "goalId": "x-goalId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-criterion-id",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "criterionId": "x-criterionId"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "criterionId": "x-criterionId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-scenario",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "scenario": "x-scenario"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "scenario": "x-scenario"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-expected-evidence",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "expectedEvidence": "x-expectedEvidence"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "expectedEvidence": "x-expectedEvidence"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-user-model",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "userModel": "happy"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "userModel": "happy"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-title",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "title": "x-title"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "title": "x-title"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-objective",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "objective": "x-objective"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "objective": "x-objective"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-child-goals",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "childGoals": [
+          {
+            "title": "x-title",
+            "objective": "x-objective"
+          }
+        ]
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "childGoals": [
+              {
+                "title": "x-title",
+                "objective": "x-objective"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-revised-title",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "revisedTitle": "x-revisedTitle"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "revisedTitle": "x-revisedTitle"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-revised-objective",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "revisedObjective": "x-revisedObjective"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "revisedObjective": "x-revisedObjective"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-pending-order",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "pendingOrder": [
+          "x-pendingOrder"
+        ]
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "pendingOrder": [
+              "x-pendingOrder"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-blocked-reason",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "blockedReason": "x-blockedReason"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "blockedReason": "x-blockedReason"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-idempotency-key",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "idempotencyKey": "x-idempotencyKey"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "idempotencyKey": "x-idempotencyKey"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-session-id",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind-split-subgoal",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "split_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "split_subgoal"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind-reorder-pending",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "reorder_pending",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "reorder_pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind-revise-pending-wording",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "revise_pending_wording",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "revise_pending_wording"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind-revise-criterion",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "revise_criterion",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "revise_criterion"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind-annotate-ledger",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "annotate_ledger",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "annotate_ledger"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-kind-mark-blocked-superseded",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "mark_blocked_superseded",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "kind": "mark_blocked_superseded"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-source-user-prompt-submit",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "user_prompt_submit",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "source": "user_prompt_submit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-source-cli",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "cli",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "source": "cli"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-user-model-edge",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "userModel": "edge"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "userModel": "edge"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-user-model-regression",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "userModel": "regression"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "userModel": "regression"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.steer/authority-user-model-adversarial",
+      "row": "toolkit.steer",
+      "kind": "effect",
+      "input": {
+        "kind": "add_subgoal",
+        "source": "finding",
+        "evidence": "x-evidence",
+        "rationale": "x-rationale",
+        "userModel": "adversarial"
+      },
+      "expect": [
+        {
+          "port": "loop",
+          "op": "steer",
+          "args": {
+            "userModel": "adversarial"
+          }
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/for-session-refuses-connector",
+      "row": "toolkit.forSession",
+      "input": {
+        "cwd": "x-cwd"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/for-session-refuses-service",
+      "row": "toolkit.forSession",
+      "input": {
+        "cwd": "x-cwd"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/for-session-named-refuses-connector",
+      "row": "toolkit.forSession",
+      "input": {
+        "cwd": "x-cwd",
+        "session_id": "other-session"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/for-session-named-refuses-session",
+      "row": "toolkit.forSession",
+      "input": {
+        "cwd": "x-cwd",
+        "session_id": "other-session"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "toolkit.forSession/for-session-named-refuses-service",
+      "row": "toolkit.forSession",
+      "input": {
+        "cwd": "x-cwd",
+        "session_id": "other-session"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "loop",
+          "op": "forSession",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

@@ -45,6 +45,9 @@ pub struct FakeScenario {
     pub ax_deadline_ms: Option<u64>,
     /// Pads a window's tree with leaves up to this many nodes in total.
     pub ax_node_count: BTreeMap<String, u32>,
+    /// Later versions of a window's tree: root read `k` (from 2) serves version `k - 1`, the
+    /// last one after that.
+    pub ax_versions: BTreeMap<String, Vec<FakeAxNode>>,
     pub cursor: Option<Point>,
     /// Fake-clock milliseconds a call costs before it runs.
     pub delay_ms: DelayMs,

@@ -14,6 +14,7 @@ export function withClosedDeviceLoginOptions(command: Command): Command {
     .allowExcessArguments()
     .option("--device")
     .option("--no-browser")
+    .option("--replace")
     .option("--api <url>")
     .option("--help")
 }

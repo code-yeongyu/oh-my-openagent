@@ -480,6 +480,14 @@ await runLauncher(["say", "hi"])
         expect(Buffer.from(brand.logo.slice("data:image/svg+xml;base64,".length), "base64").toString("utf8")).toBe(icon)
       })
 
+      test("#then the brand names exactly the plugin the launcher prepends (#14465)", () => {
+        const fixture = createFixture()
+        expect(run(fixture, ["say", "hi"]).status).toBe(0)
+        const { argv, env } = capture(fixture)
+        expect(argv[0]).toBe("--extension")
+        expect(JSON.parse(env.SENPI_BRAND ?? "{}").extensions).toEqual([argv[1]])
+      })
+
       // The launcher may re-exec itself under bun; whichever runtime wins, the engine must be told
       // about it so it never flips back and spawns a second interpreter of its own. Both spellings
       // are driven through a real interpreter, because the value has to track the process that

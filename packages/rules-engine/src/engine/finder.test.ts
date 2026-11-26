@@ -64,7 +64,7 @@ describe("engine findPluginBundledCandidates hephaestus model variants", () => {
       }
     })
 
-    for (const model of ["gpt-6-astra", "gpt-6-astra-fast", "openai/GPT-6-ASTRA"]) {
+    for (const model of ["gpt-6.2-astra", "gpt-6.2-astra-fast", "openai/GPT-6.2-ASTRA"]) {
       it(`#when the model is ${model} #then only the gpt-6 variant is selected`, () => {
         const pluginRoot = makePluginRoot()
 

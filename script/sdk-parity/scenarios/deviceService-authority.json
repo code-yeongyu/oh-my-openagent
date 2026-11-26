@@ -1,0 +1,266 @@
+{
+  "domain": "deviceService",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "deviceService.enable/service-switch-refuses-connector",
+      "row": "deviceService.enable",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.enable/service-switch-refuses-session",
+      "row": "deviceService.enable",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.enable/service-switch-refuses-service",
+      "row": "deviceService.enable",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.disable/service-switch-refuses-connector",
+      "row": "deviceService.disable",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.disable/service-switch-refuses-session",
+      "row": "deviceService.disable",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.disable/service-switch-refuses-service",
+      "row": "deviceService.disable",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setEnabled",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/service-switch-refuses-connector",
+      "row": "deviceService.setControl",
+      "input": {
+        "on": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/service-switch-refuses-session",
+      "row": "deviceService.setControl",
+      "input": {
+        "on": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setControl/service-switch-refuses-service",
+      "row": "deviceService.setControl",
+      "input": {
+        "on": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setControl",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/service-switch-refuses-connector",
+      "row": "deviceService.setWake",
+      "input": {
+        "on": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/service-switch-refuses-session",
+      "row": "deviceService.setWake",
+      "input": {
+        "on": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.setWake/service-switch-refuses-service",
+      "row": "deviceService.setWake",
+      "input": {
+        "on": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.setWake",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/bootstrap-refuses-connector",
+      "row": "deviceService.bootstrap",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "deviceService.bootstrap/bootstrap-refuses-session",
+      "row": "deviceService.bootstrap",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "deviceService",
+          "op": "service.bootstrap",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

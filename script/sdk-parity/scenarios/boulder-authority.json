@@ -1,0 +1,41 @@
+{
+  "domain": "boulder",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "boulder.status/opencode-read-refuses-connector",
+      "row": "boulder.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "boulder.status/opencode-read-refuses-service",
+      "row": "boulder.status",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

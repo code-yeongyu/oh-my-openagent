@@ -13,6 +13,7 @@
 
 import { createHash, randomBytes } from "node:crypto"
 
+import { missesSyncContract } from "../../contract-version.ts"
 import type { KeyringEntry, SyncAuthor, SyncEntry } from "../../crypto/entry.ts"
 import { verifyRecordSig } from "../../crypto/signatures.ts"
 import { jcsBytes, sha256B64 } from "../../crypto/vendor/sync-format/jcs.ts"
@@ -108,6 +109,11 @@ export function startChainWireServer(
     readonly acceptsPhraseKeys?: boolean
     /** Extra raw fields on the state read, e.g. a field name the service no longer uses. */
     readonly extraState?: Readonly<Record<string, unknown>>
+    /**
+     * Refuses turning a device's sync off unless the request spends a token `POST /v1/confirm` issued for that
+     * device, as omo-service does (its typed confirmation, contract 1.17.0).
+     */
+    readonly confirmDeviceOff?: boolean
   } = {},
 ): ChainWireServer {
   const authors = new Map<string, SyncAuthor>()
@@ -118,6 +124,8 @@ export function startChainWireServer(
   const uploads = new Map<string, { size: number; sha256: string; data: Uint8Array | null }>()
   const head = () => chain.at(-1)
   const pairings = new Map<string, Pending>()
+  /** Live confirmation tokens, each bound to the device it was issued for and spent by one switch. */
+  const confirmations = new Map<string, string>()
   const switches: string[] = []
   const phrase = { accept: true }
   const syncHeaders: { path: string; capabilities: string | null; version: string | null }[] = []
@@ -151,6 +159,9 @@ export function startChainWireServer(
         capabilities: req.headers.get("omo-sync-capabilities"),
         version: req.headers.get("omo-contract-version"),
       })
+      // The service's client floor for a phrase account (#13691), on every request: a client that drops the
+      // contract headers fails every test that drives it through this server.
+      if (missesSyncContract(path, req.headers)) return refusal(426, "client_update_required")
       const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "")
       const device = devices.get(token) ?? ""
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
@@ -314,10 +325,31 @@ export function startChainWireServer(
         onWrite?.()
         return Response.json(row)
       }
+      if (req.method === "POST" && path === "/v1/confirm") {
+        const body = (await req.json()) as Record<string, unknown>
+        if (body["action"] !== "sync.disable_device" || typeof body["target"] !== "string")
+          return refusal(400, "invalid_request")
+        const token = randomBytes(32).toString("base64url")
+        confirmations.set(token, body["target"])
+        return Response.json({
+          ready: true,
+          code: null,
+          at: "2026-01-01T00:00:00.000Z",
+          token,
+          expiresAt: "2026-01-01T00:10:00.000Z",
+        })
+      }
       if (req.method === "PUT" && (path === "/v1/account/sync" || /^\/v1\/devices\/[^/]+\/sync$/.test(path))) {
         const body = await req.json()
-        switches.push(`${path} ${JSON.stringify(body)}`)
         const enabled = typeof body === "object" && body !== null && "enabled" in body && body.enabled === true
+        if (options.confirmDeviceOff === true && !enabled && path !== "/v1/account/sync") {
+          const token =
+            typeof body === "object" && body !== null && "confirmToken" in body ? String(body.confirmToken) : ""
+          if (confirmations.get(token) !== decodeURIComponent(path.split("/")[3] ?? ""))
+            return refusal(400, "invalid_request")
+          confirmations.delete(token)
+        }
+        switches.push(`${path} ${JSON.stringify(body)}`)
         if (path === "/v1/account/sync") accountConsent = enabled
         else deviceConsent.set(decodeURIComponent(path.split("/")[3] ?? ""), enabled)
         return Response.json({ enabled: true })

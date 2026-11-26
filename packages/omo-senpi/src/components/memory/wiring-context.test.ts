@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { branchEntryCount } from "./wiring-context"
+import { branchEntryCount, readUi, guardedStatus, sequencedStatus } from "./wiring-context"
 
 describe("branchEntryCount", () => {
   it("#given a session manager exposing getEntryCount #when the count is read #then entries are never materialized", () => {
@@ -24,5 +24,110 @@ describe("branchEntryCount", () => {
   it("#given no session manager #when the count is read #then it is zero", () => {
     expect(branchEntryCount({})).toBe(0)
     expect(branchEntryCount(undefined)).toBe(0)
+  })
+})
+
+describe("readUi status publishing (#13046)", () => {
+  it("#given refreshes that land in any order #when the same status text is published repeatedly #then the host sees each distinct text once and every clear", () => {
+    const published: Array<string | undefined> = []
+    const host = { ui: { setStatus: (_key: string, text?: string) => published.push(text), notify: () => undefined } }
+
+    // Two readUi handles for one host ui share the last-published text, as every footer path does.
+    const first = readUi(host)
+    const second = readUi(host)
+    first?.setStatus("memory", undefined)
+    first?.setStatus("memory", "mem:project just now")
+    second?.setStatus("memory", "mem:project just now")
+    first?.setStatus("memory", "mem:project just now")
+    second?.setStatus("memory", "mem:project just now (+1)")
+    first?.setStatus("memory", undefined)
+    second?.setStatus("memory", "mem:project just now")
+
+    expect(published).toEqual([
+      undefined,
+      "mem:project just now",
+      "mem:project just now (+1)",
+      undefined,
+      "mem:project just now",
+    ])
+  })
+
+  it("#given two status keys on one host #when each publishes the same text #then the keys are deduplicated independently", () => {
+    const published: Array<[string, string | undefined]> = []
+    const host = {
+      ui: { setStatus: (key: string, text?: string) => published.push([key, text]), notify: () => undefined },
+    }
+
+    const ui = readUi(host)
+    ui?.setStatus("memory", "a")
+    ui?.setStatus("loop", "a")
+    ui?.setStatus("memory", "a")
+
+    expect(published).toEqual([
+      ["memory", "a"],
+      ["loop", "a"],
+    ])
+  })
+
+  it("#given a host setStatus that throws once #when the same text is published again #then it is retried, because a line the host never showed is not remembered", () => {
+    const published: Array<string | undefined> = []
+    let failNext = true
+    const host = {
+      ui: {
+        setStatus: (_key: string, text?: string) => {
+          if (failNext) {
+            failNext = false
+            throw new Error("host unavailable")
+          }
+          published.push(text)
+        },
+        notify: () => undefined,
+      },
+    }
+
+    const ui = readUi(host)
+    expect(() => ui?.setStatus("memory", "mem:project just now")).toThrow("host unavailable")
+    ui?.setStatus("memory", "mem:project just now")
+
+    expect(published).toEqual(["mem:project just now"])
+  })
+})
+
+describe("memory status publishing invariant (#14825)", () => {
+  function host() {
+    const calls: Array<[string, string | undefined]> = []
+    const ui = readUi({
+      ui: { setStatus: (key: string, text: string | undefined) => calls.push([key, text]), notify: () => {} },
+    })
+    if (ui === undefined) throw new Error("readUi returned no handle")
+    return { ui, calls }
+  }
+
+  it("#given a guarded refresh its guard refuses #when a newer allowed refresh computes the same line #then that line reaches the host", () => {
+    const { ui, calls } = host()
+    sequencedStatus(ui).setStatus("memory", "OLD")
+    let allowed = false
+    const refused = sequencedStatus(guardedStatus(ui, () => allowed))
+    refused.setStatus("memory", "NEW")
+    allowed = true
+    sequencedStatus(ui).setStatus("memory", "NEW")
+
+    expect(calls).toEqual([
+      ["memory", "OLD"],
+      ["memory", "NEW"],
+    ])
+  })
+
+  it("#given a refresh requested before a clear #when an unsequenced spinner frame lands after the clear #then the pre-clear refresh still stays dropped", () => {
+    const { ui, calls } = host()
+    const beforeClear = sequencedStatus(ui)
+    ui.setStatus("memory", undefined)
+    ui.setStatus("memory", "mem:a ⠋ reflecting")
+    beforeClear.setStatus("memory", "mem:a just now")
+
+    expect(calls).toEqual([
+      ["memory", undefined],
+      ["memory", "mem:a ⠋ reflecting"],
+    ])
   })
 })

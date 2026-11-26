@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readlinkSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -50,6 +50,26 @@ export type GatewayHarness = {
   readonly dispose: () => Promise<void>
 }
 
+/**
+ * Windows refuses to delete a file this process still holds open, so a handle left open under the fixture fails only
+ * there (EBUSY, #14555). Where `/proc/self/fd` exists, fail the same way on the platform pull requests run on.
+ */
+export function assertNoOpenHandlesUnder(dir: string): void {
+  const fdDir = "/proc/self/fd"
+  if (!existsSync(fdDir)) return
+  const held: string[] = []
+  for (const fd of readdirSync(fdDir)) {
+    let target: string
+    try {
+      target = readlinkSync(`${fdDir}/${fd}`)
+    } catch {
+      continue // the descriptor readdir itself used, or one closed since
+    }
+    if (target.startsWith(`${dir}/`)) held.push(target)
+  }
+  if (held.length > 0) throw new Error(`handles still open under ${dir}: ${held.join(", ")}`)
+}
+
 /** `remote`: the account surface whose device the senders stamp, through the same `stampThisDevice` every production sender uses (#13004). */
 export function createGatewayHarness(
   options: { readonly startAt?: number; readonly remote?: RemoteThreadSurface } = {},
@@ -75,7 +95,6 @@ export function createGatewayHarness(
     const created = storeFactory({
       agentDir,
       now,
-      resolveTarget: resolveFromEntries(entries, () => agentDir),
       ...extra,
     })
     stores.push(created)
@@ -190,6 +209,7 @@ export function createGatewayHarness(
       for (const created of sessions.values()) created.drain.stop()
       while (background.size > 0) await Promise.allSettled([...background])
       await Promise.all(stores.map((created) => created.dispose()))
+      assertNoOpenHandlesUnder(agentDir)
       rmSync(agentDir, { recursive: true, force: true })
     },
   }

@@ -8,7 +8,15 @@ export const SYNC_SESSION_DEFERRED = "sync-session-deferred"
 export class SyncSessionDeferredError extends Error {
   readonly code = SYNC_SESSION_DEFERRED
 
-  constructor(message: string, cause: unknown) {
+  /**
+   * @param wake Aborts when the reason to wait may have ended before the retry delay (the account the waiting pass
+   *   resolved signed out or lost its channel, #13624): the runner retries at once instead of reporting waiting.
+   */
+  constructor(
+    message: string,
+    cause: unknown,
+    readonly wake?: AbortSignal,
+  ) {
     super(message, { cause })
     this.name = "SyncSessionDeferredError"
   }

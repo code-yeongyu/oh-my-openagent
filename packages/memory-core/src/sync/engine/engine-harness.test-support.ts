@@ -15,7 +15,7 @@ import { SyncEngine, type EngineFault } from "./engine"
 import { FAKE_SPACE, FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import type { FakeSyncServer } from "./fake-server.test-support"
 import { FakeItemStore } from "./fake-store.test-support"
-import type { Clock, FreezeSettler, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, ItemStore, SyncLog, SyncRepo, Transport, WriterLock } from "./ports"
 
 export const ACCOUNT = "acc_test"
 /** Every engine test drives real git processes; under machine load a cycle can take seconds. */
@@ -62,6 +62,7 @@ export class ManualClock implements Clock {
   private at = 1_800_000_000_000
   private timers: { readonly due: number; readonly fn: () => void; cancelled: boolean }[] = []
   private waiting: (() => void)[] = []
+  private released = false
 
   /** Resolves once some timer is scheduled: subscribe-first, so a test advances only after the engine waits. */
   untilPending(): Promise<void> {
@@ -75,10 +76,24 @@ export class ManualClock implements Clock {
 
   after(ms: number, fn: () => void): () => void {
     const timer = { due: this.at + ms, fn, cancelled: false }
-    this.timers.push(timer)
-    for (const wake of this.waiting.splice(0)) wake()
+    if (this.released) {
+      queueMicrotask(() => {
+        if (!timer.cancelled) fn()
+      })
+    } else {
+      this.timers.push(timer)
+      for (const wake of this.waiting.splice(0)) wake()
+    }
     return () => {
       timer.cancelled = true
+    }
+  }
+
+  /** Teardown of manual cycles: release pending and future backoffs without advancing time. */
+  releaseWaits(): void {
+    this.released = true
+    for (const timer of this.timers.splice(0)) {
+      if (!timer.cancelled) timer.fn()
     }
   }
 
@@ -160,12 +175,13 @@ export interface Device {
 
 export interface DeviceOptions {
   readonly batchBytes?: number
+  readonly tempRoot?: string
   /** Start from a copy of another device's memory dir (its .git and journal included). */
   readonly memoryFrom?: string
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
   readonly onStatusChange?: () => void
-  readonly log?: (line: string) => void
+  readonly log?: SyncLog
   /** The account session's freeze settler (rotation on revoke). */
   readonly freeze?: FreezeSettler
   /** The memory space the device's session is bound to; FAKE_SPACE by default. */
@@ -178,7 +194,23 @@ export async function makeDevice(
   fault?: EngineFault,
   options: DeviceOptions = {},
 ): Promise<Device> {
-  const base = await mkdtemp(join(tmpdir(), `omo-sync-${name}-`))
+  const base = await mkdtemp(join(options.tempRoot ?? tmpdir(), `omo-sync-${name}-`))
+  try {
+    return await setupDevice(base, server, name, fault, options)
+  } catch (error) {
+    // The caller cannot dispose a device it never received.
+    await rm(base, { recursive: true, force: true })
+    throw error
+  }
+}
+
+async function setupDevice(
+  base: string,
+  server: FakeSyncServer,
+  name: string,
+  fault: EngineFault | undefined,
+  options: DeviceOptions,
+): Promise<Device> {
   const root = join(base, "memory")
   const stateDir = join(base, "device")
   await mkdir(stateDir, { recursive: true })
@@ -258,7 +290,11 @@ export async function makeDevice(
     async retiredJournals() {
       return (await readdir(join(root, ".git"))).filter((n) => n.startsWith("omo-sync.retired-"))
     },
-    dispose: () => rm(base, { recursive: true, force: true }),
+    async dispose() {
+      // A cycle still running (a test that timed out mid-cycle) must settle before its directory goes (#13680).
+      await device.engine.stop()
+      await rm(base, { recursive: true, force: true })
+    },
   }
   return device
 }

@@ -1,0 +1,142 @@
+{
+  "domain": "diagnostics",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "diagnostics.run/host-read-refuses-connector",
+      "row": "diagnostics.run",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.fixReflectionLock/host-change-refuses-connector",
+      "row": "diagnostics.fixReflectionLock",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.fixReflectionLock/host-change-refuses-session",
+      "row": "diagnostics.fixReflectionLock",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.fixReflectionLock/host-change-refuses-service",
+      "row": "diagnostics.fixReflectionLock",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/host-change-refuses-connector",
+      "row": "diagnostics.reapStaleEngines",
+      "input": {
+        "pids": [
+          1
+        ]
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/host-change-refuses-session",
+      "row": "diagnostics.reapStaleEngines",
+      "input": {
+        "pids": [
+          1
+        ]
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/host-change-refuses-service",
+      "row": "diagnostics.reapStaleEngines",
+      "input": {
+        "pids": [
+          1
+        ]
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

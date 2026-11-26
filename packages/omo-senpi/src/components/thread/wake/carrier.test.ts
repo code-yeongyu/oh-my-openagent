@@ -20,7 +20,7 @@ import {
   type FakeEngineHost,
   type FakeEngineOptions,
 } from "./testing/fake-engine-host"
-import { writeSessionFile } from "./testing/fake-wake-host"
+import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
 
 // The carrier (#13037 A3.1.3 to A3.1.8, A3.2): it lifts a woken session's gate, sends the engine's wake, reads
 // "finished" and hands the session back quietly, and follows the held rule and the 30 minute rule, over a real store
@@ -62,6 +62,9 @@ async function setup(
     readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
     readonly storeWrap?: (store: GatewayStore) => GatewayStore
     readonly schedule?: (run: () => void, ms: number) => () => void
+    readonly memoryHeadroom?: () => number | undefined
+    readonly memoryFloor?: () => number
+    readonly onError?: (error: unknown) => void
   } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
@@ -93,7 +96,10 @@ async function setup(
     sameDevice: options.sameDevice ?? (() => true),
     ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
     ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
+    ...(options.memoryHeadroom === undefined ? {} : { memoryHeadroom: options.memoryHeadroom }),
+    ...(options.memoryFloor === undefined ? {} : { memoryFloor: options.memoryFloor }),
     schedule: options.schedule ?? (() => () => undefined),
+    ...(options.onError === undefined ? {} : { onError: options.onError }),
     onEvent: (event) => {
       events.push(event)
       for (const waiter of waiters.splice(0)) {
@@ -195,6 +201,57 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await store.woken.list()).toEqual([])
   })
 
+  test("#given rows queued for a session that was then closed on request #when it is woken #then nothing opens, the rows are refused target_closed, and a send after the close opens it (#14273)", async () => {
+    const { fake, h, store, carrier, path, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+    })
+    const file = path("s1")
+    await intakeRow("s1", "d-before")
+    h.clock.now += 60_000
+    recordUnloadEffect(file, "s1", h.clock.now, "done")
+    h.clock.now += 60_000
+
+    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "target_closed"],
+      ["refused", "target_closed"],
+    ])
+
+    await intakeRow("s1", "d-after")
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
+  })
+
+  test("#given rows queued before a close on request that another path settles first #when it is woken #then the rows it lost are not counted queued and nothing opens (#14273 follow-up)", async () => {
+    // The other path (a sender's admission sweep) refuses each row just before the close settles it, so the close's own
+    // refusal loses the race and answers false: the row is no longer queued and must not open the closed session.
+    const { fake, h, store, carrier, path, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+      storeWrap: (inner) => ({
+        ...inner,
+        refuseQueued: async (request) => {
+          if (request.reason === "target_closed")
+            await inner.refuseQueued({ ...request, reason: "sender_not_admitted" })
+          return await inner.refuseQueued(request)
+        },
+      }),
+    })
+    const file = path("s1")
+    await intakeRow("s1", "d-before")
+    h.clock.now += 60_000
+    recordUnloadEffect(file, "s1", h.clock.now, "done")
+    h.clock.now += 60_000
+
+    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "sender_not_admitted"],
+      ["refused", "sender_not_admitted"],
+    ])
+  })
+
   test("#given a streaming turn #when the carrier looks #then it sends no release and keeps the row, and releases once the turn settled", async () => {
     const { fake, store, carrier, path } = await setup()
     fake.setSnapshot(path("s1"), FINISHED)
@@ -206,6 +263,55 @@ describe("the carrier lifts, reads finished, and hands back", () => {
 
     fake.setSnapshot(path("s1"), FINISHED)
     expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
+  })
+
+  // Hardening (#13709): a wake admitted while the engine is still restoring the session sits queued; the session reads
+  // finished, the release is refused for that delivery, and an interrupt retry would park it for a person's turn. This
+  // race was not the cause of the stalled two-device cold wake (6e), which an operator drain stop caused (#13716).
+  test("#given a finished-looking session with a queued delivery #when the release is refused for it #then the carrier keeps the session without an interrupt, and releases once the delivery ran", async () => {
+    const { fake, store, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), FINISHED)
+    await carrier.wake("s1")
+    fake.session(path("s1")).heldDeliveries = ["d-queued"]
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    expect(sent(fake, "release_session").filter((frame) => frame.interrupt === true)).toEqual([])
+    expect(await store.woken.list()).toHaveLength(1)
+
+    fake.session(path("s1")).heldDeliveries = []
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
+  })
+
+  // #13709 review M1: the keep is bounded; a delivery still refused after the grace is held, and the interrupt drops it.
+  test("#given a queued delivery that never runs #when the release is still refused after 2 minutes #then the carrier releases with interrupt and the row ends", async () => {
+    const { h, fake, store, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), FINISHED)
+    await carrier.wake("s1")
+    fake.session(path("s1")).heldDeliveries = ["d-stuck"]
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    h.clock.now += 2 * 60_000 - 1
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    expect(sent(fake, "release_session").filter((frame) => frame.interrupt === true)).toEqual([])
+    h.clock.now += 1
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
+    expect(sent(fake, "release_session").at(-1)).toMatchObject({ reason: "takeover", interrupt: true })
+    expect(await store.woken.list()).toEqual([])
+  })
+
+  // #13709 review M1: the grace counts from the latest refusal streak; a session that worked in between gets it again.
+  test("#given a delivery refused, then a working session, then a new refusal #when 2 minutes pass from the first refusal #then the carrier still keeps it without an interrupt", async () => {
+    const { h, fake, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), FINISHED)
+    await carrier.wake("s1")
+    fake.session(path("s1")).heldDeliveries = ["d-1"]
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    h.clock.now += 90_000
+    fake.setSnapshot(path("s1"), STREAMING)
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    fake.setSnapshot(path("s1"), FINISHED)
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    h.clock.now += 60_000
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "kept", reason: "working" })
+    expect(sent(fake, "release_session").filter((frame) => frame.interrupt === true)).toEqual([])
   })
 
   test("#given background work the engine would not refuse #when the carrier looks #then it never sends the release", async () => {
@@ -474,6 +580,35 @@ describe("the lease (A3.1.3)", () => {
     await reArmed
     expect(timers).toHaveLength(2)
     await carrier.stop()
+  })
+
+  test("#given a requested wake whose store start throws #when the sweep tends it #then the failure reaches onError instead of being dropped, and the next sweep opens and wakes the session", async () => {
+    let starts = 0
+    const errors: string[] = []
+    const { fake, carrier, path } = await setup({
+      storeWrap: (real) => ({
+        ...real,
+        woken: {
+          ...real.woken,
+          start: async (request) => {
+            starts += 1
+            if (starts <= 2) throw new Error(`the store write failed (${starts})`)
+            return await real.woken.start(request)
+          },
+        },
+      }),
+      onError: (error) => errors.push(error instanceof Error ? error.message : String(error)),
+    })
+    path("t")
+    await expect(carrier.wake("t")).rejects.toThrow("the store write failed (1)")
+
+    await carrier.sweep()
+    expect(errors).toEqual(["the store write failed (2)"])
+    expect(sent(fake, "wake")).toHaveLength(0)
+
+    await carrier.sweep()
+    expect(sent(fake, "wake")).toHaveLength(1)
+    expect(errors).toHaveLength(1)
   })
 
   // Review of #13220 (MEDIUM): a successor must reopen the session in the session's own directory, never its own, or an
@@ -791,5 +926,70 @@ describe("the bound on woken turns (A3.5.3)", () => {
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
     await carrier.evaluate("s1")
     expect(await carrier.wake("s1")).toEqual({ kind: "wake_limit_reached" })
+  })
+})
+
+const GIB = 1024 ** 3
+
+describe("the carrier admits wakes on measured host memory, never on a count", () => {
+  test("#given 9 sessions a host restart parked, each with a delivery and a requested wake #when the carrier sweeps with plenty of memory #then all 9 are opened and woken", async () => {
+    const { fake, store, carrier, path } = await setup({ memoryHeadroom: () => 64 * GIB })
+    const ids = Array.from({ length: 9 }, (_, index) => `parked-${index + 1}`)
+    for (const id of ids) await store.woken.request({ durable_id: id, session_file: path(id) })
+
+    await carrier.sweep()
+
+    const rows = await store.woken.list()
+    expect(rows.map((row) => [row.durable_id, row.state]).sort()).toEqual(ids.map((id) => [id, "open"]).sort())
+    expect(sent(fake, "open_session")).toHaveLength(9)
+    expect(sent(fake, "wake")).toHaveLength(9)
+  })
+
+  test("#given host memory headroom below the floor #when a session is woken #then the wake is deferred typed host_memory_pressure with the numbers, nothing opens, the row stays requested, and it opens once the probe reports enough", async () => {
+    let available = 512 * 1024 * 1024
+    const { fake, store, carrier, path } = await setup({ memoryHeadroom: () => available })
+    path("s1")
+
+    expect(await carrier.wake("s1")).toEqual({
+      kind: "host_memory_pressure",
+      available_bytes: 512 * 1024 * 1024,
+      floor_bytes: GIB,
+    })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "requested" }])
+    expect(await store.sessionWait.waitingOn({ durable_id: "s1" })).toEqual({ kind: "wake" })
+
+    available = 8 * GIB
+    await carrier.sweep()
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "open" }])
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  // #14363 review L1: under a cgroup limit at or below 1 GiB the room never reaches a fixed 1 GiB, so no wake ever ran.
+  test("#given a 768 MiB cgroup whose floor is one wake's cost, 409 MiB, and 500 MiB of room #when a session is woken #then it opens and wakes", async () => {
+    const { fake, store, carrier, path } = await setup({
+      memoryHeadroom: () => 500 * 1024 * 1024,
+      memoryFloor: () => 409 * 1024 * 1024,
+    })
+    await store.woken.request({ durable_id: "s1", session_file: path("s1") })
+
+    await carrier.sweep()
+
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "open" }])
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  test("#given room below that floor #when a session is woken #then the deferral names the floor it was measured against", async () => {
+    const { carrier, path } = await setup({
+      memoryHeadroom: () => 300 * 1024 * 1024,
+      memoryFloor: () => 409 * 1024 * 1024,
+    })
+    path("s1")
+    expect(await carrier.wake("s1")).toEqual({
+      kind: "host_memory_pressure",
+      available_bytes: 300 * 1024 * 1024,
+      floor_bytes: 409 * 1024 * 1024,
+    })
   })
 })

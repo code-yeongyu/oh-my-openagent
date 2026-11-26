@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { AsyncLocalStorage, AsyncResource } from "node:async_hooks"
-import { mkdtempSync } from "node:fs"
+import { existsSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
-import { createGatewayStore } from "../gateway/store"
+import { createGatewayStore, type GatewayStore } from "../gateway/store"
+import { assertNoOpenHandlesUnder } from "../gateway/testing/harness"
 import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
+import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
+import { shortTempDir } from "../../../../test-support/short-tmp"
 
 // A carrier that carries nothing arms no sweep timer (design A3.1.4; #13455's MEDIUM and its delta review), the
 // delivery consumer beside it is started again after it dies (#13457's MEDIUM), and the ensured host's idle-exit
@@ -15,8 +18,30 @@ import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, typ
 const directScope = { runInAsyncScope: <T>(fn: () => T): T => fn() }
 
 const latches: ThreadWakeLatch[] = []
-afterEach(() => {
-  latches.splice(0)
+const made: string[] = []
+function tempDir(prefix: string): string {
+  const dir = shortTempDir(prefix)
+  made.push(dir)
+  return dir
+}
+
+// A store a test hands to the wake is the test's to close (stop() disposes only a store it created); an open store keeps
+// its database files open, and win32 then refuses to remove the directory (EBUSY).
+const stores: GatewayStore[] = []
+function openStore(agentDir: string): GatewayStore {
+  const store = createGatewayStore({ agentDir })
+  stores.push(store)
+  return store
+}
+
+afterEach(async () => {
+  for (const latch of latches.splice(0)) for (const running of latch.running?.values() ?? []) await running.stop()
+  for (const store of stores.splice(0)) await store.dispose()
+  for (const dir of made.splice(0)) {
+    assertNoOpenHandlesUnder(dir)
+    rmSync(dir, { recursive: true, force: true })
+    expect(existsSync(dir)).toBe(false)
+  }
 })
 
 function start(agentDir: string, options: Partial<ThreadWakeOptions>, warn: (line: string) => void = () => undefined) {
@@ -47,9 +72,9 @@ function start(agentDir: string, options: Partial<ThreadWakeOptions>, warn: (lin
 
 describe("a running wake over an empty wake table", () => {
   test("#given an engine at the wake minimum and an empty wake table #when the wake starts and its start read has settled #then no sweep timer is armed", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const scheduled: number[] = []
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const running = start(agentDir, {
       store,
       deliveries: async () => undefined,
@@ -92,9 +117,41 @@ describe("the ensured host's idle-exit setting", () => {
   })
 })
 
+describe("a wake that throws", () => {
+  test("#given a carrier whose wake throws #when a send asks the running wake for it #then the failure is warned with the session id instead of vanishing with the caller's catch", async () => {
+    const agentDir = tempDir("omo-wake-runtime-")
+    writeSessionFile(join(agentDir, "sessions"), "t")
+    const real = createGatewayStore({ agentDir })
+    const warnings: string[] = []
+    const running = start(
+      agentDir,
+      {
+        store: {
+          ...real,
+          sessionWait: {
+            ...real.sessionWait,
+            read: async () => {
+              throw new Error("the wait read failed")
+            },
+          },
+        },
+        deliveries: async () => undefined,
+        schedule: () => () => undefined,
+      },
+      (line) => warnings.push(line),
+    )
+
+    await expect(running?.wake("t") ?? Promise.resolve()).rejects.toThrow("the wait read failed")
+
+    expect(warnings).toEqual(["thread wake: t was not woken and is retried by the sweep: the wait read failed"])
+    await running?.stop()
+    await real.dispose()
+  })
+})
+
 describe("the consumer retry loop's warnings", () => {
   test("#given a failure whose kind changes without a recovery #when each retry fails #then each new failure is warned once and a repeating one stays silent", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const refusing = createFakeDeliveryService({ admitted: true })
     refusing.refuseServe("internal_error")
     let broken = true
@@ -164,7 +221,7 @@ describe("the consumer retry loop's warnings", () => {
     await running?.stop()
   })
   test("#given a service that stays refused across retries #when three attempts fail and the service then recovers and fails again #then exactly one warning is written per stretch of failure", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const warnings: string[] = []
     let healthy = false
     const bad = createFakeDeliveryService({ admitted: true })
@@ -246,7 +303,7 @@ describe("the consumer retry loop's warnings", () => {
 
 describe("the consumer's stop against an in-flight retry", () => {
   test("#given a retry that opens a fresh service #when stop() runs before it settles #then the consumer that retry produces is closed, not left open", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const first = createFakeDeliveryService({ admitted: true })
     first.ackServe({ wake: true })
     const timers: (() => void)[] = []
@@ -255,7 +312,7 @@ describe("the consumer's stop against an in-flight retry", () => {
     let fresh: ReturnType<typeof createFakeDeliveryService> | undefined
     // The store is handed over so stop() cannot dispose it: a disposed store would kill the racing retry on its
     // own (its first store call throws), closing the port without the fix and hiding the leak this test pins.
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const running = start(agentDir, {
       store,
       deliveries: async () => {
@@ -301,10 +358,84 @@ describe("the consumer's stop against an in-flight retry", () => {
   })
 })
 
+// #14273 follow-up: a wake that settles a closed session's rows answers `nothing_queued`; the drained marks those
+// rows leave are reported then, not only at the next carry that ends.
+describe("a wake that settles a closed session's intake", () => {
+  test("#given a delivery from another device queued before a close on request #when the session is woken #then the wake answers nothing_queued and its drained mark is reported", async () => {
+    const agentDir = tempDir("omo-wake-runtime-")
+    const file = writeSessionFile(join(agentDir, "sessions"), "dur-closed", { cwd: tempDir("omo-wake-cwd-") })
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    const outcomes: string[] = []
+    const running = start(agentDir, {
+      store: openStore(agentDir),
+      deliveries: async () => service.port,
+      onWake: (_durableId, outcome) => outcomes.push(outcome.kind),
+    })
+    await running?.ready
+    await service.inbound({
+      command_id: "c-1",
+      sender_device: "device-b",
+      durable_id: "dur-closed",
+      record: {
+        type: "admit_external_message",
+        sessionId: "dur-closed",
+        deliveryId: "d-1",
+        text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nd-1",
+        displayText: "d-1",
+        sender: { kind: "agent", session_id: "sender-on-b" },
+        deliverAs: "followUp",
+        chainCount: 1,
+      },
+    })
+    recordUnloadEffect(file, "dur-closed", Date.now() + 1_000, "done")
+    const drainedBefore = service.calls.filter((call) => call.type === "delivery.drained").length
+
+    await running?.wake("dur-closed")
+
+    expect(outcomes.at(-1)).toBe("nothing_queued")
+    expect(service.calls.filter((call) => call.type === "delivery.drained").slice(drainedBefore)).toEqual([
+      { type: "delivery.drained", sender_device: "device-b", session_id: "dur-closed", last_command_id: "c-1" },
+    ])
+    await running?.stop()
+  })
+})
+
+// #12766 review L1: the production consumer reads the engine's own `threads.chainCountLimit` (senpi SettingsManager, the
+// setting a running session admits a live thread call against), so a queued delivery past it is refused with the counts.
+describe("the device's thread chain limit on the queued route", () => {
+  test("#given this device's user set threads.chainCountLimit to 3 #when a record at hop 4 is handed to the production consumer #then it is refused chain_count_limit with the count and the limit", async () => {
+    const agentDir = tempDir("omo-wake-runtime-")
+    writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ threads: { chainCountLimit: 3 } }))
+    writeSessionFile(join(agentDir, "sessions"), "dur-target", { cwd: tempDir("omo-wake-cwd-") })
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    const running = start(agentDir, { store: openStore(agentDir), deliveries: async () => service.port })
+    await running?.ready
+    const reply = await service.inbound({
+      command_id: "c-1",
+      sender_device: "device-b",
+      durable_id: "dur-target",
+      record: {
+        type: "admit_external_message",
+        sessionId: "dur-target",
+        deliveryId: "d-1",
+        text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nd-1",
+        displayText: "d-1",
+        sender: { kind: "agent", session_id: "sender-on-b" },
+        deliverAs: "followUp",
+        chainCount: 4,
+      },
+    })
+    expect(reply.data).toEqual({ kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 })
+    await running?.stop()
+  })
+})
+
 describe("the consumer's connect-failure and rejected-start deaths", () => {
   test("#given a device service state directory nothing answers #when the wake starts on the production port #then the failure is warned once and a retry is armed through the runtime", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
-    const stateDir = mkdtempSync("/tmp/omo-wake-no-service-")
+    const agentDir = tempDir("omo-wake-runtime-")
+    const stateDir = tempDir("omo-wake-no-service-")
     const warnings: string[] = []
     const timers: (() => void)[] = []
     const running = start(
@@ -328,7 +459,7 @@ describe("the consumer's connect-failure and rejected-start deaths", () => {
   })
 
   test("#given a deliveries seam that rejects #when the start fails and the retry fires #then the consumer is started again and serves", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const service = createFakeDeliveryService({ admitted: true })
     service.ackServe({ wake: true })
     let broken = true
@@ -374,7 +505,7 @@ describe("the consumer's connect-failure and rejected-start deaths", () => {
 })
 describe("a delivery consumer that dies", () => {
   test("#given a serving consumer whose connection the service drops #when the retry interval fires #then the consumer declares itself again on a new connection", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const service = createFakeDeliveryService({ admitted: true })
     service.ackServe({ wake: true })
     const timers: (() => void)[] = []
@@ -412,7 +543,7 @@ describe("a delivery consumer that dies", () => {
   })
 
   test("#given a service that refuses the declaration #when the retry interval fires #then the consumer tries again", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = tempDir("omo-wake-runtime-")
     const service = createFakeDeliveryService({ admitted: true })
     service.refuseServe("forbidden")
     const timers: (() => void)[] = []
@@ -456,10 +587,10 @@ describe("the wake's process scope", () => {
   // created inside the sidecar would inherit the first importing session's handle ledger. component.ts captures it at
   // omo.js's module top level and passes it here; a direct caller's scope must be the one the carrier starts in.
   test("#given a caller-supplied process scope #when the wake starts #then the carrier starts inside that scope", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-scope-")
+    const agentDir = tempDir("omo-wake-scope-")
     const latch: ThreadWakeLatch = {}
     latches.push(latch)
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const runs: number[] = []
     const scope = {
       runInAsyncScope: <T>(fn: () => T): T => {
@@ -499,10 +630,10 @@ describe("the wake's process scope", () => {
   // the woken session's connection it creates would land in that session's handle ledger and be reclaimed at its
   // shutdown. The wake must run in the process scope, as the carrier's start does.
   test("#given a wake started in a process scope #when a sending session's handler wakes a session #then the carrier's renewal timer is created in the process scope, not the sender's", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-scope-")
+    const agentDir = tempDir("omo-wake-scope-")
     const latch: ThreadWakeLatch = {}
     latches.push(latch)
-    const store = createGatewayStore({ agentDir })
+    const store = openStore(agentDir)
     const context = new AsyncLocalStorage<string>()
     const resource = context.run("process", () => new AsyncResource("omo-thread-wake-carrier-test"))
     const scheduledIn: (string | undefined)[] = []

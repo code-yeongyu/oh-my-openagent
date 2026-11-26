@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
+import { connect, createServer, type Server, type Socket } from "node:net"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -11,7 +12,7 @@ import {
   type World,
 } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { outcomeFailure } from "../../omo-senpi/src/components/thread/remote/outcome"
-import { LOCAL_SESSION_ID, pipeAddress } from "../remote-attach"
+import { LOCAL_SESSION_ID, pipeAddress, serveLines } from "../remote-attach"
 import { cleanupAttachFixtures, endpointFor, type Line, ownerState, TuiPeer, within } from "./remote-attach-support"
 
 // Every inbound record type the pinned engine knows, from its own method table (senpi#4319), never a list kept here.
@@ -241,5 +242,69 @@ describe("pipeAddress", () => {
     expect(
       pipeAddress("C:\\Users\\A\\AppData\\Local\\Temp\\omo-ra-x\\t-0011223344556677.sock", Buffer.alloc(32, 2)),
     ).not.toBe(address)
+  })
+})
+
+// omo#11999 item 3: the line bound is per line, not the whole receive buffer (a 64-char bound stands in for 64 MiB).
+describe("serveLines", () => {
+  async function served(maxLineChars: number) {
+    const lines: string[] = []
+    let lineArrived: () => void = () => {}
+    let serverSocket: Socket | undefined
+    const accepted = new Promise<Socket>((resolve) => {
+      const server = createServer((socket) => {
+        serverSocket = socket
+        serveLines(
+          socket,
+          (line) => {
+            lines.push(line)
+            lineArrived()
+          },
+          maxLineChars,
+        )
+        resolve(socket)
+      })
+      server.listen(0, "127.0.0.1", () => {
+        const address = server.address()
+        if (address === null || typeof address === "string") throw new Error("no tcp address")
+        client = connect(address.port, "127.0.0.1")
+      })
+      servers.push(server)
+    })
+    let client: Socket | undefined
+    await within(accepted, "the connection", 5_000)
+    if (client === undefined || serverSocket === undefined) throw new Error("no connection")
+    const linesReach = (count: number) =>
+      new Promise<void>((resolve) => {
+        lineArrived = () => {
+          if (lines.length >= count) resolve()
+        }
+        lineArrived()
+      })
+    return { client, server: serverSocket, lines, linesReach }
+  }
+  const servers: Server[] = []
+  afterEach(() => {
+    for (const server of servers.splice(0)) server.close()
+  })
+
+  test("#given one chunk of many complete short lines totalling past the bound #when it arrives #then every line is served and the connection stays open", async () => {
+    const { client, server, lines, linesReach } = await served(64)
+    const line = "x".repeat(40)
+    client.write(`${line}\n`.repeat(10))
+    await within(linesReach(10), "the ten lines", 5_000)
+    client.write("after\n")
+    await within(linesReach(11), "the line after the burst", 5_000)
+    expect(lines).toEqual([...Array(10).fill(line), "after"])
+    expect(server.destroyed).toBe(false)
+    client.destroy()
+  })
+
+  test("#given a single line longer than the bound and no newline #when it arrives #then the connection is closed", async () => {
+    const { client, server, lines } = await served(64)
+    const closed = new Promise<void>((resolve) => server.once("close", () => resolve()))
+    client.write("y".repeat(65))
+    await within(closed, "the connection to close", 5_000)
+    expect(lines).toEqual([])
   })
 })
