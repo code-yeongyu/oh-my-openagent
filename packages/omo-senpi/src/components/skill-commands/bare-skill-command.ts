@@ -49,8 +49,7 @@ export function resolveBareSkillCommand(
   bundledSkillNames: ReadonlySet<string>,
   hostCommands: readonly HostCommandInfo[] | undefined,
 ): BareSkillCommandResolution {
-  const hasHostCommand = (name: string): boolean =>
-    hostCommands?.some((entry) => entry.name === name) ?? false
+  const hasHostCommand = (name: string): boolean => hostCommands?.some((entry) => entry.name === name) ?? false
   const retired = SKILL_COMMAND_PATTERN.exec(text)?.[1]
   if (retired !== undefined) {
     const name = resolveSkillAlias(retired)
