@@ -1,6 +1,6 @@
 # X1a proof: the cross-device thread scenario on three surfaces
 
-Build under test: senpi 2026.11.23; thread SDK entry sha256 5937f8142a0bfe78. Regenerate with `bun script/qa/sdk-proof/run.ts`.
+Build under test: senpi 2026.11.23; thread SDK entry sha256 ad1cdf15f1fa9368. Regenerate with `bun script/qa/sdk-proof/run.ts`.
 
 Isolation: 0 request(s) to a non-loopback address refused; the loopback guard loaded in 40 world processes; session bus in the world's environment: absent.
 
