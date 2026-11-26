@@ -32,7 +32,7 @@ The one-shot `desktop.stop` calls `stopPath.stop`.
 | `ax.focused` | read | public | `EmptyParams` | `Option<AxNode>` |
 | `elementAt` | read | public | `ElementAtParams` | `Option<ElementInfo>` |
 | `waitFor` | read | public | `WaitForParams` | `WaitResult` |
-| `clipboard.read` | read | public | `EmptyParams` | `ClipboardContent` |
+| `clipboard.read` | read | public | `EmptyParams` | `ClipboardReadReply` |
 | `menu.items` | read | public | `MenuItemsParams` | `MenuItems` |
 | `surface` | read | public | `SurfaceParams` | `Surface` |
 | `click` | exec | public | `ClickParams` | `ExecReply` |
