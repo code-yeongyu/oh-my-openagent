@@ -58,8 +58,11 @@ rows. The copy's default owner and DACL name the run's own user and SYSTEM, as o
 elevated default grants only Administrators, which the copy holds deny-only, so the helper could not open its own
 process and died with 0xC0000142 before its first line (run 45856172603). A helper that writes nothing is reported
 with its exit status in hex and the system's text, and its own stdout and stderr. Nothing raises a label, adjusts a privilege, takes another account's token or changes UAC; the self-test
-holds that file to lowering only. The rows record the OS's answer to a Medium sender, so they measure the
-boundary the engine answers with `PermissionDenied`, never a way around it.
+holds that file to lowering only. The rows record what the OS allows a Medium process to do; the engine refuses
+windows above its integrity RID by policy (`PermissionDenied`, `elevated_target` before any walk) whatever the OS
+allows, so the elevated rows read NEW-EDGE. As measured, WGC window capture is allowed, PrintWindow is refused and
+UI Automation reads the name and tree; a posted WM_CHAR is refused with ERROR_ACCESS_DENIED, SendInput is dropped
+silently.
 
 The second-monitor rows (`n-host-second-monitor`, `n-affinity-wgc-monitor-secondary`)
 are measured on H6 and on any host whose facts report two or more monitors (each
