@@ -88,6 +88,8 @@ export type FakeHooks = {
   onStart?: (nodeId: string) => void
 }
 
+const notUsed = (): Promise<never> => Promise.reject(new Error("not used by these cases"))
+
 export class SelfResumingTaskManager implements TaskManager {
   readonly starts: string[] = []
   readonly denials: string[] = []
@@ -130,8 +132,7 @@ export class SelfResumingTaskManager implements TaskManager {
   }
 
   taskOf(nodeId: string): TaskRecord {
-    const task = this.#byNode(nodeId)
-    return task.record
+    return this.#byNode(nodeId).record
   }
 
   complete(nodeId: string, status: TaskStatus = "completed"): void {
@@ -202,37 +203,17 @@ export class SelfResumingTaskManager implements TaskManager {
   findOwnedTask(owner: Pick<DagTaskOwner, "nodeId">): TaskRecord | undefined {
     return [...this.#tasks.values()].find((task) => task.record.owner?.nodeId === owner.nodeId)?.record
   }
-  residencyChanged(): Promise<void> {
-    return new Promise<void>(() => undefined)
-  }
-  subscribeChild(): () => void {
-    return () => undefined
-  }
-  start(): Promise<never> {
-    throw new Error("not used")
-  }
-  continueTask(): Promise<never> {
-    throw new Error("not used")
-  }
-  interruptTask(): Promise<never> {
-    throw new Error("not used")
-  }
-  list(): readonly [] {
-    return []
-  }
-  forget(): void {}
-  getResidentHandle(): undefined {
-    return undefined
-  }
-  residentTaskIds(): readonly string[] {
-    return []
-  }
-  promoteToBackground(): boolean {
-    return false
-  }
-  wasBackground(): boolean {
-    return true
-  }
+  readonly residencyChanged = (): Promise<void> => new Promise<void>(() => undefined)
+  readonly subscribeChild = (): (() => void) => () => undefined
+  readonly start = notUsed
+  readonly continueTask = notUsed
+  readonly interruptTask = notUsed
+  readonly list = (): readonly [] => []
+  readonly forget = (): void => undefined
+  readonly getResidentHandle = (): undefined => undefined
+  readonly residentTaskIds = (): readonly string[] => []
+  readonly promoteToBackground = (): boolean => false
+  readonly wasBackground = (): boolean => true
 
   #put(nodeId: string, status: TaskStatus, owner: DagTaskOwner): Task {
     const record: TaskRecord = {
