@@ -3,8 +3,11 @@ import { describe, expect, test } from "bun:test"
 import type { SignInRequest } from "@oh-my-opencode/account-core/calls/sign-in"
 import { assembleOmoSdk } from "../assembly"
 import type { OmoPrincipal } from "../contract"
-import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
-import type { InProcessSignIn } from "./account-sign-in"
+import { assertedExpectation, BEHAVIOUR_CHANGES, type Expectation } from "../contract/behaviour-changes"
+import type { CustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
+import type { AccountAccess } from "../access"
+import type { AccountApi } from "../account"
+import { accountSignIn, type InProcessSignIn } from "./account-sign-in"
 
 // account.signIn on the root (first-party design 6.4, security design 4.2, 5.4, slice A1b). With an in-process sign-in
 // (the omo-ai/sdk entry) both methods run in this process; without one the shipped launcher child keeps running the
@@ -57,6 +60,66 @@ const signedIn =
     await request.onUserCode(CODE)
     return { kind: "ok", value: { api, device: { id: "dev-1", name: "laptop" }, deviceService } }
   }
+
+// Custody review 6073031252, A1: the refusal of replace from a session, exercised in both states of B4, so the slice
+// that flips B4 cannot find it removed. With the approved expectation a session's replace is refused before anything
+// runs (no launch check, no sign-in) and writes one record; with today's it goes on to the launch check.
+describe("replace from a session in both states of B4", () => {
+  const b4 = BEHAVIOUR_CHANGES.find((change) => change.id === "B4")
+  if (b4 === undefined || b4.exists !== "today") throw new Error("B4 is not a today change")
+
+  function signInWith(expectation: Expectation) {
+    const ran: string[] = []
+    const records: string[] = []
+    const custody: CustodyLog = {
+      begin: async () => ({ recorded: true, end: async () => true }),
+      refused: async (capability, code) => {
+        records.push(`${capability} ${code}`)
+        return true
+      },
+    }
+    const access = {
+      origin: "https://api.example.test",
+      blockedReason: () => {
+        ran.push("launch check")
+        return { kind: "error", error: { code: "desktop_sign_in", message: "m", next_action: "n" } }
+      },
+    } as unknown as AccountAccess
+    const account = {
+      signIn: async () => {
+        ran.push("sign-in")
+        throw new Error("not reached")
+      },
+    } as unknown as AccountApi
+    const signIn = accountSignIn(account, {
+      access,
+      principal: { kind: "session", session_id: "01-session" },
+      custody,
+      replaceFromSession: expectation,
+    })
+    return { signIn, ran, records }
+  }
+
+  test("#given B4's approved expectation #when a session asks to replace #then it is refused before anything runs, with one record", async () => {
+    const { signIn, ran, records } = signInWith(b4.approved)
+    const answer = await signIn({ method: "device_code", replace: true, onUserCode: () => undefined })
+    expect({ answer, ran, records }).toMatchObject({
+      answer: { kind: "error", error: { code: "sender_not_allowed", details: { principal: "session", change: "B4" } } },
+      ran: [],
+      records: ["account.signIn sender_not_allowed"],
+    })
+  })
+
+  test("#given B4's today expectation #when a session asks to replace #then the refusal does not answer and the call goes on to its launch check", async () => {
+    const { signIn, ran, records } = signInWith(b4.today)
+    const answer = await signIn({ method: "device_code", replace: true, onUserCode: () => undefined })
+    expect({ code: (answer as { error?: { code: string } }).error?.code, ran, records }).toEqual({
+      code: "desktop_sign_in",
+      ran: ["launch check"],
+      records: ["account.signIn desktop_sign_in"],
+    })
+  })
+})
 
 describe("account.signIn on the root", () => {
   test("#given B4 with no evidence #when a session's root asks to replace #then today's answer: the shipped child signs in with replace", async () => {

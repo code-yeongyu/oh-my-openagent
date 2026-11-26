@@ -19,4 +19,16 @@ describe("the custody reader's judgement of a named process", () => {
       readable: "gone",
     })
   })
+
+  // Custody review 6073031252, C1: a live pid in this scope whose present start identity cannot be read is unknown,
+  // not alive, so a lock it names breaks at the foreign-scope age and a record it started closes at the horizon.
+  test("#given a live pid in this scope whose present start identity cannot be read #then it is unknown, not alive", async () => {
+    const own = (await processScope()) ?? "a-scope"
+    const named = { pid: process.pid, start: "a-boot:1", scope: own }
+    expect({
+      unreadable: await processState(named, own, async () => null),
+      same: await processState(named, own, async () => "a-boot:1"),
+      other: await processState(named, own, async () => "a-boot:2"),
+    }).toEqual({ unreadable: "unknown", same: "alive", other: "gone" })
+  })
 })
