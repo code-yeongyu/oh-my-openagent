@@ -35,7 +35,21 @@ export function awaitsLiveParentRecovery(context: LifecycleContext, record: Task
   )
 }
 
-/** The obligation answer from live-parent recovery's own episode state, read on the fresh record. */
+/**
+ * The obligation answer from live-parent recovery's own episode state, read on the fresh record.
+ * Ownership comes first: a session-scoped fact (stopped retries, an episode, an expiry in flight) is
+ * only asked of a child this engine's current session owns.
+ *
+ * | lifecycle disposed | record | owned here | session retries stopped | open obligation              | answer  |
+ * |--------------------|--------|------------|-------------------------|------------------------------|---------|
+ * | yes                | any    | any        | any                     | any                          | stopped |
+ * | no                 | none   | -          | -                       | -                            | none    |
+ * | no                 | yes    | no         | any                     | any                          | none    |
+ * | no                 | yes    | yes        | yes                     | any                          | stopped |
+ * | no                 | yes    | yes        | no                      | attempt or expiry in flight  | owed    |
+ * | no                 | yes    | yes        | no                      | eligible, not claimed expiry | owed    |
+ * | no                 | yes    | yes        | no                      | none of the above            | none    |
+ */
 export function revivalObligation(
   context: LifecycleContext,
   taskId: string,
@@ -46,9 +60,10 @@ export function revivalObligation(
     readonly scan: () => void
   },
 ): RevivalObligation {
+  if (recovery.disposed) return "stopped"
   const record = context.store.load(taskId)
-  if (recovery.disposed || (record !== null && retriesStopped(context, record.parent_session_id))) return "stopped"
-  if (record === null) return "none"
+  if (record === null || context.registry.ownsRecord?.(record) !== true) return "none"
+  if (retriesStopped(context, record.parent_session_id)) return "stopped"
   if (recovery.episode?.busy === true || recovery.episode?.expiring === true || expiryInFlight(context, taskId))
     return "owed"
   // A claim for expiry whose close attempt is over ends the revival obligation, confirmed or not.
