@@ -185,6 +185,22 @@ function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | unde
   return async (...args) => (await target())(...args)
 }
 
+/** Design ruling on the disposed root: one answer for every call after close() or dispose(), fixed text. */
+export const ROOT_DISPOSED: OmoFailure["error"] = {
+  code: "internal_error",
+  message: "This omo SDK root was disposed; create a new root.",
+  next_action: "Create a new omo SDK root and call it again.",
+  details: { reason: "root_disposed" },
+}
+
+// A disposed root refuses at its boundary, before the principal's line, the input, any member or port; nothing is
+// recorded (no namespace is handed the refusal), since recording would reach a namespace's store. A call that entered
+// before dispose() runs to its answer.
+function openOnly(key: RootCallKey, call: Call, isDisposed: () => boolean): Call {
+  const refuse = refusing(key, ROOT_DISPOSED, [])
+  return (...args) => (isDisposed() ? refuse() : call(...args))
+}
+
 /**
  * The root object: every call of the root type, from the namespace module that serves it, else from the core the entry
  * supplies a loader for, else as not_implemented. The keys are computed, so the tree is assembled untyped and given its
@@ -198,25 +214,38 @@ export function assembleRoot(
 ): OmoSdkRoot {
   const tree: Node = {}
   const loads = namespaceLoads(loaders, context)
+  let disposed = false
   for (const key of Object.keys(ROOT_CALL_ANSWERS) as RootCallKey[]) {
     const refused = refusals.get(key)
-    if (refused !== undefined) {
-      place(tree, key, refusing(key, refused, servings))
-      continue
-    }
     const serving = servings.find((candidate) => candidate.members[key] !== undefined)
     const member = serving?.members[key] ?? loaded(key, loads)
-    // The order of answers (design 4.4): the principal's line (placed above), then the input, then availability, then the
-    // port; an unbuilt call checks its input before it answers not_implemented.
-    if (member === undefined) place(tree, key, checked(key, notImplemented(key), servings))
-    else place(tree, key, serving?.legacy?.includes(key) === true ? member : checked(key, member as Call, servings))
+    // The order of answers (design 4.4): a disposed root first, then the principal's line, then the input, then
+    // availability, then the port; an unbuilt call checks its input before it answers not_implemented.
+    const call =
+      refused !== undefined
+        ? refusing(key, refused, servings)
+        : member === undefined
+          ? checked(key, notImplemented(key), servings)
+          : serving?.legacy?.includes(key) === true
+            ? (member as Call)
+            : checked(key, member as Call, servings)
+    place(
+      tree,
+      key,
+      openOnly(key, call, () => disposed),
+    )
   }
+  // close() keeps the shipped surface's behavior (its account calls answer closed, its local reads still answer); a
+  // disposed root refuses every call (design ruling on the disposed root).
   const close = (): void => {
     for (const serving of servings) serving.close?.()
   }
-  const dispose = async (): Promise<void> => {
+  let disposing: Promise<void> | undefined
+  const dispose = (): Promise<void> => {
+    disposed = true
     close()
-    await Promise.all(servings.map((serving) => serving.dispose?.()))
+    disposing ??= Promise.all(servings.map((serving) => serving.dispose?.())).then(() => undefined)
+    return disposing
   }
   return Object.assign(tree, { close, dispose }) as unknown as OmoSdkRoot
 }
