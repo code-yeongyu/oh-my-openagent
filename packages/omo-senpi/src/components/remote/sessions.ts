@@ -281,6 +281,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       connect: async () => ({ conn: svc, owned: false }),
       dialEndpoint: async () => ({ conn: await core.dial(), owned: true }),
     })
+    // The port's held attaches and their idle timers end with the client, not only with the borrowed connection.
+    core.onClose(() => void port.close?.())
     const remote: RemoteThreadSurface = {
       // The thread bodies this member runs read the account through the client they belong to (#13414 U5).
       client: core.self(),

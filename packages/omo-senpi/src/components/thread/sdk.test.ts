@@ -447,6 +447,19 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     ])
   })
 
+  // Q's steer-all order (omo#14972): a parked session is woken by a send from the CLI or the gateway's seat sends, as by
+  // an agent's thread_send; the process has no carrier, so it records the wake for the device's running carrier.
+  test("#given a parked interactive thread #when omo thread send names it #then a wake is requested for it and the answer says no carrier here took it", async () => {
+    const { sdk, store } = fixture({ noHostAnswering: true, diskOnly: ["dur-parked"] })
+
+    const sent = await sdk.send({ thread: "dur-parked", text: "wake up" })
+
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline", reason: "wake_unavailable" } })
+    expect((await store.woken.list()).map((row) => ({ durable_id: row.durable_id, state: row.state }))).toEqual([
+      { durable_id: "dur-parked", state: "requested" },
+    ])
+  })
+
   test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the device read that stamps its sender device (#12860, #13004)", async () => {
     const account = remoteFixture.account({
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),

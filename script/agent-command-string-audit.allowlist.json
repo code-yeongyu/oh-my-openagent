@@ -154,6 +154,10 @@
     "packages/omo-native/test/remote-background.test.ts: /bin/omo x2",
     "packages/omo-native/test/remote-bootstrap-published-release.test.ts: /bin/omo",
     "packages/omo-native/test/remote-cli-harness.ts: /bin/omo",
-    "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo"
+    "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo",
+    "packages/device-service-core/test/cold-wake/refresh.test.ts: /bin/omo x2",
+    "packages/omo-native/bin/lib/service-auth.generated.js: /bin/omo",
+    "packages/omo-native/remote-bootstrap.ts: /bin/omo",
+    "packages/omo-native/test/remote-binary-path.test.ts: /bin/omo x2"
   ]
 }

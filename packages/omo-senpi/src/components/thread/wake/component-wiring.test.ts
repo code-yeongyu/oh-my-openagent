@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync } from "node:fs"
+
 import { dirname, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../../test-support/fake-extension-api"
@@ -15,6 +15,7 @@ import { connectCarrierHost } from "./carrier-connection"
 import { processIntakeAdmission, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
 import { startFakeEngineHost, type FakeEngineHost, type FakeEngineOptions } from "./testing/fake-engine-host"
 import { writeSessionFile } from "./testing/fake-wake-host"
+import { shortTempDir } from "../../../../test-support/short-tmp"
 
 // #13037 wired into production: the thread component an engine process registers starts ONE carrier for its agent
 // directory, gives the local transport the same-device wake, and (on an engine that drops a released session's retained
@@ -232,7 +233,7 @@ describe("the same-device wake through the registered thread component", () => {
   // The default answer with no configuration override: nothing is set, so the schema default decides and the send
   // wakes its target exactly as an explicit opt-in would.
   test("#given an omo configuration with no session_wake setting at all #when thread_send names a session that is not running #then the carrier opens it and its drain admits the delivery once", async () => {
-    const noConfigHome = mkdtempSync("/tmp/omo-wake-no-config-")
+    const noConfigHome = shortTempDir("omo-wake-no-config-")
     const w = await wire({ ...ENGINE_AT_MINIMUM, env: { HOME: noConfigHome } })
     const pi = await w.start()
     const woken = w.woken()
@@ -270,7 +271,7 @@ describe("the same-device wake through the registered thread component", () => {
     "#given %s loads the thread component with no session open #when the component registers #then the delivery consumer is declared only on the operator daemon",
     async (_what, operatorDaemon) => {
       const service = createFakeDeliveryService({ admitted: true })
-      const daemonSocket = join(mkdtempSync("/tmp/omo-wake-daemon-"), "rpc.sock")
+      const daemonSocket = join(shortTempDir("omo-wake-daemon-"), "rpc.sock")
       const w = await wire({
         ...ENGINE_AT_MINIMUM,
         env: { OMO_RPC_SOCKET_PATH: daemonSocket },

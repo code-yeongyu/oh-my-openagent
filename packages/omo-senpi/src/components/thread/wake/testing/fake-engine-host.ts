@@ -1,10 +1,11 @@
 import { once } from "node:events"
-import { mkdtempSync, rmSync } from "node:fs"
+import { rmSync } from "node:fs"
 import { createServer, type Socket } from "node:net"
 import { join } from "node:path"
 
 import { fakeHostTransport } from "../../../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import { testBudgetSignal } from "../../../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../../../test-support/short-tmp"
 
 type Frame = Readonly<Record<string, unknown>>
 type Reply = Readonly<Record<string, unknown>>
@@ -112,7 +113,7 @@ export type FakeEngineOptions = {
  * and `released: true` otherwise, even with background work (R4).
  */
 export async function startFakeEngineHost(options: FakeEngineOptions = {}): Promise<FakeEngineHost> {
-  const directory = mkdtempSync("/tmp/engine-host-")
+  const directory = shortTempDir("engine-host-")
   const socketPath = join(directory, "rpc.sock")
   const frames: Frame[] = []
   const sessions = new Map<string, FakeEngineSession>()
