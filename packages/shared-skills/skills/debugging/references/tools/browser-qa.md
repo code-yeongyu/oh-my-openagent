@@ -22,7 +22,7 @@ downloading a managed browser.
 
 ```js
 const profile = mkdtempSync(join(tmpdir(), "debug-repro-"))
-const browser = await omowright.connectPipe({ browserPath, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
+const browser = await omowright.connectPipe({ browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
 const page = await browser.newTab("about:blank")
 const trace = omowright.createTrace(page, { dir: traceDir })          // trace.jsonl + trace.har + before/after screenshots
 try {
