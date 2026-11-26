@@ -1,4 +1,4 @@
-import type { ThreadErrorCode, ThreadToolFailure } from "../components/thread/errors"
+import type { ThreadErrorCode, ThreadToolFailure } from "../../thread/errors"
 
 // The relay daemon's machine.op_result error codes for device ops, kept 1:1.
 const RELAY_OP_ERROR_CODES = [

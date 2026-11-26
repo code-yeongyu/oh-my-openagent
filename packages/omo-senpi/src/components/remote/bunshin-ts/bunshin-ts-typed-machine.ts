@@ -4,7 +4,7 @@ import type {
   FanoutResult,
   FanoutRun,
   StandaloneMachine,
-} from "../../vendor/bunshin-ts/index.js"
+} from "../../../../vendor/bunshin-ts/index.js"
 
 import { deviceOperationError } from "./bunshin-ts-errors"
 
