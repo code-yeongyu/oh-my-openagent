@@ -1,0 +1,184 @@
+{
+  "domain": "config",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "config.status/reads-config-files",
+      "row": "config.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.omo/omo.jsonc"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.migrate/writes-target-and-backup",
+      "row": "config.migrate",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/oh-my-opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "~/.omo/omo.jsonc.bak"
+          }
+        }
+      ]
+    },
+    {
+      "id": "config.migrate/dry-run-writes-nothing",
+      "row": "config.migrate",
+      "kind": "effect",
+      "input": {
+        "dry_run": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/oh-my-opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.migrate/dry-run-not-boolean",
+      "row": "config.migrate",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "dry_run": "yes"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/configured-source-from-cwd",
+      "row": "config.modelCapabilities.refresh",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.opencode/oh-my-opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<cache>/model-capabilities.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/directory-config",
+      "row": "config.modelCapabilities.refresh",
+      "kind": "effect",
+      "input": {
+        "directory": "/work/project"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/work/project/.opencode/oh-my-opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<cache>/model-capabilities.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/source-url-override",
+      "row": "config.modelCapabilities.refresh",
+      "kind": "effect",
+      "input": {
+        "source_url": "https://models.example.test/api.json"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<cwd>/.opencode/oh-my-opencode.json"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "path": "<cache>/model-capabilities.json",
+            "json": {
+              "sourceUrl": "https://models.example.test/api.json"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "config.modelCapabilities.refresh/empty-directory",
+      "row": "config.modelCapabilities.refresh",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "directory": ""
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}
