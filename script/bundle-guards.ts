@@ -68,14 +68,26 @@ type Verdict = { readonly exitCode: 0 | 1; readonly lines: readonly string[] }
 function runBundleGuards(root: string, base: string, head: string): Verdict {
   const touched = bundlePathsTouched(root, base, head)
   if (touched.length === 0) {
-    return { exitCode: 0, lines: [`BUNDLE_GUARDS_NOT_APPLICABLE ${base}...${head} touches no bundle input or generated path`] }
+    return {
+      exitCode: 0,
+      lines: [`BUNDLE_GUARDS_NOT_APPLICABLE ${base}...${head} touches no bundle input or generated path`],
+    }
   }
   const headSha = git(root, ["rev-parse", "--verify", `${head}^{commit}`]).out.trim()
   const checkedOut = git(root, ["rev-parse", "HEAD"]).out.trim()
   const dirty = trackedChanges(root)
   if (headSha !== checkedOut || dirty.length > 0) {
-    const why = headSha === checkedOut ? `tracked files differ from ${headSha}: ${dirty.join(" ")}` : `checkout is ${checkedOut}, not ${headSha}`
-    return { exitCode: 1, lines: [`BUNDLE_GUARDS_DIRTY_TREE ${why}`, "the guards must read the pushed bytes; restore with git checkout -- <paths>"] }
+    const why =
+      headSha === checkedOut
+        ? `tracked files differ from ${headSha}: ${dirty.join(" ")}`
+        : `checkout is ${checkedOut}, not ${headSha}`
+    return {
+      exitCode: 1,
+      lines: [
+        `BUNDLE_GUARDS_DIRTY_TREE ${why}`,
+        "the guards must read the pushed bytes; restore with git checkout -- <paths>",
+      ],
+    }
   }
   const guards = deriveBundleGuards(root)
   const header = `BUNDLE_GUARDS head=${headSha} touched=${touched.length} guards=${guards.length}`
