@@ -43,6 +43,5 @@ describe("a one-provider category chain whose every rung is usage-limited (omo#9
       expect(models).not.toContain(PARENT)
       for (const model of RUNGS) expect(models.filter((called) => called === model).length).toBeLessThanOrEqual(1)
     },
-    30_000,
   )
 })
