@@ -98,6 +98,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   })
   const settlement = tracking.settlement
   let continuationState: "none" | "pending_delivery" | "awaiting_start" = "none"
+  let continuationDelivered = false
   const reconciliation = createHandleReconciliation({
     lastInputId: () => options.inputStore?.load(taskId)?.last_effect_id,
     port: () => client,
@@ -329,6 +330,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   })
 
   const beginTurn = (): void => {
+    if (continuationState === "pending_delivery") continuationDelivered = true
     continuationState = continuationState === "pending_delivery" ? "awaiting_start" : "none"
     if (outcome !== undefined) return
     teardown.publishRunning()
@@ -418,6 +420,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     reconcileTurn: (record) =>
       reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),
     onReconciled: reconciliation.subscribe,
+    continuationDelivered: () => continuationDelivered,
     adoptFinishedTurn: async (finalResponse, evidence) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       // A session reopened from its file runs nothing the old one started (omo#10487).

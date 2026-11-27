@@ -11,6 +11,7 @@ import type { AdmitResident, TaskManager } from "../manager/types"
 import type { CancelOutcome } from "../steering"
 import type { DagNodeInput } from "./graph"
 import { RetryClock } from "./infra-retry-fixture"
+import { createDagRunReservations } from "./run-reservations"
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { GatedOwnedStarts } from "./scheduler-admission-e2e.test-harness"
 import { isLiveOwnedTask } from "./scheduler-context"
@@ -78,6 +79,7 @@ export async function selfResumeE2e(key: string, nodes: readonly DagNodeInput[],
   })
   const clock = new RetryClock()
   scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store: fixture.store,
     taskManager,
     initialRecord: fixture.manager.record(runId, parentSessionId),

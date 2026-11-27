@@ -12,6 +12,7 @@ import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
 import type { DagRunRecordV1 } from "./manager"
 import { ownedClaims } from "../manager/owned-claims"
 import type { DagTaskOwner, DagTaskOwnerScope, OwnedStartResult } from "./owner"
+import { createDagRunReservations } from "./run-reservations"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
 import type { DagNodeId, DagNodeState, DagRunEvent } from "./types"
 import { parentSessionId, runId } from "./scheduler-self-resume-record.test-harness"
@@ -236,7 +237,15 @@ export function startFixture(
   const store = createInMemoryDagStore(join(root, "senpi-task"))
   store.writeCheckpoint(runId, initialRecord)
   let eventTime = Date.parse("2026-11-26T00:00:01.000Z")
-  const scheduler = createDagScheduler({ store, taskManager, initialRecord, ...options, now: () => eventTime++ })
+  const reservations = createDagRunReservations()
+  const scheduler = createDagScheduler({
+    reservations,
+    store,
+    taskManager,
+    initialRecord,
+    ...options,
+    now: () => eventTime++,
+  })
   const events = (): readonly DagRunEvent[] => store.readEvents(runId, 0, { limit: 500 }).events
   const cleanup = (): void => fs.rmSync(root, { recursive: true, force: true })
   // Subscribe before the trigger: resolves on the node's next transition into `to` (for `reason`, if named).
