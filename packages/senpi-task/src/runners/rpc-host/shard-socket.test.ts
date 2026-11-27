@@ -123,6 +123,22 @@ describe("validateBindPath", () => {
     expect(validateBindPath(fits)).toBe(true)
     expect(validateBindPath(over)).toBe(false)
   })
+
+  test("#given a win32 target #when validating or resolving a path past the darwin limit #then the named-pipe rule applies and the primary root is kept (#15103)", () => {
+    // given: a Windows agent dir whose primary shard path plus its shield sibling is far past 103 bytes
+    const agentDir = `C:\\Users\\${"a".repeat(40)}\\.omo\\agent`
+    const identity = { kind: "p" as const, key: OWNER_KEY, ownerSessionId: "s1", inherited: false }
+
+    expect(validateBindPath(`C:\\long\\p-${OWNER_KEY}.sock`, "win32")).toBe(true)
+    const resolution = resolveShardSocket({ agentDir, env: {}, identity, platform: "win32" })
+    expect(resolution.root).toBe("primary")
+    expect(resolution.notice).toBeUndefined()
+    expect(resolution.socket.startsWith(agentDir)).toBe(true)
+    // the same shape on darwin still moves to the alternate root
+    expect(resolveShardSocket({ agentDir: `/${"a".repeat(120)}/agent`, env: {}, identity, platform: "darwin" }).root).toBe(
+      "alt",
+    )
+  })
 })
 
 describe("resolveShardSocket under the primary root", () => {

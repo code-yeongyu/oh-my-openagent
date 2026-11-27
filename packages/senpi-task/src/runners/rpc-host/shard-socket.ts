@@ -76,6 +76,8 @@ export interface ResolveShardSocketInput {
   readonly env: Env
   readonly identity: ShardIdentity
   readonly fs?: AltRootFs
+  /** Test seam; defaults to this process. win32 listens on named pipes, which have no `sun_path` limit. */
+  readonly platform?: NodeJS.Platform
 }
 
 export function shardRoot(env: Env, agentDir: string): string {
@@ -87,7 +89,10 @@ export function altRoot(agentDir: string): string {
 }
 
 /** The socket AND the siblings a host binds beside it (handoff, close shield) all fit `sun_path`. */
-export function validateBindPath(socket: string): boolean {
+export function validateBindPath(socket: string, platform: NodeJS.Platform = process.platform): boolean {
+  // win32 hosts listen on named pipes, which have no `sun_path` limit: applying the darwin-length
+  // rule there rejected working paths and routed to an alternate root that cannot exist (#15103).
+  if (platform === "win32") return true
   return (
     Buffer.byteLength(socket + HANDOFF_SIBLING_SUFFIX) <= MAX_SHARD_BIND_PATH &&
     Buffer.byteLength(socket + CLOSE_SIBLING_SUFFIX) <= MAX_SHARD_BIND_PATH
@@ -125,12 +130,12 @@ export function parseShardBasename(socket: string): { readonly kind: ShardKind; 
  * never falls back to another endpoint.
  */
 export function resolveShardSocket(input: ResolveShardSocketInput): ShardResolution {
-  const { identity } = input
+  const { identity, platform = process.platform } = input
   const primary = shardSocketPathForKey(shardRoot(input.env, input.agentDir), identity.kind, identity.key)
-  if (validateBindPath(primary)) return { socket: primary, shard: identity, root: "primary" }
+  if (validateBindPath(primary, platform)) return { socket: primary, shard: identity, root: "primary" }
 
   const alternate = shardSocketPathForKey(ensureAltRoot(input.agentDir, input.fs), identity.kind, identity.key)
-  if (!validateBindPath(alternate)) {
+  if (!validateBindPath(alternate, platform)) {
     // Impossible for the fixed prefix; reaching it is a bug, and a bind would truncate silently.
     throw new RunnerError({
       kind: "host_unavailable",
