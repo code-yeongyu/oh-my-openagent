@@ -2,7 +2,9 @@
  * An rpc host refusal that carries a `sessionText` (senpi-task `socket-auth.ts` RpcIdentityError): a dial refused for the
  * host's identity or its key record. Read by shape, since the thread client runs in its own bundle.
  */
-export function isIdentityRefusal(error: unknown): error is Error & { readonly code: string; readonly sessionText: string } {
+export function isIdentityRefusal(
+  error: unknown,
+): error is Error & { readonly code: string; readonly sessionText: string } {
   return (
     error instanceof Error &&
     "code" in error &&
