@@ -71,6 +71,7 @@ import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/s
 import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
 import { claimMemorySyncAtBoot } from "./memory-sync-boot"
+import { hostHelp } from "./bin/lib/host-help.js"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -446,6 +447,11 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  const help = hostHelp(process.argv.slice(2))
+  if (help !== undefined) {
+    console.log(help)
+    return
+  }
   // #13449: in a compiled binary the kill guard's shims ask THIS executable `__kill-guard check ...` before every kill,
   // so this branch hands it to the engine's judge before any boot step: on this route there is no handoff, no
   // migration and no agent-dir write. It is the one exception to the #10697 line below; every other start still runs
