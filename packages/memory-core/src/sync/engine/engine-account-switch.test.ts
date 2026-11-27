@@ -60,8 +60,9 @@ test("#given a device that synced on account A #when it signs in to account B on
 
 // #14481 review r1 H1: a note of the same name on both accounts. B's chain delivers its copy onto the device; a switch
 // back to A must find A's copy, never seal B's text into A's chain. A file the sync refuses to own stays put throughout:
-// its name is not NFC, which every OS stores as one entry (a reserved character such as `:` names an NTFS stream, #15234).
-const NOT_SYNCED = "cafe\u0301.txt"
+// its name carries a format character (U+200B) the key grammar refuses and NFC keeps, which every OS stores as one
+// entry (a reserved character such as `:` names an NTFS stream, #15234).
+const NOT_SYNCED = "scratch\u200bkeep.txt"
 test("#given a note of the same name on both accounts #when the device switches A to B and back #then each account keeps its own copy and a non-sync file is untouched", async () => {
   const serverA = new FakeSyncServer()
   const serverB = new FakeSyncServer()
