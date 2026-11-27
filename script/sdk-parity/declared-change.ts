@@ -105,6 +105,7 @@ export type DeclaredChange = {
   readonly before: Outcome
   readonly after: Outcome
   readonly hash: string
+  readonly baseHash: string
 }
 
 /** Parses the body's declarations; a line that does not parse is a problem, never skipped. */
@@ -162,11 +163,15 @@ function judgeDeclaration(
     before,
     after,
     hash: sha256(JSON.stringify(after)).slice(0, 24),
+    baseHash: sha256(JSON.stringify(before)).slice(0, 24),
   }
 }
 
 /** The digest's entry for a declared change: its scenario, the provider, kind, arguments and its head outcome's hash. */
-const declaredDetail = (change: DeclaredChange): string => `${[change.kind, ...change.args].join(" ")}@${change.hash}`
+// The detail binds both outcomes: a base that moves under an unchanged head changes the mark, so a signature given over
+// one 'before' does not carry to another.
+const declaredDetail = (change: DeclaredChange): string =>
+  `${[change.kind, ...change.args].join(" ")}@${change.hash}/${change.baseHash}`
 
 // What a provider answers for one scenario: it exempts it (optionally with a detail the digest binds; the gate writes the
 // scenario and the provider's name itself), it states the problem that keeps it failing, or it has nothing to say.

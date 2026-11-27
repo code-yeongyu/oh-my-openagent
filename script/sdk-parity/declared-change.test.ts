@@ -6,7 +6,7 @@ import { join } from "node:path"
 
 import { sha256 } from "./baseline"
 import { type ExemptionProvider, loadBaseScenarioTable } from "./declared-change"
-import { EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
+import { candidateDigest, EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
 import { HEAD, input, rows, text, unresolved } from "./gate-fixture"
 import type { Outcome } from "./scenario-run"
 import { SCENARIOS, type Scenario } from "./scenarios"
@@ -36,7 +36,7 @@ describe("the declared form: what a declaration admits", () => {
   test("#given an answer declaration over two answers that differ only in the value #then it is exempt, printed and bound", () => {
     const report = gateReport(withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n"))
     expect(report.failures).toEqual([])
-    expect(report.exempted).toEqual([expect.stringMatching(/^s1#exempt=declared:answer@[0-9a-f]{24}$/)])
+    expect(report.exempted).toEqual([expect.stringMatching(/^s1#exempt=declared:answer@[0-9a-f]{24}\/[0-9a-f]{24}$/)])
     expect(renderReport(report)).toContain("CHANGED ON PURPOSE: 1 declared scenario(s)")
   })
 
@@ -262,9 +262,37 @@ describe("the exempt mark and what it binds", () => {
     expect(gateReport(withOutcomes(ok(1), ok(2), ""), { named }).exempted).toEqual(["s1#exempt=named:x"])
   })
 
-  test("#given a declared change #then its hash is of the HEAD outcome", () => {
+  test("#given a declared change #then its mark binds the head outcome's hash and the base outcome's", () => {
+    const hash = (outcome: Outcome) => sha256(JSON.stringify(outcome)).slice(0, 24)
     const report = gateReport(withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n"))
-    expect(report.exempted).toEqual([`s1#exempt=declared:answer@${sha256(JSON.stringify(ok(2))).slice(0, 24)}`])
+    expect(report.exempted).toEqual([`s1#exempt=declared:answer@${hash(ok(2))}/${hash(ok(1))}`])
+  })
+
+  test("#given the same declared head over another base, or another head over the same base #then the digest changes", () => {
+    const body = "SDK-Parity-Changed: s1 answer\n"
+    const digest = (before: Outcome, after: Outcome) => gateReport(withOutcomes(before, after, body)).digest
+    expect(new Set([digest(ok(1), ok(2)), digest(ok(0), ok(2)), digest(ok(1), ok(3))]).size).toBe(3)
+  })
+
+  test("#given a report with an exempt mark #then its digest is the one over that mark", () => {
+    const report = gateReport(withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n"))
+    expect(report.digest).toBe(candidateDigest(HEAD, [...report.exempted]))
+    expect(report.digest).not.toBe(candidateDigest(HEAD, []))
+  })
+
+  test("#given a declared outcome with masked spans #then the print counts each mask on each side", () => {
+    const output = renderReport(
+      gateReport(withOutcomes(ok("<sandbox>/a <sandbox>/b"), ok("<sandbox>/c"), "SDK-Parity-Changed: s1 answer\n")),
+    )
+    expect(output).toContain("[masked: <sandbox> x2]")
+    expect(output).toContain("[masked: <sandbox> x1]")
+  })
+
+  test("#given a scenario with no outcome at the merge base #then it fails as not run", () => {
+    const gate = input({ base: { ...input().base, outcomes: {} }, head: { ...input().head, outcomes: { s1: ok(1) } } })
+    expect(failuresOf(gate)).toEqual([
+      "threads.send: scenario s1 has no outcome at the merge base; the runner did not run it",
+    ])
   })
 
   test("#given outcomes equal for 900 characters and different after #then the print shows the difference and says the heads match", () => {
