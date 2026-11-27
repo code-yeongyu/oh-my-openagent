@@ -61,7 +61,7 @@ export const send = (fixture: E2eFixture, idOrName: string, callerSessionId = pa
     ...(allScope ? { allScope } : {}),
   })
 
-export function manualDeadline() {
+function manualDeadline() {
   const pending: Array<() => void> = []
   const deadline: TeardownStepDeadline = () => new Promise<void>((resolve) => pending.push(resolve))
   const expire = (): void => {
