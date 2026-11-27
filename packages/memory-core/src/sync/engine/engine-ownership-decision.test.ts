@@ -45,12 +45,16 @@ async function undecidedDevice(): Promise<{
   return { d, server, gitDir, head, files }
 }
 
-test("#given memory sync cannot tell whose memory this is #when it waits #then its notice names the signed-in account and the files a use would upload", async () => {
-  const { d, gitDir } = await undecidedDevice()
+test("#given memory sync cannot tell whose memory this is and nobody chose #when it keeps running #then nothing is uploaded, the memory stays on this device and its notice names the account and the files a use would upload", async () => {
+  const { d, server, gitDir, head } = await undecidedDevice()
   const before = (await readUndecided(gitDir))?.files ?? 0
   await d.write("later.md", note("written while undecided\n"))
-  await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
+  for (let round = 0; round < 3; round += 1)
+    await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
 
+  expect(server.head).toBe(head)
+  expect(await readFile(join(d.repo.root, "unsent.md"), "utf8")).toBe(note("edited before the upgrade, never pushed\n"))
+  expect(await readFile(join(d.repo.root, "later.md"), "utf8")).toBe(note("written while undecided\n"))
   expect(before).toBeGreaterThanOrEqual(3)
   expect(await readUndecided(gitDir)).toMatchObject({ account: "acc_a", files: before + 1 })
 })

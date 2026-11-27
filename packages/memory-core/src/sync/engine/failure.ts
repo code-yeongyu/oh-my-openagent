@@ -58,7 +58,7 @@ const OWNERSHIP_UNDECIDED: SyncFailure = {
   reason:
     "This device has memory from before its account's oldest kept sync history, so OmO cannot tell which account it belongs to.",
   action:
-    "Nothing is uploaded: this memory stays on this device until a later OmO version lets you choose whether to upload it to this account or keep it aside.",
+    "Nothing is uploaded and this memory stays on this device. This version of OmO has no command to choose what happens to it yet; a later version adds one.",
 }
 
 const OFFLINE: SyncFailure = {
