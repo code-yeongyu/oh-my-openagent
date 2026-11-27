@@ -71,8 +71,8 @@ impl Session {
         let route = match mutation.route.clone() {
             Ok(route) => route,
             Err(refusal) => {
-                let refused = self.stamp(refusal.into(), object);
-                return Err(self.refuse(record, Some("Route".to_owned()), refused));
+                let stage = Some("Route".to_owned());
+                return Err(self.refuse_stamped(record, stage, refusal.into(), object));
             }
         };
         self.reconcile_stop();
@@ -106,8 +106,7 @@ impl Session {
         let waited_ms = match busy {
             Ok(waited_ms) => waited_ms,
             Err(busy) => {
-                let busy = self.stamp(busy, object);
-                return Err(self.refuse(record, Some("Busy".to_owned()), busy));
+                return Err(self.refuse_stamped(record, Some("Busy".to_owned()), busy, object));
             }
         };
         // The busy wait let time pass after the gate: a stop, a lock or a lost permission
@@ -121,8 +120,7 @@ impl Session {
                 Ok(fresh) => (plan, epoch) = fresh,
                 Err(refused) => {
                     let (stage, out) = *refused;
-                    let out = self.stamp(out, object);
-                    return Err(self.refuse(record, Some(stage), out));
+                    return Err(self.refuse_stamped(record, Some(stage), out, object));
                 }
             }
         }
@@ -231,8 +229,7 @@ impl Session {
                         .warn(format!("marker not cleared after a refused send: {error}"));
                 }
                 let refused = Refused::from(refusal).with_paused(paused);
-                let refused = self.stamp(refused, object);
-                Err(self.refuse(record, None, refused))
+                Err(self.refuse_stamped(record, None, refused, object))
             }
             Some(stop) => {
                 let ended = Ended::of(stop, count);
