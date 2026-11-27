@@ -219,3 +219,36 @@ test("#given a sync context #when another sign-in replaced the stored one #then 
   await expect(ctx.chain.state()).rejects.toBeInstanceOf(CredentialIdentityChanged)
   expect(paths).toEqual(["/v1/me"])
 })
+
+// #13138 re-review L4: a credential stored before generations and accounts existed belongs to the account the
+// service named for it, so the same device and keys under another account is refused even though nothing else differs.
+test("#given a credential with neither a generation nor an account #when a record for the same device and keys under another account replaces it while the account is fetched #then that record is left alone and no pin write is admitted", async () => {
+  let replacement: Stored | undefined
+  const { ctx, secrets } = await context({
+    beforeBuild: (secrets) => {
+      plant(secrets, beforeGenerations)
+    },
+    whileAccountIsFetched: (secrets) => {
+      replacement = plant(secrets, (stored) => ({
+        ...stored,
+        accountId: "acct-other",
+        credentialGeneration: "generation-of-the-other-account",
+      }))
+    },
+  })
+  expect(storedCredential(secrets)).toEqual(replacement ?? {})
+  await expect(ctx.authority.boundary?.(() => undefined)).rejects.toThrow("no longer current")
+})
+
+// #13138 re-review L5: the device listing is a request of this context too.
+test("#given a sync context #when another sign-in replaced the stored one #then its device listing is refused before it is sent", async () => {
+  const paths: string[] = []
+  const { ctx, secrets } = await context({ onRequest: (request) => paths.push(new URL(request.url).pathname) })
+  plant(secrets, (stored) => ({
+    ...stored,
+    device: { ...grant.device, id: "device-other" },
+    accessToken: "replacement-access",
+  }))
+  await expect(ctx.listDevices?.()).rejects.toBeInstanceOf(CredentialIdentityChanged)
+  expect(paths).toEqual(["/v1/me"])
+})

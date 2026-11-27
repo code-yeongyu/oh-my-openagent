@@ -79,12 +79,13 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
       log: (line) => process.stderr.write(`${line}\n`),
     }),
   })
-  // The sign-in this context holds. Its generation moves only when the store mints its first one: by the account
-  // write below, or by a token refresh of a credential stored before generations existed. That one is taken once.
+  // The sign-in this context holds. A credential stored before generations existed has none until the store's next
+  // write (the account write below, or a token refresh): the first one seen is taken, once, and nothing else is.
   let held = credentials
   const stillHeld = (current: Credentials | null): current is Credentials => {
     if (!sameIdentity(current, held)) return false
-    if (held.credentialGeneration === undefined && current.credentialGeneration !== undefined) held = current
+    if (held.credentialGeneration === undefined && current.credentialGeneration !== undefined)
+      held = { ...held, credentialGeneration: current.credentialGeneration }
     return true
   }
   // A request carries this sign-in's token or is not sent: a replacement's token never rides beside this keyring.
@@ -100,12 +101,15 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
   if (typeof account !== "string" || account === "")
     throw new SignInError("The service named no account for this sign-in.")
+  // From here the held sign-in is this account's: the same device and keys under another account is another sign-in,
+  // also for a credential stored before accounts were recorded.
+  if (held.accountId === undefined) held = { ...held, accountId: account }
   // Every credential that can earn a sync pin names its account, so discarding its keys can retire the pin (#12280).
   await session.update(async (current) => {
     if (!stillHeld(current) || current.accountId !== undefined) return
     await store.write({ ...current, accountId: account })
-    // The held sign-in now names its account, and its generation if this write minted it.
-    held = (await store.readAuthoritative()) ?? held
+    // A credential stored before generations existed gets its generation from this write.
+    stillHeld(await store.readAuthoritative())
   })
   const http = {
     baseUrl: api,
@@ -141,6 +145,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
-    listDevices: () => listLiveDevices(session),
+    listDevices: () => listLiveDevices({ accessToken: token, request: session.request }),
   }
 }
