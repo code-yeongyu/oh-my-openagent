@@ -4,6 +4,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { observedLaunch } from "../bin/lib/host-launch.js"
+import { formatDoctorLines, formatEndpointLines } from "../bin/lib/daemon-status.js"
 import { buildSenpiArgs } from "../compile-args"
 
 test("npm daemon run, host ensure and host handoff give the engine the product launch spec", () => {
@@ -81,5 +82,16 @@ test("an older or unresponsive host leaves ensure successful and explicitly unob
     expect(calls).toEqual([13])
     expect(answer.exitCode).toBe(0)
     expect(JSON.parse(answer.stdout)).toMatchObject({ action: "reuse", pid: 7, productPlugin: "unknown" })
+  }
+})
+test("status and doctor distinguish the live primary's reported extensions from an unobserved profile", () => {
+  for (const [extensions, expected] of [
+    [["/runtime/plugin", "/runtime/plugin/extensions/omo-member.js"], "loaded"],
+    [[], "absent"],
+    [undefined, "unknown"],
+  ] as const) {
+    const endpoints = [{ reachable: true, socket: "/agent/rpc/rpc.sock", launchProfile: { core: { extensions } } }]
+    expect(formatEndpointLines(endpoints)[0]).toContain(`product plugin: ${expected}`)
+    expect(formatDoctorLines(endpoints)[0]).toContain(`product plugin: ${expected}`)
   }
 })
