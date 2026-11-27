@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawn, type StdioOptions } from "node:child_process"
 import { once } from "node:events"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { createRequire } from "node:module"
+// Windows holds a just-exited engine.exe image open briefly (unmapping, on-access scanning); the held root
+// is deferred with a holder diagnostic (#11190) instead of failing the run or retrying (#15177).
+import { removeTestRootBestEffort } from "../../../../../../test-support/held-test-root.mjs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Duplex } from "node:stream"
@@ -44,7 +47,7 @@ beforeAll(async () => {
   if (code !== 0) throw new Error(`bun build --compile failed: ${errors}`)
 }, 150_000)
 
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => removeTestRootBestEffort(root))
 
 async function launch(table: string, slots: number) {
   const stdio: StdioOptions = ["ignore", "pipe", "pipe", "ignore", "ignore"]
