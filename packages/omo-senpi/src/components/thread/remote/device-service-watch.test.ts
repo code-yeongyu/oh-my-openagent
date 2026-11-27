@@ -18,7 +18,7 @@ type AttachRecord = Extract<AttachEvent, { readonly kind: "records" }>["records"
 // connection ends every attach on it with "closed".
 function fakeDevice(
   engine: { state: JsonObject; failures?: number },
-  options: { readonly snapshotAfterAttach?: boolean } = {},
+  options: { readonly snapshotAfterAttach?: boolean; readonly soloHeld?: Promise<void> } = {},
 ) {
   const attaches: string[] = []
   const live: Array<{
@@ -48,7 +48,12 @@ function fakeDevice(
     const service = {
       closed,
       close,
-      locate: async () => {
+      ...(options.soloHeld === undefined ? {} : { takesSingleLocate: true }),
+      locate: async (_device: string, _id: string, opts?: { readonly single?: boolean }) => {
+        if (opts?.single === true) {
+          await options.soloHeld
+          throw new LocalApiError("session_not_found", "no such session on the solo device")
+        }
         if (locate.key === undefined) throw new LocalApiError("session_not_found", "gone")
         return { key: locate.key }
       },
@@ -330,6 +335,41 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
       ["lost engine_failed", "resync running -> idle settled=[7]"],
       [1_000, 2_000, 4_000],
     ])
+  })
+
+  // omo#14748 review round 7: an unrelated solo lookup kept the port's fence closed past one cap while the watch
+  // recovered, and the refusal (nothing sent) ended the watch session_replaced as if the session were gone.
+  test("#given a solo lookup's locate still running on the port #when the watched session is relisted and the fence refuses the first re-locate #then the watch backs off, re-locates once the solo settles, re-attaches and resyncs", async () => {
+    const engine = { state: RUNNING as JsonObject }
+    let releaseSolo: () => void = () => {}
+    const device = fakeDevice(engine, { soloHeld: new Promise<void>((resolve) => (releaseSolo = resolve)) })
+    const delays: number[] = []
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: device.connect,
+      lookupCapMs: 20,
+      retryDelay: async (ms) => {
+        delays.push(ms)
+        releaseSolo()
+      },
+    })
+    const seen = recorder()
+    const watch = await watching(port, seen.handlers)
+    expect(await port.lookupAlone?.("c", "0195f0c2-1a2b-7c3d-8e4f-00000000c0a1", 5_000)).toEqual({
+      kind: "silent",
+      reason: "lookup_timeout",
+    })
+    engine.state = IDLE
+    device.locate.key = "s1-after"
+    device.current().end("session_replaced")
+    await seen.until(2)
+    watch.stop()
+    expect([seen.log, device.attaches, delays]).toEqual([
+      ["lost lookup_fence_timeout", "resync running -> idle settled=[7] restarted"],
+      ["s1", "s1-after"],
+      [1_000],
+    ])
+    expect(String(await watch.ended)).toBe("stopped")
   })
 
   test("#given a watch relocated after session_replaced #when the new key is not listed either #then it ends session_replaced, the reason its attach gave", async () => {

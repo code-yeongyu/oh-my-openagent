@@ -4,8 +4,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { DISPLAY_UNSAFE, ORDINARY, unsafeCodeUnits } from "@oh-my-opencode/utils/testing/display-unsafe"
 import { gatewayDatabasePath } from "../gateway/paths"
-import { GATEWAY_MIGRATIONS } from "../gateway/schema"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { SessionCallableOp, StoreExtensionRegistration } from "../gateway/store-extensions"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "../tools"
@@ -25,7 +25,7 @@ const migrations = [
   [
     "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
     "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-    "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+    "CREATE TABLE gw_items (item_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
   ],
 ]
 const openDeclaration: SessionCallableOp = {
@@ -142,24 +142,31 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
 }
 
 function insertDescriptor(agentDir: string, name: string, toolName: string): void {
-  const descriptor = {
-    moduleUrl: fixtureModule.href,
-    migrations: [],
-    sessionCallable: [
-      {
-        op: "openThread",
-        toolName,
-        description: "planted",
-        parameters: { type: "object", additionalProperties: false, properties: {} },
-      },
-    ],
-  }
+  insertDescriptors(agentDir, [[name, toolName]])
+}
+
+function insertDescriptors(agentDir: string, rows: readonly (readonly [name: string, toolName: string])[]): void {
   const db = new Database(gatewayDatabasePath(agentDir))
   try {
-    db.query("INSERT INTO extension_registrations (name, descriptor_json, updated_at) VALUES (?, ?, 0)").run(
-      name,
-      JSON.stringify(descriptor),
-    )
+    const insert = db.query("INSERT INTO extension_registrations (name, descriptor_json, updated_at) VALUES (?, ?, 0)")
+    db.transaction(() => {
+      for (const [name, toolName] of rows)
+        insert.run(
+          name,
+          JSON.stringify({
+            moduleUrl: fixtureModule.href,
+            migrations: [],
+            sessionCallable: [
+              {
+                op: "openThread",
+                toolName,
+                description: "planted",
+                parameters: { type: "object", additionalProperties: false, properties: {} },
+              },
+            ],
+          }),
+        )
+    })()
   } finally {
     db.close()
   }
@@ -212,6 +219,26 @@ test("#given declarations named bash and task, one composing a name the session 
   expect(logs).toHaveLength(firstPass)
   expect(host.tools.get("bash")).toBe(core.bash)
 }, 10_000)
+
+test("#given two persisted rows per extension name composing the same tool name #when the session starts #then each skip is logged once with the name escaped", async () => {
+  const { agentDir, options } = await surface([caller])
+  const names = [...new Set([...DISPLAY_UNSAFE, ...ORDINARY].map((name) => name.toWellFormed()))]
+  insertDescriptors(
+    agentDir,
+    names.flatMap((name) => [
+      [name, "zz_open"],
+      [`${name}_zz`, "open"],
+    ]),
+  )
+  const host = sessionStartHost({})
+  const logs: string[] = []
+  registerExtensionTools(host, options, (line) => logs.push(line))
+  await host.start("ext_gw_open")
+  const skipped = logs.filter((line) => line.includes("was not registered"))
+  expect(skipped).toHaveLength(names.length)
+  for (const line of skipped) expect({ line, units: unsafeCodeUnits(line) }).toEqual({ line, units: [] })
+  for (const name of ORDINARY) expect(skipped.some((line) => line.includes(`ext_${name}_zz_open`))).toBe(true)
+})
 
 test("#given the production shape (the engine's getSessionId() is the caller's durable id) #when the tool runs #then the op receives that durable id", async () => {
   const { tools } = await surface([caller])
@@ -431,8 +458,9 @@ test("#given a store at the previous schema version with data #when it opens #th
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
   // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns), v13
-  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay) and v15 (the
-  // deliveries rebuild): all re-run. Pinned, not counted from the end, because later migrations append.
+  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay), v15 (the
+  // deliveries rebuild) and v16 (deliveries.collapse_key): all re-run. Pinned, not counted from the end, because later
+  // migrations append.
   const previous = 9
   {
     const seed = storeAt(agentDir)

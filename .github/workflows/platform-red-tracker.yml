@@ -3,7 +3,8 @@ name: Platform red tracker
 # Pull requests run Linux only (#13802), so a macOS/Windows regression first shows on the dev push run.
 # When a macOS/Windows job of such a run fails, this files ONE open `ci:platform-red` issue, or comments on the open
 # one, naming for each failed job the merge whose run first turned it red (a later merge only inherits the red).
-# publish.yml refuses to cut a release while that issue is open.
+# publish.yml refuses to cut a release while that issue is open, so any green dev push run re-checks the issue and
+# closes it once every tracked job passed again on its own workflow's latest dev push run (close-when-green).
 on:
   workflow_run:
     workflows: [CI, Computer conformance fixtures, Computer engine, Desktop engine, Desktop Windows QA, Engine trust helper, get.omo.dev CI, Git job helper]
@@ -128,4 +129,31 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Files or comments on the one open `ci:platform-red` issue for `${{ github.event.workflow_run.name }}` at `${{ github.event.workflow_run.head_sha }}`.
           JOB_SUMMARY_NEXT: Fix the listed macOS/Windows job; publish.yml refuses a release while the issue is open.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  close-when-green:
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Close the platform-red issue when every tracked job is green on its own workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: OUT_DIR="$RUNNER_TEMP/platform-red-close" bash .github/scripts/platform-red-close.sh
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Platform red tracker - close when green
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - After `${{ github.event.workflow_run.name }}` passed on `dev` at `${{ github.event.workflow_run.head_sha }}`, checks every job of the open `ci:platform-red` issue on its own workflow's latest dev push run.
+          JOB_SUMMARY_NEXT: If the issue stayed open, the step log names the job that is still red, skipped its tests, or has not re-run since its red commit.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

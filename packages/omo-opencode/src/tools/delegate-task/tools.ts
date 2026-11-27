@@ -63,7 +63,7 @@ const delegateTaskArgsSchema = {
     .array(tool.schema.string())
     .optional()
     .describe(
-      'Skill names to inject. Optional; defaults to [] when omitted. Pass an explicit array (e.g. ["git-master"]) for skill-specific tasks.',
+      'Skill names to inject. Optional; defaults to [] when omitted. Pass an explicit array (e.g. ["git"]) for skill-specific tasks.',
     ),
   description: tool.schema
     .string()

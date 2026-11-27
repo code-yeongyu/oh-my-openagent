@@ -345,7 +345,7 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wP
     }
     Write-OmoSay ''
     Write-OmoSay 'OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.'
-    Write-OmoSay 'The data goes to PostHog in the United States.'
+    Write-OmoSay 'The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).'
     Write-OmoSay 'Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).'
     Write-OmoSay 'Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md'
   } finally {

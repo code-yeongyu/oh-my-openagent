@@ -1,16 +1,19 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, watch } from "node:fs"
 import { dirname } from "node:path"
 import { createHostDaemonPaths, runHostRequest } from "@code-yeongyu/senpi"
 
 import { createDaemonEngineHarness, waitForExit } from "./daemon-real-engine-support"
+import { TREE_BOUNDED_TEST_TIMEOUT_MS } from "./daemon-test-runner"
 
 const { sandbox, ensureShard, forgetShard, cleanup } = createDaemonEngineHarness()
+// The engine's cold start is bounded by the runner's CPU-progress stall kill (#11845), as in
+// daemon-real-engine.test.ts. The idle contract itself is bounded from readiness by observeUntilReleased.
+setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
 afterEach(cleanup)
 
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
-const IDLE_TEST_BUDGET_MS = OBSERVED_IDLE_EXIT_MS * 6
 const STATUS_INTERVAL_MS = 250
 
 async function observeUntilReleased(agentDir: string, socket: string): Promise<number> {
@@ -69,21 +72,20 @@ async function observeUntilReleased(agentDir: string, socket: string): Promise<n
 
 if (process.platform !== "win32") {
   describe("omo daemon real-engine read-only and observe contracts", () => {
-    test(
-      "#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive",
-      async () => {
-        const { agentDir, socket, env } = sandbox()
-        const supervisorPid = await ensureShard(socket, {
-          ...env,
-          SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
-        })
+    test("#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive", async () => {
+      const { agentDir, socket, env } = sandbox()
+      const supervisorPid = await ensureShard(socket, {
+        ...env,
+        SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
+        // This test waits for the reaped child. Do not extend its ordinary 5 s
+        // TERM window to 60 s when the fixture's child reports loop lag.
+        SENPI_RPC_CHILD_STALLED_STOP_MAX_MS: "5000",
+      })
 
-        const reachableReads = await observeUntilReleased(agentDir, socket)
-        waitForExit(supervisorPid)
-        expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
-        forgetShard(supervisorPid)
-      },
-      IDLE_TEST_BUDGET_MS,
-    )
+      const reachableReads = await observeUntilReleased(agentDir, socket)
+      waitForExit(supervisorPid)
+      expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
+      forgetShard(supervisorPid)
+    })
   })
 }

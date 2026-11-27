@@ -41,6 +41,56 @@ KillMode=process
 WantedBy=default.target
 `
 
+// omo#14258: the external version-directory updater (~/.omo/omo-versions/<ver> plus a `current` flip) keeps the previous
+// install's directory, so its unit names the old install's launcher script behind the runtime that runs it; a newer
+// launch must bring that unit to the running version, not only older binary-runtime/<ver> programs.
+const SYSTEMD_OMO_VERSIONS_5_1_76 = `[Unit]
+Description=OmO session host
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart="/h/.bun/bin/bun" "/h/.omo/omo-versions/5.1.76/omo-ai/bin/omo.js" "daemon" "run" "--pinned"
+Environment="OMO_CODING_AGENT_DIR=/srv/profile-b/agent"
+Environment="PATH=/opt/tools/bin:/usr/bin"
+Restart=always
+RestartSec=30
+KillMode=process
+
+[Install]
+WantedBy=default.target
+`
+
+const LAUNCHD_OMO_VERSIONS_5_1_76 = `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.omo.session-host</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/h/.bun/bin/bun</string>
+    <string>/h/.omo/omo-versions/5.1.76/omo-ai/bin/omo.js</string>
+    <string>daemon</string>
+    <string>run</string>
+    <string>--pinned</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OMO_CODING_AGENT_DIR</key>
+    <string>/srv/profile-b/agent</string>
+    <key>PATH</key>
+    <string>/opt/tools/bin:/usr/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+</dict>
+</plist>
+`
+
 const LAUNCHD_5_1_75 = `<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0">
 <dict>
@@ -102,6 +152,22 @@ describe("refreshing the session host unit on Linux", () => {
     expect(runs).toEqual([])
   })
 
+  test("brings a unit naming an older omo-versions install to this runtime, keeping its agent dir and PATH", async () => {
+    const { host, home, runs } = fakeSystemd()
+    await installColdWake(host, launchOf("5.1.75"))
+    writeFileSync(linuxUnit(home), SYSTEMD_OMO_VERSIONS_5_1_76)
+    runs.length = 0
+
+    expect(await refresh(host)).toEqual({ kind: "installed", serviceRestarted: false })
+    const text = readFileSync(linuxUnit(home), "utf8")
+    expect(text).toContain(`ExecStart="${RUNTIME}"`)
+    expect(text).not.toContain("omo-versions")
+    expect(text).not.toContain("/h/.bun/bin/bun")
+    expect(text).toContain('Environment="OMO_CODING_AGENT_DIR=/srv/profile-b/agent"')
+    expect(text).toContain('Environment="PATH=/opt/tools/bin:/usr/bin"')
+    expect(runs).toContain("systemctl --user --no-block restart omo-session-host.service")
+  })
+
   test("a disabled unit gets the new text but is neither enabled nor restarted", async () => {
     const { host, home, runs, unit } = fakeSystemd()
     await installColdWake(host, launchOf("5.1.75"))
@@ -157,6 +223,23 @@ describe("refreshing the session host unit on macOS", () => {
     expect(runs).toContain(`launchctl bootstrap gui/501 ${sessionHostPlist(home)}`)
     expect(runs.some((run) => run.includes("relay-daemon"))).toBe(false)
     expect(runs.some((run) => run.startsWith("launchctl enable"))).toBe(false)
+  })
+
+  test("reloads a job naming an older omo-versions install as the new runtime's run-once job, keeping its environment", async () => {
+    const { host, home, runs } = fakeLaunchd()
+    await installColdWake(host, launchOf("5.1.75"))
+    writeFileSync(sessionHostPlist(home), LAUNCHD_OMO_VERSIONS_5_1_76)
+    runs.length = 0
+
+    expect(await refresh(host)).toEqual({ kind: "installed", serviceRestarted: false })
+    const text = readFileSync(sessionHostPlist(home), "utf8")
+    expect(text).toContain(`<string>${RUNTIME}</string>`)
+    expect(text).not.toContain("omo-versions")
+    expect(text).toContain("<string>/srv/profile-b/agent</string>")
+    expect(text).toContain("<string>/opt/tools/bin:/usr/bin</string>")
+    expect(text).not.toContain("KeepAlive")
+    expect(runs).toContain("launchctl bootout gui/501/ai.omo.session-host")
+    expect(runs).toContain(`launchctl bootstrap gui/501 ${sessionHostPlist(home)}`)
   })
 
   test("a job the user disabled gets the new plist but is not loaded or enabled", async () => {

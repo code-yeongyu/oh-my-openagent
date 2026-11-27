@@ -192,7 +192,8 @@ describe("thread_create with a first prompt (#13410)", () => {
     const args = { device: "studio", prompt: "build it", idempotency_key: "create-and-start-1" }
     const first = await run("thread_create", args)
     const replay = await run("thread_create", args)
-    expect(replay).toEqual(first)
+    const expectedReplay = { ...first, deduplicated: true }
+    expect(replay).toEqual(expectedReplay)
     expect(types(a.sent).filter((type) => type === "open_session")).toHaveLength(1)
     expect(types(a.sent).filter((type) => type === "admit_external_message")).toHaveLength(1)
   })

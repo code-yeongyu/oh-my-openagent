@@ -779,7 +779,7 @@ Built-in OpenCode skills load automatically when their description matches your 
 | Skill | Editions | When it triggers |
 |-------|:--------:|------------------|
 | `playwright` | Ultimate | Browser automation |
-| `git-master` | Ultimate | Atomic commits, rebases, history search |
+| `git` | Ultimate | Atomic commits, rebases, history search (`git-master` still resolves) |
 | `frontend` | Ultimate | UI/UX implementation work |
 | `review-work` | Ultimate | Post-implementation code review |
 | `$omo:remove-ai-slops` | Ultimate | Cleaning AI-generated code smells |

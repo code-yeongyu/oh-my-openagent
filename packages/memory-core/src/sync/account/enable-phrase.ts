@@ -33,7 +33,8 @@ export const placeOf = (input: EnableSyncInput): PhraseGenesisPlace => ({
 export const commitIntent = async (captured: Captured, intent: GenesisIntent): Promise<EnableOutcome> => {
   const result = await completeGenesis(captured, intent)
   checkSyncOperation(captured)
-  if (result === "phrase_refused") {
+  if (typeof result === "object") {
+    const devices = result.devices.length > 0 ? { devices: result.devices } : {}
     // The service refused this ceremony's append. Only this device's own switch is withdrawn. The account-wide switch
     // is shared consent that another device's ceremony turns on before its genesis lands, so no read of the chain can
     // make switching it off race-free (review LOW, #13335 @ 9b1f3c9f); it stays as it is.
@@ -41,9 +42,9 @@ export const commitIntent = async (captured: Captured, intent: GenesisIntent): P
       await captured.pairing.setDeviceSync(captured.serviceDeviceId, false)
     } catch {
       // Review LOW (#13337 @ 6e726034): the refusal stays the answer; a failed withdrawal is reported, not thrown.
-      return { kind: "phrase_unavailable", reason: "service-floor-off", deviceSyncLeftOn: true }
+      return { kind: "phrase_unavailable", reason: "service-floor-off", ...devices, deviceSyncLeftOn: true }
     }
-    return { kind: "phrase_unavailable", reason: "service-floor-off" }
+    return { kind: "phrase_unavailable", reason: "service-floor-off", ...devices }
   }
   if (result !== "created")
     return isPhraseIntent(intent)

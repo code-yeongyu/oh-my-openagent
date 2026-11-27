@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -13,8 +13,8 @@ afterEach(() => {
 })
 
 /** A run as the senpi harness's startCaseRun hands it over: its env opts out of senpi's telemetry only. */
-function harnessRun() {
-  const dir = mkdtempSync(join(tmpdir(), "eq-omo-sandbox-"))
+function harnessRun(parent = tmpdir()) {
+  const dir = mkdtempSync(join(parent, "eq-omo-sandbox-"))
   roots.push(dir)
   const box = { dir, agentDir: join(dir, "agent"), cwd: join(dir, "work") }
   mkdirSync(box.agentDir, { recursive: true })
@@ -25,6 +25,15 @@ function harnessRun() {
 const pluginTelemetryOn = (env) => isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() })
 
 describe("prepareCaseSandbox", () => {
+  test("#given a sandbox under a directory that holds an instruction file #when a case sandbox is prepared #then it refuses, so the file can never reach a recorded prompt (omo#14904)", () => {
+    const parent = mkdtempSync(join(tmpdir(), "eq-omo-home-"))
+    roots.push(parent)
+    writeFileSync(join(parent, "AGENTS.md"), "# operator instructions\n")
+    const run = harnessRun(parent)
+
+    expect(() => prepareCaseSandbox(run, {})).toThrow(/instruction file/)
+  })
+
   test("#given the harness env, which leaves the plugin's telemetry on #when a case sandbox is prepared #then the CLI child's plugin telemetry is off", () => {
     const run = harnessRun()
     expect(pluginTelemetryOn(run.env)).toBe(true)

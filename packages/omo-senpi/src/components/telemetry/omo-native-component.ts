@@ -383,7 +383,6 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       createOmoNativeNoticeRegistration({
         diagnostics: options.diagnostics,
         env,
-        isConfigEnabled: options.isConfigEnabled,
         stateDir,
       }).register(pi, ctx)
     },
