@@ -252,7 +252,15 @@ describe("wake_reached_no_drain", () => {
     h.session("A")
     const target = h.session("T", { drainRegistered: false })
     for (const mode of ["auto", "follow_up"] as const) {
-      expect(summary(await send(h, "A", "T", `brief ${mode}`, { mode }))).toBe("queued_offline")
+      const result = await send(h, "A", "T", `brief ${mode}`, { mode })
+      expect(summary(result)).toBe("queued_offline")
+      // The offline answer names the reopen that drains the queue (#15249): nothing wakes this
+      // target on its own, so the next action is the explicit thread_create reopen.
+      expect(result.kind === "ok" && result.delivery.kind === "queued_offline" ? result.delivery.next_action : undefined).toEqual({
+        resume: "reopen",
+        tool: "thread_create",
+        thread: "T",
+      })
     }
     await h.quiesce()
     expect(h.wakes.filter((wake) => wake.target === "T")).toHaveLength(2)

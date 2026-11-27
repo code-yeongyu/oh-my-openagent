@@ -137,8 +137,16 @@ export type ThreadDelivery =
       readonly queue_position: number
       readonly waiting_on?: { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
     }
-  /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
-  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
+  /**
+   * Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start.
+   * `next_action` names what actually brings such a session back: the explicit reopen drains the queue (#15249).
+   */
+  | {
+      readonly kind: "queued_offline"
+      readonly queue_position: number
+      readonly reason?: "wake_unavailable"
+      readonly next_action?: { readonly resume: "reopen"; readonly tool: "thread_create"; readonly thread: string }
+    }
 
 /**
  * What a send through the session gateway adds to a delivery result: the durable `delivery_id` and the lane the target

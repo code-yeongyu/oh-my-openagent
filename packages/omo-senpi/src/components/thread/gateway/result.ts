@@ -96,6 +96,19 @@ export function resultFromRow(
   }
   return {
     ...base,
-    delivery: { kind: offline ? "queued_offline" : "queued", queue_position: Math.max(queuePosition, 1) },
+    delivery: {
+      kind: offline ? "queued_offline" : "queued",
+      queue_position: Math.max(queuePosition, 1),
+      // Nothing will wake this session on its own: name the reopen that drains the queue (#15249).
+      ...(offline
+        ? {
+            next_action: {
+              resume: "reopen" as const,
+              tool: "thread_create" as const,
+              thread: row.target_durable_id,
+            },
+          }
+        : {}),
+    },
   }
 }

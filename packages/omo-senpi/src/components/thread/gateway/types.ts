@@ -291,7 +291,12 @@ export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
   | { readonly kind: "queued"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
   /** `reason: wake_unavailable`: the same-device switch is on and the target was asked to wake, but no carrier runs (#13037). */
-  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
+  | {
+      readonly kind: "queued_offline"
+      readonly queue_position: number
+      readonly reason?: "wake_unavailable"
+      readonly next_action?: { readonly resume: "reopen"; readonly tool: "thread_create"; readonly thread: string }
+    }
 
 /**
  * What the receiver is parked on while the delivery waits (omo#13037 5.1): an approval (a tool permission or question) a

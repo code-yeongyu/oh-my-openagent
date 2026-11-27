@@ -205,6 +205,26 @@ describe("thread_send / thread_handoff results", () => {
     ])
   })
 
+  test("#given an offline target whose answer names the reopen #when it renders #then the next action says how the queue drains", () => {
+    const offline = {
+      kind: "ok",
+      thread: PEER,
+      link: threadLink(PEER, undefined),
+      delivery: {
+        kind: "queued_offline",
+        queue_position: 1,
+        next_action: { resume: "reopen", tool: "thread_create", thread: PEER },
+      },
+      message_seq: 3,
+      deduplicated: true,
+      delivery_id: DELIVERY,
+      effective_mode: "auto",
+    } as ThreadToolResult
+    expect(result("thread_send", offline, { thread: "reviewer", message: "hi" })[0]).toBe(
+      `-> reviewer  queued #1: thread is offline, delivers when it starts; nothing wakes it on its own - reopen with tool.thread_create({ thread: "${PEER}" })`,
+    )
+  })
+
   test("#given a send to another device #when it renders #then the device is a detail line", () => {
     const remote = {
       kind: "ok",

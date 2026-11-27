@@ -31,7 +31,8 @@ export function createSameDeviceWake(options: SameDeviceWakeOptions): SameDevice
       await options.store.woken.request({ durable_id: result.thread_id, session_file: target.session_path })
       const { queue_position } = result.delivery
       if (options.carrier === undefined)
-        return { ...result, delivery: { kind: "queued_offline", queue_position, reason: "wake_unavailable" } }
+        // Keep the reopen hint the result already carries: no carrier runs, so nothing wakes it (#15249).
+        return { ...result, delivery: { ...result.delivery, reason: "wake_unavailable" } }
       void options.carrier.wake(result.thread_id).catch(() => undefined)
       return { ...result, delivery: { kind: "queued", queue_position, waiting_on: { kind: "wake" } } }
     },
