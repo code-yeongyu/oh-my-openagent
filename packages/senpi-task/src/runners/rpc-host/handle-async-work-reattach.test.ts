@@ -195,7 +195,10 @@ describe("re-joining a child whose turn waits on its own async work (omo#10487)"
     // then - held on the recorded work, not adopted as the answer
     expect(settled).toBeUndefined()
 
-    // when - the confirmation reads the drained, idle session
+    // when - the confirmations read the drained, idle session past the wake-delivery grace
+    scheduler.runNext()
+    await flushSettlement()
+    expect(settled).toBeUndefined()
     scheduler.runNext()
     await flushSettlement()
 
