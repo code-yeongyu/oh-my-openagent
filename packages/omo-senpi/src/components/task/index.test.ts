@@ -29,6 +29,8 @@ const TEAM_TOOL_NAMES = ["team_create", "team_delete", "task_create", "task_get"
 const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
   "context",
+  "tool_call",
+  "session_start",
   "session_start",
   "session_hold_changed",
   "session_before_reload",
@@ -54,6 +56,7 @@ const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 interface RecordedLog {
   level: "info" | "warn" | "error"
   message: string
+  details?: unknown
 }
 
 const tempRoots: string[] = []
@@ -73,7 +76,7 @@ function createLogger(): ComponentLogger & { entries: RecordedLog[] } {
   return {
     entries,
     info: (message) => entries.push({ level: "info", message }),
-    warn: (message) => entries.push({ level: "warn", message }),
+    warn: (message, details) => entries.push({ level: "warn", message, ...(details === undefined ? {} : { details }) }),
     error: (message) => entries.push({ level: "error", message }),
   }
 }
@@ -180,6 +183,62 @@ function toolNames(pi: FakeExtensionAPI): string[] {
 }
 
 describe("omo-senpi task component wiring", () => {
+  it("#given a deferred cancel tool #when task is first called #then the parent gets controls without unrelated tools", async () => {
+    const logger = createLogger()
+    const pi = new FakeExtensionAPI()
+    let active = ["task", "task_send", "task_output", "bash"]
+    let activationAttempts = 0
+    const host = Object.assign(pi, {
+      getAllTools: () => ([...pi.tools, { name: "task_other_mcp", exposure: "search" }]).flatMap((tool) =>
+        typeof tool.name === "string" ? [{ ...tool, name: tool.name }] : [],
+      ),
+      getActiveTools: () => active,
+      setActiveTools: (names: string[]) => {
+        activationAttempts++
+        active = names
+      },
+    })
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: tempProject }).register(host, ctxFor(pi, logger))
+
+    await pi.dispatch("tool_call", { toolName: "bash" }, {})
+    expect(activationAttempts).toBe(0)
+    await pi.dispatch("tool_call", { toolName: "task" }, {})
+    expect(active).toEqual(["task", "task_send", "task_output", "bash", "task_cancel"])
+    await pi.dispatch("tool_call", { toolName: "task" }, {})
+    expect(activationAttempts).toBe(1)
+  })
+
+  it("#given a host that refuses activation #when task is called again #then it logs once and retries without blocking", async () => {
+    const logger = createLogger()
+    const pi = new FakeExtensionAPI()
+    let active = ["task", "task_output"]
+    let rejectActivation = true
+    const host = Object.assign(pi, {
+      getAllTools: () => [
+        { name: "task_cancel", exposure: "search" },
+        { name: "task_send", exposure: "search", allowLazyActivation: false },
+      ],
+      getActiveTools: () => active,
+      setActiveTools: (names: string[]) => {
+        if (!rejectActivation) active = names
+      },
+    })
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: tempProject }).register(host, ctxFor(pi, logger))
+
+    const call = { toolName: "task", input: { prompt: "do not log this" } }
+    await pi.dispatch("tool_call", call, {})
+    await pi.dispatch("tool_call", call, {})
+    const diagnostics = logger.entries.filter(({ details }) =>
+      typeof details === "object" && details !== null && "event" in details && details.event === "task_control_activation_failed",
+    )
+    expect(diagnostics.map(({ details }) => details)).toEqual([
+      { event: "task_control_activation_failed", reason: "activation_rejected", tools: ["task_cancel"] },
+    ])
+    rejectActivation = false
+    await pi.dispatch("tool_call", call, {})
+    expect(active).toEqual(["task", "task_output", "task_cancel"])
+  })
+
   it("#given an empty project #when the task component registers and the session starts without task activity #then no state directory is created", async () => {
     const project = tempProject()
     const pi = new FakeExtensionAPI()
