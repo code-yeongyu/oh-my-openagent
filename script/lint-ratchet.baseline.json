@@ -2290,5 +2290,7795 @@
   },
   "test-support/posthog-test-guard-installed.test.ts": {
     "omo-testing/no-flake-masking": 1
+  },
+  "#flake-values": {
+    "packages/ast-grep-mcp/src/sg-runner.test.ts": [
+      {
+        "line": 203,
+        "value": 4000
+      },
+      {
+        "line": 216,
+        "value": 4000
+      },
+      {
+        "line": 229,
+        "value": 4000
+      },
+      {
+        "line": 274,
+        "value": 4000
+      },
+      {
+        "line": 323,
+        "value": 4000
+      },
+      {
+        "line": 355,
+        "value": 4000
+      },
+      {
+        "line": 385,
+        "value": 4000
+      },
+      {
+        "line": 414,
+        "value": 4000
+      }
+    ],
+    "packages/ast-grep-mcp/src/tools/scan.test.ts": [
+      {
+        "line": 203,
+        "value": 15000
+      }
+    ],
+    "packages/device-service-core/test/local-api/conformance/runner.ts": [
+      {
+        "line": 165,
+        "value": 30000
+      },
+      {
+        "line": 169,
+        "value": 30000
+      }
+    ],
+    "packages/device-service-core/test/local-api/la17-exact-windows-dacl.test.ts": [
+      {
+        "line": 115,
+        "value": 120000
+      }
+    ],
+    "packages/git-bash-mcp/src/runner.test.ts": [
+      {
+        "line": 103,
+        "value": 30000
+      }
+    ],
+    "packages/isolation-core/src/git/command.test.ts": [
+      {
+        "line": 158,
+        "value": 20000
+      },
+      {
+        "line": 186,
+        "value": 20000
+      },
+      {
+        "line": 240,
+        "value": 20000
+      }
+    ],
+    "packages/lsp-core/src/lsp/bun-project-checks.test.ts": [
+      {
+        "line": 104,
+        "value": 30000
+      },
+      {
+        "line": 113,
+        "value": 30000
+      }
+    ],
+    "packages/lsp-tools-mcp/test/initialize-timeout.test.ts": [
+      {
+        "line": 93,
+        "value": 10000
+      },
+      {
+        "line": 108,
+        "value": 5000
+      }
+    ],
+    "packages/mcp-client-core/src/mcp-oauth/callback-server.test.ts": [
+      {
+        "line": 27,
+        "value": null
+      },
+      {
+        "line": 62,
+        "value": null
+      },
+      {
+        "line": 91,
+        "value": null
+      },
+      {
+        "line": 116,
+        "value": null
+      }
+    ],
+    "packages/mcp-client-core/src/skill-mcp-manager/abort-signal.test.ts": [
+      {
+        "line": 103,
+        "value": 15000
+      },
+      {
+        "line": 114,
+        "value": 15000
+      }
+    ],
+    "packages/mcp-client-core/src/skill-mcp-manager/env-grants-cross-process.test.ts": [
+      {
+        "line": 145,
+        "value": 30000
+      }
+    ],
+    "packages/mcp-client-core/src/skill-mcp-manager/env-grants-store.test.ts": [
+      {
+        "line": 269,
+        "value": 15000
+      },
+      {
+        "line": 335,
+        "value": 15000
+      }
+    ],
+    "packages/memory-core/src/compile/compile.test.ts": [
+      {
+        "line": 39,
+        "value": 30000
+      },
+      {
+        "line": 60,
+        "value": 30000
+      },
+      {
+        "line": 75,
+        "value": 30000
+      },
+      {
+        "line": 92,
+        "value": 30000
+      },
+      {
+        "line": 107,
+        "value": 30000
+      },
+      {
+        "line": 124,
+        "value": 30000
+      },
+      {
+        "line": 151,
+        "value": 30000
+      },
+      {
+        "line": 165,
+        "value": 30000
+      },
+      {
+        "line": 186,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/concurrency/auto-maintenance.test.ts": [
+      {
+        "line": 88,
+        "value": 30000
+      },
+      {
+        "line": 125,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/concurrency/sigkill-takeover.test.ts": [
+      {
+        "line": 171,
+        "value": null
+      },
+      {
+        "line": 221,
+        "value": 30000
+      },
+      {
+        "line": 284,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/concurrency/two-process.test.ts": [
+      {
+        "line": 59,
+        "value": 30000
+      },
+      {
+        "line": 102,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/crdt/loro-runtime-packaging.test.ts": [
+      {
+        "line": 83,
+        "value": 20000
+      }
+    ],
+    "packages/memory-core/src/facts/agreement-recovery.test.ts": [
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 109,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/agreements-replay.test.ts": [
+      {
+        "line": 219,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction-legacy-header.test.ts": [
+      {
+        "line": 66,
+        "value": 60000
+      },
+      {
+        "line": 85,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction-person-aliases.test.ts": [
+      {
+        "line": 110,
+        "value": 30000
+      },
+      {
+        "line": 136,
+        "value": 30000
+      },
+      {
+        "line": 161,
+        "value": 30000
+      },
+      {
+        "line": 191,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction-person-lifecycle.test.ts": [
+      {
+        "line": 124,
+        "value": 30000
+      },
+      {
+        "line": 148,
+        "value": 30000
+      },
+      {
+        "line": 181,
+        "value": 30000
+      },
+      {
+        "line": 208,
+        "value": 30000
+      },
+      {
+        "line": 234,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction-receipts.test.ts": [
+      {
+        "line": 61,
+        "value": 30000
+      },
+      {
+        "line": 90,
+        "value": 30000
+      },
+      {
+        "line": 115,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction-retired-ledger.test.ts": [
+      {
+        "line": 79,
+        "value": 30000
+      },
+      {
+        "line": 98,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction-routing-gate.test.ts": [
+      {
+        "line": 106,
+        "value": 30000
+      },
+      {
+        "line": 133,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/extraction.test.ts": [
+      {
+        "line": 135,
+        "value": 30000
+      },
+      {
+        "line": 146,
+        "value": 30000
+      },
+      {
+        "line": 198,
+        "value": 30000
+      },
+      {
+        "line": 228,
+        "value": 30000
+      },
+      {
+        "line": 248,
+        "value": 30000
+      },
+      {
+        "line": 279,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/facts/queue-parked.test.ts": [
+      {
+        "line": 111,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/facts/recovery.test.ts": [
+      {
+        "line": 64,
+        "value": 30000
+      },
+      {
+        "line": 78,
+        "value": 30000
+      },
+      {
+        "line": 92,
+        "value": 30000
+      },
+      {
+        "line": 104,
+        "value": 30000
+      },
+      {
+        "line": 140,
+        "value": 30000
+      },
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 182,
+        "value": 30000
+      },
+      {
+        "line": 211,
+        "value": 30000
+      },
+      {
+        "line": 230,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/exec-fsmonitor.test.ts": [
+      {
+        "line": 67,
+        "value": 360000
+      },
+      {
+        "line": 77,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/git/exec-pipe-holder.test.ts": [
+      {
+        "line": 70,
+        "value": 60000
+      },
+      {
+        "line": 91,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/git/exec-timeout.test.ts": [
+      {
+        "line": 77,
+        "value": 60000
+      },
+      {
+        "line": 103,
+        "value": 60000
+      },
+      {
+        "line": 149,
+        "value": 60000
+      },
+      {
+        "line": 178,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/git/open-file-holders-slow-lsof.test.ts": [
+      {
+        "line": 53,
+        "value": 30000
+      },
+      {
+        "line": 75,
+        "value": 30000
+      },
+      {
+        "line": 90,
+        "value": 30000
+      },
+      {
+        "line": 105,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/repo-commit-times.test.ts": [
+      {
+        "line": 336,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/repo-head-reftable.test.ts": [
+      {
+        "line": 60,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/git/repo-head.test.ts": [
+      {
+        "line": 57,
+        "value": 60000
+      },
+      {
+        "line": 73,
+        "value": 60000
+      },
+      {
+        "line": 89,
+        "value": 60000
+      },
+      {
+        "line": 110,
+        "value": 60000
+      },
+      {
+        "line": 127,
+        "value": 60000
+      },
+      {
+        "line": 146,
+        "value": 60000
+      },
+      {
+        "line": 167,
+        "value": 60000
+      },
+      {
+        "line": 183,
+        "value": 60000
+      },
+      {
+        "line": 199,
+        "value": 60000
+      },
+      {
+        "line": 214,
+        "value": 60000
+      },
+      {
+        "line": 244,
+        "value": 60000
+      },
+      {
+        "line": 279,
+        "value": 60000
+      },
+      {
+        "line": 298,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/git/repo-lock-sweep-authorization.test.ts": [
+      {
+        "line": 92,
+        "value": 30000
+      },
+      {
+        "line": 113,
+        "value": 30000
+      },
+      {
+        "line": 145,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/repo-lock-sweep-handoff.test.ts": [
+      {
+        "line": 121,
+        "value": 30000
+      },
+      {
+        "line": 162,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/repo-lock-sweep-orphan.test.ts": [
+      {
+        "line": 139,
+        "value": 30000
+      },
+      {
+        "line": 170,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/repo-lock-sweep.test.ts": [
+      {
+        "line": 147,
+        "value": 30000
+      },
+      {
+        "line": 208,
+        "value": 30000
+      },
+      {
+        "line": 238,
+        "value": 30000
+      },
+      {
+        "line": 271,
+        "value": 30000
+      },
+      {
+        "line": 329,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/repo.test.ts": [
+      {
+        "line": 184,
+        "value": 30000
+      },
+      {
+        "line": 258,
+        "value": 30000
+      },
+      {
+        "line": 286,
+        "value": 30000
+      },
+      {
+        "line": 329,
+        "value": 30000
+      },
+      {
+        "line": 358,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/test-repo-config.test.ts": [
+      {
+        "line": 82,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/git/timeout-diagnostics.test.ts": [
+      {
+        "line": 58,
+        "value": 60000
+      },
+      {
+        "line": 139,
+        "value": 90000
+      }
+    ],
+    "packages/memory-core/src/journal/lock.test.ts": [
+      {
+        "line": 146,
+        "value": 30000
+      },
+      {
+        "line": 172,
+        "value": 30000
+      },
+      {
+        "line": 241,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/journal/store.test.ts": [
+      {
+        "line": 250,
+        "value": 15000
+      }
+    ],
+    "packages/memory-core/src/locks/process-start-time.test.ts": [
+      {
+        "line": 158,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/locks/subprocess-contention.test.ts": [
+      {
+        "line": 209,
+        "value": 30000
+      },
+      {
+        "line": 298,
+        "value": 30000
+      },
+      {
+        "line": 316,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/memfs/hooks-secret.test.ts": [
+      {
+        "line": 61,
+        "value": 30000
+      },
+      {
+        "line": 82,
+        "value": 60000
+      },
+      {
+        "line": 99,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/memfs/hooks-teardown.test.ts": [
+      {
+        "line": 35,
+        "value": 30000
+      },
+      {
+        "line": 61,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/recall/bm25-persist.test.ts": [
+      {
+        "line": 154,
+        "value": null
+      },
+      {
+        "line": 173,
+        "value": null
+      },
+      {
+        "line": 191,
+        "value": null
+      },
+      {
+        "line": 218,
+        "value": null
+      },
+      {
+        "line": 253,
+        "value": null
+      },
+      {
+        "line": 283,
+        "value": null
+      },
+      {
+        "line": 308,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/recall/provider-git-budget.test.ts": [
+      {
+        "line": 81,
+        "value": 60000
+      },
+      {
+        "line": 112,
+        "value": 60000
+      },
+      {
+        "line": 134,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/receipts/receipts.test.ts": [
+      {
+        "line": 108,
+        "value": 30000
+      },
+      {
+        "line": 204,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/reflection/description-preflight.test.ts": [
+      {
+        "line": 123,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/soul/watermark.test.ts": [
+      {
+        "line": 197,
+        "value": 120000
+      }
+    ],
+    "packages/memory-core/src/sync/account/account-chain.test.ts": [
+      {
+        "line": 115,
+        "value": 30000
+      },
+      {
+        "line": 135,
+        "value": 30000
+      },
+      {
+        "line": 152,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/account/engine-roundtrip.test.ts": [
+      {
+        "line": 98,
+        "value": null
+      },
+      {
+        "line": 131,
+        "value": null
+      },
+      {
+        "line": 161,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/account/genesis-replication.test.ts": [
+      {
+        "line": 128,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/account/pairing-flows.test.ts": [
+      {
+        "line": 150,
+        "value": 30000
+      },
+      {
+        "line": 182,
+        "value": 30000
+      },
+      {
+        "line": 212,
+        "value": 30000
+      },
+      {
+        "line": 251,
+        "value": 30000
+      },
+      {
+        "line": 329,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/account/phrase-notice.test.ts": [
+      {
+        "line": 81,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/account/revoke-rotation-races.test.ts": [
+      {
+        "line": 40,
+        "value": null
+      },
+      {
+        "line": 62,
+        "value": null
+      },
+      {
+        "line": 90,
+        "value": null
+      },
+      {
+        "line": 116,
+        "value": null
+      },
+      {
+        "line": 140,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/account/revoke-rotation-settler.test.ts": [
+      {
+        "line": 104,
+        "value": null
+      },
+      {
+        "line": 135,
+        "value": null
+      },
+      {
+        "line": 162,
+        "value": null
+      },
+      {
+        "line": 189,
+        "value": null
+      },
+      {
+        "line": 212,
+        "value": null
+      },
+      {
+        "line": 243,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/account/revoke-rotation.test.ts": [
+      {
+        "line": 62,
+        "value": null
+      },
+      {
+        "line": 90,
+        "value": null
+      },
+      {
+        "line": 126,
+        "value": null
+      },
+      {
+        "line": 151,
+        "value": null
+      },
+      {
+        "line": 176,
+        "value": null
+      },
+      {
+        "line": 207,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/account/session.test.ts": [
+      {
+        "line": 97,
+        "value": 30000
+      },
+      {
+        "line": 119,
+        "value": 30000
+      },
+      {
+        "line": 128,
+        "value": 30000
+      },
+      {
+        "line": 140,
+        "value": 30000
+      },
+      {
+        "line": 153,
+        "value": 30000
+      },
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 167,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/crypto/receiver-parity.test.ts": [
+      {
+        "line": 286,
+        "value": null
+      },
+      {
+        "line": 331,
+        "value": null
+      },
+      {
+        "line": 389,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/adapters/http-transport.test.ts": [
+      {
+        "line": 360,
+        "value": 15000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-capture-key-symmetry.test.ts": [
+      {
+        "line": 58,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-capture-symlink.test.ts": [
+      {
+        "line": 47,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-clone.test.ts": [
+      {
+        "line": 49,
+        "value": null
+      },
+      {
+        "line": 65,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-converge.test.ts": [
+      {
+        "line": 69,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-crash.test.ts": [
+      {
+        "line": 53,
+        "value": null
+      },
+      {
+        "line": 73,
+        "value": null
+      },
+      {
+        "line": 92,
+        "value": null
+      },
+      {
+        "line": 111,
+        "value": null
+      },
+      {
+        "line": 136,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-durability.test.ts": [
+      {
+        "line": 65,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-fuzz.test.ts": [
+      {
+        "line": 126,
+        "value": 120000
+      },
+      {
+        "line": 131,
+        "value": 120000
+      },
+      {
+        "line": 139,
+        "value": 180000
+      },
+      {
+        "line": 144,
+        "value": 180000
+      },
+      {
+        "line": 155,
+        "value": 180000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-harness-dispose.test.ts": [
+      {
+        "line": 69,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-idle.test.ts": [
+      {
+        "line": 30,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-join-adopt.test.ts": [
+      {
+        "line": 60,
+        "value": null
+      },
+      {
+        "line": 73,
+        "value": null
+      },
+      {
+        "line": 92,
+        "value": null
+      },
+      {
+        "line": 119,
+        "value": null
+      },
+      {
+        "line": 146,
+        "value": null
+      },
+      {
+        "line": 162,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-journaled-recovery.test.ts": [
+      {
+        "line": 67,
+        "value": 60000
+      },
+      {
+        "line": 86,
+        "value": 60000
+      },
+      {
+        "line": 115,
+        "value": 60000
+      },
+      {
+        "line": 146,
+        "value": 60000
+      },
+      {
+        "line": 171,
+        "value": 60000
+      },
+      {
+        "line": 201,
+        "value": 60000
+      },
+      {
+        "line": 232,
+        "value": 60000
+      },
+      {
+        "line": 249,
+        "value": 60000
+      },
+      {
+        "line": 278,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-legacy-journal.test.ts": [
+      {
+        "line": 84,
+        "value": null
+      },
+      {
+        "line": 117,
+        "value": null
+      },
+      {
+        "line": 144,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-normalized-name.test.ts": [
+      {
+        "line": 58,
+        "value": null
+      },
+      {
+        "line": 76,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-offline-count.test.ts": [
+      {
+        "line": 42,
+        "value": null
+      },
+      {
+        "line": 65,
+        "value": null
+      },
+      {
+        "line": 77,
+        "value": null
+      },
+      {
+        "line": 93,
+        "value": null
+      },
+      {
+        "line": 108,
+        "value": null
+      },
+      {
+        "line": 126,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-offline.test.ts": [
+      {
+        "line": 59,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-outbox-journal.test.ts": [
+      {
+        "line": 92,
+        "value": null
+      },
+      {
+        "line": 123,
+        "value": null
+      },
+      {
+        "line": 163,
+        "value": null
+      },
+      {
+        "line": 191,
+        "value": null
+      },
+      {
+        "line": 212,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-oversized-item.test.ts": [
+      {
+        "line": 38,
+        "value": 180000
+      },
+      {
+        "line": 86,
+        "value": 60000
+      },
+      {
+        "line": 107,
+        "value": 60000
+      },
+      {
+        "line": 136,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-oversized-legacy.test.ts": [
+      {
+        "line": 92,
+        "value": 60000
+      },
+      {
+        "line": 109,
+        "value": 60000
+      },
+      {
+        "line": 128,
+        "value": 60000
+      },
+      {
+        "line": 140,
+        "value": 60000
+      },
+      {
+        "line": 162,
+        "value": 60000
+      },
+      {
+        "line": 189,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-oversized-peer.test.ts": [
+      {
+        "line": 81,
+        "value": 60000
+      },
+      {
+        "line": 97,
+        "value": 60000
+      },
+      {
+        "line": 119,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-push-bounded.test.ts": [
+      {
+        "line": 118,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-push-shape.test.ts": [
+      {
+        "line": 56,
+        "value": null
+      },
+      {
+        "line": 96,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-real-store.test.ts": [
+      {
+        "line": 34,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-received-key-escape.test.ts": [
+      {
+        "line": 51,
+        "value": null
+      },
+      {
+        "line": 67,
+        "value": null
+      },
+      {
+        "line": 90,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-received-key-liveness.test.ts": [
+      {
+        "line": 64,
+        "value": null
+      },
+      {
+        "line": 91,
+        "value": null
+      },
+      {
+        "line": 108,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-received-key-metadata.test.ts": [
+      {
+        "line": 40,
+        "value": null
+      },
+      {
+        "line": 68,
+        "value": null
+      },
+      {
+        "line": 84,
+        "value": null
+      },
+      {
+        "line": 104,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-received-key-symlink.test.ts": [
+      {
+        "line": 44,
+        "value": null
+      },
+      {
+        "line": 60,
+        "value": null
+      },
+      {
+        "line": 77,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-received-key-upgrade.test.ts": [
+      {
+        "line": 103,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-rejoin-outgoing.test.ts": [
+      {
+        "line": 164,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-render-reads.test.ts": [
+      {
+        "line": 45,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-review.test.ts": [
+      {
+        "line": 48,
+        "value": null
+      },
+      {
+        "line": 74,
+        "value": null
+      },
+      {
+        "line": 108,
+        "value": null
+      },
+      {
+        "line": 134,
+        "value": null
+      },
+      {
+        "line": 167,
+        "value": null
+      },
+      {
+        "line": 210,
+        "value": null
+      },
+      {
+        "line": 241,
+        "value": null
+      },
+      {
+        "line": 267,
+        "value": null
+      },
+      {
+        "line": 289,
+        "value": null
+      },
+      {
+        "line": 322,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-shown-failure.test.ts": [
+      {
+        "line": 61,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-space-move.test.ts": [
+      {
+        "line": 57,
+        "value": null
+      },
+      {
+        "line": 78,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-status.test.ts": [
+      {
+        "line": 47,
+        "value": null
+      },
+      {
+        "line": 62,
+        "value": null
+      },
+      {
+        "line": 97,
+        "value": null
+      },
+      {
+        "line": 132,
+        "value": null
+      },
+      {
+        "line": 163,
+        "value": null
+      },
+      {
+        "line": 191,
+        "value": null
+      },
+      {
+        "line": 213,
+        "value": null
+      },
+      {
+        "line": 237,
+        "value": null
+      },
+      {
+        "line": 271,
+        "value": null
+      },
+      {
+        "line": 304,
+        "value": null
+      },
+      {
+        "line": 335,
+        "value": null
+      },
+      {
+        "line": 355,
+        "value": null
+      },
+      {
+        "line": 380,
+        "value": null
+      },
+      {
+        "line": 399,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-tamper.test.ts": [
+      {
+        "line": 43,
+        "value": null
+      },
+      {
+        "line": 58,
+        "value": null
+      },
+      {
+        "line": 73,
+        "value": null
+      },
+      {
+        "line": 89,
+        "value": null
+      },
+      {
+        "line": 103,
+        "value": null
+      },
+      {
+        "line": 119,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/engine-triggers.test.ts": [
+      {
+        "line": 42,
+        "value": null
+      },
+      {
+        "line": 59,
+        "value": null
+      },
+      {
+        "line": 79,
+        "value": null
+      },
+      {
+        "line": 102,
+        "value": null
+      },
+      {
+        "line": 159,
+        "value": null
+      },
+      {
+        "line": 182,
+        "value": null
+      },
+      {
+        "line": 237,
+        "value": null
+      },
+      {
+        "line": 284,
+        "value": null
+      },
+      {
+        "line": 319,
+        "value": null
+      },
+      {
+        "line": 346,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/sync/engine/open.test.ts": [
+      {
+        "line": 84,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/item/casefold-packaging.test.ts": [
+      {
+        "line": 28,
+        "value": 20000
+      }
+    ],
+    "packages/memory-core/src/sync/item/convergence.test.ts": [
+      {
+        "line": 103,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/item/idempotence.r3.test-support.ts": [
+      {
+        "line": 273,
+        "value": 120000
+      }
+    ],
+    "packages/memory-core/src/sync/item/render-for-disk.property.test.ts": [
+      {
+        "line": 161,
+        "value": 120000
+      }
+    ],
+    "packages/memory-core/src/sync/item/roundtrip.test.ts": [
+      {
+        "line": 76,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/mirror-hook-pipes.test.ts": [
+      {
+        "line": 93,
+        "value": 120000
+      }
+    ],
+    "packages/memory-core/src/sync/mirror.test.ts": [
+      {
+        "line": 123,
+        "value": 30000
+      },
+      {
+        "line": 136,
+        "value": 30000
+      },
+      {
+        "line": 153,
+        "value": 30000
+      },
+      {
+        "line": 171,
+        "value": 30000
+      },
+      {
+        "line": 189,
+        "value": 30000
+      },
+      {
+        "line": 208,
+        "value": 30000
+      },
+      {
+        "line": 222,
+        "value": 30000
+      },
+      {
+        "line": 238,
+        "value": 30000
+      },
+      {
+        "line": 253,
+        "value": 30000
+      },
+      {
+        "line": 286,
+        "value": 30000
+      },
+      {
+        "line": 300,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/redact.test.ts": [
+      {
+        "line": 191,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/sync/space/adopt-commit.test.ts": [
+      {
+        "line": 85,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/space/adopt-deletion-gate.test.ts": [
+      {
+        "line": 169,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/space/adopt-preservation.test-support.ts": [
+      {
+        "line": 90,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/space/adopt-readback.test.ts": [
+      {
+        "line": 280,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/space/adopt-replay.test.ts": [
+      {
+        "line": 79,
+        "value": 60000
+      },
+      {
+        "line": 113,
+        "value": 60000
+      },
+      {
+        "line": 154,
+        "value": 60000
+      },
+      {
+        "line": 194,
+        "value": 60000
+      },
+      {
+        "line": 230,
+        "value": 60000
+      },
+      {
+        "line": 254,
+        "value": 60000
+      }
+    ],
+    "packages/memory-core/src/sync/wire-fixture-bind.test.ts": [
+      {
+        "line": 64,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/tools/memory-apply-patch-provenance.test.ts": [
+      {
+        "line": 34,
+        "value": null
+      },
+      {
+        "line": 65,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/tools/memory-apply-patch-validation.test.ts": [
+      {
+        "line": 59,
+        "value": null
+      },
+      {
+        "line": 93,
+        "value": null
+      },
+      {
+        "line": 147,
+        "value": null
+      },
+      {
+        "line": 186,
+        "value": null
+      },
+      {
+        "line": 236,
+        "value": null
+      }
+    ],
+    "packages/memory-core/src/tools/memory-claim-receipts.test.ts": [
+      {
+        "line": 73,
+        "value": 30000
+      },
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 97,
+        "value": 30000
+      },
+      {
+        "line": 110,
+        "value": 30000
+      },
+      {
+        "line": 121,
+        "value": 30000
+      },
+      {
+        "line": 139,
+        "value": 30000
+      },
+      {
+        "line": 156,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/tools/memory-legacy-header.test.ts": [
+      {
+        "line": 71,
+        "value": 30000
+      },
+      {
+        "line": 78,
+        "value": 30000
+      },
+      {
+        "line": 94,
+        "value": 30000
+      },
+      {
+        "line": 101,
+        "value": 30000
+      },
+      {
+        "line": 120,
+        "value": 60000
+      },
+      {
+        "line": 139,
+        "value": 30000
+      },
+      {
+        "line": 155,
+        "value": 30000
+      },
+      {
+        "line": 189,
+        "value": 120000
+      },
+      {
+        "line": 208,
+        "value": 30000
+      },
+      {
+        "line": 214,
+        "value": 30000
+      }
+    ],
+    "packages/memory-core/src/tools/write-with-pipe-holding-hook.test.ts": [
+      {
+        "line": 102,
+        "value": 90000
+      }
+    ],
+    "packages/omo-codex/plugin/components/bootstrap/test/environment.test.ts": [
+      {
+        "line": 184,
+        "value": 30000
+      }
+    ],
+    "packages/omo-codex/src/install/codex-cache-install.test.ts": [
+      {
+        "line": 86,
+        "value": 15000
+      },
+      {
+        "line": 131,
+        "value": 15000
+      },
+      {
+        "line": 162,
+        "value": 15000
+      },
+      {
+        "line": 196,
+        "value": 15000
+      },
+      {
+        "line": 228,
+        "value": 15000
+      },
+      {
+        "line": 373,
+        "value": 15000
+      }
+    ],
+    "packages/omo-codex/src/install/codex-cache-windows-command-shim.test.ts": [
+      {
+        "line": 77,
+        "value": 30000
+      }
+    ],
+    "packages/omo-codex/src/install/install-codex-git-bash-preflight.test.ts": [
+      {
+        "line": 82,
+        "value": null
+      },
+      {
+        "line": 128,
+        "value": null
+      },
+      {
+        "line": 158,
+        "value": null
+      },
+      {
+        "line": 185,
+        "value": null
+      },
+      {
+        "line": 213,
+        "value": null
+      },
+      {
+        "line": 244,
+        "value": null
+      }
+    ],
+    "packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts": [
+      {
+        "line": 78,
+        "value": null
+      },
+      {
+        "line": 110,
+        "value": null
+      }
+    ],
+    "packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts": [
+      {
+        "line": 48,
+        "value": 30000
+      }
+    ],
+    "packages/omo-codex/src/install/install-codex-packaged.test.ts": [
+      {
+        "line": 161,
+        "value": 30000
+      }
+    ],
+    "packages/omo-codex/src/install/install-codex-project-local-cleanup.test.ts": [
+      {
+        "line": 86,
+        "value": 15000
+      },
+      {
+        "line": 138,
+        "value": 30000
+      },
+      {
+        "line": 173,
+        "value": 15000
+      }
+    ],
+    "packages/omo-codex/src/install/install-codex.test.ts": [
+      {
+        "line": 251,
+        "value": null
+      },
+      {
+        "line": 284,
+        "value": null
+      },
+      {
+        "line": 315,
+        "value": null
+      },
+      {
+        "line": 361,
+        "value": null
+      },
+      {
+        "line": 390,
+        "value": null
+      }
+    ],
+    "packages/omo-codex/src/install/lazycodex-install-surface.test.ts": [
+      {
+        "line": 65,
+        "value": null
+      },
+      {
+        "line": 116,
+        "value": null
+      },
+      {
+        "line": 189,
+        "value": null
+      },
+      {
+        "line": 217,
+        "value": null
+      }
+    ],
+    "packages/omo-native/test/account-cli-entry.test.ts": [
+      {
+        "line": 63,
+        "value": 20000
+      }
+    ],
+    "packages/omo-native/test/account-cli.test.ts": [
+      {
+        "line": 379,
+        "value": 30000
+      }
+    ],
+    "packages/omo-native/test/bun-global-upgrade.test.ts": [
+      {
+        "line": 151,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/child-process-signal.test.ts": [
+      {
+        "line": 202,
+        "value": 30000
+      },
+      {
+        "line": 217,
+        "value": 30000
+      },
+      {
+        "line": 241,
+        "value": 30000
+      },
+      {
+        "line": 259,
+        "value": 30000
+      },
+      {
+        "line": 289,
+        "value": 30000
+      },
+      {
+        "line": 334,
+        "value": 30000
+      }
+    ],
+    "packages/omo-native/test/compile-entry-exit-status.test.ts": [
+      {
+        "line": 18,
+        "value": 120000
+      }
+    ],
+    "packages/omo-native/test/compile-prebuilds.test.ts": [
+      {
+        "line": 65,
+        "value": 120000
+      }
+    ],
+    "packages/omo-native/test/compiled-ca-trust.test.ts": [
+      {
+        "line": 73,
+        "value": 60000
+      },
+      {
+        "line": 99,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/compiled-kill-guard-dispatch.test.ts": [
+      {
+        "line": 104,
+        "value": 120000
+      },
+      {
+        "line": 133,
+        "value": 120000
+      },
+      {
+        "line": 146,
+        "value": 120000
+      }
+    ],
+    "packages/omo-native/test/compiled-setup-binary.test.ts": [
+      {
+        "line": 85,
+        "value": 120000
+      }
+    ],
+    "packages/omo-native/test/computer-use-doctor.test.ts": [
+      {
+        "line": 366,
+        "value": null
+      }
+    ],
+    "packages/omo-native/test/device-service-pin-served.test.ts": [
+      {
+        "line": 45,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/doctor-migration.test.ts": [
+      {
+        "line": 691,
+        "value": 30000
+      }
+    ],
+    "packages/omo-native/test/keychain-helper-build.test.ts": [
+      {
+        "line": 28,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/keychain-helper-session.test.ts": [
+      {
+        "line": 84,
+        "value": 10000
+      },
+      {
+        "line": 97,
+        "value": 10000
+      },
+      {
+        "line": 109,
+        "value": 10000
+      }
+    ],
+    "packages/omo-native/test/launcher-private-fd-pair.test.ts": [
+      {
+        "line": 133,
+        "value": 150000
+      }
+    ],
+    "packages/omo-native/test/launcher.test.ts": [
+      {
+        "line": 324,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/linux-trust-containers.test.ts": [
+      {
+        "line": 210,
+        "value": 900000
+      }
+    ],
+    "packages/omo-native/test/memory-sync-boot-claim.test.ts": [
+      {
+        "line": 210,
+        "value": 300000
+      },
+      {
+        "line": 220,
+        "value": 300000
+      }
+    ],
+    "packages/omo-native/test/openssl-default-file.test.ts": [
+      {
+        "line": 385,
+        "value": 240000
+      }
+    ],
+    "packages/omo-native/test/openssl-hash-dir.test.ts": [
+      {
+        "line": 286,
+        "value": 30000
+      },
+      {
+        "line": 336,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/packed-install.test.ts": [
+      {
+        "line": 208,
+        "value": 240000
+      },
+      {
+        "line": 242,
+        "value": 240000
+      }
+    ],
+    "packages/omo-native/test/payload.test.ts": [
+      {
+        "line": 155,
+        "value": null
+      }
+    ],
+    "packages/omo-native/test/provisioned-handoff-private-fds.test.ts": [
+      {
+        "line": 55,
+        "value": 60000
+      },
+      {
+        "line": 89,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/provisioned-handoff-startup-pipe.test.ts": [
+      {
+        "line": 61,
+        "value": 60000
+      },
+      {
+        "line": 76,
+        "value": 60000
+      },
+      {
+        "line": 100,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/provisioned-handoff.test.ts": [
+      {
+        "line": 192,
+        "value": 180000
+      }
+    ],
+    "packages/omo-native/test/self-update-held-package.test.ts": [
+      {
+        "line": 324,
+        "value": 10000
+      }
+    ],
+    "packages/omo-native/test/sync-cli-phrase-pty.test.ts": [
+      {
+        "line": 60,
+        "value": 60000
+      }
+    ],
+    "packages/omo-native/test/sync-phrase-tty-pty.test.ts": [
+      {
+        "line": 38,
+        "value": 40000
+      }
+    ],
+    "packages/omo-native/test/trust-stage.test.ts": [
+      {
+        "line": 582,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/agents/per-agent-prompt-parity.test.ts": [
+      {
+        "line": 137,
+        "value": 120000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/accounts-closed.test.ts": [
+      {
+        "line": 99,
+        "value": 60000
+      },
+      {
+        "line": 114,
+        "value": 60000
+      },
+      {
+        "line": 123,
+        "value": 60000
+      },
+      {
+        "line": 140,
+        "value": 60000
+      },
+      {
+        "line": 153,
+        "value": 60000
+      },
+      {
+        "line": 161,
+        "value": 60000
+      },
+      {
+        "line": 172,
+        "value": 60000
+      },
+      {
+        "line": 204,
+        "value": 60000
+      },
+      {
+        "line": 212,
+        "value": 60000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/cli-roundtrip.test.ts": [
+      {
+        "line": 92,
+        "value": 15000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/closed-device-login.test.ts": [
+      {
+        "line": 97,
+        "value": 60000
+      },
+      {
+        "line": 147,
+        "value": 60000
+      },
+      {
+        "line": 204,
+        "value": 60000
+      },
+      {
+        "line": 211,
+        "value": 60000
+      },
+      {
+        "line": 218,
+        "value": 60000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/commands-review.test.ts": [
+      {
+        "line": 104,
+        "value": 15000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/credential-lock-held.test.ts": [
+      {
+        "line": 99,
+        "value": 40000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/credential-lock-torn.test.ts": [
+      {
+        "line": 30,
+        "value": 20000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/logout-outcomes.test.ts": [
+      {
+        "line": 97,
+        "value": 15000
+      },
+      {
+        "line": 222,
+        "value": 15000
+      },
+      {
+        "line": 262,
+        "value": 15000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/refresh-process.test.ts": [
+      {
+        "line": 64,
+        "value": 10000
+      },
+      {
+        "line": 127,
+        "value": 30000
+      },
+      {
+        "line": 143,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/session-machine-reconcile.test.ts": [
+      {
+        "line": 248,
+        "value": 10000
+      },
+      {
+        "line": 280,
+        "value": 10000
+      }
+    ],
+    "packages/omo-opencode/src/cli/service-auth/versioned-keystore.test.ts": [
+      {
+        "line": 56,
+        "value": 8000
+      }
+    ],
+    "packages/omo-opencode/src/cli/worktree-sweep/worktree-sweep.test.ts": [
+      {
+        "line": 317,
+        "value": 30000
+      },
+      {
+        "line": 347,
+        "value": 30000
+      },
+      {
+        "line": 416,
+        "value": 30000
+      },
+      {
+        "line": 459,
+        "value": 30000
+      },
+      {
+        "line": 482,
+        "value": 30000
+      },
+      {
+        "line": 510,
+        "value": 30000
+      },
+      {
+        "line": 532,
+        "value": 30000
+      },
+      {
+        "line": 550,
+        "value": 30000
+      },
+      {
+        "line": 585,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/dependency-security.test.ts": [
+      {
+        "line": 138,
+        "value": 90000
+      }
+    ],
+    "packages/omo-opencode/src/features/mcp-oauth/callback-server.test.ts": [
+      {
+        "line": 153,
+        "value": null
+      },
+      {
+        "line": 173,
+        "value": null
+      },
+      {
+        "line": 189,
+        "value": null
+      },
+      {
+        "line": 210,
+        "value": null
+      },
+      {
+        "line": 253,
+        "value": null
+      },
+      {
+        "line": 276,
+        "value": null
+      },
+      {
+        "line": 297,
+        "value": null
+      },
+      {
+        "line": 319,
+        "value": null
+      },
+      {
+        "line": 340,
+        "value": null
+      }
+    ],
+    "packages/omo-opencode/src/features/team-mode/integration.test.ts": [
+      {
+        "line": 170,
+        "value": 30000
+      },
+      {
+        "line": 204,
+        "value": 30000
+      },
+      {
+        "line": 271,
+        "value": 30000
+      },
+      {
+        "line": 403,
+        "value": 30000
+      },
+      {
+        "line": 443,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts": [
+      {
+        "line": 517,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/hooks/atlas/index.test.ts": [
+      {
+        "line": 1185,
+        "value": 10000
+      }
+    ],
+    "packages/omo-opencode/src/hooks/shared/prompt-async-gate-live-routing.test.ts": [
+      {
+        "line": 240,
+        "value": 5000
+      },
+      {
+        "line": 299,
+        "value": 5000
+      }
+    ],
+    "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint-leader.test.ts": [
+      {
+        "line": 157,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts": [
+      {
+        "line": 621,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/hooks/todo-continuation-enforcer/opencode-overload-continuation.test.ts": [
+      {
+        "line": 133,
+        "value": 10000
+      }
+    ],
+    "packages/omo-opencode/src/hooks/todo-continuation-enforcer/todo-continuation-enforcer.test.ts": [
+      {
+        "line": 322,
+        "value": 15000
+      },
+      {
+        "line": 345,
+        "value": 15000
+      },
+      {
+        "line": 436,
+        "value": 15000
+      },
+      {
+        "line": 459,
+        "value": 15000
+      },
+      {
+        "line": 515,
+        "value": 15000
+      },
+      {
+        "line": 740,
+        "value": 15000
+      },
+      {
+        "line": 809,
+        "value": 15000
+      },
+      {
+        "line": 885,
+        "value": 30000
+      },
+      {
+        "line": 923,
+        "value": 30000
+      },
+      {
+        "line": 978,
+        "value": 30000
+      },
+      {
+        "line": 1012,
+        "value": 30000
+      },
+      {
+        "line": 1051,
+        "value": 30000
+      },
+      {
+        "line": 1092,
+        "value": 60000
+      },
+      {
+        "line": 1121,
+        "value": 30000
+      },
+      {
+        "line": 1159,
+        "value": 30000
+      },
+      {
+        "line": 1198,
+        "value": 30000
+      },
+      {
+        "line": 1276,
+        "value": 15000
+      },
+      {
+        "line": 1317,
+        "value": 15000
+      },
+      {
+        "line": 1347,
+        "value": 15000
+      },
+      {
+        "line": 1380,
+        "value": 15000
+      },
+      {
+        "line": 1439,
+        "value": 15000
+      },
+      {
+        "line": 1466,
+        "value": 15000
+      },
+      {
+        "line": 1584,
+        "value": 15000
+      },
+      {
+        "line": 1627,
+        "value": 15000
+      },
+      {
+        "line": 1668,
+        "value": 15000
+      },
+      {
+        "line": 1710,
+        "value": 15000
+      },
+      {
+        "line": 1752,
+        "value": 15000
+      },
+      {
+        "line": 1830,
+        "value": 15000
+      },
+      {
+        "line": 2248,
+        "value": 15000
+      },
+      {
+        "line": 2317,
+        "value": 15000
+      },
+      {
+        "line": 2400,
+        "value": 20000
+      },
+      {
+        "line": 2544,
+        "value": 30000
+      },
+      {
+        "line": 2589,
+        "value": 15000
+      }
+    ],
+    "packages/omo-opencode/src/index.test.ts": [
+      {
+        "line": 170,
+        "value": 15000
+      }
+    ],
+    "packages/omo-opencode/src/plugin-handlers/config-handler.test.ts": [
+      {
+        "line": 1454,
+        "value": 5000
+      }
+    ],
+    "packages/omo-opencode/src/plugin/normalize-tool-arg-schemas.test.ts": [
+      {
+        "line": 96,
+        "value": 60000
+      }
+    ],
+    "packages/omo-opencode/src/shared/dist-bundle-bun-globals.test.ts": [
+      {
+        "line": 122,
+        "value": 20000
+      },
+      {
+        "line": 191,
+        "value": 20000
+      }
+    ],
+    "packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts": [
+      {
+        "line": 140,
+        "value": 30000
+      }
+    ],
+    "packages/omo-opencode/src/shared/live-server-route.test.ts": [
+      {
+        "line": 204,
+        "value": 5000
+      }
+    ],
+    "packages/omo-opencode/src/shared/markdown-link-audit.test.ts": [
+      {
+        "line": 268,
+        "value": 20000
+      },
+      {
+        "line": 281,
+        "value": 20000
+      }
+    ],
+    "packages/omo-opencode/src/shared/mock-module-lifecycle-audit.test.ts": [
+      {
+        "line": 299,
+        "value": 20000
+      }
+    ],
+    "packages/omo-opencode/src/shared/opencode-adapter-bun-runtime-audit.test.ts": [
+      {
+        "line": 179,
+        "value": 20000
+      }
+    ],
+    "packages/omo-opencode/src/shared/opencode-coupling-audit.test.ts": [
+      {
+        "line": 100,
+        "value": 20000
+      },
+      {
+        "line": 122,
+        "value": 20000
+      }
+    ],
+    "packages/omo-opencode/src/tools/delegate-task/category-dispatch.test.ts": [
+      {
+        "line": 247,
+        "value": 10000
+      }
+    ],
+    "packages/omo-opencode/src/tools/delegate-task/sync-session-poller.deleted-session.test.ts": [
+      {
+        "line": 59,
+        "value": 5000
+      },
+      {
+        "line": 93,
+        "value": 5000
+      }
+    ],
+    "packages/omo-opencode/src/tools/delegate-task/tools.test.ts": [
+      {
+        "line": 490,
+        "value": 10000
+      },
+      {
+        "line": 556,
+        "value": 10000
+      },
+      {
+        "line": 629,
+        "value": 10000
+      },
+      {
+        "line": 695,
+        "value": 10000
+      },
+      {
+        "line": 756,
+        "value": 10000
+      },
+      {
+        "line": 1334,
+        "value": 20000
+      },
+      {
+        "line": 1399,
+        "value": 20000
+      },
+      {
+        "line": 1459,
+        "value": 20000
+      },
+      {
+        "line": 1559,
+        "value": 20000
+      },
+      {
+        "line": 1610,
+        "value": 20000
+      },
+      {
+        "line": 1659,
+        "value": 20000
+      },
+      {
+        "line": 1735,
+        "value": 20000
+      },
+      {
+        "line": 1972,
+        "value": 10000
+      },
+      {
+        "line": 2027,
+        "value": 10000
+      },
+      {
+        "line": 2126,
+        "value": 10000
+      },
+      {
+        "line": 2231,
+        "value": 10000
+      },
+      {
+        "line": 2343,
+        "value": 10000
+      },
+      {
+        "line": 2534,
+        "value": 20000
+      },
+      {
+        "line": 2601,
+        "value": 20000
+      },
+      {
+        "line": 2722,
+        "value": 20000
+      },
+      {
+        "line": 2802,
+        "value": 20000
+      },
+      {
+        "line": 2940,
+        "value": 20000
+      },
+      {
+        "line": 3008,
+        "value": 20000
+      },
+      {
+        "line": 3086,
+        "value": 20000
+      },
+      {
+        "line": 3166,
+        "value": 20000
+      },
+      {
+        "line": 3246,
+        "value": 20000
+      },
+      {
+        "line": 3695,
+        "value": 20000
+      },
+      {
+        "line": 4462,
+        "value": 20000
+      },
+      {
+        "line": 4597,
+        "value": 20000
+      },
+      {
+        "line": 4660,
+        "value": 20000
+      },
+      {
+        "line": 4729,
+        "value": 20000
+      },
+      {
+        "line": 4795,
+        "value": 20000
+      },
+      {
+        "line": 4868,
+        "value": 20000
+      },
+      {
+        "line": 4929,
+        "value": 20000
+      },
+      {
+        "line": 4968,
+        "value": 20000
+      },
+      {
+        "line": 5027,
+        "value": 20000
+      },
+      {
+        "line": 5086,
+        "value": 10000
+      },
+      {
+        "line": 5141,
+        "value": 10000
+      },
+      {
+        "line": 5203,
+        "value": 10000
+      }
+    ],
+    "packages/omo-opencode/src/tools/look-at/tools.test.ts": [
+      {
+        "line": 596,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/plugin/scripts/bounded-stage.test.mjs": [
+      {
+        "line": 50,
+        "value": 30000
+      },
+      {
+        "line": 66,
+        "value": 30000
+      },
+      {
+        "line": 206,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/plugin/scripts/build-artifact.test.mjs": [
+      {
+        "line": 63,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/plugin/scripts/build-extension.test.mjs": [
+      {
+        "line": 780,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/plugin/scripts/stage-agent-toolkit.test.mjs": [
+      {
+        "line": 34,
+        "value": null
+      },
+      {
+        "line": 63,
+        "value": null
+      },
+      {
+        "line": 77,
+        "value": null
+      },
+      {
+        "line": 89,
+        "value": null
+      },
+      {
+        "line": 110,
+        "value": null
+      },
+      {
+        "line": 124,
+        "value": null
+      },
+      {
+        "line": 142,
+        "value": null
+      },
+      {
+        "line": 173,
+        "value": null
+      },
+      {
+        "line": 187,
+        "value": null
+      },
+      {
+        "line": 207,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/plugin/scripts/stage-x-search-skill.test.mjs": [
+      {
+        "line": 29,
+        "value": null
+      },
+      {
+        "line": 47,
+        "value": null
+      },
+      {
+        "line": 63,
+        "value": null
+      },
+      {
+        "line": 75,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/scripts/qa/task-rpc-diagnostics.test.mjs": [
+      {
+        "line": 66,
+        "value": 20000
+      },
+      {
+        "line": 108,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/scripts/qa/task-rpc-e2e.windows.test.ts": [
+      {
+        "line": 214,
+        "value": 440000
+      }
+    ],
+    "packages/omo-senpi/scripts/qa/task-runtime-fallback-e2e.windows.test.ts": [
+      {
+        "line": 115,
+        "value": 930000
+      }
+    ],
+    "packages/omo-senpi/scripts/qa/thread-tools/engine-version.test.mjs": [
+      {
+        "line": 72,
+        "value": 60000
+      },
+      {
+        "line": 94,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/bundle-purity.test.ts": [
+      {
+        "line": 96,
+        "value": 120000
+      }
+    ],
+    "packages/omo-senpi/src/components/comment-checker/comment-checker.stdin-pipe.test.ts": [
+      {
+        "line": 91,
+        "value": 60000
+      },
+      {
+        "line": 112,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/engine-probe-phase.test.ts": [
+      {
+        "line": 43,
+        "value": 10000
+      },
+      {
+        "line": 78,
+        "value": 10000
+      },
+      {
+        "line": 112,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/engine-probe.test.ts": [
+      {
+        "line": 104,
+        "value": 10000
+      },
+      {
+        "line": 150,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/index.passive-status.test.ts": [
+      {
+        "line": 136,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/launch-refusal.test.ts": [
+      {
+        "line": 20,
+        "value": 10000
+      },
+      {
+        "line": 45,
+        "value": 10000
+      },
+      {
+        "line": 55,
+        "value": 10000
+      },
+      {
+        "line": 114,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/permission-child.test.ts": [
+      {
+        "line": 23,
+        "value": 120000
+      },
+      {
+        "line": 42,
+        "value": 120000
+      },
+      {
+        "line": 57,
+        "value": 120000
+      },
+      {
+        "line": 70,
+        "value": 120000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/permission-event.test.ts": [
+      {
+        "line": 42,
+        "value": 120000
+      },
+      {
+        "line": 67,
+        "value": 120000
+      },
+      {
+        "line": 82,
+        "value": 120000
+      },
+      {
+        "line": 97,
+        "value": 120000
+      },
+      {
+        "line": 114,
+        "value": 120000
+      },
+      {
+        "line": 128,
+        "value": 120000
+      },
+      {
+        "line": 152,
+        "value": 120000
+      },
+      {
+        "line": 184,
+        "value": 120000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/permission-events.test.ts": [
+      {
+        "line": 157,
+        "value": 120000
+      }
+    ],
+    "packages/omo-senpi/src/components/computer-use/permission-registry.test.ts": [
+      {
+        "line": 42,
+        "value": 120000
+      }
+    ],
+    "packages/omo-senpi/src/components/config-watch/index.test.ts": [
+      {
+        "line": 239,
+        "value": 10000
+      },
+      {
+        "line": 264,
+        "value": 10000
+      },
+      {
+        "line": 300,
+        "value": 10000
+      },
+      {
+        "line": 337,
+        "value": 10000
+      },
+      {
+        "line": 377,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/desktop-toolkit/host-tool-routes.test.ts": [
+      {
+        "line": 72,
+        "value": 5000
+      },
+      {
+        "line": 102,
+        "value": 5000
+      }
+    ],
+    "packages/omo-senpi/src/components/desktop-toolkit/lifecycle.test.ts": [
+      {
+        "line": 30,
+        "value": 5000
+      }
+    ],
+    "packages/omo-senpi/src/components/desktop-toolkit/thread-tools.test.ts": [
+      {
+        "line": 253,
+        "value": 5000
+      },
+      {
+        "line": 264,
+        "value": 5000
+      }
+    ],
+    "packages/omo-senpi/src/components/lsp/post-edit-diagnostics.test.ts": [
+      {
+        "line": 62,
+        "value": null
+      },
+      {
+        "line": 84,
+        "value": null
+      },
+      {
+        "line": 89,
+        "value": null
+      },
+      {
+        "line": 190,
+        "value": null
+      },
+      {
+        "line": 193,
+        "value": null
+      },
+      {
+        "line": 194,
+        "value": null
+      },
+      {
+        "line": 196,
+        "value": null
+      },
+      {
+        "line": 197,
+        "value": null
+      },
+      {
+        "line": 199,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/agreements.test.ts": [
+      {
+        "line": 45,
+        "value": 30000
+      },
+      {
+        "line": 61,
+        "value": 30000
+      },
+      {
+        "line": 74,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/doctor-receipts.ts": [
+      {
+        "line": 51,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/init.test.ts": [
+      {
+        "line": 44,
+        "value": 30000
+      },
+      {
+        "line": 67,
+        "value": 30000
+      },
+      {
+        "line": 81,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/memory-repository.test.ts": [
+      {
+        "line": 51,
+        "value": 20000
+      },
+      {
+        "line": 65,
+        "value": 20000
+      },
+      {
+        "line": 115,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/people-ask.test.ts": [
+      {
+        "line": 45,
+        "value": 30000
+      },
+      {
+        "line": 79,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/people-gate.test.ts": [
+      {
+        "line": 28,
+        "value": 30000
+      },
+      {
+        "line": 40,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/people-selection.test.ts": [
+      {
+        "line": 27,
+        "value": 30000
+      },
+      {
+        "line": 39,
+        "value": 30000
+      },
+      {
+        "line": 66,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/commands/people.test.ts": [
+      {
+        "line": 28,
+        "value": 30000
+      },
+      {
+        "line": 43,
+        "value": 30000
+      },
+      {
+        "line": 57,
+        "value": 30000
+      },
+      {
+        "line": 69,
+        "value": 30000
+      },
+      {
+        "line": 94,
+        "value": 30000
+      },
+      {
+        "line": 112,
+        "value": 30000
+      },
+      {
+        "line": 139,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/compaction-survival.test.ts": [
+      {
+        "line": 240,
+        "value": 30000
+      },
+      {
+        "line": 252,
+        "value": 30000
+      },
+      {
+        "line": 274,
+        "value": 30000
+      },
+      {
+        "line": 294,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/desktop-sync/channel-compiled.test.ts": [
+      {
+        "line": 111,
+        "value": 90000
+      },
+      {
+        "line": 118,
+        "value": 90000
+      },
+      {
+        "line": 129,
+        "value": 90000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/device-session-wiring.test.ts": [
+      {
+        "line": 122,
+        "value": 30000
+      },
+      {
+        "line": 128,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/device-session/account-source-freshness.test.ts": [
+      {
+        "line": 188,
+        "value": 30000
+      },
+      {
+        "line": 264,
+        "value": 30000
+      },
+      {
+        "line": 285,
+        "value": 30000
+      },
+      {
+        "line": 302,
+        "value": 30000
+      },
+      {
+        "line": 326,
+        "value": 30000
+      },
+      {
+        "line": 347,
+        "value": 30000
+      },
+      {
+        "line": 376,
+        "value": 30000
+      },
+      {
+        "line": 403,
+        "value": 30000
+      },
+      {
+        "line": 449,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/device-session/revoke-session.test.ts": [
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 168,
+        "value": 30000
+      },
+      {
+        "line": 174,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/device-session/selected-account-source.test.ts": [
+      {
+        "line": 220,
+        "value": 30000
+      },
+      {
+        "line": 230,
+        "value": 30000
+      },
+      {
+        "line": 238,
+        "value": 30000
+      },
+      {
+        "line": 254,
+        "value": 30000
+      },
+      {
+        "line": 268,
+        "value": 30000
+      },
+      {
+        "line": 275,
+        "value": 30000
+      },
+      {
+        "line": 288,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/dream-selector.test.ts": [
+      {
+        "line": 293,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-agreement-flow.test.ts": [
+      {
+        "line": 87,
+        "value": 30000
+      },
+      {
+        "line": 140,
+        "value": 30000
+      },
+      {
+        "line": 206,
+        "value": 30000
+      },
+      {
+        "line": 255,
+        "value": 30000
+      },
+      {
+        "line": 307,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-applied-recovery.test.ts": [
+      {
+        "line": 86,
+        "value": 60000
+      },
+      {
+        "line": 113,
+        "value": 60000
+      },
+      {
+        "line": 150,
+        "value": 60000
+      },
+      {
+        "line": 168,
+        "value": 60000
+      },
+      {
+        "line": 188,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-apply-rpc.test.ts": [
+      {
+        "line": 90,
+        "value": 60000
+      },
+      {
+        "line": 110,
+        "value": 60000
+      },
+      {
+        "line": 141,
+        "value": 60000
+      },
+      {
+        "line": 151,
+        "value": 60000
+      },
+      {
+        "line": 173,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-consent.test.ts": [
+      {
+        "line": 143,
+        "value": 30000
+      },
+      {
+        "line": 150,
+        "value": 30000
+      },
+      {
+        "line": 157,
+        "value": 30000
+      },
+      {
+        "line": 161,
+        "value": 30000
+      },
+      {
+        "line": 168,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-drain.test.ts": [
+      {
+        "line": 92,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-engine-boundary.test.ts": [
+      {
+        "line": 240,
+        "value": 30000
+      },
+      {
+        "line": 253,
+        "value": 30000
+      },
+      {
+        "line": 275,
+        "value": 30000
+      },
+      {
+        "line": 300,
+        "value": 30000
+      },
+      {
+        "line": 317,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-failure-streaks.test.ts": [
+      {
+        "line": 100,
+        "value": 30000
+      },
+      {
+        "line": 121,
+        "value": 30000
+      },
+      {
+        "line": 151,
+        "value": 30000
+      },
+      {
+        "line": 171,
+        "value": 30000
+      },
+      {
+        "line": 197,
+        "value": 30000
+      },
+      {
+        "line": 223,
+        "value": 30000
+      },
+      {
+        "line": 245,
+        "value": 30000
+      },
+      {
+        "line": 265,
+        "value": 30000
+      },
+      {
+        "line": 287,
+        "value": 30000
+      },
+      {
+        "line": 302,
+        "value": 30000
+      },
+      {
+        "line": 325,
+        "value": 60000
+      },
+      {
+        "line": 367,
+        "value": 60000
+      },
+      {
+        "line": 380,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-launch-gating.test.ts": [
+      {
+        "line": 67,
+        "value": 30000
+      },
+      {
+        "line": 91,
+        "value": 30000
+      },
+      {
+        "line": 124,
+        "value": 30000
+      },
+      {
+        "line": 148,
+        "value": 30000
+      },
+      {
+        "line": 163,
+        "value": 30000
+      },
+      {
+        "line": 188,
+        "value": 30000
+      },
+      {
+        "line": 219,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-oversized-runner.test.ts": [
+      {
+        "line": 119,
+        "value": 30000
+      },
+      {
+        "line": 133,
+        "value": 30000
+      },
+      {
+        "line": 151,
+        "value": 30000
+      },
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 178,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-payload-cap.test.ts": [
+      {
+        "line": 79,
+        "value": 60000
+      },
+      {
+        "line": 115,
+        "value": 60000
+      },
+      {
+        "line": 146,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-payload-cleanup.test.ts": [
+      {
+        "line": 94,
+        "value": 30000
+      },
+      {
+        "line": 107,
+        "value": 30000
+      },
+      {
+        "line": 120,
+        "value": 30000
+      },
+      {
+        "line": 144,
+        "value": 30000
+      },
+      {
+        "line": 156,
+        "value": 30000
+      },
+      {
+        "line": 178,
+        "value": 30000
+      },
+      {
+        "line": 198,
+        "value": 30000
+      },
+      {
+        "line": 216,
+        "value": 30000
+      },
+      {
+        "line": 240,
+        "value": 30000
+      },
+      {
+        "line": 265,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-payload-oversize.test.ts": [
+      {
+        "line": 112,
+        "value": 30000
+      },
+      {
+        "line": 143,
+        "value": 30000
+      },
+      {
+        "line": 169,
+        "value": 30000
+      },
+      {
+        "line": 199,
+        "value": 30000
+      },
+      {
+        "line": 221,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-provider.test.ts": [
+      {
+        "line": 151,
+        "value": 30000
+      },
+      {
+        "line": 161,
+        "value": 30000
+      },
+      {
+        "line": 183,
+        "value": 30000
+      },
+      {
+        "line": 211,
+        "value": 30000
+      },
+      {
+        "line": 230,
+        "value": 30000
+      },
+      {
+        "line": 248,
+        "value": 30000
+      },
+      {
+        "line": 272,
+        "value": 30000
+      },
+      {
+        "line": 296,
+        "value": 30000
+      },
+      {
+        "line": 333,
+        "value": 30000
+      },
+      {
+        "line": 343,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-run-prune.test.ts": [
+      {
+        "line": 44,
+        "value": 30000
+      },
+      {
+        "line": 58,
+        "value": 30000
+      },
+      {
+        "line": 74,
+        "value": 30000
+      },
+      {
+        "line": 88,
+        "value": 30000
+      },
+      {
+        "line": 103,
+        "value": 30000
+      },
+      {
+        "line": 124,
+        "value": 30000
+      },
+      {
+        "line": 141,
+        "value": 30000
+      },
+      {
+        "line": 157,
+        "value": 30000
+      },
+      {
+        "line": 179,
+        "value": 30000
+      },
+      {
+        "line": 197,
+        "value": 30000
+      },
+      {
+        "line": 218,
+        "value": 30000
+      },
+      {
+        "line": 240,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-runner-abort.test.ts": [
+      {
+        "line": 25,
+        "value": 30000
+      },
+      {
+        "line": 80,
+        "value": 30000
+      },
+      {
+        "line": 103,
+        "value": 30000
+      },
+      {
+        "line": 148,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-runner-locking.test.ts": [
+      {
+        "line": 37,
+        "value": 30000
+      },
+      {
+        "line": 76,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-runner-people.test.ts": [
+      {
+        "line": 25,
+        "value": 90000
+      },
+      {
+        "line": 53,
+        "value": 90000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-runner.test.ts": [
+      {
+        "line": 73,
+        "value": 30000
+      },
+      {
+        "line": 94,
+        "value": 30000
+      },
+      {
+        "line": 119,
+        "value": 30000
+      },
+      {
+        "line": 156,
+        "value": 30000
+      },
+      {
+        "line": 195,
+        "value": 90000
+      },
+      {
+        "line": 232,
+        "value": 30000
+      },
+      {
+        "line": 278,
+        "value": 60000
+      },
+      {
+        "line": 296,
+        "value": 30000
+      },
+      {
+        "line": 345,
+        "value": 30000
+      },
+      {
+        "line": 378,
+        "value": 30000
+      },
+      {
+        "line": 420,
+        "value": 30000
+      },
+      {
+        "line": 435,
+        "value": 30000
+      },
+      {
+        "line": 450,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-secret-screening.test.ts": [
+      {
+        "line": 54,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/facts-wiring.test.ts": [
+      {
+        "line": 113,
+        "value": 30000
+      },
+      {
+        "line": 127,
+        "value": 30000
+      },
+      {
+        "line": 142,
+        "value": 30000
+      },
+      {
+        "line": 156,
+        "value": 30000
+      },
+      {
+        "line": 169,
+        "value": 30000
+      },
+      {
+        "line": 194,
+        "value": 30000
+      },
+      {
+        "line": 216,
+        "value": 30000
+      },
+      {
+        "line": 244,
+        "value": 30000
+      },
+      {
+        "line": 270,
+        "value": 30000
+      },
+      {
+        "line": 286,
+        "value": 30000
+      },
+      {
+        "line": 299,
+        "value": 30000
+      },
+      {
+        "line": 314,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/identity-runtime.test.ts": [
+      {
+        "line": 155,
+        "value": 30000
+      },
+      {
+        "line": 242,
+        "value": 30000
+      },
+      {
+        "line": 396,
+        "value": 30000
+      },
+      {
+        "line": 436,
+        "value": 30000
+      },
+      {
+        "line": 472,
+        "value": 30000
+      },
+      {
+        "line": 489,
+        "value": 30000
+      },
+      {
+        "line": 504,
+        "value": 30000
+      },
+      {
+        "line": 517,
+        "value": 30000
+      },
+      {
+        "line": 538,
+        "value": 30000
+      },
+      {
+        "line": 567,
+        "value": 30000
+      },
+      {
+        "line": 612,
+        "value": 30000
+      },
+      {
+        "line": 640,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/index-engine.test.ts": [
+      {
+        "line": 119,
+        "value": 300000
+      },
+      {
+        "line": 129,
+        "value": 300000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/index-selection.test.ts": [
+      {
+        "line": 94,
+        "value": 30000
+      },
+      {
+        "line": 98,
+        "value": 30000
+      },
+      {
+        "line": 109,
+        "value": 30000
+      },
+      {
+        "line": 120,
+        "value": 30000
+      },
+      {
+        "line": 131,
+        "value": 30000
+      },
+      {
+        "line": 142,
+        "value": 30000
+      },
+      {
+        "line": 153,
+        "value": 30000
+      },
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 170,
+        "value": 30000
+      },
+      {
+        "line": 181,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/journal-wiring.test.ts": [
+      {
+        "line": 404,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/kibitzer/delivery-idle.test.ts": [
+      {
+        "line": 222,
+        "value": 5000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/memory-claim-receipt.test.ts": [
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 90,
+        "value": 30000
+      },
+      {
+        "line": 106,
+        "value": 30000
+      },
+      {
+        "line": 120,
+        "value": 30000
+      },
+      {
+        "line": 141,
+        "value": 30000
+      },
+      {
+        "line": 155,
+        "value": 30000
+      },
+      {
+        "line": 172,
+        "value": 30000
+      },
+      {
+        "line": 181,
+        "value": 30000
+      },
+      {
+        "line": 195,
+        "value": 30000
+      },
+      {
+        "line": 203,
+        "value": 30000
+      },
+      {
+        "line": 227,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/memory-maintenance.test.ts": [
+      {
+        "line": 96,
+        "value": 60000
+      },
+      {
+        "line": 118,
+        "value": 60000
+      },
+      {
+        "line": 144,
+        "value": 60000
+      },
+      {
+        "line": 166,
+        "value": 30000
+      },
+      {
+        "line": 184,
+        "value": 60000
+      },
+      {
+        "line": 204,
+        "value": 60000
+      },
+      {
+        "line": 222,
+        "value": 60000
+      },
+      {
+        "line": 242,
+        "value": 60000
+      },
+      {
+        "line": 261,
+        "value": 60000
+      },
+      {
+        "line": 301,
+        "value": 30000
+      },
+      {
+        "line": 328,
+        "value": 30000
+      },
+      {
+        "line": 359,
+        "value": 30000
+      },
+      {
+        "line": 417,
+        "value": 60000
+      },
+      {
+        "line": 465,
+        "value": 60000
+      },
+      {
+        "line": 503,
+        "value": 60000
+      },
+      {
+        "line": 518,
+        "value": 60000
+      },
+      {
+        "line": 553,
+        "value": 60000
+      },
+      {
+        "line": 580,
+        "value": 60000
+      },
+      {
+        "line": 593,
+        "value": 60000
+      },
+      {
+        "line": 642,
+        "value": 60000
+      },
+      {
+        "line": 661,
+        "value": 60000
+      },
+      {
+        "line": 679,
+        "value": 60000
+      },
+      {
+        "line": 706,
+        "value": 60000
+      },
+      {
+        "line": 732,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/nudge-wiring.test.ts": [
+      {
+        "line": 95,
+        "value": 30000
+      },
+      {
+        "line": 122,
+        "value": 30000
+      },
+      {
+        "line": 148,
+        "value": 30000
+      },
+      {
+        "line": 183,
+        "value": 30000
+      },
+      {
+        "line": 218,
+        "value": 30000
+      },
+      {
+        "line": 253,
+        "value": 30000
+      },
+      {
+        "line": 292,
+        "value": 60000
+      },
+      {
+        "line": 329,
+        "value": 30000
+      },
+      {
+        "line": 370,
+        "value": 30000
+      },
+      {
+        "line": 408,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/palace/entry-collector.test.ts": [
+      {
+        "line": 19,
+        "value": 30000
+      },
+      {
+        "line": 33,
+        "value": 30000
+      },
+      {
+        "line": 44,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/palace/history-collector.test.ts": [
+      {
+        "line": 36,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/palace/people.test.ts": [
+      {
+        "line": 41,
+        "value": 30000
+      },
+      {
+        "line": 55,
+        "value": 30000
+      },
+      {
+        "line": 65,
+        "value": 30000
+      },
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 90,
+        "value": 30000
+      },
+      {
+        "line": 99,
+        "value": 30000
+      },
+      {
+        "line": 111,
+        "value": 30000
+      },
+      {
+        "line": 125,
+        "value": 30000
+      },
+      {
+        "line": 138,
+        "value": 30000
+      },
+      {
+        "line": 149,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/palace/reflection-collector.test.ts": [
+      {
+        "line": 28,
+        "value": 30000
+      },
+      {
+        "line": 43,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/project-memory-recall.test.ts": [
+      {
+        "line": 163,
+        "value": 30000
+      },
+      {
+        "line": 183,
+        "value": 30000
+      },
+      {
+        "line": 195,
+        "value": 30000
+      },
+      {
+        "line": 206,
+        "value": 30000
+      },
+      {
+        "line": 218,
+        "value": 30000
+      },
+      {
+        "line": 235,
+        "value": 30000
+      },
+      {
+        "line": 249,
+        "value": 30000
+      },
+      {
+        "line": 261,
+        "value": 30000
+      },
+      {
+        "line": 281,
+        "value": 30000
+      },
+      {
+        "line": 301,
+        "value": 30000
+      },
+      {
+        "line": 326,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/prompt-agreements-cache.test.ts": [
+      {
+        "line": 76,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/prompt-pinning-expiry.test.ts": [
+      {
+        "line": 73,
+        "value": 30000
+      },
+      {
+        "line": 88,
+        "value": 30000
+      },
+      {
+        "line": 108,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/prompt-pinning-sync.test.ts": [
+      {
+        "line": 69,
+        "value": 30000
+      },
+      {
+        "line": 84,
+        "value": 30000
+      },
+      {
+        "line": 100,
+        "value": 30000
+      },
+      {
+        "line": 115,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/prompt-pinning.test.ts": [
+      {
+        "line": 91,
+        "value": 30000
+      },
+      {
+        "line": 113,
+        "value": 30000
+      },
+      {
+        "line": 135,
+        "value": 30000
+      },
+      {
+        "line": 150,
+        "value": 30000
+      },
+      {
+        "line": 164,
+        "value": 30000
+      },
+      {
+        "line": 182,
+        "value": 30000
+      },
+      {
+        "line": 198,
+        "value": 30000
+      },
+      {
+        "line": 215,
+        "value": 30000
+      },
+      {
+        "line": 245,
+        "value": 30000
+      },
+      {
+        "line": 268,
+        "value": 30000
+      },
+      {
+        "line": 284,
+        "value": 30000
+      },
+      {
+        "line": 300,
+        "value": 30000
+      },
+      {
+        "line": 316,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/prompt-recall-interference.test.ts": [
+      {
+        "line": 70,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/prompt.test.ts": [
+      {
+        "line": 36,
+        "value": 30000
+      },
+      {
+        "line": 52,
+        "value": 30000
+      },
+      {
+        "line": 66,
+        "value": 30000
+      },
+      {
+        "line": 96,
+        "value": 30000
+      },
+      {
+        "line": 111,
+        "value": 30000
+      },
+      {
+        "line": 138,
+        "value": 30000
+      },
+      {
+        "line": 160,
+        "value": 30000
+      },
+      {
+        "line": 199,
+        "value": 30000
+      },
+      {
+        "line": 238,
+        "value": 30000
+      },
+      {
+        "line": 267,
+        "value": 30000
+      },
+      {
+        "line": 299,
+        "value": 30000
+      },
+      {
+        "line": 336,
+        "value": 30000
+      },
+      {
+        "line": 359,
+        "value": 30000
+      },
+      {
+        "line": 391,
+        "value": 30000
+      },
+      {
+        "line": 418,
+        "value": 30000
+      },
+      {
+        "line": 440,
+        "value": 30000
+      },
+      {
+        "line": 477,
+        "value": 30000
+      },
+      {
+        "line": 504,
+        "value": 30000
+      },
+      {
+        "line": 531,
+        "value": 30000
+      },
+      {
+        "line": 548,
+        "value": 30000
+      },
+      {
+        "line": 577,
+        "value": 30000
+      },
+      {
+        "line": 601,
+        "value": 30000
+      },
+      {
+        "line": 621,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/recall-drain.test.ts": [
+      {
+        "line": 95,
+        "value": 30000
+      },
+      {
+        "line": 120,
+        "value": 30000
+      },
+      {
+        "line": 138,
+        "value": 30000
+      },
+      {
+        "line": 154,
+        "value": 30000
+      },
+      {
+        "line": 180,
+        "value": 30000
+      },
+      {
+        "line": 199,
+        "value": 30000
+      },
+      {
+        "line": 213,
+        "value": 30000
+      },
+      {
+        "line": 228,
+        "value": 30000
+      },
+      {
+        "line": 250,
+        "value": 30000
+      },
+      {
+        "line": 267,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/recall-reingestion.test.ts": [
+      {
+        "line": 120,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/recall-session-read.test.ts": [
+      {
+        "line": 85,
+        "value": 30000
+      },
+      {
+        "line": 100,
+        "value": 30000
+      },
+      {
+        "line": 112,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/recall-transcript-mentions.test.ts": [
+      {
+        "line": 137,
+        "value": 30000
+      },
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 176,
+        "value": 30000
+      },
+      {
+        "line": 191,
+        "value": 30000
+      },
+      {
+        "line": 246,
+        "value": 30000
+      },
+      {
+        "line": 271,
+        "value": 30000
+      },
+      {
+        "line": 288,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/recall-wiring.test.ts": [
+      {
+        "line": 137,
+        "value": 30000
+      },
+      {
+        "line": 199,
+        "value": 30000
+      },
+      {
+        "line": 235,
+        "value": 30000
+      },
+      {
+        "line": 272,
+        "value": 30000
+      },
+      {
+        "line": 297,
+        "value": 30000
+      },
+      {
+        "line": 324,
+        "value": 30000
+      },
+      {
+        "line": 341,
+        "value": 30000
+      },
+      {
+        "line": 358,
+        "value": 30000
+      },
+      {
+        "line": 376,
+        "value": 30000
+      },
+      {
+        "line": 391,
+        "value": 30000
+      },
+      {
+        "line": 409,
+        "value": 30000
+      },
+      {
+        "line": 421,
+        "value": 30000
+      },
+      {
+        "line": 438,
+        "value": 30000
+      },
+      {
+        "line": 458,
+        "value": 30000
+      },
+      {
+        "line": 476,
+        "value": 30000
+      },
+      {
+        "line": 490,
+        "value": 30000
+      },
+      {
+        "line": 502,
+        "value": 30000
+      },
+      {
+        "line": 517,
+        "value": 30000
+      },
+      {
+        "line": 537,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sandbox-absent-paths.test.ts": [
+      {
+        "line": 121,
+        "value": 30000
+      },
+      {
+        "line": 148,
+        "value": 30000
+      },
+      {
+        "line": 174,
+        "value": 30000
+      },
+      {
+        "line": 198,
+        "value": 30000
+      },
+      {
+        "line": 227,
+        "value": 30000
+      },
+      {
+        "line": 262,
+        "value": 30000
+      },
+      {
+        "line": 298,
+        "value": 30000
+      },
+      {
+        "line": 326,
+        "value": 30000
+      },
+      {
+        "line": 383,
+        "value": 30000
+      },
+      {
+        "line": 406,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sandbox-bwrap-probe.test.ts": [
+      {
+        "line": 97,
+        "value": 30000
+      },
+      {
+        "line": 113,
+        "value": 30000
+      },
+      {
+        "line": 140,
+        "value": 30000
+      },
+      {
+        "line": 170,
+        "value": 30000
+      },
+      {
+        "line": 178,
+        "value": 30000
+      },
+      {
+        "line": 201,
+        "value": 30000
+      },
+      {
+        "line": 223,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sandbox-deferred-probe.test.ts": [
+      {
+        "line": 67,
+        "value": 30000
+      },
+      {
+        "line": 83,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sandbox-engine-trust.test.ts": [
+      {
+        "line": 168,
+        "value": 60000
+      },
+      {
+        "line": 192,
+        "value": 60000
+      },
+      {
+        "line": 206,
+        "value": 60000
+      },
+      {
+        "line": 222,
+        "value": 60000
+      },
+      {
+        "line": 246,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sandbox.test.ts": [
+      {
+        "line": 123,
+        "value": 30000
+      },
+      {
+        "line": 186,
+        "value": 30000
+      },
+      {
+        "line": 210,
+        "value": 30000
+      },
+      {
+        "line": 249,
+        "value": 30000
+      },
+      {
+        "line": 278,
+        "value": 30000
+      },
+      {
+        "line": 305,
+        "value": 30000
+      },
+      {
+        "line": 327,
+        "value": 30000
+      },
+      {
+        "line": 343,
+        "value": 30000
+      },
+      {
+        "line": 362,
+        "value": 30000
+      },
+      {
+        "line": 382,
+        "value": 30000
+      },
+      {
+        "line": 405,
+        "value": 30000
+      },
+      {
+        "line": 422,
+        "value": 30000
+      },
+      {
+        "line": 451,
+        "value": 30000
+      },
+      {
+        "line": 471,
+        "value": 30000
+      },
+      {
+        "line": 490,
+        "value": 30000
+      },
+      {
+        "line": 508,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/shutdown-work-composition.test.ts": [
+      {
+        "line": 89,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/shutdown-work-settled.test.ts": [
+      {
+        "line": 272,
+        "value": null
+      },
+      {
+        "line": 299,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/status.test.ts": [
+      {
+        "line": 177,
+        "value": 30000
+      },
+      {
+        "line": 370,
+        "value": 30000
+      },
+      {
+        "line": 388,
+        "value": 30000
+      },
+      {
+        "line": 405,
+        "value": 30000
+      },
+      {
+        "line": 422,
+        "value": 30000
+      },
+      {
+        "line": 439,
+        "value": 30000
+      },
+      {
+        "line": 462,
+        "value": 30000
+      },
+      {
+        "line": 483,
+        "value": 30000
+      },
+      {
+        "line": 502,
+        "value": 30000
+      },
+      {
+        "line": 536,
+        "value": 30000
+      },
+      {
+        "line": 573,
+        "value": 30000
+      },
+      {
+        "line": 598,
+        "value": 30000
+      },
+      {
+        "line": 623,
+        "value": 30000
+      },
+      {
+        "line": 649,
+        "value": 30000
+      },
+      {
+        "line": 669,
+        "value": 30000
+      },
+      {
+        "line": 690,
+        "value": 30000
+      },
+      {
+        "line": 719,
+        "value": 30000
+      },
+      {
+        "line": 753,
+        "value": 30000
+      },
+      {
+        "line": 865,
+        "value": 30000
+      },
+      {
+        "line": 889,
+        "value": 30000
+      },
+      {
+        "line": 918,
+        "value": 30000
+      },
+      {
+        "line": 947,
+        "value": 30000
+      },
+      {
+        "line": 964,
+        "value": 30000
+      },
+      {
+        "line": 987,
+        "value": 30000
+      },
+      {
+        "line": 1014,
+        "value": 30000
+      },
+      {
+        "line": 1041,
+        "value": 30000
+      },
+      {
+        "line": 1066,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sync-device-names-wiring.test.ts": [
+      {
+        "line": 105,
+        "value": 30000
+      },
+      {
+        "line": 109,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sync-rpc-wire.test.ts": [
+      {
+        "line": 223,
+        "value": 15000
+      },
+      {
+        "line": 241,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/sync-rpc-worker.test.ts": [
+      {
+        "line": 65,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/tools-operations.test.ts": [
+      {
+        "line": 37,
+        "value": 30000
+      },
+      {
+        "line": 57,
+        "value": 30000
+      },
+      {
+        "line": 86,
+        "value": 30000
+      },
+      {
+        "line": 116,
+        "value": 30000
+      },
+      {
+        "line": 137,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/tools-write-notice.test.ts": [
+      {
+        "line": 63,
+        "value": 60000
+      },
+      {
+        "line": 83,
+        "value": 60000
+      },
+      {
+        "line": 113,
+        "value": 60000
+      },
+      {
+        "line": 134,
+        "value": 60000
+      },
+      {
+        "line": 155,
+        "value": 60000
+      },
+      {
+        "line": 176,
+        "value": 60000
+      },
+      {
+        "line": 201,
+        "value": 60000
+      },
+      {
+        "line": 222,
+        "value": 60000
+      },
+      {
+        "line": 248,
+        "value": 60000
+      },
+      {
+        "line": 305,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/usage-ledgers-wiring.test.ts": [
+      {
+        "line": 73,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-notice-inputs.test.ts": [
+      {
+        "line": 53,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-pressure-dream.test.ts": [
+      {
+        "line": 119,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-reflection-stale-lock.test.ts": [
+      {
+        "line": 54,
+        "value": 30000
+      },
+      {
+        "line": 75,
+        "value": 30000
+      },
+      {
+        "line": 99,
+        "value": 30000
+      },
+      {
+        "line": 118,
+        "value": 30000
+      },
+      {
+        "line": 140,
+        "value": 30000
+      },
+      {
+        "line": 165,
+        "value": 30000
+      },
+      {
+        "line": 253,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-reflection-stale-reaper.test.ts": [
+      {
+        "line": 153,
+        "value": 30000
+      },
+      {
+        "line": 173,
+        "value": 30000
+      },
+      {
+        "line": 190,
+        "value": 30000
+      },
+      {
+        "line": 209,
+        "value": 30000
+      },
+      {
+        "line": 235,
+        "value": 30000
+      },
+      {
+        "line": 256,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-runtime-stale-ctx.test.ts": [
+      {
+        "line": 106,
+        "value": 30000
+      },
+      {
+        "line": 148,
+        "value": 30000
+      },
+      {
+        "line": 186,
+        "value": 30000
+      },
+      {
+        "line": 274,
+        "value": 30000
+      },
+      {
+        "line": 327,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-runtime.test.ts": [
+      {
+        "line": 54,
+        "value": 30000
+      },
+      {
+        "line": 87,
+        "value": 30000
+      },
+      {
+        "line": 111,
+        "value": 30000
+      },
+      {
+        "line": 141,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-shutdown.test.ts": [
+      {
+        "line": 63,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring-write-notice.test.ts": [
+      {
+        "line": 79,
+        "value": 30000
+      },
+      {
+        "line": 90,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/wiring.test.ts": [
+      {
+        "line": 107,
+        "value": 30000
+      },
+      {
+        "line": 172,
+        "value": 30000
+      },
+      {
+        "line": 468,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts": [
+      {
+        "line": 173,
+        "value": 30000
+      },
+      {
+        "line": 190,
+        "value": 30000
+      },
+      {
+        "line": 203,
+        "value": 30000
+      },
+      {
+        "line": 226,
+        "value": 30000
+      },
+      {
+        "line": 244,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/hold-lock-lifecycle.test.ts": [
+      {
+        "line": 83,
+        "value": 30000
+      },
+      {
+        "line": 116,
+        "value": 30000
+      },
+      {
+        "line": 209,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ic8.test.ts": [
+      {
+        "line": 51,
+        "value": 10000
+      },
+      {
+        "line": 133,
+        "value": 60000
+      },
+      {
+        "line": 155,
+        "value": 60000
+      },
+      {
+        "line": 193,
+        "value": 60000
+      },
+      {
+        "line": 217,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.integration.test.ts": [
+      {
+        "line": 168,
+        "value": 60000
+      },
+      {
+        "line": 192,
+        "value": 60000
+      },
+      {
+        "line": 221,
+        "value": 60000
+      },
+      {
+        "line": 247,
+        "value": 60000
+      },
+      {
+        "line": 267,
+        "value": 60000
+      },
+      {
+        "line": 291,
+        "value": 60000
+      },
+      {
+        "line": 313,
+        "value": 60000
+      },
+      {
+        "line": 336,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/model-preflight.test.ts": [
+      {
+        "line": 350,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-finalization-cleanup.test.ts": [
+      {
+        "line": 61,
+        "value": 30000
+      },
+      {
+        "line": 86,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-finalization-crash.test.ts": [
+      {
+        "line": 136,
+        "value": 30000
+      },
+      {
+        "line": 165,
+        "value": 30000
+      },
+      {
+        "line": 205,
+        "value": 30000
+      },
+      {
+        "line": 237,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-finalization-park.test.ts": [
+      {
+        "line": 47,
+        "value": 30000
+      },
+      {
+        "line": 66,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-finalization-race.test.ts": [
+      {
+        "line": 103,
+        "value": 30000
+      },
+      {
+        "line": 144,
+        "value": 30000
+      },
+      {
+        "line": 184,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-finalization-target.test.ts": [
+      {
+        "line": 61,
+        "value": 30000
+      },
+      {
+        "line": 82,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-quarantine.test.ts": [
+      {
+        "line": 95,
+        "value": 30000
+      },
+      {
+        "line": 125,
+        "value": 30000
+      },
+      {
+        "line": 147,
+        "value": 30000
+      },
+      {
+        "line": 190,
+        "value": 30000
+      },
+      {
+        "line": 216,
+        "value": 30000
+      },
+      {
+        "line": 242,
+        "value": 30000
+      },
+      {
+        "line": 265,
+        "value": 30000
+      },
+      {
+        "line": 291,
+        "value": 30000
+      },
+      {
+        "line": 312,
+        "value": 30000
+      },
+      {
+        "line": 336,
+        "value": 30000
+      },
+      {
+        "line": 358,
+        "value": 30000
+      },
+      {
+        "line": 385,
+        "value": 30000
+      },
+      {
+        "line": 438,
+        "value": 30000
+      },
+      {
+        "line": 456,
+        "value": 30000
+      },
+      {
+        "line": 486,
+        "value": 30000
+      },
+      {
+        "line": 509,
+        "value": 30000
+      },
+      {
+        "line": 527,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation-failure-detail.test.ts": [
+      {
+        "line": 42,
+        "value": 30000
+      },
+      {
+        "line": 67,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation-ghost.test.ts": [
+      {
+        "line": 70,
+        "value": 30000
+      },
+      {
+        "line": 89,
+        "value": 30000
+      },
+      {
+        "line": 106,
+        "value": 30000
+      },
+      {
+        "line": 125,
+        "value": 30000
+      },
+      {
+        "line": 147,
+        "value": 30000
+      },
+      {
+        "line": 167,
+        "value": 30000
+      },
+      {
+        "line": 188,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation-liveness.test.ts": [
+      {
+        "line": 59,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation-stranded.test.ts": [
+      {
+        "line": 59,
+        "value": 30000
+      },
+      {
+        "line": 79,
+        "value": 30000
+      },
+      {
+        "line": 98,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation-sweep.test.ts": [
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 102,
+        "value": 30000
+      },
+      {
+        "line": 136,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation-wait-policy.test.ts": [
+      {
+        "line": 52,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation.test-support.test.ts": [
+      {
+        "line": 26,
+        "value": 30000
+      },
+      {
+        "line": 40,
+        "value": 60000
+      },
+      {
+        "line": 58,
+        "value": 60000
+      },
+      {
+        "line": 90,
+        "value": 60000
+      },
+      {
+        "line": 110,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-reconciliation.test.ts": [
+      {
+        "line": 90,
+        "value": 30000
+      },
+      {
+        "line": 185,
+        "value": 30000
+      },
+      {
+        "line": 220,
+        "value": 30000
+      },
+      {
+        "line": 250,
+        "value": 30000
+      },
+      {
+        "line": 276,
+        "value": 30000
+      },
+      {
+        "line": 309,
+        "value": 30000
+      },
+      {
+        "line": 348,
+        "value": 30000
+      },
+      {
+        "line": 377,
+        "value": 30000
+      },
+      {
+        "line": 419,
+        "value": 30000
+      },
+      {
+        "line": 449,
+        "value": 30000
+      },
+      {
+        "line": 490,
+        "value": 30000
+      },
+      {
+        "line": 528,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-terminal-claim.test.ts": [
+      {
+        "line": 83,
+        "value": 30000
+      },
+      {
+        "line": 98,
+        "value": 30000
+      },
+      {
+        "line": 102,
+        "value": 30000
+      },
+      {
+        "line": 115,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-terminal-precedence.integration.test.ts": [
+      {
+        "line": 176,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-terminal-precedence.test.ts": [
+      {
+        "line": 70,
+        "value": 30000
+      },
+      {
+        "line": 89,
+        "value": 30000
+      },
+      {
+        "line": 104,
+        "value": 30000
+      },
+      {
+        "line": 115,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/run-tip-recovery.test.ts": [
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 94,
+        "value": 30000
+      },
+      {
+        "line": 121,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/runner-finalization.test.ts": [
+      {
+        "line": 37,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/runner-model-chain.integration.test.ts": [
+      {
+        "line": 54,
+        "value": 60000
+      },
+      {
+        "line": 76,
+        "value": 60000
+      },
+      {
+        "line": 112,
+        "value": 60000
+      },
+      {
+        "line": 127,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/runner.integration.test.ts": [
+      {
+        "line": 72,
+        "value": 60000
+      },
+      {
+        "line": 170,
+        "value": 60000
+      },
+      {
+        "line": 184,
+        "value": 60000
+      },
+      {
+        "line": 202,
+        "value": 60000
+      },
+      {
+        "line": 216,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/senpi-command.test.ts": [
+      {
+        "line": 98,
+        "value": 30000
+      },
+      {
+        "line": 111,
+        "value": 30000
+      },
+      {
+        "line": 125,
+        "value": 30000
+      },
+      {
+        "line": 147,
+        "value": 30000
+      },
+      {
+        "line": 165,
+        "value": 30000
+      },
+      {
+        "line": 183,
+        "value": 30000
+      },
+      {
+        "line": 197,
+        "value": 30000
+      },
+      {
+        "line": 237,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/spawn-supervisor-env.test.ts": [
+      {
+        "line": 78,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/spawn-supervisor-queued.test.ts": [
+      {
+        "line": 81,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/spawn-supervisor.test.ts": [
+      {
+        "line": 69,
+        "value": 30000
+      },
+      {
+        "line": 124,
+        "value": 30000
+      },
+      {
+        "line": 184,
+        "value": 5000
+      },
+      {
+        "line": 244,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/supervisor-slot.test.ts": [
+      {
+        "line": 39,
+        "value": 60000
+      },
+      {
+        "line": 75,
+        "value": 60000
+      },
+      {
+        "line": 98,
+        "value": 60000
+      },
+      {
+        "line": 134,
+        "value": 60000
+      },
+      {
+        "line": 158,
+        "value": 60000
+      },
+      {
+        "line": 192,
+        "value": 60000
+      },
+      {
+        "line": 230,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/memory/worker/supervisor-test-signals.test.ts": [
+      {
+        "line": 36,
+        "value": 3000
+      }
+    ],
+    "packages/omo-senpi/src/components/onboarding/claim-takeover-race.test.ts": [
+      {
+        "line": 207,
+        "value": 60000
+      },
+      {
+        "line": 214,
+        "value": 120000
+      }
+    ],
+    "packages/omo-senpi/src/components/onboarding/history-background.test.ts": [
+      {
+        "line": 163,
+        "value": 20000
+      },
+      {
+        "line": 188,
+        "value": 20000
+      },
+      {
+        "line": 273,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/onboarding/tui-memory-flow.test.ts": [
+      {
+        "line": 137,
+        "value": 60000
+      },
+      {
+        "line": 185,
+        "value": 90000
+      },
+      {
+        "line": 238,
+        "value": 90000
+      }
+    ],
+    "packages/omo-senpi/src/components/remote/tui/run-omo.test.ts": [
+      {
+        "line": 78,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-cancel-node-production.test.ts": [
+      {
+        "line": 79,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-cancel-run-production.test.ts": [
+      {
+        "line": 97,
+        "value": 15000
+      },
+      {
+        "line": 109,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-e2e-lifecycle.test.ts": [
+      {
+        "line": 882,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-native-guidance.test.ts": [
+      {
+        "line": 106,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-rpc-handlers.test.ts": [
+      {
+        "line": 168,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-runtime.test.ts": [
+      {
+        "line": 319,
+        "value": 15000
+      },
+      {
+        "line": 442,
+        "value": 15000
+      },
+      {
+        "line": 703,
+        "value": 15000
+      },
+      {
+        "line": 832,
+        "value": 20000
+      },
+      {
+        "line": 1385,
+        "value": 20000
+      },
+      {
+        "line": 1417,
+        "value": 20000
+      },
+      {
+        "line": 1459,
+        "value": 20000
+      },
+      {
+        "line": 1490,
+        "value": 20000
+      },
+      {
+        "line": 1517,
+        "value": 20000
+      },
+      {
+        "line": 1571,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/dag-stop-integrated.test.ts": [
+      {
+        "line": 144,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/engine-native-pause.test.ts": [
+      {
+        "line": 66,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/engine-paused-birth.test.ts": [
+      {
+        "line": 142,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/engine-workpool-pause.test.ts": [
+      {
+        "line": 168,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/package-extensions-lifecycle.test.ts": [
+      {
+        "line": 140,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/run-pause-human-restart.test.ts": [
+      {
+        "line": 242,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/task/task-inprocess-ancestry.test.ts": [
+      {
+        "line": 196,
+        "value": 30000
+      },
+      {
+        "line": 206,
+        "value": 30000
+      },
+      {
+        "line": 216,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/telemetry/ingest-key.test.ts": [
+      {
+        "line": 177,
+        "value": 2000
+      }
+    ],
+    "packages/omo-senpi/src/components/telemetry/omo-native-disabled-load.test.ts": [
+      {
+        "line": 137,
+        "value": 60000
+      },
+      {
+        "line": 146,
+        "value": 60000
+      },
+      {
+        "line": 157,
+        "value": 60000
+      },
+      {
+        "line": 171,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/component.test.ts": [
+      {
+        "line": 753,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/cross-process.test.ts": [
+      {
+        "line": 237,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/engine.test.ts": [
+      {
+        "line": 151,
+        "value": 30000
+      },
+      {
+        "line": 488,
+        "value": 30000
+      },
+      {
+        "line": 503,
+        "value": 60000
+      },
+      {
+        "line": 523,
+        "value": 60000
+      },
+      {
+        "line": 621,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/extension-authorizer.test.ts": [
+      {
+        "line": 93,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/extension-session-await.test.ts": [
+      {
+        "line": 180,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/receipt-write-failure.test.ts": [
+      {
+        "line": 141,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/store-extension-lifecycle.test.ts": [
+      {
+        "line": 62,
+        "value": 20000
+      },
+      {
+        "line": 105,
+        "value": 20000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/store-extension-session-paths.test.ts": [
+      {
+        "line": 231,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/gateway/store-extensions-concurrency.test.ts": [
+      {
+        "line": 72,
+        "value": 30000
+      },
+      {
+        "line": 103,
+        "value": 5000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/published-endpoint.test.ts": [
+      {
+        "line": 42,
+        "value": 15000
+      },
+      {
+        "line": 54,
+        "value": 15000
+      },
+      {
+        "line": 64,
+        "value": 15000
+      },
+      {
+        "line": 74,
+        "value": 15000
+      },
+      {
+        "line": 85,
+        "value": 10000
+      },
+      {
+        "line": 99,
+        "value": 10000
+      },
+      {
+        "line": 112,
+        "value": 15000
+      },
+      {
+        "line": 124,
+        "value": 15000
+      },
+      {
+        "line": 137,
+        "value": 15000
+      },
+      {
+        "line": 148,
+        "value": 15000
+      },
+      {
+        "line": 163,
+        "value": 15000
+      },
+      {
+        "line": 180,
+        "value": 15000
+      },
+      {
+        "line": 190,
+        "value": 10000
+      },
+      {
+        "line": 222,
+        "value": 15000
+      },
+      {
+        "line": 235,
+        "value": 30000
+      },
+      {
+        "line": 254,
+        "value": 15000
+      },
+      {
+        "line": 264,
+        "value": 15000
+      },
+      {
+        "line": 281,
+        "value": 15000
+      },
+      {
+        "line": 317,
+        "value": 15000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/remote/remote-anchor-e2e.test.ts": [
+      {
+        "line": 105,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/components/thread/tools/extension-tools.test.ts": [
+      {
+        "line": 221,
+        "value": 10000
+      },
+      {
+        "line": 371,
+        "value": 10000
+      }
+    ],
+    "packages/omo-senpi/src/components/ultrawork/ultrawork-packaged-reload.test.ts": [
+      {
+        "line": 127,
+        "value": 90000
+      }
+    ],
+    "packages/omo-senpi/src/computer-use-lazy-runtime.test.ts": [
+      {
+        "line": 159,
+        "value": 70000
+      }
+    ],
+    "packages/omo-senpi/src/engine-compact-delta-package-probe.test.ts": [
+      {
+        "line": 190,
+        "value": null
+      },
+      {
+        "line": 202,
+        "value": null
+      },
+      {
+        "line": 215,
+        "value": null
+      }
+    ],
+    "packages/omo-senpi/src/extension/compose-cold-pi-tui.test.ts": [
+      {
+        "line": 49,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/extension/compose.test.ts": [
+      {
+        "line": 199,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/extension/hand-browser-placement.test.ts": [
+      {
+        "line": 83,
+        "value": 90000
+      }
+    ],
+    "packages/omo-senpi/src/extension/prewarm-diagnostics-engine.test.ts": [
+      {
+        "line": 194,
+        "value": 30000
+      }
+    ],
+    "packages/omo-senpi/src/extension/prompt-cache-preview.test.ts": [
+      {
+        "line": 325,
+        "value": 90000
+      },
+      {
+        "line": 357,
+        "value": 90000
+      },
+      {
+        "line": 378,
+        "value": 90000
+      }
+    ],
+    "packages/omo-senpi/src/hermetic-types.test.ts": [
+      {
+        "line": 121,
+        "value": 60000
+      },
+      {
+        "line": 133,
+        "value": 60000
+      }
+    ],
+    "packages/omo-senpi/src/otlp-sidecar.test.ts": [
+      {
+        "line": 94,
+        "value": 45000
+      }
+    ],
+    "packages/omo-senpi/src/posthog-packed-install.test.ts": [
+      {
+        "line": 137,
+        "value": 240000
+      }
+    ],
+    "packages/omo-senpi/test-support/split-local-session.test.ts": [
+      {
+        "line": 69,
+        "value": 30000
+      },
+      {
+        "line": 114,
+        "value": 8000
+      }
+    ],
+    "packages/openclaw-core/src/__tests__/reply-listener-process.real-process.test.ts": [
+      {
+        "line": 60,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-engine/test/conformance.test.ts": [
+      {
+        "line": 155,
+        "value": null
+      }
+    ],
+    "packages/senpi-desktop-engine/test/engine-headless.test.ts": [
+      {
+        "line": 40,
+        "value": null
+      },
+      {
+        "line": 191,
+        "value": null
+      }
+    ],
+    "packages/senpi-desktop-engine/test/launch-refusal.test.ts": [
+      {
+        "line": 65,
+        "value": 10000
+      },
+      {
+        "line": 77,
+        "value": 10000
+      },
+      {
+        "line": 84,
+        "value": 10000
+      },
+      {
+        "line": 91,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-desktop-engine/test/mcp-client.test.ts": [
+      {
+        "line": 63,
+        "value": null
+      },
+      {
+        "line": 82,
+        "value": null
+      },
+      {
+        "line": 100,
+        "value": null
+      },
+      {
+        "line": 117,
+        "value": null
+      }
+    ],
+    "packages/senpi-desktop-service/test/display.test.ts": [
+      {
+        "line": 38,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-service/test/engine.test.ts": [
+      {
+        "line": 16,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-service/test/holds.test.ts": [
+      {
+        "line": 38,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-service/test/launch-refusal-exclusions.test.ts": [
+      {
+        "line": 61,
+        "value": 10000
+      },
+      {
+        "line": 71,
+        "value": 10000
+      },
+      {
+        "line": 85,
+        "value": 10000
+      },
+      {
+        "line": 95,
+        "value": 10000
+      },
+      {
+        "line": 104,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-desktop-service/test/launch-refusal.test.ts": [
+      {
+        "line": 26,
+        "value": 10000
+      },
+      {
+        "line": 37,
+        "value": 10000
+      },
+      {
+        "line": 55,
+        "value": 10000
+      },
+      {
+        "line": 66,
+        "value": 10000
+      },
+      {
+        "line": 87,
+        "value": 10000
+      },
+      {
+        "line": 96,
+        "value": 10000
+      },
+      {
+        "line": 106,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-desktop-service/test/legacy-capabilities.test.ts": [
+      {
+        "line": 38,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-service/test/observe.test.ts": [
+      {
+        "line": 38,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-service/test/request-too-large.test.ts": [
+      {
+        "line": 19,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-service/test/zoom.test.ts": [
+      {
+        "line": 38,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-desktop-tool/test/launch-refusal.test.ts": [
+      {
+        "line": 59,
+        "value": 10000
+      },
+      {
+        "line": 89,
+        "value": 10000
+      },
+      {
+        "line": 103,
+        "value": 10000
+      },
+      {
+        "line": 129,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-desktop-tool/test/permission-guidance.test.ts": [
+      {
+        "line": 36,
+        "value": 30000
+      },
+      {
+        "line": 59,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/__adversarial__/chaos-bench.test.ts": [
+      {
+        "line": 88,
+        "value": null
+      }
+    ],
+    "packages/senpi-task/src/dag/e2e-failure.test.ts": [
+      {
+        "line": 557,
+        "value": null
+      },
+      {
+        "line": 873,
+        "value": null
+      }
+    ],
+    "packages/senpi-task/src/dag/manager.test.ts": [
+      {
+        "line": 739,
+        "value": 30000
+      },
+      {
+        "line": 769,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/dag/recovery-nonblocking.test.ts": [
+      {
+        "line": 310,
+        "value": 30000
+      },
+      {
+        "line": 358,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/dag/recovery-orphaned.test.ts": [
+      {
+        "line": 316,
+        "value": 30000
+      },
+      {
+        "line": 345,
+        "value": 30000
+      },
+      {
+        "line": 369,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/dag/scheduler-infra-retry.test.ts": [
+      {
+        "line": 53,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/lazy/senpi-barrel-load-failure.test.ts": [
+      {
+        "line": 63,
+        "value": 30000
+      },
+      {
+        "line": 74,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/admission-lease-handoff.test.ts": [
+      {
+        "line": 48,
+        "value": 5000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/admission-lease-wait.test.ts": [
+      {
+        "line": 30,
+        "value": 5000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/batch-admission-race.test.ts": [
+      {
+        "line": 114,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/deferred-revival-lifecycle.test.ts": [
+      {
+        "line": 39,
+        "value": 10000
+      },
+      {
+        "line": 52,
+        "value": 10000
+      },
+      {
+        "line": 66,
+        "value": 10000
+      },
+      {
+        "line": 102,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/deferred-revival.test.ts": [
+      {
+        "line": 24,
+        "value": 10000
+      },
+      {
+        "line": 57,
+        "value": 10000
+      },
+      {
+        "line": 76,
+        "value": 10000
+      },
+      {
+        "line": 91,
+        "value": 10000
+      },
+      {
+        "line": 109,
+        "value": 10000
+      },
+      {
+        "line": 126,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/idle-cold-revive.test.ts": [
+      {
+        "line": 40,
+        "value": 20000
+      }
+    ],
+    "packages/senpi-task/src/lifecycle/reconcile-revival-race.test.ts": [
+      {
+        "line": 82,
+        "value": 20000
+      }
+    ],
+    "packages/senpi-task/src/manager/designated-models-only-runners.test.ts": [
+      {
+        "line": 53,
+        "value": 60000
+      },
+      {
+        "line": 70,
+        "value": 60000
+      },
+      {
+        "line": 85,
+        "value": 60000
+      },
+      {
+        "line": 110,
+        "value": 60000
+      },
+      {
+        "line": 136,
+        "value": 60000
+      },
+      {
+        "line": 170,
+        "value": 90000
+      }
+    ],
+    "packages/senpi-task/src/manager/designated-models-only.test.ts": [
+      {
+        "line": 43,
+        "value": 30000
+      },
+      {
+        "line": 64,
+        "value": 30000
+      },
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 94,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/manager/held-admissions.test.ts": [
+      {
+        "line": 170,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/manager/manager-claim.test.ts": [
+      {
+        "line": 233,
+        "value": null
+      }
+    ],
+    "packages/senpi-task/src/manager/manager-respawn-host-reconciliation.test.ts": [
+      {
+        "line": 130,
+        "value": 5000
+      }
+    ],
+    "packages/senpi-task/src/manager/pause-resume-allocation.test.ts": [
+      {
+        "line": 91,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/manager/pause-resume-capacity.test.ts": [
+      {
+        "line": 125,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/manager/pause-resume-fence.test.ts": [
+      {
+        "line": 113,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/manager/start-busy-host.test.ts": [
+      {
+        "line": 234,
+        "value": 15000
+      },
+      {
+        "line": 279,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/manager/start-refusal-order.test.ts": [
+      {
+        "line": 109,
+        "value": 10000
+      }
+    ],
+    "packages/senpi-task/src/runners/builtin-chain-thinking-level.test.ts": [
+      {
+        "line": 160,
+        "value": 20000
+      },
+      {
+        "line": 177,
+        "value": 30000
+      },
+      {
+        "line": 239,
+        "value": 20000
+      }
+    ],
+    "packages/senpi-task/src/runners/explicit-pin.integration.test.ts": [
+      {
+        "line": 187,
+        "value": 30000
+      },
+      {
+        "line": 208,
+        "value": 30000
+      },
+      {
+        "line": 226,
+        "value": 30000
+      },
+      {
+        "line": 252,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/runners/in-process-access-terminated-error.test.ts": [
+      {
+        "line": 33,
+        "value": 20000
+      }
+    ],
+    "packages/senpi-task/src/runners/in-process-caller-settings.test.ts": [
+      {
+        "line": 53,
+        "value": 30000
+      },
+      {
+        "line": 67,
+        "value": 30000
+      },
+      {
+        "line": 84,
+        "value": 30000
+      },
+      {
+        "line": 113,
+        "value": 30000
+      },
+      {
+        "line": 145,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/runners/in-process-dialog-forwarding.test.ts": [
+      {
+        "line": 72,
+        "value": 30000
+      },
+      {
+        "line": 81,
+        "value": 30000
+      },
+      {
+        "line": 92,
+        "value": 30000
+      },
+      {
+        "line": 101,
+        "value": 30000
+      },
+      {
+        "line": 140,
+        "value": 30000
+      },
+      {
+        "line": 184,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/runners/in-process/child-shutdown.integration.test.ts": [
+      {
+        "line": 94,
+        "value": 120000
+      },
+      {
+        "line": 107,
+        "value": 120000
+      },
+      {
+        "line": 119,
+        "value": 120000
+      },
+      {
+        "line": 188,
+        "value": 120000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc-host/handle-detached.test.ts": [
+      {
+        "line": 29,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc-host/handle-reattach-reconciliation.test.ts": [
+      {
+        "line": 80,
+        "value": 5000
+      },
+      {
+        "line": 127,
+        "value": 5000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc-host/host-request-auth.test.ts": [
+      {
+        "line": 204,
+        "value": 10000
+      },
+      {
+        "line": 271,
+        "value": 20000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc-host/liveness.test.ts": [
+      {
+        "line": 49,
+        "value": 30000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc-host/reconcile-turn.test.ts": [
+      {
+        "line": 159,
+        "value": 5000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc-process.windows.test.ts": [
+      {
+        "line": 168,
+        "value": 110000
+      }
+    ],
+    "packages/senpi-task/src/runners/rpc/handle-detached.test.ts": [
+      {
+        "line": 23,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/team/member-extension/boot-dependencies.test.ts": [
+      {
+        "line": 38,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/team/member-extension/residency.test.ts": [
+      {
+        "line": 67,
+        "value": null
+      }
+    ],
+    "packages/senpi-task/src/team/member-extension/workpool-startup.test.ts": [
+      {
+        "line": 41,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/team/tasks.test.ts": [
+      {
+        "line": 85,
+        "value": 15000
+      }
+    ],
+    "packages/senpi-task/src/tools/task/lease-parking.test.ts": [
+      {
+        "line": 189,
+        "value": 25000
+      },
+      {
+        "line": 190,
+        "value": 25000
+      },
+      {
+        "line": 191,
+        "value": 25000
+      },
+      {
+        "line": 227,
+        "value": 25000
+      },
+      {
+        "line": 255,
+        "value": 25000
+      }
+    ],
+    "packages/senpi-task/src/tools/task/typed-handle.test.ts": [
+      {
+        "line": 150,
+        "value": 20000
+      },
+      {
+        "line": 186,
+        "value": 20000
+      }
+    ],
+    "packages/shared-skills/bundled-skill-scripts-write-nothing.test.ts": [
+      {
+        "line": 180,
+        "value": 120000
+      },
+      {
+        "line": 221,
+        "value": 120000
+      }
+    ],
+    "packages/shared-skills/skills/debugging/references/scripts/dap.test.ts": [
+      {
+        "line": 95,
+        "value": 60000
+      },
+      {
+        "line": 103,
+        "value": 60000
+      },
+      {
+        "line": 114,
+        "value": 60000
+      }
+    ],
+    "packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.test.ts": [
+      {
+        "line": 66,
+        "value": 60000
+      },
+      {
+        "line": 76,
+        "value": 60000
+      },
+      {
+        "line": 86,
+        "value": 60000
+      }
+    ],
+    "packages/shared-skills/skills/programming/scripts/typescript/new-project.test.ts": [
+      {
+        "line": 146,
+        "value": 120000
+      }
+    ],
+    "packages/shared-skills/skills/ulw-research/scripts/value-mode-unit-classes.test.ts": [
+      {
+        "line": 188,
+        "value": 120000
+      },
+      {
+        "line": 291,
+        "value": 120000
+      },
+      {
+        "line": 391,
+        "value": 120000
+      },
+      {
+        "line": 488,
+        "value": 120000
+      }
+    ],
+    "packages/skills-loader-core/src/features/builtin-skills/skills/dev-browser.test.ts": [
+      {
+        "line": 126,
+        "value": 20000
+      },
+      {
+        "line": 143,
+        "value": 20000
+      },
+      {
+        "line": 157,
+        "value": 20000
+      },
+      {
+        "line": 178,
+        "value": 20000
+      },
+      {
+        "line": 195,
+        "value": 20000
+      },
+      {
+        "line": 211,
+        "value": 20000
+      }
+    ],
+    "packages/team-core/src/team-mailbox/consumer-lease.test.ts": [
+      {
+        "line": 96,
+        "value": 2000
+      }
+    ],
+    "packages/team-core/src/team-mailbox/poll.test.ts": [
+      {
+        "line": 106,
+        "value": 15000
+      },
+      {
+        "line": 185,
+        "value": 15000
+      }
+    ],
+    "packages/team-core/src/team-state-store/lock-lease-race.test.ts": [
+      {
+        "line": 156,
+        "value": 30000
+      },
+      {
+        "line": 172,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-state-store/lock-lease.test.ts": [
+      {
+        "line": 119,
+        "value": 60000
+      }
+    ],
+    "packages/team-core/src/team-state-store/locks-exclusion.test.ts": [
+      {
+        "line": 42,
+        "value": 60000
+      },
+      {
+        "line": 65,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-state-store/locks-reclaim.test.ts": [
+      {
+        "line": 87,
+        "value": 30000
+      },
+      {
+        "line": 130,
+        "value": 30000
+      },
+      {
+        "line": 150,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-state-store/locks-worker.test.ts": [
+      {
+        "line": 118,
+        "value": 30000
+      },
+      {
+        "line": 142,
+        "value": 30000
+      },
+      {
+        "line": 176,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-state-store/locks.test.ts": [
+      {
+        "line": 283,
+        "value": 2000
+      }
+    ],
+    "packages/team-core/src/team-tasklist/claim.test.ts": [
+      {
+        "line": 73,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-tasklist/list.test.ts": [
+      {
+        "line": 42,
+        "value": 30000
+      },
+      {
+        "line": 63,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-tasklist/store.test.ts": [
+      {
+        "line": 32,
+        "value": 30000
+      }
+    ],
+    "packages/team-core/src/team-tasklist/update.test.ts": [
+      {
+        "line": 30,
+        "value": 30000
+      },
+      {
+        "line": 53,
+        "value": 30000
+      }
+    ],
+    "packages/telemetry-core/src/activity-state.concurrency.test.ts": [
+      {
+        "line": 55,
+        "value": 60000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-entry.test.ts": [
+      {
+        "line": 77,
+        "value": 30000
+      },
+      {
+        "line": 85,
+        "value": 30000
+      },
+      {
+        "line": 91,
+        "value": 30000
+      },
+      {
+        "line": 108,
+        "value": 30000
+      },
+      {
+        "line": 115,
+        "value": 30000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-kill.test.ts": [
+      {
+        "line": 69,
+        "value": 60000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-retry.test.ts": [
+      {
+        "line": 129,
+        "value": 30000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-sender.test.ts": [
+      {
+        "line": 59,
+        "value": 30000
+      },
+      {
+        "line": 85,
+        "value": 30000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-spool-processes.test.ts": [
+      {
+        "line": 107,
+        "value": 120000
+      },
+      {
+        "line": 136,
+        "value": 60000
+      },
+      {
+        "line": 166,
+        "value": 60000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-spool-purge.test.ts": [
+      {
+        "line": 58,
+        "value": 5000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-spool-recovery.test.ts": [
+      {
+        "line": 266,
+        "value": 60000
+      },
+      {
+        "line": 319,
+        "value": 30000
+      },
+      {
+        "line": 357,
+        "value": 30000
+      }
+    ],
+    "packages/telemetry-core/src/otlp-timeout.test.ts": [
+      {
+        "line": 101,
+        "value": 40000
+      },
+      {
+        "line": 122,
+        "value": 40000
+      },
+      {
+        "line": 142,
+        "value": 70000
+      },
+      {
+        "line": 196,
+        "value": 30000
+      }
+    ],
+    "packages/telemetry-core/src/root-types-entry.test.ts": [
+      {
+        "line": 24,
+        "value": 60000
+      }
+    ],
+    "packages/utils/src/ast-grep/sg-probe-contract.test.ts": [
+      {
+        "line": 188,
+        "value": 30000
+      }
+    ],
+    "packages/utils/src/ast-grep/sg-resolution.test.ts": [
+      {
+        "line": 382,
+        "value": 30000
+      }
+    ],
+    "packages/utils/src/prompt-async-gate.test.ts": [
+      {
+        "line": 1673,
+        "value": 2000
+      },
+      {
+        "line": 1734,
+        "value": 10000
+      }
+    ],
+    "postinstall.test.ts": [
+      {
+        "line": 96,
+        "value": 30000
+      },
+      {
+        "line": 111,
+        "value": 30000
+      },
+      {
+        "line": 132,
+        "value": 30000
+      },
+      {
+        "line": 150,
+        "value": 30000
+      }
+    ],
+    "script/agent-command-string-audit.test.ts": [
+      {
+        "line": 42,
+        "value": 120000
+      }
+    ],
+    "script/build-cli-node.test.ts": [
+      {
+        "line": 37,
+        "value": 120000
+      },
+      {
+        "line": 53,
+        "value": 60000
+      },
+      {
+        "line": 74,
+        "value": 120000
+      }
+    ],
+    "script/build-omo-binary.test.ts": [
+      {
+        "line": 739,
+        "value": 900000
+      },
+      {
+        "line": 784,
+        "value": 30000
+      },
+      {
+        "line": 1013,
+        "value": 60000
+      },
+      {
+        "line": 1041,
+        "value": 60000
+      }
+    ],
+    "script/build-omo-native.test.ts": [
+      {
+        "line": 254,
+        "value": 120000
+      }
+    ],
+    "script/build-omob.test.ts": [
+      {
+        "line": 385,
+        "value": 120000
+      }
+    ],
+    "script/changelog-fragments-cli.test.ts": [
+      {
+        "line": 121,
+        "value": 30000
+      },
+      {
+        "line": 139,
+        "value": 30000
+      },
+      {
+        "line": 159,
+        "value": 30000
+      },
+      {
+        "line": 201,
+        "value": 30000
+      }
+    ],
+    "script/ci-job-summary-workflow.test.ts": [
+      {
+        "line": 166,
+        "value": null
+      }
+    ],
+    "script/ci-test-timeout.test.ts": [
+      {
+        "line": 67,
+        "value": 60000
+      }
+    ],
+    "script/embedded-payload-probe.test.ts": [
+      {
+        "line": 42,
+        "value": 60000
+      },
+      {
+        "line": 54,
+        "value": 60000
+      }
+    ],
+    "script/engine-sidecar-sources.test.ts": [
+      {
+        "line": 531,
+        "value": 60000
+      }
+    ],
+    "script/gpt-mini-reference-audit.test.ts": [
+      {
+        "line": 53,
+        "value": 20000
+      }
+    ],
+    "script/installer/channel-maintenance.ts": [
+      {
+        "line": 60,
+        "value": null
+      },
+      {
+        "line": 61,
+        "value": null
+      }
+    ],
+    "script/keychain-helper-publish-main-workflow.test.ts": [
+      {
+        "line": 76,
+        "value": null
+      },
+      {
+        "line": 142,
+        "value": null
+      },
+      {
+        "line": 170,
+        "value": null
+      }
+    ],
+    "script/keychain-helper-release-workflow.test.ts": [
+      {
+        "line": 107,
+        "value": null
+      },
+      {
+        "line": 150,
+        "value": null
+      }
+    ],
+    "script/keychain-helper-release.test.ts": [
+      {
+        "line": 134,
+        "value": 60000
+      }
+    ],
+    "script/knip-coverage.test.ts": [
+      {
+        "line": 100,
+        "value": 600000
+      },
+      {
+        "line": 118,
+        "value": 600000
+      }
+    ],
+    "script/knip-entry-exports.test.ts": [
+      {
+        "line": 130,
+        "value": 600000
+      },
+      {
+        "line": 165,
+        "value": 600000
+      }
+    ],
+    "script/knip-next-route-segment.test.ts": [
+      {
+        "line": 65,
+        "value": 600000
+      }
+    ],
+    "script/latest-model-ids-audit.test.ts": [
+      {
+        "line": 92,
+        "value": 20000
+      }
+    ],
+    "script/no-raw-tls-client.test.ts": [
+      {
+        "line": 342,
+        "value": 60000
+      }
+    ],
+    "script/omo-native-trust-mutations.test.ts": [
+      {
+        "line": 62,
+        "value": 60000
+      },
+      {
+        "line": 70,
+        "value": 60000
+      },
+      {
+        "line": 79,
+        "value": 60000
+      },
+      {
+        "line": 93,
+        "value": 60000
+      }
+    ],
+    "script/omob-refresh.test.ts": [
+      {
+        "line": 189,
+        "value": 60000
+      },
+      {
+        "line": 212,
+        "value": 60000
+      },
+      {
+        "line": 278,
+        "value": 60000
+      }
+    ],
+    "script/package-layout-exclusion.test.ts": [
+      {
+        "line": 152,
+        "value": 20000
+      },
+      {
+        "line": 169,
+        "value": 20000
+      }
+    ],
+    "script/package-layout.test.ts": [
+      {
+        "line": 196,
+        "value": 15000
+      },
+      {
+        "line": 214,
+        "value": 15000
+      },
+      {
+        "line": 230,
+        "value": 15000
+      },
+      {
+        "line": 246,
+        "value": 15000
+      },
+      {
+        "line": 262,
+        "value": 15000
+      },
+      {
+        "line": 296,
+        "value": 15000
+      }
+    ],
+    "script/package-log-commands.test.ts": [
+      {
+        "line": 76,
+        "value": 30000
+      },
+      {
+        "line": 101,
+        "value": 30000
+      },
+      {
+        "line": 114,
+        "value": 30000
+      },
+      {
+        "line": 137,
+        "value": 30000
+      }
+    ],
+    "script/package-registration-audit.test.ts": [
+      {
+        "line": 325,
+        "value": 20000
+      }
+    ],
+    "script/publish-gate-reuse-ci-basis-waiver.test.ts": [
+      {
+        "line": 508,
+        "value": null
+      },
+      {
+        "line": 541,
+        "value": null
+      },
+      {
+        "line": 558,
+        "value": null
+      },
+      {
+        "line": 571,
+        "value": null
+      },
+      {
+        "line": 626,
+        "value": null
+      }
+    ],
+    "script/publish-readiness-budget.test.ts": [
+      {
+        "line": 129,
+        "value": null
+      },
+      {
+        "line": 141,
+        "value": null
+      },
+      {
+        "line": 154,
+        "value": null
+      },
+      {
+        "line": 167,
+        "value": null
+      },
+      {
+        "line": 183,
+        "value": null
+      }
+    ],
+    "script/publish-release-platform-workflow.test.ts": [
+      {
+        "line": 243,
+        "value": 30000
+      },
+      {
+        "line": 301,
+        "value": 30000
+      },
+      {
+        "line": 385,
+        "value": 30000
+      }
+    ],
+    "script/publish-release-tag-child-path.test.ts": [
+      {
+        "line": 381,
+        "value": null
+      },
+      {
+        "line": 391,
+        "value": null
+      },
+      {
+        "line": 405,
+        "value": null
+      },
+      {
+        "line": 420,
+        "value": null
+      }
+    ],
+    "script/qa/computer/conformance/fixtures/fixture-process.test.ts": [
+      {
+        "line": 36,
+        "value": 30000
+      }
+    ],
+    "script/qa/computer/conformance/preflight.test.ts": [
+      {
+        "line": 97,
+        "value": 90000
+      }
+    ],
+    "script/qa/computer/replay.test.ts": [
+      {
+        "line": 231,
+        "value": 60000
+      },
+      {
+        "line": 242,
+        "value": 60000
+      },
+      {
+        "line": 267,
+        "value": 60000
+      },
+      {
+        "line": 279,
+        "value": 60000
+      },
+      {
+        "line": 294,
+        "value": 60000
+      },
+      {
+        "line": 319,
+        "value": 60000
+      },
+      {
+        "line": 331,
+        "value": 60000
+      },
+      {
+        "line": 352,
+        "value": 60000
+      },
+      {
+        "line": 365,
+        "value": 120000
+      },
+      {
+        "line": 379,
+        "value": 60000
+      },
+      {
+        "line": 391,
+        "value": 120000
+      },
+      {
+        "line": 415,
+        "value": 60000
+      },
+      {
+        "line": 429,
+        "value": 60000
+      },
+      {
+        "line": 451,
+        "value": 60000
+      },
+      {
+        "line": 489,
+        "value": 60000
+      },
+      {
+        "line": 511,
+        "value": 60000
+      },
+      {
+        "line": 545,
+        "value": 60000
+      },
+      {
+        "line": 553,
+        "value": 60000
+      }
+    ],
+    "script/qa/omo-native-telemetry-drive.test.mjs": [
+      {
+        "line": 100,
+        "value": 15000
+      }
+    ],
+    "script/release-assets-verify-workflow.test.ts": [
+      {
+        "line": 174,
+        "value": 30000
+      },
+      {
+        "line": 184,
+        "value": 30000
+      },
+      {
+        "line": 199,
+        "value": 30000
+      },
+      {
+        "line": 223,
+        "value": 30000
+      },
+      {
+        "line": 237,
+        "value": 30000
+      },
+      {
+        "line": 253,
+        "value": 30000
+      },
+      {
+        "line": 274,
+        "value": 30000
+      },
+      {
+        "line": 288,
+        "value": 30000
+      },
+      {
+        "line": 306,
+        "value": 30000
+      },
+      {
+        "line": 321,
+        "value": 30000
+      }
+    ],
+    "script/release-desktop-engine-target.test.ts": [
+      {
+        "line": 128,
+        "value": 30000
+      }
+    ],
+    "script/senpi-hooks-state-errors.test.ts": [
+      {
+        "line": 30,
+        "value": 60000
+      },
+      {
+        "line": 40,
+        "value": 60000
+      },
+      {
+        "line": 50,
+        "value": 60000
+      }
+    ],
+    "script/senpi-hooks-state.test.ts": [
+      {
+        "line": 63,
+        "value": 60000
+      },
+      {
+        "line": 93,
+        "value": 60000
+      }
+    ],
+    "script/senpi-worker-compile.test.ts": [
+      {
+        "line": 89,
+        "value": 45000
+      }
+    ],
+    "script/sync-lazycodex-marketplace.test.ts": [
+      {
+        "line": 339,
+        "value": 15000
+      },
+      {
+        "line": 421,
+        "value": null
+      },
+      {
+        "line": 458,
+        "value": null
+      },
+      {
+        "line": 517,
+        "value": null
+      }
+    ],
+    "script/test-environment-isolation.test.ts": [
+      {
+        "line": 107,
+        "value": 250000
+      },
+      {
+        "line": 160,
+        "value": 130000
+      }
+    ],
+    "test-support/posthog-test-guard-installed.test.ts": [
+      {
+        "line": 88,
+        "value": 30000
+      }
+    ]
   }
 }

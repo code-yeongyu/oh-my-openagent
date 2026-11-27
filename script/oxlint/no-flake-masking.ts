@@ -152,3 +152,10 @@ const noFlakeMasking = {
 }
 
 export default noFlakeMasking
+
+// The rule's own site predicates, exported so the lint ratchet can extract the VALUES of these
+// arguments and compare them against the baseline, not only their count (#15114). One detection
+// source for both consumers: a second copy of the predicates could drift and let a raise hide
+// behind a shape the rule no longer reports.
+export { testCall, configCall, argumentsOf, propertiesOf, keyName, child }
+export { testTimeouts as timeoutKeys, configTimeouts as configTimeoutKeys }
