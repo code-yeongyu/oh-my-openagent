@@ -12,7 +12,7 @@ export type AsyncWorkScheduler = (run: () => void, delayMs: number) => AsyncWork
 const DEFAULT_ASYNC_WORK_STALE_LIMIT_MS = 60 * 60_000
 // senpi drops a finished monitor from its lifecycle at once but delivers the monitor's wake only after its
 // notifier's coalescing window (default 2 s, at most 60 s), so a drained, idle session can still be woken.
-export const WAKE_DELIVERY_GRACE_MS = 60_000
+const WAKE_DELIVERY_GRACE_MS = 60_000
 const DRAINED_SIGNATURE = "drained"
 
 type CompletedOutcome = Extract<RunnerOutcome, { readonly status: "completed" }>

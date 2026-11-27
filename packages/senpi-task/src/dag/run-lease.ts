@@ -51,7 +51,7 @@ export function holderProbeOf(
   return { taskManager: options.taskManager, hostPid: options.hostPid ?? process.pid, ...ownerLiveness(options) }
 }
 
-export function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
+function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
   return { kind: "dag" as const, runId: record.runId, nodeId }
 }
 
@@ -84,7 +84,7 @@ function activeChildren(probe: DagRunHolderProbe, record: DagRunRecordV1): TaskR
 // children of a dead owner, so a child still under a live foreign owner means that process runs it.
 // The owner is judged as the lifecycle judges it: a pid now held by a process whose start contradicts
 // the claim's stamp owns nothing, even while a reconcile that could not take the claim left it there.
-export function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): DagRunHolder | undefined {
+function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): DagRunHolder | undefined {
   const view = probe.ownerProcesses ?? ownerProcessViewFor(probe.isProcessAlive, undefined)
   for (const task of activeChildren(probe, record)) {
     const pid = task.host_pid
@@ -112,7 +112,7 @@ export function observeChildOwners(probe: DagRunHolderProbe, record: DagRunRecor
  * claim, the unheld cancel and the shutdown pause all ask this (#15125). The lease and the previous
  * holder are bare pids on the run record, with no start stamp, so a pid alone answers for them.
  */
-export function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): DagRunHolder | undefined {
+function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): DagRunHolder | undefined {
   const leased = record.leaseHolderPid ?? record.previousLeaseHolderPid
   return leased === undefined ? liveChildOwner(probe, record) : { pid: leased }
 }
