@@ -15,6 +15,7 @@ import {
 } from "./__fixtures__/pending-revival-run"
 import { runId } from "./__fixtures__/reattached-run"
 import type { DagRunRecordV1 } from "./manager"
+import type { DagNodeId } from "./types"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
 function overCapacity() {
@@ -48,7 +49,7 @@ describe("a run whose only active node waits for its child's revival (#15150 on 
     f.advance(5_000)
 
     // when
-    const refusal = await refusalOf(() => run.scheduler.retryNode(runId, ["k-hang"]))
+    const refusal = await refusalOf(() => run.scheduler.retryNode(runId, ["k-hang" as DagNodeId]))
 
     // then
     expect(refusal).toMatchObject({ code: "run_still_active" })
@@ -69,7 +70,7 @@ describe("a run whose only active node waits for its child's revival (#15150 on 
     expect((await run.settled).record?.status).toBe("paused")
 
     // when
-    const refusal = await refusalOf(() => run.scheduler.retryNode(runId, ["k-hang"]))
+    const refusal = await refusalOf(() => run.scheduler.retryNode(runId, ["k-hang" as DagNodeId]))
 
     // then
     expect(refusal).toMatchObject({ code: "run_still_active", nodeIds: ["k-hang"] })
