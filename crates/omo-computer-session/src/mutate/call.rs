@@ -1,6 +1,6 @@
 //! One mutating call as the funnel takes it, and its builders.
 
-use omo_computer_core::backend::{InputEvent, Route};
+use omo_computer_core::backend::{InputEvent, Refusal, Route};
 use omo_computer_core::frame::FrameRefusal;
 use omo_computer_core::methods::Method;
 use omo_computer_core::requests::CallAuthority;
@@ -11,7 +11,10 @@ pub struct Mutation<'a> {
     pub method: Method,
     pub call: Call<'a>,
     pub events: Vec<InputEvent>,
-    pub route: Route,
+    /// The route the call's input takes, or the route refusal decided at the call site (a
+    /// background call that names no window): the funnel refuses it at stage "Route", after
+    /// `NOT_OPEN` and with its audit line, before anything is planned or sent (review M1 of #13788).
+    pub route: Result<Route, Refusal>,
     pub call_id: Option<String>,
     pub run_generation: Option<u64>,
     pub frame_id: Option<String>,
@@ -32,7 +35,7 @@ impl<'a> Mutation<'a> {
         method: Method,
         call: Call<'a>,
         events: Vec<InputEvent>,
-        route: Route,
+        route: Result<Route, Refusal>,
         authority: &CallAuthority,
     ) -> Self {
         Self {
@@ -52,7 +55,12 @@ impl<'a> Mutation<'a> {
 
     /// A v1 text call: no `callId` on the wire, so the funnel mints one.
     #[must_use]
-    pub fn typed(method: Method, call: Call<'a>, route: Route, text: String) -> Self {
+    pub fn typed(
+        method: Method,
+        call: Call<'a>,
+        route: Result<Route, Refusal>,
+        text: String,
+    ) -> Self {
         Self {
             method,
             call,

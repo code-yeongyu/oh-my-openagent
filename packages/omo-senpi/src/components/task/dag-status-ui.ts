@@ -1,5 +1,6 @@
 import type { CapturedUi } from "./runtime-context"
-import { runRows, type DagStatusRunSnapshot } from "./dag-status-row-format"
+import { AWAITING_REVIVAL_ACTIVITY, awaitsChildRevival, type NodeChildRecord } from "./dag-quiet-nodes"
+import { runRows, type DagStatusNode, type DagStatusRunSnapshot } from "./dag-status-row-format"
 
 export type { DagStatusNode, DagStatusRoute, DagStatusRunSnapshot, DagStatusWave } from "./dag-status-row-format"
 
@@ -27,7 +28,12 @@ export interface DagStatusActivityEvent {
 // The read seam the widget needs from DagManager: session-scoped run list plus per-run snapshot.
 export interface DagStatusUiManager {
   list(parentSessionId: string, options?: { readonly limit?: number }): readonly DagStatusRunSummary[]
-  snapshot(runId: string, parentSessionId: string): DagStatusRunSnapshot
+  snapshot(runId: string, parentSessionId: string): DagStatusUiRunSnapshot
+}
+
+// The widget also reads each node's child id, to tell a node waiting on its child's revival (#15150).
+export type DagStatusUiRunSnapshot = Omit<DagStatusRunSnapshot, "nodes"> & {
+  readonly nodes: readonly (DagStatusNode & { readonly taskId?: string })[]
 }
 
 export interface DagStatusUiRuntime {
@@ -56,6 +62,8 @@ export interface DagStatusUiDeps {
   readonly terminalWidth?: () => number | undefined
   // Local rendering time for live node elapsed labels and deterministic tests.
   readonly now?: () => number
+  // A node child's record: a node whose child waits for its revival says so instead of looking busy.
+  readonly childRecord?: (taskId: string) => NodeChildRecord | undefined
 }
 
 export interface DagStatusUi {
@@ -109,7 +117,7 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
     const runs = liveRuns()
     const maxWidth = deps.terminalWidth?.() ?? process.stdout.columns
     const renderedAt = now()
-    const rows = runs.flatMap((run) => runRows(run, liveActivity.get(run.runId), { maxWidth, now: renderedAt }))
+    const rows = runs.flatMap((run) => runRows(run, activityOf(run), { maxWidth, now: renderedAt }))
     pruneActivity(runs)
     if (rows.length === 0) {
       // Blanking is only honest when nothing is live. A run the manager still lists but whose
@@ -148,11 +156,11 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
     return liveCount === 1 ? "◌ tracking 1 dag run" : `◌ tracking ${liveCount} dag runs`
   }
 
-  function liveRuns(): readonly DagStatusRunSnapshot[] {
+  function liveRuns(): readonly DagStatusUiRunSnapshot[] {
     const sessionId = deps.runtime.sessionId()
     // Fail-closed: without a session id there is nothing to scope, so no run is queried.
     if (sessionId === undefined) return []
-    const snapshots: DagStatusRunSnapshot[] = []
+    const snapshots: DagStatusUiRunSnapshot[] = []
     for (const summary of deps.manager.list(sessionId)) {
       if (TERMINAL_RUN_STATUSES.has(summary.status)) continue
       // A run pruned between list and snapshot is stale, not fatal: drop it and keep painting.
@@ -163,12 +171,20 @@ export function createDagStatusUi(deps: DagStatusUiDeps): DagStatusUi {
     return snapshots
   }
 
-  function readSnapshot(runId: string, sessionId: string): DagStatusRunSnapshot | undefined {
+  function readSnapshot(runId: string, sessionId: string): DagStatusUiRunSnapshot | undefined {
     try {
       return deps.manager.snapshot(runId, sessionId)
     } catch {
       return undefined
     }
+  }
+
+  function activityOf(run: DagStatusUiRunSnapshot): ReadonlyMap<string, string> | undefined {
+    const waiting = run.nodes.filter((node) => awaitsChildRevival(node, deps.childRecord))
+    if (waiting.length === 0) return liveActivity.get(run.runId)
+    const activity = new Map(liveActivity.get(run.runId))
+    for (const node of waiting) activity.set(node.id, AWAITING_REVIVAL_ACTIVITY)
+    return activity
   }
 
   function pruneActivity(runs: readonly DagStatusRunSnapshot[]): void {

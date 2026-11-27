@@ -11,6 +11,7 @@ import { createProvisionalExitTracker, type ExitConfirmationSchedule } from "./p
 import { settlePaused } from "./settle-paused"
 import type { ResumedChildTurn } from "../pause/ports"
 import { publishHostTaskStatus } from "./host-task-status"
+import type { UsageLimitMemory } from "./usage-limit-memory"
 
 export type ManagedOutcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
 
@@ -40,6 +41,8 @@ export type OutcomeTrackerPorts = {
   // record is then guaranteed non-terminal, so the waiters must be settled from this record instead.
   readonly settleWaiters: (taskId: string, terminal?: TaskRecord) => void
   readonly tryRuntimeFallback: (input: ErrorOutcomeInput) => Promise<boolean>
+  // The usage-limit memory the runtime walk consults, so the terminal error judges the chain the same way.
+  readonly usageLimits?: UsageLimitMemory
   // A cancel is waiting to stop this task: the run ends as cancelled, never as the failure the stop
   // causes. Settles once that cancel finished, whether or not its own record write landed.
   readonly stopSettlement?: (taskId: string) => Promise<void> | undefined
@@ -128,6 +131,8 @@ function errnoField(error: unknown, key: "code" | "syscall" | "path"): string | 
 export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker {
   const provisional = createProvisionalExitTracker(ports)
   const turns = new Map<string, object>()
+  // A park that itself ended the run's turn waits here for that outcome's terminal write (omo#10487).
+  const parksAfterTerminal = new Map<string, () => void>()
   // A terminal outcome is never lost to a persistence fault (#8050). When the store cannot write the
   // terminal record (Windows EPERM on the rename after the store's own retries), the run is still
   // settled: the residency is released through forget() and every waiter receives a synthesized
@@ -153,9 +158,13 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         updated_at: timestamp,
         terminal_at: timestamp,
       })
+      parksAfterTerminal.delete(taskId)
       return
     }
     ports.settleWaiters(taskId)
+    const park = parksAfterTerminal.get(taskId)
+    parksAfterTerminal.delete(taskId)
+    park?.()
   }
 
   async function settleErrorOutcome(input: ErrorOutcomeInput): Promise<void> {
@@ -172,7 +181,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     persistTerminal(input.taskId, owned, input.timestamp, {
       type: "fail",
       timestamp: input.timestamp,
-      ...terminalFailureFields(owned, input.outcome.failure, isModelTurnFailure(input.outcome)),
+      ...terminalFailureFields(owned, input.outcome.failure, isModelTurnFailure(input.outcome), ports.usageLimits),
       ...(input.outcome.killed === true ? { killed: true } : {}),
       ...(input.runStats === undefined ? {} : { run_stats: input.runStats }),
     })
@@ -181,8 +190,21 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   // The session parked - the child itself (its recorded endpoint refused the reattach) or the host
   // (idle sweep, generation handoff). No outcome will settle on that handle again, so the record parks
   // at rpc_detached WITH the cause, keeping its status, and the run is released like a suspension.
-  function parkOwned(taskId: string, handle: ManagedChildHandle, epoch: number, reason: SuspensionReason): void {
+  // A park that itself ended the run's turn (a turn held on the child's own async work ends as that
+  // abandoned work) parks only once that outcome is persisted: forgetting the handle first would drop
+  // it and leave a running record whose reopened transcript ends on the held note (omo#10487).
+  function parkOwned(
+    taskId: string,
+    handle: ManagedChildHandle,
+    epoch: number,
+    reason: SuspensionReason,
+    settledTurn = false,
+  ): void {
     if (ownedRecord(ports, taskId, handle, epoch) === null) return
+    if (settledTurn) {
+      parksAfterTerminal.set(taskId, () => parkOwned(taskId, handle, epoch, reason))
+      return
+    }
     ports.store.mutate(taskId, (fresh) => {
       const { host_pid: _hostPid, ...rest } = fresh
       return { ...rest, residency_state: "rpc_detached", suspension_reason: reason, updated_at: nowIso(ports.now) }
@@ -244,6 +266,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
 
   function release(taskId: string): void {
     turns.delete(taskId)
+    parksAfterTerminal.delete(taskId)
     provisional.release(taskId)
     parkWatches.get(taskId)?.()
     parkWatches.delete(taskId)
@@ -253,7 +276,9 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
 
   function watchParks(taskId: string, handle: ManagedChildHandle, epoch: number): void {
     release(taskId)
-    const stop = handle.onParked?.((event) => parkOwned(taskId, handle, epoch, event.reason))
+    const stop = handle.onParked?.((event) =>
+      parkOwned(taskId, handle, epoch, event.reason, event.settledTurn === true),
+    )
     if (stop !== undefined) parkWatches.set(taskId, stop)
   }
 
@@ -296,9 +321,14 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     const outcomePromise = turn?.outcome ?? handle.waitForOutcome()
     outcomePromise
       .then(async (outcome) => {
+        // A run that ended without a failure, or was stopped, answers no usage-limit probe; only its own probe ends.
+        if (outcome.status !== "error") ports.usageLimits?.endProbe(taskId, epoch)
         if (turns.get(taskId) !== tracking) return
         const stopped = ports.stopSettlement?.(taskId)
-        if (stopped !== undefined) return await settleStopped(taskId, handle, model, epoch, stopped)
+        if (stopped !== undefined) {
+          ports.usageLimits?.endProbe(taskId, epoch)
+          return await settleStopped(taskId, handle, model, epoch, stopped)
+        }
         const paused = ports.pauseSettlement?.(taskId, epoch)
         if (paused !== undefined) {
           if (await settlePaused(ports, taskId, handle, epoch, paused)) return

@@ -57,4 +57,6 @@ export type {
   StartResult,
   TaskManager,
   TaskManagerOptions,
+  OwnerResumeFence,
+  OwnerResumeVerdict,
 } from "./types"

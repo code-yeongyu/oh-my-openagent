@@ -1,5 +1,6 @@
 import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runners/in-process/child-handle"
 import { mapExitOutcomeToError } from "../runners/rpc/exit-mapping"
+import { finishedTurnOutcome } from "../runners/pending-async-work"
 import type { HostSessionChildHandle } from "../runners/rpc-host/handle-port"
 import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
 import type {
@@ -65,7 +66,8 @@ export type ManagedChildHandle = {
   effectiveModel?(): EffectiveModel | undefined
   // A daemon-session child whose session parked - itself (its recorded endpoint refused a reattach) or
   // by its host (idle sweep, generation handoff): the record parks with that reason either way.
-  onParked?(listener: (event: { readonly reason: SuspensionReason }) => void): () => void
+  // `settledTurn`: the park itself ended the run's turn, whose outcome is persisted before the record parks.
+  onParked?(listener: (event: { readonly reason: SuspensionReason; readonly settledTurn?: true }) => void): () => void
   // A daemon-session child the host swapped under its live routing handle: the record's session
   // identity is re-stamped from this event (F9); the child keeps running on the new transcript.
   onReplaced?(listener: (event: HostSessionReplaced) => void): () => void
@@ -73,7 +75,8 @@ export type ManagedChildHandle = {
   onDurableSessionId?(listener: (id: string) => void): () => void
   // A daemon-session child whose connection dropped and is being recovered (omo#9403).
   transportRecovering?(): boolean
-  // A cancel was accepted: no transport recovery may bring this child back as running.
+  // A cancel was accepted: no transport recovery may bring this child back as running, and an
+  // in-process turn held on the child's own work ends cancelled at once, never held again (omo#10487).
   markStopping?(): void
   // Host-session: the host answered this child's end of its session (omo#11765).
   hostEndAnswered?(): boolean
@@ -93,6 +96,9 @@ export type ManagedChildHandle = {
   // settled (a monitor or background job woke it), so the manager can reopen the record.
   onSelfResumed?(listener: () => void): () => void
   onReconciled?(listener: (notice: ReconciledTurnNotice) => void): () => void
+  // Host-session children: reconciliation sent this handle the continuation of an interrupted turn,
+  // whose run will reopen the record its notice marked interrupted (#15125).
+  continuationDelivered?(): boolean
   // RPC handles expose a settled process signal; in-process handles omit it because their session
   // lifecycle has no separate child process to observe.
   hasExited?(): boolean
@@ -116,6 +122,7 @@ export function adaptInProcessHandle(handle: InProcessChildHandle): ManagedChild
     steer: (text, identity) => handle.steer(text, identity),
     followUp: (text, identity) => handle.followUp(text, identity),
     abort: () => handle.abort(),
+    markStopping: () => handle.markStopping?.(),
     subscribe: (listener) => handle.subscribe(listener),
     waitForOutcome: () => handle.waitForIdle(),
     lastAssistantText: () => handle.lastAssistantText(),
@@ -156,6 +163,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
           publishTaskStatus: (status: TaskStatus) => handle.publishTaskStatus(status),
           stopWhenReachable: () => handle.stopWhenReachable(),
           onReconciled: (listener: (notice: ReconciledTurnNotice) => void) => handle.onReconciled(listener),
+          continuationDelivered: () => handle.continuationDelivered(),
         }
       : {}),
     steer: (text, identity) => handle.steer(text, identity),
@@ -236,7 +244,8 @@ async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
   // Legacy handles without the observation seam retain their prior text behavior, so a revived turn
   // cannot silently reuse the previous turn's final text.
   const finalResponse = hasTerminalReader ? terminal?.text : handle.lastAssistantText()
-  if (finalResponse !== undefined && finalResponse.length > 0) return { status: "completed", finalResponse }
+  // A legacy handle reports no engine lifecycle: the documented unrecorded case (omo#10487).
+  if (finalResponse !== undefined && finalResponse.length > 0) return finishedTurnOutcome(finalResponse, "unrecorded")
   return {
     status: "error",
     failure: {
