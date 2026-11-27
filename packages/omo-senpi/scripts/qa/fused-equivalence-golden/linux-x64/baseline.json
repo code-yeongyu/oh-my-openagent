@@ -1,11 +1,11 @@
 {
  "repo": {
-  "head": "9eb30678a8a7e698d46ebe6cb24731b7442a6797",
+  "head": "9414d85a9582d1a2e0c7805ad332e4075a9ed2db",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "linux-x64",
  "runtimes": {
-  "harness": "node@26.12.0",
+  "harness": "node@24.22.0",
   "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.23 (pinned)"
  },
  "hashes": {
