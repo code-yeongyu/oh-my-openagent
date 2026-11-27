@@ -191,13 +191,13 @@ describe("task_cancel on a finished child that is still resident (omo#9785)", ()
       host_pid: process.pid,
       parent_session_id: "parent-2",
     })
-    const { lifecycle, cancel } = cancelSurface(store, new SessionRegistry())
+    const { lifecycle, cancelWith } = cancelSurface(store, new SessionRegistry())
 
     // when
-    const result = await cancel()
+    const result = await cancelWith()
 
     // then
-    expect(result.details).toMatchObject({ kind: "noop", status: "completed" })
+    expect(result).toMatchObject({ kind: "noop", status: "completed" })
     expect(store.load(TASK)?.residency_state).toBe("resident")
     lifecycle.dispose?.()
   })
