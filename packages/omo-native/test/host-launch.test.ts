@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { observedLaunch, RAW_HOST_LAUNCH_ENV, takeRawHostLaunch } from "../bin/lib/host-launch.js"
@@ -9,7 +9,8 @@ import { formatDoctorLines, formatEndpointLines } from "../bin/lib/daemon-status
 import { buildSenpiArgs } from "../compile-args"
 
 test("npm daemon run, host ensure, host handoff and host session open give the engine the product launch spec", () => {
-  const root = mkdtempSync(join(tmpdir(), "omo-host-launch-"))
+  // The launcher names its spec by its own real path, so the expectation does too (macOS tmpdir is /var -> /private/var).
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-host-launch-")))
   try {
     const home = join(root, "home")
     const engine = join(root, "node_modules", "@code-yeongyu", "senpi")
@@ -60,6 +61,8 @@ test("npm daemon run, host ensure, host handoff and host session open give the e
         ["host", "session", "open"],
       ],
     ] as const) {
+      // On win32 omo daemon refuses before it starts anything (exit 4, no unix socket); the host rows still run there.
+      if (process.platform === "win32" && args[0] === "daemon") continue
       writeFileSync(capture, "")
       const result = spawnSync(process.execPath, [join(root, "bin/omo.js"), ...args], {
         cwd: home,
@@ -124,7 +127,8 @@ test("an older or unresponsive host leaves ensure successful and explicitly unob
 })
 test("status and doctor distinguish the live primary's reported extensions from an unobserved profile", () => {
   for (const [extensions, expected] of [
-    [["/runtime/plugin", "/runtime/plugin/extensions/omo-member.js"], "loaded"],
+    // Native separators, as a live primary reports them on every platform (#15312: a POSIX literal missed on win32).
+    [[join("/runtime", "plugin"), join("/runtime", "plugin", "extensions", "omo-member.js")], "loaded"],
     [[], "absent"],
     [undefined, "unknown"],
   ] as const) {
