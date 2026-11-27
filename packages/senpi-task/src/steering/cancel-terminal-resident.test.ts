@@ -43,7 +43,7 @@ function cancelSurface(store: TaskRecordStore, registry: FakeRegistry, options?:
   return {
     lifecycle,
     engine,
-    cancel: () => runTaskCancel(manager, { task_id: TASK }),
+    cancel: () => runTaskCancel(manager, { task_id: TASK }, "parent-1"),
     cancelWith: () => engine.cancelTask(TASK, undefined, options),
   }
 }
