@@ -27,8 +27,8 @@ describe.skipIf(process.platform === "win32")("a thread on an endpoint refused f
       await withContractHost({}, async (answering) => {
         const dir = mkdtempSync(join(tmpdir(), "identity-refused-"))
         const sessions = join(dir, "sessions")
-        mkdirSync(sessions, { recursive: true })
-        const file = join(sessions, `2026-11-27T10-00-00-000Z_${TARGET}.jsonl`)
+        mkdirSync(join(sessions, "--workspace--"), { recursive: true })
+        const file = join(sessions, "--workspace--", `2026-11-27T10-00-00-000Z_${TARGET}.jsonl`)
         writeFileSync(
           file,
           `${JSON.stringify({ type: "session", id: TARGET, timestamp: "2026-11-27T10:00:00.000Z", cwd: dir })}\n${JSON.stringify({ type: "session_info", name: "unproven-target" })}\n`,
@@ -51,10 +51,12 @@ describe.skipIf(process.platform === "win32")("a thread on an endpoint refused f
             callerSessionId: () => "caller",
             callerWorkspaceRoot: () => dir,
           })
+          let calls = 0
           const run = async (name: string, args: Readonly<Record<string, unknown>>) => {
             const tool = tools.find((candidate) => candidate.name === name)
             if (tool === undefined) throw new Error(`${name} is not registered`)
-            const output = await tool.execute(`call-${name}`, args, undefined, undefined, {} as never)
+            calls += 1
+            const output = await tool.execute(`call-${calls}`, args, undefined, undefined, {} as never)
             return { result: output.details.result as Record<string, unknown>, rendered: JSON.stringify(output) }
           }
           const rendered: string[] = []
@@ -76,6 +78,18 @@ describe.skipIf(process.platform === "win32")("a thread on an endpoint refused f
           const sent = await run("thread_send", { thread: TARGET, message: "hello", all_scope: true })
           rendered.push(sent.rendered)
           expect(sent.result).toMatchObject({
+            kind: "ok",
+            delivery: { kind: "queued", waiting_on: { kind: "host_identity_unproven" } },
+          })
+
+          await store.registerIncarnation({
+            durable_id: TARGET,
+            incarnation: "published",
+            endpoint: { kind: "rpc_host", socket: refused.socket },
+          })
+          const published = await run("thread_send", { thread: TARGET, message: "again", all_scope: true })
+          rendered.push(published.rendered)
+          expect(published.result).toMatchObject({
             kind: "ok",
             delivery: { kind: "queued", waiting_on: { kind: "host_identity_unproven" } },
           })
