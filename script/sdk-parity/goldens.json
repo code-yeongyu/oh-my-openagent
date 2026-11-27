@@ -335,7 +335,209 @@
             "kind": "parse",
             "count": 1
           }
-        ]
+        ],
+        "routing": {
+          "categories": [
+            {
+              "name": "architect",
+              "source": "builtin",
+              "chain": [
+                "claude-fable-5-2",
+                "claude-fable-5-1"
+              ]
+            },
+            {
+              "name": "artistry",
+              "source": "builtin",
+              "chain": [
+                "claude-fable-5-2",
+                "claude-fable-5-1",
+                "claude-opus-5-5",
+                "kimi-k3.1-pro"
+              ]
+            },
+            {
+              "name": "deep-high",
+              "source": "builtin",
+              "chain": [
+                "gpt-6.2-astra"
+              ]
+            },
+            {
+              "name": "deep-low",
+              "source": "builtin",
+              "chain": [
+                "gpt-6.2-sol"
+              ]
+            },
+            {
+              "name": "quick",
+              "source": "builtin",
+              "chain": [
+                "gpt-6-luna-fast",
+                "claude-haiku-5-5",
+                "deepseek-flash",
+                "qwen3.6-flash",
+                "minimax-m3",
+                "minimax-m2.7",
+                "grok-4.20-0309-non-reasoning",
+                "glm-5.3-flash",
+                "mimo-v2.6-flash"
+              ]
+            },
+            {
+              "name": "ultrabrain",
+              "source": "builtin",
+              "chain": [
+                "gpt-6.2-astra"
+              ]
+            },
+            {
+              "name": "unspecified-high",
+              "source": "builtin",
+              "chain": [
+                "claude-opus-5-5",
+                "glm-5.3",
+                "kimi-k3.1-pro"
+              ]
+            },
+            {
+              "name": "unspecified-low",
+              "source": "builtin",
+              "chain": [
+                "claude-sonnet-5-5",
+                "mimo-v2.6-pro",
+                "grok-4.7",
+                "glm-5.3",
+                "gpt-6.2-sol",
+                "gpt-6.1-sol",
+                "gpt-5.6-sol",
+                "claude-sonnet-5",
+                "qwen3.8-max-preview",
+                "deepseek-v4-pro",
+                "mimo-v2.5-pro"
+              ]
+            },
+            {
+              "name": "visual-engineering",
+              "source": "builtin",
+              "chain": [
+                "gemini-4-argon",
+                "claude-fable-5-2",
+                "claude-fable-5-1",
+                "claude-opus-5-5",
+                "kimi-k3.1-pro"
+              ]
+            },
+            {
+              "name": "writing",
+              "source": "builtin",
+              "chain": [
+                "gemini-4-argon",
+                "claude-opus-5-5",
+                "claude-opus-4-6"
+              ]
+            }
+          ],
+          "agents": [
+            {
+              "name": "explore",
+              "source": "builtin",
+              "chain": [
+                "kimi-for-coding-highspeed",
+                "gpt-6-luna-fast",
+                "claude-haiku-5-5",
+                "deepseek-flash",
+                "qwen3.7-plus",
+                "minimax-m2.7"
+              ]
+            },
+            {
+              "name": "librarian",
+              "source": "builtin",
+              "chain": [
+                "kimi-for-coding-highspeed",
+                "gpt-6-luna-fast",
+                "claude-haiku-5-5",
+                "deepseek-flash",
+                "qwen3.7-plus",
+                "minimax-m2.7"
+              ]
+            },
+            {
+              "name": "omo-native-code-reviewer",
+              "source": "builtin",
+              "chain": []
+            },
+            {
+              "name": "omo-native-gate-reviewer",
+              "source": "builtin",
+              "chain": []
+            },
+            {
+              "name": "omo-native-qa-executor",
+              "source": "builtin",
+              "chain": []
+            },
+            {
+              "name": "plan-consultant",
+              "source": "builtin",
+              "chain": [
+                "claude-fable-5-2",
+                "claude-fable-5-1",
+                "claude-opus-5-5",
+                "kimi-k3.1-pro",
+                "kimi-k3"
+              ]
+            },
+            {
+              "name": "plan-reviewer",
+              "source": "builtin",
+              "chain": [
+                "gpt-6.2-astra",
+                "gpt-6-astra",
+                "claude-opus-5-5",
+                "gemini-4-argon",
+                "gemini-3.1-pro",
+                "glm-5.2"
+              ]
+            }
+          ]
+        },
+        "engine": {
+          "compaction": {
+            "enabled": true,
+            "speculativeEnabled": true,
+            "speculativeFraction": 0.75,
+            "speculativeCooldownMs": 30000,
+            "idleCompactionEnabled": true,
+            "reserveTokens": 16384,
+            "keepRecentTokens": 20000
+          },
+          "retry": {
+            "modelFallback": true,
+            "fallbackRevertPolicy": "cooldown-expiry",
+            "fallbackChains": {
+              "claude-fable-5-2": [
+                "claude-opus-5-5",
+                "claude-opus-5"
+              ],
+              "claude-fable-5-1": [
+                "claude-opus-5-5",
+                "claude-opus-5"
+              ],
+              "claude-fable-5": [
+                "claude-opus-5-5",
+                "claude-opus-5"
+              ],
+              "claude-opus-5-5": [
+                "claude-fable-5-2:medium",
+                "kimi-k3.1-pro:max"
+              ]
+            }
+          },
+          "readAtEngineVersion": "2026.11.19-5"
+        }
       }
     }
   }
