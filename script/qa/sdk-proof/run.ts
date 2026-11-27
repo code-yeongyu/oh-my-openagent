@@ -112,7 +112,9 @@ async function runCappedCase(world: World): Promise<CappedRecord[]> {
     (late) => void Promise.all(late.map((driver) => driver.close())),
   )
   if (ready === undefined)
-    return [{ step: "start", raw: null, cell: "not reached", why: "the drivers were not ready within the step deadline" }]
+    return [
+      { step: "start", raw: null, cell: "not reached", why: "the drivers were not ready within the step deadline" },
+    ]
   const [tools, cli] = ready
   try {
     return await runCapped(tools, cli, DEVICE_B.id, world.observer)

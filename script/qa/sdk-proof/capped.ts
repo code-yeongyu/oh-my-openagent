@@ -75,8 +75,17 @@ export async function runCapped(
     DEADLINE_MS,
   )
   const key = "stalled" in opened ? undefined : await observer.adopt(before)
-  if (key === undefined || !(await settles(async () => (await texts(key, "assistant")).some((t) => t.includes(ackOf(open))), "B answers its opening prompt")))
-    return skip(["start", "capped", "resend", "lift"], "the thread on B did not open and answer its first prompt (setup)")
+  if (
+    key === undefined ||
+    !(await settles(
+      async () => (await texts(key, "assistant")).some((t) => t.includes(ackOf(open))),
+      "B answers its opening prompt",
+    ))
+  )
+    return skip(
+      ["start", "capped", "resend", "lift"],
+      "the thread on B did not open and answer its first prompt (setup)",
+    )
   const thread = "stalled" in opened ? "" : (opened.thread ?? "")
 
   const send = async (token: string, idempotency_key: string) =>
@@ -88,7 +97,8 @@ export async function runCapped(
 
   const first = "QA-TOKEN-x1a-capped-first"
   const started = await send(first, "x1a-capped-first")
-  if ("stalled" in started) return skip(["start", "capped", "resend", "lift"], "the first tools send answered nothing (harness)")
+  if ("stalled" in started)
+    return skip(["start", "capped", "resend", "lift"], "the first tools send answered nothing (harness)")
   const answeredFirst = await settles(
     async () => (await texts(key, "assistant")).some((text) => text.includes(ackOf(first))),
     "B answers the first send",
@@ -98,7 +108,9 @@ export async function runCapped(
     step: "start",
     raw: started.raw,
     cell: startedOk ? "pass" : "fail",
-    why: startedOk ? "started, and B answered it" : `delivery ${JSON.stringify(deliveryOf(started.raw))}; B answered: ${answeredFirst}`,
+    why: startedOk
+      ? "started, and B answered it"
+      : `delivery ${JSON.stringify(deliveryOf(started.raw))}; B answered: ${answeredFirst}`,
   })
 
   const parked = "QA-TOKEN-x1a-capped-parked"
@@ -125,7 +137,8 @@ export async function runCapped(
   if ("stalled" in resent) return skip(["resend", "lift"], "the resend answered nothing (harness)")
   const copies = (await texts(key, "sent")).filter((text) => text.includes(parked)).length
   const resendWhy = notParked(resent.raw)
-  const resendOk = resendWhy === undefined && isRecord(resent.raw) && resent.raw["deduplicated"] === true && copies === 1
+  const resendOk =
+    resendWhy === undefined && isRecord(resent.raw) && resent.raw["deduplicated"] === true && copies === 1
   records.push({
     step: "resend",
     raw: resent.raw,
@@ -167,6 +180,8 @@ export const cappedTable = (records: readonly CappedRecord[]): string =>
     "",
     "| Step | Cell |",
     "|---|---|",
-    ...records.map((record) => `| ${record.step} | ${record.cell === "pass" ? "pass" : `${record.cell}: ${record.why}`} |`),
+    ...records.map(
+      (record) => `| ${record.step} | ${record.cell === "pass" ? "pass" : `${record.cell}: ${record.why}`} |`,
+    ),
     "",
   ].join("\n")
