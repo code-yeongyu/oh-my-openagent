@@ -3,7 +3,12 @@ import { describe, expect, test } from "bun:test"
 import { buildChildArgs } from "./spawn"
 import { PersonaTooLargeError, personaArgs } from "./persona-args"
 
-const baseSpec = { task_id: "st_00000001", cwd: "/tmp/project", state_dir: "/tmp/project/.omo/senpi-task", prompt: "review" }
+const baseSpec = {
+  task_id: "st_00000001",
+  cwd: "/tmp/project",
+  state_dir: "/tmp/project/.omo/senpi-task",
+  prompt: "review",
+}
 
 describe("personaArgs", () => {
   test("#given a reviewer persona #when a process child is built #then its instructions, allowlist and denylist reach the senpi argv", () => {
@@ -16,10 +21,14 @@ describe("personaArgs", () => {
     })
     // then
     expect(args).toEqual([
-      "--no-extensions", "--no-ask-user",
-      "--append-system-prompt", "Role: code reviewer.",
-      "--tools", "read,grep,bash",
-      "--exclude-tools", "task",
+      "--no-extensions",
+      "--no-ask-user",
+      "--append-system-prompt",
+      "Role: code reviewer.",
+      "--tools",
+      "read,grep,bash",
+      "--exclude-tools",
+      "task",
     ])
   })
 
@@ -36,7 +45,10 @@ describe("personaArgs", () => {
   })
 
   test("#given a workpool worker with an allowlist #when building #then its yield tool stays allowed", () => {
-    expect(personaArgs({ toolAllowlist: ["read"], memberScopedToolNames: ["workpool"] })).toEqual(["--tools", "read,workpool"])
+    expect(personaArgs({ toolAllowlist: ["read"], memberScopedToolNames: ["workpool"] })).toEqual([
+      "--tools",
+      "read,workpool",
+    ])
   })
 
   test("#given instructions over the argv budget #when building #then the launch is refused", () => {

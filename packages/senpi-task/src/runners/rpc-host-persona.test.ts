@@ -26,18 +26,21 @@ describe("a daemon-hosted child's persona (#13057)", () => {
   test.each([
     ["no allowlist", { toolDenylist: [DENIED] }, { excludeTools: [DENIED] }],
     ["an empty allowlist", { toolAllowlist: [] }, { tools: [] }],
-  ] as const)("#given %s #when the open request is built #then the persona says exactly that", async (_case, spec, wire) => {
-    // given
-    const host = await fakeHost({ capabilities: PERSONA_CAPABLE })
-    const runner = runnerOver(host)
+  ] as const)(
+    "#given %s #when the open request is built #then the persona says exactly that",
+    async (_case, spec, wire) => {
+      // given
+      const host = await fakeHost({ capabilities: PERSONA_CAPABLE })
+      const runner = runnerOver(host)
 
-    // when
-    const handle = await runner.start(childSpec(spec))
+      // when
+      const handle = await runner.start(childSpec(spec))
 
-    // then
-    expect(openPayloads(host.commands)[0]?.["persona"]).toEqual(wire)
-    await handle.terminate()
-  })
+      // then
+      expect(openPayloads(host.commands)[0]?.["persona"]).toEqual(wire)
+      await handle.terminate()
+    },
+  )
 
   test("#given a host that holds a session persona #when a child with a tool policy starts #then open_session carries its instructions, allowlist and denylist", async () => {
     // given

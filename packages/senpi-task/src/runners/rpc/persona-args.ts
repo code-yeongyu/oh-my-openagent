@@ -37,7 +37,8 @@ export function personaPolicy(persona: RpcPersona, carrier: PersonaCarrier): Per
   const instructions = persona.instructions
   if (instructions !== undefined && instructions.length > 0) assertInstructionsFit(instructions, carrier)
   const allow = persona.toolAllowlist
-  const yieldTool = persona.memberScopedToolNames?.includes(WORKPOOL_YIELD_TOOL_NAME) === true ? [WORKPOOL_YIELD_TOOL_NAME] : []
+  const yieldTool =
+    persona.memberScopedToolNames?.includes(WORKPOOL_YIELD_TOOL_NAME) === true ? [WORKPOOL_YIELD_TOOL_NAME] : []
   const deny = persona.toolDenylist
   return {
     ...(instructions === undefined || instructions.length === 0 ? {} : { appendSystemPrompt: instructions }),
