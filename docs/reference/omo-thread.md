@@ -359,6 +359,52 @@ if (created.kind === "ok") {
 }
 ```
 
+### Attach a raw pi-RPC stream to a host session
+
+`attachRpcSession`, exported from the same `runtime/thread-sdk/sdk.js`, gives an integration that relays a session to a
+client outside omo (an editor bridge, for example) the stream `omo --mode rpc` speaks on stdio, served by a session on a
+running shared host. It covers the whole protocol between the integration and the host. It boots no gateway store and
+no account surface:
+
+```js
+const { attachRpcSession } = await import(`${pluginRoot}/runtime/thread-sdk/sdk.js`)
+const attached = await attachRpcSession({
+  agentDir,
+  session: { open: { cwd: process.cwd(), kind: "interactive", permissionPreset: "auto", retain_on_disconnect: true } },
+})
+if (attached.kind === "error") throw new Error(`${attached.error.code}: ${attached.error.message}`)
+const { stream } = attached
+const relay = (async () => {
+  for await (const record of stream.records) process.stdout.write(`${JSON.stringify(record)}\n`)
+})()
+for await (const chunk of process.stdin) stream.write(chunk)
+await stream.detach()
+await relay
+```
+
+- **Endpoint and authentication.** By default the call dials the host socket the thread tools use: a socket override
+  from the environment if set, otherwise `<agentDir>/rpc/rpc.sock`. Pass `socket` to name another host. On POSIX it
+  answers the host's challenge with the key record under the agent dir (or `SENPI_RPC_KEY_ROOT`) and verifies the
+  host's proof first. On Windows the endpoint's secret file proves the pipe.
+- **Starting the host.** The call never starts a host. Start it with senpi's `ensureHost` or the thread SDK's
+  `warmDaemon` first; with nothing serving the endpoint the call answers `not_running`.
+- **Session.** `{ open: { ... } }` sends `open_session` with those fields (`cwd`, `kind`, `permissionPreset`,
+  `sessionPath` to reopen a saved session, `provider` and `modelId`, `thinkingLevel`, `retain_on_disconnect`,
+  `context`, ...). `{ attach: { durableSessionId } }` attaches to a session the host already holds.
+- **Records out.** `records` yields this session's records in host order, with the host's routing `sessionId`
+  removed. Records the host wrote before `open_session` answered come first. Untagged answers to commands sent through
+  this stream are included. Another session's records never arrive. It ends once, when `ended` settles.
+- **Records in.** `send(record)` sends one command and tags it for the session. It returns false once the stream has
+  ended. `write(chunk)` splits raw JSONL bytes with the host's strict framing: only `\n` ends a record, and a trailing
+  `\r` is dropped. It sends each object and answers `{ sent, rejected }`, where `rejected` holds the lines that are not
+  a JSON object.
+- **Detaching.** `detach()` sends `release_attachment`, so the session keeps running and can be attached again.
+  `detach({ close: true })` sends `close_session` instead. Either way the connection then closes.
+- **Why it ended.** `ended` settles with `detached`, `session_closed`, `session_released` or `connection_closed`.
+- **Failures.** Every failure is answered as `{ kind: "error", error: { code, message } }` and never thrown. The codes
+  are `not_running`, `unreachable`, `auth_required`, `auth_failed`, `host_identity_unproven`, `unsafe_key_record`,
+  `session_not_found`, `refused` (the host's own code is in `message`), `request_timeout` and `closed`.
+
 ### Diagnose a local read RPC failure
 
 Set `OMO_THREAD_READ_TRACE=1` in the **calling process** to print a `[thread-read-rpc]` line to stderr when a local socket conversation for `list_sessions`, `get_protocol_info`, `get_messages`, or `get_entries` fails. Leave it unset for normal use. Each line contains only the requested command, the last observed socket phase, elapsed milliseconds, a fixed error code, `caller_stall_ms` (how long the calling process's own event loop was blocked over the whole call, every attempt included) and `attempts` (2 when a connection lost during such a stall was dialed again). It does not contain socket paths, IDs, credentials or transcript data.

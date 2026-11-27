@@ -12,6 +12,18 @@ import {
 } from "../components/thread/sdk"
 
 export type { LocatedThread, ThreadSdk, ThreadSdkOptions } from "../components/thread/sdk"
+// A raw pi-RPC stream to one session on a running shared host (#15238); it needs no store and no account surface.
+export { attachRpcSession } from "../components/thread/rpc-session"
+export type {
+  AttachRpcSessionOptions,
+  AttachRpcSessionResult,
+  RpcRecord,
+  RpcSessionEnd,
+  RpcSessionErrorCode,
+  RpcSessionFailure,
+  RpcSessionStream,
+  RpcSessionTarget,
+} from "../components/thread/rpc-session"
 // `omo host status --all` stamps each terminal row's `last_activity_at` with the same reader `omo thread list` uses.
 export { readSessionFacts } from "../components/thread/session-facts"
 
