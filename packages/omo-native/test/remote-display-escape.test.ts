@@ -1,50 +1,58 @@
 import { describe, expect, test } from "bun:test"
 
 import { DISPLAY_UNSAFE, ORDINARY, unsafeCodeUnits } from "@oh-my-opencode/utils/testing/display-unsafe"
-import type { Status } from "../../device-service-core/src/index.ts"
-import type { DeviceRow, SessionsList } from "../../omo-senpi/src/components/remote/index"
-import type { ThreadToolResult } from "../../omo-senpi/src/components/thread/contracts"
+import type {
+  DeviceRow,
+  InterruptResult,
+  SendReceipt,
+  ServiceStatus,
+  SessionsList,
+} from "../../omo-senpi/src/components/remote/index"
 import {
   candidateLines,
+  closeLines,
   deviceLines,
+  interruptLines,
+  modelLines,
+  openedLines,
   personNextAction,
   refusalLines,
+  sendLines,
   sendWaitNotice,
   sessionEndedLine,
   sessionLines,
-  sessionVerbLines,
   statusLines,
   undeliveredPromptLines,
 } from "../remote-render"
 
-const result = (value: unknown): ThreadToolResult => value as ThreadToolResult
+const receipt = (value: unknown): SendReceipt => value as SendReceipt
 
-function verbResults(value: string): (readonly [Parameters<typeof sessionVerbLines>[0], ThreadToolResult])[] {
+function receipts(value: string): SendReceipt[] {
   return [
-    ["open", result({ kind: "ok", deduplicated: false, name: value, thread: value, device: value })],
-    [
-      "send",
-      result({
-        kind: "ok",
-        delivery: { kind: "queued", queue_position: 2, waiting_on: { kind: "approval", device: value } },
-      }),
-    ],
-    ["send", result({ kind: "ok", delivery: { kind: "steered", turn_id: value } })],
-    ["send", result({ kind: "ok", delivery: { kind: "started", turn_id: value } })],
-    ["model", result({ kind: "ok", model: { provider: value, id: value } })],
-    [
-      "interrupt",
-      result({
-        kind: "ok",
-        interrupted: true,
-        background: {
-          status: "ok",
-          stopped: [{ id: value, description: value }],
-          failed: [{ id: value, reason: value }],
-        },
-      }),
-    ],
-    ["close", result({ kind: "ok", closed: false, dropped_deliveries: [value] })],
+    receipt({ lane: "queued", queue_position: 2, waiting_on: { kind: "approval", device: value } }),
+    receipt({ lane: "steered", turn_id: value }),
+    receipt({ lane: "started", turn_id: value }),
+  ]
+}
+
+const interrupted = (value: string): InterruptResult => ({
+  thread: value,
+  interrupted: true,
+  background: {
+    status: "stopped",
+    stopped: [{ kind: "task", id: value, description: value }],
+    failed: [{ kind: "task", id: value, reason: value }],
+  },
+})
+
+// Every session verb's success lines (#14890 moved them from sessionVerbLines onto one builder per verb).
+function verbLines(value: string): string[] {
+  return [
+    ...openedLines(value),
+    ...receipts(value).flatMap((sent) => sendLines(value, sent)),
+    ...modelLines(value, value),
+    ...interruptLines(value, interrupted(value)),
+    ...closeLines(value, { closed: false, dropped_deliveries: [value] }),
   ]
 }
 
@@ -54,7 +62,7 @@ function everyLine(value: string): string[] {
     enabled: true,
     device: { name: value },
     detail: { action: value },
-  } as unknown as Status
+  } as unknown as ServiceStatus
   const devices = [
     { id: value, name: value, kind: value, platform: value, online: true, last_seen_ms: null },
   ] as unknown as DeviceRow[]
@@ -91,7 +99,7 @@ function everyLine(value: string): string[] {
     ...refusalLines(refusal),
     ...undeliveredPromptLines(value, { message: value, next_action: value }),
     sessionEndedLine(value, value),
-    ...verbResults(value).flatMap(([verb, answer]) => sessionVerbLines(verb, value, answer)),
+    ...verbLines(value),
   ].flatMap((line) => line.split("\n"))
 }
 
@@ -112,13 +120,17 @@ describe("omo remote human lines", () => {
 
   test("#given a fixture-bearing result #when the human lines are built #then the result's JSON form is unchanged", () => {
     for (const fixture of DISPLAY_UNSAFE) {
-      for (const [verb, answer] of verbResults(fixture)) {
-        const before = JSON.stringify(answer)
-        sessionVerbLines(verb, fixture, answer)
-        expect(JSON.stringify(answer)).toBe(before)
+      for (const sent of receipts(fixture)) {
+        const before = JSON.stringify(sent)
+        sendLines(fixture, sent)
+        expect(JSON.stringify(sent)).toBe(before)
       }
+      const stopped = interrupted(fixture)
+      const before = JSON.stringify(stopped)
+      interruptLines(fixture, stopped)
+      expect(JSON.stringify(stopped)).toBe(before)
       expect(personNextAction(fixture)).toBe(fixture)
-      const notice = sendWaitNotice(fixture, result({ kind: "ok", delivery: { kind: "queued", queue_position: 1 } }))
+      const notice = sendWaitNotice(fixture, receipt({ lane: "queued", queue_position: 1 }))
       expect(notice).toBe(`Queued on ${fixture} at position 1.`)
     }
   })

@@ -5,6 +5,7 @@ import type { LiveRunStats, TaskRecord, TaskRunStats } from "../state"
 import type {
   CancelOptions,
   CancelOutcome,
+  InterruptOptions,
   InterruptOutcome,
   RedispatchOutcome,
   SendInput,
@@ -39,7 +40,7 @@ export type TaskManager = {
   selfResumeStopPending?(taskId: string): boolean
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
+  interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // senpi#3266: one-step re-dispatch of a flagged "resumed, waiting for input" task onto a fresh
   // live session, replaying its persisted prompt under the same task identity and a new run epoch.
