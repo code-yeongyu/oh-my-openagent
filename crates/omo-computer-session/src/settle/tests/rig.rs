@@ -52,7 +52,10 @@ impl Backend for Counting {
         self.inner.platform()
     }
 
-    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+    fn set_stop_chord(
+        &mut self,
+        chord: Option<&str>,
+    ) -> omo_computer_core::backend::BackendResult<()> {
         self.inner.set_stop_chord(chord)
     }
 

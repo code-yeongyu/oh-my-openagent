@@ -81,7 +81,11 @@ impl BoundIdentity {
                 .collect::<Vec<_>>()
                 .join(":")
         });
-        format!("{}|{}|{code}", app_key.to_ascii_lowercase(), self.path.as_deref().unwrap_or(""))
+        format!(
+            "{}|{}|{code}",
+            app_key.to_ascii_lowercase(),
+            self.path.as_deref().unwrap_or("")
+        )
     }
 }
 

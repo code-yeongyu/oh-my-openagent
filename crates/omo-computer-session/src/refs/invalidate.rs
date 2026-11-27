@@ -52,8 +52,15 @@ impl RefRegistry {
     /// # Errors
     /// `ControlRequired{needs_observe}` until a new observation of the window exists.
     pub fn exec_gate(&self, window: &str) -> Result<(), Refusal> {
-        if self.windows.get(window).is_some_and(|refs| refs.needs_observe) {
-            return Err(Refusal::new(EngineCode::ControlRequired, Reason::NeedsObserve));
+        if self
+            .windows
+            .get(window)
+            .is_some_and(|refs| refs.needs_observe)
+        {
+            return Err(Refusal::new(
+                EngineCode::ControlRequired,
+                Reason::NeedsObserve,
+            ));
         }
         Ok(())
     }
@@ -61,12 +68,17 @@ impl RefRegistry {
     /// Expires every generation of `window`; their refs answer `StaleRef{epoch}` or
     /// `StaleRef{identity_changed}` and no number of theirs carries over.
     pub fn expire(&mut self, window: &str, why: Expiry) {
-        let Some(refs) = self.windows.get_mut(window) else { return };
+        let Some(refs) = self.windows.get_mut(window) else {
+            return;
+        };
         let released: usize = refs.generations.values().map(|g| g.entries.len()).sum();
         // Only the latest expiry's numbers keep an owner (ruling R70bx): the previous expiry's
         // tokens become pruned tokens, so repeated expiries cannot grow the owner map.
-        let wiped: Vec<u64> =
-            refs.generations.values().flat_map(|g| g.entries.iter().map(|entry| entry.n)).collect();
+        let wiped: Vec<u64> = refs
+            .generations
+            .values()
+            .flat_map(|g| g.entries.iter().map(|entry| entry.n))
+            .collect();
         // An expiry that wipes nothing (two epoch moves with no observe between) keeps the
         // previous expiry's numbers and owners, so its tokens keep their reason; the map
         // still cannot grow, because nothing new is added.
@@ -78,7 +90,9 @@ impl RefRegistry {
                 }
             }
         }
-        let Some(refs) = self.windows.get_mut(window) else { return };
+        let Some(refs) = self.windows.get_mut(window) else {
+            return;
+        };
         refs.generations.clear();
         refs.by_object.clear();
         refs.by_native_id.clear();

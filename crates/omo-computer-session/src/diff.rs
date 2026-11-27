@@ -73,9 +73,18 @@ pub fn decide(baseline: Option<&Side>, current: &Side, nodes_observed: u32) -> D
     let gates = [
         (!baseline.complete, DiffFallback::BaselineIncomplete),
         (!current.complete, DiffFallback::CurrentIncomplete),
-        (baseline.window != current.window, DiffFallback::WindowChanged),
-        (baseline.menu_root || current.menu_root, DiffFallback::MenuRoot),
-        (reordered(&baseline.outline, &current.outline), DiffFallback::Reordered),
+        (
+            baseline.window != current.window,
+            DiffFallback::WindowChanged,
+        ),
+        (
+            baseline.menu_root || current.menu_root,
+            DiffFallback::MenuRoot,
+        ),
+        (
+            reordered(&baseline.outline, &current.outline),
+            DiffFallback::Reordered,
+        ),
         (baseline.projection, DiffFallback::QueryProjection),
     ];
     if let Some((_, reason)) = gates.iter().find(|(failed, _)| *failed) {
@@ -91,25 +100,58 @@ pub fn decide(baseline: Option<&Side>, current: &Side, nodes_observed: u32) -> D
 /// The survivors, compared as sequences of element numbers, are not in their old order, or a
 /// survivor's rendered parent is another element than in the baseline (a move, A-IS-59).
 fn reordered(baseline: &Outline, current: &Outline) -> bool {
-    let now: HashMap<u64, Option<u64>> = current.lines.iter().map(|line| (line.n, line.parent)).collect();
-    let old: HashMap<u64, Option<u64>> = baseline.lines.iter().map(|line| (line.n, line.parent)).collect();
-    let before = baseline.lines.iter().map(|line| line.n).filter(|n| now.contains_key(n));
-    let after = current.lines.iter().map(|line| line.n).filter(|n| old.contains_key(n));
-    let moved = current.lines.iter().any(|line| old.get(&line.n).is_some_and(|parent| *parent != line.parent));
+    let now: HashMap<u64, Option<u64>> = current
+        .lines
+        .iter()
+        .map(|line| (line.n, line.parent))
+        .collect();
+    let old: HashMap<u64, Option<u64>> = baseline
+        .lines
+        .iter()
+        .map(|line| (line.n, line.parent))
+        .collect();
+    let before = baseline
+        .lines
+        .iter()
+        .map(|line| line.n)
+        .filter(|n| now.contains_key(n));
+    let after = current
+        .lines
+        .iter()
+        .map(|line| line.n)
+        .filter(|n| old.contains_key(n));
+    let moved = current.lines.iter().any(|line| {
+        old.get(&line.n)
+            .is_some_and(|parent| *parent != line.parent)
+    });
     moved || !before.eq(after)
 }
 
 fn render(baseline: &Side, current: &Side, nodes_observed: u32) -> String {
-    let old: HashMap<u64, &OutlineLine> = baseline.outline.lines.iter().map(|line| (line.n, line)).collect();
+    let old: HashMap<u64, &OutlineLine> = baseline
+        .outline
+        .lines
+        .iter()
+        .map(|line| (line.n, line))
+        .collect();
     let mut out: Vec<String> = Vec::new();
-    let added: HashSet<u64> = current.outline.lines.iter().map(|line| line.n).filter(|n| !old.contains_key(n)).collect();
+    let added: HashSet<u64> = current
+        .outline
+        .lines
+        .iter()
+        .map(|line| line.n)
+        .filter(|n| !old.contains_key(n))
+        .collect();
     // The run being printed: its parent and the indentation of its first line.
     let mut run: Option<(Option<u64>, usize)> = None;
     for (at, line) in current.outline.lines.iter().enumerate() {
         let body = line.text.trim_start();
         if !added.contains(&line.n) {
             run = None;
-            if old.get(&line.n).is_some_and(|before| before.key != line.key) {
+            if old
+                .get(&line.n)
+                .is_some_and(|before| before.key != line.key)
+            {
                 out.push(format!("~ {body}"));
             }
             continue;
@@ -118,7 +160,10 @@ fn render(baseline: &Side, current: &Side, nodes_observed: u32) -> String {
         match run {
             // A descendant of an added node, or a further added sibling of the run.
             Some((parent, base)) if inside_added || parent == line.parent => {
-                out.push(format!("+ {}{body}", "  ".repeat(line.indent.saturating_sub(base))));
+                out.push(format!(
+                    "+ {}{body}",
+                    "  ".repeat(line.indent.saturating_sub(base))
+                ));
             }
             _ => {
                 let after = current.outline.lines[..at]
@@ -133,7 +178,13 @@ fn render(baseline: &Side, current: &Side, nodes_observed: u32) -> String {
     }
     let changed = out.len();
     let present: HashSet<u64> = current.outline.lines.iter().map(|line| line.n).collect();
-    let mut gone: Vec<u64> = baseline.outline.lines.iter().map(|line| line.n).filter(|n| !present.contains(n)).collect();
+    let mut gone: Vec<u64> = baseline
+        .outline
+        .lines
+        .iter()
+        .map(|line| line.n)
+        .filter(|n| !present.contains(n))
+        .collect();
     gone.sort_unstable();
     if out.is_empty() && gone.is_empty() {
         out.push("no changes".to_owned());
@@ -166,7 +217,13 @@ fn ranges(sorted: &[u64]) -> String {
         }
     }
     runs.iter()
-        .map(|(start, end)| if start == end { format!("e{start}") } else { format!("e{start}-e{end}") })
+        .map(|(start, end)| {
+            if start == end {
+                format!("e{start}")
+            } else {
+                format!("e{start}-e{end}")
+            }
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }

@@ -32,9 +32,12 @@ impl Session {
         }
         sent.user_moved_on = self.funnel.control.presence.take_ended().is_some();
         // A lost audit line outranks the binding note: one warning slot, integrity first.
-        sent.warning = appended.is_err().then(|| "write_failed".to_owned()).or_else(|| {
-            identity_unavailable.then(|| crate::consent::IDENTITY_UNAVAILABLE.to_owned())
-        });
+        sent.warning = appended
+            .is_err()
+            .then(|| "write_failed".to_owned())
+            .or_else(|| {
+                identity_unavailable.then(|| crate::consent::IDENTITY_UNAVAILABLE.to_owned())
+            });
         sent.audit_id = appended.ok();
         let reply = report::reply(report_mode, method, sent).unwrap_or_else(|rejection| {
             eprintln!("omo-computer-engine: action report rejected: {rejection:?}");

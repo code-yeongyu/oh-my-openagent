@@ -47,7 +47,10 @@ pub(crate) struct WindowRefs {
 impl WindowRefs {
     /// The newest generation that is not a drill.
     pub(crate) fn latest_top(&self) -> Option<&Generation> {
-        self.generations.values().rev().find(|generation| generation.parent.is_none())
+        self.generations
+            .values()
+            .rev()
+            .find(|generation| generation.parent.is_none())
     }
 }
 
@@ -75,7 +78,14 @@ pub type Location = (String, u64, usize);
 impl RefRegistry {
     #[must_use]
     pub fn with_cap(cap: usize) -> Self {
-        Self { next_n: 1, windows: HashMap::new(), owner: HashMap::new(), retained: 0, cap, tick: 0 }
+        Self {
+            next_n: 1,
+            windows: HashMap::new(),
+            owner: HashMap::new(),
+            retained: 0,
+            cap,
+            tick: 0,
+        }
     }
 
     /// Objects held by the live generations of every window.
@@ -90,8 +100,18 @@ impl RefRegistry {
     }
 
     /// Records what generation `number` rendered: the baseline a later `since` diffs against.
-    pub fn attach(&mut self, window: &str, number: u64, outline: crate::diff::Outline, projection: bool) {
-        if let Some(generation) = self.windows.get_mut(window).and_then(|refs| refs.generations.get_mut(&number)) {
+    pub fn attach(
+        &mut self,
+        window: &str,
+        number: u64,
+        outline: crate::diff::Outline,
+        projection: bool,
+    ) {
+        if let Some(generation) = self
+            .windows
+            .get_mut(window)
+            .and_then(|refs| refs.generations.get_mut(&number))
+        {
             generation.outline = Some(outline);
             generation.projection = projection;
         }
@@ -114,10 +134,20 @@ impl RefRegistry {
         let stale = Refusal::bare(EngineCode::StaleRef);
         let parsed = RefToken::parse(token).ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
         if object_mode && matches!(parsed, RefToken::Bare { .. }) {
-            return Err(Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified));
+            return Err(Refusal::new(
+                EngineCode::InvalidTarget,
+                Reason::RefUnqualified,
+            ));
         }
-        let window_id = self.owner.get(&parsed.n()).ok_or_else(|| stale.clone())?.clone();
-        let window = self.windows.get_mut(&window_id).ok_or_else(|| stale.clone())?;
+        let window_id = self
+            .owner
+            .get(&parsed.n())
+            .ok_or_else(|| stale.clone())?
+            .clone();
+        let window = self
+            .windows
+            .get_mut(&window_id)
+            .ok_or_else(|| stale.clone())?;
         let number = match parsed {
             RefToken::Bare { n } => window
                 .generations
@@ -130,7 +160,9 @@ impl RefRegistry {
         };
         let Some(generation) = window.generations.get_mut(&number) else {
             return Err(match window.wiped {
-                Some((below, reason)) if number < below => Refusal::new(EngineCode::StaleRef, reason),
+                Some((below, reason)) if number < below => {
+                    Refusal::new(EngineCode::StaleRef, reason)
+                }
                 _ => stale,
             });
         };
@@ -139,7 +171,10 @@ impl RefRegistry {
         generation.last_used = self.tick;
         // A hit on a drill also uses the full observation it hangs under: the LRU prune looks
         // only at full observations, and drops the drill with its parent.
-        if let Some(parent) = generation.parent.and_then(|top| window.generations.get_mut(&top)) {
+        if let Some(parent) = generation
+            .parent
+            .and_then(|top| window.generations.get_mut(&top))
+        {
             parent.last_used = self.tick;
         }
         Ok((window_id, number, index))

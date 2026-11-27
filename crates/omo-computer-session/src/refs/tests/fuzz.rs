@@ -26,7 +26,10 @@ struct Lcg(u64);
 
 impl Lcg {
     fn below(&mut self, bound: usize) -> usize {
-        self.0 = self.0.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
         usize::try_from((self.0 >> 33) % u64::try_from(bound.max(1)).unwrap_or(1)).unwrap_or(0)
     }
 }
@@ -56,10 +59,20 @@ impl Row {
 
 fn window(rows: &[Row]) -> Node {
     let sub = |s: usize| {
-        let kids = rows.iter().filter(|r| r.group == s).map(Row::node).collect();
-        el("group", &format!("S{s}")).obj(5 + u64::try_from(s).unwrap_or(0)).kids(kids)
+        let kids = rows
+            .iter()
+            .filter(|r| r.group == s)
+            .map(Row::node)
+            .collect();
+        el("group", &format!("S{s}"))
+            .obj(5 + u64::try_from(s).unwrap_or(0))
+            .kids(kids)
     };
-    let group = |g: usize| el("group", &format!("G{g}")).obj(3 + u64::try_from(g).unwrap_or(0)).kids(vec![sub(2 * g), sub(2 * g + 1)]);
+    let group = |g: usize| {
+        el("group", &format!("G{g}"))
+            .obj(3 + u64::try_from(g).unwrap_or(0))
+            .kids(vec![sub(2 * g), sub(2 * g + 1)])
+    };
     el("window", "W").obj(1).kids(vec![group(0), group(1)])
 }
 
@@ -70,7 +83,13 @@ fn script(rng: &mut Lcg, reads: usize) -> Vec<Vec<Row>> {
     let mut next = 10_u64;
     let mut fresh = |rng: &mut Lcg| {
         next += 1;
-        Row { title: format!("r{next}"), role: roles[rng.below(3)], id: ids[rng.below(3)], object: (rng.below(5) != 0).then_some(next), group: rng.below(4) }
+        Row {
+            title: format!("r{next}"),
+            role: roles[rng.below(3)],
+            id: ids[rng.below(3)],
+            object: (rng.below(5) != 0).then_some(next),
+            group: rng.below(4),
+        }
     };
     let mut rows: Vec<Row> = (0..rng.below(5) + 1).map(|_| fresh(rng)).collect();
     let mut gone: Vec<Row> = Vec::new();
@@ -127,8 +146,14 @@ fn under(generation: &crate::refs::Generation, mut at: usize, root: u64) -> bool
 fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
     let drilled = refs.generation("w", sub).expect("sub-generation");
     let root = drilled.entries[0].n;
-    let others: Vec<&crate::refs::Generation> = refs.windows["w"].generations.values().filter(|g| g.number != sub).collect();
-    let holder = |g: &crate::refs::Generation, n: u64| g.position(n).map(|at| g.entries[at].object.map(|o| o.0));
+    let others: Vec<&crate::refs::Generation> = refs.windows["w"]
+        .generations
+        .values()
+        .filter(|g| g.number != sub)
+        .collect();
+    let holder = |g: &crate::refs::Generation, n: u64| {
+        g.position(n).map(|at| g.entries[at].object.map(|o| o.0))
+    };
     // Only a FULL read the old holder is ABSENT from may hand its number on (A1 rule 2: presence
     // in the read); a drill never may (ruling R18). An object holds a number LIVE while some valid
     // generation newer than the number's last such hand-over shows it with that number. A recreated element's old object, or an element that came back under a fresh
@@ -137,19 +162,29 @@ fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
         let handed_on = others
             .iter()
             .filter(|g| g.parent.is_none() && holder(g, n).is_some_and(|h| h != Some(object)))
-            .filter(|g| !g.entries.iter().any(|e| e.object.map(|o| o.0) == Some(object)))
+            .filter(|g| {
+                !g.entries
+                    .iter()
+                    .any(|e| e.object.map(|o| o.0) == Some(object))
+            })
             .map(|g| g.number)
             .max()
             .unwrap_or(0);
-        others.iter().any(|g| g.number > handed_on && holder(g, n) == Some(Some(object)))
+        others
+            .iter()
+            .any(|g| g.number > handed_on && holder(g, n) == Some(Some(object)))
     };
     let mut out = Vec::new();
     for entry in &drilled.entries {
         let by_object = others.iter().find_map(|g| {
             let at = g.position(entry.n)?;
             let held = g.entries[at].object?;
-            (entry.object != Some(held) && holds_live(held.0, entry.n))
-                .then(|| format!("(e) drill s{sub} gave {:?} e{} that object {} ({:?}) holds live in s{}", entry.read.title, entry.n, held.0, g.entries[at].read.title, g.number))
+            (entry.object != Some(held) && holds_live(held.0, entry.n)).then(|| {
+                format!(
+                    "(e) drill s{sub} gave {:?} e{} that object {} ({:?}) holds live in s{}",
+                    entry.read.title, entry.n, held.0, g.entries[at].read.title, g.number
+                )
+            })
         });
         // Without native objects nothing tells two elements apart by identity, so the oracle uses
         // the script's ground truth, the row title. The number's latest holder (its entry in the
@@ -158,7 +193,10 @@ fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
         // drill under its own title (case C4: an object-less holder present beside the element
         // that took its number).
         let by_place = || {
-            let (g, at) = others.iter().rev().find_map(|g| g.position(entry.n).map(|at| (*g, at)))?;
+            let (g, at) = others
+                .iter()
+                .rev()
+                .find_map(|g| g.position(entry.n).map(|at| (*g, at)))?;
             let held = &g.entries[at];
             if held.object.is_some() {
                 return None;
@@ -166,7 +204,11 @@ fn drill_breaches(refs: &RefRegistry, sub: u64) -> Vec<String> {
             if !under(g, at, root) {
                 return Some(format!("(e) drill s{sub} gave {:?} e{} whose latest holder {:?} in s{} lies outside the subtree", entry.read.title, entry.n, held.read.title, g.number));
             }
-            let present = held.read.title != entry.read.title && drilled.entries.iter().any(|e| e.read.title == held.read.title);
+            let present = held.read.title != entry.read.title
+                && drilled
+                    .entries
+                    .iter()
+                    .any(|e| e.read.title == held.read.title);
             present.then(|| format!("(e) drill s{sub} gave {:?} e{} whose latest holder {:?} in s{} is present in the drill", entry.read.title, entry.n, held.read.title, g.number))
         };
         out.extend(by_object.or_else(by_place));
@@ -185,28 +227,58 @@ fn breaches(seed: u64, reads: usize) -> Vec<String> {
     for index in 0..script.len() {
         tree.show("w", index);
         let observation = read(&mut refs, &mut tree, previous.as_ref().map(|(g, _)| *g));
-        let numbers: Vec<u64> = refs.generation("w", observation.generation).expect("read").entries.iter().map(|e| e.n).collect();
+        let numbers: Vec<u64> = refs
+            .generation("w", observation.generation)
+            .expect("read")
+            .entries
+            .iter()
+            .map(|e| e.n)
+            .collect();
         if numbers.len() != numbers.iter().collect::<BTreeSet<_>>().len() {
-            out.push(format!("seed {seed} read {index}: (b) a number twice in one read"));
+            out.push(format!(
+                "seed {seed} read {index}: (b) a number twice in one read"
+            ));
         }
         let now = holders(&refs, observation.generation);
         if let Some((_, before)) = &previous {
             for (object, n) in &now {
                 if before.get(object).is_some_and(|old| old != n) {
-                    out.push(format!("seed {seed} read {index}: (a) object {object} e{} -> e{n}", before[object]));
+                    out.push(format!(
+                        "seed {seed} read {index}: (a) object {object} e{} -> e{n}",
+                        before[object]
+                    ));
                 }
             }
             let was: BTreeMap<u64, u64> = before.iter().map(|(o, n)| (*n, *o)).collect();
-            for line in observation.diff.as_deref().unwrap_or_default().lines().filter(|l| l.starts_with("~ ")) {
-                let n: u64 = line.split(":e").nth(1).and_then(|r| r.split(']').next()).and_then(|d| d.parse().ok()).unwrap_or(0);
-                if let Some(old) = was.get(&n).filter(|old| now.get(old).is_some_and(|m| *m != n)) {
+            for line in observation
+                .diff
+                .as_deref()
+                .unwrap_or_default()
+                .lines()
+                .filter(|l| l.starts_with("~ "))
+            {
+                let n: u64 = line
+                    .split(":e")
+                    .nth(1)
+                    .and_then(|r| r.split(']').next())
+                    .and_then(|d| d.parse().ok())
+                    .unwrap_or(0);
+                if let Some(old) = was
+                    .get(&n)
+                    .filter(|old| now.get(old).is_some_and(|m| *m != n))
+                {
                     out.push(format!("seed {seed} read {index}: (d) e{n} relabelled while its object {old} lives as e{}", now[old]));
                 }
             }
         }
         for (object, n) in &now {
-            if last_holder.get(n).is_some_and(|holder| holder != object && now.contains_key(holder)) {
-                out.push(format!("seed {seed} read {index}: (c) e{n} moved from a live object to {object}"));
+            if last_holder
+                .get(n)
+                .is_some_and(|holder| holder != object && now.contains_key(holder))
+            {
+                out.push(format!(
+                    "seed {seed} read {index}: (c) e{n} moved from a live object to {object}"
+                ));
             }
         }
         last_holder.extend(now.iter().map(|(o, n)| (*n, *o)));
@@ -214,17 +286,33 @@ fn breaches(seed: u64, reads: usize) -> Vec<String> {
             tree.show("w", index + 1);
             for _ in 0..rng.below(3) + 1 {
                 let valid: Vec<u64> = refs.windows["w"].generations.keys().copied().collect();
-                let from = if rng.below(2) == 0 { valid[valid.len() - 1] } else { valid[rng.below(valid.len())] };
+                let from = if rng.below(2) == 0 {
+                    valid[valid.len() - 1]
+                } else {
+                    valid[rng.below(valid.len())]
+                };
                 let generation = refs.generation("w", from).expect("valid");
-                let containers: Vec<usize> = (0..generation.entries.len()).filter(|i| generation.entries[*i].read.role == "group").collect();
+                let containers: Vec<usize> = (0..generation.entries.len())
+                    .filter(|i| generation.entries[*i].read.role == "group")
+                    .collect();
                 if containers.is_empty() {
                     continue;
                 }
                 let token = generation.token(containers[rng.below(containers.len())]);
-                let Ok(drilled) = drill(&mut refs, &mut tree, &token, None, true) else { continue };
-                out.extend(drill_breaches(&refs, drilled.generation).into_iter().map(|b| format!("seed {seed} read {index}: {b}")));
+                let Ok(drilled) = drill(&mut refs, &mut tree, &token, None, true) else {
+                    continue;
+                };
+                out.extend(
+                    drill_breaches(&refs, drilled.generation)
+                        .into_iter()
+                        .map(|b| format!("seed {seed} read {index}: {b}")),
+                );
                 // A drill is a read too: its holders are the latest holders of their numbers.
-                last_holder.extend(holders(&refs, drilled.generation).into_iter().map(|(o, n)| (n, o)));
+                last_holder.extend(
+                    holders(&refs, drilled.generation)
+                        .into_iter()
+                        .map(|(o, n)| (n, o)),
+                );
             }
         }
         previous = Some((observation.generation, now));
@@ -238,15 +326,22 @@ fn breaches(seed: u64, reads: usize) -> Vec<String> {
 fn the_oracle_sees_case_c4() {
     let o = || el("listitem", "O").id("row").obj(21);
     let z = || el("listitem", "Z").id("row");
-    let g = |kids: Vec<Node>| el("window", "W").obj(1).kids(vec![el("group", "G").obj(3).kids(kids)]);
-    let mut tree = Tree::default().window("w", 1, vec![g(vec![o()]), g(vec![z()]), g(vec![z(), o()])]);
+    let g = |kids: Vec<Node>| {
+        el("window", "W")
+            .obj(1)
+            .kids(vec![el("group", "G").obj(3).kids(kids)])
+    };
+    let mut tree =
+        Tree::default().window("w", 1, vec![g(vec![o()]), g(vec![z()]), g(vec![z(), o()])]);
     let mut refs = RefRegistry::default();
     let s1 = read(&mut refs, &mut tree, None).generation;
     tree.show("w", 1);
     let s2 = read(&mut refs, &mut tree, Some(s1)).generation;
     tree.show("w", 2);
     let token = refs.generation("w", s2).map(|g| g.token(1)).expect("G");
-    let drilled = drill(&mut refs, &mut tree, &token, None, true).expect("drill G").generation;
+    let drilled = drill(&mut refs, &mut tree, &token, None, true)
+        .expect("drill G")
+        .generation;
     assert_eq!(drill_breaches(&refs, drilled), Vec::<String>::new());
 }
 
@@ -257,7 +352,11 @@ fn numbering_fuzz_holds_the_a1_invariants_on_every_read_and_drill() {
     let found: Vec<String> = (0..SEEDS).flat_map(|seed| breaches(seed, READS)).collect();
     let mut by_kind: BTreeMap<&str, usize> = BTreeMap::new();
     for breach in &found {
-        let kind = breach.split(": (").nth(1).and_then(|k| k.split(')').next()).unwrap_or("?");
+        let kind = breach
+            .split(": (")
+            .nth(1)
+            .and_then(|k| k.split(')').next())
+            .unwrap_or("?");
         *by_kind.entry(kind).or_insert(0) += 1;
     }
     assert!(

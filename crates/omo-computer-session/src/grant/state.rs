@@ -146,10 +146,14 @@ impl Control {
         };
         match self.consent.admit_exec(app.as_ref()) {
             Ok(admission) => {
-                plan.identity_unavailable = app.is_some()
-                    && admission.binding == Some(crate::consent::Binding::PathOnly);
+                plan.identity_unavailable =
+                    app.is_some() && admission.binding == Some(crate::consent::Binding::PathOnly);
                 plan.audit_binding = admission.binding.zip(app.as_ref()).map(|(binding, app)| {
-                    let observed = app.bound.identity.as_ref().and_then(|id| serde_json::to_vec(id).ok());
+                    let observed = app
+                        .bound
+                        .identity
+                        .as_ref()
+                        .and_then(|id| serde_json::to_vec(id).ok());
                     (binding == crate::consent::Binding::Identity, observed)
                 });
             }
@@ -183,7 +187,9 @@ impl Control {
         });
         match lease {
             Err((LeaseRefusal::Grant, _)) if self.consent.is_denied(Part::Foreground, None) => {
-                plan.stages.consent.get_or_insert(ConsentRefusal::DeniedThisTurn);
+                plan.stages
+                    .consent
+                    .get_or_insert(ConsentRefusal::DeniedThisTurn);
             }
             Err((refusal, detail)) => {
                 plan.stages.lease = Some(refusal);
@@ -231,10 +237,14 @@ impl Control {
             ..refusal.refusal().into()
         };
         if plan.foreground && !self.slot.is_mine(&self.token) {
-            self.slot.acquire(&self.token).map_err(|refused| match refused {
-                SlotRefusal::Held(holder) => lease(LeaseRefusal::InputBusy, Some(holder_detail(&holder))),
-                SlotRefusal::LockUnavailable => TRANSACTION_FAILED.into(),
-            })?;
+            self.slot
+                .acquire(&self.token)
+                .map_err(|refused| match refused {
+                    SlotRefusal::Held(holder) => {
+                        lease(LeaseRefusal::InputBusy, Some(holder_detail(&holder)))
+                    }
+                    SlotRefusal::LockUnavailable => TRANSACTION_FAILED.into(),
+                })?;
             if let Err(refusal) = self.presence.begin(backend) {
                 self.slot.release(&self.token);
                 return Err(lease(refusal, None));

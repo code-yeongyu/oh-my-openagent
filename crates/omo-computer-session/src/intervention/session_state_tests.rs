@@ -21,7 +21,11 @@ fn screen_locked_refuses_exec_and_pauses() {
             ms: 120_001
         }]
     );
-    let session = refused.stamps.session.clone().expect("object mode stamps the session");
+    let session = refused
+        .stamps
+        .session
+        .clone()
+        .expect("object mode stamps the session");
     assert_eq!(session.screen_locked, Tristate::Known(true));
     assert!(sink.is_empty(), "{:?}", sink.lines());
 
@@ -82,9 +86,8 @@ fn deactivated_session_keeps_background_route() {
 
 #[test]
 fn a_lock_beside_a_deactivation_governs() {
-    let (backend, sink) = fake(
-        r#","session_timeline":[{"t_ms":0,"screen_locked":true,"session_active":false}]"#,
-    );
+    let (backend, sink) =
+        fake(r#","session_timeline":[{"t_ms":0,"screen_locked":true,"session_active":false}]"#);
     let refused = object_session(Box::new(backend))
         .framed_click(None)
         .expect_err("locked");
@@ -98,7 +101,10 @@ fn a_system_suspend_pauses_and_ends_typed_past_the_ceiling() {
     let refused = object_session(Box::new(backend))
         .framed_click(None)
         .expect_err("suspended past the ceiling");
-    assert_eq!(wire(&refused), ("SessionInactive", Some("system_suspended")));
+    assert_eq!(
+        wire(&refused),
+        ("SessionInactive", Some("system_suspended"))
+    );
     assert_eq!(
         refused.stamps.paused.first().map(|p| p.reason),
         Some(PauseReason::SystemSuspended)
@@ -115,11 +121,23 @@ fn an_all_unknown_session_refuses_and_pauses_nothing() {
     assert!(report.paused().is_empty());
     assert_eq!(
         report.session().map(|s| s.screen_locked),
-        Some(Tristate::Unknown(omo_computer_core::session_state::UnknownLiteral::Unknown))
+        Some(Tristate::Unknown(
+            omo_computer_core::session_state::UnknownLiteral::Unknown
+        ))
     );
     // Row 21 (R26): a foreground delivery also shows the presence surface; the click itself
     // is still exactly three input lines.
     let lines = sink.lines();
-    assert_eq!(lines.iter().filter(|line| line.starts_with("post_input")).count(), 3, "{lines:?}");
-    assert!(lines.iter().any(|line| line == "presence show"), "{lines:?}");
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.starts_with("post_input"))
+            .count(),
+        3,
+        "{lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line == "presence show"),
+        "{lines:?}"
+    );
 }

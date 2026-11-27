@@ -49,9 +49,9 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
-    use omo_computer_core::error::Reason;
     use omo_computer_backend_fake::{fixtures_dir, FakeBackend, FakeScenario, StopPathScript};
     use omo_computer_core::backend::Route;
+    use omo_computer_core::error::Reason;
     use omo_computer_core::methods::Method;
     use omo_computer_core::requests::CallAuthority;
     use omo_computer_safety::{Call, TargetRef, VerbKind};
@@ -80,7 +80,9 @@ mod tests {
             chord: None,
             force: false,
         };
-        let route = Route::BackgroundWindow { window: "101".to_owned() };
+        let route = Route::BackgroundWindow {
+            window: "101".to_owned(),
+        };
         let mutation = Mutation::exec(
             Method::Click,
             call,

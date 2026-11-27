@@ -49,7 +49,12 @@ impl Preview {
     ///
     /// # Errors
     /// Why the frame was dropped; nothing is emitted then.
-    pub fn offer(&mut self, now_ms: u64, lease_active: bool, frame: FrameBytes) -> Result<(), Dropped> {
+    pub fn offer(
+        &mut self,
+        now_ms: u64,
+        lease_active: bool,
+        frame: FrameBytes,
+    ) -> Result<(), Dropped> {
         if !self.subscribed {
             return Err(Dropped::NotSubscribed);
         }
@@ -62,11 +67,17 @@ impl Preview {
         if frame.width.max(frame.height) > MAX_LONG_EDGE_PX || frame.bytes.len() > MAX_BYTES {
             return Err(Dropped::TooLarge);
         }
-        if self.last_ms.is_some_and(|last| now_ms.saturating_sub(last) < MIN_INTERVAL_MS) {
+        if self
+            .last_ms
+            .is_some_and(|last| now_ms.saturating_sub(last) < MIN_INTERVAL_MS)
+        {
             return Err(Dropped::TooSoon);
         }
         self.last_ms = Some(now_ms);
-        self.outbox.push(PreviewFrame { at_ms: now_ms, frame });
+        self.outbox.push(PreviewFrame {
+            at_ms: now_ms,
+            frame,
+        });
         Ok(())
     }
 

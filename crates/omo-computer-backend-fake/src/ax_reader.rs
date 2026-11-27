@@ -5,7 +5,9 @@
 //! has a handle that dies with its tree version. Reads cost fake-clock time: `NODES_PER_MS`
 //! nodes per millisecond, as many per children read as fit in the slice.
 
-use omo_computer_core::ax::{AxHandle, AxReader, Evidence, NativeObject, NodeRead, RootRead, Slice, WindowKey, DEADLINE_MS};
+use omo_computer_core::ax::{
+    AxHandle, AxReader, Evidence, NativeObject, NodeRead, RootRead, Slice, WindowKey, DEADLINE_MS,
+};
 use omo_computer_core::backend::{BackendResult, Refusal};
 use omo_computer_core::error::EngineCode;
 
@@ -27,8 +29,17 @@ fn current<'a>(state: &'a FakeState, window: &str) -> Option<(u64, u64, &'a Fake
         k => versions?.get(k - 1)?,
     };
     let real = u32::try_from(crate::ax_tree::flatten(root).len()).unwrap_or(u32::MAX);
-    let pad = state.scenario.ax_node_count.get(window).map_or(0, |total| total.saturating_sub(real));
-    Some((u64::try_from(index).ok()?, u64::try_from(version).ok()?, root, pad))
+    let pad = state
+        .scenario
+        .ax_node_count
+        .get(window)
+        .map_or(0, |total| total.saturating_sub(real));
+    Some((
+        u64::try_from(index).ok()?,
+        u64::try_from(version).ok()?,
+        root,
+        pad,
+    ))
 }
 
 fn handle(window: u64, version: u64, flat: usize, node: Option<&FakeAxNode>) -> AxHandle {
@@ -52,14 +63,24 @@ fn read(node: &FakeAxNode, handle: AxHandle, pad: u32) -> NodeRead {
         focused: Some(node.focused),
         actions: node.actions.clone(),
         bounds: node.bounds,
-        child_count: u32::try_from(node.children.len()).unwrap_or(u32::MAX).saturating_add(pad),
-        evidence: Evidence::of(node.title.is_some(), node.value.is_some(), node.description.is_some()),
+        child_count: u32::try_from(node.children.len())
+            .unwrap_or(u32::MAX)
+            .saturating_add(pad),
+        evidence: Evidence::of(
+            node.title.is_some(),
+            node.value.is_some(),
+            node.description.is_some(),
+        ),
         ..NodeRead::default()
     }
 }
 
 fn pad_read(handle: AxHandle) -> NodeRead {
-    NodeRead { handle: Some(handle), role: PAD_ROLE.to_owned(), ..NodeRead::default() }
+    NodeRead {
+        handle: Some(handle),
+        role: PAD_ROLE.to_owned(),
+        ..NodeRead::default()
+    }
 }
 
 /// Where `handle` lives now: window, version, flat index (padding past the real nodes).
@@ -71,7 +92,9 @@ fn locate(state: &FakeState, wanted: AxHandle) -> Option<(String, usize)> {
         let (w, version, root, pad) = current(state, window)?;
         let nodes = crate::ax_tree::flatten(root);
         let total = nodes.len() + usize::try_from(pad).unwrap_or(0);
-        let found = (0..total).find(|flat| handle(w, version, *flat, nodes.get(*flat).map(|(_, node)| *node)) == wanted);
+        let found = (0..total).find(|flat| {
+            handle(w, version, *flat, nodes.get(*flat).map(|(_, node)| *node)) == wanted
+        });
         if let Some(flat) = found {
             return Some((window.clone(), flat));
         }
@@ -91,13 +114,20 @@ impl FakeBackend {
             .children
             .iter()
             .map(|child| {
-                let index = nodes.iter().position(|(_, n)| std::ptr::eq(*n, child)).unwrap_or(usize::MAX);
+                let index = nodes
+                    .iter()
+                    .position(|(_, n)| std::ptr::eq(*n, child))
+                    .unwrap_or(usize::MAX);
                 read(child, handle(w, version, index, Some(child)), 0)
             })
             .collect();
-        let padding = (0..usize::try_from(own_pad).unwrap_or(0)).map(|i| pad_read(handle(w, version, nodes.len() + i, None)));
+        let padding = (0..usize::try_from(own_pad).unwrap_or(0))
+            .map(|i| pad_read(handle(w, version, nodes.len() + i, None)));
         children.extend(padding);
-        Some((read(node, handle(w, version, flat, Some(node)), own_pad), children))
+        Some((
+            read(node, handle(w, version, flat, Some(node)), own_pad),
+            children,
+        ))
     }
 }
 
@@ -117,10 +147,15 @@ impl AxReader for FakeBackend {
             return Err(Refusal::bare(EngineCode::WindowNotFound));
         };
         *state.ax_reads.entry(window.to_owned()).or_insert(0) += 1;
-        let (node, _) = Self::node_at(&state, window, 0).ok_or(Refusal::bare(EngineCode::AxFailed))?;
+        let (node, _) =
+            Self::node_at(&state, window, 0).ok_or(Refusal::bare(EngineCode::AxFailed))?;
         let process_start = state.process_start.get(window).copied().unwrap_or(0);
         Ok(RootRead {
-            window: WindowKey { id: listed.id.clone(), pid: listed.pid, process_start },
+            window: WindowKey {
+                id: listed.id.clone(),
+                pid: listed.pid,
+                process_start,
+            },
             app: listed.app,
             focused: listed.focused,
             node,
@@ -129,17 +164,32 @@ impl AxReader for FakeBackend {
 
     fn children(&mut self, parent: AxHandle, from: u32, slice_ms: u64) -> Slice<Vec<NodeRead>> {
         let state = self.lock();
-        let Some((window, flat)) = locate(&state, parent) else { return Slice::Read(Vec::new()) };
-        let Some((_, children)) = Self::node_at(&state, &window, flat) else { return Slice::Read(Vec::new()) };
-        let fit = usize::try_from(slice_ms.saturating_mul(NODES_PER_MS)).unwrap_or(usize::MAX).max(1);
-        let batch: Vec<NodeRead> = children.into_iter().skip(usize::try_from(from).unwrap_or(usize::MAX)).take(fit).collect();
-        self.clock.advance(u64::try_from(batch.len()).unwrap_or(u64::MAX).div_ceil(NODES_PER_MS));
+        let Some((window, flat)) = locate(&state, parent) else {
+            return Slice::Read(Vec::new());
+        };
+        let Some((_, children)) = Self::node_at(&state, &window, flat) else {
+            return Slice::Read(Vec::new());
+        };
+        let fit = usize::try_from(slice_ms.saturating_mul(NODES_PER_MS))
+            .unwrap_or(usize::MAX)
+            .max(1);
+        let batch: Vec<NodeRead> = children
+            .into_iter()
+            .skip(usize::try_from(from).unwrap_or(usize::MAX))
+            .take(fit)
+            .collect();
+        self.clock.advance(
+            u64::try_from(batch.len())
+                .unwrap_or(u64::MAX)
+                .div_ceil(NODES_PER_MS),
+        );
         Slice::Read(batch)
     }
 
     fn node(&mut self, handle: AxHandle, _slice_ms: u64) -> Slice<Option<NodeRead>> {
         let state = self.lock();
-        let found = locate(&state, handle).and_then(|(window, flat)| Self::node_at(&state, &window, flat));
+        let found =
+            locate(&state, handle).and_then(|(window, flat)| Self::node_at(&state, &window, flat));
         Slice::Read(found.map(|(node, _)| node))
     }
 }

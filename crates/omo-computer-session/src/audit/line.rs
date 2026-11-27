@@ -192,7 +192,11 @@ impl AuditEvent {
     /// adds the `identity_unavailable` warning.
     pub fn bind_app(&mut self, by_identity: bool, observed_identity: Option<&[u8]>) {
         self.app_binding = Some(AppBinding {
-            binding: if by_identity { BindingKind::Identity } else { BindingKind::Path },
+            binding: if by_identity {
+                BindingKind::Identity
+            } else {
+                BindingKind::Path
+            },
             identity_sha256_16: observed_identity.map(super::chain::sha256_16),
         });
         if !by_identity && !self.warnings.contains(&Warning::IdentityUnavailable) {
@@ -214,14 +218,25 @@ mod app_binding_tests {
         path.bind_app(false, None);
         let wire = serde_json::to_value(&path).expect("json");
         assert_eq!(wire["appBinding"], serde_json::json!({ "binding": "path" }));
-        assert_eq!(wire["warnings"], serde_json::json!(["identity_unavailable"]));
+        assert_eq!(
+            wire["warnings"],
+            serde_json::json!(["identity_unavailable"])
+        );
         assert_eq!(path.warnings, vec![Warning::IdentityUnavailable]);
         let mut identity = AuditEvent::default();
         identity.bind_app(true, Some(b"{\"cdhash\":\"aa\"}"));
         let wire = serde_json::to_value(&identity).expect("json");
         assert_eq!(wire["appBinding"]["binding"], "identity");
-        assert_eq!(wire["appBinding"]["identitySha256_16"].as_str().map(str::len), Some(16));
-        assert!(wire.get("warnings").is_none(), "an identity binding adds no warning");
+        assert_eq!(
+            wire["appBinding"]["identitySha256_16"]
+                .as_str()
+                .map(str::len),
+            Some(16)
+        );
+        assert!(
+            wire.get("warnings").is_none(),
+            "an identity binding adds no warning"
+        );
     }
 }
 

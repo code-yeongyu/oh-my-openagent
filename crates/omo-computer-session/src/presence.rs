@@ -43,7 +43,9 @@ impl PresenceState {
     /// it cannot be shown.
     pub fn begin(&mut self, backend: &mut dyn Backend) -> Result<(), LeaseRefusal> {
         let mut surface = backend.presence().ok_or(LeaseRefusal::NoPresenceSurface)?;
-        surface.show().map_err(|_| LeaseRefusal::NoPresenceSurface)?;
+        surface
+            .show()
+            .map_err(|_| LeaseRefusal::NoPresenceSurface)?;
         self.shown = Some(surface);
         Ok(())
     }

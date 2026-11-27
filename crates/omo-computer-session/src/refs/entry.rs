@@ -34,11 +34,18 @@ impl Identity {
         self.role == other.role
             && self.native_id == other.native_id
             && self.ancestor_path == other.ancestor_path
-            && (self.stable_text_unknown || other.stable_text_unknown || self.stable_text == other.stable_text)
+            && (self.stable_text_unknown
+                || other.stable_text_unknown
+                || self.stable_text == other.stable_text)
     }
 
     fn key(&self) -> TupleKey<'_> {
-        (&self.role, self.stable_text.as_deref(), self.native_id.as_deref(), &self.ancestor_path)
+        (
+            &self.role,
+            self.stable_text.as_deref(),
+            self.native_id.as_deref(),
+            &self.ancestor_path,
+        )
     }
 }
 
@@ -88,7 +95,11 @@ impl Generation {
 
     #[must_use]
     pub fn token(&self, index: usize) -> String {
-        RefToken::Qualified { generation: self.number, n: self.entries[index].n }.to_string()
+        RefToken::Qualified {
+            generation: self.number,
+            n: self.entries[index].n,
+        }
+        .to_string()
     }
 
     /// The `ElementInfo` of entry `index` under its token in this generation.
@@ -103,7 +114,11 @@ impl Generation {
             native_role: read.native_role.clone(),
             title: read.title.clone(),
             description: read.description.clone(),
-            value: if read.secure { None } else { read.value.clone() },
+            value: if read.secure {
+                None
+            } else {
+                read.value.clone()
+            },
             enabled: read.enabled,
             focused: read.focused,
             child_count: Some(read.child_count),
@@ -134,7 +149,9 @@ pub fn identities(walk: &Walk, drilled: Option<&Identity>) -> Vec<Identity> {
     let mut sibling_roles: HashMap<(Option<usize>, &str), u32> = HashMap::new();
     let mut out: Vec<Identity> = Vec::with_capacity(walk.nodes.len());
     for node in &walk.nodes {
-        let place = sibling_roles.entry((node.parent, node.read.role.as_str())).or_insert(0);
+        let place = sibling_roles
+            .entry((node.parent, node.read.role.as_str()))
+            .or_insert(0);
         *place += 1;
         let (ancestor_path, own) = match (node.parent, drilled) {
             (None, Some(root)) => (root.ancestor_path.clone(), root.path.clone()),
@@ -161,7 +178,10 @@ pub fn identities(walk: &Walk, drilled: Option<&Identity>) -> Vec<Identity> {
     for identity in &out {
         *counts.entry(identity.key()).or_insert(0) += 1;
     }
-    let unique: Vec<bool> = out.iter().map(|identity| counts[&identity.key()] == 1).collect();
+    let unique: Vec<bool> = out
+        .iter()
+        .map(|identity| counts[&identity.key()] == 1)
+        .collect();
     for (identity, unique) in out.iter_mut().zip(unique) {
         identity.unique_at_capture = unique;
     }

@@ -85,7 +85,8 @@ impl Reservations {
             .map(crate::lease::dir_lock)
             .transpose()
             .map_err(|_| AdmitRefusal::LockUnavailable)?;
-        self.check(token, windows, now_ms).map_err(AdmitRefusal::Busy)?;
+        self.check(token, windows, now_ms)
+            .map_err(AdmitRefusal::Busy)?;
         for window in windows {
             self.put(token, window, None);
         }

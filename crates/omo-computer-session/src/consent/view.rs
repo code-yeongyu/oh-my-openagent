@@ -120,8 +120,10 @@ impl ConsentView {
             }
             // Review L6: the parser's canonical spelling, the one the backend is sent and the
             // re-arm compares.
-            Some(Some(text)) => omo_computer_safety::protected::Chord::parse(text)
-                .map_or_else(|| StopChord::Unparseable(text.clone()), |chord| StopChord::Chord(chord.canonical())),
+            Some(Some(text)) => omo_computer_safety::protected::Chord::parse(text).map_or_else(
+                || StopChord::Unparseable(text.clone()),
+                |chord| StopChord::Chord(chord.canonical()),
+            ),
         }
     }
 
@@ -169,6 +171,10 @@ impl ConsentView {
     /// `apps.allow` as the app keys the denied-app table lets through.
     #[must_use]
     pub fn allowed_keys(&self) -> Vec<String> {
-        self.apps.allow.iter().map(|entry| entry.app_key.clone()).collect()
+        self.apps
+            .allow
+            .iter()
+            .map(|entry| entry.app_key.clone())
+            .collect()
     }
 }

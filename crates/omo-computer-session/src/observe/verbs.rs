@@ -17,16 +17,26 @@ use crate::session::{Session, NOT_OPEN};
 const NO_READER: Refusal = Refusal::new(EngineCode::AxUnsupported, Reason::SnapshotUnsupported);
 
 /// A null-mode `observe` is the v1 capture, which this session does not serve yet.
-const NO_CAPTURE: Refusal = Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported);
+const NO_CAPTURE: Refusal =
+    Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported);
 
 fn ax_node(token: String, read: &NodeRead) -> AxNode {
-    let bounds = read.bounds.unwrap_or(Rect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 });
+    let bounds = read.bounds.unwrap_or(Rect {
+        x: 0.0,
+        y: 0.0,
+        width: 0.0,
+        height: 0.0,
+    });
     AxNode {
         reference: token,
         role: read.role.clone(),
         native_role: read.native_role.clone(),
         title: read.title.clone(),
-        value: if read.secure { None } else { read.value.clone() },
+        value: if read.secure {
+            None
+        } else {
+            read.value.clone()
+        },
         description: read.description.clone(),
         enabled: read.enabled.unwrap_or(true),
         focused: read.focused.unwrap_or(false),
@@ -64,7 +74,13 @@ impl Session {
     pub fn drill(&mut self, params: DrillParams) -> Result<Observation, Unresolved> {
         let object_mode = self.object_mode()?;
         let reader = self.backend.ax_reader().ok_or(NO_READER)?;
-        drill(&mut self.refs, reader, &params.reference, params.depth, object_mode)
+        drill(
+            &mut self.refs,
+            reader,
+            &params.reference,
+            params.depth,
+            object_mode,
+        )
     }
 
     /// The element a ref names, re-identified and read live.
@@ -75,7 +91,10 @@ impl Session {
         let object_mode = self.object_mode()?;
         let reader = self.backend.ax_reader().ok_or(NO_READER)?;
         let resolved = self.refs.resolve(&params.reference, object_mode, reader)?;
-        let generation = self.refs.generation(&resolved.window, resolved.generation).ok_or(Refusal::bare(EngineCode::StaleRef))?;
+        let generation = self
+            .refs
+            .generation(&resolved.window, resolved.generation)
+            .ok_or(Refusal::bare(EngineCode::StaleRef))?;
         Ok(ax_node(generation.token(resolved.index), &resolved.live))
     }
 
@@ -87,7 +106,10 @@ impl Session {
         let object_mode = self.object_mode()?;
         let reader = self.backend.ax_reader().ok_or(NO_READER)?;
         let resolved = self.refs.resolve(&params.reference, object_mode, reader)?;
-        let generation = self.refs.generation(&resolved.window, resolved.generation).ok_or(Refusal::bare(EngineCode::StaleRef))?;
+        let generation = self
+            .refs
+            .generation(&resolved.window, resolved.generation)
+            .ok_or(Refusal::bare(EngineCode::StaleRef))?;
         Ok(generation
             .entries
             .iter()

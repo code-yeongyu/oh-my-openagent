@@ -89,7 +89,10 @@ pub(super) fn refused(
 ) {
     let before = sink.lines();
     let refusal = click(session, call).expect_err("refused").refusal;
-    assert_eq!((refusal.code.wire(), refusal.reason.map(Reason::wire)), (code, Some(reason)));
+    assert_eq!(
+        (refusal.code.wire(), refusal.reason.map(Reason::wire)),
+        (code, Some(reason))
+    );
     assert_eq!(sink.lines(), before, "a frame refusal sends nothing");
 }
 
@@ -176,7 +179,10 @@ impl Backend for Shared {
         self.fake().platform()
     }
 
-    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+    fn set_stop_chord(
+        &mut self,
+        chord: Option<&str>,
+    ) -> omo_computer_core::backend::BackendResult<()> {
         self.fake().set_stop_chord(chord)
     }
 

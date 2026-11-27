@@ -106,7 +106,8 @@ impl Raster {
         };
         if x < self.width && y < self.height {
             let row_len = usize::try_from(self.width).unwrap_or(0) + 1;
-            let index = usize::try_from(y).unwrap_or(0) * row_len + 1 + usize::try_from(x).unwrap_or(0);
+            let index =
+                usize::try_from(y).unwrap_or(0) * row_len + 1 + usize::try_from(x).unwrap_or(0);
             if let Some(pixel) = self.rows.get_mut(index) {
                 *pixel = gray;
             }

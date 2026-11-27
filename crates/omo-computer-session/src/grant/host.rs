@@ -13,13 +13,13 @@ use super::state::{holder_detail, MachineClock};
 use omo_computer_safety::protected::Os;
 
 use crate::consent::{bind_scope, AppTarget, Consent, ConsentView, Part};
-use crate::mutate::LOCAL_HAND;
 use crate::lease::{Holder, SessionToken};
 use crate::mutate::Refused;
+use crate::mutate::LOCAL_HAND;
 use crate::presence::LeaseEnd;
 use crate::preview::{Dropped, PreviewFrame};
-use omo_computer_core::backend::FrameBytes;
 use crate::{Session, NOT_OPEN};
+use omo_computer_core::backend::FrameBytes;
 
 impl Session {
     /// Every session of a test machine reads `clock` for reservations.
@@ -101,7 +101,11 @@ impl Session {
         let control = &self.funnel.control;
         control
             .grant
-            .admit(control.consent.view(), (Method::ControlAcquire, None), control.consent.hand())
+            .admit(
+                control.consent.view(),
+                (Method::ControlAcquire, None),
+                control.consent.hand(),
+            )
             .map_err(|refusal| Refused::from(refusal.refusal()))?;
         let busy = |holder: &Holder| Refused {
             detail: Some(Box::new(holder_detail(holder))),
@@ -112,10 +116,16 @@ impl Session {
         }
         // Review L10's second site: a record lock that cannot be taken is TransactionFailed with
         // nothing taken, never InputBusy naming this session.
-        self.funnel.control.slot.acquire(&self.funnel.control.token).map_err(|refused| match refused {
-            crate::lease::SlotRefusal::Held(holder) => busy(&holder),
-            crate::lease::SlotRefusal::LockUnavailable => crate::mutate::TRANSACTION_FAILED.into(),
-        })?;
+        self.funnel
+            .control
+            .slot
+            .acquire(&self.funnel.control.token)
+            .map_err(|refused| match refused {
+                crate::lease::SlotRefusal::Held(holder) => busy(&holder),
+                crate::lease::SlotRefusal::LockUnavailable => {
+                    crate::mutate::TRANSACTION_FAILED.into()
+                }
+            })?;
         if let Err(refusal) = self.funnel.control.presence.begin(self.backend.as_mut()) {
             self.funnel.control.slot.release(&self.funnel.control.token);
             return Err(refusal.refusal().into());
@@ -139,11 +149,19 @@ impl Session {
         // Review L5: the armed listener is polled FIRST, so a press queued in it is never dropped
         // when a changed chord replaces it; the re-arm follows.
         let backend = &mut self.backend;
-        self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
+        self.guard.observe(
+            &mut || backend.stop_listener(),
+            &mut omo_computer_safety::NoHolds,
+        );
         self.rearm_on_changed_chord();
         let epoch = self.guard.supervisor().stop_epoch();
         self.funnel.control.grant.reconcile(epoch);
-        if self.funnel.control.lease_epoch.is_some_and(|taken| taken != epoch) {
+        if self
+            .funnel
+            .control
+            .lease_epoch
+            .is_some_and(|taken| taken != epoch)
+        {
             self.end_lease(LeaseEnd::Stop);
         }
     }
@@ -153,7 +171,10 @@ impl Session {
         self.funnel.control.presence.end(why);
         self.funnel.control.slot.release(&self.funnel.control.token);
         self.funnel.control.lease_epoch = None;
-        self.funnel.control.lease_hook.lease_ended(self.backend.as_mut(), why);
+        self.funnel
+            .control
+            .lease_hook
+            .lease_ended(self.backend.as_mut(), why);
     }
 
     /// Installs the lease-end hook a later row's state lives in (R45).
@@ -170,7 +191,10 @@ impl Session {
     /// `display.resume`: re-arms the display-awake hold only; it restores no lease.
     pub fn display_resume(&mut self) {
         self.funnel.control.display_released = false;
-        self.funnel.control.lease_hook.display_resumed(self.backend.as_mut());
+        self.funnel
+            .control
+            .lease_hook
+            .display_resumed(self.backend.as_mut());
     }
 
     #[must_use]
@@ -211,8 +235,9 @@ impl Session {
         };
         self.funnel.control.token = match &self.funnel.control.runtime {
             None => SessionToken::in_memory(holder),
-            Some(runtime) => SessionToken::under(runtime, holder)
-                .map_err(|_| Refusal::bare(omo_computer_core::error::EngineCode::TransactionFailed))?,
+            Some(runtime) => SessionToken::under(runtime, holder).map_err(|_| {
+                Refusal::bare(omo_computer_core::error::EngineCode::TransactionFailed)
+            })?,
         };
         Ok(())
     }
@@ -244,7 +269,11 @@ impl Session {
     }
 
     /// `session.open` after the gate: the session id, the consent view and the session token.
-    pub(crate) fn open_control(&mut self, session_id: &str, stop_hotkey: Option<&str>) -> Result<(), Refusal> {
+    pub(crate) fn open_control(
+        &mut self,
+        session_id: &str,
+        stop_hotkey: Option<&str>,
+    ) -> Result<(), Refusal> {
         self.funnel.set_session_id(session_id.to_owned());
         self.open_consent()?;
         self.refuse_carried_chord(stop_hotkey, "session.open")?;
@@ -256,9 +285,17 @@ impl Session {
     /// call (one audit line naming both chords) and leaves the hand tampered (R70an C).
     /// The configured chord as armed: its parsed spelling, or `None` when it cannot be armed.
     fn configured_chord(&self) -> Option<String> {
-        match self.funnel.control.consent.view().stop_chord(backend_os(self.backend.as_ref())) {
+        match self
+            .funnel
+            .control
+            .consent
+            .view()
+            .stop_chord(backend_os(self.backend.as_ref()))
+        {
             crate::consent::StopChord::Chord(chord) => Some(chord),
-            crate::consent::StopChord::Unparseable(_) | crate::consent::StopChord::Unreadable => None,
+            crate::consent::StopChord::Unparseable(_) | crate::consent::StopChord::Unreadable => {
+                None
+            }
         }
     }
 
@@ -309,11 +346,16 @@ impl Session {
         ))
     }
 
-    pub(crate) fn refuse_carried_chord(&mut self, stop_hotkey: Option<&str>, call: &str) -> Result<(), Refusal> {
+    pub(crate) fn refuse_carried_chord(
+        &mut self,
+        stop_hotkey: Option<&str>,
+        call: &str,
+    ) -> Result<(), Refusal> {
         let os = backend_os(self.backend.as_ref());
         let view = self.funnel.control.consent.view();
         let configured = match view.stop_chord(os) {
-            crate::consent::StopChord::Chord(chord) | crate::consent::StopChord::Unparseable(chord) => chord,
+            crate::consent::StopChord::Chord(chord)
+            | crate::consent::StopChord::Unparseable(chord) => chord,
             crate::consent::StopChord::Unreadable => "unreadable".to_owned(),
         };
         if let Err(refusal) = check_stop_hotkey(view, os, stop_hotkey) {
@@ -357,7 +399,10 @@ impl Session {
     /// Session close: the lease, the reservations and the presence surface end.
     pub(crate) fn close_control(&mut self) {
         self.control_release();
-        self.funnel.control.reservations.release_all(&self.funnel.control.token);
+        self.funnel
+            .control
+            .reservations
+            .release_all(&self.funnel.control.token);
     }
 }
 
@@ -410,7 +455,6 @@ pub(crate) fn view_of(raw: Option<serde_json::Value>) -> ConsentView {
     )
 }
 
-
 /// A-IS-62 rev 7: the longest chord compared or written; a peer-supplied chord cannot grow the line.
 const MAX_CHORD_BYTES: usize = 256;
 
@@ -430,10 +474,24 @@ mod view_of_tests {
     fn a_session_with_no_consent_file_is_read_only_and_arms_no_chord() {
         use omo_computer_safety::protected::Os;
         let view = super::view_of(None);
-        assert_eq!(view.stop_chord(Os::Linux), crate::consent::StopChord::Unreadable, "no chord is armed");
-        assert_eq!(view.grants, vec!["computer:read".to_owned()], "computer:read only");
+        assert_eq!(
+            view.stop_chord(Os::Linux),
+            crate::consent::StopChord::Unreadable,
+            "no chord is armed"
+        );
+        assert_eq!(
+            view.grants,
+            vec!["computer:read".to_owned()],
+            "computer:read only"
+        );
         let consent = crate::consent::Consent::new(view, crate::mutate::LOCAL_HAND, Os::Linux);
         assert!(consent.admit_exec(None).is_err(), "no exec is admitted");
-        assert_eq!(super::view_of(Some(serde_json::json!({ "stopHotkey": null }))).grants.len(), 2, "a handed view is read as written");
+        assert_eq!(
+            super::view_of(Some(serde_json::json!({ "stopHotkey": null })))
+                .grants
+                .len(),
+            2,
+            "a handed view is read as written"
+        );
     }
 }

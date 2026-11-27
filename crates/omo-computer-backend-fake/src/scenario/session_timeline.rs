@@ -62,7 +62,10 @@ impl Fields {
     fn pause_reasons(self) -> Vec<SessionPauseReason> {
         [
             (self.screen_locked, SessionPauseReason::ScreenLocked),
-            (self.screensaver_active, SessionPauseReason::ScreensaverActive),
+            (
+                self.screensaver_active,
+                SessionPauseReason::ScreensaverActive,
+            ),
             (!self.session_active, SessionPauseReason::SessionDeactivated),
             (self.system_suspended, SessionPauseReason::SystemSuspended),
         ]

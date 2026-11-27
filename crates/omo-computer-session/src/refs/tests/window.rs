@@ -1,7 +1,9 @@
 //! The one ref rule: eight generations per window, the needs-observe mark, the at-once expiry
 //! of a window, and the retained-object cap.
 
-use omo_computer_core::ax::{AxHandle, NodeRead, RootRead, Walk, WalkNode, WindowKey, RETAINED_OBJECTS};
+use omo_computer_core::ax::{
+    AxHandle, NodeRead, RootRead, Walk, WalkNode, WindowKey, RETAINED_OBJECTS,
+};
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::report::Effect;
@@ -11,7 +13,13 @@ use super::super::{Drilled, Expiry, RefRegistry};
 use super::{n_of, snap};
 
 fn tree() -> Tree {
-    Tree::default().window("w", 1, vec![el("window", "W").obj(1).kids(vec![el("button", "Send").obj(2)])])
+    Tree::default().window(
+        "w",
+        1,
+        vec![el("window", "W")
+            .obj(1)
+            .kids(vec![el("button", "Send").obj(2)])],
+    )
 }
 
 fn token(refs: &RefRegistry, number: u64) -> String {
@@ -32,20 +40,44 @@ fn refs_older_than_8_generations_are_stale() {
             token(&refs, number)
         })
         .collect();
-    assert_eq!(refs.resolve(&tokens[0], true, &mut tree).map_err(|u| u.refusal), Err(Refusal::bare(EngineCode::StaleRef)), "gen-1 after 9 snapshots");
+    assert_eq!(
+        refs.resolve(&tokens[0], true, &mut tree)
+            .map_err(|u| u.refusal),
+        Err(Refusal::bare(EngineCode::StaleRef)),
+        "gen-1 after 9 snapshots"
+    );
     for live in &tokens[1..] {
-        assert!(refs.resolve(live, true, &mut tree).is_ok(), "{live} is one of the last 8");
+        assert!(
+            refs.resolve(live, true, &mut tree).is_ok(),
+            "{live} is one of the last 8"
+        );
     }
     // A confirmed or observed report leaves the window valid; the closed set marks it.
     for keeps in [Effect::Confirmed, Effect::Observed] {
         refs.after_report("w", keeps);
         assert_eq!(refs.exec_gate("w"), Ok(()), "{keeps:?}");
     }
-    for marks in [Effect::Partial, Effect::Unverifiable, Effect::SuspectedNoop, Effect::Refused] {
+    for marks in [
+        Effect::Partial,
+        Effect::Unverifiable,
+        Effect::SuspectedNoop,
+        Effect::Refused,
+    ] {
         refs.after_report("w", marks);
-        assert_eq!(refs.exec_gate("w"), Err(Refusal::new(EngineCode::ControlRequired, Reason::NeedsObserve)), "{marks:?}");
+        assert_eq!(
+            refs.exec_gate("w"),
+            Err(Refusal::new(
+                EngineCode::ControlRequired,
+                Reason::NeedsObserve
+            )),
+            "{marks:?}"
+        );
         snap(&mut tree, &mut refs, "w");
-        assert_eq!(refs.exec_gate("w"), Ok(()), "a new observation clears {marks:?}");
+        assert_eq!(
+            refs.exec_gate("w"),
+            Ok(()),
+            "a new observation clears {marks:?}"
+        );
     }
     refs.after_error("w");
     assert!(refs.exec_gate("w").is_err());
@@ -53,26 +85,45 @@ fn refs_older_than_8_generations_are_stale() {
     let before = token(&refs, refs.latest("w").expect("latest").number);
     refs.expire("w", Expiry::Epoch);
     assert_eq!(refs.exec_gate("w"), Ok(()));
-    assert_eq!(refs.resolve(&before, true, &mut tree).map_err(|u| u.refusal), Err(stale(Reason::Epoch)));
+    assert_eq!(
+        refs.resolve(&before, true, &mut tree)
+            .map_err(|u| u.refusal),
+        Err(stale(Reason::Epoch))
+    );
     // A relaunched window (new pid) expires its refs at the next observation.
     let current = snap(&mut tree, &mut refs, "w");
     let before = token(&refs, current);
     tree.relaunch("w", 99);
     snap(&mut tree, &mut refs, "w");
-    assert_eq!(refs.resolve(&before, true, &mut tree).map_err(|u| u.refusal), Err(stale(Reason::IdentityChanged)));
+    assert_eq!(
+        refs.resolve(&before, true, &mut tree)
+            .map_err(|u| u.refusal),
+        Err(stale(Reason::IdentityChanged))
+    );
     // Never minted, unparseable and unqualified tokens.
     for (token, refusal) in [
         ("s1:e999999", Refusal::bare(EngineCode::StaleRef)),
         ("button", Refusal::bare(EngineCode::InvalidTarget)),
-        ("e1", Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified)),
+        (
+            "e1",
+            Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified),
+        ),
     ] {
-        assert_eq!(refs.resolve(token, true, &mut tree).map_err(|u| u.refusal), Err(refusal), "{token}");
+        assert_eq!(
+            refs.resolve(token, true, &mut tree).map_err(|u| u.refusal),
+            Err(refusal),
+            "{token}"
+        );
     }
 }
 
 fn flat_walk(count: usize, first: u64) -> Walk {
     let node = |i: usize| WalkNode {
-        read: NodeRead { handle: Some(AxHandle(first + u64::try_from(i).unwrap_or(0))), role: "cell".into(), ..NodeRead::default() },
+        read: NodeRead {
+            handle: Some(AxHandle(first + u64::try_from(i).unwrap_or(0))),
+            role: "cell".into(),
+            ..NodeRead::default()
+        },
         parent: (i > 0).then_some(0),
         depth: u32::from(i > 0),
         logical: u32::from(i > 0),
@@ -82,11 +133,24 @@ fn flat_walk(count: usize, first: u64) -> Walk {
     let mut nodes: Vec<WalkNode> = (0..count).map(node).collect();
     nodes[0].read.child_count = u32::try_from(count - 1).unwrap_or(0);
     nodes[0].children_read = nodes[0].read.child_count;
-    Walk { nodes, complete: true, elapsed_ms: 0 }
+    Walk {
+        nodes,
+        complete: true,
+        elapsed_ms: 0,
+    }
 }
 
 fn root(window: &str) -> RootRead {
-    RootRead { window: WindowKey { id: window.into(), pid: 1, process_start: 1 }, app: "A".into(), focused: false, node: NodeRead::default() }
+    RootRead {
+        window: WindowKey {
+            id: window.into(),
+            pid: 1,
+            process_start: 1,
+        },
+        app: "A".into(),
+        focused: false,
+        node: NodeRead::default(),
+    }
 }
 
 #[test]
@@ -102,10 +166,21 @@ fn the_65537th_object_prunes_the_oldest_generation_and_its_token_resolves_to_not
     }
     assert_eq!(refs.retained(), RETAINED_OBJECTS);
     refs.mint(&root("late"), &flat_walk(1, 99_000_000), None);
-    assert_eq!(refs.retained(), RETAINED_OBJECTS + 1 - per, "the least recently used generation went");
+    assert_eq!(
+        refs.retained(),
+        RETAINED_OBJECTS + 1 - per,
+        "the least recently used generation went"
+    );
     let mut tree = Tree::default();
-    assert_eq!(refs.resolve(&first_tokens[0], true, &mut tree).map_err(|u| u.refusal), Err(Refusal::bare(EngineCode::StaleRef)));
-    assert!(refs.locate(&first_tokens[1], true).is_ok(), "the next oldest stays");
+    assert_eq!(
+        refs.resolve(&first_tokens[0], true, &mut tree)
+            .map_err(|u| u.refusal),
+        Err(Refusal::bare(EngineCode::StaleRef))
+    );
+    assert!(
+        refs.locate(&first_tokens[1], true).is_ok(),
+        "the next oldest stays"
+    );
 }
 
 /// Review L1 (#13368): the per-window maps hold only the numbers the kept generations hold, so
@@ -118,13 +193,23 @@ fn element_churn_keeps_the_per_window_maps_to_the_kept_generations() {
         refs.mint(&root("w"), &flat_walk(50, 1_000 * (read + 1)), None);
     }
     let window = refs.windows.get("w").expect("the window");
-    let held: std::collections::HashSet<u64> =
-        window.generations.values().flat_map(|g| g.entries.iter().map(|e| e.n)).collect();
+    let held: std::collections::HashSet<u64> = window
+        .generations
+        .values()
+        .flat_map(|g| g.entries.iter().map(|e| e.n))
+        .collect();
     assert_eq!(window.generations.len(), 8, "eight generations kept");
-    assert!(window.last_entry.keys().all(|n| held.contains(n)), "last_entry holds only kept numbers");
+    assert!(
+        window.last_entry.keys().all(|n| held.contains(n)),
+        "last_entry holds only kept numbers"
+    );
     assert_eq!(window.last_entry.len(), held.len());
     assert!(window.by_object.values().all(|n| held.contains(n)));
-    assert!(window.by_native_id.values().flatten().all(|n| held.contains(n)));
+    assert!(window
+        .by_native_id
+        .values()
+        .flatten()
+        .all(|n| held.contains(n)));
 }
 
 /// Review L3 (#13368): a hit on a drill sub-generation refreshes the full observation it hangs
@@ -133,9 +218,18 @@ fn element_churn_keeps_the_per_window_maps_to_the_kept_generations() {
 fn heavy_drill_use_keeps_its_parent_observation_through_a_prune() {
     let mut refs = RefRegistry::with_cap(10);
     let top = refs.mint(&root("a"), &flat_walk(4, 1_000), None).generation;
-    let anchor = refs.generation("a", top).expect("a").entries[1].identity.clone();
-    let drilled = Drilled { top, from: top, index: 1, identity: &anchor };
-    let sub = refs.mint(&root("a"), &flat_walk(2, 2_000), Some(drilled)).generation;
+    let anchor = refs.generation("a", top).expect("a").entries[1]
+        .identity
+        .clone();
+    let drilled = Drilled {
+        top,
+        from: top,
+        index: 1,
+        identity: &anchor,
+    };
+    let sub = refs
+        .mint(&root("a"), &flat_walk(2, 2_000), Some(drilled))
+        .generation;
     let drill_token = refs.generation("a", sub).expect("the drill").token(1);
     let other = refs.mint(&root("b"), &flat_walk(4, 3_000), None).generation;
     // The drill is the most recently used generation of all.
@@ -143,9 +237,15 @@ fn heavy_drill_use_keeps_its_parent_observation_through_a_prune() {
         refs.locate(&drill_token, true).expect("the drill resolves");
     }
     refs.mint(&root("c"), &flat_walk(3, 4_000), None);
-    assert!(refs.locate(&drill_token, true).is_ok(), "the drill and its parent stay");
+    assert!(
+        refs.locate(&drill_token, true).is_ok(),
+        "the drill and its parent stay"
+    );
     assert!(refs.generation("a", top).is_some(), "the parent stays");
-    assert!(refs.generation("b", other).is_none(), "the least recently used observation went");
+    assert!(
+        refs.generation("b", other).is_none(),
+        "the least recently used observation went"
+    );
 }
 
 /// Review L1 of #13368 (at d8305695c6): the registry's owner map is pruned with the window's
@@ -161,8 +261,17 @@ fn element_churn_keeps_the_owner_map_to_the_kept_numbers() {
         .values()
         .flat_map(|g| g.entries.iter().map(|e| e.n))
         .collect();
-    let owned: Vec<u64> = refs.owner.iter().filter(|(_, w)| w.as_str() == "w").map(|(n, _)| *n).collect();
-    assert_eq!(owned.len(), held.len(), "the owner map holds only kept numbers");
+    let owned: Vec<u64> = refs
+        .owner
+        .iter()
+        .filter(|(_, w)| w.as_str() == "w")
+        .map(|(n, _)| *n)
+        .collect();
+    assert_eq!(
+        owned.len(),
+        held.len(),
+        "the owner map holds only kept numbers"
+    );
     assert!(owned.iter().all(|n| held.contains(n)));
 }
 
@@ -177,18 +286,51 @@ fn repeated_expiries_keep_only_the_latest_expiry_s_owner_entries() {
     let mut tokens = Vec::new();
     for read in 0..5_u64 {
         let minted = refs.mint(&root("w"), &flat_walk(20, 10_000 * (read + 1)), None);
-        tokens.push(refs.generation("w", minted.generation).expect("minted").token(1));
+        tokens.push(
+            refs.generation("w", minted.generation)
+                .expect("minted")
+                .token(1),
+        );
         refs.expire("w", Expiry::Epoch);
     }
-    let owned = refs.owner.values().filter(|owner| owner.as_str() == "w").count();
-    assert_eq!(owned, 20, "only the latest expiry's 20 numbers keep an owner");
+    let owned = refs
+        .owner
+        .values()
+        .filter(|owner| owner.as_str() == "w")
+        .count();
+    assert_eq!(
+        owned, 20,
+        "only the latest expiry's 20 numbers keep an owner"
+    );
     let mut tree = Tree::default();
-    let latest = refs.resolve(&tokens[4], true, &mut tree).map_err(|u| u.refusal);
-    let earlier = refs.resolve(&tokens[0], true, &mut tree).map_err(|u| u.refusal);
-    assert_eq!(latest, Err(stale(Reason::Epoch)), "the latest expiry answers its reason");
-    assert_eq!(earlier, Err(Refusal::bare(EngineCode::StaleRef)), "an earlier expiry is a pruned token");
-    let next = |reason| lookup(FailureKey { source: Source::Engine(EngineCode::StaleRef), reason }).map(|row| row.next_call);
-    assert_eq!(next(Some(Reason::Epoch)), next(None), "both answers carry the same next call");
+    let latest = refs
+        .resolve(&tokens[4], true, &mut tree)
+        .map_err(|u| u.refusal);
+    let earlier = refs
+        .resolve(&tokens[0], true, &mut tree)
+        .map_err(|u| u.refusal);
+    assert_eq!(
+        latest,
+        Err(stale(Reason::Epoch)),
+        "the latest expiry answers its reason"
+    );
+    assert_eq!(
+        earlier,
+        Err(Refusal::bare(EngineCode::StaleRef)),
+        "an earlier expiry is a pruned token"
+    );
+    let next = |reason| {
+        lookup(FailureKey {
+            source: Source::Engine(EngineCode::StaleRef),
+            reason,
+        })
+        .map(|row| row.next_call)
+    };
+    assert_eq!(
+        next(Some(Reason::Epoch)),
+        next(None),
+        "both answers carry the same next call"
+    );
 }
 
 /// Review L1 of #13391 (at 68521dfbec): an expiry that wipes nothing (two epoch moves with no
@@ -198,12 +340,26 @@ fn repeated_expiries_keep_only_the_latest_expiry_s_owner_entries() {
 fn an_expiry_that_wipes_nothing_keeps_the_last_tokens_reason() {
     let mut refs = RefRegistry::default();
     let minted = refs.mint(&root("w"), &flat_walk(20, 10_000), None);
-    let token = refs.generation("w", minted.generation).expect("minted").token(1);
+    let token = refs
+        .generation("w", minted.generation)
+        .expect("minted")
+        .token(1);
     refs.expire("w", Expiry::Epoch);
     refs.expire("w", Expiry::Epoch);
-    let owned = refs.owner.values().filter(|owner| owner.as_str() == "w").count();
-    assert_eq!(owned, 20, "the empty expiry did not drop the last expiry's owner entries");
+    let owned = refs
+        .owner
+        .values()
+        .filter(|owner| owner.as_str() == "w")
+        .count();
+    assert_eq!(
+        owned, 20,
+        "the empty expiry did not drop the last expiry's owner entries"
+    );
     let mut tree = Tree::default();
     let answer = refs.resolve(&token, true, &mut tree).map_err(|u| u.refusal);
-    assert_eq!(answer, Err(stale(Reason::Epoch)), "the last real token keeps its reason");
+    assert_eq!(
+        answer,
+        Err(stale(Reason::Epoch)),
+        "the last real token keeps its reason"
+    );
 }

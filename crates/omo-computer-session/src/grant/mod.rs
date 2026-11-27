@@ -8,14 +8,14 @@
 
 mod host;
 mod lease_hook;
-mod state;
-mod wire;
 #[cfg(test)]
 mod presence_tests;
 #[cfg(test)]
 mod session_tests;
+mod state;
 #[cfg(test)]
 mod tests;
+mod wire;
 
 pub use lease_hook::{LeaseHook, NoLeaseHook};
 pub use state::{wall_clock, ChordTamper, Control, MachineClock, Plan};
@@ -79,7 +79,11 @@ impl ForegroundGrant {
 
     /// Reconciles the grant with the stop epoch: a grant from an earlier epoch is gone.
     pub fn reconcile(&mut self, stop_epoch: u64) {
-        if self.held.as_ref().is_some_and(|(_, epoch)| *epoch != stop_epoch) {
+        if self
+            .held
+            .as_ref()
+            .is_some_and(|(_, epoch)| *epoch != stop_epoch)
+        {
             self.held = None;
         }
     }
@@ -110,6 +114,9 @@ impl ForegroundGrant {
         if view.full_access && implied_by_full_access(method, target, hand) {
             return Ok(GrantKind::ImpliedFullAccess);
         }
-        self.held.as_ref().map(|(kind, _)| kind.clone()).ok_or(LeaseRefusal::Grant)
+        self.held
+            .as_ref()
+            .map(|(kind, _)| kind.clone())
+            .ok_or(LeaseRefusal::Grant)
     }
 }

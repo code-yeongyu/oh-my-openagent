@@ -23,12 +23,12 @@ pub use additions::{
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
-pub use session_timeline::{state_at, SessionMark};
 pub use records::{
     DelayMs, FakeAxNode, FakeDisplay, FakeMenuNode, FakeWindow, FocusRead, FocusRecordKind,
     FocusRecordOutcome, RemoteForwarding, ScriptedFailure, ScriptedHit, TimedUserInput,
     UserInputKind, UserPress, WindowIdentityScript,
 };
+pub use session_timeline::{state_at, SessionMark};
 
 use crate::method::FakeMethod;
 use crate::persona::Persona;

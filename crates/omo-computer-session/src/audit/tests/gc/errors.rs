@@ -64,11 +64,17 @@ fn a_digest_that_is_not_a_plain_component_is_refused_and_touches_nothing_outside
     std::fs::write(&outside, b"keep").expect("a file outside the store");
     let mut store = ArtifactStore::new(dir.clone(), GcLimits::default());
     for digest in ["../outside", "a/b", "..", ""] {
-        assert!(store.record(digest, "png", b"x", 0).is_err(), "record refuses {digest:?}");
+        assert!(
+            store.record(digest, "png", b"x", 0).is_err(),
+            "record refuses {digest:?}"
+        );
         assert!(!store.release(digest), "release refuses {digest:?}");
     }
     assert_eq!(std::fs::read(&outside).expect("still there"), b"keep");
-    assert!(store.record("0123abcd", "png", b"x", 0).is_ok(), "a plain digest is written");
+    assert!(
+        store.record("0123abcd", "png", b"x", 0).is_ok(),
+        "a plain digest is written"
+    );
 }
 
 /// Review L1 of #13367 (at d68eaa25fe): the extension is a plain path component too; one with a
@@ -79,8 +85,17 @@ fn an_extension_that_is_not_a_plain_component_is_refused() {
     let dir = root.path().join("artifacts");
     let mut store = ArtifactStore::new(dir.clone(), GcLimits::default());
     for ext in ["png/../../x", "../x", "a/b", "..", ""] {
-        assert!(store.record("0123abcd", ext, b"x", 0).is_err(), "record refuses ext {ext:?}");
+        assert!(
+            store.record("0123abcd", ext, b"x", 0).is_err(),
+            "record refuses ext {ext:?}"
+        );
     }
-    assert!(!root.path().join("x").exists(), "nothing escaped the artifact directory");
-    assert!(store.record("0123abcd", "png", b"x", 0).is_ok(), "a plain extension is written");
+    assert!(
+        !root.path().join("x").exists(),
+        "nothing escaped the artifact directory"
+    );
+    assert!(
+        store.record("0123abcd", "png", b"x", 0).is_ok(),
+        "a plain extension is written"
+    );
 }

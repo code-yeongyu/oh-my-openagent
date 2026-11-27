@@ -17,7 +17,9 @@ pub fn denied_app_seeds(os: Os) -> &'static [String] {
 pub fn is_denied_app(os: Os, app_key: &str) -> bool {
     let (app, surface) = app_key
         .split_once(':')
-        .map_or((app_key, None), |(app, surface)| (app, Some(surface.to_owned())));
+        .map_or((app_key, None), |(app, surface)| {
+            (app, Some(surface.to_owned()))
+        });
     ProtectedTable::of(os).is_denied_app(&Identity {
         pid: 0,
         app_key: app.to_owned(),

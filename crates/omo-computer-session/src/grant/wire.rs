@@ -25,12 +25,20 @@ pub(crate) fn typed<T: DeserializeOwned>(params: Value) -> Result<T, HostCallErr
 
 impl Session {
     /// One host call this session's rows serve, or `None` for any other method.
-    pub fn host_call(&mut self, method: Method, params: Value) -> Option<Result<Value, HostCallError>> {
+    pub fn host_call(
+        &mut self,
+        method: Method,
+        params: Value,
+    ) -> Option<Result<Value, HostCallError>> {
         self.reconcile_stop();
         let outcome = match method {
-            Method::ControlGrant => typed::<ControlGrantParams>(params).map(|p| json!(self.control_grant(p))),
+            Method::ControlGrant => {
+                typed::<ControlGrantParams>(params).map(|p| json!(self.control_grant(p)))
+            }
             Method::ControlAcquire => typed::<EmptyParams>(params).and_then(|_| {
-                self.control_acquire().map(|state| json!(state)).map_err(HostCallError::Refused)
+                self.control_acquire()
+                    .map(|state| json!(state))
+                    .map_err(HostCallError::Refused)
             }),
             Method::ControlRevoke => typed::<EmptyParams>(params).map(|_| {
                 self.control_revoke();

@@ -100,10 +100,7 @@ impl FakeStopListener {
 impl StopListener for FakeStopListener {
     fn poll_stop(&mut self) -> BackendResult<bool> {
         if self.script == StopPathScript::Deaf {
-            return Err(Refusal::new(
-                EngineCode::StopPathUnavailable,
-                Reason::Deaf,
-            ));
+            return Err(Refusal::new(EngineCode::StopPathUnavailable, Reason::Deaf));
         }
         let mut state = lock(&self.shared);
         state.stop_polls += 1;

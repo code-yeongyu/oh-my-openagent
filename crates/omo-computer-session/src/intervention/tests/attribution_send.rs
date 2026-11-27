@@ -15,7 +15,11 @@ fn foreign_input_inside_the_window_before_the_send_holds_it() {
         .expect_err("the user's key 20 ms before the send holds it");
     assert_eq!(wire(&refused), ("UserIntervened", None));
     assert_eq!(refused.stamps.delivered, None, "nothing was sent");
-    let posts: Vec<String> = sink.lines().into_iter().filter(|l| l.starts_with("post_input")).collect();
+    let posts: Vec<String> = sink
+        .lines()
+        .into_iter()
+        .filter(|l| l.starts_with("post_input"))
+        .collect();
     assert!(posts.is_empty(), "{posts:?}");
 }
 
@@ -24,7 +28,13 @@ fn consecutive_sends_with_no_foreign_input_both_go_out() {
     let (backend, sink) = fake("");
     let mut session = object_session(Box::new(backend));
     session.framed_click(None).expect("first click");
-    session.framed_click(None).expect("the second is not held by the first send's own input");
-    let posts = sink.lines().into_iter().filter(|l| l.starts_with("post_input")).count();
+    session
+        .framed_click(None)
+        .expect("the second is not held by the first send's own input");
+    let posts = sink
+        .lines()
+        .into_iter()
+        .filter(|l| l.starts_with("post_input"))
+        .count();
     assert_eq!(posts, 6);
 }

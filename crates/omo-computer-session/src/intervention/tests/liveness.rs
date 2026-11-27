@@ -48,7 +48,10 @@ impl Backend for ExitsAt {
     fn platform(&self) -> Option<omo_computer_core::report::Platform> {
         self.inner.platform()
     }
-    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+    fn set_stop_chord(
+        &mut self,
+        chord: Option<&str>,
+    ) -> omo_computer_core::backend::BackendResult<()> {
         self.inner.set_stop_chord(chord)
     }
     fn post_text(
@@ -92,7 +95,10 @@ fn target_exits_mid_type_reports_exited() {
         .type_text(params(json!({"target": "101", "text": "abcdefghij"})))
         .expect_err("the process exited after the third grapheme");
     assert_eq!(wire(&refused), ("WindowNotFound", None));
-    assert_eq!(refused.stamps.delivered, Some(Delivered { count: 3, of: 10 }));
+    assert_eq!(
+        refused.stamps.delivered,
+        Some(Delivered { count: 3, of: 10 })
+    );
     assert_eq!(refused.interrupted, Some(Disposition::UNCERTAIN_UNSAFE));
     let target = refused.stamps.target.expect("the exited target");
     assert_eq!(
@@ -104,11 +110,13 @@ fn target_exits_mid_type_reports_exited() {
 
 #[test]
 fn a_window_that_crashed_before_admission_is_window_not_found_with_nothing_sent() {
-    let (backend, sink) = fake(
-        r#","target_exit":[{"after_call":"windows","window":"101","exit_code":0}]"#,
-    );
+    let (backend, sink) =
+        fake(r#","target_exit":[{"after_call":"windows","window":"101","exit_code":0}]"#);
     let mut backend = backend;
-    assert!(backend.windows(&WindowFilter::default()).is_ok(), "the read that fires the exit");
+    assert!(
+        backend.windows(&WindowFilter::default()).is_ok(),
+        "the read that fires the exit"
+    );
     let refused = object_session(Box::new(backend))
         .framed_click(None)
         .expect_err("crashed");
@@ -125,5 +133,8 @@ fn a_healthy_call_carries_no_target_member() {
         .expect("healthy");
     let value = serde_json::to_value(report(reply)).expect("json");
     assert!(value.get("target").is_none(), "{value}");
-    assert!(value.get("session").is_some(), "object mode stamps the session: {value}");
+    assert!(
+        value.get("session").is_some(),
+        "object mode stamps the session: {value}"
+    );
 }

@@ -124,5 +124,10 @@ fn a_stop_pressed_during_the_busy_wait_refuses_and_sends_nothing() {
     control
         .click()
         .expect("with no stop the click is sent after the wait");
-    assert_eq!(control.sink.len(), 3, "move, down, up: {:?}", control.sink.lines());
+    assert_eq!(
+        control.sink.len(),
+        3,
+        "move, down, up: {:?}",
+        control.sink.lines()
+    );
 }

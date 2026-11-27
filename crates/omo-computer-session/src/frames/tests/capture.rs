@@ -216,6 +216,10 @@ fn backend_capture_annotations_are_read_into_the_frame() {
     let captured = session.capture_frame("101", false, None).expect("a frame");
     assert_eq!(captured.route, Some(CaptureRoute::Composite));
     assert_eq!(captured.occluders_visible, Some(false));
-    assert_eq!(captured.cursor, CursorMode::Engine, "the backend's own report wins over the call flag");
+    assert_eq!(
+        captured.cursor,
+        CursorMode::Engine,
+        "the backend's own report wins over the call flag"
+    );
     assert!(sink.is_empty(), "a read sends nothing");
 }

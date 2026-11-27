@@ -60,9 +60,7 @@ pub fn route_refusal(state: &SessionState, route: Route) -> Option<Refusal> {
 pub fn ceiling_refusal(reason: PauseReason) -> Refusal {
     match reason {
         PauseReason::UserActive => Refusal::bare(EngineCode::UserIntervened),
-        PauseReason::ScreenLocked => {
-            Refusal::new(EngineCode::ScreenLocked, Reason::ScreenLocked)
-        }
+        PauseReason::ScreenLocked => Refusal::new(EngineCode::ScreenLocked, Reason::ScreenLocked),
         PauseReason::SystemSuspended => {
             Refusal::new(EngineCode::SessionInactive, Reason::SystemSuspended)
         }
