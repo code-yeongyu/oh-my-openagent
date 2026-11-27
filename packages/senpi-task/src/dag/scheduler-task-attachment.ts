@@ -100,6 +100,9 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
     context.foreignSettlement = false
     return true
   }
+  // Own settlements are listed first and un-wrapped: when a child settles, its residency wake fires
+  // in the same tick, and the fold must win so the dependents it unblocks join the next admission
+  // batch.
   const settled = await Promise.race([
     ...[...context.attachedTasks.values()].map((entry) => entry.settled),
     ...(residencyReleased === undefined ? [] : [residencyReleased.then(() => null)]),
@@ -108,6 +111,16 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
   ])
   if (settled === null) return true
   if (settled === undefined || context.suspended || context.cancellationStarted) return false
+  foldSettlement(context, settled)
+  return true
+}
+
+// Pending forever while nothing is attached, which is what every caller's race wants.
+export function nextOwnSettlement(context: SchedulerContext): Promise<AttachedTaskSettlement> {
+  return Promise.race([...context.attachedTasks.values()].map((entry) => entry.settled))
+}
+
+export function foldSettlement(context: SchedulerContext, settled: AttachedTaskSettlement): void {
   const task = context.attachedTasks.get(settled.nodeId)
   context.attachedTasks.delete(settled.nodeId)
   context.attachedTaskIds.delete(settled.nodeId)
@@ -121,7 +134,6 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
   } finally {
     task?.resolveFolded()
   }
-  return true
 }
 
 function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: TaskRecord): void {

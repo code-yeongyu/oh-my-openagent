@@ -122,7 +122,7 @@ export function emitWaveAdmissions(context: SchedulerContext, scheduled: readonl
   }
 }
 
-function emitCompletedWaves(context: SchedulerContext): void {
+export function emitCompletedWaves(context: SchedulerContext): void {
   if (context.emittedWaveAdmissions.size === 0) return
   const snapshot = context.journal.snapshot()
   const states = new Map(snapshot.nodes.map((node) => [node.id, node.state]))
