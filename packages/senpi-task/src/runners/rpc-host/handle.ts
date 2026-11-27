@@ -1,9 +1,10 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
+import { finishedTurnOutcome, pendingWorkOf } from "../pending-async-work"
 import { exitTurnOutcome, promptFailureOutcome } from "../rpc/turn-outcome"
-import { createTurnSettlement, sessionIsIdle } from "../rpc/turn-settlement"
-import { createTurnWakeSources } from "../rpc/turn-wake-sources"
+import { sessionIsIdle } from "../rpc/turn-settlement"
+import { createTurnTracking } from "../rpc/turn-tracking"
 import type { ChildEventListener, ChildExitOutcome, RpcTerminalAssistantMessage } from "../types"
 import { classifySessionExit, isParkingReason, type SessionCloseIntent, type SessionExitCause } from "./exit-mapping"
 import { bindHostSessionPort } from "./handle-client-binding"
@@ -85,24 +86,27 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     waiters.settleTurn(settled)
   }
 
-  const wakeSources = createTurnWakeSources()
-  const settlement = createTurnSettlement({
+  const tracking = createTurnTracking({
     settle: settleTurn,
     abortedByUser: () => abortedByUser,
     baseline: () => turnBaseline,
     finalText: () => finalText,
     probe: () => client.getState(),
     settleConfirmMs: heartbeatIntervalMs,
-    wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
     disposed: () => tornDown,
+    scheduleConfirmation: options.settlementScheduler,
   })
+  const settlement = tracking.settlement
   let continuationState: "none" | "pending_delivery" | "awaiting_start" = "none"
+  let continuationDelivered = false
   const reconciliation = createHandleReconciliation({
     lastInputId: () => options.inputStore?.load(taskId)?.last_effect_id,
     port: () => client,
-    settle: (settled) => {
-      if (settled.status === "completed") finalText = settled.finalResponse
-      settleTurn(settled)
+    observeState: tracking.observeState,
+    settle: (outcome) => settlement.finish(outcome),
+    adopt: (finalResponse, evidence) => {
+      finalText = finalResponse
+      settlement.adopt(finalResponse, evidence)
     },
     continuing: () => {
       continuationState = "pending_delivery"
@@ -128,13 +132,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
         finalText = terminal.text ?? finalText
       }
     }
-    settlement.observe(event)
-    // The host's loose boundary parse fans every tagged record - raw `extension_event` records
-    // included - into this same funnel (see `session-wire.ts` isAgentSessionEvent).
-    if ((event as { readonly type?: string }).type === "extension_event") {
-      wakeSources.observe(event)
-      settlement.reconfirmHeld()
-    }
+    // The host's loose boundary parse fans every tagged record - raw `extension_event` and
+    // `session_lifecycle` records included - into this same funnel (session-wire.ts isAgentSessionEvent).
+    tracking.observe(event)
   }
 
   const unresponsiveClose = createUnresponsiveClose({
@@ -158,6 +158,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onState: (state) => {
       lastSeenAt = now()
       identity.observeDurableId(state.sessionId)
+      tracking.observeState(state)
     },
     onStatus: (status) => {
       closingUnresponsive = status.state === "terminal-pending"
@@ -197,7 +198,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     listeners.clearActive()
     stopHeartbeat()
     waiters.flushIdle()
-    if (turnOutcome === undefined) settleTurn(settlement.pending() ?? exitTurnOutcome(built, finalText))
+    if (turnOutcome === undefined)
+      settleTurn(
+        settlement.pending(intent === "terminated" ? "terminated" : undefined) ??
+          exitTurnOutcome(built, finalText, tracking.evidence()),
+      )
+    settlement.cancelConfirmation()
     waiters.settleExit(built)
   }
 
@@ -206,10 +212,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const park = (event: HostSessionParked): void => {
     // A parked session is idle on the host: an outcome held for `agent_idle` is final (omo#9069).
     const held = settlement.pending()
-    if (turnOutcome === undefined && held !== undefined) settleTurn(held)
+    const settledTurn = turnOutcome === undefined && held !== undefined
+    if (settledTurn) settleTurn(held)
+    settlement.cancelConfirmation()
     parked = true
     stopHeartbeat()
-    listeners.emitParked(event)
+    listeners.emitParked(settledTurn ? { ...event, settledTurn: true } : event)
   }
 
   const settleClassified = (classified: ReturnType<typeof classifySessionExit>): void =>
@@ -272,8 +280,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       bindHostSessionPort(client, clientBinding)
     },
     turnResumed: () => listeners.emitTurnResumed(),
-    reconcile: (reopened: boolean) =>
-      reconciliation.reconcile(identity.current().sessionPath, undefined, true, reopened),
+    // A session reopened from its file runs nothing the old one started: a turn held on its own async
+    // work lost that work (omo#10487).
+    reconcile: async (reopened: boolean) =>
+      reopened && settlement.abandon()
+        ? "failed"
+        : reconciliation.reconcile(identity.current().sessionPath, undefined, true, reopened),
     beginContinuation: () => beginTurn(),
     endLost: () => endSession({ kind: "transport_gone" }),
     // Transport failures park in recovery; a prompt rejection keeps its own actionable cause.
@@ -318,6 +330,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   })
 
   const beginTurn = (): void => {
+    if (continuationState === "pending_delivery") continuationDelivered = true
     continuationState = continuationState === "pending_delivery" ? "awaiting_start" : "none"
     if (outcome !== undefined) return
     teardown.publishRunning()
@@ -328,7 +341,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     terminalAssistantMessage = undefined
     abortedByUser = false
     turnBaseline = finalText
-    wakeSources.resetTurn()
+    tracking.resetTurn()
   }
 
   const delivery = createInputDelivery({
@@ -407,13 +420,17 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     reconcileTurn: (record) =>
       reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),
     onReconciled: reconciliation.subscribe,
-    adoptFinishedTurn: async (finalResponse) => {
+    continuationDelivered: () => continuationDelivered,
+    adoptFinishedTurn: async (finalResponse, evidence) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
+      // A session reopened from its file runs nothing the old one started (omo#10487).
+      if (openDisposition === "reopened" && pendingWorkOf(evidence) !== undefined)
+        return settleTurn(finishedTurnOutcome(finalResponse, evidence))
       // A state read that fails is not proof of idleness, and must never cost the reattach: stay busy.
       const state = await client.getState().catch(() => undefined)
       if (state === undefined || !sessionIsIdle(state)) return
-      if (turnOutcome === undefined && settlement.pending() === undefined)
-        settleTurn({ status: "completed", finalResponse })
+      tracking.observeState(state)
+      if (turnOutcome === undefined && settlement.pending() === undefined) settlement.adopt(finalResponse, evidence)
     },
     waitForIdle: () => waiters.waitForIdle(reachedIdle || outcome !== undefined),
     hasExited: () => outcome !== undefined,
@@ -423,11 +440,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       if (state === undefined) return undefined
       return sessionIsIdle(state)
     },
-    waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+    waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText, tracking.evidence()),
     runPause: createRpcRunPause({
       taskId,
       claimNextTurn: claims.claim,
-      currentOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+      currentOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText, tracking.evidence()),
       control: () => {
         const wire = client.taskParentWire?.()
         if (wire === undefined) throw new TaskParentControlError("unsupported")
