@@ -343,6 +343,29 @@ describe("config.status", () => {
     ["a comment holding a canary, then an error", '// CANARY-VALUE-16\n{ "a": }'],
     ["not JSON at all: one line that is a token", "CANARY-VALUE-17"],
   ]
+  test("#given a configuration load that throws a canary #when status runs #then it answers the fixed refusal with the class name and none of the thrown text", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-sdk-config-throw-"))
+    homes.push(home)
+    const env = new Proxy(
+      { HOME: home },
+      {
+        get(target, key) {
+          if (key === "HOME") throw new Error(`CANARY-THROWN-1 at ${home}`)
+          return Reflect.get(target, key)
+        },
+      },
+    )
+    expect(await createOmoSdk({ env, cwd: home }).config.status()).toEqual({
+      kind: "error",
+      error: {
+        code: "internal_error",
+        message: "the omo SDK failed unexpectedly",
+        next_action: "retry; report it if it repeats",
+        details: { name: "Error" },
+      },
+    })
+  })
+
   for (const [label, body] of VARIANTS)
     test(`#given ${label} in the user and the project file #when status runs #then the answer carries no canary and no path`, async () => {
       const base = mkdtempSync(join(tmpdir(), "omo-sdk-config-variant-"))

@@ -91,7 +91,12 @@ export function presentationProblems(
   goldens: Goldens,
   matched: Set<string> = new Set(),
 ): string[] {
-  if (scenario.surface === "tool" || scenario.surface === "loop-parse" || scenario.usage === undefined)
+  if (
+    scenario.surface === "tool" ||
+    scenario.surface === "loop-parse" ||
+    scenario.surface === "sdk" ||
+    scenario.usage === undefined
+  )
     return ["the scenario declares no usage block"]
   const command = scenario.usage
   const keys = (outcome: Outcome) => Object.keys(outcome).toSorted().join(",")
