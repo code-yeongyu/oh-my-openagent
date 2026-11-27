@@ -85,7 +85,7 @@ describe("an ambiguous usage limit's same-provider probe (#11383)", () => {
     } finally {
       manager.workpools.dispose()
     }
-  }, 10_000)
+  })
 
   test("#given the probe rung never answers #when the probe timeout passes #then the child fails with the provider's limit, the silent child is stopped, and a later child is refused without a call", async () => {
     // given
@@ -107,5 +107,5 @@ describe("an ambiguous usage limit's same-provider probe (#11383)", () => {
     } finally {
       manager.workpools.dispose()
     }
-  }, 10_000)
+  })
 })
