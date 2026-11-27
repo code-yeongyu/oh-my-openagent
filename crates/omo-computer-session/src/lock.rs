@@ -71,15 +71,19 @@ impl InteractionLock {
     }
 
     fn open(&self) -> io::Result<std::fs::File> {
-        if let Some(dir) = self.path.parent() {
-            // Windows: the lock directory carries L3's protected DACL, read back.
-            #[cfg(windows)]
-            dir::protected_dir(dir)?;
-            #[cfg(not(windows))]
-            crate::marker::private_dir(dir)?;
-        }
-        file::open(&self.path)
+        open_runtime_lock(&self.path)
     }
+}
+
+pub(crate) fn open_runtime_lock(path: &Path) -> io::Result<std::fs::File> {
+    if let Some(dir) = path.parent() {
+        // Windows: the lock directory carries L3's protected DACL, read back.
+        #[cfg(windows)]
+        dir::protected_dir(dir)?;
+        #[cfg(not(windows))]
+        crate::marker::private_dir(dir)?;
+    }
+    file::open(path)
 }
 
 #[cfg(test)]

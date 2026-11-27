@@ -8,6 +8,7 @@ license.workspace = true
 crate-type = ["rlib"]
 
 [dependencies]
+arc-swap = "1.7"
 omo-computer-core = { path = "../omo-computer-core" }
 omo-computer-safety = { path = "../omo-computer-safety" }
 serde.workspace = true

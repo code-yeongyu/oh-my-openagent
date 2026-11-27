@@ -2,9 +2,8 @@
 //! the thinnest `click` and `typeText`. Both verbs reach the backend only through the mutate
 //! funnel (`crate::mutate`); consent, receipts and settle policy are added there by later rows.
 
-use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal};
+use omo_computer_core::backend::{Backend, InputEvent, Refusal};
 use omo_computer_core::error::EngineCode;
-use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilities};
 use omo_computer_core::params::{
     Button, ClickParams, ReportMode, SessionOpenParams, TypeTextParams,
 };
@@ -12,18 +11,17 @@ use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::requests::{read_click, read_session_open, read_type_text, V1Request, Verb};
 use omo_computer_core::methods::Method;
-use omo_computer_core::results::{
-    CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
-};
-use omo_computer_core::session_state::Tristate;
+use omo_computer_core::results::{ExecReply, SessionOpened, StopPathStatus};
 use omo_computer_safety::{Call, Guard, HostAdditions, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
 use crate::frames::random_u64;
 use crate::mutate::{key_event, route_for, Funnel, Mutation, Refused};
+use crate::presence::{palette::Palette, reports::Publisher};
 
-/// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
-pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
+mod capabilities;
+
+pub use capabilities::{legacy_capabilities, NO_GLOBAL_LISTENER};
 
 /// An exec call with no open session: the session's bare `Closed` row.
 pub const NOT_OPEN: Refusal = Refusal::bare(EngineCode::Closed);
@@ -36,6 +34,7 @@ pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
     pub(crate) tag: u64,
     pub(crate) settings: crate::intervention::OpenSettings,
+    pub(crate) cursor: Option<Publisher>,
 }
 
 /// The session state of one engine process.
@@ -50,6 +49,7 @@ pub struct Session {
     /// The session-scoped display-awake hold (design row C22).
     pub(crate) display_awake: crate::intervention::SharedHold,
     pub(crate) settle: crate::settle::SettleState,
+    pub(crate) cursor_palette: Palette,
 }
 
 impl Session {
@@ -63,7 +63,9 @@ impl Session {
     /// pre-input markers and the interaction lock under its RUNTIME root.
     #[must_use]
     pub fn for_roots(backend: Box<dyn Backend>, roots: &Roots) -> Self {
-        Self::build(backend, Guard::for_roots(roots), Funnel::for_roots(roots))
+        let mut session = Self::build(backend, Guard::for_roots(roots), Funnel::for_roots(roots));
+        session.cursor_palette = Palette::Host(roots.runtime.clone());
+        session
     }
 
     #[must_use]
@@ -84,11 +86,13 @@ impl Session {
             report_mode: request.report_mode,
             tag: random_u64(),
             settings: crate::intervention::OpenSettings::read(&request),
+            cursor: None,
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         // Row 21 (A-IS-62, R70ai): the open request's stop_hotkey is compared with the consent file's.
         let stop_hotkey = request.config.as_ref().and_then(|config| config.stop.stop_hotkey.as_deref());
         self.open_control(&resume_token[..16], stop_hotkey)?;
+        self.register_cursor();
         self.funnel.sweep(SweepTrigger::Open);
         self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {
@@ -133,19 +137,6 @@ impl Session {
     #[must_use]
     pub fn stop_path_status(&self) -> StopPathStatus {
         self.guard.status()
-    }
-
-    /// The capabilities in the open session's report mode; with no session, the v1 shape.
-    #[must_use]
-    pub fn capabilities(&self) -> CapabilitiesReply {
-        let capabilities = self.sampled_capabilities();
-        match self.opened.as_ref().map(|opened| opened.report_mode) {
-            Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
-            Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
-                &capabilities,
-                &self.backend.probe_permissions(),
-            ))),
-        }
     }
 
     pub fn close(&mut self) {
@@ -220,46 +211,10 @@ impl Session {
     }
 }
 
-const fn permission(state: PermissionState) -> &'static str {
-    match state {
-        PermissionState::Granted => "granted",
-        PermissionState::Denied => "denied",
-        PermissionState::Unknown => "unknown",
-    }
-}
-
-const fn known_true(state: Tristate) -> bool {
-    matches!(state, Tristate::Known(true))
-}
-
-/// The v1 record a null-mode session reads, projected from the object-mode capabilities.
-#[must_use]
-pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> LegacyCapabilities {
-    LegacyCapabilities {
-        backend: caps.backend.clone(),
-        display_server: None,
-        capture: caps.capture.available,
-        input: caps.window_input.available,
-        ax: caps.input_modes.contains(&InputMode::Ax),
-        background_window_input: caps.background_window_input,
-        cursor_overlay: false,
-        delivery_modes: caps.delivery_modes.clone(),
-        capture_permission: permission(probe.capture).to_owned(),
-        input_permission: permission(probe.input).to_owned(),
-        ax_permission: permission(probe.accessibility).to_owned(),
-        display_count: caps.display_count,
-        focus_guard: caps.background_window_input,
-        stop_path: "none".to_owned(),
-        stop_reason: Some(NO_GLOBAL_LISTENER.to_owned()),
-        integrity_level: None,
-        screen_locked: known_true(caps.session.screen_locked),
-        display_asleep: Some(known_true(caps.session.display_asleep)),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use omo_computer_backend_fake::{FakeBackend, FakeScenario, RecordingSink, StopPathScript};
+    use omo_computer_core::results::CapabilitiesReply;
     use serde_json::json;
 
     use super::*;

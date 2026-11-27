@@ -7,6 +7,9 @@
 
 pub mod look;
 pub mod motion;
+pub(crate) mod palette;
+pub mod reports;
+mod session_reports;
 pub mod units;
 
 use omo_computer_core::backend::{Backend, Presence};

@@ -189,6 +189,7 @@ impl Session {
         let watch = admission
             .pid
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
+        self.offer_cursor(&mutation);
         let outcome = self.send_watched(mutation.events, mutation.route, tag, watch, target);
         drop(lock);
         let (count, of) = (outcome.count, outcome.of);
