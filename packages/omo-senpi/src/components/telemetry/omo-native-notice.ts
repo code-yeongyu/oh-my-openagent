@@ -31,7 +31,10 @@ export type OmoNativeNoticeRegistration = {
  * The first-run consent question (#14920 wave B): an interactive session with a confirm dialog is
  * asked once; the answer is persisted before any telemetry decision reads it. A session with no
  * dialog (headless, print, RPC) asks nothing and writes nothing, so such runs count as not
- * consented. The question is skipped when the machine already opted out through the env matrix or
+ * consented. Only an interactive TUI session has that dialog: senpi's RPC mode binds a real UI context
+ * whose `confirm` is forwarded to the client, and print mode's no-op `confirm` answers `false`, so the
+ * presence of `confirm` proves nothing. Asking in an RPC session held `open_session` forever, because
+ * no client can answer while the session is still opening (#15213, #15196). The question is skipped when the machine already opted out through the env matrix or
  * runs automated, because that user has already decided.
  */
 export function createOmoNativeNoticeRegistration(options: OmoNativeNoticeOptions = {}): OmoNativeNoticeRegistration {
@@ -87,7 +90,9 @@ export function createOmoNativeNoticeRegistration(options: OmoNativeNoticeOption
 
 function consentUi(value: unknown): ConsentUi | undefined {
   if (typeof value !== "object" || value === null) return undefined
-  const ui = (value as Record<string, unknown>)["ui"]
+  const ctx = value as Record<string, unknown>
+  if (ctx["mode"] !== "tui" || ctx["hasUI"] !== true) return undefined
+  const ui = ctx["ui"]
   if (typeof ui !== "object" || ui === null) return undefined
   const confirm = (ui as Record<string, unknown>)["confirm"]
   return typeof confirm === "function"
