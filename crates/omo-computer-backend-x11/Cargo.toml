@@ -15,7 +15,8 @@ omo-computer-backend-atspi = { path = "../omo-computer-backend-atspi" }
 [target.'cfg(target_os = "linux")'.dependencies]
 image.workspace = true
 serde_json.workspace = true
-x11rb = { workspace = true, features = ["composite", "damage", "xfixes"] }
+unicode-segmentation = "1.13"
+x11rb = { workspace = true, features = ["composite", "damage", "res", "xfixes", "xkb", "xtest"] }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 tempfile.workspace = true

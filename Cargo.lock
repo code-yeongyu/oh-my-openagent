@@ -2024,6 +2024,7 @@ dependencies = [
  "omo-computer-safety",
  "serde_json",
  "tempfile",
+ "unicode-segmentation",
  "x11rb",
 ]
 
