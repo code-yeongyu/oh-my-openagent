@@ -161,9 +161,51 @@ describe("#given the same name on this device and on B #when it is resolved #the
   })
 })
 
-describe("characterization of current behaviour: a closed copy of an id here while B lists it live", () => {
-  test("#given the closed copy here and B's live row #when the id is resolved #then this device's id hit answers, as resolveAddress does today", async () => {
-    await expectHit(T.stale, hit(T.stale, "here", "id"))
+describe("#given a closed copy of an id here #when the bare id is resolved #then a live holder elsewhere wins over the copy", () => {
+  test("#given the closed copy here and B's live row #when the id is resolved #then B's live row answers, not the stale copy", async () => {
+    await expectHit(T.stale, hit(T.stale, "device", "id", B.id))
+  })
+
+  test("#given the closed copy here and B's row ended #when the id is resolved #then ambiguous_target names both devices and says one is a session file", async () => {
+    const resolved = await resolve(T.stale, {}, { staleEndedOnB: true })
+    expect(resolved).toMatchObject({
+      kind: "error",
+      code: "ambiguous_target",
+      details: { reason: "session_file_without_engine" },
+    })
+    const candidates = (
+      resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
+    ) as readonly AddressCandidate[]
+    expect(candidates.map((candidate) => candidate.device).sort()).toEqual([B.id, HERE.id].sort())
+  })
+
+  test("#given the closed copy here and B missed the listing round #when the id is resolved #then it refuses listing_incomplete, never the copy", async () => {
+    expect(await resolve(T.stale, {}, { incomplete: true })).toMatchObject({
+      kind: "error",
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: [B.id] },
+    })
+  })
+
+  test("#given the closed copy here and the account listing cannot be read #when the id is resolved #then it refuses host_unavailable, never the copy", async () => {
+    const two = createTwoDevices()
+    cleanups.push(two.cleanup)
+    const broken = {
+      ...two.remote,
+      sessions: {
+        ...two.remote.sessions,
+        listing: async () => {
+          throw new Error("device service connection lost")
+        },
+      },
+    }
+    expect(
+      await resolveAddress(
+        { remote: broken, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive },
+        T.stale,
+        {},
+      ),
+    ).toMatchObject({ kind: "error", code: "host_unavailable" })
   })
 
   test("#given a thread only this device holds, not live #when resolved #then this device's copy answers", async () => {
