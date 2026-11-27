@@ -395,8 +395,9 @@ export function resolveTarget(
     (hasCallerRoot && sameWorkspace(entry.cwd, callerRoot, rootResolver))
   const hit = matchThread(entries, target, { view: ladderView, named: inScope, idPrefix: opts.id_prefix ?? true })
 
-  // Step 1: the exact durable id wins immediately, across every entry; this device's book is listed first, so its
-  // copy of an id another device also lists is the one answered.
+  // Step 1: the exact durable id wins immediately, across every entry; this device's book is listed first, so the ladder
+  // answers its copy of an id another device also lists. address/bare.ts then lets the account decide when that copy is
+  // only a session file (#15246).
   if (hit.kind !== "none" && hit.step === "id") {
     const first = hit.kind === "one" ? hit.entry : hit.entries[0]
     if (first !== undefined) return scopedIdHit(first, opts, callerRoot, hasCallerRoot, rootResolver)

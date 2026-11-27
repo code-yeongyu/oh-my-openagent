@@ -126,8 +126,8 @@ const found = (hit: Extract<LadderResult, { readonly kind: "ok" }>, allScope: bo
 })
 
 /**
- * A bare address over this device's book and the account's (decision 0027: one resolver). A local id hit never reads the
- * account. A configured relay's failure, plan refusal or alias holder's typed failure answers before not_found; a thread
+ * A bare address over this device's book and the account's (decision 0027: one resolver). A local id hit on a session an
+ * engine here runs never reads the account; a hit on a session file alone does (`fileHere`, #15246). A configured relay's failure, plan refusal or alias holder's typed failure answers before not_found; a thread
  * id nothing lists gets the per-device probe; a miss while a device did not answer this listing round is
  * host_unavailable naming it (the remembered device when the memory has one), never not_found. No relay set up: a local
  * miss stays a local not_found.

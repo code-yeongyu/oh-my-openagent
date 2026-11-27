@@ -6,6 +6,7 @@ import { resolveAddress, type AddressCandidate, type Resolution, type ResolveOpt
 import {
   ALIAS,
   B,
+  B_TWIN,
   FIX,
   HERE,
   KEY,
@@ -177,6 +178,28 @@ describe("#given a closed copy of an id here #when the bare id is resolved #then
       resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
     ) as readonly AddressCandidate[]
     expect(candidates.map((candidate) => candidate.device).sort()).toEqual([B.id, HERE.id].sort())
+  })
+
+  test("#given the closed copy here and two devices listing it live #when the id is resolved #then ambiguous_target names all three", async () => {
+    const resolved = await resolve(T.stale, {}, { twin: true, staleAlsoOnTwin: true })
+    expect(resolved).toMatchObject({
+      kind: "error",
+      code: "ambiguous_target",
+      details: { reason: "session_file_without_engine" },
+    })
+    const candidates = (
+      resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
+    ) as readonly AddressCandidate[]
+    expect(candidates.map((candidate) => candidate.device).sort()).toEqual([B.id, B_TWIN.id, HERE.id].sort())
+  })
+
+  // Review L2 of #15252: an offline holder whose rows the account listing still carries is a holder, not "nobody".
+  test("#given the closed copy here and B offline, its row still in the account listing #when the id is resolved #then B's row answers, never the copy", async () => {
+    await expectHit(T.stale, hit(T.stale, "device", "id", B.id), {}, { bOffline: true })
+  })
+
+  test("#given the closed copy here and no account set up (signed out) #when the id is resolved #then the file here answers, as before", async () => {
+    await expectHit(T.stale, hit(T.stale, "here", "id"), {}, { plan: "signed_out" })
   })
 
   test("#given the closed copy here and B missed the listing round #when the id is resolved #then it refuses listing_incomplete, never the copy", async () => {

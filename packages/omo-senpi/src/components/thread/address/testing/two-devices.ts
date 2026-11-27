@@ -162,6 +162,8 @@ export type TwoDeviceOptions = {
   readonly plan?: string
   /** B lists the stale copy's id as an ended session instead of a live one. */
   readonly staleEndedOnB?: boolean
+  /** The twin device (requires `twin`) also lists the stale copy's id live. */
+  readonly staleAlsoOnTwin?: boolean
 }
 
 /**
@@ -182,6 +184,7 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
       options.staleEndedOnB === true && entry.durable_id === T.stale ? { ...entry, state: "ended" } : entry,
     ),
     ...(options.fix === true ? [FIX_ROW] : []),
+    ...(options.staleAlsoOnTwin === true ? [row(T.stale, "rk-stale-on-twin", "stale live", "idle", B_TWIN.id)] : []),
   ]
   const aliases = new Map<string, AliasHolder>([
     [ALIAS.onB, { session_id: T.bLive, device: B.id }],
