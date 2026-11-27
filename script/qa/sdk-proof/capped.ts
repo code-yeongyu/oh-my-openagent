@@ -32,7 +32,7 @@ const deliveryOf = (raw: unknown): Readonly<Record<string, unknown>> =>
   isRecord(raw) && isRecord(raw["delivery"]) ? raw["delivery"] : {}
 
 /** Why an answer is not a delivery parked behind B's cap-per-message cap, or undefined when it is one. */
-export function notParked(raw: unknown): string | undefined {
+function notParked(raw: unknown): string | undefined {
   const delivery = deliveryOf(raw)
   const wait = isRecord(delivery["waiting_on"]) ? delivery["waiting_on"] : {}
   if (delivery["kind"] !== "queued") return `delivery.kind is ${String(delivery["kind"])}, not queued`
