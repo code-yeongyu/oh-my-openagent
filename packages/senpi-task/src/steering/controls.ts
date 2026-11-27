@@ -6,13 +6,13 @@ import type { TaskRecord } from "../state"
 import { createUnhandledHostSessionCancel } from "./host-session-cancel"
 import { runMoved, staleCancel } from "./stale-run"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
-import type { CancelOptions, CancelOutcome, InterruptOutcome, SteeringPort } from "./types"
+import type { CancelOptions, CancelOutcome, InterruptOptions, InterruptOutcome, SteeringPort } from "./types"
 
 export const CANCEL_PENDING_REASON = "cancel requested, child unreachable"
 
 export function createSteeringControls(
   port: SteeringPort,
-  resolve: (idOrName: string) => TaskRecord | undefined,
+  resolve: (idOrName: string, caller?: CancelOptions["caller"]) => TaskRecord | undefined,
   clearPersistedQueue: (taskId: string) => void,
 ) {
   const nowIso = (): string => new Date(port.now()).toISOString()
@@ -30,8 +30,8 @@ export function createSteeringControls(
     )
   }
 
-  async function interruptTask(idOrName: string): Promise<InterruptOutcome> {
-    const record = resolve(idOrName)
+  async function interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome> {
+    const record = resolve(idOrName, options?.caller)
     if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
     if (record.status !== "running") {
       return {
@@ -72,7 +72,7 @@ export function createSteeringControls(
   }
 
   async function cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const record = resolve(idOrName)
+    const record = resolve(idOrName, options?.caller)
     const destructionCause = options?.abort === "skip" ? "cancel_without_abort" : "cancel"
     if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
     const expected = options?.expectedRunEpoch
