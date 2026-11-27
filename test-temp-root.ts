@@ -6,6 +6,7 @@ import { basename, join } from "node:path"
 import { removeTestRootBestEffort, skippedTestRoots } from "./test-support/held-test-root.mjs"
 import reportOnlyPrefixesByOwner from "./test-temp-leak-report-only.json"
 import { isOsCreatedTempEntry, reportOnlyOwner as ownerIn } from "./test-temp-leak-match"
+import { unsettledShortTempDirs } from "./packages/omo-senpi/test-support/short-tmp"
 
 // Every test process gets its own temp root, and the OS temp dir variables point at it for the rest
 // of the process (#9766). os.tmpdir() re-reads them on each call, so every mkdtemp a test makes, and
@@ -185,13 +186,25 @@ function removeRunRoot(): void {
 export function runTestTempRootTeardown(): void {
   const leftovers = leftoverEntries()
   removeRunRoot()
+  // shortTempDir directories live OUTSIDE the run root (a darwin-shaped socket path), so the scan above
+  // cannot see them; the helper registers what it creates and here each unsettled one is removed and
+  // reported with its owner (#15106).
+  const shortTempLeftovers = unsettledShortTempDirs()
   const known = leftovers.filter((entry) => reportOnlyOwner(entry) !== undefined)
   const unexpected = leftovers.filter((entry) => reportOnlyOwner(entry) === undefined)
   if (known.length > 0) reportKnownLeaks(known)
-  if (unexpected.length === 0) return
+  if (unexpected.length === 0 && shortTempLeftovers.length === 0) return
   throw new Error(
-    `Tests left ${unexpected.length} temp entr${unexpected.length === 1 ? "y" : "ies"} behind (#9766). ` +
-      "Remove every temp dir a test creates in afterEach/afterAll, onTestFinished, or a finally block:\n" +
-      unexpected.map((entry) => `  ${entry}`).join("\n"),
+    (unexpected.length > 0
+      ? `Tests left ${unexpected.length} temp entr${unexpected.length === 1 ? "y" : "ies"} behind (#9766). ` +
+        "Remove every temp dir a test creates in afterEach/afterAll, onTestFinished, or a finally block:\n" +
+        unexpected.map((entry) => `  ${entry}`).join("\n") +
+        (shortTempLeftovers.length > 0 ? "\n" : "")
+      : "") +
+    (shortTempLeftovers.length > 0
+      ? `Tests left ${shortTempLeftovers.length} shortTempDir entr${shortTempLeftovers.length === 1 ? "y" : "ies"} behind (#15106). ` +
+        "Remove what shortTempDir created in afterEach/afterAll, or a finally block:\n" +
+        shortTempLeftovers.map((leftover) => `  ${leftover.path} (${leftover.file})`).join("\n")
+      : ""),
   )
 }
