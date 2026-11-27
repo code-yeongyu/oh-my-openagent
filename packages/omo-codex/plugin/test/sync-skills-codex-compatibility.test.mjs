@@ -176,7 +176,7 @@ test("#given the flattened plugin cache the Codex installer produces #when sync-
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
     assert.ok(syncedSkills.includes("ultrawork"), "component skill ultrawork must be synced")
-    assert.ok(syncedSkills.includes("git-master"), "shared skill git-master must be synced from the linked package")
+    assert.ok(syncedSkills.includes("git"), "shared skill git must be synced from the linked package")
   } finally {
     await rm(codexHome, { recursive: true, force: true })
   }

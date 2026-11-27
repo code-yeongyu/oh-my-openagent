@@ -33,8 +33,9 @@
 import { constants } from "node:fs"
 import { access, chmod, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, relative, resolve } from "node:path"
+import { join, resolve } from "node:path"
 import {
+  caseName,
   casesIn,
   describe,
   InputError,
@@ -130,13 +131,6 @@ async function replay(argv: readonly string[]): Promise<number> {
   const verdict = classify(opts.row.n, outcomes, ledgers, await readText(opts.row.plan, "plan file"))
   console.log(verdict.lines.join("\n"))
   return verdict.failing > 0 ? 1 : 0
-}
-
-// A case as its result lines name it: the repository-relative path, else the path given.
-function caseName(casePath: string): string {
-  // Case names print with forward slashes on every OS, so the output is the same on Windows.
-  const rel = relative(ROOT, casePath).replaceAll("\\", "/")
-  return rel.startsWith("..") ? casePath : rel
 }
 
 async function replayCase(opts: Options, casePath: string): Promise<number> {

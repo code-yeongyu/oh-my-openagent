@@ -29,7 +29,38 @@ export type LoopParseScenario = {
   readonly argv: readonly string[]
 }
 
-export type Scenario = CliScenario | ToolScenario | LoopParseScenario
+// The shipped SDK, driven in a child process against the tree's own code: the fixture files written under a sandbox
+// home (and its project directory, the call's cwd), one call of the member, its answer normalized.
+export type SdkScenario = {
+  readonly id: string
+  readonly capability: string
+  readonly surface: "sdk"
+  readonly member: string
+  // Paths relative to the sandbox home; "project/..." lands in the project directory the call runs in.
+  readonly files: Readonly<Record<string, string>>
+}
+
+export type Scenario = CliScenario | ToolScenario | LoopParseScenario | SdkScenario
+
+// What each runner consumes to make its call. A field outside it (the usage block a CLI scenario names) only states an
+// expectation and may change; the call itself may not, for an unresolved capability (gate.ts).
+export function callPart(scenario: Scenario): Readonly<Record<string, unknown>> {
+  switch (scenario.surface) {
+    case "native":
+    case "opencode":
+    case "loop-parse":
+      return { surface: scenario.surface, capability: scenario.capability, argv: scenario.argv }
+    case "tool":
+      return { surface: scenario.surface, capability: scenario.capability, tool: scenario.tool, args: scenario.args }
+    case "sdk":
+      return {
+        surface: scenario.surface,
+        capability: scenario.capability,
+        member: scenario.member,
+        files: scenario.files,
+      }
+  }
+}
 
 const native = (id: string, capability: string, argv: readonly string[], usage?: string): CliScenario => ({
   id,
@@ -118,4 +149,17 @@ export const SCENARIOS: readonly Scenario[] = [
   }),
   tool("tool-archive-missing", "threads.archive", "thread_archive", { thread: "missing-thread" }),
   tool("tool-handoff-missing", "threads.handoff", "thread_handoff", { thread: "missing-thread", message: "hi" }),
+  {
+    id: "sdk-config-status-diagnostics",
+    capability: "config.status",
+    surface: "sdk",
+    member: "config.status",
+    files: {
+      ".omo/omo.jsonc": JSON.stringify({
+        zz_fixture_unknown_key: 1,
+        task: { host_engine_policy: "fixture-not-a-policy", zz_fixture_nested_key: true },
+      }),
+      "project/.omo/omo.jsonc": '{ "zz_fixture_parse": ',
+    },
+  },
 ]

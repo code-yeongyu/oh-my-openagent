@@ -1,9 +1,10 @@
 import { outcomeOf } from "../thread/remote/outcome"
 import { eventStream, openAttachment, pendingRequestOf, raiserOnly } from "./attach"
-import { type ClientCore, ok, type RemoteClient } from "./client"
+import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle } from "./seams"
+import { answerEvents, expectSend, fallbackFor, SEND_TAIL, type TranscriptFallback } from "./send-transcript"
 import type {
   AttachEvent,
   AttachHandle,
@@ -322,6 +323,9 @@ class SessionTurn {
    * reported once the status reaches idle. Cleared when a new run starts.
    */
   #endPending = false
+  /** The last text block of the run (its content index, and whether it ended its line), and a message boundary since. */
+  #block: { readonly index: unknown; readonly endsLine: boolean } | undefined
+  #newMessage = false
   /** The requests the session waits on, shown ones and raiser-only ones alike (#13753 M2). */
   readonly #asked = new Map<string, Asked>()
 
@@ -408,15 +412,24 @@ class SessionTurn {
       this.text = ""
       this.aborted = false
       this.turnId = nonEmpty(record["runId"])
+      this.#block = undefined
     }
     if (type === "agent_end") this.aborted = record["aborted"] === true
+    if (type === "message_start" || type === "message_end") this.#newMessage = true
     const moved = this.#moved(record)
     if (moved === "closed") return "closed"
     const update = record["assistantMessageEvent"]
     if (type === "message_update" && isObject(update) && update["type"] === "text_delta") {
       const delta = typeof update["delta"] === "string" ? update["delta"] : ""
-      this.text += delta
-      return [...moved, { kind: "text", delta }]
+      if (delta === "") return [...moved, { kind: "text", delta }]
+      // Another content block, or another message, never runs into the text before it: a line break joins them.
+      const block = this.#block
+      const joined =
+        block !== undefined && !block.endsLine && (this.#newMessage || update["contentIndex"] !== block.index)
+      this.#newMessage = false
+      this.#block = { index: update["contentIndex"], endsLine: delta.endsWith("\n") }
+      this.text += joined ? `\n${delta}` : delta
+      return [...moved, ...(joined ? [{ kind: "text" as const, delta: "\n" }] : []), { kind: "text", delta }]
     }
     const tool = toolEvent(record)
     return tool === undefined ? moved : [...moved, tool]
@@ -428,6 +441,8 @@ class SessionTurn {
         this.#markRunning()
         return this.#update()
       case "agent_settled":
+        // senpi settles the run of a session that closed under it with reason session_closed: the session ended.
+        if (record["reason"] === "session_closed") return "closed"
         return this.#update(false, this.#markEnded())
       case "session_lifecycle":
         return this.#update(false, this.#lease(leaseOf(record["lifecycle"])))
@@ -606,6 +621,31 @@ const RETRY_WAIT = "Call sessions.get for the session's state, then sessions.wai
 
 const ANSWER_ELSEWHERE = "A person answers it with attach(thread).answer on a person client."
 
+/** senpi's settle of a run whose session closed under it: the followed send's turn ends with the session. */
+const sessionClosed = (record: JsonObject): boolean =>
+  record["type"] === "agent_settled" && record["reason"] === "session_closed"
+
+const isRemoteFailure = (value: unknown): value is RemoteFailure =>
+  isObject(value) && value["kind"] === "error" && typeof value["code"] === "string"
+
+/**
+ * A follow's or wait's `from`, settled (F1, #13414 4c-2): the send's receipt (or none), or why the send it waited on
+ * failed. A caller that rejects with the send's own typed failure gets that failure; anything else thrown is internal.
+ */
+const settledReceipt = async (from: FollowOpts["from"]): Promise<Outcome<SendReceipt | undefined>> => {
+  try {
+    return ok(await from)
+  } catch (reason) {
+    if (isRemoteFailure(reason)) return reason
+    const why = reason instanceof Error ? reason.message : String(reason)
+    return remoteFailure(
+      "internal_error",
+      `The send this call waited on failed: ${why}.`,
+      nextActionFor("internal_error"),
+    )
+  }
+}
+
 const attachEnded = (): RemoteFailure =>
   remoteFailure(
     "host_unavailable",
@@ -622,6 +662,8 @@ export function streamMembers(core: ClientCore): StreamMembers {
 
   const follow = (thread: ThreadHandle, opts?: FollowOpts) => {
     let watch: SessionWatch | undefined
+    // An engine that stamps no id: the transcript at a run's settle decides the send's turn (send-transcript.ts).
+    let fallback: TranscriptFallback | undefined
     let finished = false
     const deadlineMs = opts?.deadlineMs ?? DEADLINES.followTotal
     const output = eventStream<FollowEvent>({ onStop: () => finish() })
@@ -632,6 +674,7 @@ export function streamMembers(core: ClientCore): StreamMembers {
       output.end()
       cancelTimer()
       resyncEnd?.()
+      fallback?.stop()
       opts?.signal?.removeEventListener("abort", onAbort)
       watch?.stop()
     }
@@ -682,8 +725,15 @@ export function streamMembers(core: ClientCore): StreamMembers {
     }
 
     // From one send: only the records that carry its id (SendTurn); the session's state and leases are not consulted.
-    const from = opts?.from
-    const send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
+    // Its receipt may still be pending (F1): the attach opens at once and holds every record until the receipt is known.
+    let from: SendReceipt | undefined
+    let send: SendTurn | undefined
+    const awaitedSend = opts?.from === undefined ? undefined : expectSend(core, thread)
+    const receipt = settledReceipt(opts?.from)
+    void receipt.then((settled) => {
+      awaitedSend?.()
+      if (settled.kind === "error") fail(settled)
+    })
     // A re-attach's get_state that says the run is over ends the turn only if no record of the send follows it within
     // RESYNC_GRACE_MS: the turn's own end, with its last text and its aborted flag, wins when it still streams.
     let resyncEnd: (() => void) | undefined
@@ -691,8 +741,13 @@ export function streamMembers(core: ClientCore): StreamMembers {
       if (turn === undefined || from === undefined || send === undefined) return
       if (event.kind !== "record") return deliver(turn.apply(event))
       const seen = send.started
+      if (seen && sessionClosed(event.record)) return finish({ kind: "end", outcome: { reason: "session_closed" } })
       const verdict = send.classify(event.record)
-      if (verdict === "other") return
+      if (verdict === "other") {
+        if (!seen && event.record["type"] === "agent_settled") fallback?.settled()
+        return
+      }
+      fallback?.stop()
       resyncEnd?.()
       resyncEnd = undefined
       // Another turn's records are never applied: its agent_end must not mark this turn interrupted.
@@ -715,9 +770,10 @@ export function streamMembers(core: ClientCore): StreamMembers {
         // From a send, only a re-attach reads the state: its run lease off running ends a turn whose end fell in the gap.
         if (send !== undefined) {
           const ending = turn
-          if (ending !== undefined && from !== undefined && resyncEnd === undefined && send.ranOutIn(state))
+          const sent = from
+          if (ending !== undefined && sent !== undefined && resyncEnd === undefined && send.ranOutIn(state))
             resyncEnd = core.timers.after(RESYNC_GRACE_MS, () =>
-              finish({ kind: "end", outcome: sendOutcome(ending, from) }),
+              finish({ kind: "end", outcome: sendOutcome(ending, sent) }),
             )
           return
         }
@@ -725,11 +781,28 @@ export function streamMembers(core: ClientCore): StreamMembers {
         release(anchor?.baseline(leaseOf(state["lifecycle"])) ?? [])
       },
       ended: () => fail(attachEnded()),
-    }).then((opened) => {
+    }).then(async (opened) => {
       if (opened.kind === "error") return fail(opened)
       watch = opened.value
       if (finished) return watch.stop()
+      // Nothing reaches the handlers before start, so the records that arrived while the receipt was pending are held.
+      const known = await receipt
+      if (finished || known.kind === "error") return
+      from = known.value
+      send = from?.delivery_id === undefined ? undefined : new SendTurn(from.delivery_id)
       turn = new SessionTurn()
+      const attached = watch
+      const answered = from
+      if (send !== undefined && answered !== undefined)
+        fallback = fallbackFor(
+          answered,
+          () => attached.handle.read({ tail: SEND_TAIL }),
+          (answer) => {
+            const { text, end } = answerEvents(answer, answered)
+            for (const event of text) output.push(event)
+            finish({ kind: "end", outcome: end })
+          },
+        )
       if (send !== undefined) {
         if (person) for (const request of watch.handle.pending()) output.push({ kind: "frame", request })
         if (from?.lane === "queued" || from?.lane === "queued_offline")
@@ -760,11 +833,14 @@ export function streamMembers(core: ClientCore): StreamMembers {
       // "No run" is believed only once the fresh read came back: the snapshot's idle can be stale (#13753).
       let confirmed = false
       let settled = false
+      // An engine that stamps no id: the transcript at a run's settle decides the send's turn (send-transcript.ts).
+      let fallback: TranscriptFallback | undefined
       const done = (outcome: Awaited<R<WaitResult>>): void => {
         if (settled) return
         settled = true
         cancelTimer()
         resyncEnd?.()
+        fallback?.stop()
         opts?.signal?.removeEventListener("abort", onAbort)
         watch?.stop()
         resolve(outcome)
@@ -789,14 +865,25 @@ export function streamMembers(core: ClientCore): StreamMembers {
       const release = (events: readonly AttachEvent[]): void => {
         for (const event of events) if (turn !== undefined) check(turn.apply(event))
       }
-      // From one send: settled on its turn's end (idle) or on the next input taking over (running), nothing else.
-      const send = opts?.from?.delivery_id === undefined ? undefined : new SendTurn(opts.from.delivery_id)
+      // From one send: settled on its turn's end (idle) or on the next input taking over (running), nothing else. Its
+      // receipt may still be pending (F1), as for follow.
+      let send: SendTurn | undefined
+      const awaitedSend = opts?.from === undefined ? undefined : expectSend(core, thread)
+      const receipt = settledReceipt(opts?.from)
+      void receipt.then((known) => {
+        awaitedSend?.()
+        if (known.kind === "error") done(known)
+      })
       let resyncEnd: (() => void) | undefined
       const ofSend = (event: AttachEvent): void => {
         if (turn === undefined || send === undefined) return
         if (event.kind !== "record") return check(turn.apply(event))
+        if (send.started && sessionClosed(event.record)) return result("ended", "closed")
+        const seen = send.started
         const verdict = send.classify(event.record)
+        if (verdict === "other" && !seen && event.record["type"] === "agent_settled") fallback?.settled()
         if (verdict !== "other") {
+          fallback?.stop()
           resyncEnd?.()
           resyncEnd = undefined
         }
@@ -824,8 +911,19 @@ export function streamMembers(core: ClientCore): StreamMembers {
         if (opened.kind === "error") return done(opened)
         watch = opened.value
         if (settled) return watch.stop()
+        const known = await receipt
+        if (settled || known.kind === "error") return
+        send = known.value?.delivery_id === undefined ? undefined : new SendTurn(known.value.delivery_id)
         turn = new SessionTurn()
-        if (send !== undefined) return watch.start()
+        if (send !== undefined) {
+          const attached = watch
+          fallback = fallbackFor(
+            known.value,
+            () => attached.handle.read({ tail: SEND_TAIL }),
+            () => result("settled", "idle"),
+          )
+          return watch.start()
+        }
         turn.resync(opened.value.initial)
         const atOpen = snapshotLease(opened.value.initial)
         const anchored = new FollowAnchor(atOpen)
