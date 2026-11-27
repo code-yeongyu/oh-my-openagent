@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { writeFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { OmoSidePanelSettingsSchema, type OmoSidePanelSettings } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext } from "../../extension/types"
+import type { ComponentContext, SenpiAccountLimits } from "../../extension/types"
 
 import {
   GIT_REFRESH_FLOOR_MS,
@@ -19,6 +19,7 @@ import { createSidePanelComponent } from "./index"
 import type { PanelMemory, PanelMemoryIdentity, PanelTimers } from "./types"
 import { SIDE_PANEL_DIFF_COMMAND } from "./constants"
 import type { PanelTaskRecord } from "./data/task-records"
+import { claimRegularModeNotice, REGULAR_MODE_NOTICE_MARKER } from "./regular-mode-notice"
 import { testTempDir } from "../../../test-support/temp-dir"
 
 interface WidgetCall {
@@ -271,6 +272,12 @@ function mounted(
   }
   const tui = fakeTui()
   const notices: string[] = []
+  // The latest anchor: a remount registers a fresh one, and an earlier one is stale by design.
+  const attachWith = (candidate: unknown): void => {
+    const factory = [...widgets].reverse().find((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY)?.content
+    if (typeof factory !== "function") throw new Error("anchor factory missing")
+    ;(factory as (tui: unknown, theme: unknown) => unknown)(candidate, undefined)
+  }
   const host = hostContext(widgets, {
     model: { id: "anthropic/claude-opus-5" },
     getContextUsage: () => ({ tokens: 29_000, contextWindow: 1_000_000, percent: 2.9 }),
@@ -299,12 +306,8 @@ function mounted(
     advance: (ms: number) => {
       clock += ms
     },
-    attach: (): void => {
-      // The latest anchor: a remount registers a fresh one, and an earlier one is stale by design.
-      const factory = [...widgets].reverse().find((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY)?.content
-      if (typeof factory !== "function") throw new Error("anchor factory missing")
-      ;(factory as (tui: unknown, theme: unknown) => unknown)(tui, undefined)
-    },
+    attach: (): void => attachWith(tui),
+    attachWith,
   }
 }
 
@@ -315,21 +318,24 @@ describe("side panel wiring", () => {
       cwd: "/workspaces/long-nested-directory/another-directory/oh-my-openagent-test-worktree",
       location: "…ory/another-directory/oh-my-openagent-test-worktree",
     },
-  ])("#given a mounted panel at $cwd #when the column renders #then it carries the session facts and the location", async ({ cwd, location }) => {
-    // given
-    const harness = mounted({}, {}, cwd)
-    await harness.pi.dispatch("session_start", {}, harness.host)
+  ])(
+    "#given a mounted panel at $cwd #when the column renders #then it carries the session facts and the location",
+    async ({ cwd, location }) => {
+      // given
+      const harness = mounted({}, {}, cwd)
+      await harness.pi.dispatch("session_start", {}, harness.host)
 
-    // when
-    harness.attach()
-    const rows = columnRows(harness.tui)
+      // when
+      harness.attach()
+      const rows = columnRows(harness.tui)
 
-    // then
-    expect(rows[0]).toBe("SESSION  $1.20 · 16.8K")
-    expect(rows).toContain("model   claude-opus-5")
-    expect(rows).toContain("CONTEXT  29K/1M")
-    expect(rows[rows.length - 1]).toBe(location)
-  })
+      // then
+      expect(rows[0]).toBe("SESSION  $1.20 · 16.8K")
+      expect(rows).toContain("model   claude-opus-5")
+      expect(rows).toContain("CONTEXT  29K/1M")
+      expect(rows[rows.length - 1]).toBe(location)
+    },
+  )
 
   test("#given a tool starts #when the column renders #then the tool row appears with its target", async () => {
     // given
@@ -338,7 +344,11 @@ describe("side panel wiring", () => {
     harness.attach()
 
     // when
-    await harness.pi.dispatch("tool_execution_start", { toolName: "read", args: { file_path: "src/index.ts" } }, harness.host)
+    await harness.pi.dispatch(
+      "tool_execution_start",
+      { toolName: "read", args: { file_path: "src/index.ts" } },
+      harness.host,
+    )
     const rows = columnRows(harness.tui)
 
     // then
@@ -547,6 +557,34 @@ describe("side panel git wiring", () => {
 })
 
 describe("side panel usage wiring", () => {
+  function engineLimits(initial: readonly SenpiAccountLimits[]) {
+    let records = initial
+    const listeners = new Set<(limits: SenpiAccountLimits) => void>()
+    return {
+      get: () => records,
+      on: (listener: (limits: SenpiAccountLimits) => void) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      report(next: SenpiAccountLimits) {
+        records = [next]
+        for (const listener of listeners) listener(next)
+      },
+    }
+  }
+
+  const claudeRecord = (account: string, usedPercent: number): SenpiAccountLimits => ({
+    provider: "anthropic-subscription",
+    account,
+    windows: [{ id: "claude:5h", label: "5h", windowMinutes: 300, usedPercent }],
+    reportedAt: new Date(100_000).toISOString(),
+  })
+
+  function withEngine(harness: ReturnType<typeof mounted>, engine: ReturnType<typeof engineLimits>) {
+    harness.pi.getSubscriptionLimits = engine.get
+    harness.pi.onSubscriptionLimits = engine.on
+  }
+
   test("#given the usage section is off #when a session starts #then no credential is ever read", async () => {
     // given
     let reads = 0
@@ -557,9 +595,9 @@ describe("side panel usage wiring", () => {
           reads += 1
           return { auth: {}, pool: undefined }
         },
-        fetch: () => Promise.reject(new Error("the network must not be touched")),
       },
     })
+    withEngine(harness, engineLimits([claudeRecord("default", 44)]))
 
     // when
     await harness.pi.dispatch("session_start", {}, harness.host)
@@ -567,45 +605,59 @@ describe("side panel usage wiring", () => {
 
     // then
     expect(reads).toBe(0)
+    expect(columnRows(harness.tui).some((row) => row.startsWith("USAGE"))).toBe(false)
   })
 
-  test("#given the section is on #when a session starts #then credentials are read for the poll", async () => {
-    // given
-    let reads = 0
+  test("#given the engine already holds an account's limits #when the panel mounts #then they are on screen at once", async () => {
+    // given the engine polls before any turn (senpi#3684), so a fresh window starts with numbers
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
-      usage: {
-        cachePath: join(testTempDir("omo-usage-wiring-"), "usage.json"),
-        readCredentials: () => {
-          reads += 1
-          return { auth: {}, pool: undefined }
-        },
-        fetch: () => Promise.reject(new Error("no provider is configured, so nothing should be fetched")),
-      },
+      usage: { readCredentials: () => ({ auth: {}, pool: undefined }) },
     })
+    withEngine(harness, engineLimits([claudeRecord("default", 44)]))
 
     // when
     await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attach()
 
     // then
-    expect(reads).toBe(1)
+    const rows = columnRows(harness.tui)
+    expect(rows.some((row) => row.startsWith("USAGE"))).toBe(true)
+    expect(rows.some((row) => row.includes("44%"))).toBe(true)
   })
 
-  test("#given a turn ends #when the panel refreshes #then the poller gets a pass for rotations", async () => {
-    // given a pool rotation only shows up when credentials are re-read; waiting for the poll
-    // interval would leave the old account's name over the new account's numbers
+  test("#given the engine reports new limits #when the record lands #then the column shows them", async () => {
+    // given
+    const engine = engineLimits([])
+    const harness = mounted({
+      loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
+      usage: { readCredentials: () => ({ auth: {}, pool: undefined }) },
+    })
+    withEngine(harness, engine)
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attach()
+    expect(columnRows(harness.tui).some((row) => row.startsWith("USAGE"))).toBe(false)
+
+    // when
+    engine.report(claudeRecord("default", 63))
+
+    // then
+    expect(columnRows(harness.tui).some((row) => row.includes("63%"))).toBe(true)
+  })
+
+  test("#given a turn ends #when the panel refreshes #then the serving account is re-read for rotations", async () => {
+    // given a pool rotation only shows up when credentials are re-read
     let reads = 0
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
       usage: {
-        cachePath: join(testTempDir("omo-usage-nudge-"), "usage.json"),
         readCredentials: () => {
           reads += 1
           return { auth: {}, pool: undefined }
         },
-        fetch: () => Promise.reject(new Error("no provider is configured, so nothing should be fetched")),
       },
     })
+    withEngine(harness, engineLimits([]))
     await harness.pi.dispatch("session_start", {}, harness.host)
     const afterMount = reads
 
@@ -617,19 +669,16 @@ describe("side panel usage wiring", () => {
     expect(reads).toBeGreaterThan(afterMount)
   })
 
-  test("#given numbers another session cached #when the panel mounts #then they are on screen at once", async () => {
-    // given the cache is shared, so a new window starts with the numbers rather than waiting
-    const cachePath = join(testTempDir("omo-usage-shared-"), "usage.json")
-    writeFileSync(
-      cachePath,
-      JSON.stringify({ claude: { account: "work", updatedAt: 100_000, windows: [{ label: "5h", percent: 44 }] } }),
-    )
+  test("#given a host without subscription limits #when the section is on #then nothing is read and no section is drawn", async () => {
+    // given an older senpi that predates pi.getSubscriptionLimits
+    let reads = 0
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
       usage: {
-        cachePath,
-        readCredentials: () => ({ auth: {}, pool: undefined }),
-        fetch: () => Promise.reject(new Error("the cached entry is fresh, so nothing should be fetched")),
+        readCredentials: () => {
+          reads += 1
+          return { auth: {}, pool: undefined }
+        },
       },
     })
 
@@ -638,9 +687,8 @@ describe("side panel usage wiring", () => {
     harness.attach()
 
     // then
-    const rows = columnRows(harness.tui)
-    expect(rows.some((row) => row.startsWith("USAGE"))).toBe(true)
-    expect(rows.some((row) => row.includes("44%"))).toBe(true)
+    expect(reads).toBe(0)
+    expect(columnRows(harness.tui).some((row) => row.startsWith("USAGE"))).toBe(false)
   })
 })
 
@@ -874,13 +922,13 @@ describe("side panel session boundaries and section gates", () => {
   test("#given a child from the previous session #when the session switches #then the next session shows none of it", async () => {
     // given
     let records: PanelTaskRecord[] = [
-        {
-          task_id: "t1",
-          status: "running",
-          created_at: new Date(40_000).toISOString(),
-          parent_session_id: "session-1",
-          task_summary: "map the seams",
-        },
+      {
+        task_id: "t1",
+        status: "running",
+        created_at: new Date(40_000).toISOString(),
+        parent_session_id: "session-1",
+        task_summary: "map the seams",
+      },
     ]
     const harness = mounted({ readTaskRecords: () => records })
     await harness.pi.dispatch("session_start", {}, harness.host)
@@ -933,7 +981,9 @@ describe("side panel session boundaries and section gates", () => {
     await harness.pi.dispatch("session_start", {}, harness.host)
     harness.attach()
     expect(columnRows(harness.tui).length).toBeGreaterThan(0)
-    const anchorsBefore = harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length
+    const anchorsBefore = harness.widgets.filter(
+      (call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined,
+    ).length
 
     // when: the host clears the old root and mounts a fresh one, as switchTuiMode does
     harness.tui.setLayoutRoot({ render: () => ["transcript"], invalidate: () => {} })
@@ -941,7 +991,9 @@ describe("side panel session boundaries and section gates", () => {
     harness.attach()
 
     // then: the host never calls a mounted factory again, so the panel must register a fresh anchor
-    expect(harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length).toBe(anchorsBefore + 1)
+    expect(
+      harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length,
+    ).toBe(anchorsBefore + 1)
     expect(columnRows(harness.tui).some((row) => row.startsWith("SESSION"))).toBe(true)
   })
 
@@ -952,7 +1004,9 @@ describe("side panel session boundaries and section gates", () => {
     await harness.pi.dispatch("session_start", {}, harness.host)
     harness.attach()
     expect(() => columnRows(harness.tui)).toThrow()
-    const anchorsBefore = harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length
+    const anchorsBefore = harness.widgets.filter(
+      (call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined,
+    ).length
 
     // when
     harness.tui.setLayoutRoot({ render: () => ["transcript"], invalidate: () => {} })
@@ -960,7 +1014,9 @@ describe("side panel session boundaries and section gates", () => {
     harness.attach()
 
     // then: the host never calls a mounted factory again, so the panel must register a fresh anchor
-    expect(harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length).toBe(anchorsBefore + 1)
+    expect(
+      harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length,
+    ).toBe(anchorsBefore + 1)
     expect(columnRows(harness.tui).some((row) => row.startsWith("SESSION"))).toBe(true)
   })
 
@@ -987,6 +1043,71 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   })
   return { promise, resolve }
 }
+
+describe("side panel regular-mode notice", () => {
+  test("#given the panel is on and the renderer exposes no layout seam #when the anchor attaches #then the notice shows once and the claim is install-wide", async () => {
+    // given: regular TUI mode - the default tuiMode - hands the panel a renderer without the seam
+    const stateDir = testTempDir("omo-10560-")
+    const harness = mounted({ loadSettings: () => settings({ enabled: true }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attachWith({ requestRender() {}, terminal: { columns: 200 } })
+
+    // then
+    expect(harness.notices).toHaveLength(1)
+    expect(existsSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER))).toBe(true)
+
+    // when: the next session of the same install attaches the same regular renderer
+    await harness.pi.dispatch("session_shutdown", {}, harness.host)
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attachWith({ requestRender() {}, terminal: { columns: 200 } })
+
+    // then: the claim is install-wide, so the notice never repeats
+    expect(harness.notices).toHaveLength(1)
+  })
+
+  test("#given a fullscreen renderer with a layout root #when the anchor attaches #then no notice is shown and nothing is claimed", async () => {
+    // given
+    const stateDir = testTempDir("omo-10560-")
+    const harness = mounted({ loadSettings: () => settings({ enabled: true }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attach()
+
+    // then
+    expect(harness.notices).toHaveLength(0)
+    expect(existsSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER))).toBe(false)
+  })
+
+  test("#given the panel is off #when a session starts #then no notice is shown", async () => {
+    // given
+    const stateDir = testTempDir("omo-10560-")
+    const harness = mounted({ loadSettings: () => settings({ enabled: false }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+
+    // then
+    expect(harness.notices).toHaveLength(0)
+    expect(existsSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER))).toBe(false)
+  })
+
+  test("#given the notice was already claimed for the install #when a regular session attaches #then the notice stays silent", async () => {
+    // given
+    const stateDir = testTempDir("omo-10560-")
+    claimRegularModeNotice(stateDir)
+    const harness = mounted({ loadSettings: () => settings({ enabled: true }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attachWith({ requestRender() {}, terminal: { columns: 200 } })
+
+    // then
+    expect(harness.notices).toHaveLength(0)
+  })
+})
 
 describe("side panel lifecycle and guards", () => {
   test("#given a mounted column #when a switch is only announced #then the column stays", async () => {
@@ -1018,7 +1139,12 @@ describe("side panel lifecycle and guards", () => {
 
     // when: each dispatch races the next turn of the event loop, which runs only once microtasks drain
     const settled: boolean[] = []
-    const events = [["tool_execution_start", { toolName: "read" }], ["tool_execution_end", {}], ["message_end", {}], ["turn_end", {}]] as const
+    const events = [
+      ["tool_execution_start", { toolName: "read" }],
+      ["tool_execution_end", {}],
+      ["message_end", {}],
+      ["turn_end", {}],
+    ] as const
     for (const [event, payload] of events) {
       harness.advance(GIT_REFRESH_FLOOR_MS + 1)
       const idle = new Promise<boolean>((resolve) => setImmediate(() => resolve(false)))
@@ -1052,7 +1178,8 @@ describe("side panel lifecycle and guards", () => {
     // given
     let reads = 0
     const harness = mounted({
-      loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: false, agents: false, session: false } }),
+      loadSettings: () =>
+        settings({ enabled: true, sections: { ...allSections(), usage: false, agents: false, session: false } }),
       readTaskRecords: () => {
         reads += 1
         return []
@@ -1109,7 +1236,13 @@ describe("side panel lifecycle and guards", () => {
     }
     const stale: PanelMemory = {
       identity: identity.id,
-      reflection: { streak: 3, parkedAt: "2026-09-21T09:00:00.000Z", nextProbeAt: "2026-09-21T15:00:00.000Z", reason: "stale park", detail: "stale" },
+      reflection: {
+        streak: 3,
+        parkedAt: "2026-09-21T09:00:00.000Z",
+        nextProbeAt: "2026-09-21T15:00:00.000Z",
+        reason: "stale park",
+        detail: "stale",
+      },
       factsQueued: 7,
       recallSurfaced: 0,
       recallPending: 0,
@@ -1152,7 +1285,13 @@ describe("side panel lifecycle and guards", () => {
         called.resolve()
         await gate.promise
         return [
-          { task_id: "t1", status: "running", created_at: new Date(40_000).toISOString(), parent_session_id: "session-1", task_summary: "late child" },
+          {
+            task_id: "t1",
+            status: "running",
+            created_at: new Date(40_000).toISOString(),
+            parent_session_id: "session-1",
+            task_summary: "late child",
+          },
         ]
       },
     })
@@ -1189,7 +1328,9 @@ describe("side panel lifecycle and guards", () => {
     await first
 
     // then
-    expect(harness.widgets.some((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined)).toBe(false)
+    expect(
+      harness.widgets.some((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined),
+    ).toBe(false)
   })
 
   test("#given an ended session #when a tool finishes before the next one starts #then git is not run", async () => {

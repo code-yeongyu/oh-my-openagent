@@ -5,7 +5,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import { acquireSessionAdmissionLease, type AdmissionLeaseTiming } from "./admission-lease"
 import { isRevivalCandidate, isUnboundedResidency, residentsOf, selectRevivalBatch } from "./revival-selection"
-import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
 import { parkHandlelessResident } from "./park-terminal-resident"
@@ -31,7 +31,11 @@ export async function admitResident(context: LifecycleContext, parentSessionId: 
       error: new AgentLimitReached({
         max_children: maxChildren,
         session_id: parentSessionId,
-        residents: residents.map((record) => ({ task_id: record.task_id, name: record.name ?? record.task_id, status: record.status })),
+        residents: residents.map((record) => ({
+          task_id: record.task_id,
+          name: record.name ?? record.task_id,
+          status: record.status,
+        })),
       }),
     }
   }
@@ -58,21 +62,27 @@ export function blocksFinishedTeardown(context: LifecycleContext, taskId: string
 /** Reclaim terminal residents that have not been touched during the idle retention window. */
 export async function reclaimIdleResidents(context: LifecycleContext): Promise<readonly string[]> {
   const cutoff = context.now() - context.config.resident_idle_timeout_ms
-  const candidates = context.store.list().records.filter(
-    (record) =>
-      record.residency_state === "resident" &&
-      (record.host_pid === context.hostPid || context.registry.get(record.task_id) !== undefined) &&
-      TERMINAL_STATUSES.has(record.status) &&
-      Date.parse(record.updated_at) <= cutoff &&
-      !blocksFinishedTeardown(context, record.task_id),
-  )
+  const candidates = context.store
+    .list()
+    .records.filter(
+      (record) =>
+        record.residency_state === "resident" &&
+        (record.host_pid === context.hostPid || context.registry.get(record.task_id) !== undefined) &&
+        TERMINAL_STATUSES.has(record.status) &&
+        Date.parse(record.updated_at) <= cutoff &&
+        !blocksFinishedTeardown(context, record.task_id),
+    )
   // Each resident is reclaimed on its own (omo#9785): one child that is slow to stop never delays the
   // others, and every teardown step is bounded, so the sweep always settles and the next one runs.
   const outcomes = await Promise.all(candidates.map((candidate) => reclaimIdleResident(context, candidate, cutoff)))
   return outcomes.filter((taskId): taskId is string => taskId !== undefined)
 }
 
-async function reclaimIdleResident(context: LifecycleContext, candidate: TaskRecord, cutoff: number): Promise<string | undefined> {
+async function reclaimIdleResident(
+  context: LifecycleContext,
+  candidate: TaskRecord,
+  cutoff: number,
+): Promise<string | undefined> {
   // Reuse send/teardown arbitration across suspension's asynchronous abort and dispose.
   if (context.registry.tryClaimEviction?.(candidate.task_id) === false) return undefined
   try {
@@ -84,7 +94,8 @@ async function reclaimIdleResident(context: LifecycleContext, candidate: TaskRec
       !TERMINAL_STATUSES.has(fresh.status) ||
       Date.parse(fresh.updated_at) > cutoff ||
       blocksFinishedTeardown(context, fresh.task_id)
-    ) return undefined
+    )
+      return undefined
     if (fresh.killed === true || fresh.status === "cancelled" || fresh.status === "lost") {
       await destroyResidentTask(context, fresh.task_id, "cancel")
     } else {
@@ -119,7 +130,9 @@ export function startIdleResidentReclaimer(
       .catch((error) => {
         log("senpi-task idle resident sweep failed", { error: String(error) })
       })
-      .finally(() => { running = false })
+      .finally(() => {
+        running = false
+      })
   }, context.config.resident_idle_timeout_ms)
   timer.unref?.()
   return () => context.idleReclaimerScheduler.clearInterval(timer)
@@ -159,6 +172,8 @@ export type BatchAdmissionOptions = {
   // Records this reconciliation pass has already classified as unsafe to admit (for example, a
   // terminal no-transcript record whose disposal lock contended). They remain suspended for retry.
   readonly excludeTaskIds?: ReadonlySet<string>
+  // Startup may wait on a host or a lease. Only its approved snapshot may be claimed afterwards.
+  readonly canClaim?: (record: TaskRecord) => boolean
 }
 
 export type ResidencyClaimResult = "claimed" | "not_claimable"
@@ -176,9 +191,15 @@ export function claimResidencySlot(
   // already resident+ours must read as not_claimable to a stale-observation retry, not as a win.
   let applied = false
   const claimed = context.store.mutate(taskId, (fresh) => {
-    if (!expect(fresh)) return fresh
+    if (!reconciliationActive(context) || !expect(fresh)) return fresh
     applied = true
-    return { ...fresh, residency_state: "resident", host_pid: context.hostPid, updated_at: nowIso(context), residency_claim: randomUUID() }
+    return {
+      ...fresh,
+      residency_state: "resident",
+      host_pid: context.hostPid,
+      updated_at: nowIso(context),
+      residency_claim: randomUUID(),
+    }
   })
   if (claimed === null) return "not_claimable"
   return applied ? "claimed" : "not_claimable"
@@ -195,7 +216,11 @@ export function reclaimOrphanedResident(context: LifecycleContext, observed: Tas
     (fresh) =>
       fresh.residency_state === "resident" &&
       fresh.host_pid === observed.host_pid &&
-      (fresh.host_pid === undefined || fresh.host_pid === context.hostPid || !context.signaller.isAlive(fresh.host_pid)) &&
+      fresh.residency_claim === observed.residency_claim &&
+      fresh.notification.run_epoch === observed.notification.run_epoch &&
+      (fresh.host_pid === undefined ||
+        fresh.host_pid === context.hostPid ||
+        !context.signaller.isAlive(fresh.host_pid)) &&
       fresh.updated_at === observed.updated_at,
   )
 }
@@ -207,17 +232,24 @@ export async function admitSuspendedBatch(
 ): Promise<BatchAdmissionResult> {
   const acquire = options.acquireLease ?? acquireSessionAdmissionLease
   const acquired = await acquire(context.store.stateDir, parentSessionId, options.timing ?? {})
+  if (!reconciliationActive(context)) {
+    if (acquired.kind !== "contended") acquired.lease.release()
+    return { lease: "acquired", outcomes: [] }
+  }
   if (acquired.kind === "contended") {
     // Bounded wait expired: the WHOLE batch defers, never a throw aborting session start.
     return {
       lease: "lock_contended",
-      outcomes: context.store.list().records
-        .filter((record) => !options.excludeTaskIds?.has(record.task_id) && isRevivalCandidate(record, parentSessionId))
+      outcomes: context.store
+        .list()
+        .records.filter(
+          (record) => !options.excludeTaskIds?.has(record.task_id) && isRevivalCandidate(record, parentSessionId),
+        )
         .map((record) => ({
-        task_id: record.task_id,
-        kind: "deferred",
-        reason: "lock_contended",
-      })),
+          task_id: record.task_id,
+          kind: "deferred",
+          reason: "lock_contended",
+        })),
     }
   }
 
@@ -228,7 +260,9 @@ export async function admitSuspendedBatch(
     // Residents include live foreign owners; when the configured cap sits below the current
     // resident count, nothing is selected - revive none, keep owned residents, evict nothing.
     const { selected, deferred } = selectRevivalBatch(
-      context.store.list().records,
+      context.store
+        .list()
+        .records.filter((record) => record.residency_state === "resident" || options.canClaim?.(record) !== false),
       parentSessionId,
       context.config.residency_max_children,
       options.excludeTaskIds,
@@ -245,7 +279,7 @@ export async function admitSuspendedBatch(
         const result = claimResidencySlot(
           context,
           record.task_id,
-          (fresh) => isRevivalCandidate(fresh, parentSessionId),
+          (fresh) => isRevivalCandidate(fresh, parentSessionId) && options.canClaim?.(fresh) !== false,
         )
         outcomes.push(
           result === "claimed"

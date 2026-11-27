@@ -1,17 +1,9 @@
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
-import {
-  formatMemoryStatusLine,
-  formatRelativeAge,
-  readMemoryStatusSegments,
-  type GitRepoForStatus,
-} from "./status"
-import {
-  createMemoryFooterLive,
-  type MemoryFooterTimers,
-  type MemoryFooterUi,
-} from "./status-live"
+import { formatMemoryStatusLine, formatRelativeAge, readMemoryStatusSegments, type GitRepoForStatus } from "./status"
+import { createMemoryFooterLive, type MemoryFooterTimers, type MemoryFooterUi } from "./status-live"
+import type { SyncStatusReader } from "./sync-status-surface"
 
 const SECOND_MS = 1_000
 
@@ -21,6 +13,7 @@ export interface MemoryFooterStatusLiveOptions {
   readonly timers?: MemoryFooterTimers
   readonly now?: () => number
   readonly createGitRepo?: (repoPath: string) => GitRepoForStatus
+  readonly syncStatus?: SyncStatusReader
 }
 
 export interface MemoryFooterStatusLive {
@@ -32,6 +25,8 @@ export interface MemoryFooterStatusLive {
   stop(): void
   /** Permanently stops animation (session shutdown). */
   dispose(): void
+  /** Resolves once the footer restore that runs git after a run stops animating has finished. */
+  settled(): Promise<void>
 }
 
 /**
@@ -39,9 +34,7 @@ export interface MemoryFooterStatusLive {
  * session, computes the todo-18 segment line, and gates recomputation behind a cheap fingerprint
  * so agent_settled does not shell out to git on every event.
  */
-export function createMemoryFooterStatusLive(
-  options: MemoryFooterStatusLiveOptions,
-): MemoryFooterStatusLive {
+export function createMemoryFooterStatusLive(options: MemoryFooterStatusLiveOptions): MemoryFooterStatusLive {
   const now = options.now ?? Date.now
   const createRepo = options.createGitRepo ?? defaultGitRepo
   const repos = new Map<string, GitRepoForStatus>()
@@ -64,13 +57,14 @@ export function createMemoryFooterStatusLive(
       const repo = repoFor(context)
       const head = await repo.head()
       if (head === null) return `none|${options.isActive(identity)}`
-      const segments = await readMemoryStatusSegments(repo, context, sessionId)
+      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus)
       return [
         head,
         segments.dirty ? "dirty" : "clean",
         segments.backlogSteps,
         segments.streak,
         options.isActive(identity),
+        segments.syncBlocked === true ? "sync-blocked" : segments.syncHeld === true ? "sync-held" : "sync-ok",
       ].join("|")
     },
     refreshSegments: async (identity) => {
@@ -83,7 +77,7 @@ export function createMemoryFooterStatusLive(
       const committedAt = await repo.headCommitTimestamp()
       const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, now())
       if (age === null) return undefined
-      const segments = await readMemoryStatusSegments(repo, context, sessionId)
+      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus)
       return formatMemoryStatusLine(identity, age, segments)
     },
   })
@@ -115,6 +109,10 @@ export function createMemoryFooterStatusLive(
 
     dispose() {
       live.dispose()
+    },
+
+    settled() {
+      return live.settled()
     },
   }
 }

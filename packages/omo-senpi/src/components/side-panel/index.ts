@@ -42,7 +42,8 @@ export function createSidePanelComponent(options: SidePanelComponentOptions = {}
       // is honored below.
       pi.registerFlag(SIDE_PANEL_FLAG, {
         type: "boolean",
-        description: "Force the omo side panel on for this run; side_panel.enabled in omo.json is the persistent switch.",
+        description:
+          "Force the omo side panel on for this run; side_panel.enabled in omo.json is the persistent switch.",
       })
 
       const cwd = pi.cwd ?? process.cwd()
@@ -126,7 +127,8 @@ function defaultLoadSettings(cwd: string): OmoSidePanelSettings {
 async function loadBundledRuntime(): Promise<SidePanelControllerFactory> {
   const bundled = typeof OMO_SENPI_BUNDLED !== "undefined" && OMO_SENPI_BUNDLED
   const loaded: unknown = await import(new URL(bundled ? SIDE_PANEL_RUNTIME_FILE : "runtime.ts", import.meta.url).href)
-  const create = typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "createSidePanelController") : undefined
+  const create =
+    typeof loaded === "object" && loaded !== null ? Reflect.get(loaded, "createSidePanelController") : undefined
   if (!isControllerFactory(create)) throw new Error("side panel runtime did not export createSidePanelController")
   return create
 }

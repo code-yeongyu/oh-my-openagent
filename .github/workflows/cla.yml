@@ -1,17 +1,10 @@
 name: CLA Assistant
 
+# CLA signing and 'recheck' comments only. The per-PR CLA check runs in pr-automation.yml. Every run here keeps its own
+# group and is never cancelled: a later comment must not cancel a run that is recording a signature.
 on:
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "Open pull request to recheck"
-        required: true
-        type: string
   issue_comment:
     types: [created]
-  workflow_run:
-    workflows: [PR Automation Signal]
-    types: [completed]
 
 permissions:
   actions: write
@@ -20,173 +13,18 @@ permissions:
   statuses: write
   checks: write
 
+concurrency:
+  group: ${{ github.workflow }}-run-${{ github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   cla:
     if: >-
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+      github.event_name == 'issue_comment' && github.event.issue.pull_request &&
         (github.event.comment.body == 'recheck' ||
-          github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
-      github.event.workflow_run.event == 'pull_request' ||
-      github.event.workflow_run.event == 'pull_request_review' ||
-      github.event_name == 'workflow_dispatch'
+          github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')
     runs-on: ubuntu-latest
     steps:
-      - name: Check out trusted automation helper
-        if: github.event_name != 'issue_comment'
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-          sparse-checkout: script/pr-automation-context.mjs
-          sparse-checkout-cone-mode: false
-
-      - name: Resolve current PR from GitHub run metadata
-        if: github.event_name != 'issue_comment'
-        id: pr
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { pathToFileURL } = await import('node:url');
-            const { prepareCLAEvent } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/pr-automation-context.mjs`).href);
-            const pr = await prepareCLAEvent({ github, context, core, eventPath: `${process.env.RUNNER_TEMP}/cla-pr-event.json` });
-            if (pr) core.setOutput('head_sha', pr.head.sha);
-
-      - name: Check stored CLA signatures
-        id: cla_state
-        if: github.event_name != 'issue_comment' && steps.pr.outputs.pr_number != ''
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { readFile } = await import('node:fs/promises');
-            context.payload = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/cla-pr-event.json`, 'utf8'));
-            const signaturePath = "signatures/cla.json";
-            const signatureBranch = "cla-signatures";
-            const allowlist = [
-              "code-yeongyu",
-              "YeongYU",
-              "bot*",
-              "dependabot*",
-              "github-actions*",
-              "*[bot]",
-              "sisyphus-dev-ai",
-              "web-flow",
-            ];
-
-            const matchesAllowlist = (login) => {
-              const normalizedLogin = login.toLowerCase();
-
-              return allowlist.some((entry) => {
-                const pattern = entry.toLowerCase();
-
-                if (pattern.startsWith("*")) {
-                  return normalizedLogin.endsWith(pattern.slice(1));
-                }
-
-                if (pattern.endsWith("*")) {
-                  return normalizedLogin.startsWith(pattern.slice(0, -1));
-                }
-
-                return normalizedLogin === pattern;
-              });
-            };
-
-            const { owner, repo } = context.repo;
-            const pullNumber = context.payload.pull_request.number;
-
-            const [signatureFile, commits] = await Promise.all([
-              github.rest.repos.getContent({
-                owner,
-                repo,
-                path: signaturePath,
-                ref: signatureBranch,
-              }),
-              github.paginate(github.rest.pulls.listCommits, {
-                owner,
-                repo,
-                pull_number: pullNumber,
-                per_page: 100,
-              }),
-            ]);
-
-            if (Array.isArray(signatureFile.data) || signatureFile.data.type !== "file") {
-              core.setFailed(`${signaturePath} is not a file on ${signatureBranch}`);
-              return;
-            }
-
-            const signatureContent = Buffer.from(
-              signatureFile.data.content,
-              signatureFile.data.encoding,
-            ).toString("utf8");
-            const signatures = JSON.parse(signatureContent);
-            const signedContributors = Array.isArray(signatures.signedContributors)
-              ? signatures.signedContributors
-              : [];
-            const signedIds = new Set(
-              signedContributors
-                .map((contributor) => Number(contributor.id))
-                .filter((id) => Number.isFinite(id)),
-            );
-            const signedNames = new Set(
-              signedContributors
-                .map((contributor) => String(contributor.name || "").toLowerCase())
-                .filter(Boolean),
-            );
-            const contributors = new Map();
-
-            for (const commit of commits) {
-              if (commit.author?.login && commit.author?.id) {
-                contributors.set(commit.author.login, {
-                  id: commit.author.id,
-                  login: commit.author.login,
-                });
-              }
-            }
-
-            const unsigned = [...contributors.values()].filter((contributor) => {
-              const login = contributor.login.toLowerCase();
-
-              return (
-                !matchesAllowlist(contributor.login) &&
-                !signedIds.has(contributor.id) &&
-                !signedNames.has(login)
-              );
-            });
-
-            core.setOutput("needs_cla_action", unsigned.length > 0 ? "true" : "false");
-
-            if (unsigned.length > 0) {
-              const { data: current } = await github.rest.pulls.get({
-                owner, repo, pull_number: pullNumber,
-              });
-              if (current.state !== "open" ||
-                  current.head.sha !== context.payload.pull_request.head.sha) return;
-              const marker = "CLA Assistant Lite bot";
-              const body = `Thank you for your contribution! ${unsigned
-                .map(contributor => `@${contributor.login}`).join(", ")} must sign the ` +
-                `[Contributor License Agreement](https://github.com/${owner}/${repo}/blob/dev/CLA.md).\n\n` +
-                "To sign, comment on this PR with:\n```\n" +
-                "I have read the CLA Document and I hereby sign the CLA\n```\n\n" +
-                `<sub>Posted by the **${marker}**.</sub>`;
-              const comments = await github.paginate(github.rest.issues.listComments, {
-                owner, repo, issue_number: pullNumber, per_page: 100,
-              });
-              const existing = comments.find(comment =>
-                comment.user?.login === "github-actions[bot]" &&
-                comment.body?.includes(marker));
-              if (existing) {
-                await github.rest.issues.updateComment({
-                  owner, repo, comment_id: existing.id, body,
-                });
-              } else {
-                await github.rest.issues.createComment({
-                  owner, repo, issue_number: pullNumber, body,
-                });
-              }
-            } else {
-              core.info("All linked commit authors already signed the CLA or are allowlisted.");
-            }
-
       - name: CLA Assistant
         if: >-
           github.event_name == 'issue_comment' &&
@@ -215,16 +53,11 @@ jobs:
           lock-pullrequest-aftermerge: false
 
       - name: Report CLA result on the current PR head
-        if: >-
-          always() &&
-          ((github.event_name != 'issue_comment' && steps.pr.outputs.pr_number != '') ||
-            github.event_name == 'issue_comment')
+        if: always()
         uses: actions/github-script@v9
         env:
-          PR_NUMBER: ${{ steps.pr.outputs.pr_number || github.event.issue.number }}
-          EXPECTED_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           RESULT: ${{ job.status }}
-          UNSIGNED: ${{ steps.cla_state.outputs.needs_cla_action }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -250,7 +83,7 @@ jobs:
             echo
             echo "### What this job checks"
             echo
-            echo "- Checks stored CLA signatures for pull requests."
+            echo "- Records CLA signing and recheck comments; pr-automation.yml checks stored signatures on every PR head."
             echo "- Records signing comments with Contributor Assistant; trusted API checks deliver instructions."
             echo
             echo "### If this fails"

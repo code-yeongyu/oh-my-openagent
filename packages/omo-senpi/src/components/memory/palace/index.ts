@@ -1,4 +1,5 @@
-export { registerPalaceCommand, runPalaceCommand } from "./command"
+export { registerPalaceCommand } from "./command"
+export { runPalaceCommand } from "./command-runtime"
 export type { PalaceCommandContext, PalaceCommandUi, PalaceContextResolver } from "./command"
 export {
   HISTORY_MAX_COMMITS,

@@ -44,8 +44,6 @@ export function normalizeToolArgSchemas<TDefinition extends Pick<ToolDefinition,
 
 const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(["contentEncoding", "contentMediaType"])
 
-
-
 function normalizeJsonSchemaRef(value: string): string {
   if (value.startsWith("#") || value.includes(":") || value.startsWith("/")) {
     return value

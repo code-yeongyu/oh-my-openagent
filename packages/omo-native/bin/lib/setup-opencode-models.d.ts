@@ -20,7 +20,10 @@ export type ConvertedChoice = {
 
 export const NATIVE_AGENT_NAMES: readonly string[]
 
-export function readEditionRouting(options: { home: string; env: Readonly<Record<string, string | undefined>> }): EditionRouting
+export function readEditionRouting(options: {
+  home: string
+  env: Readonly<Record<string, string | undefined>>
+}): EditionRouting
 
 export function readModelChoices(options: {
   home: string

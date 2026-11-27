@@ -23,13 +23,17 @@ describe("backgroundStartText", () => {
 
   test("#given only a description #when the start text is built #then the description labels the task", () => {
     // given / when / then
-    expect(backgroundStartText(STARTED, { description: "auditing" })).toContain("Started task auditing (st_00000001, running)")
+    expect(backgroundStartText(STARTED, { description: "auditing" })).toContain(
+      "Started task auditing (st_00000001, running)",
+    )
   })
 
   test("#given no labels #when the start text is built #then the name is used and the id form stays stable", () => {
     // given / when / then
     expect(backgroundStartText(STARTED, {})).toContain("Started task auditor (st_00000001, running)")
-    expect(backgroundStartText({ ...STARTED, name: STARTED.task_id }, {})).toContain("Started task st_00000001 (running)")
+    expect(backgroundStartText({ ...STARTED, name: STARTED.task_id }, {})).toContain(
+      "Started task st_00000001 (running)",
+    )
   })
 })
 
@@ -142,7 +146,11 @@ describe("task tool start text for retired curated ids", () => {
     // when
     const output = await execute(
       "canonical-single",
-      { prompt: "Review the work plan at .omo/plans/gate-plan.md", subagent_type: "plan-reviewer", run_in_background: true },
+      {
+        prompt: "Review the work plan at .omo/plans/gate-plan.md",
+        subagent_type: "plan-reviewer",
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,

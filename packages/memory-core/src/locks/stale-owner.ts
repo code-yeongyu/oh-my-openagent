@@ -5,6 +5,7 @@ import { hostname } from "node:os"
 import type { LockRecord } from "./lock-record"
 import { isSameOwner, readOwner, releaseLock, type OwnerSnapshot } from "./lock-owner"
 import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "./process-identity"
+import { recordProvenDeadTakeover } from "./proven-dead-takeovers"
 import { isUnlinkSharingError, publishExclusive } from "./publish"
 
 function errorCode(error: unknown): string | undefined {
@@ -113,7 +114,17 @@ export async function recoverStaleOwner(
     // a third contender's publish; in that case the critical section is no longer ours.
     const fence = await readOwner(recoveryPath)
     if (fence === null || fence.record?.nonce !== recoveryRecord.nonce) return false
-    await unlink(lockPath)
+    try {
+      await unlink(lockPath)
+    } catch (error) {
+      // The proven-dead primary vanished between the fence read and this unlink (Windows CI,
+      // #11644): it is already reclaimed. Every other failure still surfaces.
+      if (errorCode(error) !== "ENOENT") throw error
+    }
+    // Record the reclaimed previous owner so consumers that gate on dead-owner evidence (the
+    // stranded-git-lock sweep) can prove reclamation after the lock file itself is republished;
+    // the proof is bound to the contender's acquisition nonce (omo #10199 r5 MEDIUM 3).
+    if (current.record !== null) recordProvenDeadTakeover(lockPath, current.record, contender.nonce)
     return true
   } finally {
     await releaseLock(recoveryPath, recoveryRecord)

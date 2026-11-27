@@ -1,0 +1,60 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "scripts/materialize-shared-upstreams.mjs",
+        "scripts/sync-skills.mjs",
+        "scripts/sync-version.mjs",
+        "scripts/sync-hook-status-messages.mjs",
+        "scripts/build-bundled-mcp-runtimes.mjs",
+        "scripts/build-components.mjs",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/aggregate-plugin-fixture.mjs",
+        "test/component-hook-contract-cases.mjs",
+        "test/index.js",
+        "test/sync-skills-test-support.mjs",
+        "test/teammode-safety-fixture.mjs",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "components/lcx/skills/lcx-contribute-bug-fix/scripts/create-pr-body.mjs",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/auto-update-state.d.mts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/sync-skills.d.mts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@vitest/coverage-v8",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "vitest",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveLogPath
+    "packages/omo-codex/plugin/scripts/auto-update-state.mjs": ["resolveLogPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) INSTALL_SNAPSHOT_FILE
+    "packages/omo-codex/plugin/scripts/install-flow.mjs": ["INSTALL_SNAPSHOT_FILE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) materializeSharedUpstreams
+    "packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs": ["materializeSharedUpstreams"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readModelCatalog
+    "packages/omo-codex/plugin/scripts/migrate-codex-config.mjs": ["readModelCatalog"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveMultiAgentVersionForModel, readRootModel, readRootModelCatalogPath
+    "packages/omo-codex/plugin/scripts/migrate-codex-config/multi-agent-v2-guard.mjs": ["resolveMultiAgentVersionForModel", "readRootModel", "readRootModelCatalogPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MANAGED_KEYS
+    "packages/omo-codex/plugin/scripts/migrate-codex-config/root-settings.mjs": ["MANAGED_KEYS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readRepoJson, readPluginVersion, hasSpawnIsolationArgument
+    "packages/omo-codex/plugin/test/aggregate-plugin-fixture.mjs": ["readRepoJson", "readPluginVersion", "hasSpawnIsolationArgument"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CONTEXT_PRESSURE_SKILL_BUDGET_BYTES, assertPackagedContentMatches
+    "packages/omo-codex/plugin/test/sync-skills-test-support.mjs": ["CONTEXT_PRESSURE_SKILL_BUDGET_BYTES", "assertPackagedContentMatches"]
+  }
+}

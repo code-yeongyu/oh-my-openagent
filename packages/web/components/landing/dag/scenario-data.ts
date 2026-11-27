@@ -19,7 +19,7 @@ export const NODE_SPECS: readonly DagNodeSpec[] = [
     id: "source-sweep",
     label: "source-sweep",
     category: "deep",
-    model: "GPT 6 Astra",
+    model: "GPT 6.2 Astra",
     dependsOn: ["plan-interview"],
   },
   {
@@ -68,7 +68,7 @@ export const NODE_SPECS: readonly DagNodeSpec[] = [
     id: "deck",
     label: "deck",
     category: "visual-engineering",
-    model: "GPT 6 Astra",
+    model: "GPT 6.2 Astra",
     dependsOn: ["chart-system", "claim-graph"],
   },
   {
@@ -142,7 +142,7 @@ export const TIMELINE: readonly TimelineEvent[] = [
     atMs: 16400,
     nodeId: "gate-review",
     state: "completed",
-    activity: "APPROVE — every claim evidenced",
+    activity: "APPROVE: every claim evidenced",
   },
 ]
 

@@ -14,7 +14,11 @@ import { createMemoryFooterStatusLive } from "./status-live-wiring"
 
 const roots: string[] = []
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 interface FakeTimers extends MemoryFooterTimers {
@@ -127,6 +131,48 @@ describe("memory footer status live wiring", () => {
     live.dispose()
   })
 
+  test("#given a run stops animating and its footer restore is still running git #when settled is awaited #then it resolves only after the restore finishes (#10154)", async () => {
+    const context = await contextFixture()
+    const timers = fakeTimers()
+    const ui = recorder()
+    let active = true
+    let releaseStatus!: () => void
+    const statusGate = new Promise<void>((resolve) => {
+      releaseStatus = resolve
+    })
+    let released = false
+    const live = createMemoryFooterStatusLive({
+      resolveContext: () => context,
+      isActive: () => active,
+      timers,
+      now: () => NOW,
+      createGitRepo: () =>
+        stubRepo({
+          status: async () => {
+            await statusGate
+            return ""
+          },
+        }),
+    })
+    live.syncActive("session-1", ui.ui)
+    active = false
+    live.syncActive("session-1", ui.ui)
+
+    let releasedBeforeSettle: boolean | undefined
+    const settled = live.settled().then(() => {
+      releasedBeforeSettle = released
+    })
+    // Opened on a later event-loop turn: a settled() that resolves early records false.
+    setImmediate(() => {
+      released = true
+      releaseStatus()
+    })
+    await settled
+
+    expect(releasedBeforeSettle).toBe(true)
+    live.dispose()
+  })
+
   test("#given an unbound session #when activity syncs #then no timer starts and no git runs", async () => {
     const timers = fakeTimers()
     const ui = recorder()
@@ -161,12 +207,13 @@ describe("memory footer status live wiring", () => {
       isActive: () => false,
       timers: fakeTimers(),
       now: () => NOW,
-      createGitRepo: () => stubRepo({
-        head: async () => {
-          headReads += 1
-          return "sha-1"
-        },
-      }),
+      createGitRepo: () =>
+        stubRepo({
+          head: async () => {
+            headReads += 1
+            return "sha-1"
+          },
+        }),
     })
 
     await live.refresh("session-1", ui.ui)
@@ -188,10 +235,11 @@ describe("memory footer status live wiring", () => {
       isActive: () => false,
       timers: fakeTimers(),
       now: () => NOW,
-      createGitRepo: () => stubRepo({
-        head: async () => head,
-        headCommitTimestamp: async () => committedAt,
-      }),
+      createGitRepo: () =>
+        stubRepo({
+          head: async () => head,
+          headCommitTimestamp: async () => committedAt,
+        }),
     })
 
     await live.refresh("session-1", ui.ui)
@@ -199,10 +247,7 @@ describe("memory footer status live wiring", () => {
     committedAt = Date.parse("2026-08-10T01:30:00.000Z") / 1000
     await live.refresh("session-1", ui.ui)
 
-    expect(ui.calls.map((call) => call.text)).toEqual([
-      "mem:agent-test 2h ago",
-      "mem:agent-test 30m ago",
-    ])
+    expect(ui.calls.map((call) => call.text)).toEqual(["mem:agent-test 2h ago", "mem:agent-test 30m ago"])
     live.dispose()
   })
 

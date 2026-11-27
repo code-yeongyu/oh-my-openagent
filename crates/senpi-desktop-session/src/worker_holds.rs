@@ -22,6 +22,7 @@ impl Worker {
         params: &HoldKeysParams,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
+        let duration = hold_duration(params.duration)?;
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             keys: Some(&params.keys),
@@ -34,11 +35,11 @@ impl Worker {
         let supervisor = self.safety.supervisor.clone();
         let signal = self.hold_signal.clone().unwrap_or_else(|| supervisor.hold_signal());
         self.mutate(&mutation, cancelled, |worker| {
-            let duration = hold_duration(params.duration)?;
             let keys = parse_keys(&params.keys)?;
             if keys.is_empty() {
                 return Err(DesktopError::invalid_key("held keys must not be empty"));
             }
+            worker.refuse_dangerous_chord(&keys, false, HOLD_REMEDY)?;
             let mode = ParsedPointerOptions::parse(params.opts.as_ref())?.mode;
             if matches!(target, Target::Window(_)) {
                 worker.window(&target)?;
@@ -53,7 +54,9 @@ impl Worker {
                 check()?;
                 signal.wait(&supervisor, duration)
             };
-            worker.backend()?.hold_keys(&target, &keys, mode, &HoldControl { check: &check, wait: &wait })?;
+            signal.with_input(&supervisor, || {
+                worker.backend()?.hold_keys(&target, &keys, mode, &HoldControl { check: &check, wait: &wait })
+            })?;
             Ok(Response::Unit)
         })
     }
@@ -63,9 +66,11 @@ impl Worker {
         params: &HoldMouseParams,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
+        let duration = hold_duration(params.duration)?;
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
+            consume: crate::worker_input::consumes(params.opts.as_ref()),
             keys: params.keys.as_deref(),
             ..Mutation::new(
                 MutatingAction::HoldMouse,
@@ -76,16 +81,17 @@ impl Worker {
         let supervisor = self.safety.supervisor.clone();
         let signal = self.hold_signal.clone().unwrap_or_else(|| supervisor.hold_signal());
         self.mutate(&mutation, cancelled, |worker| {
-            let duration = hold_duration(params.duration)?;
             let keys = match params.keys.as_deref() {
                 None => Vec::new(),
                 Some([]) => Vec::new(),
                 Some(keys) => parse_keys(keys)?,
             };
+            worker.refuse_dangerous_chord(&keys, false, HOLD_REMEDY)?;
             let button = MouseButton::parse(params.button.as_deref())?;
             let mode = ParsedPointerOptions::parse(params.opts.as_ref())?.mode;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
+            worker.read_hit(x, y);
             let check = || {
                 if cancelled() {
                     signal.cancel();
@@ -96,20 +102,25 @@ impl Worker {
                 check()?;
                 signal.wait(&supervisor, duration)
             };
-            worker.backend()?.hold_mouse(
+            signal.with_input(&supervisor, || worker.backend()?.hold_mouse(
                 &target,
                 &MouseHold { x, y, button, keys: &keys },
                 mode,
                 &HoldControl { check: &check, wait: &wait },
-            )?;
+            ))?;
+            worker.judge(&target, &frame)?;
             Ok(Response::Unit)
         })
     }
 }
 
+/// Holds take no `force`: an object-mode session never holds a dangerous
+/// chord (DESIGN 2 A13), and the refusal points to the request that can send it.
+const HOLD_REMEDY: &str = "a hold never sends it; send it with keyChord and force: true";
+
 fn hold_duration(seconds: f64) -> CoreResult<Duration> {
     if !seconds.is_finite() || !(0.0..=100.0).contains(&seconds) {
-        return Err(DesktopError::input_failed("hold duration must be finite seconds in 0..=100"));
+        return Err(DesktopError::internal("hold params bypassed duration parsing"));
     }
     Ok(Duration::from_secs_f64(seconds))
 }

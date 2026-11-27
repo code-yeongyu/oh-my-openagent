@@ -1,5 +1,5 @@
 import { isTerminalRecord, nowIso } from "./manager-helpers"
-import type { ResolvedModelRecord, TaskRecord } from "../state"
+import type { EffectiveModelRecord, TaskRecord } from "../state"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
 import type { EffectiveModel } from "../runners/pinned-model-equivalence"
 
@@ -9,7 +9,9 @@ import type { EffectiveModel } from "../runners/pinned-model-equivalence"
  * stream those. Anything else is not a model observation, and an event naming only one half is
  * ignored: a partial observation must never rewrite the record.
  */
-export function readObservedModel(event: ManagedChildEvent): { readonly provider: string; readonly modelId: string } | undefined {
+export function readObservedModel(
+  event: ManagedChildEvent,
+): { readonly provider: string; readonly modelId: string } | undefined {
   if (typeof event.message !== "object" || event.message === null) return undefined
   const provider = readStringField(event.message, "provider")
   const modelId = readStringField(event.message, "model")
@@ -48,18 +50,25 @@ export function stampSpawnEffectiveModel(record: TaskRecord, observedModel: Effe
  * the fallback path's job. A same-value observation is a no-op, so the store is not churned per
  * assistant message.
  */
-export function observeChildEffectiveModel(port: EffectiveModelPort, provider: string, modelId: string, serviceTier?: string): void {
+export function observeChildEffectiveModel(
+  port: EffectiveModelPort,
+  provider: string,
+  modelId: string,
+  serviceTier?: string,
+): void {
   if (port.store.load === undefined || port.store.replace === undefined) return
   const current = port.store.load(port.taskId)
   if (current === null || current === undefined || isTerminalRecord(current)) return
   const sameRoute = current.effective_model?.provider === provider && current.effective_model.model_id === modelId
   const tier = serviceTier ?? (sameRoute ? current.effective_model?.service_tier : undefined)
   if (sameRoute && current.effective_model?.service_tier === tier) return
-  const effective: ResolvedModelRecord = {
+  const effective: EffectiveModelRecord = {
     provider,
     model_id: modelId,
     display: `${provider}/${modelId}`,
-    source: current.effective_model?.source ?? current.resolved_model?.source ?? "explicit",
+    // A newly observed route must not inherit a live-event source: "set" says who switched TO
+    // the previous route, not this one. The plan's source is the honest fallback.
+    source: current.resolved_model?.source ?? "explicit",
     ...(tier === undefined ? {} : { service_tier: tier }),
   }
   port.store.replace({ ...current, effective_model: effective, updated_at: nowIso(port.now) })
@@ -71,7 +80,10 @@ export function subscribeEffectiveModel(handle: ManagedChildHandle, port: Effect
     const observed = readObservedModel(event)
     if (observed !== undefined) {
       const effective = handle.effectiveModel?.()
-      const tier = effective?.provider === observed.provider && effective.id === observed.modelId ? effective.serviceTier : undefined
+      const tier =
+        effective?.provider === observed.provider && effective.id === observed.modelId
+          ? effective.serviceTier
+          : undefined
       observeChildEffectiveModel(port, observed.provider, observed.modelId, tier)
     }
   })

@@ -15,7 +15,7 @@ describe("omo setup credential guidance", () => {
 
         expect(logins).toEqual([
           { provider: "openai", target: "chatgpt-subscription", state: "login" },
-          { provider: "anthropic", target: "anthropic", state: "login" },
+          { provider: "anthropic", target: "anthropic-subscription", state: "login" },
           { provider: "github-copilot", target: "github-copilot", state: "login" },
         ])
       })
@@ -35,7 +35,9 @@ describe("omo setup credential guidance", () => {
   describe("#given an OAuth credential with no omo provider", () => {
     describe("#when the guidance is built", () => {
       test("#then it has no /login target", () => {
-        expect(guidance(["some-unknown-oauth"], []).logins).toEqual([{ provider: "some-unknown-oauth", state: "unsupported" }])
+        expect(guidance(["some-unknown-oauth"], []).logins).toEqual([
+          { provider: "some-unknown-oauth", state: "unsupported" },
+        ])
       })
     })
   })

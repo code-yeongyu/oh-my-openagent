@@ -3,7 +3,11 @@ import { lstat, readFile, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, posix } from "node:path"
 
-import { attestLegacyDaemonOwnership, probeLegacyJsonRpcEndpoint, type LegacyDaemonAttestationInput } from "./lsp-daemon-reaper-attestation"
+import {
+  attestLegacyDaemonOwnership,
+  probeLegacyJsonRpcEndpoint,
+  type LegacyDaemonAttestationInput,
+} from "./lsp-daemon-reaper-attestation"
 
 const LEGACY_EXIT_WAIT_TIMEOUT_MS = 5_000
 const LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/
@@ -77,7 +81,12 @@ export async function reapLspDaemons(
     }
 
     if (!(await waitForProcessExit(metadata.pid, LEGACY_EXIT_WAIT_TIMEOUT_MS))) {
-      results.push(deferred(parsedVersion, `timed out waiting ${LEGACY_EXIT_WAIT_TIMEOUT_MS}ms for the proven legacy daemon to exit`))
+      results.push(
+        deferred(
+          parsedVersion,
+          `timed out waiting ${LEGACY_EXIT_WAIT_TIMEOUT_MS}ms for the proven legacy daemon to exit`,
+        ),
+      )
       continue
     }
 

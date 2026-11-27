@@ -37,6 +37,7 @@ describe("reflection health", () => {
           streak: 4,
           fingerprint: "child_exit:same detail suffix one",
           lastFailure: {
+            runId: "four",
             reason: "child_exit",
             detail: "same detail suffix one",
             finishedAt: "2026-08-12T04:00:00.000Z",

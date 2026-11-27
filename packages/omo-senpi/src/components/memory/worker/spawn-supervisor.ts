@@ -1,7 +1,8 @@
+import { createLedgerDeadlineReader } from "./ledger-deadline-reader"
 import { spawn } from "node:child_process"
 import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { mkdir } from "@oh-my-opencode/memory-core/fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import {
   readRunJson,
@@ -14,17 +15,8 @@ import { emitMemoryReceipt, runReceipt, type ReceiptWarn, type RunReceiptLedger 
 import { requireRunMetadata } from "./spawn-metadata"
 import { describeReflectionLauncher } from "./launcher-identity"
 import { waitForRunCompletion } from "./run-sentinel"
-import {
-  defaultSupervisorPath,
-  definedEnvironment,
-  isNodeSignal,
-  readTail,
-} from "./spawn-supervisor-support"
-import type {
-  ReflectionChildResult,
-  ReflectionSandbox,
-  ReflectionSpawnArgs,
-} from "./spawn-types"
+import { defaultSupervisorPath, definedEnvironment, isNodeSignal, readTail } from "./spawn-supervisor-support"
+import type { ReflectionChildResult, ReflectionSandbox, ReflectionSpawnArgs } from "./spawn-types"
 
 /** Prefix of the error the launcher sees when the supervisor exits without a complete outcome. */
 export const SUPERVISOR_EXIT_PREFIX = "memory run supervisor exited with"
@@ -51,7 +43,7 @@ export async function runReflectionChild(
   const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
   if (graceMs < 0 || maxOutputBytes <= 0) throw new TypeError("reflection spawn limits are invalid")
 
-  const prepared = await (options.sandbox ?? passthroughSandbox)(spawnArgs)
+  const prepared = options.sandbox === undefined ? spawnArgs : await options.sandbox(spawnArgs)
   const metadata = requireRunMetadata(prepared)
   const launchedAt = (options.now ?? Date.now)()
   if (!Number.isFinite(prepared.hardDeadlineAt) || prepared.hardDeadlineAt <= 0) {
@@ -70,6 +62,9 @@ export async function runReflectionChild(
     thinking: prepared.thinking,
     nextAttempt: prepared.nextAttempt,
     hardDeadlineAt: prepared.hardDeadlineAt,
+    queuedAt: launchedAt,
+    memoryRoot: prepared.memoryRoot ?? dirname(dirname(dirname(metadata.worktree.parent.dir))),
+    maxConcurrentRuns: prepared.maxConcurrentRuns,
     terminationGraceMs: graceMs,
     maxOutputBytes,
     supervisorPath: options.supervisorPath,
@@ -123,6 +118,9 @@ async function runSupervisedChild(input: {
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
   readonly hardDeadlineAt: number
+  readonly queuedAt: number
+  readonly memoryRoot: string
+  readonly maxConcurrentRuns?: number
   readonly terminationGraceMs: number
   readonly maxOutputBytes: number
   readonly supervisorPath?: string
@@ -144,6 +142,9 @@ async function runSupervisedChild(input: {
     cwd: input.cwd,
     env: definedEnvironment(input.env),
     hardDeadlineAt: input.hardDeadlineAt,
+    queuedAt: input.queuedAt,
+    memoryRoot: input.memoryRoot,
+    maxConcurrentRuns: input.maxConcurrentRuns,
     terminationGraceMs: input.terminationGraceMs,
     maxOutputBytes: input.maxOutputBytes,
     stdoutPath,
@@ -155,6 +156,7 @@ async function runSupervisedChild(input: {
     model: input.model,
     ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
     launching: true,
+    queued: true,
     hardDeadlineAt: input.hardDeadlineAt,
     deadlineAt: input.hardDeadlineAt + input.terminationGraceMs,
   }
@@ -170,9 +172,6 @@ async function runSupervisedChild(input: {
     windowsHide: true,
   })
   supervisor.unref()
-  if (input.receiptsDir !== undefined && input.attempt === 1) {
-    await emitMemoryReceipt(input.receiptsDir, runReceipt(launchedRun(input.ledger), "launched"), undefined, input.receiptWarn)
-  }
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
   const publishingPath = join(input.runDir, "publishing.json")
@@ -189,7 +188,10 @@ async function runSupervisedChild(input: {
   const outcomeWait = new AbortController()
   type RunCompletion =
     | { readonly kind: "error"; readonly error: Error }
-    | { readonly kind: "close"; readonly exit: { readonly code: number | null; readonly signal: NodeJS.Signals | null } }
+    | {
+        readonly kind: "close"
+        readonly exit: { readonly code: number | null; readonly signal: NodeJS.Signals | null }
+      }
     | { readonly kind: "outcome"; readonly result: "present" | "timeout" }
   let settle: (completion: RunCompletion) => void = () => {}
   const completion = new Promise<RunCompletion>((resolve) => {
@@ -204,16 +206,26 @@ async function runSupervisedChild(input: {
   const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
     settle({ kind: "close", exit: { code, signal } })
   }
+  // Subscribed before the first await: a supervisor that exits during the launch receipt write has
+  // already emitted `close`, and a listener attached afterwards would wait for an outcome it cannot publish.
   supervisor.once("error", onError)
   supervisor.once("close", onClose)
+  if (input.receiptsDir !== undefined && input.attempt === 1) {
+    await emitMemoryReceipt(
+      input.receiptsDir,
+      runReceipt(launchedRun(input.ledger), "launched"),
+      undefined,
+      input.receiptWarn,
+    )
+  }
   void waitForRunCompletion(
-      outcomePath,
-      launchPath,
-      hasCompleteOutcome,
-      input.hardDeadlineAt + input.terminationGraceMs + OUTCOME_PUBLICATION_MARGIN_MS,
-      Date.now,
-      outcomeWait.signal,
-    ).then((result) => settle({ kind: "outcome", result }))
+    outcomePath,
+    launchPath,
+    hasCompleteOutcome,
+    createLedgerDeadlineReader(input.runDir, OUTCOME_PUBLICATION_MARGIN_MS),
+    Date.now,
+    outcomeWait.signal,
+  ).then((result) => settle({ kind: "outcome", result }))
   const result = await completion.finally(() => {
     outcomeWait.abort()
     supervisor.off("error", onError)
@@ -247,8 +259,4 @@ function launchedRun(ledger: Readonly<Record<string, unknown>>): RunReceiptLedge
     ...(typeof ledger.origin === "string" ? { origin: ledger.origin } : {}),
     startedAt: String(ledger.startedAt),
   }
-}
-
-function passthroughSandbox(spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs {
-  return spawnArgs
 }

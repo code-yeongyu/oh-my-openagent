@@ -1,5 +1,6 @@
 import type { CommandDefinition } from "@oh-my-opencode/claude-code-compat-core/claude-code-command-loader/types"
 import type { SkillMcpConfig } from "../../types"
+import type { SkillProvenance } from "./skill-provenance"
 
 export type SkillScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project" | "shared"
 
@@ -24,6 +25,8 @@ export interface LazyContentLoader {
 }
 
 export interface LoadedSkill {
+  provenance?: SkillProvenance
+  mcpSourcePath?: string
   name: string
   path?: string
   resolvedPath?: string

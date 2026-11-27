@@ -9,6 +9,8 @@
 
 import { loadKibitzerPersona, PERSONA_ASSET_FILENAMES } from "@oh-my-opencode/memory-core"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+
+import type { ComponentLogger } from "../../../extension/types"
 import {
   resolveCategory,
   type ChildHandle,
@@ -21,34 +23,40 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import { childModelChainSpec, type ChildModelChainSpec } from "../memory-child-model-chain"
-import { resolveReflectionModel, type ReflectionModelCandidate, type ReflectionThinkingLevel } from "../worker/resolve-model"
+import {
+  resolveReflectionModel,
+  type ReflectionModelCandidate,
+  type ReflectionThinkingLevel,
+} from "../worker/resolve-model"
 import type { KibitzerSidecarChildInput } from "./sidecar"
 import { orderKibitzerCandidatesByConnection } from "./sidecar-connected-order"
 import type { KibitzerWakeConfiguration } from "./sidecar-outcome"
 import { KIBITZER_SIDECAR_TOOL_NAMES } from "./sidecar-prompt"
+import { kibitzerStartLadder } from "./sidecar-start-ladder"
 import { loadKibitzerTaskRuntime, type KibitzerTaskRuntime } from "./task-runtime"
 import type { AnyKibitzerSidecarTool } from "./tools/result"
 
 export const KIBITZER_SIDECAR_DEFAULT_CATEGORY = "quick"
 
-export type KibitzerSidecarModelUnavailableCause = "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category"
+export type KibitzerSidecarModelUnavailableCause =
+  "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category"
 
 export type KibitzerSidecarModelResolution =
   | {
-    readonly kind: "resolved"
-    readonly category: string
-    readonly model: string
-    readonly thinking?: ReflectionThinkingLevel
-    readonly fallbacks: readonly ReflectionModelCandidate[]
-    readonly chain: ChildModelChainSpec
-  }
+      readonly kind: "resolved"
+      readonly category: string
+      readonly model: string
+      readonly thinking?: ReflectionThinkingLevel
+      readonly fallbacks: readonly ReflectionModelCandidate[]
+      readonly chain: ChildModelChainSpec
+    }
   | {
-    readonly kind: "unavailable"
-    readonly category: string
-    readonly cause: KibitzerSidecarModelUnavailableCause
-    /** The category chain's providers with no connection, when the resolver knew them. */
-    readonly missingProviders?: readonly string[]
-  }
+      readonly kind: "unavailable"
+      readonly category: string
+      readonly cause: KibitzerSidecarModelUnavailableCause
+      /** The category chain's providers with no connection, when the resolver knew them. */
+      readonly missingProviders?: readonly string[]
+    }
 
 export interface KibitzerSidecarModelInput {
   /** `memory.recall.category`; defaults to {@link KIBITZER_SIDECAR_DEFAULT_CATEGORY}. */
@@ -155,10 +163,7 @@ export function buildKibitzerSidecarSpec(input: KibitzerSidecarSpecInput): Child
 }
 
 export type KibitzerSidecarStartCode =
-  | KibitzerSidecarModelUnavailableCause
-  | "persona_unavailable"
-  | "runtime_unavailable"
-  | "session_create_failed"
+  KibitzerSidecarModelUnavailableCause | "persona_unavailable" | "runtime_unavailable" | "session_create_failed"
 
 /** A child that could not be started, named by the stage that refused; the sidecar backs off on it. */
 export class KibitzerSidecarStartError extends Error {
@@ -209,12 +214,19 @@ export interface KibitzerSidecarChildStarterOptions {
   /** QA seam; production reads the primed persona asset. */
   readonly loadPersona?: () => string
   /** QA seam; production awaits the primed `#omo-task-runtime` load. */
-  readonly loadTaskRuntime?: () => Promise<Pick<KibitzerTaskRuntime, "createInProcessJudgeRunner" | "findModelReference">>
+  readonly loadTaskRuntime?: () => Promise<StarterTaskRuntime>
   /** QA seam mirroring the facts runner: replaces the child session construction. */
   readonly createSession?: CreateChildSession
   /** QA seam: replaces the in-process runner entirely. */
   readonly createRunner?: (options: { readonly createSession?: CreateChildSession }) => InProcessRunnerLike
+  /** Records a refused candidate the starter stepped past; nothing user-facing. */
+  readonly logger?: ComponentLogger
 }
+
+type StarterTaskRuntime = Pick<
+  KibitzerTaskRuntime,
+  "createInProcessJudgeRunner" | "findModelReference" | "isModelUnavailableStart"
+>
 
 /**
  * The production `startChild` port of the sidecar: resolves the pinned category against the live
@@ -224,6 +236,7 @@ export interface KibitzerSidecarChildStarterOptions {
 export function createKibitzerSidecarChildStarter(
   options: KibitzerSidecarChildStarterOptions,
 ): (input: KibitzerSidecarChildInput) => Promise<ChildHandle> {
+  const refusedModels = new Set<string>()
   return async (input) => {
     const registry = options.modelRegistry()
     const resolution = resolveKibitzerSidecarModel({
@@ -232,18 +245,26 @@ export function createKibitzerSidecarChildStarter(
       registry,
     })
     if (resolution.kind === "unavailable") {
-      throw new KibitzerSidecarStartError(resolution.cause, `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`, {
-        category: resolution.category,
-        ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
-      })
+      throw new KibitzerSidecarStartError(
+        resolution.cause,
+        `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`,
+        {
+          category: resolution.category,
+          ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
+        },
+      )
     }
     let systemPrompt: string
     try {
       systemPrompt = (options.loadPersona ?? loadKibitzerPersona)()
     } catch (error) {
-      throw new KibitzerSidecarStartError("persona_unavailable", `${PERSONA_ASSET_FILENAMES.kibitzer}: ${describe(error)}`, { cause: error })
+      throw new KibitzerSidecarStartError(
+        "persona_unavailable",
+        `${PERSONA_ASSET_FILENAMES.kibitzer}: ${describe(error)}`,
+        { cause: error },
+      )
     }
-    let runtime: Pick<KibitzerTaskRuntime, "createInProcessJudgeRunner" | "findModelReference"> | undefined
+    let runtime: StarterTaskRuntime | undefined
     if (options.createRunner === undefined) {
       try {
         runtime = await (options.loadTaskRuntime ?? loadKibitzerTaskRuntime)()
@@ -253,26 +274,44 @@ export function createKibitzerSidecarChildStarter(
     }
     const runnerOptions = options.createSession === undefined ? {} : { createSession: options.createSession }
     const runner = options.createRunner?.(runnerOptions) ?? runtime?.createInProcessJudgeRunner(runnerOptions)
-    if (runner === undefined) throw new KibitzerSidecarStartError("runtime_unavailable", "no in-process runner available")
-    const spec = buildKibitzerSidecarSpec({
-      sessionId: input.sessionId,
-      generation: input.generation,
-      cwd: options.cwd,
-      sessionDir: options.sessionDir,
-      agentDir: options.agentDir,
-      modelRegistry: registry,
-      model: registry === undefined || runtime === undefined ? undefined : runtime.findModelReference(registry, resolution.model),
-      chain: resolution.chain,
-      ...(resolution.thinking === undefined ? {} : { thinkingLevel: resolution.thinking }),
-      systemPrompt,
-      tools: input.tools,
-      prompt: input.prompt,
-    })
-    try {
-      return await runner.start(spec)
-    } catch (error) {
-      throw new KibitzerSidecarStartError("session_create_failed", describe(error), { cause: error })
+    if (runner === undefined)
+      throw new KibitzerSidecarStartError("runtime_unavailable", "no in-process runner available")
+    let lastError: unknown
+    for (const candidate of kibitzerStartLadder(resolution, refusedModels)) {
+      const spec = buildKibitzerSidecarSpec({
+        sessionId: input.sessionId,
+        generation: input.generation,
+        cwd: options.cwd,
+        sessionDir: options.sessionDir,
+        agentDir: options.agentDir,
+        modelRegistry: registry,
+        model:
+          registry === undefined || runtime === undefined
+            ? undefined
+            : runtime.findModelReference(registry, candidate.model),
+        chain: candidate.chain,
+        ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
+        systemPrompt,
+        tools: input.tools,
+        prompt: input.prompt,
+      })
+      try {
+        return await runner.start(spec)
+      } catch (error) {
+        lastError = error
+        if (runtime?.isModelUnavailableStart(error) !== true) break
+        refusedModels.add(candidate.model)
+        options.logger?.warn(
+          "omo-senpi kibitzer start refused the pinned model; trying the next recall category candidate",
+          {
+            model: candidate.model,
+            category: resolution.category,
+            error: describe(error),
+          },
+        )
+      }
     }
+    throw new KibitzerSidecarStartError("session_create_failed", describe(lastError), { cause: lastError })
   }
 }
 

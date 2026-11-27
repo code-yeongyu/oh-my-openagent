@@ -33,7 +33,11 @@ function createWake(notification: string): PendingParentWake {
   }
 }
 
-async function dispatchAt(nowMs: number, client: PromptDispatchClient, wake: PendingParentWake): Promise<(number | undefined)[]> {
+async function dispatchAt(
+  nowMs: number,
+  client: PromptDispatchClient,
+  wake: PendingParentWake,
+): Promise<(number | undefined)[]> {
   setSystemTime(new Date(nowMs))
   const flushDelays: (number | undefined)[] = []
   await sendParentWakePrompt({
@@ -61,7 +65,11 @@ describe("sendParentWakePrompt promptAsync gate hold", () => {
     expect(await dispatchAt(HOLD_START_MS, client, createWake("<system-reminder>first</system-reminder>"))).toEqual([])
 
     // when
-    const delays = await dispatchAt(HOLD_START_MS + 1_000, client, createWake("<system-reminder>second</system-reminder>"))
+    const delays = await dispatchAt(
+      HOLD_START_MS + 1_000,
+      client,
+      createWake("<system-reminder>second</system-reminder>"),
+    )
 
     // then
     expect(delays).toEqual([HOLD_MS])

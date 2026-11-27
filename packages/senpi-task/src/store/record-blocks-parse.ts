@@ -1,8 +1,13 @@
 import {
+  EFFECTIVE_MODEL_CHANGE_KINDS,
+  EFFECTIVE_MODEL_SOURCES,
   RESOLVED_MODEL_SOURCES,
   RUNNER_KINDS,
   SUSPENSION_REASONS,
-  type HostSessionIdentity,
+  type EffectiveModelChange,
+  type EffectiveModelChangeKind,
+  type EffectiveModelRecord,
+  type EffectiveModelSource,
   type PendingSteeringEntry,
   type ResolvedModelRecord,
   type RunnerKind,
@@ -22,6 +27,7 @@ import {
 } from "./scalar-read"
 import { IsolationBackendKindSchema } from "@oh-my-opencode/omo-config-core"
 import type { IsolationMergeResult, IsolationRecord, TaskIsolationSpec } from "../state"
+export { parseOptionalHostSession, validateHostSessionConsistency } from "./host-session-parse"
 
 function parseIsolationSpec(value: unknown): TaskIsolationSpec {
   if (!isRecord(value)) throw new Error("isolation is not an object")
@@ -49,8 +55,15 @@ export function parseOptionalIsolation(record: Record<string, unknown>): Isolati
   if (mergeResult === undefined) return spec
   if (!isRecord(mergeResult)) throw new Error("isolation.merge_result is not an object")
   const kind = readString(mergeResult, "kind")
-  if (kind !== "applied" && kind !== "already-applied" && kind !== "not-applied" &&
-      kind !== "branch-merged" && kind !== "branch-merge-failed" && kind !== "no-changes" && kind !== "retained") {
+  if (
+    kind !== "applied" &&
+    kind !== "already-applied" &&
+    kind !== "not-applied" &&
+    kind !== "branch-merged" &&
+    kind !== "branch-merge-failed" &&
+    kind !== "no-changes" &&
+    kind !== "retained"
+  ) {
     throw new Error("isolation.merge_result.kind is invalid")
   }
   const changesApplied = readOptionalBoolean(mergeResult, "changesApplied")
@@ -99,48 +112,13 @@ function readOptionalLiteral(
   return value
 }
 
-export function readOptionalRunnerKind(
-  record: Record<string, unknown>,
-): RunnerKind | undefined {
+export function readOptionalRunnerKind(record: Record<string, unknown>): RunnerKind | undefined {
   const val = readOptionalLiteral(record, "runner_kind", RUNNER_KINDS)
   return val as RunnerKind | undefined
 }
 
-export function readOptionalSuspensionReason(
-  record: Record<string, unknown>,
-): SuspensionReason | undefined {
+export function readOptionalSuspensionReason(record: Record<string, unknown>): SuspensionReason | undefined {
   return readOptionalLiteral(record, "suspension_reason", SUSPENSION_REASONS) as SuspensionReason | undefined
-}
-
-export function parseOptionalHostSession(
-  record: Record<string, unknown>,
-): HostSessionIdentity | undefined {
-  const value = record["host_session"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("host_session is not an object")
-
-  const socket = readString(value, "socket")
-  const routingId = readString(value, "routing_id")
-  const sessionPath = readString(value, "session_path")
-  const instanceId = readString(value, "instance_id")
-  const daemonPid = readOptionalNumber(value, "daemon_pid")
-
-  return {
-    socket,
-    routing_id: routingId,
-    session_path: sessionPath,
-    instance_id: instanceId,
-    ...(daemonPid === undefined ? {} : { daemon_pid: daemonPid }),
-  }
-}
-
-export function validateHostSessionConsistency(
-  runnerKind: RunnerKind | undefined,
-  hostSession: HostSessionIdentity | undefined,
-): void {
-  if (hostSession !== undefined && runnerKind !== "host-session") {
-    throw new Error("host_session present but runner_kind is not 'host-session'")
-  }
 }
 
 export function parseOptionalOwner(record: Record<string, unknown>): DagTaskOwner | undefined {
@@ -168,9 +146,8 @@ export function parseOptionalSpawnSpec(record: Record<string, unknown>): TaskSpa
     const prompt = readString(value, "prompt")
     const instructions = readOptionalString(value, "instructions")
     const memberScopedToolNames = readOptionalStringArray(value, "member_scoped_tool_names")
-    const isolation: TaskIsolationSpec | undefined = value["isolation"] === undefined
-      ? undefined
-      : parseIsolationSpec(value["isolation"])
+    const isolation: TaskIsolationSpec | undefined =
+      value["isolation"] === undefined ? undefined : parseIsolationSpec(value["isolation"])
     return {
       version: 1,
       ...(isolation === undefined ? {} : { isolation }),
@@ -220,17 +197,37 @@ export function parseOptionalPendingSteering(
     }
     const pool = candidate["workpool"]
     if (pool !== undefined) {
-      if (!isRecord(pool) || typeof pool["pool_id"] !== "string" || !/^wp_[0-9a-f]{32}$/.test(pool["pool_id"]) ||
-        typeof pool["item_id"] !== "string" || pool["item_id"] !== id || !/^wi_[0-9a-f]{32}$/.test(id) ||
-        typeof pool["key"] !== "string" || pool["key"].trim().length === 0 ||
-        typeof pool["generation"] !== "number" || !Number.isSafeInteger(pool["generation"]) || pool["generation"] < 1 ||
-        typeof pool["run_epoch"] !== "number" || !Number.isSafeInteger(pool["run_epoch"]) || pool["run_epoch"] < 0) {
+      if (
+        !isRecord(pool) ||
+        typeof pool["pool_id"] !== "string" ||
+        !/^wp_[0-9a-f]{32}$/.test(pool["pool_id"]) ||
+        typeof pool["item_id"] !== "string" ||
+        pool["item_id"] !== id ||
+        !/^wi_[0-9a-f]{32}$/.test(id) ||
+        typeof pool["key"] !== "string" ||
+        pool["key"].trim().length === 0 ||
+        typeof pool["generation"] !== "number" ||
+        !Number.isSafeInteger(pool["generation"]) ||
+        pool["generation"] < 1 ||
+        typeof pool["run_epoch"] !== "number" ||
+        !Number.isSafeInteger(pool["run_epoch"]) ||
+        pool["run_epoch"] < 0
+      ) {
         warnings?.push(`pending_steering[${index}] at ${path}: invalid workpool correlation, dropped`)
         continue
       }
-      entries.push({ id, message, deliver_as: deliverAs, workpool: {
-        pool_id: pool["pool_id"], item_id: pool["item_id"], key: pool["key"], generation: pool["generation"], run_epoch: pool["run_epoch"],
-      } })
+      entries.push({
+        id,
+        message,
+        deliver_as: deliverAs,
+        workpool: {
+          pool_id: pool["pool_id"],
+          item_id: pool["item_id"],
+          key: pool["key"],
+          generation: pool["generation"],
+          run_epoch: pool["run_epoch"],
+        },
+      })
     } else entries.push({ id, message, deliver_as: deliverAs })
   }
   return entries
@@ -238,12 +235,57 @@ export function parseOptionalPendingSteering(
 
 export function parseOptionalResolvedModel(
   record: Record<string, unknown>,
-  key: "requested_model" | "resolved_model" | "effective_model" = "resolved_model",
+  key: "requested_model" | "resolved_model" = "resolved_model",
 ): ResolvedModelRecord | undefined {
   const value = record[key]
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error(`${key} is not an object`)
   return readResolvedModel(value)
+}
+
+// effective_model accepts the wider live-event source set and the operator flag (F12); every
+// other resolved-model field is shared with readResolvedModel. On disk the live-event detail
+// lives in a nested `change` block while `source` keeps an old-union value pre-F12 builds parse
+// (store/storable-record.ts); records this branch's earlier heads persisted with a live kind
+// directly in `source` map back unchanged.
+export function parseOptionalEffectiveModel(record: Record<string, unknown>): EffectiveModelRecord | undefined {
+  const value = record["effective_model"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("effective_model is not an object")
+  const base = readResolvedModelFields(value)
+  const change = readEffectiveModelChange(value)
+  if (change !== undefined) {
+    return {
+      ...base,
+      source: change.kind,
+      ...(change.switched_by_operator === undefined ? {} : { switched_by_operator: change.switched_by_operator }),
+    }
+  }
+  const source = readString(value, "source")
+  if (!(EFFECTIVE_MODEL_SOURCES as readonly string[]).includes(source)) {
+    throw new Error(`effective_model.source must be ${EFFECTIVE_MODEL_SOURCES.join(" or ")}`)
+  }
+  const switchedByOperator = readOptionalBoolean(value, "switched_by_operator")
+  return {
+    ...base,
+    source: source as EffectiveModelSource,
+    ...(switchedByOperator === undefined ? {} : { switched_by_operator: switchedByOperator }),
+  }
+}
+
+function readEffectiveModelChange(value: Record<string, unknown>): EffectiveModelChange | undefined {
+  const change = value["change"]
+  if (change === undefined) return undefined
+  if (!isRecord(change)) throw new Error("effective_model.change is not an object")
+  const kind = readString(change, "kind")
+  if (!(EFFECTIVE_MODEL_CHANGE_KINDS as readonly string[]).includes(kind)) {
+    throw new Error(`effective_model.change.kind must be ${EFFECTIVE_MODEL_CHANGE_KINDS.join(" or ")}`)
+  }
+  const switchedByOperator = readOptionalBoolean(change, "switched_by_operator")
+  return {
+    kind: kind as EffectiveModelChangeKind,
+    ...(switchedByOperator === undefined ? {} : { switched_by_operator: switchedByOperator }),
+  }
 }
 
 export function parseOptionalResolvedModelArray(
@@ -273,6 +315,12 @@ export function parseNotification(record: Record<string, unknown>): TaskNotifica
 }
 
 function readResolvedModel(value: Record<string, unknown>): ResolvedModelRecord {
+  return { ...readResolvedModelFields(value), source: readResolvedModelSource(value) }
+}
+
+// Everything but the source, shared by the resolved and effective model readers: each
+// validates its own source union.
+function readResolvedModelFields(value: Record<string, unknown>): Omit<ResolvedModelRecord, "source"> {
   const variant = readOptionalString(value, "variant")
   const legacyReasoningEffort = readOptionalString(value, "reasoning_effort")
   const reasoning = readOptionalString(value, "reasoning")
@@ -280,7 +328,6 @@ function readResolvedModel(value: Record<string, unknown>): ResolvedModelRecord 
     provider: readString(value, "provider"),
     model_id: readString(value, "model_id"),
     display: readString(value, "display"),
-    source: readResolvedModelSource(value),
     ...(variant === undefined ? {} : { variant }),
     ...(legacyReasoningEffort === undefined ? {} : { reasoning_effort: legacyReasoningEffort }),
     ...(reasoning === undefined ? {} : { reasoning }),

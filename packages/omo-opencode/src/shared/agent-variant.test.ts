@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../config"
-import {
-  applyAgentVariant,
-  lowerReasoningForModel,
-  resolveAgentVariant,
-  resolveVariantForModel,
-} from "./agent-variant"
+import { applyAgentVariant, lowerReasoningForModel, resolveAgentVariant, resolveVariantForModel } from "./agent-variant"
 
 describe("resolveAgentVariant", () => {
   test("returns undefined when agent name missing", () => {
@@ -300,7 +295,7 @@ describe("resolveVariantForModel", () => {
         "custom-agent": { category: "ultrabrain" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
+    const model = { providerID: "openai", modelID: "gpt-6.2-astra" }
 
     // when
     const variant = resolveVariantForModel(config, "custom-agent", model)

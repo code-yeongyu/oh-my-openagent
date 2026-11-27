@@ -13,6 +13,7 @@ import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
+import { stampReceipt } from "../tools/claim-frontmatter"
 import {
   parsePeopleCard,
   resolveSlugCollision,
@@ -22,6 +23,7 @@ import {
   type ObservationSection,
   type PeopleLimits,
 } from "../people"
+import { factDisplayText, stripReceiptSuffix } from "./display"
 import type { FactsExtractionRecord, FactsPersonReference } from "./extraction"
 import { readFactsPeopleIndex, type FactsPeopleIndexEntry } from "./person-index"
 
@@ -46,10 +48,13 @@ export interface FactsPersonTarget {
 
 export interface FactsRoutingPlan {
   readonly notes: ReadonlyMap<string, readonly FactsExtractionRecord[]>
-  readonly observations: ReadonlyMap<string, {
-    readonly target: FactsPersonTarget
-    readonly records: readonly FactsExtractionRecord[]
-  }>
+  readonly observations: ReadonlyMap<
+    string,
+    {
+      readonly target: FactsPersonTarget
+      readonly records: readonly FactsExtractionRecord[]
+    }
+  >
 }
 
 type MutableObservationBucket = {
@@ -142,11 +147,14 @@ export function normalizeObservationText(text: string): string {
 
 function renderCardSkeleton(target: FactsPersonTarget): string {
   if (target.person === undefined) throw new Error(`New person target lacks identity: ${target.slug}`)
-  return renderMemoryFile({
-    description: `Person - ${target.person.name}`,
-    kind: "person",
-    aliases: [...target.person.aliases],
-  }, "")
+  return renderMemoryFile(
+    {
+      description: `Person - ${target.person.name}`,
+      kind: "person",
+      aliases: [...target.person.aliases],
+    },
+    "",
+  )
 }
 
 async function renderExplicitObservations(
@@ -158,31 +166,38 @@ async function renderExplicitObservations(
 ): Promise<string> {
   const path = join(repoDir, "people", slug, "observations.md")
   const existing = await readFile(path, "utf8").catch(() => undefined)
-  const parsed = existing === undefined
-    ? { frontmatter: { description: `Observations - ${displayName}` }, body: "" }
-    : parseMemoryFile(existing)
+  const parsed =
+    existing === undefined
+      ? { frontmatter: { description: `Observations - ${displayName}` }, body: "" }
+      : parseMemoryFile(existing)
   const { card } = parsePeopleCard(parsed.body, limits)
-  const groups: { section: ObservationSection; entries: ObservationEntry[] }[] =
-    (card.observations ?? []).map((group) => ({ section: group.section, entries: [...group.entries] }))
+  const groups: { section: ObservationSection; entries: ObservationEntry[] }[] = (card.observations ?? []).map(
+    (group) => ({ section: group.section, entries: [...group.entries] }),
+  )
   let explicit = groups.find((group) => group.section === "Explicit")
   if (explicit === undefined) {
     explicit = { section: "Explicit", entries: [] }
     groups.unshift(explicit)
   }
   for (const record of records) {
-    const normalized = normalizeObservationText(record.text)
+    const content = factDisplayText(record)
+    const normalized = normalizeObservationText(stripReceiptSuffix(record.text))
     const at = explicit.entries.findIndex(
-      (entry) => normalizeObservationText(entry.content) === normalized,
+      (entry) => normalizeObservationText(stripReceiptSuffix(entry.content)) === normalized,
     )
     if (at === -1) {
-      explicit.entries.push({ date: record.date, content: record.text })
+      explicit.entries.push({ date: record.date, content })
       continue
     }
     const found = explicit.entries[at]!
-    explicit.entries[at] = { ...found, date: record.date, n: (found.n ?? 1) + 1 }
+    const refreshed = record.receipt === undefined ? found.content : content
+    explicit.entries[at] = { ...found, content: refreshed, date: record.date, n: (found.n ?? 1) + 1 }
   }
-  const body = serializePeopleCard({ entries: card.entries, observations: groups }, limits)
-  return renderMemoryFile(parsed.frontmatter, `${body}\n`)
+  const body = `${serializePeopleCard({ entries: card.entries, observations: groups }, limits)}\n`
+  // Same header rule as every writer and the commit hook: a legacy user header is dropped, a user record becomes mixed.
+  const frontmatter =
+    existing === undefined ? parsed.frontmatter : stampReceipt(parsed, parsed.frontmatter, body, undefined)
+  return renderMemoryFile(frontmatter, body)
 }
 
 function resolvePersonSlug(

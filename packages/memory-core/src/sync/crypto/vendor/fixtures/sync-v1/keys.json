@@ -1,0 +1,59 @@
+{
+  "comment": "synthetic fixture material only; never a real credential",
+  "account": "encoding-account",
+  "devices": {
+    "owner": {
+      "signing_seed": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "sealing_private": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+      "principal": {
+        "kind": "device",
+        "id": "HcahOcBrYYAu1Uf5BVu8YQ"
+      }
+    },
+    "joining": {
+      "signing_seed": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU",
+      "sealing_private": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY",
+      "principal": {
+        "kind": "device",
+        "id": "-1m1eENVhqdXRJ3XlN__jQ"
+      }
+    },
+    "recovered": {
+      "signing_seed": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+      "sealing_private": "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
+      "principal": {
+        "kind": "device",
+        "id": "PDv3T8-fwlpWrp0DPgjWhA"
+      }
+    },
+    "recovered2": {
+      "signing_seed": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk",
+      "sealing_private": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
+      "principal": {
+        "kind": "device",
+        "id": "9E1ebcxyTXttYU2Y8qFbhQ"
+      }
+    }
+  },
+  "wrap_test_device": {
+    "sealing_private": "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE",
+    "sealing_public": "QElQLbksojQsP5LaxdbefIXbXfVAeltJls458u-36Cc"
+  },
+  "recovery": {
+    "key1": {
+      "credential_id": "CwsLCwsLCwsLCwsLCwsLCw",
+      "prf_output": "KioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKio",
+      "enrollment_nonce": "KysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKys"
+    },
+    "key2": {
+      "credential_id": "FRUVFRUVFRUVFRUVFRUVFQ",
+      "prf_output": "NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ",
+      "enrollment_nonce": "NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU"
+    }
+  },
+  "epochs": {
+    "1": "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0",
+    "2": "Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4",
+    "3": "Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8"
+  }
+}

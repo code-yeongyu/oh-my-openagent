@@ -1,5 +1,23 @@
 # Installing the attached engine
 
+## Doctor states
+
+`node "<skill-root>/scripts/browser-doctor.mjs" --json` reports one state:
+
+| State | Meaning | Next |
+|---|---|---|
+| `ready` | CLI, daemon and a connected browser | start a session |
+| `no-cli` / `no-daemon` / `no-extension` | something is missing | `node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>]` prepares everything it can for **the browser the user uses**, then prints the **single** step only the user can do (relaunch that browser and click **Enable**); relay it verbatim, wait, re-run the doctor |
+| `choose-browser` | the signals do not single out one browser (Safari/Firefox default, an idle default while another browser runs, several in use) | nothing was installed; take the browser from memory or ask the user, then `browser-install.mjs --browser=<id>` |
+| `no-browser-support` | no Chromium-family profile on this machine | say so and stop |
+| `outdated-extension` | the only connected extension is BrowserSkill 0.4.0, which leaves a "BrowserSkill" tab group in the user's browser after every task | start no session; relay the doctor's remedy (update the extension to 0.4.1 or later, delete saved "BrowserSkill" groups by hand), then re-run the doctor |
+
+**Install into the browser the user actually uses, never into whatever happens to be on disk.** Before
+installing, check your memory for the user's browser; otherwise read the doctor's `browser` (picked
+from the OS default browser, running apps and recent use — `candidates` shows the evidence). If memory
+and the doctor disagree, or the doctor says `choose-browser`, ask the user. Pass the answer as
+`--browser=<id>` and record it in memory. A Chrome that is merely installed is not their browser.
+
 Three pieces. The onboarding script prepares all three; a human finishes exactly one.
 
 | Piece | Channel | Automatable |
@@ -11,8 +29,7 @@ Three pieces. The onboarding script prepares all three; a human finishes exactly
 ## Inside the OmO desktop app
 
 The app installs the `bsk` CLI and starts its daemon itself, and keeps the daemon running when the app closes.
-Do not run `browser-install.mjs` there unless the doctor says the app's engine is missing; a session set to
-`OMO_BROWSER_ENGINE=builtin` or `none` never uses this skill's attached engine at all. `BSK_HOME` and `BSK_BIN`
+Do not run `browser-install.mjs` there unless the doctor says the app's engine is missing. `BSK_HOME` and `BSK_BIN`
 still decide where the CLI and daemon are found, here and everywhere else.
 
 ## Supported

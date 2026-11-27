@@ -5,6 +5,7 @@ import {
   getDesktopEngineHost,
   launchDesktopEngine,
   type DesktopEngineLocateDiagnostic,
+  type DesktopLaunchRefusalReason,
 } from "@oh-my-opencode/senpi-desktop-engine"
 import type { DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol"
 import { isSupportedHost } from "@oh-my-opencode/senpi-desktop-tool"
@@ -13,6 +14,7 @@ import { resolveInstalledEngine } from "../omo-senpi/src/components/computer-use
 import {
   COMPUTER_USE_DOCTOR_TIMEOUT_MS,
   type EngineLauncher,
+  type EngineProbeResult,
   probeComputerUseEngine,
 } from "./computer-use-engine-probe"
 
@@ -60,8 +62,10 @@ export type ComputerUseDoctorReport =
       readonly enginePath: string
       readonly engineSource: string
       readonly launchedEnginePath?: string
-      readonly code: "abi-mismatch" | "handshake-failed" | "timeout"
+      readonly code: Extract<EngineProbeResult, { ok: false }>["code"]
       readonly message: string
+      readonly reason?: DesktopLaunchRefusalReason
+      readonly diagnostic?: string
     })
 
 export type ComputerUseDoctorInput = {
@@ -76,13 +80,9 @@ export type ComputerUseDoctorInput = {
   readonly launchEngine?: EngineLauncher
 }
 
-function unavailable(
-  base: ComputerUseDoctorBase,
-  diagnostic: DesktopEngineLocateDiagnostic,
-): ComputerUseDoctorReport {
+function unavailable(base: ComputerUseDoctorBase, diagnostic: DesktopEngineLocateDiagnostic): ComputerUseDoctorReport {
   return { ...base, kind: "unavailable", diagnostic }
 }
-
 
 export async function computerUseDoctorReport(input: ComputerUseDoctorInput): Promise<ComputerUseDoctorReport> {
   const platform = input.platform ?? process.platform
@@ -96,32 +96,40 @@ export async function computerUseDoctorReport(input: ComputerUseDoctorInput): Pr
   if (!settings.enabled) return { ...base, kind: "skipped", reason: "disabled" }
 
   const locatorOptions = {
-    platform, arch,
+    platform,
+    arch,
     runtimeDir: input.env.OMO_PACKAGE_DIR ?? "",
     execDir: dirname(process.execPath),
     packageDir: resolve(input.packageRoot, "..", "senpi-desktop-engine"),
     repoRoot: resolve(input.packageRoot, "..", ".."),
   }
   const resolved = resolveInstalledEngine(settings.enginePath, input.env, input.version, locatorOptions)
-  if ("notInstalled" in resolved) return { ...base, kind: "not-installed", attemptedPaths: resolved.notInstalled.attemptedPaths }
+  if ("notInstalled" in resolved)
+    return { ...base, kind: "not-installed", attemptedPaths: resolved.notInstalled.attemptedPaths }
   if ("diagnostic" in resolved) return unavailable(base, resolved.diagnostic)
-  const probe = (path: string) => ({ probe: probeComputerUseEngine(
-    path,
-    input.env,
-    input.timeoutMs ?? COMPUTER_USE_DOCTOR_TIMEOUT_MS,
-    input.launchEngine,
-  ) })
+  const probe = (path: string) => ({
+    probe: probeComputerUseEngine(
+      path,
+      input.env,
+      input.timeoutMs ?? COMPUTER_USE_DOCTOR_TIMEOUT_MS,
+      input.launchEngine,
+    ),
+  })
   const home = input.env.HOME ?? homedir()
-  const launched = settings.enginePath !== undefined && "path" in resolved
-    ? { path: resolved.path, value: probe(resolved.path) }
-    : await launchDesktopEngine({
-      version: input.version,
-      host,
-      allowDownload: false,
-      cacheDir: join(home, ".omo", "cache", "senpi-desktop-engine"),
-      installDir: join(home, ".omo", "engines", "senpi-desktop-engine"),
-      locatorOptions,
-    }, probe)
+  const launched =
+    settings.enginePath !== undefined && "path" in resolved
+      ? { path: resolved.path, value: probe(resolved.path) }
+      : await launchDesktopEngine(
+          {
+            version: input.version,
+            host,
+            allowDownload: false,
+            cacheDir: join(home, ".omo", "cache", "senpi-desktop-engine"),
+            installDir: join(home, ".omo", "engines", "senpi-desktop-engine"),
+            locatorOptions,
+          },
+          probe,
+        )
   if (launched.path === null) {
     return unavailable(base, launched.diagnostic)
   }
@@ -132,7 +140,14 @@ export async function computerUseDoctorReport(input: ComputerUseDoctorInput): Pr
     ...(launched.path === resolved.path ? {} : { launchedEnginePath: launched.path }),
   }
   if (!probed.ok) {
-    return { ...base, ...location, kind: "failed", code: probed.code, message: probed.message }
+    return {
+      ...base,
+      ...location,
+      kind: "failed",
+      code: probed.code,
+      message: probed.message,
+      ...(probed.code === "launch-context-unavailable" ? { reason: probed.reason, diagnostic: probed.diagnostic } : {}),
+    }
   }
   return {
     ...base,

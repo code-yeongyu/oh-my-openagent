@@ -91,7 +91,7 @@ export function InstallTabs({ className }: { readonly className?: string }): JSX
             aria-controls={`${baseId}-panel-${target}`}
             tabIndex={selected === target ? 0 : -1}
             onClick={() => select(target, false)}
-            className="install-tab eyebrow focus-visible:outline-accent-32 min-h-11 px-2.5 focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-3"
+            className="install-tab eyebrow focus-ring-inset min-h-11 px-2.5 sm:px-3"
           >
             {target === "unix" ? null : <span className="max-sm:hidden">{t("windows")} </span>}
             {t(`tabs.${target}`)}

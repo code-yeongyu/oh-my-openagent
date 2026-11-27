@@ -1,16 +1,10 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import * as logger from "../shared/logger"
+import { createPreemptiveCompactionHook } from "./preemptive-compaction"
 
 const logMock = mock(() => {})
-
-mock.module("../shared/logger", () => ({
-  log: logMock,
-}))
-
-afterAll(() => { mock.restore() })
-
-const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
 type AssistantHistoryMessage = {
   info: {
@@ -51,11 +45,7 @@ function appendAssistantHistory(
   })
 }
 
-function buildAssistantUpdate(input: {
-  sessionID: string
-  id: string
-  parts: unknown[]
-}): {
+function buildAssistantUpdate(input: { sessionID: string; id: string; parts: unknown[] }): {
   event: {
     type: string
     properties: {
@@ -94,6 +84,11 @@ function buildAssistantUpdate(input: {
 describe("preemptive-compaction post-compaction degradation monitor", () => {
   beforeEach(() => {
     logMock.mockClear()
+    spyOn(logger, "log").mockImplementation(logMock)
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   it("triggers recovery summarize after three consecutive no-text tail messages", async () => {
@@ -125,13 +120,10 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
     // then
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
     expect(ctx.client.tui.showToast).toHaveBeenCalledTimes(1)
-    expect(logMock).toHaveBeenCalledWith(
-      "[preemptive-compaction] Detected post-compaction no-text tail pattern",
-      {
-        sessionID,
-        streak: 3,
-      },
-    )
+    expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Detected post-compaction no-text tail pattern", {
+      sessionID,
+      streak: 3,
+    })
   })
 
   it("resets no-text streak when assistant emits text content", async () => {
@@ -153,41 +145,49 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
       id: "msg_1",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_1",
-      parts: [{ type: "step-start" }, { type: "step-finish" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_1",
+        parts: [{ type: "step-start" }, { type: "step-finish" }],
+      }),
+    )
 
     appendAssistantHistory(sessionHistory, {
       id: "msg_2",
       parts: [{ type: "text", text: "Recovered response" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_2",
-      parts: [{ type: "text", text: "Recovered response" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_2",
+        parts: [{ type: "text", text: "Recovered response" }],
+      }),
+    )
 
     appendAssistantHistory(sessionHistory, {
       id: "msg_3",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_3",
-      parts: [{ type: "step-start" }, { type: "step-finish" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_3",
+        parts: [{ type: "step-start" }, { type: "step-finish" }],
+      }),
+    )
 
     appendAssistantHistory(sessionHistory, {
       id: "msg_4",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_4",
-      parts: [{ type: "step-start" }, { type: "step-finish" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_4",
+        parts: [{ type: "step-start" }, { type: "step-finish" }],
+      }),
+    )
 
     // then
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()

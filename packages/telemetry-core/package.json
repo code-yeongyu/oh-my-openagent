@@ -4,10 +4,37 @@
   "type": "module",
   "private": true,
   "description": "Harness-neutral telemetry primitives for oh-my-opencode products.",
+  "imports": {
+    "#telemetry-immediate-send": "./src/posthog-immediate-send.ts"
+  },
   "exports": {
+    "./injected": {
+      "types": "./injected.d.ts",
+      "import": "./src/injected.ts"
+    },
+    "./posthog-transport": {
+      "types": "./posthog-transport.d.ts",
+      "import": "./src/posthog-transport.ts"
+    },
     ".": {
       "types": "./index.d.ts",
       "import": "./src/index.ts"
+    },
+    "./immediate-send": {
+      "types": "./immediate-send.d.ts",
+      "import": "./src/posthog-immediate-send.ts"
+    },
+    "./install-disclosure": {
+      "types": "./src/install-disclosure.ts",
+      "import": "./src/install-disclosure.ts"
+    },
+    "./otlp-opt-out": {
+      "types": "./src/otlp-spool-purge.ts",
+      "import": "./src/otlp-spool-purge.ts"
+    },
+    "./otlp": {
+      "types": "./src/otlp-entry.ts",
+      "import": "./src/otlp-entry.ts"
     }
   },
   "types": "./index.d.ts",
@@ -16,7 +43,12 @@
     "test": "bun test src/*.test.ts"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
     "@oh-my-opencode/utils": "workspace:*",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api-logs": "0.223.0",
+    "@opentelemetry/context-async-hooks": "2.12.0",
+    "@opentelemetry/core": "2.12.0",
     "posthog-node": "^5.52.4"
   },
   "sideEffects": false

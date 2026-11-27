@@ -5,19 +5,12 @@ name: Review Claims
 # - labeling one of them auto-requests the labeler as reviewer and clears stale-review
 # - the claim label is removed ONLY when the claimer submits a real review (approve / request changes)
 # - claims idle for 3+ days are swept to stale-review
+# Per-PR reconciliation (request the claimer, release on review, post the gate) runs in pr-automation.yml.
 
 on:
-  workflow_run:
-    workflows: [PR Automation Signal]
-    types: [completed]
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "Open PR to reconcile (leave empty for the stale sweep)"
-        required: false
-        type: string
   merge_group:
     types: [checks_requested]
 
@@ -72,42 +65,9 @@ jobs:
             echo "| Event | ${{ github.event.action }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  reconcile:
-    name: Reconcile fork review claims
-    if: github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.pr_number != '')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: write
-      issues: write
-      checks: write
-    steps:
-      - name: Check out trusted automation helpers
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-          sparse-checkout: |
-            script/pr-automation-context.mjs
-            script/pr-review-claims.mjs
-          sparse-checkout-cone-mode: false
-      - name: Reconcile current claims using GitHub metadata
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { pathToFileURL } = await import('node:url');
-            const { reconcileReviewClaims } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/pr-review-claims.mjs`).href);
-            await reconcileReviewClaims({ github, context, core });
-      - name: Write job summary
-        if: always()
-        run: echo 'Reconciled current PR metadata without executing PR code.' >> "$GITHUB_STEP_SUMMARY"
-
   stale-sweep:
     name: Sweep stale review claims
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.pr_number == '')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

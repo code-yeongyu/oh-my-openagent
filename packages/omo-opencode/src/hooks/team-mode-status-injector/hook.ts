@@ -37,12 +37,9 @@ export type TeamModeStatusInjectorHook = {
   ) => Promise<void>
 }
 
-const TEAM_MODE_STATUS_MARKER = "<team_mode_status enabled=\"true\">"
+const TEAM_MODE_STATUS_MARKER = '<team_mode_status enabled="true">'
 
-function resolveSessionID(
-  input: TeamModeStatusInjectorInput,
-  messages: MessageWithParts[],
-): string | undefined {
+function resolveSessionID(input: TeamModeStatusInjectorInput, messages: MessageWithParts[]): string | undefined {
   if (typeof input.sessionID === "string" && input.sessionID.length > 0) {
     return input.sessionID
   }
@@ -90,18 +87,15 @@ function latestUserMessageRequestsTeamMode(
   }
 
   const promptText = extractPromptText(message.parts)
-  return detectKeywordsWithType(
-    promptText,
-    undefined,
-    undefined,
-    keywordDetectorConfig?.disabled_keywords,
-  ).some((keyword) => keyword.type === "team")
+  return detectKeywordsWithType(promptText, undefined, undefined, keywordDetectorConfig?.disabled_keywords).some(
+    (keyword) => keyword.type === "team",
+  )
 }
 
 function buildTeamModeStatusContent(): string {
   return `${TEAM_MODE_STATUS_MARKER}
 Team mode is ENABLED for this session. Presence of the team_* tools is authoritative proof; do not inspect config files to verify.
-Closure invariant: every team you open is yours to close. After each team_task_update that completes or fails a task, call team_task_list({ teamRunId }); if every task is terminal, run team_shutdown_request + team_approve_shutdown per active member, then team_delete — in the same turn, without waiting for the user to ask. Lingering teams are a defect.
+Closure invariant: every team you open is yours to close. After each team_task_update that completes or fails a task, call team_task_list({ teamRunId }); if every task is terminal, run team_shutdown_request + team_approve_shutdown per active member, then team_delete in the same turn, without waiting for the user to ask. Lingering teams are a defect.
 Load the team-mode skill for the full Closure Contract and Closure Sequence.
 </team_mode_status>`
 }
@@ -121,10 +115,7 @@ export function createTeamModeStatusInjector(
   keywordDetectorConfig?: KeywordDetectorConfig,
 ): TeamModeStatusInjectorHook {
   return {
-    "experimental.chat.messages.transform": async (
-      input,
-      output,
-    ): Promise<void> => {
+    "experimental.chat.messages.transform": async (input, output): Promise<void> => {
       if (!config.enabled || output.messages.length === 0) {
         return
       }

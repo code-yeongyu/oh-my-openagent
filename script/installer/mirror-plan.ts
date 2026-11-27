@@ -1,6 +1,7 @@
 export const VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*))?$/
 export const KEEP_BETAS = 20
-const MIRRORED_ASSET = /^(?:omo-(?:darwin|linux|windows)-[a-z0-9-]+(?:\.exe)?|SHA256SUMS|senpi-desktop-engine-[A-Za-z0-9._-]+)$/
+const MIRRORED_ASSET =
+  /^(?:omo-(?:darwin|linux|windows)-[a-z0-9-]+(?:\.exe)?|SHA256SUMS|senpi-desktop-engine-[A-Za-z0-9._-]+)$/
 const BINARY = /^omo-(?:darwin|linux|windows)-/
 const HEX64 = /^[0-9a-f]{64}$/
 
@@ -55,7 +56,8 @@ export function planMirrorAssets(assets: readonly ReleaseAsset[], sums: Readonly
     const digest = githubSha256(asset)
     if (digest === null) throw new MirrorPlanError(`${asset.name} has no GitHub sha256 digest`)
     const listed = sums.get(asset.name)
-    if (BINARY.test(asset.name) && listed === undefined) throw new MirrorPlanError(`${asset.name} is missing from SHA256SUMS`)
+    if (BINARY.test(asset.name) && listed === undefined)
+      throw new MirrorPlanError(`${asset.name} is missing from SHA256SUMS`)
     if (listed !== undefined && listed !== digest) {
       throw new MirrorPlanError(`${asset.name}: SHA256SUMS says ${listed} but GitHub says ${digest}`)
     }
@@ -100,7 +102,11 @@ export function shouldMoveChannel(current: string | null, next: string, force: b
 }
 
 /** Stable versions are kept forever; only pre-releases beyond the newest `keep` are pruned, never a pinned one. */
-export function betasToPrune(versions: readonly string[], protectedVersions: ReadonlySet<string>, keep: number = KEEP_BETAS): string[] {
+export function betasToPrune(
+  versions: readonly string[],
+  protectedVersions: ReadonlySet<string>,
+  keep: number = KEEP_BETAS,
+): string[] {
   const betas = [...new Set(versions.filter((version) => VERSION_PATTERN.test(version) && isPrerelease(version)))]
   betas.sort((left, right) => compareVersions(right, left))
   return betas.slice(keep).filter((version) => !protectedVersions.has(version))

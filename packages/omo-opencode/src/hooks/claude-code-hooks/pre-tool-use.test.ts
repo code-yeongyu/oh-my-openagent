@@ -39,9 +39,7 @@ describe("executePreToolUseHooks", () => {
   })
 
   it("#given no matching hooks #when called #then returns allow", async () => {
-    const config = createConfig([
-      { matcher: "Bash", hooks: [{ type: "command", command: "echo test" }] },
-    ])
+    const config = createConfig([{ matcher: "Bash", hooks: [{ type: "command", command: "echo test" }] }])
     const result = await executePreToolUseHooks(createContext({ toolName: "write" }), config)
     expect(result.decision).toBe("allow")
   })
@@ -49,9 +47,7 @@ describe("executePreToolUseHooks", () => {
   it("#given hook returns exit code 2 #when called #then returns deny", async () => {
     dispatchSpy.mockResolvedValue({ exitCode: 2, stdout: "", stderr: "blocked" })
 
-    const config = createConfig([
-      { matcher: "Write", hooks: [{ type: "command", command: "echo deny" }] },
-    ])
+    const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "echo deny" }] }])
     const result = await executePreToolUseHooks(createContext(), config)
 
     expect(result.decision).toBe("deny")
@@ -65,9 +61,7 @@ describe("executePreToolUseHooks", () => {
       stderr: "\r\nblocked line\r\n  detail\rfinal line\r\n",
     })
 
-    const config = createConfig([
-      { matcher: "Write", hooks: [{ type: "command", command: "echo deny" }] },
-    ])
+    const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "echo deny" }] }])
     const result = await executePreToolUseHooks(createContext(), config)
 
     expect(result.decision).toBe("deny")
@@ -77,9 +71,7 @@ describe("executePreToolUseHooks", () => {
   it("#given hook returns exit code 1 #when called #then returns ask", async () => {
     dispatchSpy.mockResolvedValue({ exitCode: 1, stdout: "", stderr: "needs confirmation" })
 
-    const config = createConfig([
-      { matcher: "Write", hooks: [{ type: "command", command: "echo ask" }] },
-    ])
+    const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "echo ask" }] }])
     const result = await executePreToolUseHooks(createContext(), config)
 
     expect(result.decision).toBe("ask")
@@ -201,9 +193,7 @@ describe("executePreToolUseHooks", () => {
         stderr: "",
       })
 
-      const config = createConfig([
-        { matcher: "Write", hooks: [{ type: "command", command: "bash modifier.sh" }] },
-      ])
+      const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "bash modifier.sh" }] }])
 
       const result = await executePreToolUseHooks(createContext(), config)
 
@@ -222,9 +212,7 @@ describe("executePreToolUseHooks", () => {
         stderr: "",
       })
 
-      const config = createConfig([
-        { matcher: "Write", hooks: [{ type: "command", command: "bash checker.sh" }] },
-      ])
+      const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "bash checker.sh" }] }])
 
       const result = await executePreToolUseHooks(createContext(), config)
 

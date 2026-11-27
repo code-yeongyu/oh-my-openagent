@@ -36,6 +36,7 @@ const OPENROUTER_ONLY = gateway("openrouter", [
   "openai/gpt-5.6-terra",
   "openai/gpt-6-luna",
   "moonshotai/kimi-k3",
+  "moonshotai/kimi-k3.1-pro",
   "z-ai/glm-5.3",
   "~deepseek/deepseek-flash-latest",
   "deepseek/deepseek-v4-pro",
@@ -53,6 +54,7 @@ const OPENGATEWAY_ONLY = gateway("opengateway", [
   "openai/gpt-5.6-sol",
   "openai/gpt-5.6-terra",
   "moonshotai/kimi-k3",
+  "moonshotai/kimi-k3.1-pro",
   "z-ai/glm-5.3",
   "deepseek/deepseek-flash",
   "deepseek/deepseek-v4-pro",
@@ -134,8 +136,9 @@ describe("builtin chains resolve only on their listed providers (#9146)", () => 
       const coverage = resolveCategoryCoverage({}, registry(OPENROUTER_ONLY))
 
       expect(coverage.usable).toEqual([])
-      expect(coverage.unusable.find((gap) => gap.name === "writing")?.unlistedProviderModel)
-        .toBe("openrouter/anthropic/claude-opus-5.5")
+      expect(coverage.unusable.find((gap) => gap.name === "writing")?.unlistedProviderModel).toBe(
+        "openrouter/anthropic/claude-opus-5.5",
+      )
     })
 
     test("#when the user pins that model #then the category resolves on it", () => {
@@ -172,10 +175,12 @@ describe("builtin chains resolve only on their listed providers (#9146)", () => 
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openrouter")
       expect(result.spec.modelId).toBe("openai/gpt-6-astra")
-      expect(resolveAvailableCategoryNames(
-        { categories: { ultrabrain: { models: ["openrouter/openai/gpt-6-astra"] } } },
-        registry(OPENROUTER_ONLY),
-      )).toEqual(["ultrabrain"])
+      expect(
+        resolveAvailableCategoryNames(
+          { categories: { ultrabrain: { models: ["openrouter/openai/gpt-6-astra"] } } },
+          registry(OPENROUTER_ONLY),
+        ),
+      ).toEqual(["ultrabrain"])
     })
 
     test("#when an agent names it as its model #then that pin is honored", () => {
@@ -206,29 +211,33 @@ describe("builtin chains resolve only on their listed providers (#9146)", () => 
       expect(result.spec.fallback_models?.map((entry) => entry.provider) ?? []).not.toContain("openrouter")
     })
 
-    test("#when ultrabrain resolves #then a later listed rung beats the gateway's copy of an earlier rung", () => {
+    test("#when ultrabrain resolves #then the rung's last listed provider beats the gateway's copy of the same model", () => {
       const result = resolveCategory(
         "ultrabrain",
         {},
-        registry([...OPENROUTER_ONLY, { provider: "github-copilot", id: "gpt-5.6-sol" }]),
+        registry([
+          ...OPENROUTER_ONLY,
+          { provider: "openrouter", id: "openai/gpt-6.2-astra" },
+          { provider: "opencode", id: "gpt-6.2-astra" },
+        ]),
       )
 
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.provider).toBe("github-copilot")
-      expect(result.spec.modelId).toBe("gpt-5.6-sol")
+      expect(result.spec.provider).toBe("opencode")
+      expect(result.spec.modelId).toBe("gpt-6.2-astra")
     })
 
     test("#when plan-consultant resolves #then the listed lane wins over the gateway", () => {
       const result = resolveAgent(
         "plan-consultant",
         BUILTIN_AGENTS,
-        registry([...OPENROUTER_ONLY, { provider: "moonshotai", id: "kimi-k3" }]),
+        registry([...OPENROUTER_ONLY, { provider: "moonshotai", id: "kimi-k3.1-pro" }]),
       )
 
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.model).toBe("moonshotai/kimi-k3")
+      expect(result.model).toBe("moonshotai/kimi-k3.1-pro")
     })
   })
 })

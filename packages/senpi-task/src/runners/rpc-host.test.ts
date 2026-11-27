@@ -7,13 +7,7 @@ import { RunnerError } from "./in-process/runner-error"
 import { isHostSessionHandle } from "./rpc-host"
 import { HostUnavailableError } from "./rpc-host/daemon"
 import { SessionHeldElsewhereError } from "./rpc-host/session-client"
-import {
-  CHILD_STATE_DIR,
-  childSpec,
-  fakeFallbackRunner,
-  hostRunnerHarness,
-  stubChannel,
-} from "./rpc-host.test-support"
+import { CHILD_STATE_DIR, childSpec, fakeFallbackRunner, hostRunnerHarness, stubChannel } from "./rpc-host.test-support"
 import type { FakeHostCommand } from "./rpc-host/__fixtures__/fake-host"
 import type { RpcRunnerSpec } from "./types"
 
@@ -168,7 +162,9 @@ describe("RpcHostRunner fallback", () => {
     const fallback = fakeFallbackRunner()
     const runner = runnerWithout({
       ensureDaemon: () =>
-        Promise.reject(new HostUnavailableError("ensure_failed", { fallbackAllowed: false, detail: "socket dir unwritable" })),
+        Promise.reject(
+          new HostUnavailableError("ensure_failed", { fallbackAllowed: false, detail: "socket dir unwritable" }),
+        ),
       fallback,
     })
 
@@ -230,6 +226,7 @@ describe("RpcHostRunner start failures", () => {
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("child-prompt-failed")
     expect(RunnerError.is(failure) ? failure.failure.rejected_while : undefined).toBe("alive")
     expect(RunnerError.is(failure) ? failure.failure.message : "").toContain("prompt rejected by the host")
+    await runner.settleTeardowns()
     expect(channel.calls).toEqual(["open", "prompt", "abort", "close", "detach"])
   })
 

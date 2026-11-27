@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server"
 import createMiddleware from "next-intl/middleware"
 import { locales, type Locale } from "./i18n/config"
 import { routing } from "./i18n/routing"
-import { desktopDownloadEnabled } from "./lib/desktop-download"
+import {
+  desktopDownloadEnabled,
+  PUBLIC_DESKTOP_BETA_URL,
+  PUBLIC_DESKTOP_STABLE_URL,
+} from "./lib/desktop-download"
 
 const handleI18nRouting = createMiddleware(routing)
 const oldHosts = new Set(["www.omo.dev"])
@@ -22,6 +26,16 @@ const installGuidePaths = new Set([
 ])
 
 const desktopPaths = new Set(["desktop"])
+
+// Shipped desktop builds link https://omo.dev/download (reinstall screen, deb update pill). While this
+// site's own download page is off, that path goes to the public stable download page (which links the
+// beta page), or to the beta page when `?channel=beta` asks for it, instead of a 404.
+// Temporary (307), not permanent: a browser must not keep skipping this site's page once it is enabled.
+function publicDesktopDownloadPage(request: NextRequest): string {
+  return request.nextUrl.searchParams.get("channel") === "beta"
+    ? PUBLIC_DESKTOP_BETA_URL
+    : PUBLIC_DESKTOP_STABLE_URL
+}
 
 function getLocaleSegment(segment: string | undefined): Locale | null {
   if (!segment) return null
@@ -58,7 +72,17 @@ function getDownloadPath(pathname: string): string | null {
   return locale ? `/${locale}/download` : "/download"
 }
 
+function isDownloadPath(pathname: string): boolean {
+  const segments = pathname.split("/").filter(Boolean)
+  const routeSegments = getLocaleSegment(segments[0]) ? segments.slice(1) : segments
+  return routeSegments.join("/") === "download"
+}
+
 export default function proxy(request: NextRequest): NextResponse {
+  if (!desktopDownloadEnabled() && isDownloadPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(publicDesktopDownloadPage(request), 307)
+  }
+
   const forwardedHost = request.headers.get("x-forwarded-host")
   const requestHost = request.headers.get("host")
   const hostname = (forwardedHost ?? requestHost ?? request.nextUrl.hostname).split(":")[0]
@@ -111,11 +135,13 @@ export const config = {
      * - Any path containing a dot (favicon.ico, *.webp, *.png, etc.)
      */
     "/((?!api|design|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
+    // Locale-agnostic on purpose: Next.js needs a literal matcher, so the locale itself is
+    // checked against the registry by getLocaleSegment instead of a second hand-written list.
     "/installation.md",
-    "/:locale(en|ko|ja|zh)/installation.md",
+    "/:locale/installation.md",
     "/docs/installation.md",
     "/docs/guide/install.md",
-    "/:locale(en|ko|ja|zh)/docs/guide/install.md",
-    "/:locale(en|ko|ja|zh)/docs/installation.md",
+    "/:locale/docs/guide/install.md",
+    "/:locale/docs/installation.md",
   ],
 }

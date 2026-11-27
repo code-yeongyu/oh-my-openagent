@@ -1,5 +1,10 @@
 import { isTeamMemberProcess } from "../../team/member-extension/identity"
-import { OMO_SENPI_TASK_DEPTH, OMO_SENPI_TASK_ROOT_SESSION_ID, OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
+import {
+  OMO_SENPI_TASK_DEPTH,
+  OMO_SENPI_TASK_ROOT_SESSION_ID,
+  OMO_SENPI_TASK_RPC_CHILD,
+  OMO_SENPI_TASK_TRACEPARENT,
+} from "../rpc/spawn"
 
 /**
  * The READER of what `buildChildContext` writes. One extension set serves every session of the
@@ -31,7 +36,9 @@ export function readSessionContext(pi: unknown): Readonly<Record<string, string>
   if (typeof pi !== "object" || pi === null || !("sessionContext" in pi)) return undefined
   const context = pi.sessionContext
   if (typeof context !== "object" || context === null) return undefined
-  const entries = Object.entries(context).flatMap(([key, value]) => (typeof value === "string" ? [[key, value] as const] : []))
+  const entries = Object.entries(context).flatMap(([key, value]) =>
+    typeof value === "string" ? [[key, value] as const] : [],
+  )
   return entries.length === 0 ? undefined : Object.fromEntries(entries)
 }
 
@@ -68,10 +75,25 @@ export function readSessionAncestry(pi: unknown, env: NodeJS.ProcessEnv = proces
   return childAncestry(env[OMO_SENPI_TASK_DEPTH], env[OMO_SENPI_TASK_ROOT_SESSION_ID])
 }
 
+/**
+ * The delegating turn's traceparent this omo-spawned session inherited, from the same two channels as
+ * its ancestry. An ordinary session never reads the variable, so an ambient value cannot parent it.
+ * Unvalidated: the telemetry consumer accepts only a well-formed W3C value.
+ */
+export function readSessionTraceparent(pi: unknown, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const context = readSessionContext(pi)
+  const role = context?.["role"]
+  if (role !== undefined && role.length > 0) return context?.["traceparent"]
+  if (!isTeamMemberProcess(env) && env[OMO_SENPI_TASK_RPC_CHILD] !== "1") return undefined
+  return env[OMO_SENPI_TASK_TRACEPARENT]
+}
+
 function childAncestry(depth: string | undefined, rootSessionId: string | undefined): SessionAncestry {
   const parsed = depth === undefined || depth.length === 0 ? Number.NaN : Number(depth)
   const resolved = Number.isInteger(parsed) && parsed >= 1 ? parsed : 1
-  return rootSessionId === undefined || rootSessionId.length === 0 ? { depth: resolved } : { depth: resolved, rootSessionId }
+  return rootSessionId === undefined || rootSessionId.length === 0
+    ? { depth: resolved }
+    : { depth: resolved, rootSessionId }
 }
 
 /** The member identity the daemon carries on the session, in place of the per-process env trio. */
@@ -86,7 +108,13 @@ export interface MemberSessionIdentity {
 export function readMemberSessionIdentity(pi: unknown): MemberSessionIdentity | undefined {
   const context = readSessionContext(pi)
   if (context?.["role"] !== "member") return undefined
-  const { team_run_id: teamRunId, member_name: memberName, team_config: teamConfig, task_id: taskId, state_dir: stateDir } = context
+  const {
+    team_run_id: teamRunId,
+    member_name: memberName,
+    team_config: teamConfig,
+    task_id: taskId,
+    state_dir: stateDir,
+  } = context
   if (teamRunId === undefined || memberName === undefined || teamConfig === undefined) return undefined
   if (taskId === undefined || stateDir === undefined) return undefined
   return { teamRunId, memberName, teamConfig, taskId, stateDir }

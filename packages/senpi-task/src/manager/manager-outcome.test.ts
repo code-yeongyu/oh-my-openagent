@@ -4,13 +4,8 @@ import { join } from "node:path"
 import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import type { TaskRecordStore } from "../store"
-import {
-  baseSpec,
-  cleanupProjects,
-  flush,
-  makeManager,
-  tempProject,
-} from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, flush, makeManager, tempProject } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -105,6 +100,25 @@ describe("TaskManager outcome guards", () => {
     expect(record?.final_response).toBeUndefined()
   })
 
+  test("#given a running child aborted by another client #when the runner settles interrupted with the partial text #then the record ends interrupted with no failure", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const taskId = started.task_id
+
+    // when - a foreign user abort: agent_end { aborted: true, abortSource: "user" } with no local abort
+    inProcess.handles.get(taskId)?.settle({ status: "interrupted", finalResponse: "partial work before the abort" })
+    await flush()
+
+    // then
+    const record = store.load(taskId)
+    expect(record?.status).toBe("interrupted")
+    expect(record?.final_response).toBe("partial work before the abort")
+    expect(record?.error_message).toBeUndefined()
+    expect(await manager.waitFor(taskId)).toMatchObject({ status: "interrupted" })
+  })
+
   test("#given a running child #when its outcome settles in the gap after forget but before persist_only lands #then the record is still untouched", async () => {
     // given
     const { manager, store, inProcess } = makeManager({})
@@ -185,7 +199,7 @@ describe("TaskManager outcome guards", () => {
     // given - the Windows EPERM class (#8050): every terminal transition is refused, so the on-disk
     // record is pinned at running and nothing re-reading the store can ever see a terminal.
     const project = tempProject()
-    const disk = createTaskRecordStore({ project_dir: project })
+    const disk = createTaskRecordStore(ownedTaskState(project))
     const refusal = Object.assign(new Error("EPERM: operation not permitted, rename"), {
       code: "EPERM",
       syscall: "rename",
@@ -238,7 +252,7 @@ describe("TaskManager background intent", () => {
 
     // then
     expect(promoted).toBe(true)
-    const reloaded = createTaskRecordStore({ project_dir: project })
+    const reloaded = createTaskRecordStore(ownedTaskState(project))
     expect(reloaded.load(taskId)?.notify_on_terminal).toBe(true)
     expect(manager.wasBackground(taskId)).toBe(true)
     expect(manager.promoteToBackground(taskId)).toBe(false)

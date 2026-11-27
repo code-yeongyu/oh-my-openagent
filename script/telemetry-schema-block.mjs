@@ -1,11 +1,17 @@
 import { pathToFileURL } from "node:url"
 
-import { OMO_NATIVE_EVENT_SCHEMAS } from "../packages/omo-senpi/src/components/telemetry/product-identity.ts"
+import {
+  OMO_NATIVE_COMMON_PROPERTY_SCHEMAS,
+  OMO_NATIVE_EVENT_SCHEMAS,
+} from "../packages/omo-senpi/src/components/telemetry/product-identity.ts"
 
 const BEGIN_SENTINEL = "<!-- BEGIN GENERATED SCHEMA -->"
 const END_SENTINEL = "<!-- END GENERATED SCHEMA -->"
 
-export function generateTelemetrySchemaBlock(schemas = OMO_NATIVE_EVENT_SCHEMAS) {
+export function generateTelemetrySchemaBlock(
+  schemas = OMO_NATIVE_EVENT_SCHEMAS,
+  commonProperties = OMO_NATIVE_COMMON_PROPERTY_SCHEMAS,
+) {
   if (schemas === null || typeof schemas !== "object" || Array.isArray(schemas)) {
     throw new TypeError("Telemetry event schemas must be an object")
   }
@@ -17,29 +23,32 @@ export function generateTelemetrySchemaBlock(schemas = OMO_NATIVE_EVENT_SCHEMAS)
 
   const rows = entries.flatMap(([eventName, properties]) => {
     assertMarkdownIdentifier(eventName, "event name")
-    if (properties === null || typeof properties !== "object" || Array.isArray(properties) || Object.keys(properties).length === 0) {
+    if (
+      properties === null ||
+      typeof properties !== "object" ||
+      Array.isArray(properties) ||
+      Object.keys(properties).length === 0
+    ) {
       throw new Error(`Telemetry event ${eventName} must contain at least one property schema`)
     }
 
     return Object.entries(properties).map(([propertyName, schema]) => {
-      assertMarkdownIdentifier(propertyName, `property for ${eventName}`)
-      if (schema === null || typeof schema !== "object" || Array.isArray(schema)) {
-        throw new Error(`Telemetry property ${eventName}.${propertyName} must contain schema metadata`)
-      }
-      const type = schema.type
-      if (type !== "boolean" && type !== "number" && type !== "string") {
-        throw new Error(`Telemetry property ${eventName}.${propertyName} has invalid type ${String(type)}`)
-      }
-      const values = schema.values
-      if (values !== undefined && (!Array.isArray(values) || values.length === 0)) {
-        throw new Error(`Telemetry property ${eventName}.${propertyName} values must be a non-empty array`)
-      }
-      const valueCell = values === undefined ? "-" : values.map((value) => {
-        assertMarkdownIdentifier(value, `allowed value for ${eventName}.${propertyName}`)
-        return `\`${value}\``
-      }).join(", ")
-      return `| \`${eventName}\` | \`${propertyName}\` | \`${type}\` | ${valueCell} |`
+      const cells = describeProperty(eventName, propertyName, schema)
+      return `| \`${eventName}\` | \`${propertyName}\` | ${cells} |`
     })
+  })
+
+  if (
+    commonProperties === null ||
+    typeof commonProperties !== "object" ||
+    Array.isArray(commonProperties) ||
+    Object.keys(commonProperties).length === 0
+  ) {
+    throw new Error("Telemetry common properties must contain at least one property schema")
+  }
+  const commonRows = Object.entries(commonProperties).map(([propertyName, schema]) => {
+    const cells = describeProperty("common", propertyName, schema)
+    return `| \`${propertyName}\` | ${cells} |`
   })
 
   return [
@@ -49,8 +58,41 @@ export function generateTelemetrySchemaBlock(schemas = OMO_NATIVE_EVENT_SCHEMAS)
     "| Event | Property | Type | Allowed values |",
     "|-------|----------|------|----------------|",
     ...rows,
+    "",
+    "## Common properties",
+    "",
+    "Every event above also carries these properties.",
+    "",
+    "| Property | Type | Allowed values |",
+    "|----------|------|----------------|",
+    ...commonRows,
     END_SENTINEL,
   ].join("\n")
+}
+
+function describeProperty(owner, propertyName, schema) {
+  assertMarkdownIdentifier(propertyName, `property for ${owner}`)
+  if (schema === null || typeof schema !== "object" || Array.isArray(schema)) {
+    throw new Error(`Telemetry property ${owner}.${propertyName} must contain schema metadata`)
+  }
+  const type = schema.type
+  if (type !== "boolean" && type !== "number" && type !== "string") {
+    throw new Error(`Telemetry property ${owner}.${propertyName} has invalid type ${String(type)}`)
+  }
+  const values = schema.values
+  if (values !== undefined && (!Array.isArray(values) || values.length === 0)) {
+    throw new Error(`Telemetry property ${owner}.${propertyName} values must be a non-empty array`)
+  }
+  const valueCell =
+    values === undefined
+      ? "-"
+      : values
+          .map((value) => {
+            assertMarkdownIdentifier(value, `allowed value for ${owner}.${propertyName}`)
+            return `\`${value}\``
+          })
+          .join(", ")
+  return `\`${type}\` | ${valueCell}`
 }
 
 function assertMarkdownIdentifier(value, description) {

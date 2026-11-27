@@ -55,122 +55,139 @@ function formatOffendingLine(lineNumber: number, line: string): string {
 }
 
 describe("dist bundle Bun globals", () => {
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned #then no globalThis.Bun destructures remain", async () => {
-    const dist = await Bun.file(DIST_INDEX).text()
+  test.skipIf(!existsSync(DIST_INDEX))(
+    "#given dist bundle #when scanned #then no globalThis.Bun destructures remain",
+    async () => {
+      const dist = await Bun.file(DIST_INDEX).text()
 
-    const matches = dist.match(GLOBAL_BUN_DESTRUCTURE) ?? []
+      const matches = dist.match(GLOBAL_BUN_DESTRUCTURE) ?? []
 
-    expect(matches).toEqual([])
-  })
+      expect(matches).toEqual([])
+    },
+  )
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned #then no top-level __require call remains", async () => {
-    const dist = await Bun.file(DIST_INDEX).text()
-    const offending: string[] = []
-    let depth = 0
+  test.skipIf(!existsSync(DIST_INDEX))(
+    "#given dist bundle #when scanned #then no top-level __require call remains",
+    async () => {
+      const dist = await Bun.file(DIST_INDEX).text()
+      const offending: string[] = []
+      let depth = 0
 
-    for (const [index, line] of dist.split("\n").entries()) {
-      if (depth === 0 && line.includes(TOP_LEVEL_REQUIRE_CALL)) {
-        offending.push(`${index + 1}: ${line.trim()}`)
-      }
+      for (const [index, line] of dist.split("\n").entries()) {
+        if (depth === 0 && line.includes(TOP_LEVEL_REQUIRE_CALL)) {
+          offending.push(`${index + 1}: ${line.trim()}`)
+        }
 
-      for (const char of line) {
-        if (char === "{") {
-          depth += 1
-        } else if (char === "}") {
-          depth -= 1
-          if (depth < 0) depth = 0
+        for (const char of line) {
+          if (char === "{") {
+            depth += 1
+          } else if (char === "}") {
+            depth -= 1
+            if (depth < 0) depth = 0
+          }
         }
       }
-    }
 
-    expect(offending).toEqual([])
-  })
+      expect(offending).toEqual([])
+    },
+  )
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when imported under node --input-type=module #then it loads without error", async () => {
-    const node = Bun.which("node")
-    if (!node) return
+  test.skipIf(!existsSync(DIST_INDEX))(
+    "#given dist bundle #when imported under node --input-type=module #then it loads without error",
+    async () => {
+      const node = Bun.which("node")
+      if (!node) return
 
-    const proc = Bun.spawn({
-      cmd: [node, "--input-type=module", "-e", "await import('./dist/index.js'); console.log('node-esm-load-ok')"],
-      cwd: process.cwd(),
-      stdout: "pipe",
-      stderr: "pipe",
-    })
+      const proc = Bun.spawn({
+        cmd: [node, "--input-type=module", "-e", "await import('./dist/index.js'); console.log('node-esm-load-ok')"],
+        cwd: process.cwd(),
+        stdout: "pipe",
+        stderr: "pipe",
+      })
 
-    const stdout = await new Response(proc.stdout).text()
-    const stderr = await new Response(proc.stderr).text()
-    const exitCode = await proc.exited
+      const stdout = await new Response(proc.stdout).text()
+      const stderr = await new Response(proc.stderr).text()
+      const exitCode = await proc.exited
 
-    expect({
-      exitCode,
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-    }).toEqual({
-      exitCode: 0,
-      stdout: "node-esm-load-ok",
-      stderr: "",
-    })
-  }, 20_000)
+      expect({
+        exitCode,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+      }).toEqual({
+        exitCode: 0,
+        stdout: "node-esm-load-ok",
+        stderr: "",
+      })
+    },
+    20_000,
+  )
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned for raw Bun runtime APIs #then no unshimmed Bun API calls remain", async () => {
-    expect(hasRawBunApiCall("Bun.file('dist/index.js')")).toBe(true)
-    expect(hasRawBunApiCall("runtime.Bun.file('dist/index.js')")).toBe(false)
-    expect(hasRawBunApiCall(".Bun.file('dist/index.js')")).toBe(false)
-    expect(hasRawBunApiCall("$Bun.file('dist/index.js')")).toBe(false)
-    expect(hasRawBunApiCall("Bun.spawnSync.options")).toBe(true)
-    expect(hasRawBunApiCall("Bun.readableStreamToText(stream)")).toBe(true)
+  test.skipIf(!existsSync(DIST_INDEX))(
+    "#given dist bundle #when scanned for raw Bun runtime APIs #then no unshimmed Bun API calls remain",
+    async () => {
+      expect(hasRawBunApiCall("Bun.file('dist/index.js')")).toBe(true)
+      expect(hasRawBunApiCall("runtime.Bun.file('dist/index.js')")).toBe(false)
+      expect(hasRawBunApiCall(".Bun.file('dist/index.js')")).toBe(false)
+      expect(hasRawBunApiCall("$Bun.file('dist/index.js')")).toBe(false)
+      expect(hasRawBunApiCall("Bun.spawnSync.options")).toBe(true)
+      expect(hasRawBunApiCall("Bun.readableStreamToText(stream)")).toBe(true)
 
-    const dist = await Bun.file(DIST_INDEX).text()
-    const offending: string[] = []
-    let insideJSDoc = false
+      const dist = await Bun.file(DIST_INDEX).text()
+      const offending: string[] = []
+      let insideJSDoc = false
 
-    for (const [index, line] of dist.split("\n").entries()) {
-      const trimmed = line.trimStart()
+      for (const [index, line] of dist.split("\n").entries()) {
+        const trimmed = line.trimStart()
 
-      if (insideJSDoc || trimmed.startsWith("/**")) {
-        insideJSDoc = !trimmed.includes("*/")
-        continue
+        if (insideJSDoc || trimmed.startsWith("/**")) {
+          insideJSDoc = !trimmed.includes("*/")
+          continue
+        }
+
+        if (line.includes("runtime.Bun") || line.includes("globalThis.Bun") || line.includes("typeof Bun")) {
+          continue
+        }
+
+        RAW_BUN_API_CALL.lastIndex = 0
+        const rawMatch = [...line.matchAll(RAW_BUN_API_CALL)].find(
+          (match) => match.index !== undefined && !isInsideStringLiteral(line, match.index),
+        )
+
+        if (rawMatch) {
+          offending.push(formatOffendingLine(index + 1, line))
+        }
       }
 
-      if (line.includes("runtime.Bun") || line.includes("globalThis.Bun") || line.includes("typeof Bun")) {
-        continue
-      }
+      expect(
+        offending,
+        `Expected zero raw Bun API calls in dist/index.js but found ${offending.length}:\n${offending.join("\n")}`,
+      ).toEqual([])
+    },
+  )
 
-      RAW_BUN_API_CALL.lastIndex = 0
-      const rawMatch = [...line.matchAll(RAW_BUN_API_CALL)].find(
-        (match) => match.index !== undefined && !isInsideStringLiteral(line, match.index),
-      )
+  test.skipIf(!existsSync(DIST_INDEX))(
+    "#given dist bundle #when imported and inspected under node --input-type=module #then stderr has no Bun reference errors",
+    async () => {
+      const node = Bun.which("node")
+      if (!node) return
 
-      if (rawMatch) {
-        offending.push(formatOffendingLine(index + 1, line))
-      }
-    }
+      const proc = Bun.spawn({
+        cmd: [node, "--input-type=module", "-e", NODE_EXPORT_SMOKE_SCRIPT],
+        cwd: process.cwd(),
+        stdout: "pipe",
+        stderr: "pipe",
+      })
 
-    expect(
-      offending,
-      `Expected zero raw Bun API calls in dist/index.js but found ${offending.length}:\n${offending.join("\n")}`,
-    ).toEqual([])
-  })
+      const stdout = await new Response(proc.stdout).text()
+      const stderr = await new Response(proc.stderr).text()
+      const exitCode = await proc.exited
+      const stderrLower = stderr.toLowerCase()
 
-  test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when imported and inspected under node --input-type=module #then stderr has no Bun reference errors", async () => {
-    const node = Bun.which("node")
-    if (!node) return
-
-    const proc = Bun.spawn({
-      cmd: [node, "--input-type=module", "-e", NODE_EXPORT_SMOKE_SCRIPT],
-      cwd: process.cwd(),
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-
-    const stdout = await new Response(proc.stdout).text()
-    const stderr = await new Response(proc.stderr).text()
-    const exitCode = await proc.exited
-    const stderrLower = stderr.toLowerCase()
-
-    expect(exitCode, stderr.trim()).toBe(0)
-    expect(stdout).toContain("SMOKE_OK:")
-    expect(stderrLower).not.toContain("referenceerror")
-    expect(stderr).not.toContain("Bun is not defined")
-  }, 20_000)
+      expect(exitCode, stderr.trim()).toBe(0)
+      expect(stdout).toContain("SMOKE_OK:")
+      expect(stderrLower).not.toContain("referenceerror")
+      expect(stderr).not.toContain("Bun is not defined")
+    },
+    20_000,
+  )
 })

@@ -4,17 +4,20 @@ import { Buffer } from "node:buffer"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { REFLECTION_SNAPSHOT_MAX_BYTES, captureCursorSnapshot, deriveState, finalizeCursor, initialReflectionState } from "./cursor"
+import {
+  REFLECTION_SNAPSHOT_MAX_BYTES,
+  captureCursorSnapshot,
+  deriveState,
+  finalizeCursor,
+  initialReflectionState,
+} from "./cursor"
 import { projectTranscriptEntries, type TranscriptEntry } from "./entries"
 import { TranscriptJournal } from "./store"
 import { realpathSync } from "node:fs"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 function entryBytes(entries: readonly TranscriptEntry[]): number {
-  return entries.reduce(
-    (total, entry) => total + Buffer.byteLength(`${JSON.stringify(entry)}\n`, "utf8"),
-    0,
-  )
+  return entries.reduce((total, entry) => total + Buffer.byteLength(`${JSON.stringify(entry)}\n`, "utf8"), 0)
 }
 
 function assistantEntries(count: number, textLength: number): TranscriptEntry[] {
@@ -51,9 +54,7 @@ describe("reflection cursor", () => {
   it("#given an aborted signal #when snapshot capture starts #then reflection state is not mutated", async () => {
     // given
     const journal = await createJournal()
-    await journal.reconcile([
-      { kind: "assistant", messageId: "assistant-1", textBlocks: ["first"] },
-    ])
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["first"] }])
     const controller = new AbortController()
     controller.abort()
 
@@ -80,9 +81,7 @@ describe("reflection cursor", () => {
     const snapshot = await journal.captureReflectionSnapshot()
     expect(snapshot).not.toBeNull()
     if (snapshot === null) throw new Error("expected a reflection snapshot")
-    await journal.reconcile([
-      { kind: "assistant", messageId: "assistant-2", textBlocks: ["second"] },
-    ])
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-2", textBlocks: ["second"] }])
 
     // when
     await journal.finalizeReflection(snapshot, true)
@@ -99,15 +98,15 @@ describe("reflection cursor", () => {
     expect(state.last_reflection_started_at).toBe("2026-08-09T12:00:01.000Z")
     expect(state.last_reflection_succeeded_at).toBe("2026-08-09T12:00:03.000Z")
     const transcript = await readFile(join(journal.options.journalDir, "transcript.jsonl"), "utf8")
-    expect(state.reflected_through_byte_offset).toBe(Buffer.byteLength(transcript.split("\n").slice(0, 3).join("\n") + "\n", "utf8"))
+    expect(state.reflected_through_byte_offset).toBe(
+      Buffer.byteLength(transcript.split("\n").slice(0, 3).join("\n") + "\n", "utf8"),
+    )
   })
 
   it("#given a captured snapshot #when reflection fails #then the cursor remains retryable", async () => {
     // given
     const journal = await createJournal()
-    await journal.reconcile([
-      { kind: "assistant", messageId: "assistant-1", textBlocks: ["first"] },
-    ])
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["first"] }])
     const snapshot = await journal.captureReflectionSnapshot()
     if (snapshot === null) throw new Error("expected a reflection snapshot")
 
@@ -163,10 +162,7 @@ describe("reflection cursor", () => {
     // then
     if (snapshot === null) throw new Error("expected a reflection snapshot")
     expect(snapshot.end_message_id).toBe("assistant-0")
-    expect(snapshot.entries.map((entry) => entry.source_message_id)).toEqual([
-      "assistant-0",
-      "assistant-0",
-    ])
+    expect(snapshot.entries.map((entry) => entry.source_message_id)).toEqual(["assistant-0", "assistant-0"])
     expect(entryBytes(snapshot.entries)).toBeGreaterThan(maxBytes)
     expect(snapshot.backlog_remaining).toBe(entries.length - 2)
   })
@@ -195,7 +191,11 @@ describe("reflection cursor", () => {
     const entries: TranscriptEntry[] = [
       ...assistantEntries(1, 20),
       ...projectTranscriptEntries(
-        { kind: "assistant", messageId: "assistant-tail", toolCalls: [{ callId: "tail-tool", name: "read", resultText: "tail" }] },
+        {
+          kind: "assistant",
+          messageId: "assistant-tail",
+          toolCalls: [{ callId: "tail-tool", name: "read", resultText: "tail" }],
+        },
         "2026-08-09T12:00:01.000Z",
       ),
     ]

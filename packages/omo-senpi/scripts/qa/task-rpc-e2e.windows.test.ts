@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const isWin32 = process.platform === "win32"
 const driverPath = fileURLToPath(new URL("./task-rpc-e2e.mjs", import.meta.url))
@@ -39,7 +40,10 @@ type DriverPayload = {
   readonly wiringFixed: boolean
 }
 
-function createDeadline(timeoutMs: number, label: string): {
+function createDeadline(
+  timeoutMs: number,
+  label: string,
+): {
   readonly promise: Promise<never>
   readonly cancel: () => void
 } {
@@ -62,7 +66,7 @@ async function waitForClose(child: ChildProcess): Promise<DriverExit> {
   const [code, signal] = await once(child, "close")
   return {
     code: typeof code === "number" ? code : null,
-    signal: typeof signal === "string" ? signal as NodeJS.Signals : null,
+    signal: typeof signal === "string" ? (signal as NodeJS.Signals) : null,
   }
 }
 
@@ -73,7 +77,9 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
     child.kill("SIGKILL")
     return
   }
-  const killer = spawn("taskkill.exe", ["/pid", String(pid), "/T", "/F"], {
+  const args = windowsTreeKillArgs(pid)
+  if (args.length === 0) return
+  const killer = spawn("taskkill.exe", args, {
     stdio: "ignore",
     windowsHide: true,
   })
@@ -90,7 +96,9 @@ function check(payload: DriverPayload, name: string): DriverCheck | undefined {
 function assertDriverChecks(payload: DriverPayload): void {
   const failed = payload.checks.filter((candidate) => candidate.verdict !== "PASS")
   if (payload.result !== "PASS" || failed.length > 0) {
-    throw new Error(`WINDOWS_TASK_RPC_E2E result=${payload.result}; failing checks: ${failed.map((candidate) => candidate.check).join(", ") || "none reported"}`)
+    throw new Error(
+      `WINDOWS_TASK_RPC_E2E result=${payload.result}; failing checks: ${failed.map((candidate) => candidate.check).join(", ") || "none reported"}`,
+    )
   }
 }
 

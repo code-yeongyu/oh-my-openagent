@@ -8,10 +8,7 @@ type ChatHeadersHook = PluginInstance extends { "chat.headers"?: infer T }
   ? T
   : (input: unknown, output: unknown) => Promise<void>
 
-export type PluginInterface = Omit<
-  PluginInstance,
-  "experimental.session.compacting" | "chat.headers"
-> & {
+export type PluginInterface = Omit<PluginInstance, "experimental.session.compacting" | "chat.headers"> & {
   "chat.headers"?: ChatHeadersHook
 }
 

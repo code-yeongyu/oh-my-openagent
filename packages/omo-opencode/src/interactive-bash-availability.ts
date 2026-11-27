@@ -8,8 +8,6 @@ function defaultWhich(binary: string): string | null {
   return (globalThis as RuntimeWithBun).Bun?.which(binary) ?? null
 }
 
-export function isInteractiveBashEnabled(
-  which: (binary: string) => string | null = defaultWhich,
-): boolean {
+export function isInteractiveBashEnabled(which: (binary: string) => string | null = defaultWhich): boolean {
   return which("tmux") !== null
 }

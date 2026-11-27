@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import { runLifecycleProbe, runLifecycleMutationProbe } from "./chaos-drive"
 import type { InvariantId } from "./chaos-invariants"
+import { useOwnedAgentDir } from "../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 const LIFECYCLE_INVARIANTS = [6, 7, 8, 9, 10, 11, 12, 13] as const satisfies readonly InvariantId[]
 
@@ -41,8 +44,9 @@ describe("suspend/revive lifecycle chaos model", () => {
       // then
       expect(report.violations.some((violation) => violation.invariant === invariant)).toBe(true)
       if (mutation === "capacity_gate_reclamation") {
-        expect(report.violations.find((violation) => violation.invariant === 12)?.detail)
-          .toContain("remained ownerless after capacity-gated reconcile")
+        expect(report.violations.find((violation) => violation.invariant === 12)?.detail).toContain(
+          "remained ownerless after capacity-gated reconcile",
+        )
       }
     })
   }

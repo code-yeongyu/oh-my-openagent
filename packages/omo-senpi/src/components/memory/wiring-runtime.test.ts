@@ -9,6 +9,7 @@ import { createMemoryIdentityContext } from "./context"
 import type { FactsExtractorRunnerOptions } from "./facts-runner"
 import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
 import { loadedMemoryConfig, memorySettings } from "./memory.test-support"
+import { withLaunchScope } from "./launch-facts"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 
 const roots: string[] = []
@@ -25,16 +26,22 @@ describe("memory runtime facts wiring", () => {
       binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
     })
     let captured: FactsExtractorRunnerOptions | undefined
-    const runtime = createMemoryRuntimeWiring({
-      sessions: new Map(),
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-      cwd: () => root,
-      env: {},
-      createFactsExtractor: (options) => {
-        captured = options
-        return { launchPending: async () => ({ status: "empty" }), reconcilePending: async () => ({ status: "empty" }) }
+    const runtime = createMemoryRuntimeWiring(
+      {
+        sessions: new Map(),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        env: {},
+        createFactsExtractor: (options) => {
+          captured = options
+          return {
+            launchPending: async () => ({ status: "empty" }),
+            reconcilePending: async () => ({ status: "empty" }),
+          }
+        },
       },
-    }, {})
+      {},
+    )
 
     // when
     runtime.factsWiringFor(identity)
@@ -59,19 +66,24 @@ describe("memory runtime agent-dir resolution", () => {
     let captured: MemoryIdentityRuntimeDeps | undefined
 
     // when
-    createMemoryRuntimeWiring({
-      sessions: new Map(),
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-      cwd: () => root,
-      env: {},
-      createRuntime: (_identity, deps) => {
-        captured = deps
-        return stubRuntime()
+    createMemoryRuntimeWiring(
+      {
+        sessions: new Map(),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        env: {},
+        createRuntime: (_identity, deps) => {
+          captured = deps
+          return stubRuntime()
+        },
       },
-    }, { current: { agentDir: engineAgentDir } }).runtimeFor(identity)
+      { current: { agentDir: engineAgentDir, sessionManager: { getSessionId: () => "session-1" } } },
+    ).runtimeFor(identity)
 
-    // then
-    expect(captured?.resolveAgentDir?.()).toBe(engineAgentDir)
+    // then: a launch reads it inside its run's scope, which this session belongs to (#10339)
+    expect(withLaunchScope({ conversationIds: ["session-1"] }, () => captured?.resolveAgentDir?.())).toBe(
+      engineAgentDir,
+    )
   }, 30_000)
 
   test("#given an event context whose agent dir is unusable #when a reflection runtime is created #then it falls back to the detected agent home", async () => {
@@ -80,16 +92,19 @@ describe("memory runtime agent-dir resolution", () => {
     let captured: MemoryIdentityRuntimeDeps | undefined
 
     // when
-    createMemoryRuntimeWiring({
-      sessions: new Map(),
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-      cwd: () => root,
-      env: {},
-      createRuntime: (_identity, deps) => {
-        captured = deps
-        return stubRuntime()
+    createMemoryRuntimeWiring(
+      {
+        sessions: new Map(),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        env: {},
+        createRuntime: (_identity, deps) => {
+          captured = deps
+          return stubRuntime()
+        },
       },
-    }, { current: { agentDir: "   " } }).runtimeFor(identity)
+      { current: { agentDir: "   " } },
+    ).runtimeFor(identity)
 
     // then
     expect(captured?.resolveAgentDir?.()).toBe(resolveAgentHome({ env: process.env }))
@@ -107,23 +122,28 @@ describe("memory runtime agent-dir resolution", () => {
     }
 
     // when
-    createMemoryRuntimeWiring({
-      sessions: new Map(),
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-      cwd: () => root,
-      env: {},
-      createRuntime: (_identity, deps) => {
-        captured = deps
-        return stubRuntime()
+    createMemoryRuntimeWiring(
+      {
+        sessions: new Map(),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        env: {},
+        createRuntime: (_identity, deps) => {
+          captured = deps
+          return stubRuntime()
+        },
       },
-    }, { current: disposedContext }).runtimeFor(identity)
+      { current: disposedContext },
+    ).runtimeFor(identity)
 
     // then
     expect(captured?.resolveAgentDir?.()).toBe(resolveAgentHome({ env: process.env }))
   }, 30_000)
 })
 
-async function seedIdentity(name: string): Promise<{ readonly root: string; readonly identity: ReturnType<typeof createMemoryIdentityContext> }> {
+async function seedIdentity(
+  name: string,
+): Promise<{ readonly root: string; readonly identity: ReturnType<typeof createMemoryIdentityContext> }> {
   const root = await mkdtemp(`${tmpdir()}/omo-memory-runtime-wiring-`)
   roots.push(root)
   return {

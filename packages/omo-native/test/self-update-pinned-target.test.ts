@@ -29,7 +29,9 @@ describe("updateTarget", () => {
     })
 
     test("#then an npm install pins omo-ai@<version>", () => {
-      expect(updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.1.1", "/home/u", noLockfile, "5.1.2")).toEqual({
+      expect(
+        updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.1.1", "/home/u", noLockfile, "5.1.2"),
+      ).toEqual({
         manager: "npm",
         command: "npm i -g omo-ai@5.1.2",
         argv: ["npm", "i", "-g", "omo-ai@5.1.2"],
@@ -37,7 +39,14 @@ describe("updateTarget", () => {
     })
 
     test("#then a beta install pins the exact beta version instead of the beta tag", () => {
-      const target = updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.0.0-0.beta.90", "/home/u", noLockfile, "5.0.0-0.beta.91")
+      const target = updateTarget(
+        "/tmp/prefix/lib/node_modules/omo-ai",
+        "linux",
+        "5.0.0-0.beta.90",
+        "/home/u",
+        noLockfile,
+        "5.0.0-0.beta.91",
+      )
       expect(target.argv).toEqual(["npm", "i", "-g", "omo-ai@5.0.0-0.beta.91"])
     })
   })
@@ -45,7 +54,8 @@ describe("updateTarget", () => {
 
 describe("omo update against the channel dist-tag", () => {
   const bunRootPath = "/tmp/custom-bun/install/global/node_modules/omo-ai"
-  const resolveBunUpdate = (targetVersion?: string) => updateTarget(bunRootPath, "linux", "5.1.1", "/home/u", () => false, targetVersion)
+  const resolveBunUpdate = (targetVersion?: string) =>
+    updateTarget(bunRootPath, "linux", "5.1.1", "/home/u", () => false, targetVersion)
   const resolveNpmUpdate = (targetVersion?: string) =>
     updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.1.1", "/home/u", () => false, targetVersion)
 
@@ -53,6 +63,7 @@ describe("omo update against the channel dist-tag", () => {
     distTags: Record<string, string> | null
     versions: string[]
     status?: number
+    engine?: string
     resolveUpdate?: (targetVersion?: string) => ReturnType<typeof updateTarget>
   }) {
     const spawned: Array<{ command: string; args: string[]; env: NodeJS.ProcessEnv }> = []
@@ -70,7 +81,7 @@ describe("omo update against the channel dist-tag", () => {
         readInstalled: () => {
           const omo = options.versions[Math.min(reads, options.versions.length - 1)] ?? "unknown"
           reads += 1
-          return { omo, engine: "2026.9.29" }
+          return { omo, engine: options.engine ?? "2026.9.29" }
         },
         run: async (command: string, args: string[], runOptions: { env?: NodeJS.ProcessEnv } = {}) => {
           spawned.push({ command, args, env: runOptions.env ?? {} })
@@ -98,11 +109,13 @@ describe("omo update against the channel dist-tag", () => {
     const h = harness({ distTags: { latest: "5.1.2" }, versions: ["5.1.1", "5.1.2"] })
     const code = await runSelfUpdate(["update"], h.options)
     expect(code).toBe(0)
-    expect(h.spawned).toEqual([{
-      command: "bun",
-      args: ["add", "-g", "omo-ai@5.1.2"],
-      env: { PATH: "/usr/bin", BUN_INSTALL: "/tmp/custom-bun" },
-    }])
+    expect(h.spawned).toEqual([
+      {
+        command: "bun",
+        args: ["add", "-g", "omo-ai@5.1.2"],
+        env: { PATH: "/usr/bin", BUN_INSTALL: "/tmp/custom-bun" },
+      },
+    ])
     expect(h.lines).toEqual([
       "omo is updated via bun: bun add -g omo-ai@5.1.2",
       "omo 5.1.1 -> 5.1.2 (engine: senpi 2026.9.29)",
@@ -124,6 +137,14 @@ describe("omo update against the channel dist-tag", () => {
     expect(h.spawned).toEqual([])
     expect(h.lines).toEqual(["omo 5.1.2 is up to date (omo-ai@latest is 5.1.2)"])
     expect(h.errors).toEqual([])
+  })
+
+  test("#given the installed version equals the dist-tag but the engine tree cannot be resolved #then it exits non-zero naming the reinstall command and runs no install", async () => {
+    const h = harness({ distTags: { latest: "5.1.2" }, versions: ["5.1.2"], engine: "unknown" })
+    const code = await runSelfUpdate(["update"], h.options)
+    expect(code).toBe(1)
+    expect(h.spawned).toEqual([])
+    expect(h.errors.join("\n")).toContain("bun add -g omo-ai@5.1.2")
   })
 
   test("#given a beta install #then it follows the beta dist-tag", async () => {

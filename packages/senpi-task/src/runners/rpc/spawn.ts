@@ -4,13 +4,20 @@ import { basename, dirname, join, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { RpcRunnerSpec } from "../types"
+import { rpcChildAncestry } from "../child-ancestry"
+import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
-import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES, WORKPOOL_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
+import {
+  MEMBER_EXTENSION_BUNDLE_NAME,
+  MEMBER_PROCESS_ENV_NAMES,
+  WORKPOOL_PROCESS_ENV_NAMES,
+} from "../../team/member-extension/identity"
 import {
   detectBunBinary,
   detectCompiledEngine,
   readRunningEngineVersion,
   resolveSenpiLauncher,
+  resolveSenpiLaunchTarget,
 } from "./senpi-launcher"
 
 export {
@@ -29,6 +36,7 @@ const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 export const OMO_SENPI_TASK_RPC_CHILD = "OMO_SENPI_TASK_RPC_CHILD"
 export const OMO_SENPI_TASK_DEPTH = "OMO_SENPI_TASK_DEPTH"
 export const OMO_SENPI_TASK_ROOT_SESSION_ID = "OMO_SENPI_TASK_ROOT_SESSION_ID"
+export const OMO_SENPI_TASK_TRACEPARENT = "OMO_SENPI_TASK_TRACEPARENT"
 const RPC_ENTRY_SPECIFIER = "@code-yeongyu/senpi/rpc-entry"
 
 export type RpcSpawnSpec = RpcRunnerSpec & {
@@ -53,7 +61,8 @@ export type RpcSpawnRuntime = {
   // Injectable so tests can pin the executable-vs-fallback branch; defaults to resolveSenpiExecutable.
   readonly resolveSenpiExecutable?: (runtime: RpcSpawnRuntime) => string | null
   // Running @code-yeongyu/senpi version used to reject PATH/sibling candidates of a different version.
-  // When omitted or unreadable, the parity check is skipped (candidates are accepted).
+  // When omitted or unreadable, the parity check is skipped (candidates are accepted). It is also the
+  // launched engine's version when the child runs the compiled engine or the rpc-entry fallback.
   readonly engineVersion?: string
   // Optional diagnostics for rejected PATH/sibling candidates. Defaults to a no-op.
   readonly onWarning?: (message: string) => void
@@ -88,7 +97,7 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   // The OMO launcher prepends its own extension before user/provider entries. DAG-owned tasks drop
   // that first entry so the detached child cannot boot a task engine, while provider extensions
   // and every non-DAG child's extension list remain unchanged.
-  const extensions = isDagOwnedChild(spec) ? (spec.extensions ?? []).slice(1) : spec.extensions ?? []
+  const extensions = isDagOwnedChild(spec) ? (spec.extensions ?? []).slice(1) : (spec.extensions ?? [])
   for (const entry of extensions) {
     if (entry.length > 0) args.push("--extension", entry)
   }
@@ -99,6 +108,7 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   if (thinkingLevel !== undefined) {
     args.push("--thinking", thinkingLevel)
   }
+  if (spec.permissionPreset !== undefined) args.push("--permission-preset", spec.permissionPreset)
   return args
 }
 
@@ -162,7 +172,13 @@ function buildChildProfile(
   // a space-joined value would parse one capability as "b extension_events" and drop the event.
   for (const varName of ["SENPI_RPC_CLIENT_CAPABILITIES", "RPC_CLIENT_CAPABILITIES", "OMO_RPC_CLIENT_CAPABILITIES"]) {
     const current = env[varName]
-    if (current !== undefined && !current.split(",").map((entry) => entry.trim()).includes("extension_events")) {
+    if (
+      current !== undefined &&
+      !current
+        .split(",")
+        .map((entry) => entry.trim())
+        .includes("extension_events")
+    ) {
       env[varName] = current.trim() === "" ? "extension_events" : `${current.trim()},extension_events`
     }
   }
@@ -170,11 +186,14 @@ function buildChildProfile(
   // A parent that is itself a child must not hand its OWN place in the tree down unchanged.
   delete env[OMO_SENPI_TASK_DEPTH]
   delete env[OMO_SENPI_TASK_ROOT_SESSION_ID]
+  delete env[OMO_SENPI_TASK_TRACEPARENT]
   if (spec.depth !== undefined) env[OMO_SENPI_TASK_DEPTH] = String(spec.depth)
   if (spec.root_session_id !== undefined) env[OMO_SENPI_TASK_ROOT_SESSION_ID] = spec.root_session_id
-  const extensions = spec.memberEnv === undefined
-    ? spec.extensions?.filter((entry) => basename(entry) !== MEMBER_EXTENSION_BUNDLE_NAME)
-    : spec.extensions
+  if (spec.traceparent !== undefined) env[OMO_SENPI_TASK_TRACEPARENT] = spec.traceparent
+  const extensions =
+    spec.memberEnv === undefined
+      ? spec.extensions?.filter((entry) => basename(entry) !== MEMBER_EXTENSION_BUNDLE_NAME)
+      : spec.extensions
   return { env, spec: extensions === spec.extensions ? spec : { ...spec, extensions } }
 }
 
@@ -183,22 +202,28 @@ export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRunt
   const profile = buildChildProfile(spec, resolved)
   const env = profile.env
   const childArgs = buildChildArgs(profile.spec)
-  const launcher = resolveSenpiLauncher(resolved)
+  const spawnedBy = rpcChildAncestry(spec)
+  // Only an engine that proves it accepts the flag receives it; an older one may refuse to boot on it.
+  const { launcher, engineVersion } = resolveSenpiLaunchTarget(resolved)
+  const ancestryArgs =
+    engineAcceptsSpawnedBy(engineVersion) && spawnedBy !== undefined ? ["--spawned-by", JSON.stringify(spawnedBy)] : []
   if (launcher !== null) {
     return {
       command: launcher.command,
-      args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs],
+      args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs, ...ancestryArgs],
       cwd: spec.cwd,
       env,
     }
   }
-  return { command: resolved.execPath, args: [resolved.resolveRpcEntry(), ...childArgs], cwd: spec.cwd, env }
+  return {
+    command: resolved.execPath,
+    args: [resolved.resolveRpcEntry(), ...childArgs, ...ancestryArgs],
+    cwd: spec.cwd,
+    env,
+  }
 }
 
-export function buildRpcModelCatalogSpawn(
-  spec: RpcSpawnSpec,
-  runtime?: Partial<RpcSpawnRuntime>,
-): RpcSpawnDescriptor {
+export function buildRpcModelCatalogSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRuntime>): RpcSpawnDescriptor {
   const resolved: RpcSpawnRuntime = { ...defaultRuntime(), ...runtime }
   const profile = buildChildProfile(spec, resolved)
   const env = profile.env

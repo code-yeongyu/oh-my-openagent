@@ -23,7 +23,9 @@ describe("writeCachedMarketplaceManifest", () => {
     })
 
     // then
-    const manifest = JSON.parse(await readFile(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"), "utf8")) as {
+    const manifest = JSON.parse(
+      await readFile(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"), "utf8"),
+    ) as {
       readonly plugins: readonly [{ readonly source: { readonly path: string } }]
     }
     expect(manifest.plugins[0]?.source.path).toBe("./omo/1.0.0")
@@ -35,7 +37,7 @@ describe("writeCachedMarketplaceManifest", () => {
     const marketplaceRoot = join(root, "cache", "sisyphuslabs")
     const manifestPath = join(marketplaceRoot, ".agents", "plugins", "marketplace.json")
     await mkdir(join(marketplaceRoot, ".agents", "plugins"), { recursive: true })
-    await writeFile(manifestPath, "{\"name\":\"old\"}\n")
+    await writeFile(manifestPath, '{"name":"old"}\n')
 
     // when / then
     await expect(
@@ -45,6 +47,6 @@ describe("writeCachedMarketplaceManifest", () => {
         plugins: [{ name: "omo", path: join(marketplaceRoot, "omo", "2.0.0"), version: "2.0.0" }],
       }),
     ).rejects.toThrow(/does not exist/)
-    expect(await readFile(manifestPath, "utf8")).toBe("{\"name\":\"old\"}\n")
+    expect(await readFile(manifestPath, "utf8")).toBe('{"name":"old"}\n')
   })
 })

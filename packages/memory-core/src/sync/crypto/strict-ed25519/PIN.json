@@ -1,0 +1,8 @@
+{
+  "source": "sisyphuslabs/omo-relay-spec",
+  "commit": "2dcd0cf3b8d3a045c93e580b69a1544ad1abd403",
+  "module": "de74994b74248414acb4b4513a3268586741770614c7ff35cc61085a0947f8f1",
+  "corpus": "3f720c310cd4e3678982a386586ab6522d5ec2223d86167f8c6b329f6675f963",
+  "oracle": "7c98536fd6c4f1d177d4bcfd09d6118db56150d8859b8ef45a8f2ac14ad11e99",
+  "oracleSource": "packages/relay-proto-oracle/test/strict-ed25519-oracle.ts (test-only copy, never imported by production)"
+}

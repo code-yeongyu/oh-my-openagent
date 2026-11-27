@@ -13,7 +13,7 @@ loadUserAgents() / loadProjectAgents() / loadOpencodeGlobalAgents() / loadOpenco
   -> loader.ts: discover .md files in agents/ directories
   -> agent-definitions-loader.ts: parse YAML frontmatter + body, load from explicit paths
   -> json-agent-loader.ts: parse .json / .jsonc agent definitions
-  -> opencode-config-agents-reader.ts: read inline agents from opencode.json
+  -> claude-code-compat-core opencode-config-agents-reader.ts: read inline agents from opencode.json
   -> claude-model-mapper.ts: translate "sonnet" / "opus" / "haiku" -> OpenCode provider/model IDs
   -> return Record<string, ClaudeCodeAgentConfig>
 ```
@@ -27,7 +27,6 @@ loadUserAgents() / loadProjectAgents() / loadOpencodeGlobalAgents() / loadOpenco
 | `agent-definitions-loader.ts` | `parseMarkdownAgentFile()`, `loadAgentDefinitions()` |
 | `json-agent-loader.ts` | `parseJsonAgentFile()` -- JSON/JSONC agent definitions |
 | `claude-model-mapper.ts` | Claude aliases -> OpenCode `providerID/modelID` |
-| `opencode-config-agents-reader.ts` | Reads inline `agents` and `agent_definitions` from `opencode.json` |
 | `types.ts` | `ClaudeCodeAgentConfig`, `AgentScope`, `LoadedAgent` |
 
 ## INTEGRATION

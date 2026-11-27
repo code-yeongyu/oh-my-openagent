@@ -1,21 +1,20 @@
+import { Buffer } from "node:buffer"
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
+import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile, type FileHandle } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
   REFLECTION_SNAPSHOT_MAX_BYTES,
   captureCursorSnapshot,
+  countCompletedSteps,
   deriveState,
   finalizeCursor,
   initialReflectionState,
   reflectedThroughByteOffset,
-  type ReflectionSnapshot, type ReflectionTranscriptState,
+  type ReflectionSnapshot,
+  type ReflectionTranscriptState,
 } from "./cursor"
-import {
-  projectTranscriptEntries,
-  type TranscriptEntry,
-  type TranscriptProjection,
-} from "./entries"
+import { projectTranscriptEntries, type TranscriptEntry, type TranscriptProjection } from "./entries"
 import { withLocalJournalLock, JournalLockTimeoutError, type JournalLock } from "./lock"
 import { syncJournalDirectory, syncJournalFile } from "./fsync"
 
@@ -29,6 +28,7 @@ export type TranscriptJournalOptions = {
   readonly snapshotMaxBytes?: number
   /** Replaces the state rename, so a test can simulate a rename the platform refuses. */
   readonly renameFile?: (from: string, to: string) => Promise<void>
+  readonly warn?: (message: string, fields: Readonly<Record<string, unknown>>) => void
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -46,12 +46,24 @@ function isTranscriptEntry(value: unknown): value is TranscriptEntry {
     typeof row.captured_at !== "string" ||
     typeof row.source_line_id !== "string" ||
     typeof row.source_message_id !== "string"
-  ) return false
+  )
+    return false
   if (row.kind === "tool_call") return true
   return (
     (row.kind === "user" || row.kind === "assistant" || row.kind === "reasoning" || row.kind === "error") &&
     typeof row.text === "string"
   )
+}
+
+function parseTranscriptRows(raw: string): TranscriptEntry[] {
+  return raw
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const parsed: unknown = JSON.parse(line)
+      if (!isTranscriptEntry(parsed)) throw new Error("Invalid transcript journal row")
+      return parsed
+    })
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -76,22 +88,23 @@ function parseState(raw: string | null): ReflectionTranscriptState {
     const unreflectedBytes = optionalNonNegativeInteger(state.unreflected_bytes)
     const consecutiveFailures = optionalNonNegativeInteger(state.consecutive_failures)
     const nextEligibleAt = optionalString(state.next_eligible_at)
+    const transcriptPrunedAt = optionalString(state.transcript_pruned_at)
     return {
+      ...(transcriptPrunedAt === undefined ? {} : { transcript_pruned_at: transcriptPrunedAt }),
       ...(unreflectedBytes === undefined ? {} : { unreflected_bytes: unreflectedBytes }),
       ...(consecutiveFailures === undefined ? {} : { consecutive_failures: consecutiveFailures }),
       ...(nextEligibleAt === undefined ? {} : { next_eligible_at: nextEligibleAt }),
       schema_version: "v3_assistant_steps",
       reflected_through_message_id: optionalString(state.reflected_through_message_id),
-      ...(reflectedThroughByteOffset === undefined ? {} : { reflected_through_byte_offset: reflectedThroughByteOffset }),
+      ...(reflectedThroughByteOffset === undefined
+        ? {}
+        : { reflected_through_byte_offset: reflectedThroughByteOffset }),
       total_completed_steps: nonNegativeInteger(state.total_completed_steps),
       reflected_completed_steps: nonNegativeInteger(state.reflected_completed_steps),
-      steps_since_last_successful_reflection: nonNegativeInteger(
-        state.steps_since_last_successful_reflection,
-      ),
+      steps_since_last_successful_reflection: nonNegativeInteger(state.steps_since_last_successful_reflection),
       last_reflection_started_at: optionalString(state.last_reflection_started_at),
       last_reflection_succeeded_at: optionalString(state.last_reflection_succeeded_at),
-      pending_compaction:
-        typeof state.pending_compaction === "boolean" ? state.pending_compaction : undefined,
+      pending_compaction: typeof state.pending_compaction === "boolean" ? state.pending_compaction : undefined,
     }
   } catch {
     return initialReflectionState()
@@ -105,6 +118,9 @@ export class TranscriptJournal {
   private readonly now: () => Date
   private readonly lock: JournalLock
   private readonly snapshotMaxBytes: number
+  private transcriptTail?: { byteOffset: number; mtimeMs: number; entries: TranscriptEntry[] }
+  /** state.json as last read or written by this store; a settle whose derived state equals it writes nothing. */
+  private persistedStateJson?: string
 
   constructor(readonly options: TranscriptJournalOptions) {
     this.snapshotMaxBytes = options.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
@@ -115,15 +131,19 @@ export class TranscriptJournal {
     this.lock = options.lock ?? withLocalJournalLock
   }
 
-  async reconcile(messages: readonly TranscriptProjection[]): Promise<AppendResult> {
+  async reconcile(messages: readonly TranscriptProjection[], signal?: AbortSignal): Promise<AppendResult> {
     const capturedAt = this.now().toISOString()
-    return this.append(messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)))
+    return this.append(
+      messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)),
+      signal,
+    )
   }
 
   /** A journal is created by its first entry: appending nothing to a journal that does not exist writes nothing (#9737). */
-  async append(entries: readonly TranscriptEntry[]): Promise<AppendResult> {
+  async append(entries: readonly TranscriptEntry[], signal?: AbortSignal): Promise<AppendResult> {
+    signal?.throwIfAborted()
     if (entries.length === 0 && !(await this.exists())) return { appended: 0, skipped: 0 }
-    return this.locked(() => this.appendUnlocked(entries))
+    return this.locked(() => this.appendUnlocked(entries), signal)
   }
 
   async readEntries(): Promise<TranscriptEntry[]> {
@@ -163,10 +183,7 @@ export class TranscriptJournal {
       })
       if (snapshot === null) return null
       signal?.throwIfAborted()
-      await this.writeStateUnlocked(
-        { ...state, last_reflection_started_at: this.now().toISOString() },
-        entries,
-      )
+      await this.writeStateUnlocked({ ...state, last_reflection_started_at: this.now().toISOString() }, entries)
       return snapshot
     }, signal)
   }
@@ -222,13 +239,17 @@ export class TranscriptJournal {
 
   async backfillReflectionByteOffset(entries: readonly TranscriptEntry[]): Promise<ReflectionTranscriptState> {
     const state = await this.readStateUnlocked()
-    await this.writeStateUnlocked({
-      ...state,
-      reflected_through_byte_offset: state.reflected_through_byte_offset
-        ?? (state.reflected_through_message_id === undefined
-          ? 0
-          : reflectedThroughByteOffset(entries, state.reflected_through_message_id)),
-    }, entries)
+    await this.writeStateUnlocked(
+      {
+        ...state,
+        reflected_through_byte_offset:
+          state.reflected_through_byte_offset ??
+          (state.reflected_through_message_id === undefined
+            ? 0
+            : reflectedThroughByteOffset(entries, state.reflected_through_message_id)),
+      },
+      entries,
+    )
     return this.readStateUnlocked()
   }
 
@@ -238,7 +259,14 @@ export class TranscriptJournal {
       const state = await this.readStateUnlocked()
       const failures = (state.consecutive_failures ?? 0) + 1
       const delay = Math.min(300_000, 5_000 * 2 ** (failures - 1))
-      await this.writeStateUnlocked({ ...state, consecutive_failures: failures, next_eligible_at: new Date(this.now().getTime() + delay).toISOString() }, entries)
+      await this.writeStateUnlocked(
+        {
+          ...state,
+          consecutive_failures: failures,
+          next_eligible_at: new Date(this.now().getTime() + delay).toISOString(),
+        },
+        entries,
+      )
     })
   }
 
@@ -281,41 +309,115 @@ export class TranscriptJournal {
         fresh.push(entry)
       }
     }
+    let allEntries: readonly TranscriptEntry[]
     if (fresh.length > 0) {
-      await appendFile(
-        this.transcriptPath,
-        `${fresh.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
-        "utf8",
-      )
+      await appendFile(this.transcriptPath, `${fresh.map((entry) => JSON.stringify(entry)).join("\n")}\n`, "utf8")
+      allEntries = [...existing, ...fresh]
+      const appended = await stat(this.transcriptPath)
+      this.transcriptTail = { byteOffset: appended.size, mtimeMs: appended.mtimeMs, entries: [...allEntries] }
+    } else {
+      allEntries = existing
     }
-    const allEntries = [...existing, ...fresh]
-    await this.writeStateUnlocked(await this.readStateUnlocked(), allEntries)
+    const state = await this.readStateUnlocked()
+    const rebuilt = existing.length === 0 && fresh.length > 0 && state.transcript_pruned_at !== undefined
+    await this.writeStateUnlocked(rebuilt ? this.reanchorAfterPrune(state, allEntries) : state, allEntries)
     return { appended: fresh.length, skipped }
   }
 
+  /**
+   * A transcript removed by retention is rebuilt from the harness projection, which may be shorter
+   * than the original: senpi's `getBranch()` after a compaction holds only the messages from the
+   * compaction's first kept entry on. The reflected count is recomputed against the rebuilt rows. When
+   * the anchor is no longer projected it lay before the kept window, so every rebuilt row is after it
+   * and unreflected: the cursor restarts at the first row instead of clamping a stale count.
+   */
+  private reanchorAfterPrune(
+    state: ReflectionTranscriptState,
+    entries: readonly TranscriptEntry[],
+  ): ReflectionTranscriptState {
+    const { transcript_pruned_at: _prunedAt, reflected_through_byte_offset: _offset, ...rest } = state
+    const anchor = state.reflected_through_message_id
+    if (anchor === undefined) return rest
+    let anchorIndex = -1
+    for (const [index, entry] of entries.entries()) if (entry.source_message_id === anchor) anchorIndex = index
+    if (anchorIndex >= 0) {
+      return { ...rest, reflected_completed_steps: countCompletedSteps(entries.slice(0, anchorIndex + 1)) }
+    }
+    this.options.warn?.("journal anchor lost after prune", {
+      journalDir: this.options.journalDir,
+      reflectedThroughMessageId: anchor,
+    })
+    const { reflected_through_message_id: _anchor, ...unanchored } = rest
+    return { ...unanchored, reflected_completed_steps: 0 }
+  }
+
   private async readEntriesUnlocked(): Promise<TranscriptEntry[]> {
+    let size: number
+    let mtimeMs: number
+    try {
+      const stats = await stat(this.transcriptPath)
+      size = stats.size
+      mtimeMs = stats.mtimeMs
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+      this.transcriptTail = undefined
+      return []
+    }
+    // Steady-state settles (the mass-wake hot path, omo#14351) append nothing: the cached rows
+    // are the journal, and only a size change pays a read. Growth reads the appended tail alone;
+    // a shrink (prune, rewrite, foreign writer) falls back to the full load.
+    const cached = this.transcriptTail
+    // Same size is only "unchanged" with the same mtime: a prune that regrows to the old size is a new file.
+    if (cached !== undefined && size === cached.byteOffset && mtimeMs === cached.mtimeMs) return cached.entries
+    if (cached !== undefined && size > cached.byteOffset) {
+      const tail = await this.readTailEntriesUnlocked(size, cached.byteOffset)
+      if (tail !== undefined) {
+        const entries = [...cached.entries, ...tail]
+        this.transcriptTail = { byteOffset: size, mtimeMs, entries }
+        return entries
+      }
+    }
     let raw: string
     try {
       raw = await readFile(this.transcriptPath, "utf8")
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error
+      this.transcriptTail = undefined
       return []
     }
-    return raw
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
-      .map((line) => {
-        const parsed: unknown = JSON.parse(line)
-        if (!isTranscriptEntry(parsed)) throw new Error("Invalid transcript journal row")
-        return parsed
-      })
+    const entries = parseTranscriptRows(raw)
+    this.transcriptTail = { byteOffset: size, mtimeMs, entries }
+    return entries
+  }
+
+  private async readTailEntriesUnlocked(
+    size: number,
+    byteOffset: number,
+  ): Promise<readonly TranscriptEntry[] | undefined> {
+    let handle: FileHandle | undefined
+    try {
+      handle = await open(this.transcriptPath, "r")
+      const length = size - byteOffset
+      const buffer = Buffer.alloc(length)
+      const { bytesRead } = await handle.read(buffer, 0, length, byteOffset)
+      return parseTranscriptRows(buffer.subarray(0, bytesRead).toString("utf8"))
+    } catch {
+      return undefined
+    } finally {
+      await handle?.close().catch(() => {})
+    }
   }
 
   private async readStateUnlocked(): Promise<ReflectionTranscriptState> {
     try {
-      return parseState(await readFile(this.statePath, "utf8"))
+      const persisted = parseState(await readFile(this.statePath, "utf8"))
+      this.persistedStateJson = JSON.stringify(persisted)
+      return persisted
     } catch (error) {
-      if (errorCode(error) === "ENOENT") return initialReflectionState()
+      if (errorCode(error) === "ENOENT") {
+        this.persistedStateJson = undefined
+        return initialReflectionState()
+      }
       throw error
     }
   }
@@ -324,22 +426,33 @@ export class TranscriptJournal {
     state: ReflectionTranscriptState,
     entries: readonly TranscriptEntry[],
   ): Promise<void> {
-    const derived = deriveState({
-      ...state,
-      ...(state.reflected_through_message_id !== undefined && state.reflected_through_byte_offset === undefined
-        ? { reflected_through_byte_offset: reflectedThroughByteOffset(entries, state.reflected_through_message_id) }
-        : {}),
-    }, entries)
+    const derived = deriveState(
+      {
+        ...state,
+        ...(state.reflected_through_message_id !== undefined && state.reflected_through_byte_offset === undefined
+          ? { reflected_through_byte_offset: reflectedThroughByteOffset(entries, state.reflected_through_message_id) }
+          : {}),
+      },
+      entries,
+    )
+    // A no-op settle (nothing appended, counters unchanged) must not rewrite state.json: the
+    // per-settle write was part of the omo#14351 mass-wake cost.
+    const derivedJson = JSON.stringify(derived)
+    if (derivedJson === this.persistedStateJson) return
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
     try {
       await (this.options.renameFile ?? rename)(temporaryPath, this.statePath)
+      this.persistedStateJson = derivedJson
     } catch (error) {
       // A refused rename must not strand the temporary copy beside state.json.
       try {
         await rm(temporaryPath, { force: true })
       } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], "state rename failed and its temporary file could not be removed")
+        throw new AggregateError(
+          [error, cleanupError],
+          "state rename failed and its temporary file could not be removed",
+        )
       }
       throw error
     }

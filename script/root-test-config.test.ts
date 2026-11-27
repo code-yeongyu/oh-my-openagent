@@ -43,7 +43,13 @@ describe("root test Bun config", () => {
 
   test("#given bun 1.3.x test argv #when CI selects the dedicated config #then --config= is passed before test", () => {
     const workflow = readFileSync(workflowPath, "utf8")
-    expect(workflow).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000\n")
+    const posixShard2 = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
+    expect(workflow).toContain("bash .github/scripts/ci-root-shard-2.sh")
+    expect(posixShard2).toContain(
+      "bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)\n",
+    )
+    expect(posixShard2).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=")
+    expect(posixShard2).not.toContain("bun test -c")
     expect(workflow).not.toContain("bun test -c")
     expect(workflow).not.toContain("format('-c {0}'")
     expect(workflow).not.toContain("--path-ignore-patterns=")
@@ -63,6 +69,15 @@ describe("root test Bun config", () => {
       "--config=bunfig.win2.parallel.windows.toml",
       "test",
       "./packages/senpi-task/src/runners/rpc-host/close.test.ts",
+    ])
+    expect(output).toContain("filters did not match any test files")
+  })
+
+  test("#given the macOS shard-2 light config #when bun discovers a top-level script test #then it is left to the heavy half", () => {
+    const output = spawnBun([
+      "--config=bunfig.win2.parallel.rest.toml",
+      "test",
+      "script/ci-root-test-partition.test.ts",
     ])
     expect(output).toContain("filters did not match any test files")
   })

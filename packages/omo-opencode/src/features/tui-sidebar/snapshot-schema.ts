@@ -4,13 +4,7 @@ import { MIRROR_SCHEMA_VERSION } from "./constants"
 import type { AgentStatus, LoopLive } from "./state-types"
 import type { BackgroundTaskStatus } from "../background-agent/types"
 
-const AGENT_STATUS_VALUES = [
-  "busy",
-  "idle",
-  "error",
-  "running",
-  "retry",
-] as const satisfies readonly AgentStatus[]
+const AGENT_STATUS_VALUES = ["busy", "idle", "error", "running", "retry"] as const satisfies readonly AgentStatus[]
 
 const BACKGROUND_TASK_STATUS_VALUES = [
   "pending",

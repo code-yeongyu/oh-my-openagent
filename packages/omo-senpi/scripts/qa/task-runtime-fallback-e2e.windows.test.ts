@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 // Every task child on Windows runs as its own `senpi --mode rpc` process, so this is where a child's own
 // fallback chain (#9582) has to survive a usage limit after a tool call - including one that lands near
@@ -36,8 +37,11 @@ function scenarioDiagnostics(outDir: string, scenario: ScenarioVerdict): string 
   const events = readIfPresent(join(dir, "task.jsonl.log"))
     .split("\n")
     .filter((line) => line.length > 0)
-    .map((line) => (JSON.parse(line) as { readonly type?: string; readonly payload?: unknown }))
-    .map((event) => `${event.type}${event.type === "child_error" || event.type === "task_start_failed" ? ` ${JSON.stringify(event.payload)}` : ""}`)
+    .map((line) => JSON.parse(line) as { readonly type?: string; readonly payload?: unknown })
+    .map(
+      (event) =>
+        `${event.type}${event.type === "child_error" || event.type === "task_start_failed" ? ` ${JSON.stringify(event.payload)}` : ""}`,
+    )
   return [
     `--- ${scenario.runner}/${scenario.scenario}: status=${String(record.status)} model=${String(record.model)} error=${String(record.error_message)}`,
     `events: ${events.join(", ")}`,
@@ -47,7 +51,9 @@ function scenarioDiagnostics(outDir: string, scenario: ScenarioVerdict): string 
 
 async function terminateProcessTree(child: ChildProcess): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return
-  const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true })
+  const args = windowsTreeKillArgs(child.pid)
+  if (args.length === 0) return
+  const killer = spawn("taskkill.exe", args, { stdio: "ignore", windowsHide: true })
   await Promise.race([once(killer, "close"), once(killer, "error")])
 }
 
@@ -77,7 +83,10 @@ test.skipIf(!isWin32)(
     })
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`fallback driver did not finish in ${DRIVER_TIMEOUT_MS}ms`)), DRIVER_TIMEOUT_MS)
+      timer = setTimeout(
+        () => reject(new Error(`fallback driver did not finish in ${DRIVER_TIMEOUT_MS}ms`)),
+        DRIVER_TIMEOUT_MS,
+      )
     })
 
     // when

@@ -1,5 +1,5 @@
-import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
 import { join } from "node:path"
@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
 import { checkExtensionCurrent } from "./build-extension.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { createBuildFixture, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 
 // The runtimes the built extension ships beside omo.js: the gateway store worker sidecar and the
 // thread SDK that runs on it. One build is shared by the whole file.
@@ -27,7 +27,8 @@ function unexpectedStderr(stderr) {
   const kept = []
   for (let index = 0; index < lines.length; index++) {
     if (/ExperimentalWarning: SQLite is an experimental feature/.test(lines[index])) {
-      if (/^\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)$/.test(lines[index + 1] ?? "")) index++
+      if (/^\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)$/.test(lines[index + 1] ?? ""))
+        index++
       continue
     }
     kept.push(lines[index])
@@ -35,6 +36,8 @@ function unexpectedStderr(stderr) {
   return kept.join("\n")
 }
 
+// #13965: the cold builds run once as setup, bounded by their progress and CPU use, not this hook's outer bound.
+beforeAll(() => fixture.warmBuilds({ reproduction: false }), BUILD_HOOK_OUTER_BOUND_MS)
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
 
@@ -55,7 +58,11 @@ describe("gateway store worker sidecar", () => {
 
       // then
       expect(fileURLToPath(gatewayStoreWorkerUrl(builtModule))).toBe(outputs.gatewayStoreWorkerOutputPath)
-      expect({ journal, referenced, transactions: typeof stats.transactions }).toEqual({ journal: "wal", referenced: false, transactions: "number" })
+      expect({ journal, referenced, transactions: typeof stats.transactions }).toEqual({
+        journal: "wal",
+        referenced: false,
+        transactions: "number",
+      })
     } finally {
       await store.dispose()
     }
@@ -66,7 +73,14 @@ describe("gateway store worker sidecar", () => {
     const outputs = await sharedOutputs()
     const agentDir = await mkdtemp(join(tmpdir(), "omo-gateway-node-worker-"))
     perTestRoots.push(agentDir)
-    const config = { agent_dir: agentDir, busy_timeout_ms: 5000, instance_id: "built-worker-probe", runtime_instance: null, legacy_mailbox_directories: [], test_hooks: {} }
+    const config = {
+      agent_dir: agentDir,
+      busy_timeout_ms: 5000,
+      instance_id: "built-worker-probe",
+      runtime_instance: null,
+      legacy_mailbox_directories: [],
+      test_hooks: {},
+    }
     const probe = [
       "const { Worker } = require('node:worker_threads')",
       `const worker = new Worker(${JSON.stringify(outputs.gatewayStoreWorkerOutputPath)})`,
@@ -81,31 +95,46 @@ describe("gateway store worker sidecar", () => {
     const child = spawn("node", ["-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
     let stdout = ""
     let stderr = ""
-    child.stdout.on("data", (chunk) => { stdout += chunk })
-    child.stderr.on("data", (chunk) => { stderr += chunk })
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
     const exitCode = await new Promise((resolve) => child.once("close", resolve))
 
     // then
     expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
     const replies = JSON.parse(stdout.trim())
-    expect(replies.map((reply) => [reply.id, reply.ok])).toEqual([[1, true], [2, true]])
+    expect(replies.map((reply) => [reply.id, reply.ok])).toEqual([
+      [1, true],
+      [2, true],
+    ])
     expect(replies[0].value.self.instance_id).toBe("built-worker-probe")
   })
 
   test("#given the built extension without its store worker sidecar #when freshness is checked #then it reports that output missing", async () => {
     const outputs = await mutableOutputs()
     await rm(outputs.gatewayStoreWorkerOutputPath)
-    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.gatewayStoreWorkerOutputPath })
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.gatewayStoreWorkerOutputPath,
+    })
   })
 })
 
 describe("thread SDK runtime", () => {
   test("#given the thread SDK build #when its inputs and exports are inspected #then it is a standalone entry that inlines no package but the contracts' typebox", async () => {
     const outputs = await sharedOutputs()
-    expect(outputs.threadSdkInputs.some(input => input.endsWith("src/extension/thread-sdk.ts"))).toBe(true)
-    expect(outputs.threadSdkInputs.filter(input => input.includes("node_modules/") && !input.includes("/node_modules/typebox/"))).toEqual([])
+    expect(outputs.threadSdkInputs.some((input) => input.endsWith("src/extension/thread-sdk.ts"))).toBe(true)
+    expect(
+      outputs.threadSdkInputs.filter(
+        (input) => input.includes("node_modules/") && !input.includes("/node_modules/typebox/"),
+      ),
+    ).toEqual([])
     const sdk = await import(outputs.threadSdkOutputPath)
-    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "createThreadSdk", "readSessionFacts"])
+    expect(Object.keys(sdk).sort()).toEqual(["createThreadSdk", "readSessionFacts"])
   })
 
   test("#given the built SDK two levels below the extensions directory #when plain node opens it #then the store runs on the emitted worker sidecar", async () => {
@@ -118,31 +147,118 @@ describe("thread SDK runtime", () => {
     await cp(outputs.threadSdkOutputPath, join(plugin, "runtime", "thread-sdk", "sdk.js"))
     await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
     const agentDir = join(plugin, "agent")
+    // A thread no host serves, known from its session file: a send to it is stored queued_offline by the worker.
+    const sessionsDir = join(agentDir, "sessions", "--probe--")
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(
+      join(sessionsDir, "epoch_dur-off.jsonl"),
+      `${JSON.stringify({ type: "session", id: "dur-off", cwd: process.cwd(), timestamp: "2026-10-02T00:00:00Z" })}\n`,
+    )
+    // The account surface is injected, so the outcome never depends on whether this host runs a device service: one
+    // account whose lookup answered and lists no such thread (not_found), one whose lookup never answered (host_unavailable).
     const probe = [
       `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "thread-sdk", "sdk.js")).href)})`,
-      `const sdk = createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined })`,
-      "const listed = await sdk.bindings({})",
-      "const missing = await sdk.outbox({ binding_id: 'no-such-binding' })",
+      "const account = (listing) => ({",
+      "  client: {",
+      "    service: { status: async () => ({ kind: 'ok', value: { state: 'connected', since_ms: 0, device: { id: 'a', name: 'a' }, origin_configured: true, enabled: true, service_version: 'probe' } }) },",
+      "    devices: { list: async () => ({ kind: 'ok', value: [",
+      "      { id: 'a', name: 'a', kind: 'device', platform: 'linux', online: true, last_seen_ms: null, self: true },",
+      "      { id: 'b', name: 'b', kind: 'device', platform: 'linux', online: true, last_seen_ms: null },",
+      "    ] }) },",
+      "  },",
+      "  sessions: { listing, sessions: async () => (await listing()).rows, close: async () => {} },",
+      "})",
+      "const other = { device: 'b', session_id: 'rk-other', durable_id: 'dur-other', title: 'other', project: '/w', path: '/w', state: 'idle', updated_ms: 1 }",
+      "const answered = account(async () => ({ rows: [other], incomplete: [] }))",
+      "const unanswered = account(async () => { throw new Error('lookup_timeout') })",
+      `const open = (remote) => createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined, remote })`,
+      "const sdk = open(answered)",
+      "const sent = await sdk.send({ thread: 'dur-off', text: 'ping', all_scope: true })",
+      "const missing = await sdk.send({ thread: 'no-such-thread', text: 'ping', all_scope: true })",
       "await sdk.dispose()",
-      "console.log(JSON.stringify({ listed: listed.kind, bindings: listed.bindings, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
+      "const silent = open(unanswered)",
+      "const unreached = await silent.send({ thread: 'no-such-thread', text: 'ping', all_scope: true })",
+      "await silent.dispose()",
+      "const code = (result) => result.kind === 'error' ? result.error.code : result.kind",
+      "console.log(JSON.stringify({ sent: sent.kind === 'ok' ? sent.delivery.kind : sent.error.code, missing: code(missing), unreached: code(unreached), principal: sdk.principal }))",
     ].join("\n")
 
     // when: a connector script run inline, whose `--input-type` the store worker must not inherit
     const child = spawn("node", ["--input-type=module", "-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
     let stdout = ""
     let stderr = ""
-    child.stdout.on("data", (chunk) => { stdout += chunk })
-    child.stderr.on("data", (chunk) => { stderr += chunk })
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
     const exitCode = await new Promise((resolve) => child.once("close", resolve))
 
     // then
     expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
-    expect(JSON.parse(stdout.trim())).toEqual({ listed: "ok", bindings: [], missing: "not_found", principal: "cli:501" })
+    expect(JSON.parse(stdout.trim())).toEqual({
+      sent: "queued_offline",
+      missing: "not_found",
+      unreached: "host_unavailable",
+      principal: "cli:501",
+    })
   })
 
   test("#given the built extension without the thread SDK #when freshness is checked #then it reports that output missing", async () => {
     const outputs = await mutableOutputs()
     await rm(outputs.threadSdkOutputPath)
-    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.threadSdkOutputPath })
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.threadSdkOutputPath,
+    })
+  })
+})
+
+describe("omo SDK runtime", () => {
+  test("#given the built omo SDK #when plain node imports it #then it exports createOmoSdk and answers typed reads with no engine", async () => {
+    // given: a signed-out store port and a state dir no device service listens on
+    const outputs = await sharedOutputs()
+    expect(outputs.omoSdkInputs.some((input) => input.endsWith("src/extension/omo-sdk.ts"))).toBe(true)
+    const home = await mkdtemp(join(tmpdir(), "omo-sdk-built-"))
+    perTestRoots.push(home)
+    const probe = [
+      `const sdk = await import(${JSON.stringify(pathToFileURL(outputs.omoSdkOutputPath).href)})`,
+      `const omo = sdk.createOmoSdk({ env: { HOME: ${JSON.stringify(home)}, OMO_DEVICE_SERVICE_STATE_DIR: ${JSON.stringify(join(home, "state"))} }, cwd: ${JSON.stringify(home)}, home: ${JSON.stringify(home)}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
+      "const [devices, status, config] = [await omo.devices.list(), await omo.deviceService.status(), await omo.config.status()]",
+      "console.log(JSON.stringify({ exports: Object.keys(sdk).sort(), devices: devices.kind === 'error' ? devices.error.code : devices.kind, status: status.kind === 'ok' ? status.value.state : status.error.code, config: config.kind }))",
+    ].join("\n")
+
+    // when
+    const child = spawn("node", ["--input-type=module", "-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
+    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+
+    // then
+    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
+    expect(JSON.parse(stdout.trim())).toEqual({
+      exports: ["SDK_VERSION", "createOmoSdk"],
+      devices: "signed_out",
+      status: "not_running",
+      config: "ok",
+    })
+  })
+
+  test("#given the built extension without the omo SDK #when freshness is checked #then it reports that output missing", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.omoSdkOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.omoSdkOutputPath,
+    })
   })
 })

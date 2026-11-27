@@ -96,7 +96,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
   const maxUnreadableProbes = input.maxUnreadableProbes ?? 3
   const endOutcome = (event: AgentEndEvent): RunnerOutcome =>
-    input.abortedByUser() ? { status: "cancelled" } : agentEndOutcome(event, input.baseline(), input.finalText())
+    agentEndOutcome(event, input.baseline(), input.finalText(), input.abortedByUser())
 
   // A terminal error outcome with no live continuation must still end the turn: agent_idle is the
   // preferred edge, but a session that never emits it (and never starts a continuation) would
@@ -165,7 +165,8 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_end": {
           if (event.willRetry !== false) return
           const outcome = endOutcome(event)
-          if (outcome.status === "cancelled") {
+          // A replaced session runs nothing more for this child: its interrupt is final at once.
+          if (outcome.status === "cancelled" || outcome.status === "interrupted") {
             clearConfirmation()
             held = undefined
             input.settle(outcome)

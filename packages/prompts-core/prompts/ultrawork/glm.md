@@ -68,6 +68,7 @@ The requested outcome is the contract.
 | Unknown library behavior | Use librarian/docs or inspect examples. |
 | Architecture uncertainty | Consult oracle after forming concrete options. |
 | Implementation obstacle | Try a different route and verify again. |
+| Permission denial or user refusal | It is final for what that call was meant to do: never reach that result with another tool, command, path or host; ask one precise question. |
 | True user-only blocker | Ask one precise question and stop. |
 
 Unacceptable endings:

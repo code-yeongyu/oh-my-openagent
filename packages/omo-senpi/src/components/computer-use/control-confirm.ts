@@ -18,9 +18,25 @@ export function controlConfirmBody(reason: string): string {
 /** Fires `onTimeout` after `timeoutMs`; the return cancels it. Injected so tests never wait on a clock. */
 export type ControlTimeoutScheduler = (onTimeout: () => void, timeoutMs: number) => () => void
 
+/** The device's own remote-exec setting (C3(b)): off until the user enables it on that device. */
+export interface DeviceExecPolicy {
+  enabled(): boolean
+}
+
 export interface ControlConfirmOptions {
   readonly timeoutMs?: number
   readonly scheduleTimeout?: ControlTimeoutScheduler
+  /** True when the session runs in full access: the grant needs no confirm (#10022). */
+  readonly fullAccess?: () => boolean
+  /** Where the computer tool runs: a fused session (today) or the hand of a split session, which has no UI. */
+  readonly placement?: () => "fused" | "hand"
+  /** Decides a hand's grants; absent, a hand is treated as a device that never enabled exec. */
+  readonly deviceExec?: DeviceExecPolicy
+}
+
+/** The in-session note shown when full access grants foreground control without asking. */
+export function fullAccessControlNote(reason: string): string {
+  return `Computer use is taking foreground control (full access, no confirm needed): ${reason}`
 }
 
 const realScheduler: ControlTimeoutScheduler = (onTimeout, timeoutMs) => {
@@ -29,7 +45,8 @@ const realScheduler: ControlTimeoutScheduler = (onTimeout, timeoutMs) => {
 }
 
 /**
- * The human confirm behind `computer.control.acquire` (#9651 B5b). Headless contexts never prompt;
+ * The human confirm behind `computer.control.acquire` (#9651 B5b). Headless contexts never prompt or grant;
+ * a full-access session grants without asking and says so in the session (#10022);
  * a refusal, a timeout, or an abort means no grant. Mirrors senpi's RPC `createDialogPromise`
  * contract (abort or a client that never answers resolves the default `false`) so the run always
  * settles instead of hanging on the human.
@@ -38,10 +55,21 @@ export async function confirmComputerControl(
   request: ControlConfirmRequest,
   options: ControlConfirmOptions = {},
 ): Promise<boolean> {
+  // A hand has nobody to ask: the device's exec setting is the consent, for every session, with no per-session confirm.
+  if (options.placement?.() === "hand") return !request.signal.aborted && options.deviceExec?.enabled() === true
+  if (request.context.hasUI === false || request.signal.aborted) return false
+  const notify = request.context.ui?.notify
+  if (options.fullAccess?.() === true && request.context.hasUI === true && notify !== undefined) {
+    notify(fullAccessControlNote(request.reason), "info")
+    return true
+  }
   const confirm = request.context.ui?.confirm
-  if (request.context.hasUI === false || confirm === undefined || request.signal.aborted) return false
+  if (confirm === undefined) return false
   // The facade refuses `acquire` before asking when too little run time is left to answer (#9967 M2).
-  const timeoutMs = Math.min(options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS, request.budgetMs ?? Number.POSITIVE_INFINITY)
+  const timeoutMs = Math.min(
+    options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS,
+    request.budgetMs ?? Number.POSITIVE_INFINITY,
+  )
   const scheduleTimeout = options.scheduleTimeout ?? realScheduler
   return await new Promise<boolean>((resolve) => {
     let settled = false
@@ -58,7 +86,10 @@ export async function confirmComputerControl(
     // The host's own timeout is passed through too, so an RPC client's pending dialog is cleared and
     // a desktop client can show the deadline; the local timer still bounds a host that ignores it.
     Promise.resolve(
-      confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), { signal: request.signal, timeout: timeoutMs }),
+      confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), {
+        signal: request.signal,
+        timeout: timeoutMs,
+      }),
     ).then(
       (approved) => settle(approved === true),
       () => settle(false),

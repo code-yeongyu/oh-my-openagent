@@ -1,3 +1,149 @@
+## 2026-11-22 - Thread train 11 (#14623)
+
+omo thread keeps list, send and read (#14319):
+
+`bin/lib/thread.js`: the binding verbs, `report`, `answer`, `outbox`, `ack`, `send --binding` and the author flags are removed; a removed verb is an unknown subcommand (exit 2).
+
+## 2026-11-20 - omo sync status (#14437)
+
+- `sync-status-cli.ts` collects the report (`collectSyncStatus`, one typed section per source) and renders it (`syncStatusLines`). Joined = a live trust pin under `trustAnchorDir`; switch = `isDeviceSyncOff`; devices come from `service-auth/devices.ts` `listLiveDevices` (the same read and schema `omo account devices` uses; it parses `syncing`), exposed on `SyncContext.listDevices`.
+- `sync-engine-status.ts` reports engine presence only: the operator socket (`resolveTaskHostSocket`) is read with senpi-task's shared `probeSocket` (the host liveness probe): `no_engine` when absent, not a socket, or refused; `running` when a connect succeeds; `unreadable` with the reason for a permission error or a host that does not answer within 2 s. The probe closes without sending a request, so it neither authenticates nor attaches; on POSIX the supervisor still counts the connection as activity, so it resets an idle engine's idle-exit clock. The engine answers `omo.memory.sync.status` only inside a session, and attaching to read it would resume and re-park another surface's session, so the engine's sync details are not read here: code-yeongyu/senpi#7107 tracks the session-less read and #14456 wires it into this command.
+- `sync-cli.ts` (399 lines) is split by verb: `sync-recover-cli.ts`, `sync-approve-cli.ts` and `sync-void-notice.ts`.
+
+## 2026-11-21 - `omo account sign-in` (#14513)
+
+`account-cli.ts` / `account-sign-in.ts`: the machine-interface verb `sign-in [--stdin|--check]` prints one JSON object per line (`code`, then `signed_in` or `refused`) and nothing else on stdout; the interface's description says this verb alone widens one line to lines. The origin comes from `OMO_SERVICE_API_URL`; there is no origin flag.
+
+## 2026-11-20 - the brand profile names the plugin the launcher prepends (#14467)
+
+`bin/lib/engine-environment.js` `brandProfile()` and `compiled-environment.ts` add `extensions: [<plugin dir>]` to `SENPI_BRAND`: the exact path `spawnSenpi` / `buildSenpiArgs` pass with `--extension`. senpi's attach plan (senpi#6914) refuses every `--extension` on a start that attaches to a host-held session, and the brand field is how it tells the distribution's own plugin from a user flag (#14465). Older engines ignore the key.
+
+## 2026-11-19 - omo update for the side-by-side versions layout (#14256)
+
+- `versioned-install.js`: `findVersionedInstall` recognises `<versions>/<ver>/node_modules/omo-ai` with `<versions>/current` linking into `<versions>`; `updateVersionedInstall` bun-installs the same package.json shape into `.stage-<ver>-<pid>`, rewrites the `omo` wrapper to the new dir, renames it to `<ver>`, runs it, writes `.complete`, then renames a fresh symlink over `current`. A failed install or a dir reporting another version never becomes `current` (`.failed-<ver>-<ts>`).
+- A target dir another writer already installed is adopted when it runs the target (no reinstall, `.complete` added); a live `.stage-<target>-<pid>` of another installer stops the update; `versioned-leftovers.js` keeps the 2 newest `.failed-*` and removes stages whose pid is gone. The `omo` wrapper is generated from its template for the new dir.
+- `path-omo.js`: the first executable `omo` on PATH and its `--version` line; a mismatch after the switch exits 1 naming both paths (#12022).
+- `self-update.js` chooses the versioned layout before the npm/bun target; `RunOptions` gains `cwd`.
+
+## 2026-11-17 - omo sync disable (#14093)
+
+- `sync-cli.ts`: `omo sync disable` turns memory sync off for this device through `disableSync`; exit 0 with the off line, exit 1 when the service refuses or the device is signed out. `bin/lib/service-auth.generated.js` is rebuilt.
+
+## 2026-11-17 - opt-in OmO keychain for Macs whose login keychain stays locked (#14033)
+
+`keychain-helper`:
+- New `store` request field and the `store-create` / `store-activate` / `store-deactivate` / `store-erase` verbs (`dedicated.c`, `dedicated-lifecycle.c`, `store-select.c`).
+- The store is `~/Library/Application Support/OmO/credential-keychain` (`0700`) with a `0600` keychain and key.
+- Store-less requests are refused while it is active. Items there get an any-application ACL.
+
+`account-store.ts` adds `omo account store`. `keychain-helper-doctor.js` adds a `credential store` line. The service-auth `store-binding` chooses the store per call and has no helper-less path while it is active (#13116).
+
+## 2026-11-17 - omo thread and omo remote print the thread field (#14056)
+
+- `bin/lib/thread-output.js`, `remote-render.ts`, `remote-session-verbs.ts`: `omo thread list|send` and `omo remote open|send` read and print `thread`; `omo remote open --json` answers the flat `thread_create` shape.
+
+## 2026-11-17 - omo login replaces this computer's earlier device on machine_exists (#14055, fixes #14032)
+
+`device-flow.ts` `loginDevice`: on `machine_exists` it calls the new `replaceDevice` option with the refusal's `detail` (`deviceId`, `deviceName`, both optional, parsed in `protocol-request.ts`). If that returns true, it mints a new device code with `replace: { deviceId }` and polls it with the same keys. A second `machine_exists` (an older service that ignores `replace`) is reported as unsupported. `invalid_grant` with `detail.reason = "replace_mismatch"` is terminal. Only the device-token reply schema (`deviceTokenGrantSchema`) accepts `replacedDeviceId`; `grantSchema` and the stored credential schema do not, and `device-flow.ts` returns it to the caller. `login-routes.ts` `signInByRoute`: a browser sign-in refused with `machine_exists` gets the same decision and, when accepted, continues as a device-code replace sign-in (`loginDevice` with `replacing`). `replace-device.ts` `decideReplace` holds the three modes (`--replace`, interactive confirm with default No, a non-interactive refusal that names the flag). `commands.ts` adds `--replace` to the open command and the closed help, and `closed-device-login.ts` accepts `--replace`. The client revokes nothing.
+
+## 2026-11-17 - the keychain helper ends with its caller; a held credential lock names its holder (#14030)
+
+`keychain-helper/src/session.c`: the client is gone on stdin EOF or on `NOTE_EXIT` of the spawning process (parent-pid poll without a kqueue). A watchdog ends a mutating verb `limits.grace_ms` (30 s) after the client is gone and every run after `limits.lifetime_ms` (10 min), with the new exit code 5. Test builds take `--grace-ms`, `--lifetime-ms` and `--stall-mutation`. `team-core` `withLock` throws `LockWaitTimeoutError` with the holder record; `credential-lock.ts` maps it to a `SignInError` naming pid, age, lock path and action. `darwin-store.ts` `clear()` throws `HelperItemNotOwned` when both deletes are refused, mapped to `KeychainItemNotOwnedError` (carried from #13792).
+
+## 2026-11-17 - account show names an unrecoverable refresh, and forget deletes it (#14021)
+
+`account-show.ts` `reportedRefreshState`: `uncertain` with no `refreshAttempt`, an attempt whose `state` is `exhausted`, or one `eligibleAttempt` rejects is reported as `expired`. An eligible attempt stays `uncertain`. `docs/reference/cli.md` documents the value. `keychain-helper` `verb_remove` deletes a marked item without a successful decrypt, then `/usr/bin/security delete-generic-password` if the ACL still refuses this binary. `pin.ts` keeps the verified helper at a content-hash path and does not delete it on exit. The helper error `acl` says the keychain is unlocked and this program is not on the item's access list.
+
+## 2026-11-16 - remote usage names the bare thread id (#13825)
+
+Review L2 of #13748 at 0571de8: `remote-session-args.ts` `parseTarget`'s usage error names `<device>/<session>` or the `thread_id` open printed; `docs/reference/remote-sessions.md` says a bare id resolves through the account listing, which can lag a session opened a moment ago, so right after `open` the device-qualified form is the one to use. Review LOW of #13748 at c09a616: `remote-session-verbs.ts` `openOn` puts `model {provider, id}` from `--model` back on the `--json` result (the one-open launch profile had dropped the field the old `set_model` step set); `test/remote-cli.test.ts` and `test/remote-id-contract.test.ts` assert it.
+
+## 2026-11-16 - omo remote open takes the launch profile, a worktree and a first prompt (#13748)
+
+`remote-session-args.ts`: `--model provider/id` (checked), `--thinking`, `--worktree [--branch B] [--base REF]` (needs `--project`), `--prompt TEXT [--steer|--follow-up]`. `remote-session-verbs.ts` `openOn` passes them to `createRelaySessionHost().open`, the same create path as `thread_create`, and no longer sends a `set_model` after the open, so a refused model leaves no session. `personDelivery` is the person pipeline `send` used, now shared with `open --prompt`. `remote-permission-preset.ts` re-exports the preset list from omo-senpi's `permission-presets.ts`. Folded from #13666: `remote-session-args.ts` `parseTarget` takes a bare durable id; `remote-session-target.ts` `resolveSessionTarget` finds its device in the account listing (`not_found` / `ambiguous_target` refuse before any command) and passes `<device>/<session>` through unchanged; `remote-cli.ts` attach resolves the same way and attaches through `attachAddressed`; `send` reports the row's thread id. Tests: `test/remote-open-mode.test.ts`, `test/remote-id-contract.test.ts` (from #13666).
+
+## 2026-11-16 - A spec with no extensions keeps its host's id; every host command the wrapper gives a spec is covered (#13729)
+
+`compile-args.ts` `carriesLaunchProfile`: a socket host child counts as carrying its launch profile when it has `--mode rpc --multi-session --listen` and either `--extension` or `--session-runtime`. The engine's `loadHostLaunchSpec` always emits `--session-runtime`, and a spec with `core.extensions: []` emits nothing else, so before this such a host still got `--extension <execDir>/plugin` prepended while `clientRuntimeBuildId` predicted no extensions (review LOW L1 on #13700). `test/compiled-host-runtime-id.test.ts` adds that case (RED at #13700's head: 1 fail), plus the cases the review found untested (L2): `host handoff` and `host session open` get this runtime's spec, `--launch-spec=<path>` is left alone, and a `--` tail stays after the inserted spec. Must not break: RPC task and memory children still exit early through `--no-extensions`; the supervisor route (`--internal-rpc-host-supervisor`, no `--mode rpc`) still gets the plugin prefix.
+
+## 2026-11-16 - A spec-launched host keeps its own extension list (#13700)
+
+`compile-args.ts` `buildSenpiArgs`: a socket host child (`--mode rpc --multi-session --listen` with `--extension` paths from its launch spec) is returned unchanged, like a `--no-extensions` caller, so the host's `runtimeBuildId` and `launch_profile` match what `host ensure` predicts from the spec. `host ensure`, `host handoff` and `host session open` without `--launch-spec` get this runtime's `plugin/daemon-launch-spec.json` (when it exists), as `omo daemon` already passes it, so a spec-less ensure still starts a host with the plugin. New test: `test/compiled-host-runtime-id.test.ts` computes both ids with the installed engine's own functions.
+
+## 2026-11-07 - Windows runtime-copy path comparison is canonical (#12769)
+
+`isProvisionedExecutable` (`compile-runtime.ts`) compared `realpathSync()` of both paths. On Windows the JS realpath keeps 8.3 short names (`RUNNER~1`) while the running exe reports the long name, so the runtime copy started directly did not recognise itself: `planProvisionedLaunch` handed off to it again, and `handedOffLauncher` kept the copy as `launcher`, which `omo update` and runtime pruning then trust. Both sides now resolve through `realpathSync.native` (falling back to `resolve` per side); on win32 the `\\?\` prefix is stripped and the comparison is case-insensitive. POSIX stays case-sensitive.
+
+## 2026-11-08 - Concurrent runtime prunes and a tested prune gate (#12627 follow-up)
+
+Review notes on #12627. `runtime-prune.ts`: the leftover sweep skips a `.prune-<version>-<pid>` tree whose pid is alive (`process.kill(pid, 0)`; `EPERM` also counts as alive), because that pruner may still rename it back to a runtime in use; a tree left by a dead pruner is still removed. `ENOENT` on the first rename means a concurrent pruner took the runtime after this listing, so it counts as removed instead of reaching stderr through `reportRuntimePrune`. `compile-entry.ts`: `launchPrunesRuntimes(args, launch)` is the one condition `main()` prunes under (a launcher is set, no handoff, not `trustLaunchKind(args) === "static"`, not `isSelfUpdate(args)`), so the rule no longer depends on the prune call staying below the fast-path returns. `bin/lib/doctor.js`: `listProcesses` runs `ps -ww`, so `args` is never cut at the terminal width (BSD/macOS) before the runtime path the prune matches.
+
+## 2026-11-06 - `omo update` replaces the installed binary, and old runtimes are pruned (#12626)
+
+The compiled launcher hands off to `~/.omo/binary-runtime/<version>/omo`, and that runtime copy is what answers `omo update`, so the printed replace command targeted the copy. The next launch re-materialized the copy from the launcher (`materializeProvisionedExecutable`), which undid the update. `handOffToProvisionedRuntime` now passes the launcher path in `OMO_PROVISIONED_LAUNCHER` beside `OMO_PROVISIONED_HANDOFF`. `planProvisionedLaunch` returns it as `launcher`, and drops both markers. A marker that is relative or names the runtime copy is ignored. `compiledUpdate` replaces `launch.launcher`. When only the runtime copy is known (it was started directly), it prints the documented installer (`install.sh` / `install.ps1`) and exits 1 instead of a replace command the next launch would undo. Package-manager detection now sees the real install path too.
+
+The runtime a launcher hands a real launch to prunes the runtimes older than its own through `runtime-prune.ts`, after the fast paths, so `--version`, `--help` and `update` (the installers run `omo --version`) never prune, and the engine's own re-runs of the runtime copy (no launcher) do not either. With nothing to prune it is one `readdir`. It keeps the newest older runtime for a rollback, every newer runtime, non-version entries (`RELEASE_VERSION` from `compiled-update.ts`), and any runtime a live process runs: on POSIX hosts doctor's `listProcesses` (`ps`, now exported) names it by the absolute path the launcher execs, and a listing that cannot be read prunes nothing; on Windows no process list is taken, because Windows refuses to rename a directory while a file inside it is open. A runtime is renamed to `.prune-<version>-<pid>` before it is deleted, so a racing launch re-provisions instead of running a half-deleted tree, and a leftover from an interrupted prune is removed next time. After the renames one more process listing runs: a runtime that started between the first listing and its rename still runs from the old path, so it is renamed back and kept; an unreadable second listing puts every renamed runtime back. A Windows rename refused because a file is open keeps the runtime silently; any other failure is one stderr line and never blocks the launch. On Windows a launch also removes the `<launcher>.old` the printed replace command leaves behind.
+
+## 2026-11-07 - Claim memory sync when an RPC engine boots (#12702, part of #11997)
+
+The launch rules live in omo-senpi `desktop-sync/bootGate.ts` `claimsMemorySyncAtBoot(args, env = process.env, runtime = process)`, exported from the device-account sidecar (`extensions/omo-device-account.js`) beside `claimMemorySyncAtBoot(take)`, so the desktop's own entry calls the same gate and claim: `--mode rpc` before `--`, not the lifecycle supervisor, a `SENPI_PRIVATE_FDS` object naming `memory-sync` (a table that does not parse leaves the claim to the extension), and a process whose senpi CLI loads the agent itself. senpi's CLI re-runs the engine in a child for exec arguments or an inherited `--inspect` (`requiresIsolatedProcess()`, dist/cli.js:169-175) and may re-run a non-Bun process under Bun (`reexecUnderBunIfNeeded()`, dist/cli.js:85-122); that child would lack a descriptor the boot claim took, so the gate answers false there and the extension claims in the process that runs the agent. `bin/lib/memory-sync-boot.js` `launchClaimsMemorySyncAtBoot` adds only omo's one-shot engine commands on top. Every entry follows the contract in `bootClaim.ts` with the running engine's own senpi modules: the gate (pure, any time before the capture), `valid-cwd.js`, `private-fd-startup-release.js`, then senpi's `private-fds.js` (the capture) and `claimMemorySyncAtBoot(takeInheritedPrivateChannel)`; the take is a required parameter because the sidecar bundles its own copy of that module. The sidecar no longer captures the table when imported (its bundled `#senpi-private-fds` loads only inside `claimInheritedDesktopSync`), so the gate still sees the table. `compile-entry.ts` runs those steps in `memory-sync-boot.ts` right before importing senpi's CLI, in both branches. The npm launcher asks the sidecar's gate before sending a launch through `bin/lib/engine-boot.js`, which drops itself from argv, runs the same steps in the engine process, and imports senpi's CLI there. A failure at boot is one stderr line; the memory component's registration then selects as before. The npm `host ensure` hop that starts the engine is senpi's own CLI and is not covered here (#12705).
+
+## 2026-11-04 - Remote attach forwards every engine record (#12261)
+
+`remote-attach.ts` answers locally only the attach TUI's plumbing (`set_client_info`, `attach_session`, `release_attachment`, `list_sessions` for the one presented row, `subscribe_sessions`, `get_state`, `get_entries`); every other record goes to the host as a delegated `session.command {rpc}` through `RemoteAttach.command`, with `sessionId: "remote"` replaced by the attached session's id. The engine's reply is sent back verbatim on the request id; a host without delegated commands answers with the command state only (`engine_applied` -> success, otherwise `"<state>: <reason>"`). Frames the engine writes on the delegated connection are relayed after `subscribe_sessions`, and a lost reply or a closed channel becomes a warning notice. `device-service-core` gains `delegated-channel.ts` (reply and frame demultiplexing, blob reassembly with length and sha256 checks) and its vendored local API client is synced with the service's current contract.
+
+## 2026-11-05 - Doctor reports a broken omo wrapper and duplicate omo-ai installs (#12534)
+
+`omo doctor` now reports a generated `omo` wrapper whose cached runtime is gone, and warns when two different omo-ai installs are both on PATH. Windows `.cmd` wrappers are not covered by the broken check: they write `rem OMO_GENERATED_RUNTIME_WRAPPER` while the check looks for the `#` marker.
+
+## 2026-11-05 - Name the OpenSSL default-file drop (#12499, part of #10762)
+
+Design revision 11, 4.4 item 6. `readDefaultFileCandidates` takes its narrowing flags from the exported `DROP_CAUSE_NARROWING` table. On a drop, `acquireEngineTrust` records one `openssl-default-file-malformed` entry carrying `file`, `cause`, `blockIndex` and `narrowing` instead of two plain codes, and returns it as `defaultFileDrop`. `runTrustStage` prints it in the `trust ensure --json` line. `trust-diagnostics.ts` accepts that structured entry and still accepts the plain code for an unreadable file; it refuses another file name, an unknown cause, a non-integer block index or a narrowing flag that does not match the cause. `engine-trust-doctor.ts` reads the adopted generation's `diagnostics.1.jsonl` and `diagnostics.jsonl`, takes the last `import-exec` or `ensure` record of that generation, and gives `omo doctor` one INFO line: the drop, or `default-file: kept` / `unreadable`. A missing or torn log yields no line and never fails doctor.
+
+## 2026-10-31 - Drop the Claude Code UA floor rewrite of the installed engine (#11964, part of senpi#5131)
+
+`packages/omo-native/bin/lib/claude-code-floor.js` is deleted and `engine-prepare.js` `prepareInstalledEngine` no longer calls `floorClaudeCodeVersion`. senpi#5131 removes the `anthropic` provider's Claude Code OAuth impersonation path and with it the `claudeCodeVersion` declaration in `@earendil-works/pi-ai/dist/api/anthropic-messages.js` and the engine bundle; against such an engine the floor step threw `omo-ai: unsupported Senpi ...: no claudeCodeVersion declaration` on every launch (reported, never fatal) and had nothing left to protect. `senpi-patch.test.ts` (floor-only) is deleted; `engine-prepare-on-launch.test.ts` proves the stamp and the RPC guard without the UA fixture, and the other fixtures stop writing a fake `anthropic-messages.js`. knip entries for the deleted file are removed. Merge order: this lands before omo pins an engine that contains senpi#5131.
+
+## 2026-10-31 - Forward Windows private pipe pairs (#11955)
+
+The shared private descriptor inspector accepts two distinct open pipe descriptors in 5..64 on Windows, refusing aliases (including those in malformed arrays), non-pipes, and runtime IPC descriptors atomically. Pipe detection checks the file-type mode bits because Node's Windows `Stats.isFIFO()` returns false even for an open pipe. The first launcher import captures and removes the table before helper children run. Explicit engine hops preserve the pair's stdio slots, including when capturing stderr, and close owned Windows copies immediately after spawn or a synchronous spawn failure. Shells receive null declarations without either private slot. Receipt-side inherit clearing stays in senpi; the POSIX socket path from #11786 is unchanged.
+
+## 2026-10-29 - Recover corrupt account credentials (#11832)
+
+Unscoped forget clears the stored credential under the session lock without a read. Scoped forget compares the current device under that lock and reports unreadable ownership as a JSON refusal. Only a well-formed target argument can select scoped deletion; malformed flags are rejected before store access. Explicit adopt replacement tolerates invalid data but not OS storage failures.
+
+## 2026-10-29 - Private descriptors survive the launcher hop (#11772)
+
+`bin/lib/private-fd-table.js` decides whether a launch carries private descriptors: a valid `SENPI_PRIVATE_FDS` table whose integer entries are open, unshared sockets in 5..15 that are not the runtime's IPC channel; every other entry still travels as `null` so the engine keeps the name declared, and named sockets the launcher cannot forward are closed on all three paths (the npm launcher at its first import, the Bun re-exec, and the compiled provisioned-runtime handoff before it spawns), never on Windows. `bin/lib/private-fds.js` captures and removes the table at the npm launcher's first import, so its helper children never see it. `spawnSenpi`, `maybeReexecUnderBun` and `reexecProvisionedRuntime` hand off through the existing signal-aware child with those descriptors in stdio when a table is present, and keep `execve` otherwise. `reexecProvisionedRuntime` reads the table without removing it, because the compiled entry runs the engine in-process and the engine's own capture must still see it. Measured: `execve` does not keep inherited descriptors on Node 24.22 or Bun 1.4.4 in any hop/target pairing, which also dropped fd 4 presenter enrollment through the npm launcher.
+
+## 2026-10-27 - SENPI_BRAND carries the OmO logo (#11445)
+
+`bin/lib/brand-logo.generated.js` (written by `bun script/build-brand-logo.ts` from `.github/assets/omo-icon-light.svg`) exports `OMO_BRAND_LOGO`, the icon as a base64 SVG data URI. `engine-environment.js` `brandProfile()` and `compiled-environment.ts` put it in `SENPI_BRAND.logo`, which the engine renders on the provider sign-in result page once the pinned senpi includes senpi#4432/#4434 (2026.10.27-1 ignores it). `bun run brand-logo:check` (also in CI's committed-bundle step) fails when the module is stale; the generator normalizes the icon to LF and `.gitattributes` keeps `*.svg` LF, so a Windows checkout produces the same module.
+
+## 2026-10-26 - Reinstall and sign-in guidance (#11390)
+
+The launcher sets `OMO_REINSTALL_COMMAND` (`updateTarget().command`) for the engine so the plugin can name the reinstall command after `SENPI_BRAND` is scrubbed. `runThreadCommand` takes a `reinstall` step from its caller (npm: the reinstall command; compiled: the releases page). `omo update` on an install already at the channel version whose engine tree cannot be resolved exits 1 with the reinstall command. `omo sync` reads the account refusal body's code through `ApiRefusal`, using the shared guidance and falling back to HTTP status for unknown or malformed bodies. Forbidden accounts are not told to sign in again; deleted accounts get the account-deleted action both here and during session refresh.
+
+Review #10496 round 2 (#10478). `applySetupStages` now tracks the files its own earlier stages wrote and passes them to `staleGuard`; `staleSetupTargets(plans, ids, written)` ignores those paths. Before this, an apply of every stage with a custom-provider key stopped halfway: the credentials stage rewrote auth.json, then the provider stage compared auth.json against the scan-time bytes and answered `stale` after credentials were written. A skill directory planned as new is now stale when anything exists at its path (it was read as a file, so the check never fired). `omo setup` passes no guard and is unchanged.
+
+## 2026-10-18 - Onboarding apply refuses stale targets and rides the engine's credential store (#10496)
+
+Review #10496 on the onboarding scan RPC (#10478). `omo.onboarding.apply` now re-reads every requested stage's target files and compares content hashes against what the scan read: any change since the scan answers `{kind:"stale", reason, paths}` with nothing written, a change that lands mid-apply refuses that stage instead of writing the scan-time copy, and a retained scan older than ten minutes answers stale with the expiry reason (`setup-stream.js` gains `staleSetupTargets`, `SetupStaleError` and a `staleGuard` option on `applySetupStages`; `omo setup` passes none of it and is unchanged). Credential additions ride the engine's own store: the shell captures `modelRegistry.authStorage` at `session_start` and writes through `modify` under its lock, so a token refresh that lands mid-apply merges instead of reverting, and an apply with no store refuses instead of an unlocked overwrite (`writeAuth` option). The TUI migration scan now loads lazily - once, only after a claim succeeds, never in `register()` - so sessions that never onboard pay none of its 200 ms. The onboarding skill keeps a hand-read fallback for harnesses the scan does not detect (Claude Code, Codex), the scan-failure `done` event documents its `reason`, a model-choice write failure warns through the apply reply's `notices` instead of the engine's stdout, and the one-implementation test asserts the injected inventory sentence equals the shared scan's output instead of grepping `component.ts`.
+
+## 2026-10-18 - `omo setup` detection becomes a per-source stream (#10478)
+
+`bin/lib/setup-stream.js` turns what `planAll` did into `scanSetup`, an async stream that yields each source (`detect`, `providers`, `credentials`, `assets`, `model-choices`) as soon as it is read and classified, with `{id, kind, state, detail?}` rows that never carry a key. `collectSetupPlans` drains it into the inventory and stage plans, and `applySetupStages` runs the existing writers for the stages a caller accepts, re-planning model choices when the provider stage is declined. `omo setup` consumes the stream and `applySetupStages` for both the one-consent and `--ask-each` paths, so its flags and output are unchanged. The engine's onboarding scan RPC (omo-senpi) imports the same module, which makes it the one implementation of setup detection. Custom providers are read only when the caller asks for them (`omo setup` always does), and the model-choice stage is the only one that loads the offline model catalog, after the other sources have been yielded.
+
+## 2026-10-17 - Standalone `omo setup` reads the model catalog and bundled skills from the binary (#10429)
+
+Thanks to @bluet for the report. In the compiled release binary, `bin/lib/package-paths.js` resolves `packageRoot` inside the binary's virtual filesystem and `resolveSenpi()` finds no installed engine, so `omo setup` printed `could not read the engine's model list (ENOENT ... '/package.json')` and never carried the OpenCode default model or agent/category picks. The same root meant the asset stage read no bundled skills, so a user skill named like a bundled one (for example `ultrawork`) was planned for import into the global skills root, where it would shadow the bundled skill.
+
+`runSetup` now takes `loadModelCatalog` and `pluginRoot`. The npm launcher keeps its defaults; the compiled entry passes `loadCompiledModelCatalog` (the pi-ai provider catalog compiled into the binary, read through senpi's `VIRTUAL_MODULES` table) and the provisioned runtime's `plugin/` directory. `test/compiled-setup-binary.test.ts` builds a real `bun build --compile` executable and runs `setup --dry-run` from a directory outside any `node_modules` tree.
+
+## 2026-10-15 - Setup e2e tests keep the child's temp files inside the fixture (#10163)
+
+`setup-opencode-providers.test.ts` runs the real launcher from a copied app that has no `node_modules`, so Bun auto-installs the engine's dependencies on first import and extracts them under the temp dir. On Windows those extraction directories (`.typebox`, `.openai`, `.client-bedrock-runtime`) outlived the child and tripped the #9766 temp-leak guard in other PRs' Windows shard. The child now gets `TMPDIR`/`TEMP`/`TMP`/`BUN_TMPDIR` inside the fixture root, which teardown removes. The Bun install cache stays the host's: a cache is not a temp leak, and a fresh per-file cache made the first engine-importing case install about 52k files cold (6.1 s instead of 0.14 s on macOS), which would have made the #10210 Windows timeout worse. One case asserts that the child's `os.tmpdir()` is the fixture's tmp dir, another that the child keeps the host's Bun install cache.
+
 ## 2026-10-14 - omo setup carries OpenCode's catalog providers, not only custom blocks (#10158)
 
 Thanks to @taxilian for the report on #8485. OpenCode serves every provider in its models.dev catalog as soon as it has a key. `omo setup` only carried omo's builtins and `provider.<id>` blocks, so a key for a catalog provider like `neuralwatt` was dropped as "a provider omo does not serve", and an OpenCode default model on it was not carried either.
@@ -71,17 +217,6 @@ refuse to publish unless that smoke succeeded; `smoke-linux-arm64` no longer req
 so an unrelated failed leg cannot block the arm64 publishes. Both publish decisions are expression-free shell steps (inputs
 via env), and `script/publish-platform-smoke-gate.test.ts` runs those exact step bodies: an empty download dir fails with
 the reason, a present payload passes, and the arm64 gate refuses on a failed or skipped smoke for arm64 legs only.
-
-## 2026-10-01 - The gateway hook's integrity check and its tests agree on Windows paths (follow-up to #9243)
-
-`verifyGatewayPackage` (`bin/lib/gateway.js`) resolves the package directory and its host entry with
-`realpathSync.native` instead of `realpathSync`. On Windows, `realpathSync` can keep an 8.3 short name
-(`C:\Users\RUNNER~1\...`) while the module loader hands back the long name for the same directory. That made the
-two sides of the containment check spell one directory two ways, which can falsely refuse a valid install reached
-through a short path. `.native` returns the canonical long name on both sides, and on POSIX it changes nothing. The test
-fixtures (`test/gateway.test-support.ts`) create their temp roots with `realpathSync.native` too, so the paths they
-expect match what the hook reports. That fixes the eight Windows-only failures in `test/gateway.test.ts` and
-`test/gateway-integrity.test.ts` on dev.
 
 ## 2026-10-01 - A `bun add -g` update leaves an `omo` that starts without node (#9293)
 
@@ -165,44 +300,6 @@ cannot repair an asset absent from that payload or enforce a gate on another rel
 ### Expected merge conflict zones
 
 The engine-sidecar resolver, binary staging fixture, and release smoke workflow.
-
-## 2026-09-30 - The gateway host receives omo's plugin root and the thread SDK URL (#9243)
-
-`runGatewayCommand` and the doctor call into the installed gateway now also pass `pluginRoot`, omo's staged plugin
-payload (`<packageRoot>/plugin`, from `package-paths.js` as doctor resolves it), and `threadSdkUrl`, the `file:` URL of
-`<pluginRoot>/runtime/thread-sdk/sdk.js`, so the gateway neither derives the install from `argv[1]` nor knows the
-payload layout. Both come from the hook's own module URL, so a symlinked install hands over the real install's paths.
-The SDK file ships with the thread SDK (#9222); until then the URL names a file that does not exist yet, and omo does
-not check it, so `omo gateway` behaves as before. `test/gateway.test.ts` covers the command (plain and symlinked
-install) and the doctor call; each case fails with its field removed.
-
-## 2026-09-30 - The gateway hook verifies the installed package before importing it (#9243)
-
-Before `bin/lib/gateway.js` imports `@oh-my-opencode/omo-gateway/host`, `verifyGatewayPackage` finds the package's
-`package.json` on the same resolver search paths the import walks and refuses the package, as `broken` with a reason that
-names its directory, unless the manifest `name` is exactly `@oh-my-opencode/omo-gateway`, it declares
-`omoGateway.hostContract` equal to 1 (the runtime `HOST_CONTRACT_VERSION` check stays), and the host entry the import
-resolves stays inside the package directory once symlinks are resolved on both sides. A refused package never runs:
-`omo gateway` prints the reason and exits 1, the doctor gateway row is `FAIL`. No package directory is still `missing`, and
-nothing changes for an install without the package. `test/gateway-integrity.test.ts` (5 cases) covers a foreign name, a
-missing and a mismatched manifest contract, a host entry symlinked out of the package, and a verified package reached
-through a symlinked package directory; each fails with its check removed.
-
-## 2026-09-30 - `omo gateway` and the doctor gateway rows load a separately installed gateway package (#9243)
-
-`bin/lib/gateway.js` is a hook, not a gateway: `omo gateway <args>` imports `@oh-my-opencode/omo-gateway/host` by bare
-name from omo's own install (the resolution the gateway itself uses for adapter packages), checks its
-`HOST_CONTRACT_VERSION` (1), and calls its `runGatewayCommand` with argv, stdio, env, cwd, the canonical agent dir,
-home and the argv that relaunches `omo gateway connect`. Without the package it prints one line, `omo gateway: the omo
-gateway is not installed: ...`, and exits 1; a package that fails to load or speaks another contract is named as
-such and also exits 1. `omo doctor` adds gateway rows only when the user config (`~/.omo/omo.jsonc` or `omo.json`) sets
-`gateway` at its top level or in `[native]`: one `WARN gateway:` row when the package is missing, `FAIL gateway:` when
-it is broken, otherwise `PASS gateway: installed` followed by the package's own rows, and a package `FAIL` row fails
-doctor. Without a `gateway` section nothing is imported and doctor output is unchanged. The launcher imports the hook
-lazily, so the startup path does not load it. `omo-config-core` accepts `gateway` as an open object in the root, layer
-and harness-block schemas so a config carrying it loads without an unknown-key diagnostic; omo never reads it.
-`test/gateway.test.ts` (9 cases) drives a packaged copy of `bin/` with and without a fixture package installed beside it;
-`omo-config-core` `src/schema/gateway.test.ts` (3 cases) fails on dev.
 
 ## 2026-09-30 - The compiled binary hands a downloaded Claude Code to the engine at startup (#9276)
 

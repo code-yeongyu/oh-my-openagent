@@ -1,12 +1,7 @@
 import { homedir } from "node:os"
 import path from "node:path"
 
-export type PathClassification =
-  | "icloud"
-  | "onedrive"
-  | "desktop-sync"
-  | "network-drive"
-  | "unknown"
+export type PathClassification = "icloud" | "onedrive" | "desktop-sync" | "network-drive" | "unknown"
 
 function normalizeInputPath(absolutePath: string): string {
   return absolutePath.replaceAll("\\", "/")
@@ -38,9 +33,11 @@ export function classifyPathEnvironment(absolutePath: string): PathClassificatio
   }
 
   if (
-    normalizedPath.startsWith("/Users/")
-    && (normalizedPath.includes("/Desktop/") || normalizedPath.endsWith("/Desktop")
-      || normalizedPath.includes("/Documents/") || normalizedPath.endsWith("/Documents"))
+    normalizedPath.startsWith("/Users/") &&
+    (normalizedPath.includes("/Desktop/") ||
+      normalizedPath.endsWith("/Desktop") ||
+      normalizedPath.includes("/Documents/") ||
+      normalizedPath.endsWith("/Documents"))
   ) {
     return "desktop-sync"
   }

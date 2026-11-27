@@ -9,12 +9,7 @@ import {
   resolveBoulderPlanPathForWork,
 } from "../../features/boulder-state"
 import type { BoulderWorkState } from "../../features/boulder-state"
-import {
-  formatJsonOutput,
-  formatNoBoulderMessage,
-  formatReadErrorMessage,
-  formatTextOutput,
-} from "./formatter"
+import { formatJsonOutput, formatNoBoulderMessage, formatReadErrorMessage, formatTextOutput } from "./formatter"
 import type { BoulderCliResult, BoulderCliWork, BoulderOptions } from "./types"
 
 function formatDurationHuman(durationMs: number): string {
@@ -87,16 +82,14 @@ function buildCliWork(directory: string, work: BoulderWorkState): BoulderCliWork
     total_tasks: progress.total,
     completed_tasks: progress.completed,
     remaining_tasks: Math.max(0, progress.total - progress.completed),
-    percentage: progress.total > 0
-      ? Math.round((progress.completed / progress.total) * 100)
-      : 0,
+    percentage: progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0,
     session_count: work.session_ids.length,
     current_task: currentTask
       ? {
-        task_key: currentTask.key,
-        task_title: currentTask.title,
-        elapsed_human: currentTaskElapsedHuman,
-      }
+          task_key: currentTask.key,
+          task_title: currentTask.title,
+          elapsed_human: currentTaskElapsedHuman,
+        }
       : undefined,
   }
 }
@@ -115,9 +108,7 @@ export async function boulder(options: BoulderOptions): Promise<number> {
   }
 
   const works = getBoulderWorks(state)
-  const filteredWorks = options.workId
-    ? works.filter((work) => work.work_id === options.workId)
-    : works
+  const filteredWorks = options.workId ? works.filter((work) => work.work_id === options.workId) : works
 
   if (filteredWorks.length === 0) {
     process.stderr.write(`${formatNoBoulderMessage(options.json)}\n`)
@@ -127,9 +118,7 @@ export async function boulder(options: BoulderOptions): Promise<number> {
   const cliWorks = filteredWorks.map((work) => buildCliWork(directory, work))
   const result: BoulderCliResult = { works: cliWorks }
 
-  const output = options.json
-    ? formatJsonOutput(result)
-    : formatTextOutput(result)
+  const output = options.json ? formatJsonOutput(result) : formatTextOutput(result)
 
   process.stdout.write(`${output}\n`)
   return 0

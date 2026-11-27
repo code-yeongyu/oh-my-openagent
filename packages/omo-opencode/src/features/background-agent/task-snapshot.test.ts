@@ -46,10 +46,12 @@ describe("toBackgroundTaskSnapshots", () => {
 
   test("passes through every background task status", () => {
     //#given
-    const tasks = ALL_BACKGROUND_TASK_STATUSES.map((status) => createTask({
-      id: `task-${status}`,
-      status,
-    }))
+    const tasks = ALL_BACKGROUND_TASK_STATUSES.map((status) =>
+      createTask({
+        id: `task-${status}`,
+        status,
+      }),
+    )
 
     //#when
     const snapshots = toBackgroundTaskSnapshots(tasks)
@@ -94,13 +96,15 @@ describe("toBackgroundTaskSnapshots", () => {
     expect(() => {
       Object.assign(first, { title: "mutated" })
     }).toThrow()
-    expect(toBackgroundTaskSnapshots([task])).toEqual([{
-      title: "summarize code",
-      status: "running",
-      toolCalls: 3,
-      lastTool: "grep",
-      agent: "sisyphus",
-    }])
+    expect(toBackgroundTaskSnapshots([task])).toEqual([
+      {
+        title: "summarize code",
+        status: "running",
+        toolCalls: 3,
+        lastTool: "grep",
+        agent: "sisyphus",
+      },
+    ])
   })
 
   test("does not expose prompt text when description is empty", () => {

@@ -15,14 +15,22 @@ import {
   memoryModuleSupervisor,
   resolveMemoryConfig,
 } from "./index"
-import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import {
+  componentContext,
+  loadedMemoryConfig,
+  memorySettings,
+  MemoryFakeExtensionAPI,
+  sessionContext,
+} from "./memory.test-support"
 import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE } from "./kibitzer/notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
+import { AGREEMENT_FLAGGED_ENTRY_TYPE } from "./agreement-notice"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { cwd: string; memoryHome: string } {
@@ -37,7 +45,9 @@ function eventBus(): {
 } {
   const handlers = new Map<string, Set<(payload: unknown) => void>>()
   return {
-    emit(name, payload) { for (const handler of handlers.get(name) ?? []) handler(payload) },
+    emit(name, payload) {
+      for (const handler of handlers.get(name) ?? []) handler(payload)
+    },
     on(name, handler) {
       const listeners = handlers.get(name) ?? new Set<(payload: unknown) => void>()
       listeners.add(handler)
@@ -89,7 +99,10 @@ describe("createMemoryComponent", () => {
       createMemoryComponent({ loadConfig: () => loadedMemoryConfig(scenario.memory) }).register(pi, ctx)
 
       expect({ handlers: pi.handlers, tools: pi.tools, commands: pi.commands, renderers: pi.entryRenderers }).toEqual({
-        handlers: [], tools: [], commands: [], renderers: [],
+        handlers: [],
+        tools: [],
+        commands: [],
+        renderers: [],
       })
     }
   })
@@ -107,8 +120,18 @@ describe("createMemoryComponent", () => {
         env: { [sentinel]: "1" },
       }).register(pi, ctx)
 
-      expect({ sentinel, handlers: pi.handlers, tools: pi.tools, commands: pi.commands, renderers: pi.entryRenderers }).toEqual({
-        sentinel, handlers: [], tools: [], commands: [], renderers: [],
+      expect({
+        sentinel,
+        handlers: pi.handlers,
+        tools: pi.tools,
+        commands: pi.commands,
+        renderers: pi.entryRenderers,
+      }).toEqual({
+        sentinel,
+        handlers: [],
+        tools: [],
+        commands: [],
+        renderers: [],
       })
       expect({ sentinel, child: isMemoryChildProcess({ [sentinel]: "1" }) }).toEqual({ sentinel, child: true })
     }
@@ -149,6 +172,7 @@ describe("createMemoryComponent", () => {
       "senpi-memory.health",
       "senpi-memory.reflection-parked",
       SOUL_UPDATED_ENTRY_TYPE,
+      AGREEMENT_FLAGGED_ENTRY_TYPE,
       RECALL_CUSTOM_TYPE,
       NUDGED_ENTRY_TYPE,
       GATE_ENTRY_TYPE,
@@ -161,10 +185,13 @@ describe("createMemoryComponent", () => {
     // Direct registration is the only surface: the memory tool always registers directly and no MCP server is offered.
     expect(pi.tools.map((tool) => tool.name)).toEqual(["memory"])
     expect(pi.mcpServers.map((server) => server.name)).toEqual([])
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: expect.objectContaining({ identity: expect.stringMatching(/^project-[a-f0-9]{8}$/), boundAt: 123 }),
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: expect.objectContaining({ identity: expect.stringMatching(/^project-[a-f0-9]{8}$/), boundAt: 123 }),
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(existsSync(memoryHome)).toBe(false)
     expect(notifications).toEqual([])
     memoryModuleSupervisor.release()
@@ -202,10 +229,13 @@ describe("createMemoryComponent", () => {
     await pi.dispatch("before_agent_start", {}, resumed)
     await pi.dispatch("before_agent_start", {}, resumed)
 
-    expect(pi.entries).toEqual([{
-      customType: MEMORY_BINDING_CUSTOM_TYPE,
-      data: { identity: identity.id, repoPathHash: recorded.repoPathHash, boundAt: 456 },
-    }])
+    expect(pi.entries).toEqual([
+      {
+        customType: MEMORY_BINDING_CUSTOM_TYPE,
+        data: { identity: identity.id, repoPathHash: recorded.repoPathHash, boundAt: 456 },
+        options: { startupBookkeeping: true },
+      },
+    ])
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     expect(notifications).toEqual([])
     memoryModuleSupervisor.release()
@@ -225,11 +255,13 @@ describe("createMemoryComponent", () => {
       resolveCwd: () => cwd,
     }).register(pi, ctx)
     const resumed = sessionContext({
-      entries: [{
-        type: "custom",
-        customType: MEMORY_BINDING_CUSTOM_TYPE,
-        data: { identity: identity.id, repoPathHash: "other-repository", boundAt: 1 },
-      }],
+      entries: [
+        {
+          type: "custom",
+          customType: MEMORY_BINDING_CUSTOM_TYPE,
+          data: { identity: identity.id, repoPathHash: "other-repository", boundAt: 1 },
+        },
+      ],
       notifications,
     })
 
@@ -239,7 +271,9 @@ describe("createMemoryComponent", () => {
     expect(pi.entries).toEqual([])
     expect(memoryModuleSupervisor.refCount).toBe(before)
     expect(notifications).toEqual([{ message: expect.stringContaining("memory identity conflict"), level: "error" }])
-    expect(ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(1)
+    expect(ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(
+      1,
+    )
   })
 
   test("#given a session bound at session_start #when before_agent_start fires #then no second binding is appended and no second reference is taken", async () => {
@@ -261,6 +295,41 @@ describe("createMemoryComponent", () => {
 
     expect(pi.entries).toHaveLength(1)
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
+    memoryModuleSupervisor.release()
+  })
+
+  test("#given a session bound at session_start #when later runs start #then the full history is never read (senpi#3110)", async () => {
+    // A reopened compacted session answers getEntries() by re-parsing its whole transcript file and holds
+    // the result until it settles idle, so an eager read here pinned that copy for every run.
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    createMemoryComponent({
+      env: { OMO_MEMORY_HOME: memoryHome },
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+    const live = sessionContext()
+    let historyReads = 0
+    const counted = {
+      ...live,
+      sessionManager: {
+        ...live.sessionManager,
+        getEntries: () => {
+          historyReads++
+          return live.sessionManager.getEntries()
+        },
+      },
+    }
+    await pi.dispatch("session_start", {}, counted)
+    historyReads = 0
+
+    await pi.dispatch("before_agent_start", {}, counted)
+    await pi.dispatch("before_agent_start", {}, counted)
+
+    expect(historyReads).toBe(0)
     memoryModuleSupervisor.release()
   })
 
@@ -294,21 +363,29 @@ describe("createMemoryComponent", () => {
       resolveCwd: () => cwd,
     }).register(pi, componentContext())
 
-    await pi.dispatch("session_start", {}, sessionContext({
-      entries: [{
-        type: "custom",
-        customType: MEMORY_BINDING_CUSTOM_TYPE,
-        data: { identity: "different-identity", repoPathHash: "hash", boundAt: 1 },
-      }],
-      notifications,
-    }))
+    await pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({
+        entries: [
+          {
+            type: "custom",
+            customType: MEMORY_BINDING_CUSTOM_TYPE,
+            data: { identity: "different-identity", repoPathHash: "hash", boundAt: 1 },
+          },
+        ],
+        notifications,
+      }),
+    )
 
     expect(pi.entries).toEqual([])
     expect(existsSync(memoryHome)).toBe(false)
-    expect(notifications).toEqual([{
-      message: expect.stringContaining("memory identity conflict"),
-      level: "error",
-    }])
+    expect(notifications).toEqual([
+      {
+        message: expect.stringContaining("memory identity conflict"),
+        level: "error",
+      },
+    ])
   })
 
   test("#given enablement latched false or true at session_start #when config reload flips it #then registration stays fixed and restart notice appears once", async () => {
@@ -325,16 +402,24 @@ describe("createMemoryComponent", () => {
         resolveCwd: () => cwd,
       }).register(pi, componentContext())
       await pi.dispatch("session_start", {}, sessionContext({ notifications }))
-      const registrations = { handlers: pi.handlers.length, renderers: pi.entryRenderers.length, entries: pi.entries.length }
+      const registrations = {
+        handlers: pi.handlers.length,
+        renderers: pi.entryRenderers.length,
+        entries: pi.entries.length,
+      }
 
       pi.events.emit("config-watch:reloaded", { registrationId: "omo", paths: ["omo.jsonc"] })
       pi.events.emit("config-watch:reloaded", { registrationId: "omo", paths: ["omo.jsonc"] })
 
-      expect({ handlers: pi.handlers.length, renderers: pi.entryRenderers.length, entries: pi.entries.length }).toEqual(registrations)
-      expect(notifications).toEqual([{
-        message: "restart required to apply memory config change",
-        level: "warning",
-      }])
+      expect({ handlers: pi.handlers.length, renderers: pi.entryRenderers.length, entries: pi.entries.length }).toEqual(
+        registrations,
+      )
+      expect(notifications).toEqual([
+        {
+          message: "restart required to apply memory config change",
+          level: "warning",
+        },
+      ])
       await pi.dispatch("session_shutdown", {}, sessionContext())
     }
   })
@@ -365,29 +450,39 @@ describe("createMemoryComponent", () => {
       let reads = 0
       createMemoryComponent({
         env: { OMO_MEMORY_HOME: memoryHome },
-        loadConfig: () => loadedMemoryConfig(memorySettings({
-          enabled: scenario === "disabled" ? reads++ === 0 : true,
-          ...(scenario === "conflicted" ? { agent: "fresh" } : {}),
-        })),
+        loadConfig: () =>
+          loadedMemoryConfig(
+            memorySettings({
+              enabled: scenario === "disabled" ? reads++ === 0 : true,
+              ...(scenario === "conflicted" ? { agent: "fresh" } : {}),
+            }),
+          ),
         resolveCwd: () => cwd,
       }).register(pi, componentContext())
 
-      await pi.dispatch("session_start", {}, {
-        sessionManager: {
-          getEntries: () => scenario === "conflicted"
-            ? [{
-                type: "custom",
-                customType: MEMORY_BINDING_CUSTOM_TYPE,
-                data: { identity: "different-identity", repoPathHash: "hash", boundAt: 1 },
-              }]
-            : [],
-          getSessionId: () => `session-${scenario}`,
+      await pi.dispatch(
+        "session_start",
+        {},
+        {
+          sessionManager: {
+            getEntries: () =>
+              scenario === "conflicted"
+                ? [
+                    {
+                      type: "custom",
+                      customType: MEMORY_BINDING_CUSTOM_TYPE,
+                      data: { identity: "different-identity", repoPathHash: "hash", boundAt: 1 },
+                    },
+                  ]
+                : [],
+            getSessionId: () => `session-${scenario}`,
+          },
+          ui: {
+            notify: () => {},
+            setStatus: (key: string, text: string | undefined) => statusCalls.push({ key, text }),
+          },
         },
-        ui: {
-          notify: () => {},
-          setStatus: (key: string, text: string | undefined) => statusCalls.push({ key, text }),
-        },
-      })
+      )
 
       expect(statusCalls).toEqual([{ key: "memory", text: undefined }])
     }

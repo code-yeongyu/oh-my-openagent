@@ -1,9 +1,10 @@
 import type { TaskStartFailureTransition } from "./start-failure"
-import type { TaskRecord } from "./record-types"
+import type { TaskInterruptCause, TaskRecord } from "./record-types"
 import type { TaskRunStats } from "./run-stats-types"
 import type { HostSessionIdentity, ResidencyState, RunnerKind, TaskStatus } from "./types"
 
 export type TaskTransition =
+  | { readonly type: "pause" | "unpause"; readonly timestamp: string }
   | {
       readonly type: "start"
       readonly timestamp: string
@@ -31,7 +32,11 @@ export type TaskTransition =
       readonly type: "interrupt"
       readonly timestamp: string
       readonly error_message?: string
+      // The partial answer a foreign user abort preserved (F10a); absent when the run had none.
+      readonly final_response?: string
       readonly run_stats?: TaskRunStats
+      /** Set only for an interrupt the parent did not request (it then notifies the parent). */
+      readonly interrupt_cause?: TaskInterruptCause
     }
   | {
       readonly type: "lose"

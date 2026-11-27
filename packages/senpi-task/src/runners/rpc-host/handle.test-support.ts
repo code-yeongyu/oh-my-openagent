@@ -84,6 +84,10 @@ export function fakeSessionPort(
     switchSession: () => Promise.resolve({ cancelled: false }),
     close: () => {
       closes += 1
+      return Promise.resolve(true)
+    },
+    closeConfirmed: () => {
+      closes += 1
       return Promise.resolve()
     },
     detach: () => {
@@ -108,7 +112,11 @@ export function fakeSessionPort(
   }
 }
 
-export function handleOverPort(client: FakeSessionPort, heartbeatIntervalMs = 60_000, now = () => 7): HostSessionChildHandle {
+export function handleOverPort(
+  client: FakeSessionPort,
+  heartbeatIntervalMs = 60_000,
+  now = () => 7,
+): HostSessionChildHandle {
   return createHostSessionHandle({
     client,
     session: FAKE_SESSION,

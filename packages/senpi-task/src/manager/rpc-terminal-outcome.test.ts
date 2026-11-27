@@ -3,17 +3,18 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskRecordStore } from "../store"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
-import { terminateRpcChild } from "../runners/rpc/terminate"
+import { stopFakeChild } from "../runners/rpc/__fixtures__/stop-fake-child"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const children: ChildProcess[] = []
 
 function createManager() {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const processRunner = new RpcProcessRunner({
     modelAdmission: async () => {},
     spawnChild: (descriptor) => {
@@ -36,7 +37,7 @@ function createManager() {
 }
 
 afterEach(async () => {
-  await Promise.all(children.splice(0).map((child) => terminateRpcChild(child, { sigkillDelayMs: 100 })))
+  await Promise.all(children.splice(0).map(stopFakeChild))
   cleanupProjects()
 })
 
@@ -66,7 +67,8 @@ describe("RPC terminal outcomes", () => {
     // then
     expect(record.status).toBe("error")
     expect(record.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
-    if (result.kind === "start_failed") expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+    if (result.kind === "start_failed")
+      expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
     expect(rejections).toEqual([])
   })
 
@@ -97,7 +99,7 @@ describe("RPC terminal outcomes", () => {
       failure: { kind: "child-turn-failed", message: "provider unavailable" },
     })
     expect(terminal.status).toBe("error")
-    expect(terminal.error_message).toBe("provider unavailable")
+    expect(terminal.error_message?.split("\n")[0]).toBe("provider unavailable")
     expect(store.load(started.task_id)?.status).toBe("error")
   })
 })

@@ -1,0 +1,3 @@
+.card { position: relative; border-radius: 16px; }
+.card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(#6366f1, #a855f7); opacity: 0.1; }
+.rule::after { content: ""; display: block; height: 1px; width: 100%; background: #e5e7eb; }

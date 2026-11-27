@@ -1,0 +1,262 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/dacl.ts
+import { LocalApiError } from "./errors.ts";
+import { powerShellError, runPowerShell, type PowerShellRunner } from "./powershell.ts";
+
+export { runPowerShell, type PowerShellRunner };
+
+// Windows: every state dir entry carries an EXACT protected DACL. A fresh DirectorySecurity/FileSecurity with
+// inheritance disabled and exactly one FullControl ACE for the user SID replaces the DACL (icacls /grant:r would keep
+// foreign explicit ACEs), the user SID is made the owner, and the result is read back as the raw SDDL and judged here.
+// Inputs travel in environment variables, never inside the script text.
+
+// The script applyExactDacl runs; the device-service guard runs the same text with its read-back in one process.
+// #1452: Set-Acl is not used. Its FileSystem provider writes every section of the descriptor, the SACL among them, which
+// needs SeSecurityPrivilege (a standard user has none), and it lives in Microsoft.PowerShell.Security. The owner is set
+// by icacls /setowner (which enables the restore privilege an elevated token holds disabled), and SetAccessControl on
+// the item persists only the section this script changed: the protected DACL. Same mechanism as oh-my-openagent#14101.
+// icacls runs where its stderr is not fatal, so a refusal reaches the exit-code check as "setowner failed: <icacls text>".
+export const APPLY_DACL_SCRIPT = String.raw`
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$sid = New-Object System.Security.Principal.SecurityIdentifier($env:LA_SID)
+if ($env:LA_KIND -eq 'dir') {
+  $acl = New-Object System.Security.AccessControl.DirectorySecurity
+  $inherit = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+} else {
+  $acl = New-Object System.Security.AccessControl.FileSecurity
+  $inherit = [System.Security.AccessControl.InheritanceFlags]::None
+}
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
+  [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit,
+  [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+$acl.SetAccessRuleProtection($true, $false)
+$acl.AddAccessRule($rule)
+$ownerSet = & { $ErrorActionPreference = 'Continue'; & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1 | ForEach-Object { "$_" } }
+if ($LASTEXITCODE -ne 0) { throw "setowner failed: $ownerSet" }
+(Get-Item -LiteralPath $env:LA_PATH -Force).SetAccessControl($acl)
+Write-Output 'applied'
+`;
+
+// The raw security descriptor, owner and DACL, as SDDL straight from Win32 (GetNamedSecurityInfoW, then
+// ConvertSecurityDescriptorToStringSecurityDescriptorW). .NET's Get-Acl/.Access is not used: it can hide ACE kinds
+// (conditional and callback ACEs among them) that would still grant access.
+export const DESCRIBE_DACL_SCRIPT = String.raw`
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+public static class LaSddl {
+  [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+  static extern uint GetNamedSecurityInfoW(string name, int type, int info, out IntPtr owner, out IntPtr group,
+    out IntPtr dacl, out IntPtr sacl, out IntPtr sd);
+  [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  static extern bool ConvertSecurityDescriptorToStringSecurityDescriptorW(IntPtr sd, int revision, int info,
+    out IntPtr text, out int length);
+  [DllImport("kernel32.dll")]
+  static extern IntPtr LocalFree(IntPtr memory);
+  public static string Read(string path) {
+    IntPtr owner, group, dacl, sacl, sd;
+    uint code = GetNamedSecurityInfoW(path, 1, 5, out owner, out group, out dacl, out sacl, out sd);
+    if (code != 0) throw new Win32Exception((int)code);
+    try {
+      IntPtr text; int length;
+      if (!ConvertSecurityDescriptorToStringSecurityDescriptorW(sd, 1, 5, out text, out length))
+        throw new Win32Exception(Marshal.GetLastWin32Error());
+      try { return Marshal.PtrToStringUni(text); } finally { LocalFree(text); }
+    } finally { LocalFree(sd); }
+  }
+}
+'@
+[LaSddl]::Read($env:LA_PATH)
+`;
+
+// Prints the current user's SID (the S-1-... form, never an alias).
+export const CURRENT_USER_SID_SCRIPT =
+  "[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
+
+export type SddlAce = {
+  readonly type: string;
+  readonly flags: string;
+  readonly rights: string;
+  readonly objectGuid: string;
+  readonly inheritObjectGuid: string;
+  readonly sid: string;
+  readonly extra: string | undefined;
+};
+export type DaclDescription = {
+  readonly sddl: string;
+  readonly owner: string;
+  readonly protected: boolean;
+  readonly flags: string;
+  readonly aces: readonly SddlAce[];
+};
+
+// Every ACE type SDDL can name. A type outside this list is a parse failure; a listed type other than A is kept and
+// refused by the verdict, never skipped.
+const ACE_TYPES = new Set([
+  "A",
+  "D",
+  "OA",
+  "OD",
+  "AU",
+  "AL",
+  "OU",
+  "OL",
+  "ML",
+  "XA",
+  "XD",
+  "ZA",
+  "XU",
+  "SP",
+  "RA",
+  "SD",
+  "CA",
+]);
+const DACL_FLAG = /^(?:P|AI|AR|NO_ACCESS_CONTROL)/;
+const SID_TOKEN = /^(?:S-1-\d+(?:-\d+)+|[A-Z]{2})$/;
+
+// One ACE from "(" to its balanced ")": a conditional or resource ACE carries a parenthesized seventh field, whose
+// quoted strings may hold parentheses; those are skipped. A quote outside that field, or an unterminated one, is a
+// parse failure, so no quote can carry text across an ACE boundary.
+const aceEnd = (text: string, start: number): number | undefined => {
+  let depth = 0;
+  for (let i = start; i < text.length; i += 1) {
+    if (text[i] === '"') {
+      if (depth < 2) return undefined;
+      const close = text.indexOf('"', i + 1);
+      if (close === -1) return undefined;
+      i = close;
+    } else if (text[i] === "(") depth += 1;
+    else if (text[i] === ")") {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return undefined;
+};
+
+// An ACE GUID field is empty or one canonical GUID, so no paren or quote can hide in it.
+const GUID_FIELD =
+  /^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})?$/;
+
+const parseAce = (body: string): SddlAce | undefined => {
+  const parts = body.split(";");
+  if (parts.length < 6) return undefined;
+  const [type = "", flags = "", rights = "", objectGuid = "", inheritObjectGuid = "", sid = ""] =
+    parts;
+  const extra = parts.length > 6 ? parts.slice(6).join(";") : undefined;
+  if (!ACE_TYPES.has(type) || !SID_TOKEN.test(sid)) return undefined;
+  if (!/^[A-Z]*$/.test(flags) || !/^(?:[A-Z]+|0x[0-9a-fA-F]+)?$/.test(rights)) return undefined;
+  if (extra === undefined && parts.length !== 6) return undefined;
+  if (!GUID_FIELD.test(objectGuid) || !GUID_FIELD.test(inheritObjectGuid)) return undefined;
+  return { type, flags, rights, objectGuid, inheritObjectGuid, sid, extra };
+};
+
+// Parses "O:<sid>D:<flags>(<ace>)..." and nothing else: a group or SACL section, an unknown flag or ACE type, and any
+// text outside the ACEs are parse failures (undefined), which the callers treat as "not exact".
+export const parseSddl = (sddl: string): DaclDescription | undefined => {
+  const head = /^O:(S-1-\d+(?:-\d+)+|[A-Z]{2})D:/.exec(sddl);
+  if (head === null) return undefined;
+  const owner = head[1] ?? "";
+  let rest = sddl.slice(head[0].length);
+  const tokens: string[] = [];
+  for (let flag = DACL_FLAG.exec(rest); flag !== null; flag = DACL_FLAG.exec(rest)) {
+    tokens.push(flag[0]);
+    rest = rest.slice(flag[0].length);
+  }
+  const aces: SddlAce[] = [];
+  while (rest.length > 0) {
+    if (!rest.startsWith("(")) return undefined;
+    const close = aceEnd(rest, 0);
+    if (close === undefined) return undefined;
+    const ace = parseAce(rest.slice(1, close));
+    if (ace === undefined) return undefined;
+    aces.push(ace);
+    rest = rest.slice(close + 1);
+  }
+  return { sddl, owner, protected: tokens.includes("P"), flags: tokens.join(""), aces };
+};
+
+// Exactly "D:PAI(A;OICI;FA;;;<sid>)" for a directory and "D:PAI(A;;FA;;;<sid>)" for a file, owned by <sid>.
+export const exactDaclVerdict = (
+  dacl: DaclDescription,
+  userSid: string,
+  kind: "dir" | "file",
+): boolean => {
+  const [ace, ...others] = dacl.aces;
+  return (
+    dacl.owner === userSid &&
+    dacl.flags === "PAI" &&
+    ace !== undefined &&
+    others.length === 0 &&
+    ace.type === "A" &&
+    ace.flags === (kind === "dir" ? "OICI" : "") &&
+    ace.rights === "FA" &&
+    ace.objectGuid === "" &&
+    ace.inheritObjectGuid === "" &&
+    ace.sid === userSid &&
+    ace.extra === undefined
+  );
+};
+
+export const currentUserSid = async (run: PowerShellRunner = runPowerShell): Promise<string> => {
+  const { code, out } = await run(CURRENT_USER_SID_SCRIPT, {});
+  const sid = out.trim();
+  if (code !== 0 || !/^S-1-[0-9-]+$/.test(sid))
+    throw new LocalApiError("insecure_state_dir", "the user SID is unreadable", {
+      insecure_cause: "unreadable",
+    });
+  return sid;
+};
+
+export const applyExactDacl = async (
+  path: string,
+  userSid: string,
+  kind: "dir" | "file",
+  run: PowerShellRunner = runPowerShell,
+): Promise<void> => {
+  const { code, err } = await run(APPLY_DACL_SCRIPT, {
+    LA_PATH: path,
+    LA_SID: userSid,
+    LA_KIND: kind,
+  });
+  if (code !== 0) {
+    const line = powerShellError(err);
+    throw new LocalApiError(
+      "insecure_state_dir",
+      `the exact DACL could not be applied${line === "" ? "" : `: ${line}`}`,
+      { insecure_cause: "dacl_not_exact" },
+    );
+  }
+};
+
+export const describeDacl = async (
+  path: string,
+  run: PowerShellRunner = runPowerShell,
+): Promise<DaclDescription> => {
+  const { code, out } = await run(DESCRIBE_DACL_SCRIPT, { LA_PATH: path });
+  const dacl = code === 0 ? parseSddl(out.trim()) : undefined;
+  if (dacl === undefined)
+    throw new LocalApiError("insecure_state_dir", "the DACL could not be read back", {
+      insecure_cause: "unreadable",
+    });
+  return dacl;
+};
+
+// Fails closed: a DACL that cannot be read back is not exact.
+export const verifyExactDacl = async (
+  path: string,
+  userSid: string,
+  kind: "dir" | "file",
+  run: PowerShellRunner = runPowerShell,
+): Promise<boolean> => {
+  let dacl: DaclDescription;
+  try {
+    dacl = await describeDacl(path, run);
+  } catch (error) {
+    if (error instanceof LocalApiError) return false;
+    throw error;
+  }
+  return exactDaclVerdict(dacl, userSid, kind);
+};

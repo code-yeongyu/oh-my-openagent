@@ -1,20 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { CONTINUATION_MARKER_DIR } from "./constants"
-import type {
-  ContinuationMarker,
-  ContinuationMarkerSource,
-  ContinuationMarkerState,
-} from "./types"
+import type { ContinuationMarker, ContinuationMarkerSource, ContinuationMarkerState } from "./types"
 
 function getMarkerPath(directory: string, sessionID: string): string {
   return join(directory, CONTINUATION_MARKER_DIR, `${sessionID}.json`)
 }
 
-export function readContinuationMarker(
-  directory: string,
-  sessionID: string,
-): ContinuationMarker | null {
+export function readContinuationMarker(directory: string, sessionID: string): ContinuationMarker | null {
   const markerPath = getMarkerPath(directory, sessionID)
   if (!existsSync(markerPath)) return null
 

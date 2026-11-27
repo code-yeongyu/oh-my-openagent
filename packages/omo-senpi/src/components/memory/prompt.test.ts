@@ -1,3 +1,4 @@
+import { MEMORY_AUTHORITY_RULE } from "@oh-my-opencode/memory-core"
 import { describe, expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -71,7 +72,11 @@ describe("createMemoryPromptHandler", () => {
     pi.on("before_agent_start", boundHandler(repo, context))
 
     // when
-    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", compactedBranch(3)))
+    const result = await dispatchEvent(
+      pi,
+      beforeAgentStart("BASE PROMPT"),
+      eventContext("session-1", compactedBranch(3)),
+    )
 
     // then
     expect(result?.systemPrompt).toContain("BASE PROMPT")
@@ -158,18 +163,28 @@ describe("createMemoryPromptHandler", () => {
     // given
     const { repo, context } = await fixture()
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveNudgeTurns: async (_repo, sessionId) => sessionId === "session-after-threshold" ? 12 : undefined,
-      resolveSoulNotice: async (_repo, sessionId) => sessionId === "session-after-threshold"
-        ? { sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" }
-        : undefined,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveNudgeTurns: async (_repo, sessionId) => (sessionId === "session-after-threshold" ? 12 : undefined),
+        resolveSoulNotice: async (_repo, sessionId) =>
+          sessionId === "session-after-threshold" ? { sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" } : undefined,
+      }),
+    )
 
     // when
-    const beforeThreshold = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-before-threshold", compactedBranch(2)))
-    const afterThreshold = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-after-threshold", compactedBranch(12)))
+    const beforeThreshold = await dispatchEvent(
+      pi,
+      beforeAgentStart("BASE PROMPT"),
+      eventContext("session-before-threshold", compactedBranch(2)),
+    )
+    const afterThreshold = await dispatchEvent(
+      pi,
+      beforeAgentStart("BASE PROMPT"),
+      eventContext("session-after-threshold", compactedBranch(12)),
+    )
 
     // then
     expect(afterThreshold?.systemPrompt).toBe(beforeThreshold?.systemPrompt)
@@ -187,32 +202,38 @@ describe("createMemoryPromptHandler", () => {
     // given
     const { repo, context } = await fixture()
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveCompileWarnTokens: () => 30_000,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveCompileWarnTokens: () => 30_000,
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
 
     // then
-    expect(result?.systemPrompt).toBe([
-      "BASE PROMPT",
-      "",
-      `<!-- senpi-memory:${IDENTITY}:begin -->`,
-      "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call.",
-      "",
-      "<self>",
-      "<projection>$MEMORY_DIR/system/persona.md</projection>",
-      "first",
-      "</self>",
-      "",
-      "<memory_metadata>",
-      `- AGENT_ID: ${IDENTITY}`,
-      "</memory_metadata>",
-      `<!-- senpi-memory:${IDENTITY}:end -->`,
-    ].join("\n"))
+    expect(result?.systemPrompt).toBe(
+      [
+        "BASE PROMPT",
+        "",
+        `<!-- senpi-memory:${IDENTITY}:begin -->`,
+        "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call. " +
+          MEMORY_AUTHORITY_RULE,
+        "",
+        "<self>",
+        "<projection>$MEMORY_DIR/system/persona.md</projection>",
+        "first",
+        "</self>",
+        "",
+        "<memory_metadata>",
+        `- AGENT_ID: ${IDENTITY}`,
+        "</memory_metadata>",
+        `<!-- senpi-memory:${IDENTITY}:end -->`,
+      ].join("\n"),
+    )
     expect(result?.systemPrompt).not.toContain(MEMORY_PRESSURE_METADATA_TOKEN)
   }, 30_000)
 
@@ -222,18 +243,22 @@ describe("createMemoryPromptHandler", () => {
     const boundary = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * advisory)
     const { repo, context } = await fixtureAtSystemTokens(boundary)
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveCompileWarnTokens: () => advisory,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveCompileWarnTokens: () => advisory,
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
 
     // then
     expect(boundary).toBe(24_000)
-    const pressureLines = result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
+    const pressureLines =
+      result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
     expect(pressureLines).toHaveLength(1)
     expect(pressureLines[0]).toContain("24000/30000")
     expect(pressureLines[0]).toContain("80%")
@@ -253,18 +278,22 @@ describe("createMemoryPromptHandler", () => {
     await writeFile(join(repo.dir, "system", "raw.md"), Buffer.from([0xff, 0xfe, 0x80]))
     await repo.commitWrite(["system/raw.md"], "add raw", { agentId: IDENTITY, authorName: "Prompt Agent" })
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveCompileWarnTokens: () => advisory,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveCompileWarnTokens: () => advisory,
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
 
     // then - decoded is 9 bytes over the boundary's byte budget, stored is 3, and the estimate
     // divides by 4: 24002 decoded against 24000 stored.
-    const pressureLines = result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
+    const pressureLines =
+      result?.systemPrompt?.split("\n").filter((line) => line.includes(MEMORY_PRESSURE_METADATA_TOKEN)) ?? []
     expect(pressureLines).toHaveLength(1)
     expect(pressureLines[0]).toContain("24002/30000")
   }, 30_000)
@@ -291,25 +320,33 @@ describe("createMemoryPromptHandler", () => {
       },
     }) as typeof repo
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => failingAfterCompile,
-      resolveCompileWarnTokens: () => advisory,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => failingAfterCompile,
+        resolveCompileWarnTokens: () => advisory,
+      }),
+    )
 
     // when / then
-    await expect(dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))).rejects.toThrow("tree unreadable")
+    await expect(
+      dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0))),
+    ).rejects.toThrow("tree unreadable")
   }, 30_000)
 
   test("#given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token", async () => {
     // given
     const { repo, context } = await fixture()
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveNudgeTurns: async () => 2,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveNudgeTurns: async () => 2,
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
@@ -326,16 +363,19 @@ describe("createMemoryPromptHandler", () => {
     const { repo, context } = await fixture()
     const failures: Array<{ input: string; sessionId: string; message: string }> = []
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveNudgeTurns: async () => {
-        throw new Error("git log --fixed-strings --all-match timed out after 5000ms")
-      },
-      onNoticeInputFailed: (input, sessionId, error) => {
-        failures.push({ input, sessionId, message: error instanceof Error ? error.message : String(error) })
-      },
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveNudgeTurns: async () => {
+          throw new Error("git log --fixed-strings --all-match timed out after 5000ms")
+        },
+        onNoticeInputFailed: (input, sessionId, error) => {
+          failures.push({ input, sessionId, message: error instanceof Error ? error.message : String(error) })
+        },
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
@@ -345,7 +385,9 @@ describe("createMemoryPromptHandler", () => {
     // The compiled memory block (persona body "first") is still injected.
     expect(result?.systemPrompt).toContain("first")
     expect(result?.message?.content ?? "").not.toContain(MEMORY_NUDGE_METADATA_TOKEN)
-    expect(failures).toEqual([{ input: "nudge", sessionId: "session-1", message: "git log --fixed-strings --all-match timed out after 5000ms" }])
+    expect(failures).toEqual([
+      { input: "nudge", sessionId: "session-1", message: "git log --fixed-strings --all-match timed out after 5000ms" },
+    ])
   }, 30_000)
 
   test("#given the soul notice read fails while the nudge works #when before_agent_start compiles #then the nudge still lands and only the soul notice is dropped", async () => {
@@ -353,15 +395,18 @@ describe("createMemoryPromptHandler", () => {
     const { repo, context } = await fixture()
     const failed: string[] = []
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveNudgeTurns: async () => 3,
-      resolveSoulNotice: async () => {
-        throw new Error("notice lock unreadable")
-      },
-      onNoticeInputFailed: (input) => failed.push(input),
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveNudgeTurns: async () => 3,
+        resolveSoulNotice: async () => {
+          throw new Error("notice lock unreadable")
+        },
+        onNoticeInputFailed: (input) => failed.push(input),
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
@@ -376,11 +421,14 @@ describe("createMemoryPromptHandler", () => {
     // given
     const { repo, context } = await fixture()
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveSoulNotice: async () => ({ sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" }),
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveSoulNotice: async () => ({ sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678" }),
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
@@ -400,17 +448,19 @@ describe("createMemoryPromptHandler", () => {
     }
     expect(await consumeSoulNoticeDelta(repo, watermark)).toBeUndefined()
     await writeFile(join(repo.dir, "system/persona.md"), "---\ndescription: Persona\n---\nevolved\n")
-    await repo.commitWrite(
-      ["system/persona.md"],
-      "chore(reflection): merge run r1\n\nOmo-Writer: reflection",
-      { agentId: IDENTITY, authorName: "Prompt Agent" },
-    )
+    await repo.commitWrite(["system/persona.md"], "chore(reflection): merge run r1\n\nOmo-Writer: reflection", {
+      agentId: IDENTITY,
+      authorName: "Prompt Agent",
+    })
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveSoulNotice: (repoArg) => consumeSoulNoticeDelta(repoArg, watermark),
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveSoulNotice: (repoArg) => consumeSoulNoticeDelta(repoArg, watermark),
+      }),
+    )
 
     // when
     const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
@@ -435,14 +485,49 @@ describe("createMemoryPromptHandler", () => {
     memoryPi.on("before_agent_start", boundHandler(repo, context))
 
     // when — mirror the host runner: the next handler receives the previous handler's prompt
-    const [foreign] = await foreignPi.dispatch("before_agent_start", beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
+    const [foreign] = await foreignPi.dispatch(
+      "before_agent_start",
+      beforeAgentStart("BASE PROMPT"),
+      eventContext("session-1", liveBranch(0)),
+    )
     const foreignPrompt = (foreign as BeforeAgentStartEventResult).systemPrompt ?? ""
-    const result = await dispatchEvent(memoryPi, beforeAgentStart(foreignPrompt), eventContext("session-1", liveBranch(0)))
+    const result = await dispatchEvent(
+      memoryPi,
+      beforeAgentStart(foreignPrompt),
+      eventContext("session-1", liveBranch(0)),
+    )
 
     // then
     expect(result?.systemPrompt).toContain("FOREIGN EXTENSION TEXT")
     expect(result?.systemPrompt).toContain("BASE PROMPT")
     expect(result?.systemPrompt).toContain(`<!-- senpi-memory:${IDENTITY}:begin -->`)
+  }, 30_000)
+
+  test("#given the nudge and soul notices both read HEAD #when one prompt runs #then git is asked for HEAD once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveNudgeTurns: async (noticeRepo) => {
+          await noticeRepo.head()
+          return undefined
+        },
+        resolveSoulNotice: async (noticeRepo) => {
+          await noticeRepo.head()
+          return undefined
+        },
+      }),
+    )
+
+    // when
+    await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
+
+    // then
+    expect(repo.headCalls).toBe(1)
   }, 30_000)
 
   test("#given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once", async () => {
@@ -469,11 +554,14 @@ describe("createMemoryPromptHandler", () => {
     // spawns between Enter and the provider request).
     const { repo, context } = await fixture()
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveCompileWarnTokens: () => 30_000,
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveCompileWarnTokens: () => 30_000,
+      }),
+    )
 
     // when
     const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
@@ -482,27 +570,34 @@ describe("createMemoryPromptHandler", () => {
 
     // then — same bytes, and the second prompt added no tree listing and no blob reads
     expect(second?.systemPrompt).toBe(first?.systemPrompt)
-    expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({ lsTree: 0, show: 0 })
+    expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({
+      lsTree: 0,
+      show: 0,
+    })
   }, 30_000)
 
   test("#given a configured per-directory limit #when before_agent_start compiles #then the projection shows that many names and counts the rest", async () => {
     // given
     const { repo, context } = await fixture()
-    for (const name of ["a", "b", "c"]) await writeFile(join(repo.dir, `note-${name}.md`), `---\ndescription: ${name}\n---\nx\n`)
+    for (const name of ["a", "b", "c"])
+      await writeFile(join(repo.dir, `note-${name}.md`), `---\ndescription: ${name}\n---\nx\n`)
     await repo.commitWrite(["note-a.md", "note-b.md", "note-c.md"], "notes", { agentId: IDENTITY, authorName: "t" })
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context,
-      createRepo: () => repo,
-      resolveProjectionLimits: () => ({ maxEntriesPerDirectory: 1, maxBytes: 0 }),
-    }))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        resolveProjectionLimits: () => ({ maxEntriesPerDirectory: 1, maxBytes: 0 }),
+      }),
+    )
 
     // when
     const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
 
     // then
     const line = result?.systemPrompt?.split("\n").find((candidate) => candidate.startsWith("$MEMORY_DIR/: "))
-    expect(line).toBe("$MEMORY_DIR/: note-a.md (+2 more; read $MEMORY_DIR/ to list)")
+    expect(line).toBe("$MEMORY_DIR/: note-a (+2 more; read $MEMORY_DIR/ to list)")
   }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {
@@ -513,7 +608,11 @@ describe("createMemoryPromptHandler", () => {
     const first = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
 
     // when — the host carries last turn's prompt forward with our block inside
-    const second = await dispatchEvent(pi, beforeAgentStart(first?.systemPrompt ?? ""), eventContext("session-1", liveBranch(2)))
+    const second = await dispatchEvent(
+      pi,
+      beforeAgentStart(first?.systemPrompt ?? ""),
+      eventContext("session-1", liveBranch(2)),
+    )
 
     // then
     expect(second?.systemPrompt?.match(new RegExp(`<!-- senpi-memory:${IDENTITY}:begin -->`, "g"))).toHaveLength(1)

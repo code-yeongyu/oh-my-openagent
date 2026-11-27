@@ -1,55 +1,21 @@
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import * as storageDetection from "../../shared/opencode-storage-detection"
+import { MESSAGE_STORAGE, SESSION_STORAGE } from "../../shared/opencode-storage-paths"
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-fallback-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
-const TEST_PART_STORAGE = join(TEST_DIR, "part")
-const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
-const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
-
-let sqliteBackend = false
+const fixtureDirs = new Set<string>()
 
 mock.module("./constants", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-  SESSION_STORAGE: TEST_SESSION_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
-  TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
-  SESSION_LIST_DESCRIPTION: "test",
-  SESSION_READ_DESCRIPTION: "test",
-  SESSION_SEARCH_DESCRIPTION: "test",
-  SESSION_INFO_DESCRIPTION: "test",
-  SESSION_DELETE_DESCRIPTION: "test",
-  TOOL_NAME_PREFIX: "session_",
+  TRANSCRIPT_DIR: join(TEST_DIR, "transcripts"),
 }))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
-  resetSqliteBackendCache: () => {},
-}))
-
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    if (!sessionID.startsWith("ses_")) return null
-    if (/[/\\]|\.\./.test(sessionID)) return null
-    if (!existsSync(TEST_MESSAGE_STORAGE)) return null
-
-    const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    if (existsSync(directPath)) return directPath
-
-    for (const dir of readdirSync(TEST_MESSAGE_STORAGE)) {
-      const nestedPath = join(TEST_MESSAGE_STORAGE, dir, sessionID)
-      if (existsSync(nestedPath)) return nestedPath
-    }
-
-    return null
-  },
-}))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
@@ -62,7 +28,8 @@ function createSdkUnavailableError(message: string): Error {
 }
 
 function createSessionMetadata(projectID: string, sessionID: string, directory: string, updated: number): void {
-  const projectDir = join(TEST_SESSION_STORAGE, projectID)
+  const projectDir = join(SESSION_STORAGE, projectID)
+  fixtureDirs.add(projectDir)
   mkdirSync(projectDir, { recursive: true })
   writeFileSync(
     join(projectDir, `${sessionID}.json`),
@@ -76,12 +43,10 @@ function createSessionMetadata(projectID: string, sessionID: string, directory: 
 }
 
 function createSessionMessage(sessionID: string, messageID: string, created: number, role = "user"): void {
-  const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
+  const sessionPath = join(MESSAGE_STORAGE, sessionID)
+  fixtureDirs.add(sessionPath)
   mkdirSync(sessionPath, { recursive: true })
-  writeFileSync(
-    join(sessionPath, `${messageID}.json`),
-    JSON.stringify({ id: messageID, role, time: { created } }),
-  )
+  writeFileSync(join(sessionPath, `${messageID}.json`), JSON.stringify({ id: messageID, role, time: { created } }))
 }
 
 function createSessionTodo(sessionID: string, items: Array<Record<string, unknown>>): void {
@@ -90,6 +55,7 @@ function createSessionTodo(sessionID: string, items: Array<Record<string, unknow
 }
 
 describe("session-manager storage fallback", () => {
+  let restoreStorageDetection: () => void
   const mockClient = {
     session: {
       list: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
@@ -99,14 +65,8 @@ describe("session-manager storage fallback", () => {
   }
 
   beforeEach(() => {
-    sqliteBackend = true
-    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
-    mkdirSync(TEST_DIR, { recursive: true })
-    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
-    mkdirSync(TEST_PART_STORAGE, { recursive: true })
-    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
-    mkdirSync(TEST_TODO_DIR, { recursive: true })
-    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
+    const sqlite = spyOn(storageDetection, "isSqliteBackend").mockReturnValue(true)
+    restoreStorageDetection = () => sqlite.mockRestore()
     mockClient.session.list.mockReset()
     mockClient.session.messages.mockReset()
     mockClient.session.todo.mockReset()
@@ -115,7 +75,12 @@ describe("session-manager storage fallback", () => {
 
   afterEach(() => {
     storage.resetStorageClient()
-    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
+    restoreStorageDetection()
+    for (const directory of fixtureDirs) {
+      rmSync(directory, { recursive: true, force: true })
+    }
+    fixtureDirs.clear()
+    rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
   test("#given a legacy file-storage session the SQLite server answers NotFoundError for #when its messages are read #then the file copy is returned (#5854)", async () => {
@@ -167,7 +132,10 @@ describe("session-manager storage fallback", () => {
     )
 
     //#when
-    const failure = await storage.readSessionMessages("ses_bad").then(() => undefined, (error: unknown) => error)
+    const failure = await storage.readSessionMessages("ses_bad").then(
+      () => undefined,
+      (error: unknown) => error,
+    )
 
     //#then
     expect(failure).toBeInstanceOf(Error)
@@ -179,7 +147,11 @@ describe("session-manager storage fallback", () => {
     createSessionMessage("ses_ok", "msg_ok", 1_000)
     mockClient.session.messages.mockImplementation((input: unknown) => {
       const id = (input as { path: { id: string } }).path.id
-      return Promise.resolve(id === "ses_bad" ? { error: { name: "UnknownError", data: { message: "database disk image is malformed" } } } : { data: [] })
+      return Promise.resolve(
+        id === "ses_bad"
+          ? { error: { name: "UnknownError", data: { message: "database disk image is malformed" } } }
+          : { data: [] },
+      )
     })
     mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: [] }))
     const { formatSessionList } = await import("./session-formatter")
@@ -189,7 +161,9 @@ describe("session-manager storage fallback", () => {
 
     //#then
     expect(output).toContain("ses_ok")
-    expect(output).toContain("Skipped 1 session that could not be read: ses_bad (UnknownError: database disk image is malformed)")
+    expect(output).toContain(
+      "Skipped 1 session that could not be read: ses_bad (UnknownError: database disk image is malformed)",
+    )
     expect(output).not.toContain("[object Object]")
   })
 
@@ -209,7 +183,9 @@ describe("session-manager storage fallback", () => {
 
   test("#given unreachable SDK list response #when getMainSessions runs #then falls back to file sessions", async () => {
     createSessionMetadata("proj_test", "ses_file", "/workspace/project", 2_000)
-    mockClient.session.list.mockImplementation(() => Promise.resolve({ error: createSdkUnavailableError("fetch failed ECONNREFUSED") }))
+    mockClient.session.list.mockImplementation(() =>
+      Promise.resolve({ error: createSdkUnavailableError("fetch failed ECONNREFUSED") }),
+    )
 
     const sessions = await storage.getMainSessions({ directory: "/workspace/project" })
 
@@ -230,16 +206,18 @@ describe("session-manager storage fallback", () => {
   test("#given SDK and file sessions overlap #when getMainSessions runs #then dedupes by id and keeps SDK metadata", async () => {
     createSessionMetadata("proj_test", "ses_file", "/workspace/project", 2_000)
     createSessionMetadata("proj_test", "ses_sdk", "/workspace/project", 1_500)
-    mockClient.session.list.mockImplementation(() => Promise.resolve({
-      data: [
-        {
-          id: "ses_sdk",
-          projectID: "sdk_project",
-          directory: "/workspace/project",
-          time: { created: 3_000, updated: 4_000 },
-        },
-      ],
-    }))
+    mockClient.session.list.mockImplementation(() =>
+      Promise.resolve({
+        data: [
+          {
+            id: "ses_sdk",
+            projectID: "sdk_project",
+            directory: "/workspace/project",
+            time: { created: 3_000, updated: 4_000 },
+          },
+        ],
+      }),
+    )
 
     const sessions = await storage.getMainSessions({ directory: "/workspace/project" })
 
@@ -260,11 +238,11 @@ describe("session-manager storage fallback", () => {
   test("#given unavailable global SDK route and overlapping scoped/file sessions #when getAllSessions runs #then returns the scoped deduped union", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     createSessionMessage("ses_sdk", "msg_002", 2_000)
-    mockClient.session.list.mockImplementation(() => Promise.resolve({
-      data: [
-        { id: "ses_sdk" },
-      ],
-    }))
+    mockClient.session.list.mockImplementation(() =>
+      Promise.resolve({
+        data: [{ id: "ses_sdk" }],
+      }),
+    )
     const globalList = mock(() => Promise.resolve({ error: { name: "NotFoundError" } }))
     storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
 
@@ -276,17 +254,32 @@ describe("session-manager storage fallback", () => {
 
   test("#given 1000 global sessions #when bounded search and directory list run #then they stop paging after enough rows", async () => {
     const globalSessions = Array.from({ length: 1_000 }, (_, index) => ({
-      id: `ses_global_${index}`, projectID: "other", directory: "/workspace/other",
+      id: `ses_global_${index}`,
+      projectID: "other",
+      directory: "/workspace/other",
       time: { created: 10_000 - index, updated: 10_000 - index },
     }))
     const globalList = mock((input?: { roots?: boolean; cursor?: number; limit?: number }): Promise<unknown> => {
       if (input?.roots) {
-        const targetPage = input.cursor === 100
-          ? ["ses_target_new", "ses_target_old"].map((id, index) => ({ id, projectID: "target", directory: "/workspace/target", time: { created: 1_000 - index, updated: 1_000 - index } }))
-          : Array.from({ length: 100 }, (_, index) => ({ id: `ses_other_${index}`, projectID: "other", directory: "/workspace/other", time: { created: 5_000 - index, updated: 5_000 - index } }))
+        const targetPage =
+          input.cursor === 100
+            ? ["ses_target_new", "ses_target_old"].map((id, index) => ({
+                id,
+                projectID: "target",
+                directory: "/workspace/target",
+                time: { created: 1_000 - index, updated: 1_000 - index },
+              }))
+            : Array.from({ length: 100 }, (_, index) => ({
+                id: `ses_other_${index}`,
+                projectID: "other",
+                directory: "/workspace/other",
+                time: { created: 5_000 - index, updated: 5_000 - index },
+              }))
         return Promise.resolve({
           data: targetPage,
-          response: new Response(null, { headers: input.cursor === 100 ? new Headers() : new Headers([["x-next-cursor", "100"]]) }),
+          response: new Response(null, {
+            headers: input.cursor === 100 ? new Headers() : new Headers([["x-next-cursor", "100"]]),
+          }),
         })
       }
 
@@ -295,7 +288,10 @@ describe("session-manager storage fallback", () => {
       const nextCursor = start + page.length
       return Promise.resolve({
         data: page,
-        response: new Response(null, { headers: nextCursor < globalSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers() }),
+        response: new Response(null, {
+          headers:
+            nextCursor < globalSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers(),
+        }),
       })
     })
     storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
@@ -314,11 +310,15 @@ describe("session-manager storage fallback", () => {
   test("#given a project whose root sessions sit behind 600 newer ones #when getMainSessions filters by directory #then it pages until the cursor is exhausted", async () => {
     const rootSessions = [
       ...Array.from({ length: 600 }, (_, index) => ({
-        id: `ses_other_${index}`, projectID: "other", directory: "/workspace/other",
+        id: `ses_other_${index}`,
+        projectID: "other",
+        directory: "/workspace/other",
         time: { created: 10_000 - index, updated: 10_000 - index },
       })),
       ...["ses_target_new", "ses_target_old"].map((id, index) => ({
-        id, projectID: "target", directory: "/workspace/target",
+        id,
+        projectID: "target",
+        directory: "/workspace/target",
         time: { created: 1_000 - index, updated: 1_000 - index },
       })),
     ]
@@ -328,7 +328,10 @@ describe("session-manager storage fallback", () => {
       const nextCursor = start + page.length
       return Promise.resolve({
         data: page,
-        response: new Response(null, { headers: nextCursor < rootSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers() }),
+        response: new Response(null, {
+          headers:
+            nextCursor < rootSessions.length ? new Headers([["x-next-cursor", String(nextCursor)]]) : new Headers(),
+        }),
       })
     })
     storage.setStorageClient(mockClient as never, { experimental: { session: { list: globalList } } })
@@ -340,7 +343,9 @@ describe("session-manager storage fallback", () => {
 
   test("#given unreachable SDK messages error #when readSessionMessages runs #then falls back to file messages", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
-    mockClient.session.messages.mockImplementation(() => Promise.reject(createSdkUnavailableError("Unable to connect to http://localhost:4096")))
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.reject(createSdkUnavailableError("Unable to connect to http://localhost:4096")),
+    )
 
     const messages = await storage.readSessionMessages("ses_file")
 
@@ -360,7 +365,9 @@ describe("session-manager storage fallback", () => {
 
   test("#given unreachable SDK todo response #when readSessionTodos runs #then falls back to file todos", async () => {
     createSessionTodo("ses_file", [{ id: "todo_1", content: "Fallback todo", status: "pending" }])
-    mockClient.session.todo.mockImplementation(() => Promise.resolve({ error: createSdkUnavailableError("network error: server unreachable") }))
+    mockClient.session.todo.mockImplementation(() =>
+      Promise.resolve({ error: createSdkUnavailableError("network error: server unreachable") }),
+    )
 
     const todos = await storage.readSessionTodos("ses_file")
 
@@ -380,7 +387,9 @@ describe("session-manager storage fallback", () => {
 
   test("#given unreachable SDK messages error #when sessionExists runs #then falls back to file existence", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
-    mockClient.session.messages.mockImplementation(() => Promise.reject(createSdkUnavailableError("ETIMEDOUT while connecting")))
+    mockClient.session.messages.mockImplementation(() =>
+      Promise.reject(createSdkUnavailableError("ETIMEDOUT while connecting")),
+    )
 
     const exists = await storage.sessionExists("ses_file")
 
@@ -401,16 +410,17 @@ describe("session-manager storage fallback", () => {
     mockClient.session.messages.mockImplementation((request: { path: { id: string } }) => {
       expect(request.path.id).toBe("ses_sqlite_scoped_out")
       return Promise.resolve({
-        data: [
-          { info: { id: "msg_sdk", role: "user", time: { created: 1_000 } }, parts: [] },
-        ],
+        data: [{ info: { id: "msg_sdk", role: "user", time: { created: 1_000 } }, parts: [] }],
       })
     })
 
     const exists = await storage.sessionExists("ses_sqlite_scoped_out")
 
     expect(exists).toBe(true)
-    expect(mockClient.session.messages).toHaveBeenCalledWith({ path: { id: "ses_sqlite_scoped_out" } })
+    expect(mockClient.session.messages).toHaveBeenCalledWith({
+      path: { id: "ses_sqlite_scoped_out" },
+      query: { limit: 1 },
+    })
   })
 
   test("#given semantic SDK error #when readSessionMessages runs #then rethrows instead of hiding bug", async () => {

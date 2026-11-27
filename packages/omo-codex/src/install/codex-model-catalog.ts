@@ -16,9 +16,14 @@ export type CodexModelCatalog = {
   readonly managedProfiles: readonly CodexReasoningProfileMatch[]
 }
 
+// The Astra id the Codex edition ships: its agent TOMLs, plugin/model-catalog.json and
+// migrate-codex-config/catalog.mjs all name it, so it moves with those files, not with
+// model-core's LATEST_MODEL_BY_FAMILY.
+export const CODEX_ASTRA_MODEL = "gpt-6.2-astra"
+
 const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
   current: {
-    model: "gpt-6-astra",
+    model: CODEX_ASTRA_MODEL,
     modelContextWindow: 600_000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh",
@@ -40,6 +45,12 @@ const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
     {
       model: "gpt-5.6-sol",
       modelContextWindow: 650_000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh",
+    },
+    {
+      model: "gpt-6-astra",
+      modelContextWindow: 600_000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh",
     },
@@ -100,7 +111,9 @@ function parseProfileMatch(match: Record<string, unknown>): CodexReasoningProfil
   } = {}
   if (typeof match["model"] === "string") profile.model = match["model"]
   if (typeof match["model_context_window"] === "number") profile.modelContextWindow = match["model_context_window"]
-  if (typeof match["model_reasoning_effort"] === "string") profile.modelReasoningEffort = match["model_reasoning_effort"]
-  if (typeof match["plan_mode_reasoning_effort"] === "string") profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
+  if (typeof match["model_reasoning_effort"] === "string")
+    profile.modelReasoningEffort = match["model_reasoning_effort"]
+  if (typeof match["plan_mode_reasoning_effort"] === "string")
+    profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
   return profile
 }

@@ -17,6 +17,7 @@ import { createSandbox, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, classifyRealSenpiChanges, parseJsonEvents, snapshotDir } from "./task-e2e-analysis.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-lane-spill-mock-provider.ts")
@@ -40,12 +41,7 @@ function snapshotRealAgentDirs() {
 // senpi-* names, but this file is the same thing: a machine-global append-only journal every
 // concurrent omo process on the host writes (17MB and growing during any live TUI session), so it
 // can no more identify QA pollution than senpi-debug.log can.
-const SHARED_OMO_DIAGNOSTICS = new Set([
-  "omo-debug.log",
-  "omo-crash.log",
-  "OmO-debug.log",
-  "OmO-crash.log",
-])
+const SHARED_OMO_DIAGNOSTICS = new Set(["omo-debug.log", "omo-crash.log", "OmO-debug.log", "OmO-crash.log"])
 
 function classifyRealAgentChanges(before, after, sandboxTokens) {
   const qaAttributedPaths = []
@@ -149,7 +145,8 @@ const GLOBAL_CAP = {
       three_tasks_spawned: items.length === 3 ? "PASS" : "FAIL",
       first_running: one?.status === "running" ? "PASS" : "FAIL",
       second_running: two?.status === "running" ? "PASS" : "FAIL",
-      distinct_lanes: new Set([one, two, three].map((item) => laneOf(item?.resolved_model))).size === 3 ? "PASS" : "FAIL",
+      distinct_lanes:
+        new Set([one, two, three].map((item) => laneOf(item?.resolved_model))).size === 3 ? "PASS" : "FAIL",
       // The behavior under test: a locally free third lane still waits on the global pool.
       third_pending: three?.status === "pending" ? "PASS" : "FAIL",
       third_queued: typeof three?.queue_position === "number" ? "PASS" : "FAIL",
@@ -268,11 +265,17 @@ function runScenario(scenario, senpiBin, outDir, pids, helpers) {
   const run = spawnSync(
     senpiBin,
     [
-      "-e", providerEntry,
-      "-p", "--mode", "json",
-      "--provider", providers[0],
-      "--model", scenario.script.models[0].split("/")[1],
-      "--session-dir", sessionDir,
+      "-e",
+      providerEntry,
+      "-p",
+      "--mode",
+      "json",
+      "--provider",
+      providers[0],
+      "--model",
+      scenario.script.models[0].split("/")[1],
+      "--session-dir",
+      sessionDir,
       "drive the lane scenario",
     ],
     {
@@ -388,7 +391,11 @@ async function main() {
   const beforeSnapshot = snapshotRealAgentDirs()
   const providedAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
 
-  const probe = spawnSync(senpiBin, ["--version"], { encoding: "utf8", timeout: 30_000 })
+  const probe = spawnSync(senpiBin, ["--version"], {
+    encoding: "utf8",
+    timeout: 30_000,
+    env: withTelemetryOptOut(process.env),
+  })
   if (probe.error !== undefined) {
     const skip = { result: "SKIP", reason: "senpi-binary-unavailable", providedAgentDir }
     writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(skip, null, 2)}\n`)
@@ -414,8 +421,11 @@ async function main() {
 
   const leakedPids = pids.filter(isAlive)
   const sandboxTokens = sandboxes.map((sandbox) => basename(sandbox.root))
-  const { qaAttributedPaths, concurrentSessionPaths, allChangedPaths: allChanged } =
-    classifyRealAgentChanges(beforeSnapshot, snapshotRealAgentDirs(), sandboxTokens)
+  const {
+    qaAttributedPaths,
+    concurrentSessionPaths,
+    allChangedPaths: allChanged,
+  } = classifyRealAgentChanges(beforeSnapshot, snapshotRealAgentDirs(), sandboxTokens)
   const realSenpiUntouched = qaAttributedPaths.length === 0
 
   // Cleanup is part of the contract: every task-owned sandbox goes, and the receipt records it.
@@ -434,8 +444,7 @@ async function main() {
       .filter((helper) => helper.exitCode === null && helper.signalCode === null)
       .map((helper) => helper.pid),
     childPidsTerminal:
-      leakedPids.length === 0 &&
-      helpers.every((helper) => helper.exitCode !== null || helper.signalCode !== null),
+      leakedPids.length === 0 && helpers.every((helper) => helper.exitCode !== null || helper.signalCode !== null),
   }
 
   const checks = {
@@ -500,16 +509,24 @@ function selfTest() {
   if (Object.values(capped).some((verdict) => verdict !== "PASS")) {
     throw new Error(`self-test: a clean global cap must pass, got ${JSON.stringify(capped)}`)
   }
-  const thirdRan = GLOBAL_CAP.check([capItems[0], capItems[1], { status: "running", resolved_model: resolvedFixture(LANE_C) }])
+  const thirdRan = GLOBAL_CAP.check([
+    capItems[0],
+    capItems[1],
+    { status: "running", resolved_model: resolvedFixture(LANE_C) },
+  ])
   if (thirdRan.third_pending !== "FAIL" || thirdRan.third_queued !== "FAIL") {
     throw new Error("self-test: a third task that ran past the global cap must fail")
   }
 
-  const items = findSpawnItems(parseJsonEvents(JSON.stringify({
-    type: "tool_execution_end",
-    toolName: "task",
-    result: { details: { items: [{ task_id: "st_1" }, { task_id: "st_2" }] } },
-  })))
+  const items = findSpawnItems(
+    parseJsonEvents(
+      JSON.stringify({
+        type: "tool_execution_end",
+        toolName: "task",
+        result: { details: { items: [{ task_id: "st_1" }, { task_id: "st_2" }] } },
+      }),
+    ),
+  )
   if (items.length !== 2) throw new Error("self-test: spawn items must be extracted from the batch result")
   console.log("SELF-TEST OK")
 }

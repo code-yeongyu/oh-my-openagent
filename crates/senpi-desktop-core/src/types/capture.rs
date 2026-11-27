@@ -97,6 +97,9 @@ pub struct CaptureResult {
     /// fallback instead of the ScreenCaptureKit worker (B9).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_capture: bool,
+    /// The captured window's identity at capture time (object mode).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<super::WindowIdentity>,
 }
 
 /// One delivered window observation; capture pixels remain the input frame.

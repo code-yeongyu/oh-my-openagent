@@ -20,7 +20,9 @@ describe("runtime security skill source server", () => {
     // when
     const indexResponse = await source.fetch(new Request(new URL("index.json", source.url).toString()))
     const index = await indexResponse.json()
-    const researchResponse = await source.fetch(new Request(new URL("security-research/SKILL.md", source.url).toString()))
+    const researchResponse = await source.fetch(
+      new Request(new URL("security-research/SKILL.md", source.url).toString()),
+    )
     const reviewResponse = await source.fetch(new Request(new URL("security-review/SKILL.md", source.url).toString()))
     const researchMarkdown = await researchResponse.text()
     const reviewMarkdown = await reviewResponse.text()

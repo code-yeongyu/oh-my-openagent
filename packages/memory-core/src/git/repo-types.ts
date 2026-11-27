@@ -16,6 +16,8 @@ export interface GitMemoryRepoOptions {
   agentId: string
   exec?: GitExec
   installHooks?: (dir: string) => void | Promise<void>
+  /** Budget for one `git commit`, hooks included (default COMMIT_TIMEOUT_MS in repo.ts). */
+  commitTimeoutMs?: number
 }
 
 export interface InitializeGitRepoOptions {

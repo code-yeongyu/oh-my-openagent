@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("category routing policy", () => {
-  test("visual-engineering prioritizes Fable 5.1 max, Opus max, then Kimi K3 max", () => {
+  test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3.1 Pro max and Kimi K3 max", () => {
     // given
     const visual = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -12,6 +12,16 @@ describe("category routing policy", () => {
 
     // then
     expect(leadingChain).toEqual([
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-2",
+        variant: "max",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -23,35 +33,15 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
-    ])
-  })
-
-  test("deep-high is a single Astra rung and deep-low a Sol ladder, so the lanes never substitute each other", () => {
-    // given
-    const low = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
-    const high = CATEGORY_MODEL_REQUIREMENTS["deep-high"]
-
-    // then
-    expect(high.fallbackChain).toEqual([
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-6-astra",
-        variant: "high",
       },
-    ])
-    expect(low.fallbackChain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "medium",
-      },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" }
     ])
   })
 
@@ -99,11 +89,11 @@ describe("category routing policy", () => {
         model: "grok-4.20-0309-non-reasoning",
       },
       { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
-      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
+      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" },
     ])
   })
 
-  test("unspecified-low follows the approved 8-rung chain headed by claude-sonnet-5-5 medium", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -127,6 +117,16 @@ describe("category routing policy", () => {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
         variant: "xhigh",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+        variant: "high",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.2-sol",
+        variant: "medium",
       },
       {
         providers: ["openai", "chatgpt-subscription"],
@@ -157,7 +157,7 @@ describe("category routing policy", () => {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -185,12 +185,22 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
     expect(artistryChain).toEqual([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-2",
+        variant: "max",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -202,12 +212,22 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
     expect(writingChain).toEqual([
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
@@ -217,7 +237,7 @@ describe("category routing policy", () => {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
         variant: "max",
-      }
+      },
     ])
   })
 })

@@ -16,7 +16,18 @@
  * A key either file already has, in the harness block or the shared base, is never overwritten.
  */
 
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { dirname, join } from "node:path"
 import { isDeepStrictEqual } from "node:util"
 import { timestamp } from "./auth-store.js"
@@ -71,10 +82,28 @@ function planItems(plan, omo, settings) {
   const items = []
   if (plan.defaultModel !== undefined) {
     const { provider, modelId, ref } = plan.defaultModel
-    items.push({ label: "default model", kind: "default", target: settings, path: [], members: [["defaultProvider", provider], ["defaultModel", modelId]] })
-    items.push({ label: "model_profile", kind: "default", target: omo, path: [block], members: [["model_profile", ref]] })
+    items.push({
+      label: "default model",
+      kind: "default",
+      target: settings,
+      path: [],
+      members: [
+        ["defaultProvider", provider],
+        ["defaultModel", modelId],
+      ],
+    })
+    items.push({
+      label: "model_profile",
+      kind: "default",
+      target: omo,
+      path: [block],
+      members: [["model_profile", ref]],
+    })
   }
-  for (const [kind, key] of [["categories", "category"], ["agents", "agent"]]) {
+  for (const [kind, key] of [
+    ["categories", "category"],
+    ["agents", "agent"],
+  ]) {
     for (const { name, entry } of plan[kind]) {
       items.push({ label: `${key} ${name}`, kind, name, target: omo, path: [block, kind], members: [[name, entry]] })
     }
@@ -87,8 +116,11 @@ function classify(item) {
   if (item.target.malformed) return "blocked"
   const container = lookup(item.target.document, item.path)
   if (container !== undefined && !isPlainObject(container)) return "blocked"
-  const existing = item.members.map(([key]) => lookup(item.target.document, [...item.path, key])
-    ?? (item.path[0]?.startsWith("[") ? lookup(item.target.document, [...item.path.slice(1), key]) : undefined))
+  const existing = item.members.map(
+    ([key]) =>
+      lookup(item.target.document, [...item.path, key]) ??
+      (item.path[0]?.startsWith("[") ? lookup(item.target.document, [...item.path.slice(1), key]) : undefined),
+  )
   if (existing.every((value) => value === undefined)) return "pending"
   return item.members.every(([, value], index) => isDeepStrictEqual(existing[index], value)) ? "carried" : "kept"
 }
@@ -105,7 +137,12 @@ function labels(plan, state) {
 function planNotices(items, dropped) {
   const lines = []
   for (const target of new Set(items.filter((item) => item.state === "blocked").map((item) => item.target.path))) {
-    lines.push(`WARN senpi: ${target} is malformed or has a non-object block; these model choices were not written: ${items.filter((item) => item.state === "blocked" && item.target.path === target).map((item) => item.label).join(", ")}`)
+    lines.push(
+      `WARN senpi: ${target} is malformed or has a non-object block; these model choices were not written: ${items
+        .filter((item) => item.state === "blocked" && item.target.path === target)
+        .map((item) => item.label)
+        .join(", ")}`,
+    )
   }
   for (const reason of dropped) lines.push(`model choice not carried: ${reason}`)
   return lines
@@ -151,7 +188,7 @@ function writeText(target, text) {
 
 // Every edit is an insertion into the file's own text (comments, order and formatting survive);
 // a file the edit cannot reproduce exactly is left untouched and reported.
-function writeTarget(target, items) {
+function writeTarget(target, items, report) {
   try {
     let text = target.text ?? "{}\n"
     for (const item of items) {
@@ -160,7 +197,9 @@ function writeTarget(target, items) {
     writeText(target, text)
     return items.map((item) => item.label)
   } catch (error) {
-    process.stdout.write(`WARN senpi: could not edit ${target.path} safely (${error.message}); these model choices were not written: ${items.map((item) => item.label).join(", ")}\n`)
+    report(
+      `WARN senpi: could not edit ${target.path} safely (${error.message}); these model choices were not written: ${items.map((item) => item.label).join(", ")}`,
+    )
     return []
   }
 }
@@ -177,9 +216,19 @@ export async function planModelChoices(stage) {
   if (!hasModelChoices(raw)) return empty
   let registry
   try {
-    registry = await (stage.loadRegistry ?? loadEngineModels)({ agentDir: stage.agentDir, customProviders: stage.customProviders })
+    registry = await (stage.loadRegistry ?? loadEngineModels)({
+      agentDir: stage.agentDir,
+      customProviders: stage.customProviders,
+      loadCatalog: stage.runtime.loadModelCatalog,
+    })
   } catch (error) {
-    return { ...empty, notices: [...raw.notices, `WARN senpi: could not read the engine's model list (${error.message}); model choices were not carried`] }
+    return {
+      ...empty,
+      notices: [
+        ...raw.notices,
+        `WARN senpi: could not read the engine's model list (${error.message}); model choices were not carried`,
+      ],
+    }
   }
   const converted = convertModelChoices(raw, registry, stage.oauthProviders)
   const settings = readTarget(settingsTargetPath(stage.agentDir))
@@ -194,9 +243,18 @@ export async function planModelChoices(stage) {
   }
 }
 
-/** The stage's one writer; records what it wrote as `plan.carried` for the counts. */
-export function applyModelChoices(plan) {
+/** The stage's one writer; records what it wrote as `plan.carried` for the counts. `options.report`
+ * receives the warning when a target cannot be edited (the CLI prints it; callers inside the
+ * engine route it to their own reply). */
+export function applyModelChoices(plan, options = {}) {
+  const report = options.report ?? ((line) => process.stdout.write(`${line}\n`))
   const pending = plan.items.filter((item) => item.state === "pending")
   const targets = [...new Set(pending.map((item) => item.target))]
-  plan.carried = targets.flatMap((target) => writeTarget(target, pending.filter((item) => item.target === target)))
+  plan.carried = targets.flatMap((target) =>
+    writeTarget(
+      target,
+      pending.filter((item) => item.target === target),
+      report,
+    ),
+  )
 }

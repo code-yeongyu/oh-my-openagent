@@ -7,11 +7,7 @@ import { resolveInheritedExtensionList } from "../runners/rpc/parent-extensions"
 import type { ResolvedModelRecord } from "../state"
 import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
-import {
-  SenpiTeamRuntimeError,
-  type SpawnMemberExtensionConfig,
-  type TeamRuntimeManagerPort,
-} from "./runtime-types"
+import { SenpiTeamRuntimeError, type SpawnMemberExtensionConfig, type TeamRuntimeManagerPort } from "./runtime-types"
 
 type TeamMember = TeamSpec["members"][number]
 
@@ -27,6 +23,7 @@ export type SpawnMembersInput = {
   readonly teamRunId: string
   readonly manager: TeamRuntimeManagerPort
   readonly leadSessionId: string
+  readonly rootSessionId?: string
   readonly spawnDepth: number
   readonly maxParallel: number
   readonly deadlineAt: number
@@ -99,10 +96,12 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
   if (member.worktreePath !== undefined) await mkdir(member.worktreePath, { recursive: true })
 
   const launch = input.memberExtension
-  const extensions = launch === undefined
-    ? undefined
-    : assembleMemberExtensions(launch.entryPath, await resolveInheritedExtensionList(launch.inheritedExtensions))
+  const extensions =
+    launch === undefined
+      ? undefined
+      : assembleMemberExtensions(launch.entryPath, await resolveInheritedExtensionList(launch.inheritedExtensions))
   const result = await input.manager.start(buildMemberStartSpec(input, member, extensions))
+  if (result.kind === "held") return { taskId: result.task_id, status: "pending" }
   if (result.kind !== "started") {
     throw new SenpiTeamRuntimeError(
       `member '${member.name}' failed to start: ${describeStartResult(result)}`,
@@ -141,7 +140,7 @@ function buildMemberStartSpec(
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
-    root_session_id: input.leadSessionId,
+    root_session_id: input.rootSessionId ?? input.leadSessionId,
     depth: input.spawnDepth,
     name: memberTaskName(input.teamRunId, member.name),
     execution_mode: "process",
@@ -154,12 +153,14 @@ function buildMemberStartSpec(
     team_role: "member",
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
-    ...(launch !== undefined ? {
-      memberEnv: {
-        SENPI_TASK_MEMBER: `${input.teamRunId}::${member.name}`,
-        SENPI_TASK_TEAM_CONFIG: launch.teamConfig,
-      },
-    } : {}),
+    ...(launch !== undefined
+      ? {
+          memberEnv: {
+            SENPI_TASK_MEMBER: `${input.teamRunId}::${member.name}`,
+            SENPI_TASK_TEAM_CONFIG: launch.teamConfig,
+          },
+        }
+      : {}),
   }
 }
 
@@ -182,16 +183,19 @@ function describePlanError(error: PlanResolutionError): string {
   const agents = error.availableAgents ?? []
   const categories = error.availableCategories ?? []
   const agentSuffix = agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
-  const categorySuffix = categories.length === 0
-    ? ""
-    : error.code === "model_unavailable"
-      ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
-      : ` Available categories: ${categories.join(", ")}.`
+  const categorySuffix =
+    categories.length === 0
+      ? ""
+      : error.code === "model_unavailable"
+        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
+        : ` Available categories: ${categories.join(", ")}.`
   return error.message + agentSuffix + categorySuffix
 }
 
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {
   switch (result.kind) {
+    case "held":
+      return `held by user Stop at pause sequence ${result.pauseSeq}`
     case "depth_denied":
       return result.reason
     case "plan_unresolved":

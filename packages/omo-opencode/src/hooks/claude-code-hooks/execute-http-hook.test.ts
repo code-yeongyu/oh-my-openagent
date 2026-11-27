@@ -1,10 +1,9 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import type { HookHttp } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const mockFetch = mock(() =>
-  Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-)
+const mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
 
 const originalFetch = globalThis.fetch
 
@@ -12,9 +11,7 @@ describe("executeHttpHook", () => {
   beforeEach(() => {
     globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
     mockFetch.mockReset()
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-    )
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
   })
 
   afterEach(() => {
@@ -52,14 +49,14 @@ describe("executeHttpHook", () => {
   })
 
   describe("#given an HTTP hook with headers and env var interpolation", () => {
-    const originalEnv = process.env
+    const originalEnv = { ...process.env }
 
     beforeEach(() => {
-      process.env = { ...originalEnv, MY_TOKEN: "secret-123", OTHER_VAR: "other-value" }
+      restoreEnvironment({ ...originalEnv, MY_TOKEN: "secret-123", OTHER_VAR: "other-value" })
     })
 
     afterEach(() => {
-      process.env = originalEnv
+      restoreEnvironment(originalEnv)
     })
 
     it("#when allowedEnvVars includes the var #then interpolates env var in headers", async () => {
@@ -200,8 +197,8 @@ describe("executeHttpHook", () => {
           new Response(JSON.stringify({ decision: "allow", reason: "ok" }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          })
-        )
+          }),
+        ),
       )
       const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
       const { executeHttpHook } = await import("./execute-http-hook")
@@ -213,9 +210,7 @@ describe("executeHttpHook", () => {
     })
 
     it("#when response has non-JSON body #then returns body as stdout", async () => {
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("plain output", { status: 200 }))
-      )
+      mockFetch.mockImplementation(() => Promise.resolve(new Response("plain output", { status: 200 })))
       const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
       const { executeHttpHook } = await import("./execute-http-hook")
 
@@ -227,9 +222,7 @@ describe("executeHttpHook", () => {
 
   describe("#given a failing HTTP response", () => {
     it("#when response status is 4xx #then returns exit code 1", async () => {
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("Bad Request", { status: 400 }))
-      )
+      mockFetch.mockImplementation(() => Promise.resolve(new Response("Bad Request", { status: 400 })))
       const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
       const { executeHttpHook } = await import("./execute-http-hook")
 
@@ -247,8 +240,8 @@ describe("executeHttpHook", () => {
             status: 502,
             statusText: "Bad Gateway",
             text: () => Promise.reject(new Error("body unavailable")),
-          })
-        )
+          }),
+        ),
       )
       const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
       const { executeHttpHook } = await import("./execute-http-hook")
@@ -281,8 +274,8 @@ describe("executeHttpHook", () => {
           new Response(JSON.stringify({ exitCode: 2, stderr: "blocked" }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          })
-        )
+          }),
+        ),
       )
       const hook: HookHttp = { type: "http", url: "http://localhost:8080/hooks" }
       const { executeHttpHook } = await import("./execute-http-hook")
@@ -295,14 +288,14 @@ describe("executeHttpHook", () => {
 })
 
 describe("interpolateEnvVars", () => {
-  const originalEnv = process.env
+  const originalEnv = { ...process.env }
 
   beforeEach(() => {
-    process.env = { ...originalEnv, TOKEN: "abc", SECRET: "xyz" }
+    restoreEnvironment({ ...originalEnv, TOKEN: "abc", SECRET: "xyz" })
   })
 
   afterEach(() => {
-    process.env = originalEnv
+    restoreEnvironment(originalEnv)
   })
 
   it("#given $VAR syntax #when var is allowed #then interpolates", async () => {
@@ -330,7 +323,7 @@ describe("interpolateEnvVars", () => {
   })
 
   it("#given ${VAR} where value contains $ANOTHER #when both allowed #then does not double-interpolate", async () => {
-    process.env = { ...process.env, TOKEN: "val$SECRET", SECRET: "oops" }
+    Object.assign(process.env, { TOKEN: "val$SECRET", SECRET: "oops" })
     const { interpolateEnvVars } = await import("./execute-http-hook")
 
     const result = interpolateEnvVars("Bearer ${TOKEN}", ["TOKEN", "SECRET"])

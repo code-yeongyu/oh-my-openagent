@@ -1,28 +1,23 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
+import * as agentLoader from "../../../features/claude-code-agent-loader"
 import type { ExecutorContext } from "../executor-types"
 import type { DelegateTaskArgs } from "../types"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
 
-type ClaudeCodeAgentRecord = Record<
-  string,
-  {
-    description?: string
-    mode?: string
-    model?: string | { providerID: string; modelID: string }
-  }
->
+type ClaudeCodeAgentRecord = ReturnType<typeof agentLoader.loadUserAgents>
 
-const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
-  () => null as {
-    models: Record<string, string[]>
-    connected: string[]
-    updatedAt: string
-  } | null,
+  () =>
+    null as {
+      models: Record<string, string[]>
+      connected: string[]
+      updatedAt: string
+    } | null,
 )
 const loadUserAgentsMock = mock((): ClaudeCodeAgentRecord => ({}))
 const loadProjectAgentsMock = mock((_directory?: string): ClaudeCodeAgentRecord => ({}))
@@ -45,7 +40,7 @@ function createBaseArgs(overrides?: Partial<DelegateTaskArgs>): DelegateTaskArgs
 function createExecutorContext(overrides?: Partial<ExecutorContext>): ExecutorContext {
   const client = {
     app: {
-      agents: async () => ([{ name: "oracle", mode: "subagent" }]),
+      agents: async () => [{ name: "oracle", mode: "subagent" }],
     },
   } as ExecutorContext["client"]
 
@@ -62,7 +57,6 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -75,20 +69,16 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
     loadProjectAgentsMock.mockImplementation(() => ({
       "claude-reviewer": { description: "Project Claude Code agent", mode: "subagent" },
     }))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
-    mock.module("../../../features/claude-code-agent-loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
+    spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
+    spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 

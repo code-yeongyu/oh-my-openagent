@@ -5,7 +5,16 @@
  * `applyProviders` is the one writer.
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { dirname, join } from "node:path"
 import { readAuthStore, timestamp, writeAuthStore } from "./auth-store.js"
 import { parseJsonc } from "./jsonc.js"
@@ -65,12 +74,21 @@ function list(label, ids) {
 }
 
 export function providerPlanLines({ result }) {
-  return [list("planned-providers", result.added.map((provider) => provider.id)), list("providers-skipped-existing", result.skippedExisting)]
+  return [
+    list(
+      "planned-providers",
+      result.added.map((provider) => provider.id),
+    ),
+    list("providers-skipped-existing", result.skippedExisting),
+  ]
 }
 
 export function providerCounts({ result }) {
   return [
-    list("providers-imported", result.added.map((provider) => provider.id)),
+    list(
+      "providers-imported",
+      result.added.map((provider) => provider.id),
+    ),
     `provider-keys-imported: ${result.keys.length}`,
     `providers-skipped-existing: ${result.skippedExisting.length}`,
   ]
@@ -101,18 +119,39 @@ function writeModels(path, target, added) {
 export function planProviders(source, agentDir) {
   const paths = { models: join(agentDir, "models.json"), auth: join(agentDir, "auth.json") }
   const models = readModelsTarget(paths.models)
-  const result = classify(source, models, readAuthStore(paths.auth))
+  const auth = readAuthStore(paths.auth)
+  const result = classify(source, models, auth)
   const notices = [...source.notices]
-  if (result.blocked.length > 0) notices.push(`WARN senpi: malformed models.json; these custom providers were not imported: ${result.blocked.join(", ")}`)
-  return { paths, models, notices, result, skipped: source.skipped, present: source.providers.length > 0, pending: result.added.length }
+  if (result.blocked.length > 0)
+    notices.push(
+      `WARN senpi: malformed models.json; these custom providers were not imported: ${result.blocked.join(", ")}`,
+    )
+  return {
+    paths,
+    models,
+    authBytes: auth.bytes,
+    notices,
+    result,
+    skipped: source.skipped,
+    present: source.providers.some((provider) => provider.origin !== "commandcode"),
+    pending: result.added.length,
+  }
 }
 
-export function applyProviders(plan) {
+/**
+ * The stage's one writer. With `options.writeAuth` the provider keys merge into whatever the
+ * store holds under its lock; the CLI path keeps its direct backup-and-write.
+ */
+export function applyProviders(plan, options = {}) {
   writeModels(plan.paths.models, plan.models, plan.result.added)
   // Re-read: the credential stage of the same run may have just written auth.json, after this plan
   // was classified. A mapped credential target can also be a custom provider id (claude-sdk-oauth ->
   // anthropic-subscription), so a key written since the plan is kept, never overwritten.
   const auth = readAuthStore(plan.paths.auth)
-  plan.result.keys = auth.malformed ? [] : plan.result.keys.filter((item) => !Object.hasOwn(auth.entries, item.provider))
-  if (plan.result.keys.length > 0) writeAuthStore(plan.paths.auth, auth, plan.result.keys)
+  plan.result.keys = auth.malformed
+    ? []
+    : plan.result.keys.filter((item) => !Object.hasOwn(auth.entries, item.provider))
+  if (plan.result.keys.length === 0) return
+  if (options.writeAuth !== undefined) return options.writeAuth(plan.paths.auth, plan.result.keys)
+  writeAuthStore(plan.paths.auth, auth, plan.result.keys)
 }

@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, mock, test } from "bun:test"
+import { join } from "node:path"
 import { getCallerUrlFromStack, installModuleMockLifecycle, normalizeStackPath } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
@@ -31,6 +32,29 @@ describe("installModuleMockLifecycle", () => {
     expect(callerUrl).toBe("file:///D:/a/oh-my-openagent/oh-my-openagent/src/hooks/example.test.ts")
   })
 
+  test("#given an extensionless relative specifier #when the default resolver mocks and restores it #then both name the loaded module file", () => {
+    // given
+    const moduleCalls: string[] = []
+    const mockApi = {
+      module: (specifier: string) => {
+        moduleCalls.push(specifier)
+      },
+      restore: mock(() => {}),
+    }
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => import.meta.url,
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    // when
+    mockApi.module("./module-mock-lifecycle", () => ({ named: "mocked" }))
+    mockApi.restore()
+
+    // then
+    const loadedModulePath = join(import.meta.dir, "module-mock-lifecycle.ts")
+    expect(moduleCalls).toEqual([loadedModulePath, loadedModulePath])
+  })
+
   test("restores the original module exports on mock.restore", () => {
     // given
     const moduleCalls: Array<{ specifier: string; value: Record<string, unknown> }> = []
@@ -44,7 +68,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     // when
@@ -53,7 +77,7 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(moduleCalls).toEqual([
-      { specifier: "./dependency", value: { named: "mocked" } },
+      { specifier: "resolved:./dependency", value: { named: "mocked" } },
       { specifier: "resolved:./dependency", value: { named: "original" } },
     ])
   })
@@ -73,7 +97,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     // when
@@ -82,7 +106,7 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency:mocked",
+      "module:resolved:./dependency:mocked",
       "delegate:restore",
       "module:resolved:./dependency:original",
     ])
@@ -101,7 +125,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     // when
@@ -126,7 +150,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -139,7 +163,7 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency:mocked",
+      "module:resolved:./dependency:mocked",
       "delegate:restore",
       "module:resolved:./dependency:original",
       "delegate:restore",
@@ -161,7 +185,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: () => "node:fs/promises",
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -171,11 +195,7 @@ describe("installModuleMockLifecycle", () => {
     lifecycle.restoreModuleMocks()
 
     // then
-    expect(events).toEqual([
-      "module:node:fs/promises:mocked",
-      "delegate:restore",
-      "module:node:fs/promises:original",
-    ])
+    expect(events).toEqual(["module:node:fs/promises:mocked", "delegate:restore", "module:node:fs/promises:original"])
   })
 
   test("#given preserved active module mocks from two owners #when global test setup cleans up #then both owner mocks are replayed", () => {
@@ -194,7 +214,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -210,11 +230,11 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
       "delegate:restore",
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -233,7 +253,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -245,9 +265,9 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency:mocked",
+      "module:resolved:./dependency:mocked",
       "delegate:restore",
-      "module:./dependency:mocked",
+      "module:resolved:./dependency:mocked",
     ])
   })
 
@@ -265,7 +285,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -277,8 +297,8 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
     ])
   })
@@ -299,7 +319,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -312,11 +332,11 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
       "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -336,7 +356,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: () => "resolved:./shared-dependency",
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency", () => ({ named: "first-mock" }))
@@ -348,11 +368,11 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency:first-mock",
-      "module:./dependency:second-mock",
+      "module:resolved:./shared-dependency:first-mock",
+      "module:resolved:./shared-dependency:second-mock",
       "delegate:restore",
-      "module:./dependency:first-mock",
-      "module:./dependency:first-mock",
+      "module:resolved:./shared-dependency:first-mock",
+      "module:resolved:./shared-dependency:first-mock",
     ])
   })
 
@@ -372,7 +392,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -383,7 +403,7 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:mock-a",
       "delegate:restore",
       "module:file:///repo/tests/owner.test.ts:./dependency-a:original",
     ])
@@ -405,7 +425,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -417,9 +437,9 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:mock-a",
       "delegate:restore",
-      "module:./dependency-a:mock-a",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:mock-a",
     ])
   })
 
@@ -439,7 +459,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -450,7 +470,7 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
+      "module:resolved:./dependency-a:mock-a",
       "delegate:restore",
       "module:resolved:./dependency-a:original",
     ])
@@ -472,7 +492,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -485,11 +505,11 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(events).toEqual([
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
       "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -504,7 +524,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: () => "file:///repo/src/dependency.ts",
-      loadOriginalModule: () => {
+      loadUnmockedModule: () => {
         loadCount += 1
         return { ok: true, value: { named: "original" } }
       },
@@ -531,7 +551,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => specifier,
-      loadOriginalModule: () => ({ ok: false, error: new Error("Cannot find module") }),
+      loadUnmockedModule: () => ({ ok: false, error: new Error("Cannot find module") }),
     })
 
     // when
@@ -557,7 +577,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/preserved.test.ts",
       resolveSpecifier: (specifier) => specifier,
-      loadOriginalModule: () => ({ ok: false, error: new Error("Cannot find module") }),
+      loadUnmockedModule: () => ({ ok: false, error: new Error("Cannot find module") }),
     })
 
     // when
@@ -566,9 +586,6 @@ describe("installModuleMockLifecycle", () => {
     lifecycle.restoreModuleMocksForTestFile("file:///repo/tests/preserved.test.ts")
 
     // then
-    expect(events).toEqual([
-      "module:virtual:missing:mocked",
-      "delegate:restore",
-    ])
+    expect(events).toEqual(["module:virtual:missing:mocked", "delegate:restore"])
   })
 })

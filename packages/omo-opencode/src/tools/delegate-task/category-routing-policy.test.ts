@@ -13,7 +13,7 @@ describe("OpenCode task category routing policy", () => {
 
     // then
     expect(routing).toEqual({
-      visualEngineering: { model: "anthropic/claude-fable-5-1", variant: "max" },
+      visualEngineering: { model: "google/gemini-4-argon", variant: "low" },
       quick: { model: "openai/gpt-6-luna-fast", variant: "low" },
       unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
     })

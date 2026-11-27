@@ -37,7 +37,12 @@ describe("task_output effective model (#9722)", () => {
     const record: TaskRecord = {
       ...parked(),
       resolved_model: { provider: "anthropic", model_id: "claude", display: "anthropic/claude", source: "explicit" },
-      effective_model: { provider: "anthropic", model_id: "claude-other", display: "anthropic/claude-other", source: "explicit" },
+      effective_model: {
+        provider: "anthropic",
+        model_id: "claude-other",
+        display: "anthropic/claude-other",
+        source: "explicit",
+      },
     }
 
     // when
@@ -64,6 +69,14 @@ describe("task_output suspension explanation", () => {
 
     // then
     expect(snapshot.suspended?.explanation).toBe(recoveryPresentation(parked("host_draining"))?.text)
+  })
+
+  test("#given a child parked by its session quitting #when the snapshot is built #then it names the quit, not a generic restart (senpi#3493)", () => {
+    // given / when
+    const snapshot = buildTaskSnapshot(parked("session_quit"), "/tmp/state", NOW)
+
+    // then
+    expect(snapshot.suspended?.explanation).toBe("resuming (session quit)")
   })
 
   test("#given a parked child with no recorded suspension reason #when the snapshot is built #then the session-resume wording is unchanged", () => {

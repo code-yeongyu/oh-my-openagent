@@ -7,3 +7,5 @@ export * from "./render"
 export * from "./ledger"
 export * from "./gate"
 export { loadKibitzerPersona } from "./assets/assets"
+
+export * from "./project-corpus"

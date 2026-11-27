@@ -7,7 +7,6 @@ import { GitMemoryRepo } from "../git"
 import { projectedChangesBetween, revisionExists } from "./changes"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-const TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 const AUTHOR = { agentId: "changes-agent", authorName: "Changes Agent" }
 const tempDirs: string[] = []
 
@@ -28,7 +27,13 @@ async function createRepo() {
   return { dir, repo }
 }
 
-async function commitFile(dir: string, repo: GitMemoryRepo, path: string, body: string, message: string): Promise<void> {
+async function commitFile(
+  dir: string,
+  repo: GitMemoryRepo,
+  path: string,
+  body: string,
+  message: string,
+): Promise<void> {
   await mkdir(dirname(join(dir, path)), { recursive: true })
   await writeFile(join(dir, path), `---\ndescription: ${path}\n---\n${body}\n`)
   await repo.commitWrite([path], message, AUTHOR)
@@ -50,22 +55,38 @@ describe("projectedChangesBetween", () => {
     const changes = await projectedChangesBetween(repo, base, await repo.head())
 
     // then
-    expect(changes).toEqual({ added: ["reference/new.md"], updated: ["system/persona.md"], removed: ["reference/old.md"] })
-  }, TIMEOUT)
+    expect(changes).toEqual({
+      added: ["reference/new.md"],
+      updated: ["system/persona.md"],
+      removed: ["reference/old.md"],
+    })
+  })
 
   it("#given commits from the excluded session and from another writer #when summarized #then only the other writer's paths remain", async () => {
     // given
     const { dir, repo } = await createRepo()
     const base = await repo.head()
-    await commitFile(dir, repo, "reference/mine.md", "mine", "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-a\nOmo-Turn: 1")
-    await commitFile(dir, repo, "reference/theirs.md", "theirs", "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-b\nOmo-Turn: 3")
+    await commitFile(
+      dir,
+      repo,
+      "reference/mine.md",
+      "mine",
+      "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-a\nOmo-Turn: 1",
+    )
+    await commitFile(
+      dir,
+      repo,
+      "reference/theirs.md",
+      "theirs",
+      "record\n\nOmo-Writer: memory-tool\nOmo-Session: session-b\nOmo-Turn: 3",
+    )
 
     // when
     const changes = await projectedChangesBetween(repo, base, await repo.head(), { excludeSessionId: "session-a" })
 
     // then
     expect(changes).toEqual({ added: ["reference/theirs.md"], updated: [], removed: [] })
-  }, TIMEOUT)
+  })
 
   it("#given base equal to head #when summarized #then git is not asked and nothing changed", async () => {
     // given
@@ -84,7 +105,7 @@ describe("projectedChangesBetween", () => {
     // then
     expect(changes).toEqual({ added: [], updated: [], removed: [] })
     expect(logCalls).toBe(0)
-  }, TIMEOUT)
+  })
 })
 
 describe("revisionExists", () => {
@@ -97,5 +118,5 @@ describe("revisionExists", () => {
     expect(head).not.toBeNull()
     expect(await revisionExists(repo, head ?? "")).toBe(true)
     expect(await revisionExists(repo, "0123456789abcdef0123456789abcdef01234567")).toBe(false)
-  }, TIMEOUT)
+  })
 })

@@ -8,33 +8,18 @@ import { buildIdentityPaths, GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import { createMemoryIdentityContext } from "./context"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
-import { rmEfaultTolerant } from "./teardown.test-support"
+import { rmWhenReleased } from "./teardown.test-support"
 import { createMemoryWiring } from "./wiring"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
-const TEMP_ROOT_RELEASE_TIMEOUT_MS = 30_000
-const TEMP_ROOT_RELEASE_POLL_MS = 50
-
-async function removeWhenReleased(root: string): Promise<void> {
-  const deadline = Date.now() + TEMP_ROOT_RELEASE_TIMEOUT_MS
-  for (;;) {
-    try {
-      await rmEfaultTolerant(root, { recursive: true, force: true })
-      return
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      if ((code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") || Date.now() >= deadline) throw error
-      await new Promise((resolve) => setTimeout(resolve, TEMP_ROOT_RELEASE_POLL_MS))
-    }
-  }
-}
-
 afterEach(async () => {
-  for (const root of roots.splice(0)) await removeWhenReleased(root)
+  for (const root of roots.splice(0)) await rmWhenReleased(root)
 })
 
 describe("memory pressure dream wiring", () => {
   test("#given committed system memory above pressure #when the first accepted turn settles #then one pressure dream launches after input and never before it", async () => {
+    useTestTimeout(30_000)
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-pressure-dream-wiring-")))
     roots.push(root)
     const identityName = "pressure-dream-agent"
@@ -50,8 +35,12 @@ describe("memory pressure dream wiring", () => {
     const reservationAttempts: unknown[] = []
     let advisoryObserved!: () => void
     let reservationObserved!: () => void
-    const advisory = new Promise<void>((resolve) => { advisoryObserved = resolve })
-    const reservation = new Promise<void>((resolve) => { reservationObserved = resolve })
+    const advisory = new Promise<void>((resolve) => {
+      advisoryObserved = resolve
+    })
+    const reservation = new Promise<void>((resolve) => {
+      reservationObserved = resolve
+    })
     const runtime = {
       reconcile: async () => {},
       store: {
@@ -77,13 +66,18 @@ describe("memory pressure dream wiring", () => {
     wiring.registerStatic(pi, componentContext())
     const eventCtx = {
       sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
-      ui: { setStatus: () => {}, notify: () => { advisoryObserved() } },
+      ui: {
+        setStatus: () => {},
+        notify: () => {
+          advisoryObserved()
+        },
+      },
     }
     let advisoryTimeout: ReturnType<typeof setTimeout> | undefined
     const boundedAdvisory = Promise.race([
       advisory,
       new Promise<never>((_resolve, reject) => {
-        advisoryTimeout = setTimeout(() => reject(new Error("pressure advisory was not observed")), 5_000)
+        advisoryTimeout = setTimeout(() => reject(new Error("pressure advisory was not observed")), remainingTestTime())
       }),
     ])
 
@@ -99,7 +93,10 @@ describe("memory pressure dream wiring", () => {
     const boundedReservation = Promise.race([
       reservation,
       new Promise<never>((_resolve, reject) => {
-        reservationTimeout = setTimeout(() => reject(new Error("pressure reservation was not observed after accepted input")), 5_000)
+        reservationTimeout = setTimeout(
+          () => reject(new Error("pressure reservation was not observed after accepted input")),
+          remainingTestTime(),
+        )
       }),
     ])
     try {
@@ -111,11 +108,13 @@ describe("memory pressure dream wiring", () => {
       if (reservationTimeout !== undefined) clearTimeout(reservationTimeout)
     }
 
-    expect(reservationAttempts).toEqual([{
-      trigger: "dream",
-      origin: "pressure",
-      conversationIds: [],
-      snapshots: [],
-    }])
+    expect(reservationAttempts).toEqual([
+      {
+        trigger: "dream",
+        origin: "pressure",
+        conversationIds: [],
+        snapshots: [],
+      },
+    ])
   }, 30_000)
 })

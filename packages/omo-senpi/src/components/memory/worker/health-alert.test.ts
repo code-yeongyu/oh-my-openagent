@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -41,7 +41,10 @@ describe("reflection health alert", () => {
 
     // then
     expect(emitted).toBe(true)
-    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)?.data as Record<string, unknown>
+    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)?.data as Record<
+      string,
+      unknown
+    >
     expect(entry).toMatchObject({
       schemaVersion: 1,
       identity: "agent-test",
@@ -51,6 +54,33 @@ describe("reflection health alert", () => {
       lastDetail: "stable",
     })
     expect(typeof entry.recommendation).toBe("string")
+  })
+
+  test("#given completions beside the newest failing run's log #when the alert fires #then the remediation names that log's absolute path", async () => {
+    // given: production keeps completions at <reflectionDir>/completions next to <reflectionDir>/runs
+    const reflection = await mkdtemp(join(tmpdir(), "reflection-health-alert-dir-"))
+    roots.push(reflection)
+    const completions = join(reflection, "completions")
+    await mkdir(completions)
+    for (let index = 0; index < 3; index += 1) {
+      await writeFile(
+        join(completions, `run-${index}.json`),
+        JSON.stringify(completion(`run-${index}`, minutesAgo(60 - index * 10), "stable")),
+      )
+    }
+    const log = join(reflection, "runs", "run-2", "child-stderr.log")
+    await mkdir(join(reflection, "runs", "run-2"), { recursive: true })
+    await writeFile(log, "stable\n")
+    const harness = liveHarness()
+
+    // when
+    await emitReflectionHealthAlert(completions, "agent-test", harness.live, harness.once)
+
+    // then
+    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)
+      ?.data as ReflectionHealthEntry
+    expect(entry.recommendation).toBe(`inspect ${log}`)
+    expect(harness.notifications[0]).toContain(log)
   })
 
   test("#given a child that died inside a Bun code frame #when the alert fires #then neither the notice nor the entry carries source lines", async () => {
@@ -67,7 +97,8 @@ describe("reflection health alert", () => {
     expect(notice).not.toContain("const ")
     expect(notice).not.toContain("at getBuiltinThemes")
     expect(notice).toContain("ENOENT: no such file or directory")
-    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)?.data as ReflectionHealthEntry
+    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)
+      ?.data as ReflectionHealthEntry
     expect(entry.lastDetail).toBe(
       "ENOENT: no such file or directory, open '/opt/omo-runtime/dist/modes/interactive/theme/dark.json'",
     )
@@ -76,7 +107,10 @@ describe("reflection health alert", () => {
 
   test("#given a streak of model misses no child can see even with extensions #when alerting runs #then the park alert stays its only notice", async () => {
     // given
-    const root = await failureStreak(3, "model_unreachable_with_extensions; model_not_visible:gw/model; attempted:gw/model")
+    const root = await failureStreak(
+      3,
+      "model_unreachable_with_extensions; model_not_visible:gw/model; attempted:gw/model",
+    )
     const harness = liveHarness()
 
     // when
@@ -224,10 +258,12 @@ describe("renderReflectionHealthEntry house notice contract", () => {
 
     // then
     expect(component).toBeDefined()
-    expect(component!.render(120).slice(1, -1).map((line) => line.slice(1).trimEnd())).toEqual([
-      bold("✗ Memory reflection failing · 4 runs in a row"),
-      "Run /login <provider>.",
-    ])
+    expect(
+      component!
+        .render(120)
+        .slice(1, -1)
+        .map((line) => line.slice(1).trimEnd()),
+    ).toEqual([bold("✗ Memory reflection failing · 4 runs in a row"), "Run /login <provider>."])
   })
 
   test("#when it renders expanded #then the detail row carries reason since and identity", () => {
@@ -241,18 +277,22 @@ describe("renderReflectionHealthEntry house notice contract", () => {
   })
 
   test("#given failure launcher attribution #when it renders expanded #then the detail row identifies both runtimes", () => {
-    const component = renderReflectionHealthEntry({
-      data: {
-        ...HEALTH,
-        launcher: {
-          runtime: "old-runtime",
-          execPath: "/old/omo",
-          pid: 11,
+    const component = renderReflectionHealthEntry(
+      {
+        data: {
+          ...HEALTH,
+          launcher: {
+            runtime: "old-runtime",
+            execPath: "/old/omo",
+            pid: 11,
+          },
+          thisRuntime: "new-runtime",
+          streakRuntimes: ["old-runtime", "older-runtime"],
         },
-        thisRuntime: "new-runtime",
-        streakRuntimes: ["old-runtime", "older-runtime"],
-      },
-    } as never, { expanded: true }, PLAIN_THEME as never)
+      } as never,
+      { expanded: true },
+      PLAIN_THEME as never,
+    )
 
     expect(component!.render(200)[3]?.slice(1).trimEnd()).toContain(
       "launched by old-runtime · this session new-runtime · across 2 runtimes",

@@ -21,7 +21,7 @@ PNG of the page itself, so no browser chrome can appear in it.
 const { mkdtempSync, rmSync } = await import("node:fs")
 const profile = mkdtempSync(`${(await import("node:os")).tmpdir()}/visual-qa-`)
 const browser = await omowright.connectPipe({
-  browserPath: chromeBinary,                      // installed Chrome, Chromium, CloakBrowser or chrome-headless-shell
+  browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary,   // or omowright.findCloakBrowserPath(); never a guessed path
   browserArgs: ["--headless", "--no-first-run", `--user-data-dir=${profile}`],
   storageRoot: profile,
 })
@@ -65,15 +65,16 @@ cloning its profile:
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "visual-qa capture", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id   // BrowserSkill 0.4: one context per page action
 try {
-  await session.navigate(url, { waitUntil: "load" })
-  await session.resize(1440, 900)                                 // desktop column of the matrix
+  await session.navigate(url, { waitUntil: "load" })             // first navigation: no sync (it throws on the blank tab)
+  await session.resize(1440, 900, { context: await sync() })     // desktop column of the matrix
   await Bun.write(`${outDir}/${route}-1440-top.png`, (await session.screenshot()).buffer)   // { buffer, width, height }
-  await session.emulate({ overrides: { width: 390, mobile: true } })  // phone column; `off: true` restores
+  await session.emulate({ overrides: { width: 390, height: 844, mobile: true }, context: await sync() })  // phone column; `off: true` restores
   await Bun.write(`${outDir}/${route}-390-top.png`, (await session.screenshot()).buffer)
 } finally {
-  await session.emulate({ off: true })
-  await session.stop()
+  try { await session.emulate({ off: true, context: await sync() }) }   // a refused sync must not skip stop()
+  finally { await session.stop() }
 }
 ```
 
@@ -89,8 +90,10 @@ not fall back to the owned engine for an authenticated criterion.
 
 ## Capture at a fixed viewport
 
-Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned) or
-`resize` (attached) instead of resizing the PNG to force a pass; a 390-wide capture at desktop
+Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned engine).
+Attached `resize(width, height)` sets the window size only and leaves the device pixel ratio at the
+user's display, so on the attached engine record the capture's DPR (PNG width / CSS viewport width)
+and compare against a reference taken at that DPR. Never resize the PNG to force a pass; a 390-wide capture at desktop
 DPR with classic scrollbars is not a phone capture. Wait for the specific page state (a locator,
 a `waitForURL`, a `createNetworkSnoop(page).waitFor(...)`), not a sleep, then compare:
 

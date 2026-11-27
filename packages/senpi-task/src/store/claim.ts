@@ -18,7 +18,11 @@ export function claimTaskRecord(store: TaskRecordStore, draft: TaskRecord, optio
   let candidate = draft
   for (;;) {
     const nameAvailable = options?.nameAvailable
-    while (options?.nameFollowsId === true && nameAvailable !== undefined && !nameAvailable(candidate.name ?? candidate.task_id)) {
+    while (
+      options?.nameFollowsId === true &&
+      nameAvailable !== undefined &&
+      !nameAvailable(candidate.name ?? candidate.task_id)
+    ) {
       if (attempts >= maxAttempts) throw new TaskIdSpaceExhaustedError()
       attempts += 1
       const nextId = bumpTaskId(parseTaskId(candidate.task_id))

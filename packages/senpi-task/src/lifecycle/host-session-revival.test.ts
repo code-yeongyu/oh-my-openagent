@@ -68,7 +68,12 @@ describe("host-session revival: attach by session path, drain deferral, daemon-l
     // given
     const store = tempStore()
     const identity = hostSession("st_0b00000a")
-    const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID, isAlive: (pid) => pid === HOST_PID, respawn: () => Promise.resolve(OK) })
+    const fixture = hostLifecycleDeps({
+      store,
+      hostPid: HOST_PID,
+      isAlive: (pid) => pid === HOST_PID,
+      respawn: () => Promise.resolve(OK),
+    })
     fixture.daemon.hold(identity.session_path)
     seedRecord(store, {
       ...hostSessionRecordInput("st_0b00000a", identity),
@@ -82,7 +87,11 @@ describe("host-session revival: attach by session path, drain deferral, daemon-l
     const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
-    expect(result.outcomes).toContainEqual({ task_id: "st_0b00000a", kind: "resumed", reason: "respawned and reattached" })
+    expect(result.outcomes).toContainEqual({
+      task_id: "st_0b00000a",
+      kind: "resumed",
+      reason: "respawned and reattached",
+    })
     expect(fixture.respawned).toEqual([{ task_id: "st_0b00000a", sessionPath: identity.session_path }])
     expect(store.load("st_0b00000a")?.host_pid).toBe(HOST_PID)
   })
@@ -91,7 +100,12 @@ describe("host-session revival: attach by session path, drain deferral, daemon-l
     // given
     const store = tempStore()
     const identity = hostSession("st_0b00000b")
-    const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID, isAlive: () => true, respawn: () => Promise.resolve(OK) })
+    const fixture = hostLifecycleDeps({
+      store,
+      hostPid: HOST_PID,
+      isAlive: () => true,
+      respawn: () => Promise.resolve(OK),
+    })
     fixture.daemon.hold(identity.session_path)
     seedRecord(store, {
       ...hostSessionRecordInput("st_0b00000b", identity),
@@ -269,13 +283,19 @@ describe("a deferred daemon-hosted child is retried in the background (omo#9069)
       store,
       hostPid: HOST_PID,
       deferredRetryBackoffMs: [5_000, 15_000, 30_000],
-      onWait: (ms) => { if (ms === 15_000) alive = true },
+      onWait: (ms) => {
+        if (ms === 15_000) alive = true
+      },
       respawn: async (record) => {
         respawnSockets.push(record.host_session?.socket)
         return OK
       },
     })
-    seedRecord(store, { ...hostSessionRecordInput("st_0b000009", identity), status: "running", residency_state: "rpc_detached" })
+    seedRecord(store, {
+      ...hostSessionRecordInput("st_0b000009", identity),
+      status: "running",
+      residency_state: "rpc_detached",
+    })
     const lifecycle = createTaskLifecycle({
       ...fixture.deps,
       store: {
@@ -314,7 +334,9 @@ describe("a deferred daemon-hosted child is retried in the background (omo#9069)
     const store = tempStore()
     const identity = hostSession("st_0b000007")
     let revived!: () => void
-    const done = new Promise<void>((resolve) => { revived = resolve })
+    const done = new Promise<void>((resolve) => {
+      revived = resolve
+    })
     const fixture = hostLifecycleDeps({
       store,
       hostPid: HOST_PID,
@@ -328,7 +350,11 @@ describe("a deferred daemon-hosted child is retried in the background (omo#9069)
       },
     })
     fixture.daemon.alive = false
-    seedRecord(store, { ...hostSessionRecordInput("st_0b000007", identity), status: "running", residency_state: "rpc_detached" })
+    seedRecord(store, {
+      ...hostSessionRecordInput("st_0b000007", identity),
+      status: "running",
+      residency_state: "rpc_detached",
+    })
     const lifecycle = createTaskLifecycle(fixture.deps)
 
     // when
@@ -359,7 +385,11 @@ describe("a deferred daemon-hosted child is retried in the background (omo#9069)
       respawn: () => Promise.resolve(OK),
     })
     fixture.daemon.alive = false
-    seedRecord(store, { ...hostSessionRecordInput("st_0b000008", identity), status: "running", residency_state: "rpc_detached" })
+    seedRecord(store, {
+      ...hostSessionRecordInput("st_0b000008", identity),
+      status: "running",
+      residency_state: "rpc_detached",
+    })
     const lifecycle = createTaskLifecycle({
       ...fixture.deps,
       store: {

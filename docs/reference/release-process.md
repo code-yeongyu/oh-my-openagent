@@ -18,6 +18,18 @@ The `/publish` command accepts `patch`, `minor`, `major`, or an explicit semanti
 
 For the `omo-ai` package (OmO Native), see the [omo-ai publishing runbook](./omo-ai-publishing.md): the version-derived channel (stable on `latest`, prereleases on `beta`), the Trusted Publisher merge gate, and the release checklist.
 
+## Release a green commit while dev moves
+
+Use `source_sha` when commits after a green `dev` revision should stay out of the release:
+
+```bash
+gh workflow run publish.yml --ref dev -f source_sha=<full-40-hex-sha> -f bump=patch
+```
+
+The pin must be an ancestor of `origin/dev` with a successful `ci.yml` **push** run at that exact SHA. The workflow stamps the version directly on the pin and merges the release-state PR into `dev`. It tags and publishes the stamp, not the merge commit, and refuses to tag it if its first parent is not the pin.
+
+The publish gate reuses the pin's CI only if `release-state-paths.mjs --check-stamp` verifies the delta. Otherwise it requires successful CI at the stamp SHA. A tag whose workflow predates `source_sha` uses its existing exact-stamp CI gate. Leave `source_sha` empty for the ordinary release; it cannot be combined with `lazycodex_only` or the CI receipt waiver.
+
 ## Resuming a Failed Publish
 
 For a transient failure, retry only the failed jobs and their dependencies:
@@ -40,7 +52,7 @@ gh workflow run publish.yml --ref dev \
 
 A failure before release state exists may still be rerun when it is purely transient and the original SHA and inputs remain correct. Once the workflow has created a `release: v<version>` commit, a `v<version>` tag, or any npm publication, resume the existing attempt rather than starting another one. The existing run is safe to resume because `publish.yml` has these explicit idempotency guards:
 
-- `prepare-release-state` / `Prepare and merge release state before publishing` returns the SHA from an existing `refs/tags/v${VERSION}` tag, or reuses an existing `release: v${VERSION}` commit on the base branch, before attempting to stamp another release.
+- `prepare-release-state` / `Prepare and merge release state before publishing` returns the SHA from an existing `refs/tags/v${VERSION}` tag, or reuses an existing `release: v${VERSION}` commit on the base branch, before attempting to stamp another release. The stamp step (`script/stamp-release-changelog.ts`) assembles every `changes/unreleased/<pr>.md` fragment into the released CHANGELOG section and deletes the consumed fragments in the same release commit (#9961).
 - `dispatch-provenance-safe-publish` / `Tag prepared source and dispatch provenance-safe publish` reuses an existing tag only when it resolves to the prepared release SHA. It fails closed when the tag points to any other SHA.
 - `publish-platform` delegates platform publication to `publish-platform.yml`, whose `Check if already published` steps probe both platform package families and skip versions already present in npm.
 - `publish-main` / `Check if already published`, `Check if oh-my-openagent already published`, and `Check if lazycodex-ai already published` probe npm and gate each corresponding publish step with the probe's `skip` output.

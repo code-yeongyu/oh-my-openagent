@@ -12,11 +12,13 @@ const EXPECTED_EVENTS = [
   "delegation_completed",
   "delegation_started",
   "feature_used",
+  "handoff_hint",
   "kibitzer_summary",
   "parallelism_summary",
   "process_crashed",
   "prompt_submitted",
   "session_started",
+  "session_summary",
   "skill_loaded",
   "turn_completed",
 ] as const
@@ -30,6 +32,8 @@ describe("OmO Native telemetry QA allowlist source", () => {
   test("#given a missing or extra event #when QA validates coverage #then divergence fails loudly", () => {
     const { daily_active: _removed, ...missing } = OMO_NATIVE_PROPERTY_ALLOWLISTS
     expect(() => assertAllowlistCoverage(missing)).toThrow("missing=daily_active")
-    expect(() => assertAllowlistCoverage({ ...OMO_NATIVE_PROPERTY_ALLOWLISTS, bogus_event: [] })).toThrow("extra=bogus_event")
+    expect(() => assertAllowlistCoverage({ ...OMO_NATIVE_PROPERTY_ALLOWLISTS, bogus_event: [] })).toThrow(
+      "extra=bogus_event",
+    )
   })
 })

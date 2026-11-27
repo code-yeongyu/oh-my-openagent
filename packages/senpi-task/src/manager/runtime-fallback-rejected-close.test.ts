@@ -6,10 +6,11 @@ import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import { adaptRpcHandle } from "./child-handle"
-import { baseSpec, cleanupProjects, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // Invariant: every committed state of a record whose failed rung was never confirmed closed still names
 // that rung's session, so a parent that dies after any single write leaves recovery something to close.
@@ -45,11 +46,20 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     // given
     const project = tempProject()
     const committed: Array<TaskRecord | null> = []
-    const store = recordingStore(createTaskRecordStore({ project_dir: project }), committed)
+    const store = recordingStore(createTaskRecordStore(ownedTaskState(project)), committed)
     const host = await harness.fakeHost()
     const rpc = harness.runnerOver(host, { closeGraceMs: 50 })
     const runner: ManagedRunner = {
-      start: async (spec) => adaptRpcHandle(await rpc.start({ task_id: spec.taskId, cwd: project, state_dir: spec.stateDir, prompt: spec.prompt, model: spec.model })),
+      start: async (spec) =>
+        adaptRpcHandle(
+          await rpc.start({
+            task_id: spec.taskId,
+            cwd: project,
+            state_dir: spec.stateDir,
+            prompt: spec.prompt,
+            model: spec.model,
+          }),
+        ),
     }
     const config = settings()
     const manager = createTaskManager({
@@ -57,7 +67,15 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
       config,
       cwd: project,
       runners: { process: runner, "in-process": runner },
-      planner: () => ({ kind: "resolved", plan: { model: "test/old", requested_model: rung("old"), resolved_model: rung("old"), fallback_models: [rung("next")] } }),
+      planner: () => ({
+        kind: "resolved",
+        plan: {
+          model: "test/old",
+          requested_model: rung("old"),
+          resolved_model: rung("old"),
+          fallback_models: [rung("next")],
+        },
+      }),
       destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
     })
     const lifecycle = createTaskLifecycle({
@@ -70,6 +88,7 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     })
     const task = await manager.start(baseSpec({ execution_mode: "process" }))
     if (task.kind !== "started") throw new Error("expected the task to start")
+    await launchSettled(manager, task.task_id)
     const [original] = host.sessions()
     if (original === undefined) throw new Error("expected the failed rung's session")
     host.withholdReply("close_session")
@@ -77,7 +96,10 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
 
     try {
       // when
-      host.emitRecord(original.routingId, { type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" } })
+      host.emitRecord(original.routingId, {
+        type: "message_end",
+        message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" },
+      })
       host.emitRecord(original.routingId, { type: "agent_end", willRetry: false, messages: [] })
       host.emitRecord(original.routingId, { type: "agent_idle" })
       const record = await settled

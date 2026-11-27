@@ -15,6 +15,16 @@ use crate::rpc::{failure_line, reply_line, Failure};
 use catalog::Catalog;
 
 const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
+const MODERN_PROTOCOL_VERSION: &str = "2026-07-28";
+const SUPPORTED_VERSIONS: [&str; 4] = [
+    MODERN_PROTOCOL_VERSION,
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05",
+];
+const VERSION_META_KEY: &str = "io.modelcontextprotocol/protocolVersion";
+const CAPABILITIES_META_KEY: &str = "io.modelcontextprotocol/clientCapabilities";
+const CLIENT_INFO_META_KEY: &str = "io.modelcontextprotocol/clientInfo";
 
 pub struct Server<X> {
     catalog: Catalog,
@@ -68,25 +78,99 @@ impl<X: FnMut(&Value) -> io::Result<Value>> Server<X> {
             ));
         };
         let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+        let modern = match modern_request(&params, method == Some("server/discover")) {
+            Ok(modern) => modern,
+            Err(error) => {
+                return Some(
+                    json!({ "jsonrpc": "2.0", "id": request_id, "error": error }).to_string(),
+                )
+            }
+        };
         let outcome = match method {
-            Some("initialize") => Ok(initialize(&params)),
-            Some("ping") => Ok(json!({})),
-            Some("tools/list") => Ok(json!({ "tools": self.catalog.tools() })),
+            Some("server/discover") => Ok(json!({
+                "supportedVersions": SUPPORTED_VERSIONS,
+                "capabilities": { "tools": {} },
+                "ttlMs": 0,
+                "cacheScope": "public",
+            })),
+            Some("initialize") if !modern => Ok(initialize(&params)),
+            Some("ping") if !modern => Ok(json!({})),
+            Some("tools/list") => {
+                let mut result = json!({ "tools": self.catalog.tools() });
+                if modern {
+                    result["ttlMs"] = json!(0);
+                    result["cacheScope"] = json!("public");
+                }
+                Ok(result)
+            }
             Some("tools/call") => self.call(&params),
             Some(_) => Err(Failure::Rejected(MethodRejection::Unknown)),
             None => Err(Failure::InvalidRequest("request has no method".to_owned())),
         };
+        let outcome = outcome.map(|mut result| {
+            if modern {
+                result["resultType"] = json!("complete");
+                result["_meta"] = json!({
+                    "io.modelcontextprotocol/serverInfo": {
+                        "name": "senpi-desktop-engine", "version": env!("CARGO_PKG_VERSION")
+                    }
+                });
+            }
+            result
+        });
         Some(reply_line(request_id, outcome))
     }
 
     fn call(&mut self, params: &Value) -> Result<Value, Failure> {
-        let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+        let name = params
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let Some(method) = self.catalog.method(name).map(str::to_owned) else {
             return Err(Failure::InvalidParams(format!("unknown tool: {name}")));
         };
-        let arguments = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+        let arguments = params
+            .get("arguments")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
         call::call_tool(&method, arguments, &mut self.exchange)
     }
+}
+
+/// The era is local to this request; unrelated legacy metadata remains valid.
+fn modern_request(params: &Value, discovery: bool) -> Result<bool, Value> {
+    let meta = params.get("_meta");
+    let has_protocol_meta = meta.is_some_and(|meta| {
+        !meta.is_object()
+            || [
+                VERSION_META_KEY,
+                CAPABILITIES_META_KEY,
+                CLIENT_INFO_META_KEY,
+            ]
+            .iter()
+            .any(|key| meta.get(key).is_some())
+    });
+    if !discovery && !has_protocol_meta {
+        return Ok(false);
+    }
+    let version = meta
+        .and_then(|meta| meta.get(VERSION_META_KEY))
+        .and_then(Value::as_str);
+    let capabilities = meta.and_then(|meta| meta.get(CAPABILITIES_META_KEY));
+    let Some(version) = version.filter(|_| capabilities.is_some_and(Value::is_object)) else {
+        return Err(json!({
+            "code": -32602,
+            "message": "Protocol version and client capabilities are required in params._meta",
+        }));
+    };
+    if version != MODERN_PROTOCOL_VERSION {
+        return Err(json!({
+            "code": -32022,
+            "message": "Unsupported protocol version",
+            "data": { "supported": SUPPORTED_VERSIONS, "requested": version },
+        }));
+    }
+    Ok(true)
 }
 
 fn initialize(params: &Value) -> Value {

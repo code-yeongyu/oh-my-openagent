@@ -26,19 +26,25 @@ function createFixture(): Fixture {
   const packageRoot = join(root, "app")
   mkdirSync(packageRoot, { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFile(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "1.2.3-test.0",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  writeFile(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
+  writeFile(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
@@ -60,10 +66,24 @@ function withoutHostProcesses(fixture: Fixture, env: NodeJS.ProcessEnv): NodeJS.
   return { ...env, PATH: `${fakeBin}${delimiter}${env.PATH ?? ""}` }
 }
 
+// An agent dir exported by the calling shell (an omo or senpi session) outranks the fixture's,
+// so the child sees only the agent-dir variables a test sets (#10265).
+function withoutInheritedAgentDir(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const isolated: NodeJS.ProcessEnv = { ...env }
+  delete isolated.OMO_CODING_AGENT_DIR
+  delete isolated.SENPI_CODING_AGENT_DIR
+  delete isolated.PI_CODING_AGENT_DIR
+  return isolated
+}
+
 function run(fixture: Fixture, env: NodeJS.ProcessEnv = {}) {
   return spawnSync(process.execPath, [fixture.launcher, "doctor"], {
     encoding: "utf8",
-    env: withoutHostProcesses(fixture, { ...process.env, SENPI_CODING_AGENT_DIR: fixture.agentDir, ...env }),
+    env: withoutHostProcesses(fixture, {
+      ...withoutInheritedAgentDir(process.env),
+      SENPI_CODING_AGENT_DIR: fixture.agentDir,
+      ...env,
+    }),
   })
 }
 
@@ -103,16 +123,36 @@ describe("omo doctor", () => {
     test("#then the version check fails with both versions", () => {
       const fixture = createFixture()
       const manifestPath = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "package.json")
-      writeFile(manifestPath, JSON.stringify({
-        name: "@code-yeongyu/senpi",
-        version: "2026.8.8",
-        type: "module",
-        exports: { ".": "./dist/index.js" },
-      }))
+      writeFile(
+        manifestPath,
+        JSON.stringify({
+          name: "@code-yeongyu/senpi",
+          version: "2026.8.8",
+          type: "module",
+          exports: { ".": "./dist/index.js" },
+        }),
+      )
       const result = run(fixture)
       expect(result.status).toBe(1)
       expect(result.stdout).toContain("FAIL senpi version")
       expect(result.stdout).toContain("expected 2026.8.9, found 2026.8.8")
+    })
+
+    test("#then a zero-padded spelling of the pinned release still passes", () => {
+      const fixture = createFixture()
+      const manifestPath = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "package.json")
+      writeFile(
+        manifestPath,
+        JSON.stringify({
+          name: "@code-yeongyu/senpi",
+          version: "2026.08.09",
+          type: "module",
+          exports: { ".": "./dist/index.js" },
+        }),
+      )
+      const result = run(fixture)
+      expect(result.stdout).toContain("PASS senpi version 2026.08.09")
+      expect(result.stdout).not.toContain("FAIL senpi version")
     })
   })
 
@@ -161,11 +201,7 @@ describe("omo doctor", () => {
 })
 
 function envWithoutAgentDir(home: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home }
-  delete env.OMO_CODING_AGENT_DIR
-  delete env.SENPI_CODING_AGENT_DIR
-  delete env.PI_CODING_AGENT_DIR
-  return env
+  return { ...withoutInheritedAgentDir(process.env), HOME: home, USERPROFILE: home }
 }
 
 describe("omo doctor", () => {

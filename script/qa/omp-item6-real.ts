@@ -44,7 +44,9 @@ export async function runRealChildKernelTool(): Promise<Record<string, unknown>>
   // it answers with that exact value - so the assertion below proves the whole round trip.
   const env = await openChildEnv((body) => {
     const seen = /parent-state:[a-z-]+/.exec(body)
-    return seen === null ? { toolName: "fixture_lookup", args: { key: "config.txt" } } : { text: `CHILD_SAW ${seen[0]}` }
+    return seen === null
+      ? { toolName: "fixture_lookup", args: { key: "config.txt" } }
+      : { text: `CHILD_SAW ${seen[0]}` }
   })
   const nested: PumpedCall[] = []
   const stopped = { value: false }
@@ -76,7 +78,10 @@ export async function runRealChildKernelTool(): Promise<Record<string, unknown>>
     assert.equal(child.status, "completed")
     assert.equal(child.final_response, "CHILD_SAW parent-state:nested-body")
     assert.ok(childSession.includes("fixture_lookup"), "the child session must expose the granted parent tool")
-    assert.ok(nested.some((call) => call.toolName === "read"), "the parent closure must reach the host bridge")
+    assert.ok(
+      nested.some((call) => call.toolName === "read"),
+      "the parent closure must reach the host bridge",
+    )
     assert.ok(agentResult.text.length > 0)
     assert.equal(parent.ok, true)
 
@@ -104,7 +109,12 @@ async function poolWorkerGrant(env: ChildEnv, kernel: ProducerKernel): Promise<R
   const context = env.context(kernel.capability, "omp-item6-parent")
   const create = await env.workpoolTool.execute(
     "omp-item6-pool",
-    { op: "create", name: "omp-item6-pool", agent: { category: "quick", prompt: "Use fixture_lookup" }, tools: ["fixture_lookup"] } as never,
+    {
+      op: "create",
+      name: "omp-item6-pool",
+      agent: { category: "quick", prompt: "Use fixture_lookup" },
+      tools: ["fixture_lookup"],
+    } as never,
     undefined,
     undefined,
     context as never,
@@ -113,7 +123,7 @@ async function poolWorkerGrant(env: ChildEnv, kernel: ProducerKernel): Promise<R
   assert.equal(details.error, undefined)
   assert.ok(details.pool_id)
   const poolId = details.pool_id
-  const record = env.manager.workpools.inspect({ sessionId: "omp-item6-parent", rootSessionId: "omp-item6-parent", depth: 0, cwd: env.root }, poolId)
+  const record = env.manager.workpools.inspect({ sessionId: "omp-item6-parent" }, poolId)
   assert.deepEqual(record.kernel_tool_names, ["fixture_lookup"])
   assert.ok(env.kernelToolBindings.get(poolId), "the pool binding is runtime state")
   const dispatched = env.manager.workpools.waitForEvent(poolId, "dispatched", AbortSignal.timeout(20_000))

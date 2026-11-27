@@ -117,13 +117,15 @@ async function pingLspDaemonOwner(
 }
 
 function sameOwner(left: LspDaemonOwnerIdentity, right: LspDaemonOwnerIdentity): boolean {
-  return left.pid === right.pid
-    && left.nonce === right.nonce
-    && left.startedAt === right.startedAt
-    && left.endpoint.kind === right.endpoint.kind
-    && left.endpoint.path === right.endpoint.path
-    && left.endpoint.dev === right.endpoint.dev
-    && left.endpoint.ino === right.endpoint.ino
+  return (
+    left.pid === right.pid &&
+    left.nonce === right.nonce &&
+    left.startedAt === right.startedAt &&
+    left.endpoint.kind === right.endpoint.kind &&
+    left.endpoint.path === right.endpoint.path &&
+    left.endpoint.dev === right.endpoint.dev &&
+    left.endpoint.ino === right.endpoint.ino
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

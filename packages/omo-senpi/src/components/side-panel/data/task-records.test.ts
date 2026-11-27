@@ -19,16 +19,7 @@ describe("panelChildFromRecord", () => {
     const mapped = statuses.map((status) => panelChildFromRecord(record({ status })).status)
 
     // then
-    expect(mapped).toEqual([
-      "queued",
-      "running",
-      "finished",
-      "failed",
-      "failed",
-      "cancelled",
-      "cancelled",
-      "queued",
-    ])
+    expect(mapped).toEqual(["queued", "running", "finished", "failed", "failed", "cancelled", "cancelled", "queued"])
   })
 
   test("#given a summary, a description and a name #when mapped #then the summary wins", () => {

@@ -1,16 +1,7 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
-
-const logMock = mock(() => {})
-
-mock.module("../shared/logger", () => ({
-  log: logMock,
-}))
-
-afterAll(() => { mock.restore() })
-
-const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
+import { describe, expect, it, mock } from "bun:test"
+import { createPreemptiveCompactionHook } from "./preemptive-compaction"
 
 type AssistantHistoryMessage = {
   info: {
@@ -51,11 +42,7 @@ function appendAssistantHistory(
   })
 }
 
-function buildAssistantUpdate(input: {
-  sessionID: string
-  id: string
-  parts: unknown[]
-}) {
+function buildAssistantUpdate(input: { sessionID: string; id: string; parts: unknown[] }) {
   return {
     event: {
       type: "message.updated",
@@ -76,10 +63,6 @@ function buildAssistantUpdate(input: {
 }
 
 describe("preemptive-compaction degradation monitor regressions", () => {
-  beforeEach(() => {
-    logMock.mockClear()
-  })
-
   it("does not re-arm monitoring after recovery-triggered compaction", async () => {
     // given
     const sessionHistory: AssistantHistoryMessage[] = []

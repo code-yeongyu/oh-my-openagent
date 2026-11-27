@@ -4,6 +4,7 @@ import { readdir, readFile, rm, unlink, utimes, writeFile } from "node:fs/promis
 import { join } from "node:path"
 
 import { createTempDirectory, startLockHolder } from "./lock-test-support"
+import { buildLockRecord, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
 
 function createErrnoError(code: string): Error & { code: string } {
   return Object.assign(new Error(code), { code })
@@ -23,7 +24,9 @@ test("#given concurrent reclaimers of one crash-torn lock #when they all reclaim
   await writeCrashTornLock(lockPath)
 
   // when
-  const outcomes = await Promise.all(Array.from({ length: 8 }, () => removeLockRecordIfUnchanged(lockPath, "", 300_000)))
+  const outcomes = await Promise.all(
+    Array.from({ length: 8 }, () => removeLockRecordIfUnchanged(lockPath, "", 300_000)),
+  )
 
   // then
   expect(outcomes.filter((outcome) => outcome === "removed")).toHaveLength(1)
@@ -46,7 +49,10 @@ test("#given a second reclaimer and a new holder racing into the gap before the 
     unlink: async (path: PathLike) => {
       if (String(path) === lockPath && racerOutcome === undefined) {
         racerOutcome = await removeLockRecordIfUnchanged(lockPath, "", 300_000)
-        racerPublished = await writeFile(lockPath, liveRecord, { flag: "wx" }).then(() => true, () => false)
+        racerPublished = await writeFile(lockPath, liveRecord, { flag: "wx" }).then(
+          () => true,
+          () => false,
+        )
       }
       await unlink(path)
     },
@@ -82,10 +88,13 @@ test("#given a reclaimer that observed a torn lock before another process took t
 
 test("#given a lock this process left behind after a failed release #when withLock runs #then it reclaims the leftover and acquires", async () => {
   // given
-  const { detectStaleLock, lockOwnerInstanceId, withLock } = await import("./locks")
+  const { detectStaleLock, withLock } = await import("./locks")
   const rootDirectory = await createTempDirectory("locks-reclaim-own-leftover-")
   const lockPath = join(rootDirectory, "lock")
-  await writeFile(lockPath, `owner ${crypto.randomUUID()}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`)
+  const record = await buildLockRecord("leftover")
+  markLockRecordHeld(record)
+  await writeFile(lockPath, record)
+  markLockRecordReleased(record)
 
   // when
   const staleDetected = await detectStaleLock(lockPath, 300_000)

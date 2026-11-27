@@ -37,12 +37,14 @@ const compliant = await runDagTool(deps, {
     nodes: [
       {
         id: "plan",
-        prompt: "TASK: draft the plan. DELIVERABLE: plan.md. SCOPE: write plan.md only. VERIFY: test -f plan.md. STOP WHEN: plan.md exists.",
+        prompt:
+          "TASK: draft the plan. DELIVERABLE: plan.md. SCOPE: write plan.md only. VERIFY: test -f plan.md. STOP WHEN: plan.md exists.",
         category: "quick",
       },
       {
         id: "verify",
-        prompt: "TASK: verify the plan. DELIVERABLE: transcript. SCOPE: read-only. VERIFY: bun test. STOP WHEN: tests pass.",
+        prompt:
+          "TASK: verify the plan. DELIVERABLE: transcript. SCOPE: read-only. VERIFY: bun test. STOP WHEN: tests pass.",
         category: "quick",
         dependsOn: ["plan"],
       },

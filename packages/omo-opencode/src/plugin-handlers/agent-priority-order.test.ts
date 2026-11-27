@@ -2,10 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 
-import {
-  reorderAgentsByPriority,
-  CANONICAL_CORE_AGENT_ORDER,
-} from "./agent-priority-order"
+import { reorderAgentsByPriority, CANONICAL_CORE_AGENT_ORDER } from "./agent-priority-order"
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 
 describe("agent-priority-order", () => {
@@ -20,12 +17,7 @@ describe("agent-priority-order", () => {
 
     test("canonical order is exactly [sisyphus, hephaestus, prometheus, atlas]", () => {
       // then
-      expect(CANONICAL_CORE_AGENT_ORDER).toEqual([
-        "sisyphus",
-        "hephaestus",
-        "prometheus",
-        "atlas",
-      ])
+      expect(CANONICAL_CORE_AGENT_ORDER).toEqual(["sisyphus", "hephaestus", "prometheus", "atlas"])
     })
 
     test("canonical order length is exactly 4", () => {
@@ -75,12 +67,7 @@ describe("agent-priority-order", () => {
         }
 
         // when
-        const result = reorderAgentsByPriority(agents, [
-          "hephaestus",
-          "sisyphus",
-          "prometheus",
-          "atlas",
-        ])
+        const result = reorderAgentsByPriority(agents, ["hephaestus", "sisyphus", "prometheus", "atlas"])
 
         // then
         expect(Object.keys(result)).toEqual([hephaestus, sisyphus, prometheus, atlas])
@@ -96,12 +83,7 @@ describe("agent-priority-order", () => {
         }
 
         // when
-        const result = reorderAgentsByPriority(agents, [
-          "not-real",
-          "atlas",
-          "hephaestus",
-          "atlas",
-        ])
+        const result = reorderAgentsByPriority(agents, ["not-real", "atlas", "hephaestus", "atlas"])
 
         // then
         expect(Object.keys(result)).toEqual([atlas, hephaestus, sisyphus, prometheus])
@@ -172,12 +154,7 @@ describe("agent-priority-order", () => {
         }
 
         // then: core agents are always first 4 in canonical order
-        expect(firstResult.slice(0, 4)).toEqual([
-          sisyphus,
-          hephaestus,
-          prometheus,
-          atlas,
-        ])
+        expect(firstResult.slice(0, 4)).toEqual([sisyphus, hephaestus, prometheus, atlas])
       })
     })
 

@@ -2,7 +2,7 @@ import {
   createDefaultPostHogTransport,
   createTelemetryClient,
   getDefaultTelemetryOsProvider,
-  getTelemetryDistinctId,
+  getTelemetryInstallDistinctId,
 } from "@oh-my-opencode/telemetry-core"
 import type {
   PostHogActivityCaptureState,
@@ -12,7 +12,7 @@ import type {
   TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
-import { getPostHogActivityCaptureState } from "./posthog-activity-state"
+import { getPostHogActivityCaptureState, getPostHogActivityStateDir } from "./posthog-activity-state"
 import { log } from "./logger"
 import { createOpencodeTelemetryProductConfig } from "./telemetry-product-identity"
 
@@ -34,9 +34,7 @@ function resolveTransportFactory(): TelemetryTransportFactory {
 }
 
 /** @internal test-only */
-export function __setActivityStateProviderForTesting(
-  provider: typeof getPostHogActivityCaptureState,
-): void {
+export function __setActivityStateProviderForTesting(provider: typeof getPostHogActivityCaptureState): void {
   activityStateProviderOverride = provider
 }
 
@@ -67,7 +65,7 @@ export type PostHogSource = "cli" | "plugin"
 export type PostHogActivityReason = "run_started" | "plugin_loaded"
 
 export type PostHogClient = {
-  readonly trackActive: (distinctId: string, reason: PostHogActivityReason) => void
+  readonly trackActive: (reason: PostHogActivityReason) => void
   readonly flush: () => Promise<void>
   readonly shutdown: () => Promise<void>
 }
@@ -162,7 +160,7 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
   }
 
   return {
-    trackActive: (distinctId, reason) => {
+    trackActive: (reason) => {
       const activityState = resolveActivityState()
       if (!activityState.captureDaily) {
         return
@@ -170,7 +168,7 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
 
       client.trackActive({
         dayUTC: activityState.dayUTC,
-        distinctId,
+        distinctId: getTelemetryInstallDistinctId(getPostHogActivityStateDir()),
         reason,
       })
     },
@@ -191,10 +189,6 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
   }
 }
 
-export function getPostHogDistinctId(): string {
-  return getTelemetryDistinctId(createOpencodeTelemetryProductConfig().machineIdPrefix, resolveOsProvider())
-}
-
 export function createCliPostHog(options: CreatePostHogOptions = {}): PostHogClient {
   return createPostHogClient("cli", options)
 }
@@ -205,7 +199,6 @@ export function createPluginPostHog(options: CreatePostHogOptions = {}): PostHog
 
 export function recordPluginTelemetry(input: RecordPluginTelemetryInput): void {
   const posthog = createPluginPostHog({ configEnabled: input.configEnabled })
-  const distinctId = getPostHogDistinctId()
-  posthog.trackActive(distinctId, "plugin_loaded")
+  posthog.trackActive("plugin_loaded")
   void posthog.flush()
 }

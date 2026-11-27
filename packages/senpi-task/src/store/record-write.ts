@@ -4,6 +4,7 @@ import { dirname } from "node:path"
 
 import { parseTaskId } from "../state"
 import type { TaskId, TaskRecord } from "../state"
+import { toStorableTaskRecord } from "./storable-record"
 
 export type WriteRecordMode = "create" | "replace"
 
@@ -30,7 +31,7 @@ export class TaskRecordCollisionError extends Error {
 
 export function writeRecord(path: string, record: TaskRecord, mode: WriteRecordMode, platform: NodeJS.Platform): void {
   mkdirSync(dirname(path), { recursive: true })
-  const payload = JSON.stringify(record)
+  const payload = JSON.stringify(toStorableTaskRecord(record))
   if (mode === "create") {
     try {
       writeFileSync(path, payload, { encoding: "utf8", flag: "wx" })
@@ -73,5 +74,10 @@ function renameWithWindowsRetry(from: string, to: string, platform: NodeJS.Platf
 }
 
 function isTransientWindowsError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && typeof error.code === "string" && WINDOWS_TRANSIENT_CODES.has(error.code)
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    WINDOWS_TRANSIENT_CODES.has(error.code)
+  )
 }

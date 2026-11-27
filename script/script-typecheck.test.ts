@@ -68,9 +68,9 @@ describe("script TypeScript project", () => {
     const scriptTsconfig = parseScriptTsconfig(readFileSync(join(scriptRoot, "tsconfig.json"), "utf8"))
 
     // when
-    const missingFiles = scriptFiles.filter((scriptFile) => (
-      !scriptTsconfig.include.includes("./*.ts") && !scriptTsconfig.include.includes(scriptFile)
-    ))
+    const missingFiles = scriptFiles.filter(
+      (scriptFile) => !scriptTsconfig.include.includes("./*.ts") && !scriptTsconfig.include.includes(scriptFile),
+    )
 
     // then
     expect(scriptFiles).toContain("./build-binaries.ts")
@@ -90,7 +90,7 @@ describe("script TypeScript project", () => {
 
     // then
     expect(toPackagePath(manifestPath)).toBe("package.json")
-    expect(scriptTypecheck).toBe("tsgo --noEmit -p script/tsconfig.json")
+    expect(scriptTypecheck).toBe("bun check --no-script --all -p script/tsconfig.json")
     expect(typecheck).toContain("bun run typecheck:script")
   })
 })

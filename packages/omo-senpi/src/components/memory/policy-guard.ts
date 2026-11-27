@@ -1,8 +1,10 @@
 import { lstatSync, readdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { isGrantedProjectMemoryRead } from "./project-memory-grants"
 import { TRANSIENT_DIRNAME, isDurableIdentityRoot } from "./transient-identity"
 
 // Structural mirror of the Senpi filesystem policy API (senpi branch feat/extension-fs-policy:
@@ -36,9 +38,7 @@ export function hasFilesystemPolicySupport(
 }
 
 export type MemoryPolicyRegistration =
-  | { readonly status: "registered" }
-  | { readonly status: "unbound" }
-  | { readonly status: "unsupported" }
+  { readonly status: "registered" } | { readonly status: "unbound" } | { readonly status: "unsupported" }
 
 /**
  * Registers the hard cross-identity filesystem policy when the host exposes the Senpi
@@ -80,7 +80,11 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
   const ownRoot = resolve(context.identityPaths.root)
   const durableAgentsRoot = dirname(resolve(context.durableRoot))
   const ownRoots = stableRoots([ownRoot])
-  const deniedAreas = stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)])
+  const deniedAreas = stableRoots([
+    dirname(ownRoot),
+    durableAgentsRoot,
+    join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME),
+  ])
   let resolvedDeniedRoots: readonly string[] | undefined
 
   return {
@@ -90,6 +94,7 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
     },
     check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
       const target = resolve(request.canonicalPath)
+      if (request.operation === "read" && isGrantedProjectMemoryRead(context, target)) return { allow: true }
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
       if (deniedAreas.some((root) => isWithin(root, target))) {
         return {
@@ -125,6 +130,8 @@ function stableRoots(paths: readonly string[]): string[] {
 }
 
 function canonicalizeFromNearestExisting(target: string): string | undefined {
+  // A macOS automount trigger stays lexical: lstat/realpath under it can park the host loop (#11545).
+  if (isDarwinAutomountTriggerPath(target)) return undefined
   let candidate = target
   const missingSegments: string[] = []
   while (true) {

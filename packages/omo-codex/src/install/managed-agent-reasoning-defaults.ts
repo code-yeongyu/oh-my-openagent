@@ -1,3 +1,8 @@
+import { CODEX_ASTRA_MODEL } from "./codex-model-catalog"
+
+// The Astra id the bundled agents shipped before CODEX_ASTRA_MODEL moved on; history keeps it literal.
+const PREVIOUS_CODEX_ASTRA_MODEL = "gpt-6-astra"
+
 export interface PreservedAgentReasoning {
   readonly model: string | null
   readonly effort: string
@@ -22,7 +27,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "low" },
-        current: { model: "gpt-6-astra", effort: "low" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+        current: { model: "gpt-6-luna", effort: "low" },
       },
     ],
   ],
@@ -39,7 +48,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "low" },
-        current: { model: "gpt-6-astra", effort: "low" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+        current: { model: "gpt-6-luna", effort: "low" },
       },
     ],
   ],
@@ -48,7 +61,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     [
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -57,7 +74,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     [
       {
         previous: { model: "gpt-5.6-luna", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -74,7 +95,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -91,7 +116,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -108,7 +137,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -121,7 +154,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "medium" },
-        current: { model: "gpt-6-astra", effort: "medium" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "medium" },
       },
     ],
   ],
@@ -134,7 +171,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "medium" },
-        current: { model: "gpt-6-astra", effort: "medium" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "medium" },
       },
     ],
   ],
@@ -147,7 +188,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -160,7 +205,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "high" },
       },
     ],
   ],
@@ -177,7 +226,11 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "low" },
-        current: { model: "gpt-6-astra", effort: "low" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+        current: { model: CODEX_ASTRA_MODEL, effort: "low" },
       },
     ],
   ],
@@ -194,13 +247,12 @@ export function resolveManagedAgentReasoning(input: {
   const latest = steps[steps.length - 1]
   if (latest === undefined) return input.preserved.effort
   // A model-only upgrade must not invalidate cached bundles with the same current effort.
-  const bundledMatchesCurrentEffort = input.bundledEffort === latest.current.effort && steps.some(
-    (step) => input.bundledModel === step.current.model && input.bundledEffort === step.current.effort,
-  )
+  const bundledMatchesCurrentEffort =
+    input.bundledEffort === latest.current.effort &&
+    steps.some((step) => input.bundledModel === step.current.model && input.bundledEffort === step.current.effort)
   if (!bundledMatchesCurrentEffort) return input.preserved.effort
   const preservedMatchesAnyStep = steps.some(
-    (step) =>
-      input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort,
+    (step) => input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort,
   )
   return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort
 }

@@ -2,6 +2,7 @@ import { dirname, join } from "node:path"
 
 import { resolveProjectStateDirectory } from "../../../senpi-task/src/store/project-state-directory.ts"
 import { AGENT_DIR_ENV_NAMES } from "./task-host-e2e-sandbox.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 /**
  * Variables that route a task runner to a daemon socket before its agent dir is consulted
@@ -28,6 +29,8 @@ const HOST_INTERNAL_ENV_PREFIX = "SENPI_RPC_HOST_"
  * SENPI_CODING_AGENT_DIR, so overriding one lane alone put QA children on the production host
  * (oh-my-openagent#8967). The memory root moves to `memory` beside the agent dir, so a child never
  * reads or writes the caller's ~/.omo/memory (its OMO_MEMORY_HOME override, or the default).
+ * Telemetry is forced off (withTelemetryOptOut) so QA traffic never reaches the production analytics
+ * project; a driver that proves telemetry spreads telemetryLocalSinkEnv after this one.
  */
 export function isolatedChildEnv(baseEnv, agentDir) {
   const env = { ...baseEnv }
@@ -37,7 +40,7 @@ export function isolatedChildEnv(baseEnv, agentDir) {
   for (const name of [...HOST_ROUTING_ENV_NAMES, ...SESSION_IDENTITY_ENV_NAMES]) delete env[name]
   for (const name of AGENT_DIR_ENV_NAMES) env[name] = agentDir
   env.OMO_MEMORY_HOME = join(dirname(agentDir), "memory")
-  return env
+  return withTelemetryOptOut(env)
 }
 
 /** The agent-dir lanes of a child launched through isolatedChildEnv, keyed as the engine reads them. */

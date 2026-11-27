@@ -84,7 +84,10 @@ describe("two parents on one daemon", () => {
     const parkedPaths = new Set(a.sessionPaths())
 
     // when
-    const summary = await a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" })
+    const summary = await a.lifecycle.suspendOnSessionShutdown({
+      parentSessionId: "parent-a",
+      reason: "session_shutdown",
+    })
     // The daemon's own view settles when the 16 detached connections are gone - parent B keeps 16.
     await world.host.waitForConnections(16)
 
@@ -198,13 +201,18 @@ describe("two parents on one daemon", () => {
     for (const path of paths) world.host.releasePath(path)
     const attached = await b2.lifecycle.reconcileOnSessionStart("parent-b")
 
-    // then - one session per path, one writer per JSONL, no replayed prompt
+    // then - one session per path, one writer per JSONL, one continuation per interrupted turn
     expect(of(attached.outcomes, "resumed")).toHaveLength(16)
     expect(world.host.sessions()).toHaveLength(16)
     expect(distinct(paths.map((path) => world.host.peakAttachments(path)))).toEqual([1])
     expect(distinct(b2.records().map((record) => record.host_session?.instance_id))).toEqual([world.host.instanceId])
     expect(distinct(b2.records().map((record) => record.suspension_reason))).toEqual([undefined])
-    expect(world.prompts()).toHaveLength(16)
+    expect(world.prompts()).toHaveLength(32)
+    expect(
+      world.host.commands.filter(
+        (command) => command.type === "prompt" && command.payload.streamingBehavior === "followUp",
+      ),
+    ).toHaveLength(16)
   })
 })
 
@@ -261,7 +269,12 @@ describe("daemon refusals", () => {
 
     // when
     world.host.stall(1_200)
-    world.host.requestUi(session?.routingId ?? "", { id: "ui-1", method: "confirm", title: "Delete?", message: "really?" })
+    world.host.requestUi(session?.routingId ?? "", {
+      id: "ui-1",
+      method: "confirm",
+      title: "Delete?",
+      message: "really?",
+    })
 
     // then
     expect((await answered).payload.id).toBe("ui-1")
@@ -286,5 +299,11 @@ describe("cold revival of a daemon-hosted child", () => {
     expect(result.opens).toBe(2)
     expect(result.peakAttachments).toBe(1)
     expect(result.transcriptRetained).toBe(true)
+    // omo#10778: the park still loaded on the host carries the finished status, set while attached
+    // (the host refuses a patch from a connection that does not hold the session), so a successor
+    // drops it; the revival flips it back to running before its message is delivered.
+    expect(result.parkedTaskStatus).toBe("completed")
+    expect(result.revivedTaskStatus).toBe("running")
+    expect(result.runningPublishedBeforeSend).toBe(true)
   })
 })

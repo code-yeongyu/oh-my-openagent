@@ -16,24 +16,8 @@ function seedPlanAndState(directory: string): void {
   const planAPath = join(planDirectory, "alpha.md")
   const planBPath = join(planDirectory, "beta.md")
 
-  writeFileSync(
-    planAPath,
-    [
-      "## TODOs",
-      "- [x] 1. Alpha task done",
-      "- [ ] 2. Alpha task running",
-    ].join("\n"),
-    "utf-8",
-  )
-  writeFileSync(
-    planBPath,
-    [
-      "## TODOs",
-      "- [x] 1. Beta task done",
-      "- [x] 2. Beta task done too",
-    ].join("\n"),
-    "utf-8",
-  )
+  writeFileSync(planAPath, ["## TODOs", "- [x] 1. Alpha task done", "- [ ] 2. Alpha task running"].join("\n"), "utf-8")
+  writeFileSync(planBPath, ["## TODOs", "- [x] 1. Beta task done", "- [x] 2. Beta task done too"].join("\n"), "utf-8")
 
   const boulderDirectory = join(directory, ".omo")
   mkdirSync(boulderDirectory, { recursive: true })

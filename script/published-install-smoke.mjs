@@ -38,6 +38,93 @@ export function isSupportedPackageSpec(packageSpec) {
   return PACKAGE_SPEC_PATTERN.test(packageSpec)
 }
 
+const REGISTRY = "https://registry.npmjs.org"
+const PROBE_TIMEOUT_MS = 15_000
+
+/** The registry URL of one version's tarball; a scoped package keeps its scope only in the path prefix. */
+export function registryTarballUrl(name, version) {
+  const bareName = name.startsWith("@") ? name.slice(name.indexOf("/") + 1) : name
+  return `${REGISTRY}/${name}/-/${bareName}-${version}.tgz`
+}
+
+function resolveDistTagVersion(name, tag) {
+  return execFileSync("npm", ["view", `${name}@${tag}`, "version"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+    shell: process.platform === "win32",
+  }).trim()
+}
+
+// npm moves the `latest` dist-tag before the new version's tarball is committed: right after 5.1.78
+// published, `latest` pointed at it while its tarball answered 404 for about three minutes (#14257), so
+// `npm pack <pkg>@latest` failed on a half-published window. The spec is resolved to latest's version,
+// that exact tarball is waited for (bounded), and the exact version is packed, so the artifact checked
+// is the artifact installed even if `latest` moves again in between.
+export async function resolveCommittedLatestSpec(
+  packageSpec,
+  {
+    deadlineMs,
+    delayMs,
+    viewVersion = resolveDistTagVersion,
+    fetchImpl = fetch,
+    now = Date.now,
+    sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)),
+    log = console.log,
+  },
+) {
+  const at = packageSpec.lastIndexOf("@")
+  if (at <= 0 || packageSpec.slice(at + 1) !== "latest") return packageSpec
+  const name = packageSpec.slice(0, at)
+  const version = viewVersion(name, "latest")
+  if (!isSupportedPackageSpec(`${name}@${version}`)) {
+    throw new Error(`npm view ${packageSpec} version returned an unrecognized version: ${JSON.stringify(version)}`)
+  }
+  const url = registryTarballUrl(name, version)
+  const start = now()
+  for (;;) {
+    let reason
+    try {
+      const response = await fetchImpl(url, {
+        method: "HEAD",
+        headers: { "Cache-Control": "no-cache" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (response.status === 200) {
+        log(`${name}@latest is ${version}; tarball committed after ${Math.round((now() - start) / 1000)} s`)
+        return `${name}@${version}`
+      }
+      reason = String(response.status)
+    } catch (error) {
+      reason = `probe failed (${error instanceof Error ? error.message : String(error)})`
+    }
+    const elapsed = now() - start
+    const remaining = deadlineMs - elapsed
+    if (remaining <= 0) {
+      const waited = elapsed < 60_000 ? `${Math.round(elapsed / 1000)} s` : `${Math.floor(elapsed / 60_000)} min`
+      throw new Error(`registry not committed: ${name}@${version} tarball ${reason} for ${waited}`)
+    }
+    log(`${name}@latest is ${version}; tarball ${reason}, ${Math.round(remaining / 1000)} s left`)
+    await sleep(Math.min(delayMs, remaining))
+  }
+}
+
+// A non-numeric override would make the deadline NaN, which `remaining <= 0` never reaches, so the
+// smoke would poll forever; a bad value fails by name instead of falling back silently.
+export function registryWaitFromEnv(env) {
+  const seconds = (key, fallback) => {
+    const raw = env[key]
+    if (raw === undefined) return fallback
+    const value = raw.trim() === "" ? Number.NaN : Number(raw)
+    if (!Number.isFinite(value) || value <= 0) throw new Error(`invalid ${key}: ${raw}`)
+    return value
+  }
+  return {
+    deadlineMs: seconds("PUBLISHED_SMOKE_REGISTRY_WAIT_SECONDS", 1200) * 1000,
+    delayMs: seconds("PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS", 15) * 1000,
+  }
+}
+
 function packPublishedTarball(packageSpec, workingDirectory) {
   if (!isSupportedPackageSpec(packageSpec)) {
     throw new Error(`refusing to pack an unrecognized package spec: ${packageSpec}`)
@@ -74,7 +161,8 @@ async function runSmoke(argv) {
   try {
     let tarballPath = args.tarballPath === null ? null : resolve(args.tarballPath)
     if (tarballPath === null) {
-      packPublishedTarball(args.packageSpec, sandbox)
+      const packageSpec = await resolveCommittedLatestSpec(args.packageSpec, registryWaitFromEnv(process.env))
+      packPublishedTarball(packageSpec, sandbox)
       const packed = (await readdir(sandbox)).filter((entry) => entry.endsWith(".tgz"))
       if (packed.length !== 1) {
         console.error(`npm pack ${args.packageSpec} produced ${packed.length} tarballs; expected exactly 1`)

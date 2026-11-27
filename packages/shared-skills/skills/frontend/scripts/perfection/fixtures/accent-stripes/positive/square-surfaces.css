@@ -1,0 +1,8 @@
+.section { border-top: 4px solid #6366f1; }
+
+.stat { position: relative; padding: 16px; }
+.stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: #10b981; }
+
+.note { padding: 12px; box-shadow: inset 4px 0 0 0 #f59e0b; }
+
+.band { padding: 12px; background: linear-gradient(to right, #6366f1 4px, #fff 4px); }

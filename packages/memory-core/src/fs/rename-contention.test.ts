@@ -25,28 +25,50 @@ describe("rename under Windows contention", () => {
   it("#given win32 #when the target is held open twice #then the rename retries and lands", async () => {
     const { calls, rename } = flakyRename(["EPERM", "EBUSY"])
     const waits: number[] = []
-    await renameWithContentionRetry("a.tmp", "a", { rename, platform: "win32", delaysMs: [5, 7, 9], sleep: async (ms) => { waits.push(ms) } })
+    await renameWithContentionRetry("a.tmp", "a", {
+      rename,
+      platform: "win32",
+      delaysMs: [5, 7, 9],
+      sleep: async (ms) => {
+        waits.push(ms)
+      },
+    })
     expect(calls).toHaveLength(3)
     expect(waits).toEqual([5, 7])
   })
 
   it("#given win32 #when the target stays held #then the rename gives up after the retry budget", async () => {
     const { calls, rename } = flakyRename(["EACCES", "EACCES", "EACCES", "EACCES"])
-    const settled = renameWithContentionRetry("a.tmp", "a", { rename, platform: "win32", delaysMs: [1, 1], sleep: async () => {} })
+    const settled = renameWithContentionRetry("a.tmp", "a", {
+      rename,
+      platform: "win32",
+      delaysMs: [1, 1],
+      sleep: async () => {},
+    })
     await expect(settled).rejects.toMatchObject({ code: "EACCES" })
     expect(calls).toHaveLength(3)
   })
 
   it("#given a POSIX platform #when rename reports EPERM #then it fails at once (a real permission error)", async () => {
     const { calls, rename } = flakyRename(["EPERM"])
-    const settled = renameWithContentionRetry("a.tmp", "a", { rename, platform: "darwin", delaysMs: [1, 1], sleep: async () => {} })
+    const settled = renameWithContentionRetry("a.tmp", "a", {
+      rename,
+      platform: "darwin",
+      delaysMs: [1, 1],
+      sleep: async () => {},
+    })
     await expect(settled).rejects.toMatchObject({ code: "EPERM" })
     expect(calls).toHaveLength(1)
   })
 
   it("#given win32 #when the source is missing #then it fails at once (not contention)", async () => {
     const { calls, rename } = flakyRename(["ENOENT"])
-    const settled = renameWithContentionRetry("a.tmp", "a", { rename, platform: "win32", delaysMs: [1, 1], sleep: async () => {} })
+    const settled = renameWithContentionRetry("a.tmp", "a", {
+      rename,
+      platform: "win32",
+      delaysMs: [1, 1],
+      sleep: async () => {},
+    })
     await expect(settled).rejects.toMatchObject({ code: "ENOENT" })
     expect(calls).toHaveLength(1)
   })

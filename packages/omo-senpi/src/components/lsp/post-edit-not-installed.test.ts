@@ -29,7 +29,7 @@ type Decision = "declined" | "allowed" | null
 
 function notInstalledResult(filePath: string, decision: Decision = null) {
   const serverId = filePath.endsWith(".json") ? "biome" : "typescript"
-  const text = `LSP server '${serverId}' is NOT INSTALLED.\nACTION REQUIRED — ASK THE USER whether to install this LSP server. [${decision ?? "ask"}]`
+  const text = `LSP server '${serverId}' is NOT INSTALLED.\nACTION REQUIRED: ASK THE USER whether to install this LSP server. [${decision ?? "ask"}]`
   return {
     content: [{ type: "text" as const, text }],
     details: {
@@ -113,9 +113,9 @@ describe("omo-senpi post-edit not-installed guidance (#9223)", () => {
     const root = tempRoot("senpi-9223-noproject-")
     const pi = setup(root)
 
-    expect(await appendedTexts(pi, touch(join(root, "rules_test.mjs")), eventContext("s", join(root, "agent")))).toEqual(
-      [],
-    )
+    expect(
+      await appendedTexts(pi, touch(join(root, "rules_test.mjs")), eventContext("s", join(root, "agent"))),
+    ).toEqual([])
   })
 
   it("#given a recorded declined decision #when edits repeat #then the declined text is appended every time", async () => {

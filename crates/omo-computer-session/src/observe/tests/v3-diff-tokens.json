@@ -1,0 +1,16 @@
+[
+  {
+    "fixture": "v3-ax-diff-one-title-change.json",
+    "fullTokens": 128,
+    "diffTokens": 22,
+    "ratio": "0.172",
+    "diffFallback": null
+  },
+  {
+    "fixture": "v3-ax-diff-reorder-full-tree.json",
+    "fullTokens": 127,
+    "diffTokens": null,
+    "ratio": null,
+    "diffFallback": "reordered"
+  }
+]

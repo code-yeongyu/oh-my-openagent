@@ -7,6 +7,11 @@
 // gives package-local runs the same hermetic home and agent dir as repo-root runs (#9578).
 // The root bunfig.toml does the same for repo-root `bun test` runs; this file covers package-local
 // `bun test` invocations from inside packages/senpi-task and packages/omo-senpi.
+import { beforeEach } from "bun:test"
+import { resetTestDeadline } from "../../../test-support/test-deadline"
+
+beforeEach(resetTestDeadline)
+
 const { installHermeticHome } = await import("../../../test-hermetic-home")
 installHermeticHome()
 

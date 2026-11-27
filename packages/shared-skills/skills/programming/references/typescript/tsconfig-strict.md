@@ -1,4 +1,4 @@
-# Strict tsconfig + Biome
+# Strict tsconfig + OXC
 
 The canonical ultra-strict config. Copy-paste, then add your own paths.
 
@@ -72,73 +72,17 @@ For Bun projects, add to `compilerOptions`:
 
 ---
 
-## biome.jsonc
+## oxlint + oxfmt
 
-```jsonc
-{
-  "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "suspicious": {
-        "noExplicitAny": "error",
-        "noConfusingVoidType": "error",
-        "noFallthroughSwitchClause": "error"
-      },
-      "style": {
-        "noDefaultExport": "error",
-        "useImportType": "error",
-        "noNonNullAssertion": "error",
-        "useEnumInitializers": "off",
-        "noParameterAssign": "error"
-      },
-      "correctness": {
-        "noUnusedVariables": "error",
-        "noUnusedImports": "error"
-      },
-      "complexity": {
-        "noBannedTypes": "error"
-      }
-    }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "double",
-      "semicolons": "asNeeded"
-    }
-  },
-  "files": {
-    "ignore": ["node_modules", "dist", "build", ".next", ".nuxt", "coverage"]
-  }
-}
-```
-
-### Key Biome rules
-
-| Rule | What |
-|---|---|
-| `noExplicitAny` | `any` in annotations is an error |
-| `noNonNullAssertion` | `x!` is an error |
-| `noDefaultExport` | Forces named exports |
-| `useImportType` | Forces `import type` for type-only imports |
-| `noParameterAssign` | No mutation of function parameters |
+Use [oxc-lint.md](oxc-lint.md) for the complete `.oxlintrc.json`, `.oxfmtrc.json`, and local JS plugin. It maps the strictness intent to verified oxlint rules, adds the two t3code copy rules, and documents type-aware support. Retain ESLint, Prettier, or Biome only in repositories already using them.
 
 ---
 
 ## CI gate
 
 ```bash
-bunx biome check .
+bunx oxlint --type-aware --deny-warnings
+bunx oxfmt --check
 bunx tsc --noEmit
 bun test
 ```
@@ -148,5 +92,5 @@ bun test
 ## Sources
 
 - TypeScript: [tsconfig reference](https://www.typescriptlang.org/tsconfig)
-- Biome: [configuration](https://biomejs.dev/reference/configuration/)
+- OXC: [oxlint configuration](https://oxc.rs/docs/guide/usage/linter/config.html) and [oxfmt configuration](https://oxc.rs/docs/guide/usage/formatter/config.html)
 - Total TypeScript: [tsconfig cheat sheet](https://www.totaltypescript.com/tsconfig-cheat-sheet)

@@ -6,6 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
+import { createMergedSelectionFixture } from "./fixtures/publish-merged-selection"
 
 /**
  * Executes the release-state reuse decision of publish.yml's "prepare" step against a real git
@@ -20,24 +21,35 @@ import { z } from "zod"
 
 const workflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 const workflowText = readFileSync(workflowPath, "utf8").replace(/\r\n/g, "\n")
-const workflow = z.object({ jobs: z.object({
-  "prepare-release-state": z.object({
-    steps: z.array(z.object({ id: z.string().optional(), run: z.string().optional() })),
-  }),
-}) }).parse(Bun.YAML.parse(workflowText))
+const workflow = z
+  .object({
+    on: z.object({ workflow_dispatch: z.object({ inputs: z.record(z.string(), z.unknown()) }) }),
+    jobs: z.object({
+      "prepare-release-state": z.object({
+        env: z.record(z.string(), z.string()),
+        steps: z.array(z.object({ id: z.string().optional(), run: z.string().optional() })),
+      }),
+    }),
+  })
+  .parse(Bun.YAML.parse(workflowText))
 
 function prepareRunBlock(): string {
   const job = workflow.jobs["prepare-release-state"]
   const step = job.steps.find((s) => s.id === "prepare")
   if (!step?.run) throw new Error("publish.yml prepare-release-state has no step id=prepare with a run block")
-  // Stop before the stamping half: the fixture is a bare history with no package manifests.
-  const cut = step.run.indexOf('git checkout -B "$RELEASE_BRANCH"')
-  if (cut === -1) throw new Error("prepare run block no longer contains the checkout -B marker")
+  // Include branch selection but stop before the stamp needs manifests.
+  const cut = step.run.indexOf("CURRENT_VERSION=")
+  if (cut === -1) throw new Error("missing stamp generation")
   return step.run.slice(0, cut)
 }
 
-function git(cwd: string, args: string[]): string {
-  const result = spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" } })
+function git(cwd: string, args: string[], input?: string): string {
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    input,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
+  })
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`)
   return result.stdout.trim()
 }
@@ -49,7 +61,11 @@ function commit(cwd: string, message: string): string {
   return git(cwd, ["rev-parse", "HEAD"])
 }
 
-interface Fixture { readonly work: string; readonly origin: string; readonly root: string }
+interface Fixture {
+  readonly work: string
+  readonly origin: string
+  readonly root: string
+}
 
 /** A bare origin with a `dev` branch and a clone that tracks it, mirroring the runner checkout. */
 function createFixture(): Fixture {
@@ -66,9 +82,15 @@ function createFixture(): Fixture {
   return { work, origin, root }
 }
 
-function pushDev(seed: string): void { git(seed, ["push", "-q", "origin", "dev"]) }
+function pushDev(seed: string): void {
+  git(seed, ["push", "-q", "origin", "dev"])
+}
 
-function mergedRelease(fixture: Fixture, version: string, extraContent = false): { readonly stamp: string; readonly merge: string } {
+function mergedRelease(
+  fixture: Fixture,
+  version: string,
+  extraContent = false,
+): { readonly stamp: string; readonly merge: string } {
   const seed = join(fixture.root, "seed")
   git(seed, ["checkout", "-q", "-b", "release"])
   const stamp = commit(seed, `release: v${version}`)
@@ -78,12 +100,28 @@ function mergedRelease(fixture: Fixture, version: string, extraContent = false):
     git(seed, ["add", "later.txt"])
     git(seed, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "later change"])
   }
-  git(seed, ["-c", "user.email=noreply@github.com", "-c", "user.name=GitHub", "merge", "--no-ff", "-q", "release", "-m", `Merge release\n\nrelease: v${version}`])
+  git(seed, [
+    "-c",
+    "user.email=noreply@github.com",
+    "-c",
+    "user.name=GitHub",
+    "merge",
+    "--no-ff",
+    "-q",
+    "release",
+    "-m",
+    `Merge release\n\nrelease: v${version}`,
+  ])
   pushDev(seed)
   return { stamp, merge: git(seed, ["rev-parse", "HEAD"]) }
 }
 
-function runMergedSelection(fixture: Fixture, stamp: string, merge: string): { readonly status: number; readonly output: string } {
+function runMergedSelection(
+  fixture: Fixture,
+  stamp: string,
+  merge: string,
+  sourceSha = "",
+): { readonly status: number; readonly output: string } {
   const step = workflow.jobs["prepare-release-state"].steps.find((candidate) => candidate.id === "publish_state")
   if (!step?.run) throw new Error("missing publish_state shell")
   const start = step.run.indexOf('if [ "$PR_STATE" = "MERGED" ]; then')
@@ -92,7 +130,9 @@ function runMergedSelection(fixture: Fixture, stamp: string, merge: string): { r
   const outputFile = join(fixture.root, "merged_output")
   writeFileSync(outputFile, "")
   const script = join(fixture.root, "merged.sh")
-  writeFileSync(script, `set -euo pipefail
+  writeFileSync(
+    script,
+    `set -euo pipefail
 retry_gh() { shift; "$@"; }
 gh() {
   case "\${*: -1}" in
@@ -103,15 +143,30 @@ gh() {
 }
 PR_STATE=MERGED
 PR_NUMBER=1
-${step.run.slice(start, end)}`)
+${step.run.slice(start, end)}`,
+  )
   const result = spawnSync("bash", [script], {
-    cwd: fixture.work, encoding: "utf8", timeout: 20_000,
-    env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", FIXTURE_STAMP: stamp, FIXTURE_MERGE: merge, GITHUB_OUTPUT: outputFile },
+    cwd: fixture.work,
+    encoding: "utf8",
+    timeout: 20_000,
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_SYSTEM: "/dev/null",
+      FIXTURE_STAMP: stamp,
+      FIXTURE_MERGE: merge,
+      SOURCE_SHA: sourceSha,
+      GITHUB_OUTPUT: outputFile,
+    },
   })
   return { status: result.status ?? -1, output: readFileSync(outputFile, "utf8") }
 }
 
-function runPrepare(fixture: Fixture, version: string): { status: number; stdout: string; stderr: string; outputs: Record<string, string> } {
+function runPrepare(
+  fixture: Fixture,
+  version: string,
+  sourceSha = "",
+): { status: number; stdout: string; stderr: string; outputs: Record<string, string> } {
   const outputFile = join(fixture.root, "github_output")
   writeFileSync(outputFile, "")
   const script = join(fixture.root, "prepare.sh")
@@ -119,14 +174,65 @@ function runPrepare(fixture: Fixture, version: string): { status: number; stdout
   const result = spawnSync("bash", [script], {
     cwd: fixture.work,
     encoding: "utf8",
-    env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", VERSION: version, OMO_AI_VERSION: version, RELEASE_REF: "dev", PREPARED_RELEASE_SHA: "", GITHUB_SHA: "", GITHUB_OUTPUT: outputFile },
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_SYSTEM: "/dev/null",
+      VERSION: version,
+      OMO_AI_VERSION: version,
+      RELEASE_REF: "dev",
+      SOURCE_SHA: sourceSha,
+      PREPARED_RELEASE_SHA: "",
+      GITHUB_SHA: "",
+      GITHUB_OUTPUT: outputFile,
+    },
   })
   const outputs: Record<string, string> = {}
-  for (const line of readFileSync(outputFile, "utf8").split("\n")) { const i = line.indexOf("="); if (i > 0) outputs[line.slice(0, i)] = line.slice(i + 1) }
+  for (const line of readFileSync(outputFile, "utf8").split("\n")) {
+    const i = line.indexOf("=")
+    if (i > 0) outputs[line.slice(0, i)] = line.slice(i + 1)
+  }
   return { status: result.status ?? -1, stdout: result.stdout, stderr: result.stderr, outputs }
 }
 
 describe("publish.yml prepare-release-state reuse decision", () => {
+  test("#given a pin behind dev #when preparing #then the release branch starts at the pin", () => {
+    expect(workflow.on.workflow_dispatch.inputs.source_sha).toMatchObject({ required: false, type: "string" })
+    expect(workflow.jobs["prepare-release-state"].env.RELEASE_REF).toBe(
+      "${{ inputs.source_sha && 'dev' || github.ref_name }}",
+    )
+    const fixture = createFixture()
+    try {
+      const seed = join(fixture.root, "seed")
+      const pin = git(seed, ["rev-parse", "HEAD"])
+      commit(seed, "later dev change")
+      pushDev(seed)
+      const result = runPrepare(fixture, "9.9.9", pin)
+      expect(result.status, result.stderr).toBe(0)
+      expect(git(fixture.work, ["branch", "--show-current"])).toBe("release/v9.9.9-source-state")
+      expect(git(fixture.work, ["rev-parse", "HEAD"])).toBe(pin)
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given dev gained content #when the pinned PR merges or resumes #then publication takes the stamp", () => {
+    const fixture = createFixture()
+    try {
+      const version = "9.9.9"
+      const { stamp, merge } = mergedRelease(fixture, version, true)
+      const pin = git(join(fixture.root, "seed"), ["rev-parse", `${stamp}^1`])
+      git(fixture.work, ["fetch", "origin"])
+      git(fixture.work, ["checkout", "--detach", stamp])
+      const result = runMergedSelection(fixture, stamp, merge, pin)
+      expect(result.status).toBe(0)
+      expect(result.output.trim()).toBe(`release_sha=${stamp}`)
+      expect(runPrepare(fixture, version, pin).outputs.release_sha).toBe(stamp)
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a stale 'release: vX' commit behind the base head #when prepare runs for vX #then it refuses instead of handing the stale SHA to the publish child", () => {
     const fixture = createFixture()
     try {
@@ -140,7 +246,9 @@ describe("publish.yml prepare-release-state reuse decision", () => {
       expect(result.outputs.release_sha).not.toBe(stale)
       expect(result.status).not.toBe(0)
       expect(result.stdout + result.stderr).toContain("stale")
-    } finally { rmSync(fixture.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
   })
 
   test("#given the 'release: vX' commit IS the base head #when prepare runs for vX #then it reuses that SHA without pushing", () => {
@@ -155,7 +263,9 @@ describe("publish.yml prepare-release-state reuse decision", () => {
       expect(result.status).toBe(0)
       expect(result.outputs.release_sha).toBe(head)
       expect(result.outputs.needs_push).toBe("false")
-    } finally { rmSync(fixture.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
   })
 
   for (const tagged of [false, true]) {
@@ -176,7 +286,9 @@ describe("publish.yml prepare-release-state reuse decision", () => {
         expect(result.outputs.release_sha).toBe(stamp)
         expect(result.outputs.release_sha).not.toBe(merge)
         expect(result.outputs.needs_push).toBe("false")
-      } finally { rmSync(fixture.root, { recursive: true, force: true }) }
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true })
+      }
     })
   }
 
@@ -197,14 +309,17 @@ describe("publish.yml prepare-release-state reuse decision", () => {
 
       expect(result.status).not.toBe(0)
       expect(result.outputs.release_sha).toBeUndefined()
-    } finally { rmSync(fixture.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
   })
 
   for (const extraContent of [false, true]) {
     test(`#given a merged release with ${extraContent ? "additional" : "identical"} content #when selecting publication source #then ${extraContent ? "publication is refused" : "the stamping commit is selected"}`, () => {
-      const fixture = createFixture()
+      const root = mkdtempSync(join(tmpdir(), "publish-stale-stamp-"))
       try {
-        const { stamp, merge } = mergedRelease(fixture, "9.9.9-beta.5", extraContent)
+        const fixture = createMergedSelectionFixture(root, "9.9.9-beta.5", extraContent, git)
+        const { stamp, merge } = fixture
 
         const result = runMergedSelection(fixture, stamp, merge)
 
@@ -216,7 +331,9 @@ describe("publish.yml prepare-release-state reuse decision", () => {
           expect(result.output).toContain(`release_sha=${stamp}\n`)
           expect(result.output).not.toContain(`release_sha=${merge}\n`)
         }
-      } finally { rmSync(fixture.root, { recursive: true, force: true }) }
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
     })
   }
 })

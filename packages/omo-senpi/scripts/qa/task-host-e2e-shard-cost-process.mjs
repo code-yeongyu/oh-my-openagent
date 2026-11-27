@@ -11,25 +11,38 @@ export function endpointSockets(sandbox) {
   const shards = join(rpc, "shards")
   return [
     ...(existsSync(join(rpc, "rpc.sock")) ? [join(rpc, "rpc.sock")] : []),
-    ...(existsSync(shards) ? readdirSync(shards).filter((name) => name.endsWith(".sock")).sort().map((name) => join(shards, name)) : []),
+    ...(existsSync(shards)
+      ? readdirSync(shards)
+          .filter((name) => name.endsWith(".sock"))
+          .sort()
+          .map((name) => join(shards, name))
+      : []),
   ]
 }
 
 export function shardOwners(sandbox) {
   const shards = join(sandbox.agentDir, "rpc", "shards")
   if (!existsSync(shards)) return {}
-  return Object.fromEntries(readdirSync(shards).filter((name) => name.endsWith(".meta.json")).flatMap((name) => {
-    try {
-      const meta = JSON.parse(readFileSync(join(shards, name), "utf8"))
-      return [[meta.socket, meta.owner_session_id]]
-    } catch {
-      return []
-    }
-  }))
+  return Object.fromEntries(
+    readdirSync(shards)
+      .filter((name) => name.endsWith(".meta.json"))
+      .flatMap((name) => {
+        try {
+          const meta = JSON.parse(readFileSync(join(shards, name), "utf8"))
+          return [[meta.socket, meta.owner_session_id]]
+        } catch {
+          return []
+        }
+      }),
+  )
 }
 
 export function hostStatus(sandbox, socket, { includeWorkers = true } = {}) {
-  const result = runBin(sandbox, ["host", "status", "--socket", socket, ...(includeWorkers ? ["--include-workers"] : []), "--json"], { timeoutMs: 30_000 })
+  const result = runBin(
+    sandbox,
+    ["host", "status", "--socket", socket, ...(includeWorkers ? ["--include-workers"] : []), "--json"],
+    { timeoutMs: 30_000 },
+  )
   return { exitCode: result.status, json: lastJsonLine(result.stdout) ?? null }
 }
 
@@ -48,13 +61,20 @@ export function statusAll(sandbox) {
   return {
     mode: "degraded",
     reason: `${(result.stderr || result.stdout).trim().split("\n")[0] ?? ""} (exit ${result.status})`,
-    endpoints: endpointSockets(sandbox).map((socket) => ({ ...(hostStatus(sandbox, socket).json ?? { socket, reachable: false }), socket })),
+    endpoints: endpointSockets(sandbox).map((socket) => ({
+      ...(hostStatus(sandbox, socket).json ?? { socket, reachable: false }),
+      socket,
+    })),
   }
 }
 
 export function supervisorPid(sandbox, socket) {
   try {
-    const dir = join(sandbox.agentDir, "rpc-host-daemon", createHash("sha256").update(socket).digest("hex").slice(0, 16))
+    const dir = join(
+      sandbox.agentDir,
+      "rpc-host-daemon",
+      createHash("sha256").update(socket).digest("hex").slice(0, 16),
+    )
     const pointer = JSON.parse(readFileSync(join(dir, "host.pid"), "utf8"))
     const generation = JSON.parse(readFileSync(join(dir, pointer.generation_dir, "host.pid"), "utf8"))
     return typeof generation.pid === "number" ? generation.pid : undefined
@@ -65,10 +85,19 @@ export function supervisorPid(sandbox, socket) {
 
 export function processTable() {
   const rows = execFileSync("ps", ["-axo", "pid=,ppid=,rss=,args="], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
-  return new Map(rows.split("\n").flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line)
-    return match === null ? [] : [[Number(match[1]), { pid: Number(match[1]), ppid: Number(match[2]), rssKb: Number(match[3]), args: match[4] }]]
-  }))
+  return new Map(
+    rows.split("\n").flatMap((line) => {
+      const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line)
+      return match === null
+        ? []
+        : [
+            [
+              Number(match[1]),
+              { pid: Number(match[1]), ppid: Number(match[2]), rssKb: Number(match[3]), args: match[4] },
+            ],
+          ]
+    }),
+  )
 }
 
 export function treePids(root, table = processTable()) {
@@ -83,7 +112,11 @@ export function treePids(root, table = processTable()) {
 export function footprintMb(pid) {
   try {
     if (process.platform === "darwin") {
-      const text = execFileSync("vmmap", ["--summary", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 })
+      const text = execFileSync("vmmap", ["--summary", String(pid)], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: 16 * 1024 * 1024,
+      })
       const match = /Physical footprint:\s+([\d.]+)([KMG])/.exec(text)
       if (match === null) return undefined
       return Math.round(Number(match[1]) * { K: 1 / 1024, M: 1, G: 1024 }[match[2]] * 10) / 10
@@ -108,9 +141,15 @@ export function sampleEndpoint(socket, supervisor, table = processTable()) {
   const pids = supervisor === undefined ? [] : treePids(supervisor, table)
   const processes = pids.map((pid) => {
     const entry = table.get(pid)
-    return { pid, role: role(entry, supervisor), rss_mb: round(entry.rssKb / 1024), footprint_mb: footprintMb(pid) ?? null }
+    return {
+      pid,
+      role: role(entry, supervisor),
+      rss_mb: round(entry.rssKb / 1024),
+      footprint_mb: footprintMb(pid) ?? null,
+    }
   })
-  const sum = (field, filter = () => true) => round(processes.filter(filter).reduce((total, entry) => total + (entry[field] ?? Number.NaN), 0))
+  const sum = (field, filter = () => true) =>
+    round(processes.filter(filter).reduce((total, entry) => total + (entry[field] ?? Number.NaN), 0))
   return {
     socket: socket.split("/").slice(-1)[0],
     supervisor_pid: supervisor ?? null,
@@ -152,7 +191,10 @@ export async function stopEndpoint(sandbox, socket) {
     pids,
     stopExit: stop.status,
     stillAlive: pids.filter(pidAlive),
-    gc: gc.status === 0 ? "removed" : `unsupported (exit ${gc.status}: ${(gc.stderr || gc.stdout).trim().split("\n")[0] ?? ""})`,
+    gc:
+      gc.status === 0
+        ? "removed"
+        : `unsupported (exit ${gc.status}: ${(gc.stderr || gc.stdout).trim().split("\n")[0] ?? ""})`,
   }
 }
 

@@ -1,6 +1,6 @@
 import type { PersistedTaskEvent } from "../store"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
-import { applyRuntimeFallbackEvent, type RuntimeFallbackStore } from "./runtime-fallback-event"
+import { applyModelEvent, type ModelEventStore } from "./runtime-fallback-event"
 
 // The transcript event types the runner subscription writes into OUR JSONL event log. The task_output
 // event-log reader (tools/output/transcript/event-log.ts) lifts exactly these back out, so the two
@@ -11,8 +11,9 @@ export const TRANSCRIPT_ERROR_EVENT = "child_error"
 
 export type TranscriptLogStore = {
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
-  readonly load?: RuntimeFallbackStore["load"]
-  readonly replace?: RuntimeFallbackStore["replace"]
+  readonly load?: ModelEventStore["load"]
+  readonly replace?: ModelEventStore["replace"]
+  readonly isOwnEffect?: ModelEventStore["isOwnEffect"]
 }
 
 // Persist the transcript-relevant slice of a child event: assistant prose from message_end, a tool
@@ -20,14 +21,18 @@ export type TranscriptLogStore = {
 // stopReason "error" diagnostic (otherwise a failed turn leaves NO trace and task_output reads an
 // empty transcript). Every other event is ignored so the log stays a clean transcript.
 export function logTranscriptEvent(store: TranscriptLogStore, taskId: string, event: ManagedChildEvent): void {
-  applyRuntimeFallbackEvent(store, taskId, event)
+  applyModelEvent(store, taskId, event)
   const persisted = toPersistedEvent(event)
   if (persisted !== undefined) store.appendEvent(taskId, persisted)
 }
 
 // Subscribe a running child's events into the store transcript log. Returns the unsubscribe so the
 // manager can detach on dispose. READ path only feeds OUR log; it never mutates child state.
-export function subscribeTranscriptLog(handle: ManagedChildHandle, store: TranscriptLogStore, taskId: string): () => void {
+export function subscribeTranscriptLog(
+  handle: ManagedChildHandle,
+  store: TranscriptLogStore,
+  taskId: string,
+): () => void {
   return handle.subscribe((event) => logTranscriptEvent(store, taskId, event))
 }
 
@@ -72,9 +77,10 @@ function readEventString(event: ManagedChildEvent, key: string): string | undefi
 function assistantFailure(message: unknown): { readonly message: string; readonly stop_reason: string } | undefined {
   if (!isRecord(message) || message.role !== "assistant") return undefined
   if (message.stopReason !== "error") return undefined
-  const diagnostic = typeof message.errorMessage === "string" && message.errorMessage.length > 0
-    ? message.errorMessage
-    : "child turn failed without a diagnostic message"
+  const diagnostic =
+    typeof message.errorMessage === "string" && message.errorMessage.length > 0
+      ? message.errorMessage
+      : "child turn failed without a diagnostic message"
   return { message: diagnostic, stop_reason: "error" }
 }
 

@@ -1,4 +1,5 @@
 import type { BuiltinCategoryDefinition } from "./types"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 // Ported from packages/omo-opencode/src/tools/delegate-task/openai-categories.ts.
 //
@@ -185,56 +186,61 @@ const DEEP_LOW_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Of the two deep lanes
 
 const DEEP_HIGH_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Route here only when you can name the decision evidence cannot settle: a trade-off with no single right answer, a contract change crossing a package or process boundary, a mechanism with no in-repo pattern to copy, or correctness argued from invariants rather than observed in a test. Wide scope with easy decisions is deep-low or unspecified-high; reasoning as the deliverable is ultrabrain.</Selection_Gate>`
 
-// The GPT flagship gate: either id present in the live registry keeps ultrabrain available. Each deep
-// lane is a single rung with no model fallback, so it gates on its own model and disappears without it.
-const GPT_FLAGSHIP_GATE_MODELS = ["gpt-6-astra", "gpt-5.6-sol"] as const
-const DEEP_LOW_GATE_MODELS = ["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"] as const
-const DEEP_HIGH_GATE_MODEL = "gpt-6-astra"
+// ultrabrain and both deep lanes are a single exact-model rung (#14155), so each gates on that one model
+// and disappears without it; the gate also pins resolution to that exact id (see builtins.ts).
+const GPT_ASTRA_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra] as const
+const DEEP_LOW_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptSol] as const
 
 export const OPENAI_CATEGORIES = [
   {
     name: "ultrabrain",
-    config: { model: "chatgpt-subscription/gpt-6-astra", variant: "max" },
-    description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
+    config: { model: `chatgpt-subscription/${LATEST_MODEL_BY_FAMILY.gptAstra}`, variant: "max" },
+    description:
+      "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveUltrabrainCategoryPromptAppend,
-    requiresModel: GPT_FLAGSHIP_GATE_MODELS,
+    requiresModel: GPT_ASTRA_GATE_MODELS,
+    exactModels: true,
   },
   {
     name: "deep-low",
-    config: { model: "chatgpt-subscription/gpt-6.1-sol", variant: "medium" },
-    description: "Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads; preferred over deep-high for 3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work. Multiple goals fan out as parallel calls.",
+    config: { model: `chatgpt-subscription/${LATEST_MODEL_BY_FAMILY.gptSol}`, variant: "medium" },
+    description:
+      "Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads; preferred over deep-high for 3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work. Multiple goals fan out as parallel calls.",
     callerGuidance: DEEP_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_LOW_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepLowCategoryPromptAppend,
     requiresModel: DEEP_LOW_GATE_MODELS,
+    exactModels: true,
   },
   {
     name: "deep-high",
-    config: { model: "chatgpt-subscription/gpt-6-astra", variant: "high" },
-    description: "Escalation deep lane: a goal whose central decision cannot be settled from evidence alone. Same one-goal, one-deliverable contract as deep-low.",
+    config: { model: `chatgpt-subscription/${LATEST_MODEL_BY_FAMILY.gptAstra}`, variant: "high" },
+    description:
+      "Escalation deep lane: a goal whose central decision cannot be settled from evidence alone. Same one-goal, one-deliverable contract as deep-low.",
     callerGuidance: DEEP_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_HIGH_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepHighCategoryPromptAppend,
-    requiresModel: DEEP_HIGH_GATE_MODEL,
+    requiresModel: GPT_ASTRA_GATE_MODELS,
+    exactModels: true,
   },
   {
     name: "quick",
-    config: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
+    config: { model: `chatgpt-subscription/${LATEST_MODEL_BY_FAMILY.gptLunaFast}`, variant: "low" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
     callerGuidance: QUICK_CATEGORY_CALLER_GUIDANCE,
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "unspecified-low",
-    config: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
+    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeSonnet}`, variant: "medium" },
     description: "Tasks that don't fit other categories, low effort required",
     callerGuidance: UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "unspecified-high",
-    config: { model: "anthropic/claude-opus-5-5", variant: "medium" },
+    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`, variant: "medium" },
     description: "Tasks that don't fit other categories, high effort required",
     callerGuidance: UNSPECIFIED_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,

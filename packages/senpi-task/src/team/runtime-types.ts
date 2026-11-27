@@ -60,6 +60,7 @@ export type CreateTeamDeps = {
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
   readonly leadSessionId: string
+  readonly rootSessionId?: string
   readonly spawnDepth: number
   readonly now?: () => number
   readonly memberExtension?: TeamMemberExtensionConfig
