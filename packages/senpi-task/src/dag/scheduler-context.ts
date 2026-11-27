@@ -9,15 +9,7 @@ import type { InfrastructureRetries } from "./infrastructure-retry"
 import type { DagExecutionModeSources } from "./execution-mode"
 import type { DagNodeSpawnPolicy } from "./scheduler"
 import { dagNodeTransitionedEvent } from "./events"
-import type {
-  DagNode,
-  DagNodeId,
-  DagNodeState,
-  DagNodeError,
-  DagNodeErrorCode,
-  DagNodeTransitionReason,
-  DagNodeCounts,
-} from "./types"
+import type { DagNode, DagNodeId, DagNodeState, DagNodeError, DagNodeErrorCode, DagNodeTransitionReason } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
 export const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["completed", "failed", "cancelled", "skipped"])
