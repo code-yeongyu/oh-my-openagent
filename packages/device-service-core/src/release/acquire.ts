@@ -106,7 +106,8 @@ const downloader =
       const declared = Number(response.headers.get("content-length") ?? "0")
       if (declared > maxBytes) return "too_large"
       const reader = response.body?.getReader()
-      if (reader === undefined) return declared === 0 ? new Uint8Array() : "missing"
+      // No body is a broken transfer: a release artifact is never empty (review of efcaf83982, LOW 1).
+      if (reader === undefined) return "missing"
       stall.signal.addEventListener(
         "abort",
         () => {
@@ -128,9 +129,10 @@ const downloader =
         chunks.push(chunk)
         rearmWatchdog()
       }
-      // A short body is a broken transfer, not a broken artifact (#13224): it never reaches the checksum step, so it
-      // can never be reported as failed verification.
-      if (stall.signal.aborted || (declared > 0 && received < declared)) return "missing"
+      // A body that disagrees with its declared length, short or long, or an empty one, is a broken transfer, not a
+      // broken artifact (#13224; review of efcaf83982, LOW 1): it never reaches the checksum step, so it can never be
+      // reported as failed verification.
+      if (stall.signal.aborted || received === 0 || (declared > 0 && received !== declared)) return "missing"
       const bytes = new Uint8Array(received)
       let offset = 0
       for (const chunk of chunks) {

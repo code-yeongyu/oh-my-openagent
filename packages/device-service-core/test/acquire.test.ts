@@ -495,27 +495,47 @@ describe("download body failures and stall bounds (#13223, #13224)", () => {
     expect(existsSync(state)).toBe(false)
   })
 
-  test("a body shorter than its declared content-length is download_failed, not checksum", async () => {
-    const key = releaseKey()
-    const release = buildRelease({ key, host: HOST })
-    const binary = release.get(binaryName) ?? new Uint8Array()
-    const served = serveRelease(entryFilesWithoutBinary(release))
-    const half = binary.slice(0, Math.ceil(binary.byteLength / 2))
-    const fetchShortBody: FetchRelease = (url, init) =>
-      url.endsWith(binaryName)
-        ? Promise.resolve(new Response(half, { headers: { "content-length": String(binary.byteLength) } }))
-        : served.fetch(url, init)
-    const state = stateDir()
+  // A body whose length disagrees with its declared content-length, either way, and an empty body, are broken
+  // transfers: none reaches the checksum step (#13224; review of efcaf83982, LOW 1).
+  const brokenBodies: readonly {
+    readonly name: string
+    readonly response: (binary: Uint8Array) => Response
+  }[] = [
+    {
+      name: "a body shorter than its declared content-length",
+      response: (binary) =>
+        new Response(binary.slice(0, Math.ceil(binary.byteLength / 2)), {
+          headers: { "content-length": String(binary.byteLength) },
+        }),
+    },
+    {
+      name: "a body longer than its declared content-length",
+      response: (binary) =>
+        new Response(new Uint8Array([...binary, 0, 1, 2]), {
+          headers: { "content-length": String(binary.byteLength) },
+        }),
+    },
+    { name: "an empty body with no content-length", response: () => new Response(new Uint8Array()) },
+  ]
+  for (const { name, response } of brokenBodies)
+    test(`${name} is download_failed, not checksum`, async () => {
+      const key = releaseKey()
+      const release = buildRelease({ key, host: HOST })
+      const binary = release.get(binaryName) ?? new Uint8Array()
+      const served = serveRelease(entryFilesWithoutBinary(release))
+      const fetchBroken: FetchRelease = (url, init) =>
+        url.endsWith(binaryName) ? Promise.resolve(response(binary)) : served.fetch(url, init)
+      const state = stateDir()
 
-    const result = await acquireDeviceService(options(state, served, key.publicHex, { fetch: fetchShortBody }))
+      const result = await acquireDeviceService(options(state, served, key.publicHex, { fetch: fetchBroken }))
 
-    expect(result).toEqual({
-      ok: false,
-      refusal: "download_failed",
-      action: "Could not download the OmO device service. Check the connection and try again.",
+      expect(result).toEqual({
+        ok: false,
+        refusal: "download_failed",
+        action: "Could not download the OmO device service. Check the connection and try again.",
+      })
+      expect(existsSync(state)).toBe(false)
     })
-    expect(existsSync(state)).toBe(false)
-  })
 
   // The bound is a stall, not a total transfer deadline: four chunks, one every 30 s of the virtual clock, finish at
   // 150 s — past the old fixed 120 s cap — and must still install.
