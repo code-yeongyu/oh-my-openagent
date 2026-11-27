@@ -68,6 +68,8 @@ describe("attestationOps", () => {
         }),
       ),
     ]);
+    // ':' is not allowed in a Windows file name, so there the file is named with '-' (src/attestations.ts).
+    const written = join(dir, `${process.platform === "win32" ? digest.replace(":", "-") : digest}.jsonl`);
     const out = await attestationOps(gh).list.invoke({
       file: artifact,
       predicateType: "https://slsa.dev/provenance/v1",
@@ -83,13 +85,13 @@ describe("attestationOps", () => {
     expect(out).toMatchObject({
       repo: "acme/widgets",
       digest,
-      path: join(dir, `${digest}.jsonl`),
+      path: written,
     });
     expect(out.items).toEqual([
       { repositoryId: 1, bundle: BUNDLE },
       { repositoryId: 2, bundle: { ...BUNDLE, n: 2 } },
     ]);
-    const lines = (await Bun.file(join(dir, `${digest}.jsonl`)).text())
+    const lines = (await Bun.file(written).text())
       .trimEnd()
       .split("\n");
     expect(lines.map((l) => JSON.parse(l))).toEqual([

@@ -18,6 +18,7 @@
         "script/build-service-auth.ts",
         "script/build.ts",
         "script/bun-panic-retry.ts",
+        "script/bundle-guards.ts",
         "script/changelog-section.ts",
         "script/check-cargo-pinned-deps.mjs",
         "script/check-copy.ts",
