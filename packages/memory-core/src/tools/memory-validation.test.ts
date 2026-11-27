@@ -201,7 +201,7 @@ describe("runMemoryTool", () => {
     expect(await setup.repo.head()).toBe(head)
   })
 
-  it("#given byte-identical replacements or descriptions #when commit detects no diff #then it reports no effective changes", async () => {
+  it("#given byte-identical replacements or descriptions #when commit detects no diff #then it answers a terminal ok, not an error", async () => {
     const rows: Array<Omit<MemoryToolParams, "author">> = [
       { command: "str_replace", reason: "no op", file_path: "note", old_string: "same", new_string: "same" },
       { command: "update_description", reason: "no op", file_path: "note", description: "Seed" },
@@ -211,23 +211,26 @@ describe("runMemoryTool", () => {
       const setup = await fixture()
       await seed(setup, "note.md", "same")
       const head = await setup.repo.head()
-      await expect(run(setup, params)).rejects.toThrow(`memory: ${params.command} made no changes`)
+      // The no-op is a successful result the model does not retry (#14814), and it commits nothing.
+      const result = await run(setup, params)
+      expect(result.message).toBe(`memory: ${params.command} made no changes`)
+      expect(result.commit).toBeUndefined()
       expect(await setup.repo.head()).toBe(head)
       expect(await setup.repo.status()).toBe("")
     }
   })
 
-  it("#given an untracked empty directory #when delete yields no affected tracked paths #then it reports made no changes", async () => {
+  it("#given an untracked empty directory #when delete yields no affected tracked paths #then it answers a terminal ok", async () => {
     const setup = await fixture()
     await mkdir(join(setup.repo.dir, "empty"))
 
-    await expect(
-      run(setup, {
-        command: "delete",
-        reason: "delete empty",
-        file_path: "empty",
-      }),
-    ).rejects.toThrow("memory: delete made no changes")
+    const result = await run(setup, {
+      command: "delete",
+      reason: "delete empty",
+      file_path: "empty",
+    })
+    expect(result.message).toBe("memory: delete made no changes")
+    expect(result.commit).toBeUndefined()
   })
 
   it("#given a UTF-16 BOM memory file #when a mutating command reads it #then a typed error asks for UTF-8 conversion", async () => {

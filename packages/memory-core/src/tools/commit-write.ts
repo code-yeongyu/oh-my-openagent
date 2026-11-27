@@ -10,7 +10,7 @@ import { claimReceiptTrailers } from "../provenance"
 import type { MemoryToolProvenance } from "./memory"
 import { provenanceStrippedTrailers } from "./claim-frontmatter"
 import { undoBehindKeptLock } from "./rollback-behind-lock"
-import { MemoryToolError } from "./tool-errors"
+import { MemoryNoChangesError, MemoryToolError } from "./tool-errors"
 
 export interface CommitMemoryWriteOptions {
   readonly repo: GitMemoryRepo
@@ -56,7 +56,7 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
     enter("apply")
     const applied = await options.apply()
     const paths = applied.affectedPaths
-    if (paths.length === 0) throw new MemoryToolError(noChangesMessage ?? "made no changes")
+    if (paths.length === 0) throw new MemoryNoChangesError(noChangesMessage ?? "made no changes")
     const violation = writer === "memory-tool" ? await refuseAgreementsViolation(repo, paths) : undefined
     if (violation !== undefined) throw new MemoryToolError(violation)
     let result
@@ -69,7 +69,7 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
       )
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
-        throw new MemoryToolError(noChangesMessage ?? "made no effective changes", { cause: error })
+        throw new MemoryNoChangesError(noChangesMessage ?? "made no effective changes", { cause: error })
       }
       if (error instanceof MemorySecretError) {
         await repo.restorePaths(paths)
