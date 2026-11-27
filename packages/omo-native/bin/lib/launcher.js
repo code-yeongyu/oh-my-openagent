@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url"
 import { isEngineCommand } from "./engine-commands.js"
 import { observedLaunch, operatorHostLaunch, withProductLaunchSpec } from "./host-launch.js"
 import { propagateResult, runChild, spawnNode } from "./child-process.js"
-import { privateFdHandoff } from "./private-fds.js"
+import { capturedStdoutHandoff, privateFdHandoff } from "./private-fds.js"
 import { launchClaimsMemorySyncAtBoot } from "./memory-sync-boot.js"
 import { doctorCoverageLines } from "./category-coverage.js"
 import { runDoctorModels } from "./model-chains.js"
@@ -92,7 +92,8 @@ async function spawnSenpi(args, withExtension, captureStdout = false) {
       ? [ENGINE_BOOT_ENTRY, senpi.cliPath, ...finalArgs]
       : [senpi.cliPath, ...finalArgs]
   if (captureStdout) {
-    const result = await runChild(process.execPath, childArgs, { ...(handoff ?? { env }), captureStdout: true })
+    // The descriptors are the private-fd contract's (capturedStdoutHandoff); only reading stdout needs this child.
+    const result = await runChild(process.execPath, childArgs, { ...capturedStdoutHandoff(env), captureStdout: true })
     propagateResult(result)
     return { exitCode: result.status ?? 1, stdout: result.stdout }
   }
@@ -310,7 +311,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
       const answer = await observedLaunch(result, { args, agentDir, pluginRoot, observe: observeProductHost })
       process.stdout.write(answer.stdout)
       process.exitCode = answer.exitCode
-    } else await spawnSenpi(args, false)
+    } else await spawnSenpi(launch, false)
     return
   }
   if (isInteractiveDefault(args)) {

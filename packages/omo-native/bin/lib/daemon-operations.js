@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
 import { decorateEndpoints, formatEndpointLines, statusPayload } from "./daemon-status.js"
+import { observedLaunch } from "./host-launch.js"
 import { hostStopBudgetMs } from "./daemon-stop-budget.js"
 
 export function parseEngineLine(stdout) {
@@ -86,18 +87,27 @@ export function runGc({ engine, migration, agentDir, env, json, pruneStoreIndex,
   return result.exitCode
 }
 
-export function runHandoff({ engine, pluginRoot, agentDir, env, policy, config, stdout, stderr }) {
+/** #15263: after the operator daemon's handoff, the primary now serving it must carry the product plugin. */
+async function observedDaemonCall(call, { args, agentDir, pluginRoot, observe }) {
+  if (observe === undefined) return { exitCode: call.result.exitCode, parsed: call.parsed }
+  const answer = await observedLaunch(
+    { exitCode: call.result.exitCode, stdout: call.result.stdout ?? "" },
+    { args, agentDir, pluginRoot, observe },
+  )
+  return { exitCode: answer.exitCode, parsed: parseEngineLine(answer.stdout) }
+}
+
+const pluginNote = (parsed) => (parsed?.productPlugin ? `; product plugin: ${parsed.productPlugin}` : "")
+
+export async function runHandoff({ engine, pluginRoot, agentDir, env, policy, config, stdout, stderr, observe }) {
   const all = readAllEndpoints(engine, agentDir, env)
   if (all.kind === "legacy") {
-    const call = endpointCall(
-      engine,
-      buildEnsureArgs("handoff", undefined, pluginRoot, policy),
-      agentDir,
-      hostCommandEnvironment(env, agentDir, config),
-    )
+    const args = buildEnsureArgs("handoff", undefined, pluginRoot, policy)
+    const call = endpointCall(engine, args, agentDir, hostCommandEnvironment(env, agentDir, config))
     if (call.result.stderr) stderr.write(call.result.stderr)
-    stdout.write(`daemon: ${call.parsed?.action ?? "handoff"}\n`)
-    return call.result.exitCode
+    const daemon = await observedDaemonCall(call, { args, agentDir, pluginRoot, observe })
+    stdout.write(`daemon: ${daemon.parsed?.action ?? "handoff"}${pluginNote(daemon.parsed)}\n`)
+    return daemon.exitCode
   }
   let refused = false
   const commandEnv = hostCommandEnvironment(env, agentDir, config)
@@ -112,8 +122,11 @@ export function runHandoff({ engine, pluginRoot, agentDir, env, policy, config, 
       : buildEnsureArgs("ensure", endpoint.socket, pluginRoot, policy)
     const call = endpointCall(engine, args, agentDir, commandEnv)
     if (call.result.stderr) stderr.write(call.result.stderr)
-    if (call.result.exitCode !== 0 || call.parsed?.action === "refuse") refused = true
-    stdout.write(`${endpoint.socket}: ${call.parsed?.action ?? "refuse"}\n`)
+    const answer = daemon
+      ? await observedDaemonCall(call, { args, agentDir, pluginRoot, observe })
+      : { exitCode: call.result.exitCode, parsed: call.parsed }
+    if (answer.exitCode !== 0 || answer.parsed?.action === "refuse") refused = true
+    stdout.write(`${endpoint.socket}: ${answer.parsed?.action ?? "refuse"}${pluginNote(answer.parsed)}\n`)
   }
   return refused ? 3 : 0
 }

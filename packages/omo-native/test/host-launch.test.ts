@@ -3,11 +3,12 @@ import { spawnSync } from "node:child_process"
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { observedLaunch } from "../bin/lib/host-launch.js"
+import { observedLaunch, RAW_HOST_LAUNCH_ENV, takeRawHostLaunch } from "../bin/lib/host-launch.js"
+import { capturedStdoutHandoffFor } from "../bin/lib/private-fd-table.js"
 import { formatDoctorLines, formatEndpointLines } from "../bin/lib/daemon-status.js"
 import { buildSenpiArgs } from "../compile-args"
 
-test("npm daemon run, host ensure and host handoff give the engine the product launch spec", () => {
+test("npm daemon run, host ensure, host handoff and host session open give the engine the product launch spec", () => {
   const root = mkdtempSync(join(tmpdir(), "omo-host-launch-"))
   try {
     const home = join(root, "home")
@@ -36,11 +37,29 @@ test("npm daemon run, host ensure and host handoff give the engine the product l
       console.log(JSON.stringify(args[1] === "status" ? { reachable: false } : { action: "start" }))
     `,
     )
-    for (const args of [
-      ["daemon", "run"],
-      ["host", "ensure"],
-      ["host", "handoff"],
-    ]) {
+    // #15263 review M1: a socket other than the operator's, and `host session open`, carry the spec too.
+    for (const [args, engineCall] of [
+      [
+        ["daemon", "run"],
+        ["host", "ensure"],
+      ],
+      [
+        ["host", "ensure"],
+        ["host", "ensure"],
+      ],
+      [
+        ["host", "handoff"],
+        ["host", "handoff"],
+      ],
+      [
+        ["host", "ensure", "--socket", join(root, "other.sock")],
+        ["host", "ensure", "--socket", join(root, "other.sock")],
+      ],
+      [
+        ["host", "session", "open"],
+        ["host", "session", "open"],
+      ],
+    ] as const) {
       writeFileSync(capture, "")
       const result = spawnSync(process.execPath, [join(root, "bin/omo.js"), ...args], {
         cwd: home,
@@ -52,17 +71,36 @@ test("npm daemon run, host ensure and host handoff give the engine the product l
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line))
-      const start = calls.find(
-        (call) => call[0] === "host" && call[1] === (args[1] === "handoff" ? "handoff" : "ensure"),
-      )
+      const start = calls.find((call) => engineCall.every((arg, index) => call[index] === arg))
       expect(start, args.join(" ")).toContain("--launch-spec")
       expect(start?.[start.indexOf("--launch-spec") + 1]).toBe(spec)
-      const compiled = buildSenpiArgs(["host", args[1] === "handoff" ? "handoff" : "ensure"], root)
+      const compiled = buildSenpiArgs([...engineCall], root)
       expect(compiled.slice(compiled.indexOf("--launch-spec"))).toEqual(["--launch-spec", spec])
     }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+// #15263 review L2: only the compiled launcher's own hop, which names its pid, skips the observation.
+test("a raw host launch marker is honored only from the parent that set it, and never left behind", () => {
+  for (const [marker, honored] of [
+    ["1", false],
+    ["41", false],
+    ["42", true],
+    [undefined, false],
+  ] as const) {
+    const env: Record<string, string | undefined> = marker === undefined ? {} : { [RAW_HOST_LAUNCH_ENV]: marker }
+    expect(takeRawHostLaunch(env, 42), String(marker)).toBe(honored)
+    expect(RAW_HOST_LAUNCH_ENV in env).toBe(false)
+  }
+})
+
+test("a captured host launch without a private descriptor table pipes only stdout", () => {
+  expect(capturedStdoutHandoffFor({ KEEP: "yes" }, undefined)).toEqual({
+    env: { KEEP: "yes" },
+    stdio: ["inherit", "pipe", "inherit"],
+  })
 })
 
 test("an older or unresponsive host leaves ensure successful and explicitly unobserved", async () => {

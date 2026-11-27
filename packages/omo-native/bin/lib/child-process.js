@@ -61,10 +61,6 @@ export function runChild(command, args, options = {}) {
   const baseStdio = shellHandoff?.stdio ?? spawnOptions.stdio ?? "inherit"
   const capturedStdio = typeof baseStdio === "string" ? [baseStdio, baseStdio, "pipe"] : [...baseStdio]
   capturedStdio[2] = "pipe"
-  if (captureStdout) {
-    capturedStdio[1] = "pipe"
-    if (!captureStderr) capturedStdio[2] = typeof baseStdio === "string" ? baseStdio : baseStdio[2]
-  }
   return new Promise((resolve, reject) => {
     let child
     // Listen before the child exists: a signal that arrives the moment the engine starts must still reach it
@@ -131,7 +127,7 @@ export function runChild(command, args, options = {}) {
         ...spawnOptions,
         ...(shellHandoff ? { env: shellHandoff.env, stdio: shellHandoff.stdio } : {}),
         // A captured stderr is still shown live; the caller also gets its tail to classify the failure.
-        ...(captureStderr || captureStdout ? { stdio: capturedStdio } : {}),
+        ...(captureStderr ? { stdio: capturedStdio } : {}),
       })
     } catch (error) {
       // Nothing was started, so nothing may keep listening for it.

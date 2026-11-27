@@ -30,9 +30,15 @@ import { remapSenpiEnvironment } from "./compiled-environment"
 import { SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
 import { runServiceAuthCommand } from "./service-auth-command"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
-import { observedLaunch, operatorHostLaunch, withProductLaunchSpec } from "./bin/lib/host-launch.js"
+import {
+  observedLaunch,
+  operatorHostLaunch,
+  RAW_HOST_LAUNCH_ENV,
+  takeRawHostLaunch,
+  withProductLaunchSpec,
+} from "./bin/lib/host-launch.js"
 import { runChild, propagateResult } from "./bin/lib/child-process.js"
-import { privateFdHandoffFor, PRIVATE_FDS_ENV } from "./bin/lib/private-fd-table.js"
+import { capturedStdoutHandoffFor, PRIVATE_FDS_ENV } from "./bin/lib/private-fd-table.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
 import { runDoctor } from "./bin/lib/doctor.js"
@@ -167,6 +173,14 @@ type CompiledLauncherSeams = {
   readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }>
 }
 
+/** #15263: the launch profile of the primary a host ensure, handoff or `omo daemon run|handoff` left serving. */
+const observeCompiledHost = async (socket: string, timeout: number, options: { keyRoot: string }) =>
+  (await import("../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/host-probe.js")).observeProtocolInfo(
+    socket,
+    timeout,
+    options,
+  )
+
 /** RULING-74: the runtime's keychain helper sits directly beside the binary (the desktop layout); every command uses it first. */
 export function compiledKeychainHelper(execDir: string): string {
   return join(execDir, "omo-keychain")
@@ -228,23 +242,16 @@ export async function runCompiledLauncher(
   }
   if (refuseRetiredCommand(args)) return true
   if (operatorHostLaunch(args, canonicalAgentDir())) {
-    if (process.env.OMO_HOST_LAUNCH_RAW === "1") {
-      delete process.env.OMO_HOST_LAUNCH_RAW
-      return false
-    }
+    if (takeRawHostLaunch(process.env, process.ppid)) return false
     const pluginRoot = join(execDir, "plugin")
-    const launchEnv = { ...process.env, OMO_HOST_LAUNCH_RAW: "1" }
-    const handoff = privateFdHandoffFor(launchEnv, process.env[PRIVATE_FDS_ENV])
+    const launchEnv = { ...process.env, [RAW_HOST_LAUNCH_ENV]: String(process.pid) }
     const launchArgs = withProductLaunchSpec(args, pluginRoot)
     const child = await runChild(
       process.execPath,
       import.meta.url.startsWith("file:") && process.argv[1]?.endsWith("/compile-entry.ts")
         ? [process.argv[1], ...launchArgs]
         : launchArgs,
-      {
-        ...(handoff ?? { env: launchEnv }),
-        captureStdout: true,
-      },
+      { ...capturedStdoutHandoffFor(launchEnv, process.env[PRIVATE_FDS_ENV]), captureStdout: true },
     )
     propagateResult(child)
     const answer = await observedLaunch(
@@ -253,12 +260,7 @@ export async function runCompiledLauncher(
         args,
         pluginRoot,
         agentDir: canonicalAgentDir(),
-        observe: async (socket: string, timeout: number, options: { keyRoot: string }) =>
-          (await import("../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/host-probe.js")).observeProtocolInfo(
-            socket,
-            timeout,
-            options,
-          ),
+        observe: observeCompiledHost,
       },
     )
     process.stdout.write(answer.stdout)
@@ -271,10 +273,14 @@ export async function runCompiledLauncher(
   const engine = {
     run(engineArgs: string[], options: { env: Record<string, string | undefined> }) {
       const marker = adoptedEngineTrust()
-      const env =
+      const trusted =
         marker === undefined
           ? options.env
           : buildTrustLaunchEnvironment(options.env, { marker, hop: false, platform: process.platform })
+      // The caller (omo daemon) observes the host itself, as on npm, so its engine call goes straight to the engine.
+      const env = operatorHostLaunch(engineArgs, canonicalAgentDir(), trusted)
+        ? { ...trusted, [RAW_HOST_LAUNCH_ENV]: String(process.pid) }
+        : trusted
       const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env, windowsHide: true })
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
@@ -310,6 +316,7 @@ export async function runCompiledLauncher(
       migration: compiledRollbackMigration(),
       pluginRoot: join(execDir, "plugin"),
       agentDir: canonicalAgentDir(),
+      observe: observeCompiledHost,
       env: process.env,
       stdout: process.stdout,
       stderr: process.stderr,

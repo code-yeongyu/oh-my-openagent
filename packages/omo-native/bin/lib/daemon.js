@@ -244,6 +244,7 @@ export function runDaemonCommand(args, options) {
       config,
       stdout,
       stderr,
+      observe: options.observe,
     })
   }
   if (subcommand === "stop" && args.includes("--all")) {

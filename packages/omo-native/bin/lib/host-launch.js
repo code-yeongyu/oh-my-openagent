@@ -29,6 +29,19 @@ export function productPluginState(profile, pluginRoot) {
     : "absent"
 }
 
+/**
+ * The compiled launcher runs the engine's own `host ensure|handoff` as a child of itself and marks that one child with
+ * its pid, so the child goes straight to the engine. A value left in a user's environment never names the parent, so it
+ * cannot skip the observation (#15263 review L2); any value is removed so it never reaches a later child.
+ */
+export const RAW_HOST_LAUNCH_ENV = "OMO_HOST_LAUNCH_RAW"
+
+export function takeRawHostLaunch(env, parentPid) {
+  const marker = env[RAW_HOST_LAUNCH_ENV]
+  delete env[RAW_HOST_LAUNCH_ENV]
+  return marker === String(parentPid)
+}
+
 export function operatorHostLaunch(args, agentDir, env = process.env) {
   // The operator socket is Unix-only. Windows descriptor-pair launches must keep inherited stdio.
   if (process.platform === "win32") return false
