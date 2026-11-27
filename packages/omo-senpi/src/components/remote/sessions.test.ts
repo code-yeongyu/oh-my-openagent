@@ -77,8 +77,8 @@ const world = (): World => {
   const replying = { ...live, delegated: { data: SESSION_REPLY, frames: [] } }
   return {
     ...base,
-    endpoints: { [PEER]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
-    primary: { [PEER]: "ZW5kcG9pbnQta2V5LTAwMD" },
+    endpoints: { [PEER]: ["FAKE_endpoint_key_tst1"] },
+    primary: { [PEER]: "FAKE_endpoint_key_tst1" },
     endpointCommand: {
       data: { sessionId: "engine-routing-1", state: { sessionId: ENGINE_ID, cwd: "/work" } },
       outcome: [{ state: "engine_applied", retryable: false }],

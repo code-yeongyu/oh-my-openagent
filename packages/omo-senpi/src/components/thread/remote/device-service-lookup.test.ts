@@ -16,7 +16,7 @@ function portFor(lookup: "timeout" | "closed" | "answers" | "no_primary") {
       if (lookup === "timeout") throw new LocalApiError("request_timeout", "no answer")
       if (lookup === "closed") throw new LocalApiError("closed", "the connection closed")
       if (lookup === "no_primary") return { endpoints: ["b3RoZXItYWdlbnQtZGlyLT", "c2hhcmQtZW5kcG9pbnQtMD"] }
-      return { endpoints: ["ZW5kcG9pbnQta2V5LTAwMD"] }
+      return { endpoints: ["FAKE_endpoint_key_tst1"] }
     },
     commandTo: async (_target: unknown, _rpc: unknown, commandId: string) => {
       calls.endpointCommand += 1

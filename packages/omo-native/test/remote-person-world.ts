@@ -6,7 +6,7 @@ import { defaultWorld, type World } from "../../device-service-core/test/local-a
 // up, and every session answers a delegated command the way a session host does.
 
 export const PEER = "dev-peer-1"
-const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+const ENDPOINT = "FAKE_endpoint_key_tst1"
 export const NEW_KEY = "FAKE_session_key_test1"
 const ENGINE_ID = "dur-new"
 

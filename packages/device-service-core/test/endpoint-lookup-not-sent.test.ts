@@ -4,7 +4,7 @@ import type { LocalApiClient } from "../src/local-api/client.ts"
 
 // An endpoint command looks the endpoint up with session.endpoints before it writes session.command. A failure of that
 // lookup dispatched nothing, so the SDK marks it not_sent; a timeout of session.command itself keeps its command_id.
-const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+const ENDPOINT = "FAKE_endpoint_key_tst1"
 
 function client(lookup: () => Promise<unknown>, serviceVersion = "0.1.0") {
   const calls = { commandTo: 0, lookups: [] as unknown[], targets: [] as unknown[] }
