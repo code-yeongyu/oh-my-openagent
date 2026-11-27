@@ -1,5 +1,3 @@
-import type { AnswerFields } from "./answer-shape"
-
 /**
  * The narrow seam between the gateway and senpi. Every senpi interaction the store, engine and
  * drain need goes through these two ports, typed against the senpi `feat/tui-control-endpoint`
@@ -20,9 +18,11 @@ export type GatewayEndpointRef = {
   readonly durable_session_id: string
 }
 
-export type ExternalAdmissionKind = "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "already_admitted"
+/** `held` (senpi#7014): kept under a hold a peer cannot release; it starts once a person releases that hold. */
+export type ExternalAdmissionKind =
+  "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "held" | "already_admitted"
 
-export type GatewayAdmissionKind = ExternalAdmissionKind | "not_steerable" | "expired"
+export type GatewayAdmissionKind = ExternalAdmissionKind | "not_steerable" | "expired" | "sender_not_admitted"
 
 /**
  * `unroutable`: the endpoint names its session only by durable id and its host lists no live session under
@@ -57,7 +57,12 @@ export type ReleaseRefusalCode =
 export type ReleaseSessionReply =
   | {
       readonly success: true
-      readonly data: { readonly released: true; readonly session_path: string; readonly attachments: number; readonly dropped: ReleaseDropped }
+      readonly data: {
+        readonly released: true
+        readonly session_path: string
+        readonly attachments: number
+        readonly dropped: ReleaseDropped
+      }
     }
   | {
       readonly success: false
@@ -76,21 +81,12 @@ export type ReleaseSessionReply =
 /** Sender side: reaching another session's endpoint. */
 export type GatewayEndpointPort = {
   readonly wake: (endpoint: GatewayEndpointRef, deliveryIds: readonly string[]) => Promise<GatewayWakeReply>
-  readonly releaseSession?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
+  readonly releaseSession?: (
+    endpoint: GatewayEndpointRef,
+    request: ReleaseSessionRequest,
+  ) => Promise<ReleaseSessionReply>
   readonly classifyLiveness?: (endpoint: GatewayEndpointRef) => Promise<EndpointLiveness>
-  /**
-   * Answers the session's pending extension UI request on its own endpoint (senpi#2372: the frame
-   * names the request in `uiRequestId` and keeps its own `id`, which the reply echoes). Resolves the
-   * session's verdict; throws only when no verdict came back. `thread_answer` calls it only after
-   * the reply token matched.
-   */
-  readonly respondUi?: (endpoint: GatewayEndpointRef, answer: UiAnswer) => Promise<UiAnswerReply>
 }
-
-/** `fields` is the answer in the shape its request kind reads (`answer-shape.ts`). */
-export type UiAnswer = { readonly ui_request_id: string; readonly fields: AnswerFields }
-/** `error` is the endpoint's own refusal code (`unknown_request`, `question_already_resolved`, ...). */
-export type UiAnswerReply = { readonly delivered: true } | { readonly delivered: false; readonly error: string }
 
 export type RuntimePhase = "idle" | "mid_turn" | "waiting_question" | "compacting"
 
@@ -112,6 +108,8 @@ export type AdmitExternalMessageInput = {
   readonly text: string
   readonly deliverAs: "steer" | "followUp"
   readonly expected_turn_id?: number
+  /** senpi `whenIdle`: `queue` puts a delivery to an idle session in its `deliverAs` queue without starting a turn. */
+  readonly whenIdle?: "start" | "queue"
   /** Ignored by a senpi from before delivery senders; the header in `text` still names the sender. */
   readonly sender?: DeliverySender
   readonly display_text?: string
@@ -125,12 +123,16 @@ export type AdmitExternalMessageInput = {
 export type SessionRuntimePort = {
   readonly phase: () => RuntimePhase
   readonly admissionGate: () => SessionAdmissionGate
-  readonly admitExternalMessage: (input: AdmitExternalMessageInput) => { readonly kind: ExternalAdmissionKind; readonly turn_epoch: number }
+  readonly admitExternalMessage: (input: AdmitExternalMessageInput) => {
+    readonly kind: ExternalAdmissionKind
+    readonly turn_epoch: number
+  }
   readonly listAdmittedDeliveries: () => { readonly pending: readonly string[]; readonly emitted: readonly string[] }
 }
 
 /** senpi's `SessionControlWakeReason` plus the drain-internal `start` (first pass after registration). */
-export type WakeReason = "idle" | "submission" | "draft_cleared" | "command" | "inbox" | "emitted" | "continue" | "start"
+export type WakeReason =
+  "idle" | "submission" | "draft_cleared" | "command" | "inbox" | "emitted" | "continue" | "start"
 
 export type DrainWakeEvent = {
   readonly reason: WakeReason
@@ -143,7 +145,12 @@ export type SessionControlDrainResult = {
 
 export type RegisterControlEndpointOptions = {
   readonly inboxDir: string
-  readonly drain: (event: { readonly type: "session_control_wake"; readonly reason: Exclude<WakeReason, "start">; readonly reasons: readonly Exclude<WakeReason, "start">[]; readonly delivery_ids?: readonly string[] }) => SessionControlDrainResult | undefined | Promise<SessionControlDrainResult | undefined>
+  readonly drain: (event: {
+    readonly type: "session_control_wake"
+    readonly reason: Exclude<WakeReason, "start">
+    readonly reasons: readonly Exclude<WakeReason, "start">[]
+    readonly delivery_ids?: readonly string[]
+  }) => SessionControlDrainResult | undefined | Promise<SessionControlDrainResult | undefined>
   readonly isSessionReferenced?: () => boolean | Promise<boolean>
 }
 
@@ -161,10 +168,12 @@ export type SessionControlRegistrar = (options: RegisterControlEndpointOptions) 
  * so nothing was admitted. They are left out of senpi's `admitted` list (which names what this
  * runtime took); the refusal is on the row, where the sender reads its outcome.
  */
-export function toSessionControlDrainResult(result: { readonly admitted: readonly { readonly delivery_id: string; readonly kind: GatewayAdmissionKind }[] }): SessionControlDrainResult {
+export function toSessionControlDrainResult(result: {
+  readonly admitted: readonly { readonly delivery_id: string; readonly kind: GatewayAdmissionKind }[]
+}): SessionControlDrainResult {
   const admitted: { delivery_id: string; kind: ExternalAdmissionKind }[] = []
   for (const entry of result.admitted) {
-    if (entry.kind === "not_steerable" || entry.kind === "expired") continue
+    if (entry.kind === "not_steerable" || entry.kind === "expired" || entry.kind === "sender_not_admitted") continue
     admitted.push({ delivery_id: entry.delivery_id, kind: entry.kind })
   }
   return { admitted }

@@ -7,18 +7,19 @@ import {
   REFLECTION_COMMIT_PATTERN,
   collectHistory,
 } from "./history-collector"
-import {
-  cleanupPalaceFixtures,
-  commitPalaceFile,
-  createPalaceFixture,
-} from "./palace.test-support"
+import { cleanupPalaceFixtures, commitPalaceFile, createPalaceFixture } from "./palace.test-support"
 
 afterEach(cleanupPalaceFixtures)
 
 describe("palace history collector", () => {
   test("#given reflection and ordinary commits #when history is collected #then reflection commits are tagged and caps are declared", async () => {
     const fixture = await createPalaceFixture()
-    await commitPalaceFile(fixture, "system/learned.md", "---\ndescription: learned\n---\n\nlearned thing\n", "feat(reflection): capture learned thing")
+    await commitPalaceFile(
+      fixture,
+      "system/learned.md",
+      "---\ndescription: learned\n---\n\nlearned thing\n",
+      "feat(reflection): capture learned thing",
+    )
 
     const history = await collectHistory(fixture.repo)
 

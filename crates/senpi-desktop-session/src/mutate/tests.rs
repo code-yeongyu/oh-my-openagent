@@ -15,7 +15,7 @@ use super::Mutation;
 use crate::request::Op;
 use crate::test_support::{click_window, harness, Harness};
 
-mod requests;
+pub(crate) mod requests;
 use requests::request_for;
 
 fn click_desktop_mutation() -> Mutation<'static> {
@@ -202,6 +202,7 @@ fn type_and_keypress_pass_the_gate() {
         opts: None,
     });
     let pressed = Op::KeyChord(KeyChordParams {
+        force: false,
         target: "101".to_owned(),
         keys: vec!["enter".to_owned()],
         opts: None,

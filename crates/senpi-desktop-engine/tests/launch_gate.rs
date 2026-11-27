@@ -165,9 +165,10 @@ fn every_entry_mode_is_refused_when_disclaimed() {
     let dir = tempfile::tempdir().expect("temp dir");
     let socket = dir.path().join("e.sock");
     let socket = socket.to_str().expect("utf-8 path");
-    let modes: [&[&str]; 9] = [
+    let modes: [&[&str]; 10] = [
         &["--stdio"],
         &["--cursor-overlay"],
+        &["--release-helper"],
         &["--schema"],
         &["--selftest"],
         &["--resume", "--endpoint", socket],

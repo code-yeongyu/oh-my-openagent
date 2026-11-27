@@ -13,17 +13,25 @@ import type { TSchema } from "typebox"
 function host() {
   const f = fixture()
   const deps = { manager: f.manager, workpools: f.manager.workpools, omoConfig: {}, agents: {} }
-  return { ...f, execute: buildWorkpoolExecute(deps), ctx: { cwd: f.root, sessionManager: { getSessionId: () => f.caller.sessionId } } }
+  return {
+    ...f,
+    execute: buildWorkpoolExecute(deps),
+    ctx: { cwd: f.root, sessionManager: { getSessionId: () => f.caller.sessionId } },
+  }
 }
 test("#given the host tool barrel #when registering workpool #then the engine exposes one factory", () => {
   // given / when / then
   const f = host()
-  expect(engine.createWorkpoolTool({ manager: f.manager, workpools: f.manager.workpools, omoConfig: {}, agents: {} }).name).toBe("workpool")
+  expect(
+    engine.createWorkpoolTool({ manager: f.manager, workpools: f.manager.workpools, omoConfig: {}, agents: {} }).name,
+  ).toBe("workpool")
 })
 test("#given inherited scheduler tools #when a child receives shared tools #then workpool family is excluded", () => {
   // given / when / then
-  const tools = ["workpool", "workpool_admin", "workflow", "task", "task_send", "team_create", "read"].map(name => ({ name }))
-  expect(filterSharedParentTools(tools).map(tool => tool.name)).toEqual(["read"])
+  const tools = ["workpool", "workpool_admin", "workflow", "task", "task_send", "team_create", "read"].map((name) => ({
+    name,
+  }))
+  expect(filterSharedParentTools(tools).map((tool) => tool.name)).toEqual(["read"])
 })
 test("#given all operation schemas #when valid machine requests are parsed #then mode and yield exclusivity are preserved", () => {
   // given
@@ -32,13 +40,22 @@ test("#given all operation schemas #when valid machine requests are parsed #then
     { op: "create", ...poolInput },
     { op: "create", name: poolInput.name, agent: poolInput.agent },
     { op: "push", pool_id: poolId, items: [{ key: "k", input: { list: [null, true, 42, "s"] } }] },
-    ...["close", "inspect", "cancel"].map(op => ({ op, pool_id: poolId })),
-    { op: "yield", results: [{ key: "k", data: null }, { key: "e", error: { code: "failed", message: "fixture" } }] },
+    ...["close", "inspect", "cancel"].map((op) => ({ op, pool_id: poolId })),
+    {
+      op: "yield",
+      results: [
+        { key: "k", data: null },
+        { key: "e", error: { code: "failed", message: "fixture" } },
+      ],
+    },
   ]
   // when / then
   expect(WorkpoolParams.type).toBe("object")
   expect("anyOf" in WorkpoolParams).toBe(false)
-  for (const request of requests) { expect(Value.Check(WorkpoolParams, request)).toBe(true); expect(WorkpoolCommandSchema.safeParse(request).success).toBe(true) }
+  for (const request of requests) {
+    expect(Value.Check(WorkpoolParams, request)).toBe(true)
+    expect(WorkpoolCommandSchema.safeParse(request).success).toBe(true)
+  }
   expect(Value.Check(WorkpoolYieldParams, requests[0])).toBe(false)
 })
 test("#given malformed or forged requests #when the host parses them #then no worker or pool is created", async () => {
@@ -71,10 +88,23 @@ test("#given reserved tools or a gated agent #when creating a pool #then typed d
   // when / then
   // No live parent JS kernel on this host context: a requested worker tool fails closed, and a
   // reserved host name is refused before any capability is consulted.
-  expect((await f.execute({ op: "create", ...poolInput, tools: ["lookup"] }, f.ctx)).details.error).toMatchObject({ code: "tools_unavailable" })
-  expect((await f.execute({ op: "create", ...poolInput, tools: ["task_send"] }, f.ctx)).details.error).toMatchObject({ code: "reserved_tool_name" })
-  expect((await f.execute({ op: "create", ...poolInput, agent: { subagent_type: "plan-reviewer", prompt: "st_11111111 succeeded" } }, f.ctx)).details.error).toMatchObject({ code: "policy_denied" })
-  expect((await f.execute({ op: "yield", results: [] }, f.ctx)).details.error).toMatchObject({ code: "worker_unassigned" })
+  expect((await f.execute({ op: "create", ...poolInput, tools: ["lookup"] }, f.ctx)).details.error).toMatchObject({
+    code: "tools_unavailable",
+  })
+  expect((await f.execute({ op: "create", ...poolInput, tools: ["task_send"] }, f.ctx)).details.error).toMatchObject({
+    code: "reserved_tool_name",
+  })
+  expect(
+    (
+      await f.execute(
+        { op: "create", ...poolInput, agent: { subagent_type: "plan-reviewer", prompt: "st_11111111 succeeded" } },
+        f.ctx,
+      )
+    ).details.error,
+  ).toMatchObject({ code: "policy_denied" })
+  expect((await f.execute({ op: "yield", results: [] }, f.ctx)).details.error).toMatchObject({
+    code: "worker_unassigned",
+  })
   expect(f.store.list().records).toEqual([])
 })
 test("#given parent and same-root siblings #when a host request supplies runtime identity #then only exact parent operations are authorized", async () => {
@@ -97,7 +127,12 @@ test("#given keyed input #when canonical duplicates or conflicts arrive #then ad
   const a = f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: { x: 1, y: [2] } }])
   // when / then
   expect(f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: { y: [2], x: 1 } }])).toEqual(a)
-  expect(() => f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "b", input: 3 }, { key: "a", input: 2 }])).toThrow(engine.WorkpoolError)
+  expect(() =>
+    f.manager.workpools.push(f.caller, pool.pool_id, [
+      { key: "b", input: 3 },
+      { key: "a", input: 2 },
+    ]),
+  ).toThrow(engine.WorkpoolError)
   expect(f.manager.workpools.inspect(f.caller, pool.pool_id).items).toHaveLength(1)
   expect(() => f.manager.workpools.create(f.caller, { ...poolInput, mode: "keep_alive" })).toThrow(engine.WorkpoolError)
   expect(f.manager.workpools.close(f.caller, pool.pool_id).status).toBe("closing")
@@ -113,13 +148,17 @@ test("#given an assigned worker #when it forges another key or parent operation 
   const event = await dispatched
   if (event.task_id === undefined) throw new Error("missing assignment")
   const taskId = event.task_id
-  expect(f.starts[0]?.memberScopedTools?.map(tool => tool.name)).toEqual(["workpool"])
+  expect(f.starts[0]?.memberScopedTools?.map((tool) => tool.name)).toEqual(["workpool"])
   // when / then
   const workerCaller = { ...f.caller, sessionId: `worker-${taskId}` }
   expect(() => f.manager.workpools.create(workerCaller, poolInput)).toThrow(engine.WorkpoolError)
   expect(() => f.manager.workpools.inspect(workerCaller, pool.pool_id)).toThrow(engine.WorkpoolError)
-  expect(() => f.manager.workpools.yieldResults(taskId, 0, { op: "create", ...poolInput })).toThrow(engine.WorkpoolError)
-  expect(f.manager.workpools.yieldResults(taskId, 0, { op: "yield", results: [{ key: "other", data: 1 }] })).toMatchObject({
+  expect(() => f.manager.workpools.yieldResults(taskId, 0, { op: "create", ...poolInput })).toThrow(
+    engine.WorkpoolError,
+  )
+  expect(
+    f.manager.workpools.yieldResults(taskId, 0, { op: "yield", results: [{ key: "other", data: 1 }] }),
+  ).toMatchObject({
     results: [{ status: "refused", error: { code: "stale_assignment" } }],
   })
   expect(f.manager.workpools.yieldResults(taskId, 0, { op: "yield", results: [{ key: "a", data: 1 }] })).toMatchObject({
@@ -138,22 +177,58 @@ test("#given a process worker launch #when the member bundle registers #then onl
   if (env === undefined) throw new Error("missing process identity")
   const tools: { name: string; parameters: TSchema }[] = []
   // when / then
-  expect(registerProcessWorkpoolWorker({ registerTool: tool => { tools.push(tool) } }, env)).toBe(true)
-  expect(tools.map(tool => tool.name)).toEqual(["workpool"])
+  expect(
+    registerProcessWorkpoolWorker(
+      {
+        registerTool: (tool) => {
+          tools.push(tool)
+        },
+      },
+      env,
+    ),
+  ).toBe(true)
+  expect(tools.map((tool) => tool.name)).toEqual(["workpool"])
   expect(Value.Check(tools[0].parameters, { op: "create", ...poolInput })).toBe(false)
   expect(Value.Check(tools[0].parameters, { op: "yield", results: [{ key: "a", data: 1 }] })).toBe(true)
-  expect(() => registerProcessWorkpoolWorker({ registerTool: tool => { tools.push(tool) } }, { ...env, OMO_WORKPOOL_TASK_ID: "st_00000000" })).toThrow(engine.WorkpoolError)
+  expect(() =>
+    registerProcessWorkpoolWorker(
+      {
+        registerTool: (tool) => {
+          tools.push(tool)
+        },
+      },
+      { ...env, OMO_WORKPOOL_TASK_ID: "st_00000000" },
+    ),
+  ).toThrow(engine.WorkpoolError)
 })
 
 test("#given a queued plan-gated worker #when the host policy changes before grant #then the admission path fails closed", async () => {
   // given
   const f = fixture()
   let executing = false
-  const execute = buildWorkpoolExecute({ manager: f.manager, workpools: f.manager.workpools, omoConfig: {}, agents: {},
-    resolveSkillInvocations: () => ({ hasInvoked: name => name === "ulw-execute" && executing, hasUserRequested: () => true, hasPlanArtifact: () => true, planArtifactReferences: () => [] }) })
+  const execute = buildWorkpoolExecute({
+    manager: f.manager,
+    workpools: f.manager.workpools,
+    omoConfig: {},
+    agents: {},
+    resolveSkillInvocations: () => ({
+      hasInvoked: (name) => name === "ulw-execute" && executing,
+      hasUserRequested: () => true,
+      hasPlanArtifact: () => true,
+      planArtifactReferences: () => [],
+    }),
+  })
   const ctx = { cwd: f.root, sessionManager: { getSessionId: () => f.caller.sessionId } }
   f.concurrency.tryAcquire("test/model", "st_00000001", 0)
-  const created = await execute({ op: "create", name: "gated", mode: "fresh", agent: { subagent_type: "plan-consultant", prompt: "Inspect the plan" } }, ctx)
+  const created = await execute(
+    {
+      op: "create",
+      name: "gated",
+      mode: "fresh",
+      agent: { subagent_type: "plan-consultant", prompt: "Inspect the plan" },
+    },
+    ctx,
+  )
   expect(created.isError).not.toBe(true)
   const poolId = created.details.pool_id
   if (typeof poolId !== "string") throw new Error("missing pool ID")

@@ -23,7 +23,12 @@ export function generateTelemetrySchemaBlock(
 
   const rows = entries.flatMap(([eventName, properties]) => {
     assertMarkdownIdentifier(eventName, "event name")
-    if (properties === null || typeof properties !== "object" || Array.isArray(properties) || Object.keys(properties).length === 0) {
+    if (
+      properties === null ||
+      typeof properties !== "object" ||
+      Array.isArray(properties) ||
+      Object.keys(properties).length === 0
+    ) {
       throw new Error(`Telemetry event ${eventName} must contain at least one property schema`)
     }
 
@@ -33,8 +38,12 @@ export function generateTelemetrySchemaBlock(
     })
   })
 
-  if (commonProperties === null || typeof commonProperties !== "object" || Array.isArray(commonProperties)
-    || Object.keys(commonProperties).length === 0) {
+  if (
+    commonProperties === null ||
+    typeof commonProperties !== "object" ||
+    Array.isArray(commonProperties) ||
+    Object.keys(commonProperties).length === 0
+  ) {
     throw new Error("Telemetry common properties must contain at least one property schema")
   }
   const commonRows = Object.entries(commonProperties).map(([propertyName, schema]) => {
@@ -74,10 +83,15 @@ function describeProperty(owner, propertyName, schema) {
   if (values !== undefined && (!Array.isArray(values) || values.length === 0)) {
     throw new Error(`Telemetry property ${owner}.${propertyName} values must be a non-empty array`)
   }
-  const valueCell = values === undefined ? "-" : values.map((value) => {
-    assertMarkdownIdentifier(value, `allowed value for ${owner}.${propertyName}`)
-    return `\`${value}\``
-  }).join(", ")
+  const valueCell =
+    values === undefined
+      ? "-"
+      : values
+          .map((value) => {
+            assertMarkdownIdentifier(value, `allowed value for ${owner}.${propertyName}`)
+            return `\`${value}\``
+          })
+          .join(", ")
   return `\`${type}\` | ${valueCell}`
 }
 

@@ -2,7 +2,7 @@
 // against real commits), a fake item store, the fake crypto, an in-process lock and a manual
 // clock. `restart` builds a fresh engine over the same directories, as a process restart would.
 
-import { copyFile, cp, mkdtemp, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises"
+import { cp, mkdtemp, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises"
 import { execFile } from "node:child_process"
 import { tmpdir } from "node:os"
 import { promisify } from "node:util"
@@ -12,10 +12,10 @@ import { disableFixtureAutoMaintenance } from "../../git/test-repo-config.test-s
 import { createDeviceItemStore } from "./adapters/device-item-store"
 import { createGitSyncRepo } from "./adapters/git-sync-repo"
 import { SyncEngine, type EngineFault } from "./engine"
-import { FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
+import { FAKE_SPACE, FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import type { FakeSyncServer } from "./fake-server.test-support"
 import { FakeItemStore } from "./fake-store.test-support"
-import type { Clock, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, ItemStore, SyncLog, SyncRepo, Transport, WriterLock } from "./ports"
 
 export const ACCOUNT = "acc_test"
 /** Every engine test drives real git processes; under machine load a cycle can take seconds. */
@@ -62,6 +62,7 @@ export class ManualClock implements Clock {
   private at = 1_800_000_000_000
   private timers: { readonly due: number; readonly fn: () => void; cancelled: boolean }[] = []
   private waiting: (() => void)[] = []
+  private released = false
 
   /** Resolves once some timer is scheduled: subscribe-first, so a test advances only after the engine waits. */
   untilPending(): Promise<void> {
@@ -75,10 +76,24 @@ export class ManualClock implements Clock {
 
   after(ms: number, fn: () => void): () => void {
     const timer = { due: this.at + ms, fn, cancelled: false }
-    this.timers.push(timer)
-    for (const wake of this.waiting.splice(0)) wake()
+    if (this.released) {
+      queueMicrotask(() => {
+        if (!timer.cancelled) fn()
+      })
+    } else {
+      this.timers.push(timer)
+      for (const wake of this.waiting.splice(0)) wake()
+    }
     return () => {
       timer.cancelled = true
+    }
+  }
+
+  /** Teardown of manual cycles: release pending and future backoffs without advancing time. */
+  releaseWaits(): void {
+    this.released = true
+    for (const timer of this.timers.splice(0)) {
+      if (!timer.cancelled) timer.fn()
     }
   }
 
@@ -118,10 +133,12 @@ export const inProcessLock = (): WriterLock & { held: boolean } => {
 
 /** The transport refuses every network call made while the writer lock is held (sync-design §5). */
 function lockGuarded(transport: Transport, lock: { readonly held: boolean }): Transport {
-  const guard = <A extends unknown[], R>(name: string, fn: (...args: A) => R) => (...args: A): R => {
-    if (lock.held) throw new Error(`network call ${name} while the writer lock is held`)
-    return fn(...args)
-  }
+  const guard =
+    <A extends unknown[], R>(name: string, fn: (...args: A) => R) =>
+    (...args: A): R => {
+      if (lock.held) throw new Error(`network call ${name} while the writer lock is held`)
+      return fn(...args)
+    }
   return {
     pull: guard("pull", transport.pull),
     download: guard("download", transport.download),
@@ -138,11 +155,14 @@ export interface Device {
   readonly clock: ManualClock
   engine: SyncEngine
   store: ItemStore
-  readonly verifier: FakeVerifier
+  verifier: FakeVerifier
   write(key: string, text: string | null): Promise<void>
   read(key: string): Promise<string | null>
-  /** A fresh engine over the same directories; `fault` crashes it at a journal marker. */
-  restart(fault?: EngineFault): Promise<void>
+  /**
+   * A fresh engine over the same directories; `fault` crashes it at a journal marker. `moveTo` binds
+   * it to another memory space (and names the space it leaves when the journal records none).
+   */
+  restart(fault?: EngineFault, moveTo?: { readonly space: string; readonly legacySpace?: string }): Promise<void>
   syncCommits(): Promise<string[]>
   workingTempFiles(): Promise<string[]>
   /** Cycle render journals left under .git/omo-sync/renders (none once every cycle ended). */
@@ -155,15 +175,42 @@ export interface Device {
 
 export interface DeviceOptions {
   readonly batchBytes?: number
+  readonly tempRoot?: string
   /** Start from a copy of another device's memory dir (its .git and journal included). */
   readonly memoryFrom?: string
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
   readonly onStatusChange?: () => void
+  readonly log?: SyncLog
+  /** The account session's freeze settler (rotation on revoke). */
+  readonly freeze?: FreezeSettler
+  /** The memory space the device's session is bound to; FAKE_SPACE by default. */
+  readonly space?: string
 }
 
-export async function makeDevice(server: FakeSyncServer, name: string, fault?: EngineFault, options: DeviceOptions = {}): Promise<Device> {
-  const base = await mkdtemp(join(tmpdir(), `omo-sync-${name}-`))
+export async function makeDevice(
+  server: FakeSyncServer,
+  name: string,
+  fault?: EngineFault,
+  options: DeviceOptions = {},
+): Promise<Device> {
+  const base = await mkdtemp(join(options.tempRoot ?? tmpdir(), `omo-sync-${name}-`))
+  try {
+    return await setupDevice(base, server, name, fault, options)
+  } catch (error) {
+    // The caller cannot dispose a device it never received.
+    await rm(base, { recursive: true, force: true })
+    throw error
+  }
+}
+
+async function setupDevice(
+  base: string,
+  server: FakeSyncServer,
+  name: string,
+  fault: EngineFault | undefined,
+  options: DeviceOptions,
+): Promise<Device> {
   const root = join(base, "memory")
   const stateDir = join(base, "device")
   await mkdir(stateDir, { recursive: true })
@@ -171,32 +218,42 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
   else await cp(options.memoryFrom, root, { recursive: true })
   const repo = await gitRepo(root, options.memoryFrom !== undefined)
   const clock = new ManualClock()
-  const verifier = new FakeVerifier(ACCOUNT)
+  let bound: { readonly space: string; readonly legacySpace?: string } = { space: options.space ?? FAKE_SPACE }
   const build = (f?: EngineFault) => {
-    const store: ItemStore = options.realStore === true
-      ? createDeviceItemStore({ stateDir, memoryRoot: root, syncDir: join(root, ".git", "omo-sync"), machineId: `machine-${name}` })
-      : new FakeItemStore(stateDir, name)
+    const verifier = new FakeVerifier(ACCOUNT, bound.space)
+    const store: ItemStore =
+      options.realStore === true
+        ? createDeviceItemStore({
+            stateDir,
+            memoryRoot: root,
+            syncDir: join(root, ".git", "omo-sync"),
+            machineId: `machine-${name}`,
+          })
+        : new FakeItemStore(stateDir, name)
     const lock = inProcessLock()
     const engine = new SyncEngine({
       repo,
       store,
       transport: lockGuarded(server.transport(`device:${name}`), lock),
       verifier,
-      sealer: new FakeSealer(ACCOUNT),
+      sealer: new FakeSealer(ACCOUNT, bound.space),
+      space: bound.space,
+      ...(bound.legacySpace === undefined ? {} : { legacySpace: bound.legacySpace }),
       lock,
       clock,
       random: () => 0,
       ...(options.batchBytes === undefined ? {} : { batchBytes: options.batchBytes }),
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
+      ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.freeze === undefined ? {} : { freeze: options.freeze }),
       ...(f === undefined ? {} : { fault: f }),
     })
-    return { store, engine }
+    return { store, engine, verifier }
   }
   const device: Device = {
     name,
     repo,
     clock,
-    verifier,
     ...build(fault),
     async write(key, text) {
       const path = join(root, key)
@@ -207,7 +264,8 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
     async read(key) {
       return readFile(join(root, key), "utf8").catch(() => null)
     },
-    async restart(f) {
+    async restart(f, moveTo) {
+      if (moveTo !== undefined) bound = moveTo
       Object.assign(device, build(f))
     },
     async syncCommits() {
@@ -232,7 +290,11 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
     async retiredJournals() {
       return (await readdir(join(root, ".git"))).filter((n) => n.startsWith("omo-sync.retired-"))
     },
-    dispose: () => rm(base, { recursive: true, force: true }),
+    async dispose() {
+      // A cycle still running (a test that timed out mid-cycle) must settle before its directory goes (#13680).
+      await device.engine.stop()
+      await rm(base, { recursive: true, force: true })
+    },
   }
   return device
 }

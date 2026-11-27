@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test"
 import { applyHashlineEdits, applyHashlineEditsWithReport } from "./edit-operations"
-import { applyAppend, applyInsertAfter, applyPrepend, applyReplaceLines, applySetLine } from "./edit-operation-primitives"
+import {
+  applyAppend,
+  applyInsertAfter,
+  applyPrepend,
+  applyReplaceLines,
+  applySetLine,
+} from "./edit-operation-primitives"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
 
@@ -47,15 +53,13 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when
-    const result = applyHashlineEdits(
-      lines.join("\n"),
-      [{ op: "prepend", pos: anchorFor(lines, 2), lines: "before 2" }]
-    )
+    const result = applyHashlineEdits(lines.join("\n"), [
+      { op: "prepend", pos: anchorFor(lines, 2), lines: "before 2" },
+    ])
 
     //#then
     expect(result).toEqual("line 1\nbefore 2\nline 2\nline 3")
   })
-
 
   it("throws when insert_after receives empty text array", () => {
     //#given
@@ -71,10 +75,9 @@ describe("hashline edit operations", () => {
 
     //#when / #then
     expect(() =>
-      applyHashlineEdits(lines.join("\n"), [{ op: "prepend", pos: anchorFor(lines, 1), lines: [] }])
+      applyHashlineEdits(lines.join("\n"), [{ op: "prepend", pos: anchorFor(lines, 1), lines: [] }]),
     ).toThrow(/non-empty/i)
   })
-
 
   it("applies mixed edits in one pass", () => {
     //#given
@@ -203,50 +206,38 @@ describe("hashline edit operations", () => {
     const lines = ["before", "old 1", "old 2", "after"]
 
     //#when
-    const result = applyReplaceLines(
-      lines,
-      anchorFor(lines, 2),
-      anchorFor(lines, 3),
-      ["before", "new 1", "new 2", "after"]
-    )
+    const result = applyReplaceLines(lines, anchorFor(lines, 2), anchorFor(lines, 3), [
+      "before",
+      "new 1",
+      "new 2",
+      "after",
+    ])
 
     //#then
     expect(result).toEqual(["before", "new 1", "new 2", "after"])
   })
 
-it("preserves last replacement line when indentation differs from surrounding context", () => {
-  //#given - re-indentation where closing brace indent deepens
-  const lines = [
-    "    before_context",
-    "old_line_1",
-    "old_line_2",
-    "old_line_3",
-    "    after_context",
-  ]
+  it("preserves last replacement line when indentation differs from surrounding context", () => {
+    //#given - re-indentation where closing brace indent deepens
+    const lines = ["    before_context", "old_line_1", "old_line_2", "old_line_3", "    after_context"]
 
-  //#when - replace 3 lines with 4; last line has deeper indent than line after range
-  const result = applyReplaceLines(
-    lines,
-    anchorFor(lines, 2),
-    anchorFor(lines, 4),
-    [
-      "    before_context",  // exact copy of line[0] → genuine echo, should strip
+    //#when - replace 3 lines with 4; last line has deeper indent than line after range
+    const result = applyReplaceLines(lines, anchorFor(lines, 2), anchorFor(lines, 4), [
+      "    before_context", // exact copy of line[0] → genuine echo, should strip
       "new_line_1",
       "new_line_2",
       "      after_context", // deeper indent than line[4] → NOT an echo, should keep
-    ]
-  )
+    ])
 
-  //#then
-  expect(result).toEqual([
-    "    before_context",
-    "new_line_1",
-    "new_line_2",
-    "      after_context",
-    "    after_context",
-  ])
-})
-
+    //#then
+    expect(result).toEqual([
+      "    before_context",
+      "new_line_1",
+      "new_line_2",
+      "      after_context",
+      "    after_context",
+    ])
+  })
 
   it("restores indentation for first replace_lines entry", () => {
     //#given
@@ -261,40 +252,51 @@ it("preserves last replacement line when indentation differs from surrounding co
 
   it("preserves blank lines and indentation in range replace (no false unwrap)", () => {
     //#given, reproduces the 애국가 bug where blank+indented lines collapse
-    const lines = ["", "동해물과 백두산이 마르고 닳도록", "하느님이 보우하사 우리나라 만세", "", "무궁화 삼천리 화려강산", "대한사람 대한으로 길이 보전하세", ""]
+    const lines = [
+      "",
+      "동해물과 백두산이 마르고 닳도록",
+      "하느님이 보우하사 우리나라 만세",
+      "",
+      "무궁화 삼천리 화려강산",
+      "대한사람 대한으로 길이 보전하세",
+      "",
+    ]
 
     //#when, replace the range with indented version (blank lines preserved)
-    const result = applyReplaceLines(
-      lines,
-      anchorFor(lines, 1),
-      anchorFor(lines, 7),
-      ["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""]
-    )
+    const result = applyReplaceLines(lines, anchorFor(lines, 1), anchorFor(lines, 7), [
+      "",
+      "  동해물과 백두산이 마르고 닳도록",
+      "  하느님이 보우하사 우리나라 만세",
+      "",
+      "  무궁화 삼천리 화려강산",
+      "  대한사람 대한으로 길이 보전하세",
+      "",
+    ])
 
     //#then, all 7 lines preserved with indentation, not collapsed to 3
-    expect(result).toEqual(["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""])
+    expect(result).toEqual([
+      "",
+      "  동해물과 백두산이 마르고 닳도록",
+      "  하느님이 보우하사 우리나라 만세",
+      "",
+      "  무궁화 삼천리 화려강산",
+      "  대한사람 대한으로 길이 보전하세",
+      "",
+    ])
   })
 
   it("collapses wrapped replacement span back to unique original single line", () => {
     //#given
-    const lines = [
-      "const request = buildRequest({ method: \"GET\", retries: 3 })",
-      "const done = true",
-    ]
+    const lines = ['const request = buildRequest({ method: "GET", retries: 3 })', "const done = true"]
 
     //#when
-    const result = applyReplaceLines(
-      lines,
-      anchorFor(lines, 1),
-      anchorFor(lines, 1),
-      ["const request = buildRequest({", "method: \"GET\", retries: 3 })"]
-    )
+    const result = applyReplaceLines(lines, anchorFor(lines, 1), anchorFor(lines, 1), [
+      "const request = buildRequest({",
+      'method: "GET", retries: 3 })',
+    ])
 
     //#then
-    expect(result).toEqual([
-      "const request = buildRequest({ method: \"GET\", retries: 3 })",
-      "const done = true",
-    ])
+    expect(result).toEqual(['const request = buildRequest({ method: "GET", retries: 3 })', "const done = true"])
   })
 
   it("keeps wrapped replacement when canonical match is not unique in original lines", () => {
@@ -382,12 +384,7 @@ it("preserves last replacement line when indentation differs from surrounding co
     const lines = ["const a = 1;", "const b = 2;"]
 
     //#when
-    const result = applyReplaceLines(
-      lines,
-      anchorFor(lines, 1),
-      anchorFor(lines, 2),
-      "const a = 10; const b = 20;"
-    )
+    const result = applyReplaceLines(lines, anchorFor(lines, 1), anchorFor(lines, 2), "const a = 10; const b = 20;")
 
     //#then
     expect(result).toEqual(["const a = 10;", "const b = 20;"])

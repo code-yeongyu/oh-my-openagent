@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -141,15 +140,19 @@ describe("startReplyListener", () => {
     )
     writeFileSync(
       configFilePath,
-      JSON.stringify({
-        ...createConfig(),
-        replyListener: {
-          ...createConfig().replyListener,
-          discordChannelId: "stale-channel",
-          authorizedDiscordUserIds: ["stale-user"],
-          pollIntervalMs: 500,
+      JSON.stringify(
+        {
+          ...createConfig(),
+          replyListener: {
+            ...createConfig().replyListener,
+            discordChannelId: "stale-channel",
+            authorizedDiscordUserIds: ["stale-user"],
+            pollIntervalMs: 500,
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     )
 
     const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
@@ -192,8 +195,7 @@ describe("startReplyListener", () => {
 
       return {
         pid: nextPid,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -218,5 +220,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

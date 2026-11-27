@@ -142,6 +142,7 @@ pub struct Supervisor {
     #[cfg(any(test, feature = "test-support"))]
     hold_waiting: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     hold_signals: Mutex<Vec<Weak<crate::HoldSignal>>>,
+    stop_observers: Mutex<Vec<Weak<dyn Fn() + Send + Sync>>>,
     suspended: AtomicBool,
     authority: Option<Arc<authority::AuthorityAdmission>>,
     published: AtomicBool,
@@ -170,6 +171,7 @@ impl Supervisor {
             #[cfg(any(test, feature = "test-support"))]
             hold_waiting: Mutex::new(None),
             hold_signals: Mutex::new(Vec::new()),
+            stop_observers: Mutex::new(Vec::new()),
             suspended: AtomicBool::new(false),
             authority: None,
             published: AtomicBool::new(false),
@@ -251,6 +253,13 @@ impl Supervisor {
         if let Some(sender) = self.hold_waiting.lock().take() {
             sender.send(()).unwrap_or(());
         }
+    }
+
+    /// The supervisor's clock, so the session measures the user's pauses on
+    /// the same (possibly fake) clock as heartbeats.
+    #[must_use]
+    pub fn now_ms(&self) -> u64 {
+        self.clock.now_ms()
     }
 
     /// Invalidation epoch: stops and authority activation invalidate old holds

@@ -9,22 +9,25 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
+import { newlyExpired } from "./projection-expiry"
 import {
   createProjectionPins,
-  renderProjectedChangesLine,
   type ProjectionPinRecord,
   type ProjectionPins,
   type ProjectionRepinReason,
   type ProjectionTurn,
 } from "./projection-pin"
+import { renderMemoryNotice } from "./prompt-notice"
 import { estimateSystemTokensCached, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 
+export {
+  MEMORY_AGREEMENT_METADATA_TOKEN,
+  MEMORY_NUDGE_METADATA_TOKEN,
+  MEMORY_SOUL_METADATA_TOKEN,
+} from "./prompt-notice"
 export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v3"
 export const MEMORY_NOTICE_CUSTOM_TYPE = "omo-memory:notice"
-export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory save"
 export const MEMORY_PRESSURE_METADATA_TOKEN = "memory pressure:"
-export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
-export const MEMORY_AGREEMENT_METADATA_TOKEN = "Agreement NEEDS-HUMAN"
 
 export interface MemoryPromptSession {
   readonly id: string
@@ -43,11 +46,7 @@ export interface MemoryPromptInjectionOptions {
   readonly onRepin?: (sessionId: string, reason: Exclude<ProjectionRepinReason, "first-turn">) => void
   readonly resolveCompileWarnTokens?: (identity: string) => number
   readonly resolveProjectionLimits?: (identity: string) => ExternalProjectionLimits
-  readonly resolveNudgeTurns?: (
-    repo: GitMemoryRepo,
-    sessionId: string,
-    identity: string,
-  ) => Promise<number | undefined>
+  readonly resolveNudgeTurns?: (repo: GitMemoryRepo, sessionId: string, identity: string) => Promise<number | undefined>
   readonly resolveSoulNotice?: (
     repo: GitMemoryRepo,
     sessionId: string,
@@ -98,8 +97,11 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     let pending = pressureInFlight.get(revision)
     if (pending === undefined) {
       // estimateSystemTokens throws on a failed read, so a stored estimate is always the commit's own.
-      pending = cache.remember(repo, "system-token-estimate", revision, async () =>
-        ({ value: String(await estimateSystemTokensCached(repo, revision, pressureEstimates)), persist: true }))
+      pending = cache
+        .remember(repo, "system-token-estimate", revision, async () => ({
+          value: String(await estimateSystemTokensCached(repo, revision, pressureEstimates)),
+          persist: true,
+        }))
         .then((stored) => {
           const tokens = Number(stored)
           pressureEstimates.set(revision, tokens)
@@ -150,20 +152,43 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
       : await noticeInput("soul", session.id, () => options.resolveSoulNotice?.(repo, session.id, context.identity))
     const flaggedAgreements = preview
       ? undefined
-      : await noticeInput("agreements", session.id, () => options.resolveAgreementsNotice?.(repo, session.id, context.identity))
+      : await noticeInput("agreements", session.id, () =>
+          options.resolveAgreementsNotice?.(repo, session.id, context.identity),
+        )
     const pinInput = { repo, sessionId: session.id, branch: session.branch, head: await repo.head() }
     const turn: ProjectionTurn = preview
-      ? { revision: await pins.peek(pinInput) }
+      ? await previewTurn(pins, pinInput)
       : await pins.advance({ ...pinInput, record: recordPin })
     if (turn.repinned !== undefined && turn.repinned !== "first-turn") options.onRepin?.(session.id, turn.repinned)
-    const block = await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), turn.revision)
+    const { block, expiries } = await cache.compileWithExpiries(
+      repo,
+      `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`,
+      blockOptions(context),
+      turn.revision,
+      turn.asOfMs,
+    )
+    const expired = preview
+      ? []
+      : newlyExpired(expiries, {
+          pinnedAtMs: turn.asOfMs,
+          noticedThroughMs: turn.expiryNoticedThroughMs,
+          nowMs: turn.nowMs,
+        })
+    if (expired.length > 0) pins.noticeExpiries({ sessionId: session.id, throughMs: turn.nowMs, record: recordPin })
     const pressureBlock = await addMemoryPressureMetadata(
       block,
       turn.revision,
       options.resolveCompileWarnTokens?.(context.identity),
       (revision) => estimatePressure(repo, revision),
     )
-    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice, turn, flaggedAgreements ?? [])
+    const notice = renderMemoryNotice({
+      compactedMessageCount: session.compactedMessageCount,
+      nudgeTurns,
+      soulNotice,
+      turn,
+      expired,
+      flaggedAgreements: flaggedAgreements ?? [],
+    })
     const nextPrompt = replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock))
     if (notice === undefined) return { systemPrompt: nextPrompt }
     return {
@@ -176,12 +201,15 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     }
   }
   return Object.assign(handler, {
-    async prebuild(context: MemoryIdentityContext): Promise<void> {
-      const repo = createRepo(context)
-      const head = await repo.head()
-      if (head === null) return
-      await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), head)
-      if (options.resolveCompileWarnTokens?.(context.identity) !== undefined) await estimatePressure(repo, head)
+    prebuild(context: MemoryIdentityContext): Promise<void> {
+      // Through the cache, so the shutdown drain's cache.settled() also waits for this HEAD read (#11135).
+      return cache.track(async () => {
+        const repo = createRepo(context)
+        const head = await repo.head()
+        if (head === null) return
+        await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), head)
+        if (options.resolveCompileWarnTokens?.(context.identity) !== undefined) await estimatePressure(repo, head)
+      })
     },
   })
 }
@@ -203,33 +231,13 @@ async function addMemoryPressureMetadata(
   return `${block.slice(0, metadataEnd)}${line}\n${block.slice(metadataEnd)}`
 }
 
-/**
- * Session-volatile lines only. Every line is a fact about THIS session's state; standing facts (what
- * memory is, that recall arrives on its own) live in the compiled block. No line means no notice.
- */
-function renderMemoryNotice(
-  compactedMessageCount: number,
-  nudgeTurns: number | undefined,
-  soulNotice: { readonly sha: string } | undefined,
-  turn: ProjectionTurn,
-  flaggedAgreements: readonly AgreementItem[],
-): string | undefined {
-  const lines = [
-    ...(compactedMessageCount === 0
-      ? []
-      : [`- ${compactedMessageCount} earlier messages were compacted out of the live context; what still matters from them arrives on its own as <recalled-memory> blocks`]),
-    ...(nudgeTurns === undefined
-      ? []
-      : [`- ${nudgeTurns} ${MEMORY_NUDGE_METADATA_TOKEN}. Save durable facts now, or decide nothing qualifies.`]),
-    ...(soulNotice === undefined
-      ? []
-      : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
-    ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision, turn.sources)]),
-    ...flaggedAgreements.map((item) =>
-      `- ${MEMORY_AGREEMENT_METADATA_TOKEN} (broken x${item.n}): "${item.text}" Do not break it again this session; if the task needs it, stop and ask your person.`),
-  ]
-  if (lines.length === 0) return undefined
-  return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")
+/** A preview composes the real turn's bytes (same revision, same expiry instant) without touching the pin. */
+async function previewTurn(
+  pins: ProjectionPins,
+  input: Parameters<ProjectionPins["peek"]>[0],
+): Promise<ProjectionTurn> {
+  const { revision, asOfMs } = await pins.peek(input)
+  return { revision, asOfMs, expiryNoticedThroughMs: asOfMs, nowMs: asOfMs }
 }
 
 function defaultCreateRepo(context: MemoryIdentityContext): GitMemoryRepo {
@@ -270,9 +278,8 @@ function countCompactedMessages(branch: readonly unknown[]): number {
     firstKeptEntryId = typeof entry.firstKeptEntryId === "string" ? entry.firstKeptEntryId : undefined
   }
   if (compactionIndex < 0) return 0
-  const keptIndex = firstKeptEntryId === undefined
-    ? -1
-    : branch.findIndex((entry) => isRecord(entry) && entry.id === firstKeptEntryId)
+  const keptIndex =
+    firstKeptEntryId === undefined ? -1 : branch.findIndex((entry) => isRecord(entry) && entry.id === firstKeptEntryId)
   const boundary = keptIndex < 0 ? compactionIndex : keptIndex
   return branch.slice(0, boundary).filter((entry) => isRecord(entry) && entry.type === "message").length
 }
@@ -287,10 +294,11 @@ function withHeadReadOnce(repo: GitMemoryRepo): GitMemoryRepo {
   return new Proxy(repo, {
     get(target, property, receiver) {
       if (property === "head") {
-        return () => (head ??= target.head().catch((error: unknown) => {
-          head = undefined
-          throw error
-        }))
+        return () =>
+          (head ??= target.head().catch((error: unknown) => {
+            head = undefined
+            throw error
+          }))
       }
       const value = Reflect.get(target, property, receiver)
       return typeof value === "function" ? value.bind(target) : value

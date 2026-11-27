@@ -19,9 +19,26 @@ export interface NormalizeFrontmatterSkip {
 }
 
 export type NormalizeFrontmatterResult =
-  | { readonly status: "clean"; readonly examined: number; readonly rewritten: readonly string[]; readonly skipped: readonly NormalizeFrontmatterSkip[] }
-  | { readonly status: "normalized"; readonly sha: string; readonly examined: number; readonly rewritten: readonly string[]; readonly skipped: readonly NormalizeFrontmatterSkip[] }
-  | { readonly status: "skipped"; readonly detail: string; readonly examined: 0; readonly rewritten: readonly string[]; readonly skipped: readonly NormalizeFrontmatterSkip[] }
+  | {
+      readonly status: "clean"
+      readonly examined: number
+      readonly rewritten: readonly string[]
+      readonly skipped: readonly NormalizeFrontmatterSkip[]
+    }
+  | {
+      readonly status: "normalized"
+      readonly sha: string
+      readonly examined: number
+      readonly rewritten: readonly string[]
+      readonly skipped: readonly NormalizeFrontmatterSkip[]
+    }
+  | {
+      readonly status: "skipped"
+      readonly detail: string
+      readonly examined: 0
+      readonly rewritten: readonly string[]
+      readonly skipped: readonly NormalizeFrontmatterSkip[]
+    }
 
 /**
  * One-time, idempotent repair of legacy frontmatter: every memory content file
@@ -91,7 +108,11 @@ function markerPathFor(repo: GitMemoryRepo): string {
   return join(resolveCommonGitDir(repo.dir), FRONTMATTER_NORMALIZATION_MARKER)
 }
 
-async function normalizeOne(root: string, path: string, stripped: string[]): Promise<"unchanged" | "rewritten" | NormalizeFrontmatterSkip["reason"]> {
+async function normalizeOne(
+  root: string,
+  path: string,
+  stripped: string[],
+): Promise<"unchanged" | "rewritten" | NormalizeFrontmatterSkip["reason"]> {
   const absolute = join(root, path)
   const content = await readFile(absolute, "utf8")
   if (describeFrontmatterGrammarViolation(content) === null) return "unchanged"

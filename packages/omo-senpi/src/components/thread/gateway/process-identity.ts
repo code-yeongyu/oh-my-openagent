@@ -22,13 +22,24 @@ export function parseLstart(text: string): number | null {
 /**
  * The process's start time as `epoch:<seconds>`. `ps` runs with `LC_ALL=C` and `TZ=UTC`, so two
  * processes with different locales or time zones record the same value for the same process.
+ * A `ps` that cannot be started at all answers null like one that fails: Bun and Node throw some spawn
+ * failures (EPERM from a process limit or a sandbox, #12314) synchronously rather than through the callback.
  */
 export function processStartTime(pid: number): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile("ps", ["-o", "lstart=", "-p", String(pid)], { env: { ...process.env, LC_ALL: "C", LANG: "C", TZ: "UTC" }, windowsHide: true, timeout: 5_000 }, (error, stdout) => {
-      const seconds = error === null ? parseLstart(stdout) : null
-      resolve(seconds === null ? null : `${EPOCH_PREFIX}${seconds}`)
-    })
+    try {
+      execFile(
+        "ps",
+        ["-o", "lstart=", "-p", String(pid)],
+        { env: { ...process.env, LC_ALL: "C", LANG: "C", TZ: "UTC" }, windowsHide: true, timeout: 5_000 },
+        (error, stdout) => {
+          const seconds = error === null ? parseLstart(stdout) : null
+          resolve(seconds === null ? null : `${EPOCH_PREFIX}${seconds}`)
+        },
+      )
+    } catch {
+      resolve(null)
+    }
   })
 }
 
@@ -56,5 +67,9 @@ export async function isClaimantDead(identity: ProcessIdentity): Promise<boolean
 }
 
 export function sameProcess(left: ProcessIdentity, right: ProcessIdentity): boolean {
-  return left.pid === right.pid && left.process_start_time === right.process_start_time && left.instance_id === right.instance_id
+  return (
+    left.pid === right.pid &&
+    left.process_start_time === right.process_start_time &&
+    left.instance_id === right.instance_id
+  )
 }

@@ -23,16 +23,19 @@ describe("flock failures are classified by errno (omo #10604)", () => {
     expect(classifyFlockFailure(code ?? -1).kind).toBe(kind)
   })
 
-  test.skipIf(process.platform === "win32")("#given a descriptor that is not open #when a lock is attempted #then it fails with EBADF instead of reading as busy", async () => {
-    // #given
-    const closedFd = 1_000_000
+  test.skipIf(process.platform === "win32")(
+    "#given a descriptor that is not open #when a lock is attempted #then it fails with EBADF instead of reading as busy",
+    async () => {
+      // #given
+      const closedFd = 1_000_000
 
-    // #when
-    const exclusive = await tryLockExclusive(closedFd)
-    const shared = await tryLockShared(closedFd)
+      // #when
+      const exclusive = await tryLockExclusive(closedFd)
+      const shared = await tryLockShared(closedFd)
 
-    // #then
-    expect(exclusive).toEqual({ kind: "failed", errno: errno.EBADF ?? -1 })
-    expect(shared).toEqual({ kind: "failed", errno: errno.EBADF ?? -1 })
-  })
+      // #then
+      expect(exclusive).toEqual({ kind: "failed", errno: errno.EBADF ?? -1 })
+      expect(shared).toEqual({ kind: "failed", errno: errno.EBADF ?? -1 })
+    },
+  )
 })

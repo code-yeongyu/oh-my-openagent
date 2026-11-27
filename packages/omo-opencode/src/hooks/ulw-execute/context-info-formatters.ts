@@ -61,9 +61,7 @@ export function buildMultipleActiveWorksContext(params: {
   const optionList = resumeOptions
     .map((option, index) => {
       const percent =
-        option.progress.total === 0
-          ? 0
-          : Math.floor((option.progress.completed / option.progress.total) * 100)
+        option.progress.total === 0 ? 0 : Math.floor((option.progress.completed / option.progress.total) * 100)
 
       return `${index + 1}. ${option.plan_name} - ${option.progress.completed}/${option.progress.total} (${percent}%) - elapsed: ${formatElapsedHuman(option.elapsed_ms)} - worktree: ${option.worktree_path ?? "current directory"} - sessions: ${option.session_count}`
     })
@@ -105,9 +103,7 @@ Looking for new plans...`
 
   const effectiveWorktree = worktreePath ?? existingState.worktree_path
   const sessionAlreadyTracked = existingState.session_ids.includes(sessionId)
-  const updatedSessions = sessionAlreadyTracked
-    ? existingState.session_ids
-    : [...existingState.session_ids, sessionId]
+  const updatedSessions = sessionAlreadyTracked ? existingState.session_ids : [...existingState.session_ids, sessionId]
   const shouldRewriteState = existingState.agent !== activeAgent || worktreePath !== undefined
 
   if (shouldRewriteState) {

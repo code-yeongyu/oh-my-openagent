@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 
 // Relative to BOTH the repo root and the plugin root. In a repo checkout the directive lives at
 // <repo>/packages/prompts-core/prompts/ultrawork/codex.md. The Codex installer flattens the plugin
@@ -8,10 +8,16 @@ import { join } from "node:path";
 // same file at <pluginRoot>/packages/prompts-core/prompts/ultrawork/codex.md and sync-skills reads
 // that copy instead. Keep the two segments lists in lockstep with
 // packages/omo-codex/src/install/codex-cache-install.ts (copyCanonicalPromptSources).
-export const canonicalUltraworkDirectiveRelativePath = join("packages", "prompts-core", "prompts", "ultrawork", "codex.md");
+export const canonicalUltraworkDirectiveRelativePath = join(
+  "packages",
+  "prompts-core",
+  "prompts",
+  "ultrawork",
+  "codex.md",
+)
 
 export function resolveCanonicalUltraworkDirectivePath(pluginRoot, repoRoot) {
-	const checkoutPath = join(repoRoot, canonicalUltraworkDirectiveRelativePath);
-	if (existsSync(checkoutPath)) return checkoutPath;
-	return join(pluginRoot, canonicalUltraworkDirectiveRelativePath);
+  const checkoutPath = join(repoRoot, canonicalUltraworkDirectiveRelativePath)
+  if (existsSync(checkoutPath)) return checkoutPath
+  return join(pluginRoot, canonicalUltraworkDirectiveRelativePath)
 }

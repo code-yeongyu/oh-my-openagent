@@ -11,7 +11,8 @@ The visual-QA skill's executable core: a zero-dependency Node CLI that produces 
 ```
 visual-qa/
 ├── SKILL.md                      # reviewer workflow (dual oracle, evidence gates) — the prose contract
-├── references/browser-setup.md
+├── references/browser-setup.md   # capture engines and the viewport/theme matrix
+├── references/behaviour-evidence.md  # state and flow cases behind checklist H12-H19
 └── scripts/
     ├── visual-qa.mjs             # SHIPPED RUNTIME: bun-build bundle of cli.ts (+ embedded modules)
     ├── cli.ts                    # development source; dispatches image-diff / tui-check
@@ -55,4 +56,4 @@ node scripts/visual-qa.mjs tui-check <capture.txt> --cols 80
 bun test scripts/*.test.ts
 ```
 
-- Parent: [`packages/shared-skills/AGENTS.md`](../../AGENTS.md).
+- Parent (source checkout only; not shipped with the skill): `packages/shared-skills/AGENTS.md`.

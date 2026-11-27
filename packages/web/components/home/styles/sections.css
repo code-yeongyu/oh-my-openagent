@@ -1,0 +1,544 @@
+/* Sections */
+.section {
+  padding-block: var(--space-10) 0;
+  scroll-margin-top: 72px;
+}
+
+/* 4.2 Section index (herdr's README.md list) */
+.index {
+  margin-top: var(--space-9);
+}
+
+.index ol {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.index li {
+  border-bottom: 1px solid var(--line);
+}
+
+.index a {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-2) var(--space-5) 0;
+  text-decoration: none;
+  color: var(--ink-soft);
+  transition: color var(--dur-ui) var(--ease-standard);
+}
+
+.index a:hover {
+  color: var(--ink);
+}
+
+.index .n {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--accent);
+}
+
+.index .t {
+  font-size: 1.0625rem;
+  color: var(--ink);
+}
+
+.index .d {
+  display: none;
+}
+
+.index {
+  margin-top: var(--space-8);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin: 0 0 var(--space-7);
+  padding: 0;
+  list-style: none;
+}
+.stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stats span {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.stats strong {
+  font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Split: text beside a figure */
+.split {
+  display: grid;
+  gap: var(--space-7);
+}
+
+/* Ultrawork terminal */
+.term .oline {
+  margin: 0;
+}
+.term .p {
+  color: var(--accent);
+}
+.kw {
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: inherit;
+}
+.steps {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  color: var(--term-fg);
+}
+.steps li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+.steps__mark {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--ok);
+  transform: translateY(2px);
+}
+
+/* Chips and two-column rows */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-7) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.chips .chip {
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+.chips .chip .dot {
+  background: var(--accent);
+}
+.rows {
+  display: grid;
+  margin: var(--space-7) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  column-gap: var(--space-8);
+}
+.rows li {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+.rows code {
+  flex: none;
+  min-width: 9.5rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* Kibitzer: two loops */
+.kib {
+  display: grid;
+  width: 100%;
+  margin-top: var(--space-7);
+  background: var(--bg-raised);
+}
+.kib__pane {
+  padding: var(--space-6);
+}
+.kib__pane + .kib__pane {
+  border-top: 1px solid var(--line);
+}
+.kib__who {
+  margin: 0;
+  font-weight: 600;
+}
+.kib__loop {
+  margin: 2px 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.kib__steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  counter-reset: k;
+}
+.kib__steps li {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.kib__memory {
+  margin-top: var(--space-4);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+.kib__memory p {
+  margin: 0;
+}
+.kib__tag {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.kib__nudge {
+  background: var(--accent-wash);
+  color: var(--ink);
+  border-color: transparent !important;
+}
+.kib__nudge .kib__tag {
+  color: var(--accent);
+}
+.kib__now {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Crafted: numbered facts */
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6) var(--space-8);
+  margin: var(--space-7) 0 0;
+  padding: var(--space-6) 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.facts li {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+}
+.facts .n {
+  font-size: var(--text-xs);
+  color: var(--accent);
+  padding-top: 4px;
+}
+.facts strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+.facts p {
+  margin: 0;
+}
+
+/* Everywhere */
+.mini-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mini-chips li {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+/* Quotes */
+.quote {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+}
+.quote blockquote {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.quote figcaption {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+/* 4.7 Makers */
+.makers__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+
+.maker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--dur-ui) var(--ease-standard);
+}
+
+.maker:hover {
+  background: var(--surface-2);
+}
+
+.maker__name {
+  font-size: var(--text-h3);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.maker__what {
+  color: var(--ink-soft);
+  line-height: 1.6;
+  max-width: 52ch;
+}
+
+.maker__url {
+  margin-top: auto;
+  font-size: var(--text-sm);
+  color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .makers__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Closing: install */
+.closing__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.closing__install {
+  width: min(100%, 640px);
+  margin-top: var(--space-7);
+  text-align: left;
+}
+.install__tabs {
+  display: flex;
+  gap: 2px;
+}
+.install__tabs button,
+.copy {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-ui) var(--ease-standard),
+    color var(--dur-ui) var(--ease-standard);
+}
+.install__tabs button:hover,
+.copy:hover {
+  color: var(--ink);
+}
+.install__tabs button[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+}
+.copy svg {
+  width: 13px;
+  height: 13px;
+}
+.copy__label {
+  display: grid;
+}
+.copy__label > span {
+  grid-area: 1 / 1;
+}
+.copy__label > span[aria-hidden="true"] {
+  visibility: hidden;
+}
+.install pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.install .dim {
+  color: var(--term-dim);
+}
+
+@media (min-width: 640px) {
+  .rows--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 900px) {
+  .split {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: center;
+  }
+  .kib {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+  .kib__pane + .kib__pane {
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+@media (max-width: 640px) {
+  .stats {
+    gap: var(--space-3);
+  }
+  .stats span {
+    font-size: var(--text-xs);
+  }
+  .rows code {
+    min-width: 0;
+  }
+  .rows li {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+/* Install panels: until a tab is picked (data-show), the target the <head> detect script set on <html> (data-install)
+   picks the panel; no JavaScript shows every panel with its label (noscript style in install-block.tsx). */
+[data-install-tabs] [data-panel],
+[data-install-tabs] [data-panel-label] {
+  display: none;
+}
+:root:not([data-install]) [data-install-tabs]:not([data-show]) [data-panel="unix"],
+:root[data-install="unix"] [data-install-tabs]:not([data-show]) [data-panel="unix"],
+:root[data-install="powershell"] [data-install-tabs]:not([data-show]) [data-panel="powershell"],
+:root[data-install="cmd"] [data-install-tabs]:not([data-show]) [data-panel="cmd"],
+[data-install-tabs][data-show="unix"] [data-panel="unix"],
+[data-install-tabs][data-show="powershell"] [data-panel="powershell"],
+[data-install-tabs][data-show="cmd"] [data-panel="cmd"] {
+  display: block;
+}
+.install__panel-label {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+.install__caption {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.install__caption > [data-caption="computer"],
+:root[data-install-hint="computer"] .install__caption > [data-caption="next"] {
+  display: none;
+}
+:root[data-install-hint="computer"] .install__caption > [data-caption="computer"] {
+  display: inline;
+}
+@media (max-width: 640px) {
+  .install__windows {
+    display: none;
+  }
+}
+
+/* Eyebrow status dot (current omo.dev): pulses unless reduced motion. */
+.eyebrow__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: eyebrow-pulse 2.2s var(--ease-standard) infinite;
+}
+.eyebrow__dot--busy {
+  background: var(--wait);
+}
+@keyframes eyebrow-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Sticky aside: the title column stays beside the desktop window while it scrolls (current omo.dev 02). */
+.aside {
+  display: grid;
+  gap: var(--space-7);
+}
+@media (min-width: 1024px) {
+  .aside {
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+  }
+  .aside__head {
+    position: sticky;
+    top: 96px;
+  }
+}
+.hero__graph {
+  width: 100%;
+  margin-top: var(--space-8);
+  text-align: left;
+}
+
+/* Touch-width hit targets for the install block (after its desktop sizes above). */
+@media (max-width: 767px) {
+  .install__tabs button,
+  .copy {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

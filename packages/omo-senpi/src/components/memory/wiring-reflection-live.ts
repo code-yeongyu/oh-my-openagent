@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import type { ReservedRun } from "@oh-my-opencode/memory-core"
+import type { ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import { createOncePerSessionGuard } from "../task/usage-guidance"
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -23,12 +23,16 @@ import {
   type ReflectionLiveSession,
 } from "./worker"
 import { describeReflectionLauncher } from "./worker/launcher-identity"
-import { readUi } from "./wiring-context"
+import { guardedStatus, readUi } from "./wiring-context"
 import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
   currentSession(): ReflectionLiveSession | undefined
-  registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined, applyFacts?: MemoryFactsApplier): void
+  registerRpc(
+    pi: SenpiExtensionAPI,
+    resolveContext: (sessionId: string) => MemoryIdentityContext | undefined,
+    applyFacts?: MemoryFactsApplier,
+  ): void
   attach(sessionId: string): void
   bind(
     pi: SenpiExtensionAPI,
@@ -41,6 +45,7 @@ export interface MemoryReflectionLiveWiring {
   onLiveReflectionCompleted(identity: string, runId: string): Promise<void>
   onSettled(sessionId: string, eventCtx: unknown, signal?: AbortSignal): Promise<void>
   syncRpc(): Promise<void>
+  syncJournal(sessionId: string, entries: readonly TranscriptProjection[]): Promise<void>
   shutdown(identity?: string): void
   /** Resolves once every status refresh started by bind or settle has finished (each one runs git in the identity dir). */
   settled(): Promise<void>
@@ -106,6 +111,9 @@ export function createMemoryReflectionLiveWiring(
     const ui = readUi(lastEventCtx.current)
     footerLive.syncActive(activeSession.current, ui)
     await footerLive.refresh(activeSession.current, ui)
+    // syncActive started the footer restore that replaces the spinner; a refresh that finds the fingerprint already
+    // recorded returns early, so the completion is delivered only once that restore has landed too.
+    await footerLive.settled()
     await rpcBridge.current?.sync()
   }
 
@@ -124,16 +132,19 @@ export function createMemoryReflectionLiveWiring(
     },
     async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
       const ui = readUi(eventCtx)
+      // The engine emits transitions only; a failure may have started before this session became active.
+      await syncNotifier?.changed(identity.identityPaths.repo, ui)
       const api = createReflectionCompletionApi(pi)
-      liveSession.current = api === undefined
-        ? undefined
-        : {
-            sessionId,
-            api,
-            identityContext: identity,
-            ...(ui === undefined ? {} : { ui }),
-            ...(options.logger === undefined ? {} : { logger: options.logger }),
-          }
+      liveSession.current =
+        api === undefined
+          ? undefined
+          : {
+              sessionId,
+              api,
+              identityContext: identity,
+              ...(ui === undefined ? {} : { ui }),
+              ...(options.logger === undefined ? {} : { logger: options.logger }),
+            }
       const initialStatus = refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
       if (initialStatus !== undefined) track(initialStatus)
       if (liveSession.current !== undefined) {
@@ -164,15 +175,21 @@ export function createMemoryReflectionLiveWiring(
       signal?.throwIfAborted()
       const ui = readUi(eventCtx)
       const identity = options.sessions.get(sessionId)?.context
-      track(footerLive.refresh(sessionId, ui === undefined ? undefined : {
-        setStatus(key, text) {
-          if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
-        },
-      }))
+      track(
+        footerLive.refresh(
+          sessionId,
+          ui === undefined
+            ? undefined
+            : guardedStatus(ui, () => !signal?.aborted && options.sessions.get(sessionId)?.context === identity),
+        ),
+      )
       await rpcBridge.current?.sync(signal)
     },
     async syncRpc(): Promise<void> {
       await rpcBridge.current?.sync()
+    },
+    async syncJournal(sessionId, entries): Promise<void> {
+      if (activeSession.current === sessionId) await rpcBridge.current?.syncJournal(entries)
     },
     shutdown(identity): void {
       if (identity !== undefined) activeRuns.clear(identity)

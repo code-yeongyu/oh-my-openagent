@@ -12,7 +12,7 @@ describe("deprecated OpenCode Zen model routing", () => {
 
     // when
     const deprecatedOpencodeEntries = allEntries.filter(
-      (entry) => deprecatedModels.has(entry.model) && entry.providers.includes("opencode")
+      (entry) => deprecatedModels.has(entry.model) && entry.providers.includes("opencode"),
     )
 
     // then

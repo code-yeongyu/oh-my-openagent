@@ -2,7 +2,12 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { DEFAULT_CATEGORIES } from "./builtins"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
-import { missingChainProviders, parseAvailableModels, resolveAvailableCategoryNames, unlistedProviderModel } from "./resolver"
+import {
+  missingChainProviders,
+  parseAvailableModels,
+  resolveAvailableCategoryNames,
+  unlistedProviderModel,
+} from "./resolver"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "./types"
 
 export type UnusableCategory = {
@@ -32,19 +37,24 @@ export function resolveCategoryCoverage<TModel extends SenpiModelPort>(
   const available = parseAvailableModels(registry.getAvailable())
   if (!available.validContainer) throw new Error("the model registry did not return a model list")
   const userCategories = config.categories ?? {}
-  const enabled = (name: string): boolean => !Object.hasOwn(userCategories, name) || userCategories[name]?.disable !== true
+  const enabled = (name: string): boolean =>
+    !Object.hasOwn(userCategories, name) || userCategories[name]?.disable !== true
   const usable = new Set(resolveAvailableCategoryNames(config, registry))
-  const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(userCategories)])).sort().filter(enabled)
+  const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(userCategories)]))
+    .sort()
+    .filter(enabled)
   return {
     usable: names.filter((name) => usable.has(name)),
-    unusable: names.filter((name) => !usable.has(name)).map((name) => {
-      const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, name) ? CATEGORY_FALLBACK_CHAINS[name] : []
-      const optIn = unlistedProviderModel(chain, available.models)
-      return {
-        name,
-        providers: missingChainProviders(chain, available.models),
-        ...(optIn !== undefined ? { unlistedProviderModel: optIn } : {}),
-      }
-    }),
+    unusable: names
+      .filter((name) => !usable.has(name))
+      .map((name) => {
+        const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, name) ? CATEGORY_FALLBACK_CHAINS[name] : []
+        const optIn = unlistedProviderModel(chain, available.models)
+        return {
+          name,
+          providers: missingChainProviders(chain, available.models),
+          ...(optIn !== undefined ? { unlistedProviderModel: optIn } : {}),
+        }
+      }),
   }
 }

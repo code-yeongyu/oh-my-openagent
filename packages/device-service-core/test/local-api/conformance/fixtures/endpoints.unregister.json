@@ -1,0 +1,63 @@
+{
+  "request": "endpoints.unregister",
+  "cases": [
+    {
+      "name": "a registered agent dir unregisters",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "endpoints.register",
+            "agent_dir": "/home/user/.omo/agent"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "endpoints.unregister",
+            "agent_dir": "/home/user/.omo/agent"
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a missing agent dir is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "endpoints.unregister"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

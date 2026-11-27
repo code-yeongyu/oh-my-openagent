@@ -5,25 +5,38 @@
  * host error code leave this module.
  */
 import { RPC_RESPONSE_TIMEOUT_PREFIX as TIMEOUT_PREFIX } from "../runners/rpc-host/reattach"
+import { ERROR_CODE_SHAPE, PROVIDER_SHAPE } from "../runners/rpc/errors"
 
-export type StartCauseClass = "request_timeout" | "host_refused" | "transport_lost"
+export type StartCauseClass =
+  "request_timeout" | "host_refused" | "transport_lost" | "credentials_missing" | "chain_not_held"
 
 export type StartCause = {
   readonly cause_class: StartCauseClass
   readonly timed_out_command?: string
   readonly cause_code?: string
+  readonly provider?: string
+  readonly designated_models?: readonly string[]
 }
 
 const TIMED_OUT_COMMANDS = new Set(["prompt", "switch_session", "open_session", "get_entries", "steer", "follow_up"])
-const ERROR_CODE_SHAPE = /^[a-z][a-z0-9_]{0,47}$/
 const TRANSPORT_LOSS_CODES = new Set(["rpc_transport_gone", "session_detached", "transport_recovery_expired"])
+// The engine's typed "this provider cannot authenticate" refusals. An expired login that could not be
+// refreshed is as provider-wide as a missing key, so both walk the chain the same way.
+const CREDENTIAL_CODES = new Set(["provider_credentials_missing", "provider_credentials_expired"])
+const CHAIN_NOT_HELD_CODES = new Set(["unsupported", "refused", "timeout"])
+// A designated model is named exactly as its selector (`provider/model[:thinking]`); anything else is dropped.
+const MODEL_SELECTOR_SHAPE = /^[A-Za-z0-9][\w.-]{0,63}\/[\w.:/@+-]{1,160}$/
 
 export function classifyStartCause(cause: unknown): StartCause | undefined {
   try {
     if (!(cause instanceof Error)) return undefined
     const code = (cause as { readonly code?: unknown }).code
     if (typeof code === "string" && TRANSPORT_LOSS_CODES.has(code)) return { cause_class: "transport_lost" }
-    if (cause.name === "RpcCommandError") return hostRefusal((cause as { readonly errorCode?: unknown }).errorCode)
+    if (cause.name === "DesignatedChainNotHeldError") return chainNotHeld(cause)
+    if (cause.name === "RpcCommandError") {
+      const refusal = cause as { readonly errorCode?: unknown; readonly errorData?: unknown }
+      return hostRefusal(refusal.errorCode, refusal.errorData)
+    }
     if (cause.message.startsWith(TIMEOUT_PREFIX)) return requestTimeout(cause.message.slice(TIMEOUT_PREFIX.length))
     return undefined
   } catch {
@@ -31,7 +44,28 @@ export function classifyStartCause(cause: unknown): StartCause | undefined {
   }
 }
 
-function hostRefusal(errorCode: unknown): StartCause {
+function chainNotHeld(cause: Error): StartCause {
+  const { reason, models } = cause as { readonly reason?: unknown; readonly models?: unknown }
+  const named = Array.isArray(models)
+    ? models.filter((model): model is string => typeof model === "string" && MODEL_SELECTOR_SHAPE.test(model))
+    : []
+  return {
+    cause_class: "chain_not_held",
+    ...(typeof reason === "string" && CHAIN_NOT_HELD_CODES.has(reason) ? { cause_code: reason } : {}),
+    ...(named.length > 0 ? { designated_models: named } : {}),
+  }
+}
+
+function hostRefusal(errorCode: unknown, errorData: unknown): StartCause {
+  if (typeof errorCode === "string" && CREDENTIAL_CODES.has(errorCode)) {
+    const provider =
+      typeof errorData === "object" && errorData !== null && "provider" in errorData ? errorData.provider : undefined
+    return {
+      cause_class: "credentials_missing",
+      cause_code: errorCode,
+      ...(typeof provider === "string" && PROVIDER_SHAPE.test(provider) ? { provider } : {}),
+    }
+  }
   return typeof errorCode === "string" && ERROR_CODE_SHAPE.test(errorCode)
     ? { cause_class: "host_refused", cause_code: errorCode }
     : { cause_class: "host_refused" }
@@ -58,6 +92,15 @@ export function describeStartCause(cause: StartCause, operation: "prompt" | "ses
     }
     case "transport_lost":
       return "the connection to the child was lost (transport_lost)"
+    case "credentials_missing": {
+      const provider = cause.provider ?? "its provider"
+      return `${provider} has no usable credentials (${cause.cause_code ?? "credentials_missing"}); sign in to ${provider} or add its API key`
+    }
+    case "chain_not_held": {
+      const chain = cause.designated_models === undefined ? "" : ` (${cause.designated_models.join(" -> ")})`
+      const code = cause.cause_code === undefined ? "chain_not_held" : `chain_not_held: ${cause.cause_code}`
+      return `the engine could not hold its designated model chain${chain} (${code}), and a child never runs outside its designated models`
+    }
     default:
       return assertNever(cause.cause_class)
   }

@@ -7,9 +7,10 @@ use std::ptr::{self, NonNull};
 use std::sync::LazyLock;
 
 use objc2_application_services::{AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType};
-use objc2_core_foundation::{CFArray, CFBoolean, CFDate, CFRetained, CFString, CFType, CGPoint, CGSize};
+use objc2_core_foundation::{CFArray, CFBoolean, CFDate, CFRange, CFRetained, CFString, CFType, CGPoint, CGSize};
 use senpi_desktop_core::ax::{AxBounds, AxHandle};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
+use senpi_desktop_core::frame::PointHit;
 
 const AX_TIMEOUT_SECONDS: f32 = 2.0;
 
@@ -48,12 +49,17 @@ pub(super) fn ensure_trusted() -> CoreResult<()> {
     }
 }
 
+/// A retained, generation-bound handle for `element` (see `retained`).
 pub(super) fn handle(element: CFRetained<AXUIElement>) -> AxHandle {
-    AxHandle::native(element)
+    super::retained::wrap(element)
 }
 
-/// The AXUIElement behind a handle this backend produced.
-pub(super) fn element(handle: &AxHandle) -> CoreResult<&AXUIElement> {
+/// The AXUIElement behind a handle this backend produced: `StaleRef` once the
+/// ref generations that held it expired or its app was replaced.
+pub(crate) fn element(handle: &AxHandle) -> CoreResult<&AXUIElement> {
+    if let Some(found) = super::retained::resolve(handle) {
+        return found;
+    }
     handle
         .downcast_native::<CFRetained<AXUIElement>>()
         .map(|element| &**element)
@@ -93,7 +99,7 @@ pub(crate) fn window_id(element: &AXUIElement) -> Option<u32> {
 
 /// The CGWindowID of the window owning `element`: the element itself when
 /// it is a window, else its `AXWindow`.
-pub(super) fn owner_window_id(element: &AXUIElement) -> Option<u32> {
+pub(crate) fn owner_window_id(element: &AXUIElement) -> Option<u32> {
     if copy_string(element, "AXRole").as_deref() == Some("AXWindow") {
         return window_id(element);
     }
@@ -120,8 +126,53 @@ pub(super) fn copy_attribute_result(
     Ok(Some(unsafe { CFRetained::from_raw(pointer) }))
 }
 
+/// A read that tells an empty answer from no answer: `Some(None)` when the
+/// application answered without a value, `None` when it did not answer
+/// (`CannotComplete` is a messaging timeout) or the read failed otherwise.
+pub(crate) fn copy_answered(element: &AXUIElement, attribute: &str) -> Option<Option<CFRetained<CFType>>> {
+    match copy_attribute_result(element, attribute) {
+        Ok(value) => Some(value),
+        Err(error) if error == AXError::NoValue || error == AXError::AttributeUnsupported => Some(None),
+        Err(_) => None,
+    }
+}
+
 pub(crate) fn copy_attribute(element: &AXUIElement, attribute: &str) -> Option<CFRetained<CFType>> {
     copy_attribute_result(element, attribute).ok().flatten()
+}
+
+/// Reads an optional attribute of an element a ref names: a destroyed element
+/// is a stale ref, any other failure reads as no value.
+pub(crate) fn copy_held_attribute(element: &AXUIElement, attribute: &str) -> CoreResult<Option<CFRetained<CFType>>> {
+    match copy_attribute_result(element, attribute) {
+        Err(AXError::InvalidUIElement) => Err(element_gone()),
+        result => Ok(result.ok().flatten()),
+    }
+}
+
+/// `InvalidUIElement` means the element itself is gone (its view was removed
+/// or its window closed), so the ref that named it is stale.
+pub(super) fn element_gone() -> DesktopError {
+    DesktopError::stale_ref("the element no longer exists; re-run ax()/find()")
+}
+
+/// Whether the app reports `name` as settable on `element`.
+pub(super) fn attribute_settable(element: &AXUIElement, name: &str) -> bool {
+    let attribute = CFString::from_str(name);
+    let mut settable = 0;
+    // SAFETY: The Boolean out parameter is writable and all CF objects outlive
+    // the synchronous AX query.
+    (unsafe { element.is_attribute_settable(&attribute, NonNull::from(&mut settable)) } == AXError::Success)
+        && settable != 0
+}
+
+/// The attribute's value as a `CFRange`, when it is one (`AXSelectedTextRange`).
+pub(super) fn copy_range(element: &AXUIElement, attribute: &str) -> Option<CFRange> {
+    let value = copy_attribute(element, attribute)?.downcast::<AXValue>().ok()?;
+    let mut range = CFRange { location: 0, length: 0 };
+    // SAFETY: The output is a live CFRange and the AXValue accessor validates
+    // the requested type before writing it.
+    unsafe { value.value(AXValueType::CFRange, NonNull::from(&mut range).cast()) }.then_some(range)
 }
 
 pub(crate) fn copy_string(element: &AXUIElement, attribute: &str) -> Option<String> {
@@ -219,4 +270,19 @@ pub(super) fn ax_result(error: AXError, context: impl Into<String>) -> CoreResul
     } else {
         Err(DesktopError::ax_failed(format!("{} ({error:?})", context.into())))
     }
+}
+
+/// The element at a global logical point, as the object-mode `hit` reports
+/// it: its role, and its title (else description) unless it is a secure text
+/// field.
+pub(crate) fn hit_at(x: f64, y: f64) -> CoreResult<Option<PointHit>> {
+    Ok(super::tree::element_at(x, y)?.map(|hit| {
+        let role = copy_string(&hit, "AXRole").unwrap_or_default();
+        let secure = role == "AXSecureTextField"
+            || copy_string(&hit, "AXSubrole").as_deref() == Some("AXSecureTextField");
+        let label = copy_string(&hit, "AXTitle")
+            .filter(|title| !title.is_empty())
+            .or_else(|| copy_string(&hit, "AXDescription"));
+        PointHit { role, label, secure }
+    }))
 }

@@ -44,6 +44,52 @@
       },
       "additionalProperties": false
     },
+    "session_wake": {
+      "type": "object",
+      "properties": {
+        "same_device": {
+          "type": "boolean"
+        },
+        "wake_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "operator_alerts": {
+      "type": "object",
+      "properties": {
+        "error_streak": {
+          "type": "object",
+          "properties": {
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "realert_minutes": {
+              "type": "number",
+              "minimum": 0
+            },
+            "threads": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "webhook_url_env": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -220,6 +266,13 @@
                 }
               ]
             }
+          },
+          "models_distribution": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_robin"
+            ]
           },
           "reasoning": {
             "anyOf": [
@@ -740,6 +793,13 @@
                 }
               ]
             }
+          },
+          "models_distribution": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_robin"
+            ]
           },
           "reasoning": {
             "anyOf": [
@@ -1621,6 +1681,30 @@
     "model_profile": {
       "type": "string"
     },
+    "model_pad": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "object",
+          "properties": {
+            "daily": {
+              "type": "string"
+            },
+            "geeky": {
+              "type": "string"
+            },
+            "normal": {
+              "type": "string"
+            },
+            "heavy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "memory": {
       "type": "object",
       "properties": {
@@ -2031,19 +2115,67 @@
         },
         "projection": {
           "default": {
-            "max_entries_per_directory": 40,
-            "max_bytes": 24576
+            "max_entries_per_directory": 0,
+            "max_bytes": 40960
           },
           "type": "object",
           "properties": {
             "max_entries_per_directory": {
-              "default": 40,
+              "default": 0,
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
             },
             "max_bytes": {
-              "default": 24576,
+              "default": 40960,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "runtime": {
+          "default": {
+            "retention_days": 7,
+            "abandoned_journal_days": 14,
+            "completions_days": 30,
+            "pass_budget_ms": 60000,
+            "discard_unreflected_journals": false,
+            "max_bytes": 2147483648
+          },
+          "type": "object",
+          "properties": {
+            "retention_days": {
+              "default": 7,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "abandoned_journal_days": {
+              "default": 14,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "completions_days": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "pass_budget_ms": {
+              "default": 60000,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "discard_unreflected_journals": {
+              "default": false,
+              "type": "boolean"
+            },
+            "max_bytes": {
+              "default": 2147483648,
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
@@ -2340,6 +2472,40 @@
                 },
                 "additionalProperties": false
               },
+              "runtime": {
+                "type": "object",
+                "properties": {
+                  "retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "abandoned_journal_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "completions_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "pass_budget_ms": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "discard_unreflected_journals": {
+                    "type": "boolean"
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -2363,6 +2529,16 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "device_service": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -2533,6 +2709,34 @@
         },
         "cua_adapter": {
           "type": "boolean"
+        },
+        "run_sandbox": {
+          "type": "string",
+          "enum": [
+            "vm",
+            "quickjs"
+          ],
+          "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+        },
+        "intervention": {
+          "type": "string",
+          "enum": [
+            "continue",
+            "pause"
+          ],
+          "description": "What a background action does while the user uses the target app (default: continue)"
+        },
+        "macos_key_priming": {
+          "type": "string",
+          "enum": [
+            "on",
+            "off"
+          ],
+          "description": "macOS background keys first make the target window key (default: off)"
+        },
+        "trace": {
+          "type": "boolean",
+          "description": "Per-request timing traces (default: false)"
         }
       },
       "additionalProperties": false,
@@ -2543,6 +2747,36 @@
       "items": {
         "type": "string"
       }
+    },
+    "keyword_detector": {
+      "type": "object",
+      "properties": {
+        "enabled_expansions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        },
+        "disabled_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "exclude_models": {
       "type": "array",
@@ -2595,6 +2829,52 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -2765,6 +3045,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -3285,6 +3572,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -4106,6 +4400,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -4407,6 +4725,40 @@
               },
               "additionalProperties": false
             },
+            "runtime": {
+              "type": "object",
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "abandoned_journal_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "completions_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pass_budget_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "discard_unreflected_journals": {
+                  "type": "boolean"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -4694,6 +5046,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -4716,6 +5102,15 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -4863,6 +5258,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -4873,6 +5296,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -4925,6 +5378,52 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -5095,6 +5594,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -5615,6 +6121,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -6436,6 +6949,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -6737,6 +7274,40 @@
               },
               "additionalProperties": false
             },
+            "runtime": {
+              "type": "object",
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "abandoned_journal_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "completions_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pass_budget_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "discard_unreflected_journals": {
+                  "type": "boolean"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -7024,6 +7595,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -7046,6 +7651,15 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -7193,6 +7807,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -7203,6 +7845,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -7255,6 +7927,52 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -7425,6 +8143,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -7945,6 +8670,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -8766,6 +9498,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -9067,6 +9823,40 @@
               },
               "additionalProperties": false
             },
+            "runtime": {
+              "type": "object",
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "abandoned_journal_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "completions_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pass_budget_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "discard_unreflected_journals": {
+                  "type": "boolean"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -9354,6 +10144,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -9376,6 +10200,15 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -9523,6 +10356,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -9533,6 +10394,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -9587,6 +10478,52 @@
                   ],
                   "additionalProperties": false
                 }
+              }
+            },
+            "additionalProperties": false
+          },
+          "session_wake": {
+            "type": "object",
+            "properties": {
+              "same_device": {
+                "type": "boolean"
+              },
+              "wake_limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          "operator_alerts": {
+            "type": "object",
+            "properties": {
+              "error_streak": {
+                "type": "object",
+                "properties": {
+                  "threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "realert_minutes": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "threads": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "webhook_url_env": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -9761,6 +10698,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "reasoning": {
                   "anyOf": [
@@ -10281,6 +11225,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "reasoning": {
                   "anyOf": [
@@ -11102,6 +12053,30 @@
           "model_profile": {
             "type": "string"
           },
+          "model_pad": {
+            "type": "object",
+            "properties": {
+              "labels": {
+                "type": "object",
+                "properties": {
+                  "daily": {
+                    "type": "string"
+                  },
+                  "geeky": {
+                    "type": "string"
+                  },
+                  "normal": {
+                    "type": "string"
+                  },
+                  "heavy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "memory": {
             "type": "object",
             "properties": {
@@ -11403,6 +12378,40 @@
                 },
                 "additionalProperties": false
               },
+              "runtime": {
+                "type": "object",
+                "properties": {
+                  "retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "abandoned_journal_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "completions_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "pass_budget_ms": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "discard_unreflected_journals": {
+                    "type": "boolean"
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -11690,6 +12699,40 @@
                       },
                       "additionalProperties": false
                     },
+                    "runtime": {
+                      "type": "object",
+                      "properties": {
+                        "retention_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "abandoned_journal_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "completions_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "pass_budget_ms": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "discard_unreflected_journals": {
+                          "type": "boolean"
+                        },
+                        "max_bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "compile_warn_tokens": {
                       "type": "integer",
                       "exclusiveMinimum": 0,
@@ -11712,6 +12755,15 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "device_service": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -11859,6 +12911,34 @@
               },
               "cua_adapter": {
                 "type": "boolean"
+              },
+              "run_sandbox": {
+                "type": "string",
+                "enum": [
+                  "vm",
+                  "quickjs"
+                ],
+                "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+              },
+              "intervention": {
+                "type": "string",
+                "enum": [
+                  "continue",
+                  "pause"
+                ],
+                "description": "What a background action does while the user uses the target app (default: continue)"
+              },
+              "macos_key_priming": {
+                "type": "string",
+                "enum": [
+                  "on",
+                  "off"
+                ],
+                "description": "macOS background keys first make the target window key (default: off)"
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Per-request timing traces (default: false)"
               }
             },
             "additionalProperties": false,
@@ -11869,6 +12949,36 @@
             "items": {
               "type": "string"
             }
+          },
+          "keyword_detector": {
+            "type": "object",
+            "properties": {
+              "enabled_expansions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              },
+              "disabled_keywords": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
           },
           "exclude_models": {
             "type": "array",
@@ -11921,6 +13031,52 @@
                 },
                 "additionalProperties": false
               },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -12091,6 +13247,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -12611,6 +13774,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -13432,6 +14602,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -13733,6 +14927,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -14020,6 +15248,40 @@
                           },
                           "additionalProperties": false
                         },
+                        "runtime": {
+                          "type": "object",
+                          "properties": {
+                            "retention_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "abandoned_journal_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "completions_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "pass_budget_ms": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "discard_unreflected_journals": {
+                              "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -14042,6 +15304,15 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -14189,6 +15460,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -14199,6 +15498,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -14251,6 +15580,52 @@
                 },
                 "additionalProperties": false
               },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -14421,6 +15796,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -14941,6 +16323,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -15762,6 +17151,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -16063,6 +17476,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -16350,6 +17797,40 @@
                           },
                           "additionalProperties": false
                         },
+                        "runtime": {
+                          "type": "object",
+                          "properties": {
+                            "retention_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "abandoned_journal_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "completions_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "pass_budget_ms": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "discard_unreflected_journals": {
+                              "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -16372,6 +17853,15 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -16519,6 +18009,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -16529,6 +18047,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -16581,6 +18129,52 @@
                 },
                 "additionalProperties": false
               },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -16751,6 +18345,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -17271,6 +18872,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -18092,6 +19700,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -18393,6 +20025,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -18680,6 +20346,40 @@
                           },
                           "additionalProperties": false
                         },
+                        "runtime": {
+                          "type": "object",
+                          "properties": {
+                            "retention_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "abandoned_journal_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "completions_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "pass_budget_ms": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "discard_unreflected_journals": {
+                              "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -18702,6 +20402,15 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -18849,6 +20558,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -18859,6 +20596,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -19082,6 +20849,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -19635,6 +21409,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -20187,6 +21968,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -20738,6 +22526,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -21294,6 +23089,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -21845,6 +23647,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -22398,6 +24207,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -22949,6 +24765,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -23502,6 +25325,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -24053,6 +25883,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -24606,6 +26443,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -25157,6 +27001,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -25710,6 +27561,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -26261,6 +28119,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -26814,6 +28679,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "fallback_models": {
                 "anyOf": [
@@ -27375,6 +29247,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "fallback_models": {
                 "anyOf": [
@@ -28051,6 +29930,10 @@
                   "minimum": 0
                 },
                 "timeout_seconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "first_prompt_timeout_seconds": {
                   "type": "number",
                   "minimum": 0
                 },

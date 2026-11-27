@@ -29,7 +29,11 @@ export const RETIRED_PROVIDER_IDS: Readonly<Record<string, string>> = Object.fre
 })
 
 const EMPTY: OmoNativeInventory = Object.freeze({
-  providerCount: 0, signedInProviderCount: 0, configuredProviderCount: 0, modelCount: 0, providers: "",
+  providerCount: 0,
+  signedInProviderCount: 0,
+  configuredProviderCount: 0,
+  modelCount: 0,
+  providers: "",
 })
 
 /**
@@ -65,31 +69,36 @@ export function readOmoNativeInventory(
     const usable = [...new Set([...configured, ...signedIn])]
     const defaultProvider = stringProperty(settings, "defaultProvider")
     const defaultModel = stringProperty(settings, "defaultModel")
-    const masked = defaultProvider !== undefined && defaultModel !== undefined
-      ? maskProviderAndModel(defaultProvider, defaultModel)
-      : undefined
+    const masked =
+      defaultProvider !== undefined && defaultModel !== undefined
+        ? maskProviderAndModel(defaultProvider, defaultModel)
+        : undefined
     return {
       providerCount: usable.length,
       signedInProviderCount: new Set(signedIn).size,
       configuredProviderCount: new Set(configured).size,
       modelCount,
       providers: providerKinds(usable),
-      ...(masked === undefined ? {} : {
-        defaultProvider: masked.provider,
-        defaultModel: masked.model_id,
-      }),
+      ...(masked === undefined
+        ? {}
+        : {
+            defaultProvider: masked.provider,
+            defaultModel: masked.model_id,
+          }),
     }
   } catch (error) {
     // A parse error's message can quote the start of an apiKey in models.json: report a fixed one instead.
     const reported = error instanceof SyntaxError ? new Error("models.json or settings.json is not valid JSON") : error
     diagnostics?.({ event: "omo_native_inventory_read_failed", error: reported, source: "omo-native-session" })
     // The configured inventory is unreadable; the providers the user signed into still count.
-    return signedIn.length === 0 ? EMPTY : {
-      ...EMPTY,
-      providerCount: new Set(signedIn).size,
-      signedInProviderCount: new Set(signedIn).size,
-      providers: providerKinds([...new Set(signedIn)]),
-    }
+    return signedIn.length === 0
+      ? EMPTY
+      : {
+          ...EMPTY,
+          providerCount: new Set(signedIn).size,
+          signedInProviderCount: new Set(signedIn).size,
+          providers: providerKinds([...new Set(signedIn)]),
+        }
   }
 }
 
@@ -103,7 +112,11 @@ function readSignedInProviders(
   } catch (error) {
     if (Reflect.get(Object(error), "code") !== "ENOENT") {
       // A fixed error: a JSON parse message can quote the start of a credential.
-      diagnostics?.({ event: "omo_native_inventory_read_failed", error: new Error("auth.json is unreadable or not a JSON object"), source: "omo-native-session" })
+      diagnostics?.({
+        event: "omo_native_inventory_read_failed",
+        error: new Error("auth.json is unreadable or not a JSON object"),
+        source: "omo-native-session",
+      })
     }
     return []
   }

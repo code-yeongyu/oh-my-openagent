@@ -26,7 +26,7 @@ function fakeChannel(fail?: "open" | "close"): FakeChannel {
     },
     close: () => {
       calls.push("close_session")
-      return fail === "close" ? Promise.reject(new Error("host gone")) : Promise.resolve()
+      return fail === "close" ? Promise.reject(new Error("host gone")) : Promise.resolve(true)
     },
     detach: () => {
       calls.push("detach")

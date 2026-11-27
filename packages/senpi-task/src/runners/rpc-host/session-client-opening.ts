@@ -1,11 +1,17 @@
 import type { RpcTransportGoneError } from "@code-yeongyu/senpi"
+import { log } from "@oh-my-opencode/utils"
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
+import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { HostUnavailableError } from "./daemon"
 import {
-  assertHostUsable, RETRY_FALLBACK_PROFILE_CAPABILITY, toWireOpen,
-  type HostProtocolProbe, type HostRpcClient, type HostRpcClientFactory, type HostSessionOpenInput,
+  assertHostUsable,
+  toWireOpen,
+  type HostProtocolProbe,
+  type HostRpcClient,
+  type HostRpcClientFactory,
+  type HostSessionOpenInput,
 } from "./session-transport"
-import { toOpenFailure } from "./session-wire"
+import { HostSessionDetachedError, toOpenFailure } from "./session-wire"
 
 interface SessionOpeningPorts {
   readonly socketPath: string
@@ -14,7 +20,8 @@ interface SessionOpeningPorts {
   readonly socketAccepts: (socketPath: string) => Promise<boolean>
   readonly onDisconnect: (error: RpcTransportGoneError) => void
   readonly onEvent: (record: unknown) => void
-  readonly bindClient: (client: HostRpcClient | undefined) => void
+  /** False when the owner was released while this connection was still dialing: the open must not go on. */
+  readonly bindClient: (client: HostRpcClient | undefined) => boolean
 }
 
 /** Probe and open one child connection; preserve the host's refusal and profile contracts. */
@@ -26,14 +33,24 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
       detail: "the daemon accepts connections but did not answer get_protocol_info",
     })
   }
-  const identity = assertHostUsable(probed)
+  const identity = assertHostUsable(probed, input.retryFallback)
   const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
   client.onEvent(ports.onEvent)
   await client.start()
-  ports.bindClient(client)
-  const profileHonored = identity.capabilities.includes(RETRY_FALLBACK_PROFILE_CAPABILITY)
-  const retryFallbackDropped = !profileHonored && input.retryFallback !== undefined
-  const wire = toWireOpen(profileHonored ? input : withoutRetryFallback(input))
+  // A release during the probe or the dial found no client to stop; this connection is the one it meant to end.
+  if (!ports.bindClient(client)) {
+    await client.stop()
+    throw new HostSessionDetachedError("open_session")
+  }
+  // No capability names spawnedBy, so the host's engine version decides; an unproven host opens without it.
+  const spawnedByHonored = engineAcceptsSpawnedBy(identity.engineVersion)
+  if (!spawnedByHonored && input.spawnedBy !== undefined) {
+    log("senpi-task host engine does not accept spawnedBy; opening the child without ancestry", {
+      socket: ports.socketPath,
+      engineVersion: identity.engineVersion,
+    })
+  }
+  const wire = toWireOpen(spawnedByHonored ? input : withoutSpawnedBy(input))
   const opened = await client.openSession(wire).catch(async (error: unknown) => {
     ports.bindClient(undefined)
     await client.stop()
@@ -46,10 +63,10 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
     }
     throw toOpenFailure(error, input.sessionPath)
   })
-  return { opened, identity, retryFallbackDropped }
+  return { opened, identity }
 }
 
-function withoutRetryFallback(input: HostSessionOpenInput): HostSessionOpenInput {
-  const { retryFallback: _retryFallback, ...rest } = input
+function withoutSpawnedBy(input: HostSessionOpenInput): HostSessionOpenInput {
+  const { spawnedBy: _spawnedBy, ...rest } = input
   return rest
 }

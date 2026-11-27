@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  UNCONFIGURED_POSTHOG_API_KEY,
-  hasTelemetryApiKey,
-  shouldDisableTelemetry,
-} from "./index"
+import { UNCONFIGURED_POSTHOG_API_KEY, hasTelemetryApiKey, shouldDisableTelemetry } from "./index"
 
 const OPT_OUT_CASES = [
   ["unset env enables telemetry", {}, false],
@@ -24,7 +20,12 @@ const OPT_OUT_CASES = [
   ["codex send false", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "false" }, true],
   ["codex send no", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "no" }, true],
   ["codex send trims and lowercases", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: " FALSE " }, true],
-  ["approved codex send yes convergence", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "yes" }, true],
+  ["codex send yes keeps telemetry on", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "yes" }, false],
+  ["global send yes keeps telemetry on", { OMO_SEND_ANONYMOUS_TELEMETRY: "yes" }, false],
+  ["otel sdk disabled true stops telemetry", { OTEL_SDK_DISABLED: "true" }, true],
+  ["otel sdk disabled trims and lowercases", { OTEL_SDK_DISABLED: " TRUE " }, true],
+  ["otel sdk disabled false keeps telemetry on", { OTEL_SDK_DISABLED: "false" }, false],
+  ["otel sdk disabled 1 is not the boolean form", { OTEL_SDK_DISABLED: "1" }, false],
   ["invalid disable value", { OMO_CODEX_DISABLE_POSTHOG: "maybe" }, false],
   ["global telemetry disable 1", { OMO_DISABLE_TELEMETRY: "1" }, true],
   ["global telemetry disable true", { OMO_DISABLE_TELEMETRY: "true" }, true],
@@ -40,25 +41,25 @@ describe("telemetry API key configuration", () => {
     ["whitespace-only", "   ", false],
     ["exact unconfigured placeholder", UNCONFIGURED_POSTHOG_API_KEY, false],
     ["longer key containing the placeholder", `${UNCONFIGURED_POSTHOG_API_KEY}_configured`, true],
-  ] as const)("#given %s input #when key availability is checked #then the expected result is returned", (_name, apiKey, expected) => {
-    expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
-  })
+  ] as const)(
+    "#given %s input #when key availability is checked #then the expected result is returned",
+    (_name, apiKey, expected) => {
+      expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
+    },
+  )
 })
 
 describe("opt-out telemetry env matrix", () => {
-  test.each(OPT_OUT_CASES)(
-    "#given %s #when evaluated #then disabled=%p",
-    (_name, env, expected) => {
-      // given
-      const productPrefix = "OMO_CODEX"
+  test.each(OPT_OUT_CASES)("#given %s #when evaluated #then disabled=%p", (_name, env, expected) => {
+    // given
+    const productPrefix = "OMO_CODEX"
 
-      // when
-      const result = shouldDisableTelemetry({ env, productEnvPrefix: productPrefix })
+    // when
+    const result = shouldDisableTelemetry({ env, productEnvPrefix: productPrefix })
 
-      // then
-      expect(result).toBe(expected)
-    },
-  )
+    // then
+    expect(result).toBe(expected)
+  })
 })
 
 describe("DO_NOT_TRACK global opt-out", () => {

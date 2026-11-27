@@ -19,7 +19,10 @@ async function readSpawnStream(stream: ReadableStream<Uint8Array> | undefined): 
   try {
     return await new Response(stream).text()
   } catch (error) {
-    if (error instanceof Error && (error.message.includes("already been used") || error.message.includes("disturbed or locked"))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("already been used") || error.message.includes("disturbed or locked"))
+    ) {
       return ""
     }
     throw error
@@ -34,7 +37,7 @@ function isMissingExecutableError(error: Error): boolean {
 export async function spawnWithTimeout(
   command: string[],
   options: SpawnOptions,
-  timeoutMs: number = DEFAULT_SPAWN_TIMEOUT_MS
+  timeoutMs: number = DEFAULT_SPAWN_TIMEOUT_MS,
 ): Promise<SpawnWithTimeoutResult> {
   let proc: ReturnType<typeof spawnWithWindowsHide>
   try {

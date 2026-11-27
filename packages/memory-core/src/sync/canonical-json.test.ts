@@ -8,13 +8,17 @@ type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 const RFC8785_EXAMPLES: { name: string; input: string; canonical: string }[] = [
   {
     name: "§3.2.2 primitives: numbers re-serialized, string escapes minimized",
-    input: '{\n"numbers": [333333333.33333329, 1E30, 4.50,\n2e-3, 0.000000000000000000000000001],\n"string": "\\u20ac$\\u000F\\u000aA\'\\u0042\\u0022\\u005c\\\\\\"/",\n"literals": [null, true, false]\n}',
-    canonical: '{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\\u000f\\nA\'B\\"\\\\\\\\\\"/"}',
+    input:
+      '{\n"numbers": [333333333.33333329, 1E30, 4.50,\n2e-3, 0.000000000000000000000000001],\n"string": "\\u20ac$\\u000F\\u000aA\'\\u0042\\u0022\\u005c\\\\\\"/",\n"literals": [null, true, false]\n}',
+    canonical:
+      '{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\\u000f\\nA\'B\\"\\\\\\\\\\"/"}',
   },
   {
     name: "§3.2.3 sorting: UTF-16 code unit order, not UTF-8",
-    input: '{\n"\\u20ac": "Euro Sign",\n"\\r": "Carriage Return",\n"\\ufb33": "Hebrew Letter Dalet With Dagesh",\n"1": "One",\n"\\ud83d\\ude00": "Emoji: Grinning Face",\n"\\u0080": "Control",\n"\\u00f6": "Latin Small Letter O With Diaeresis"\n}',
-    canonical: '{"\\r":"Carriage Return","1":"One","\u0080":"Control","ö":"Latin Small Letter O With Diaeresis","€":"Euro Sign","😀":"Emoji: Grinning Face","דּ":"Hebrew Letter Dalet With Dagesh"}',
+    input:
+      '{\n"\\u20ac": "Euro Sign",\n"\\r": "Carriage Return",\n"\\ufb33": "Hebrew Letter Dalet With Dagesh",\n"1": "One",\n"\\ud83d\\ude00": "Emoji: Grinning Face",\n"\\u0080": "Control",\n"\\u00f6": "Latin Small Letter O With Diaeresis"\n}',
+    canonical:
+      '{"\\r":"Carriage Return","1":"One","\u0080":"Control","ö":"Latin Small Letter O With Diaeresis","€":"Euro Sign","😀":"Emoji: Grinning Face","דּ":"Hebrew Letter Dalet With Dagesh"}',
   },
 ]
 
@@ -72,7 +76,10 @@ describe("canonical-json (RFC 8785)", () => {
   })
 
   test("a canonical record with a __proto__ key is accepted and keeps it as an own property", () => {
-    const parsed = requireCanonicalJson(enc('{"__proto__":{"x":1},"t":"omo-sync/v1/record"}')) as Record<string, unknown>
+    const parsed = requireCanonicalJson(enc('{"__proto__":{"x":1},"t":"omo-sync/v1/record"}')) as Record<
+      string,
+      unknown
+    >
     expect(Object.keys(parsed)).toEqual(["__proto__", "t"])
     expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype)
   })

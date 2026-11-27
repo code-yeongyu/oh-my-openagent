@@ -56,7 +56,6 @@ export type TelemetryProductConfig = {
   readonly defaultApiKey: string
   readonly defaultHost: string
   readonly eventName: string
-  readonly machineIdPrefix: string
   readonly packageName: string
   readonly packageVersion: string
   readonly platform: string
@@ -130,10 +129,7 @@ export type TelemetryTransport = {
   readonly traces?: TurnTracing
 }
 
-export type TelemetryTransportFactory = (
-  apiKey: string,
-  options: TelemetryTransportOptions,
-) => TelemetryTransport
+export type TelemetryTransportFactory = (apiKey: string, options: TelemetryTransportOptions) => TelemetryTransport
 
 export type TelemetryClient = {
   readonly enabled: boolean

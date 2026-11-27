@@ -167,3 +167,25 @@ fn mismatched_resume_token_yields_no_reset_proof() {
     // Then: no UserReset exists to lift suspension with
     assert!(proof.is_none());
 }
+
+#[test]
+fn every_committed_stop_calls_the_live_stop_observers() {
+    // Given: an observer that counts the stops it saw
+    let (supervisor, _clock) = supervisor_at(1_000);
+    let seen = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = Arc::clone(&seen);
+    let observer: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+        counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    });
+    supervisor.observe_stops(&observer);
+
+    // When: a stop commits, and another after the observer is dropped
+    supervisor.trigger_stop(StopSource::Api);
+    let after_first = seen.load(std::sync::atomic::Ordering::SeqCst);
+    drop(observer);
+    supervisor.trigger_stop(StopSource::HostRelay);
+
+    // Then: only the stop the live observer outlived reached it
+    assert_eq!(after_first, 1);
+    assert_eq!(seen.load(std::sync::atomic::Ordering::SeqCst), 1);
+}

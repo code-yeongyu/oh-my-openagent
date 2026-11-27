@@ -28,7 +28,7 @@ describe("runCliInstaller telemetry isolation", () => {
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
-      hasBailianCodingPlan: false,
+        hasBailianCodingPlan: false,
         hasVercelAiGateway: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
@@ -50,7 +50,6 @@ describe("runCliInstaller telemetry isolation", () => {
           throw new Error("shutdown failed")
         }),
       })),
-      getPostHogDistinctId: mock(() => "install-distinct-id"),
     }))
 
     const { runCliInstaller } = await import(`./cli-installer?telemetry=${Date.now()}-${Math.random()}`)

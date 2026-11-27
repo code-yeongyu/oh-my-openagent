@@ -26,7 +26,6 @@ Same-named skill at higher scope overrides lower.
 | `skill-content.ts` | YAML frontmatter parsing from SKILL.md |
 | `skill-discovery.ts` | Find SKILL.md files in directory trees |
 | `skill-directory-loader.ts` | Load all skills from a single directory |
-| `config-source-discovery.ts` | Discover scope directories from config |
 | `skill-template-resolver.ts` | Variable substitution in skill templates |
 | `skill-mcp-config.ts` | Extract MCP configs from skill YAML |
 | `types.ts` | `LoadedSkill`, `SkillScope`, `SkillDiscoveryResult` |

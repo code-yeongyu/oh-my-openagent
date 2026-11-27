@@ -36,10 +36,7 @@ export type MonitorStatusInjectorHook = {
 
 const MONITOR_STATUS_PREFIX = "Active monitors:"
 
-function resolveSessionID(
-  input: MonitorStatusInjectorInput,
-  messages: MessageWithParts[],
-): string | undefined {
+function resolveSessionID(input: MonitorStatusInjectorInput, messages: MessageWithParts[]): string | undefined {
   if (typeof input.sessionID === "string" && input.sessionID.length > 0) {
     return input.sessionID
   }

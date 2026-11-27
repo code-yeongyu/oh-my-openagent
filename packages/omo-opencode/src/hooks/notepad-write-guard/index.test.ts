@@ -5,14 +5,8 @@ const REFUSED_PREFIX = "Refused: Write to"
 
 type Hook = ReturnType<typeof createNotepadWriteGuardHook>
 
-async function invoke(
-  hook: Hook,
-  args: { tool: string; filePath: string },
-): Promise<void> {
-  await hook["tool.execute.before"]?.(
-    { tool: args.tool } as never,
-    { args: { filePath: args.filePath } } as never,
-  )
+async function invoke(hook: Hook, args: { tool: string; filePath: string }): Promise<void> {
+  await hook["tool.execute.before"]?.({ tool: args.tool } as never, { args: { filePath: args.filePath } } as never)
 }
 
 async function expectWriteBlocked(hook: Hook, filePath: string): Promise<void> {

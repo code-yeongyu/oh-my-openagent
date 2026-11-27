@@ -2,10 +2,53 @@ import { PROVENANCE_MIGRATION } from "./provenance-record"
 
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
-  constructor(readonly found: number, readonly supported: number, scope = "Gateway") {
-    super(`${scope} schema ${found} is newer than this binary's supported version ${supported}.`)
+  /**
+   * Both versions, carried across the store worker so a caller names them without reading the message. An extension's
+   * own schema names the extension, so its migration counts are never read as the gateway's (`errors.ts`
+   * `gatewaySchemaRefusal`).
+   */
+  readonly details: { readonly found: number; readonly supported: number; readonly extension?: string }
+  constructor(found: number, supported: number, extension?: string) {
+    super(
+      `${extension === undefined ? "Gateway" : `Extension ${extension}`} schema ${found} is newer than this binary's supported version ${supported}.`,
+    )
+    this.details = extension === undefined ? { found, supported } : { found, supported, extension }
   }
 }
+
+/** Every `deliveries` column as of v14, in table order: the v15 rebuild copies exactly these. */
+const DELIVERY_COLUMNS = [
+  "delivery_id",
+  "target_durable_id",
+  "seq",
+  "sender",
+  "sender_turn",
+  "envelope",
+  "body",
+  "bytes",
+  "mode_requested",
+  "mode_effective",
+  "expected_turn_id",
+  "state",
+  "reason",
+  "admitted_by",
+  "claimed_at",
+  "attempt",
+  "admission_kind",
+  "turn_epoch",
+  "root_id",
+  "hop",
+  "created_at",
+  "updated_at",
+  "expires_at",
+  "binding_id",
+  "binding_revision",
+  "actor_user_id",
+  "wait_kind",
+  "ledger_id",
+  "verbatim_text",
+  "verbatim_display_text",
+].join(", ")
 
 export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   [
@@ -275,6 +318,192 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
      SELECT s.type, s.name, NULL FROM sqlite_schema s
      WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
   ],
+
+  // v11 (#13014): what the receiver was parked on when its drain queued a delivery; NULL when it was not, and on older rows.
+  ["ALTER TABLE deliveries ADD COLUMN wait_kind TEXT CHECK (wait_kind IS NULL OR wait_kind = 'approval')"],
+
+  // v12 (#13037): a delivery taken in from another device for a session that is not running. `ledger_id` is the engine's
+  // ledger key for it (`device:<attested device>/<sender's delivery id>`), the key the drain admits it under and the
+  // reconcile, the transcript scan and the cause lookup match on; the two text columns hold the sender's rendered text and
+  // display text verbatim. All three are NULL on every other row, which behaves exactly as before.
+  [
+    "ALTER TABLE deliveries ADD COLUMN ledger_id TEXT",
+    "ALTER TABLE deliveries ADD COLUMN verbatim_text TEXT",
+    "ALTER TABLE deliveries ADD COLUMN verbatim_display_text TEXT",
+    "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'deliveries_ledger', NULL)",
+  ],
+
+  // v13 (#13037): one row per session a wake asked for or opened and that has not ended. A row past `requested` holds one
+  // of the store's places (the cap); `lease_owner` is the carrier's process identity and `generation` fences its writes;
+  // `attempts` and `next_attempt_at` are set when an open failed for a transient reason and the row went back to `requested`.
+  // Idempotent, so a store rewound to v12 re-runs it without touching the rows it holds.
+  [
+    `CREATE TABLE IF NOT EXISTS woken_sessions (
+      durable_id TEXT PRIMARY KEY,
+      session_file TEXT NOT NULL,
+      host_instance TEXT,
+      state TEXT NOT NULL CHECK (state IN ('requested', 'opening', 'open', 'closing')),
+      requested_at INTEGER NOT NULL,
+      opened_at INTEGER,
+      first_waiting_at INTEGER,
+      lease_owner TEXT,
+      lease_expires_at INTEGER,
+      generation INTEGER NOT NULL DEFAULT 0,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER
+    )`,
+    "CREATE INDEX IF NOT EXISTS woken_sessions_state ON woken_sessions (state)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'woken_sessions', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('index', 'woken_sessions_state', NULL)",
+  ],
+
+  // v14 (#13037): what the carrier and the consumer keep beside the woken row. `session_wait`: a session found held or
+  // waiting for a person, with its hold kinds and the size of its file then (a changed size allows one new probe).
+  // `wake_counts`: consecutive wakes per session, and the input revision they were counted at; it outlives the row.
+  // `intake_marks`: per sender device and session, the newest command that committed a new intake row; `intake_commands`:
+  // the command id each intake row was committed under (A5.3: an answer names it, a deduplicated repeat included). Idempotent.
+  [
+    `CREATE TABLE IF NOT EXISTS session_wait (
+      durable_id TEXT PRIMARY KEY,
+      wait TEXT NOT NULL CHECK (wait IN ('held', 'waiting')),
+      hold_kinds TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      written_at INTEGER NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS wake_counts (
+      durable_id TEXT PRIMARY KEY,
+      count INTEGER NOT NULL,
+      human_input_revision INTEGER
+    )`,
+    `CREATE TABLE IF NOT EXISTS intake_marks (
+      sender_device TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      last_command_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (sender_device, session_id)
+    )`,
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'session_wait', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'wake_counts', NULL)",
+    `CREATE TABLE IF NOT EXISTS intake_commands (
+      ledger_id TEXT PRIMARY KEY,
+      command_id TEXT NOT NULL
+    )`,
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_marks', NULL)",
+    "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_commands', NULL)",
+  ],
+
+  // v15 (#14333): `start` is a lane: a delivery that began a turn on an idle session records it, so its result and the
+  // header its receiver reads say what happened instead of `follow_up`. SQLite cannot widen a CHECK in place, so
+  // `deliveries` is rebuilt the way v7 rebuilt `bindings`: every column (the later ALTERs' included, in their order) and
+  // every rowid carried over, the four indexes and the v8 provenance trigger recreated before the step commits. It runs
+  // with foreign_keys OFF and a foreign_key_check on `deliveries` before the bump (migrate()).
+  [
+    `CREATE TABLE deliveries_v15 (
+      delivery_id TEXT PRIMARY KEY,
+      target_durable_id TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      sender TEXT NOT NULL,
+      sender_turn TEXT,
+      envelope TEXT NOT NULL,
+      body TEXT NOT NULL,
+      bytes INTEGER NOT NULL,
+      mode_requested TEXT NOT NULL CHECK (mode_requested IN ('auto', 'steer', 'follow_up')),
+      mode_effective TEXT CHECK (mode_effective IS NULL OR mode_effective IN ('start', 'steer', 'follow_up')),
+      expected_turn_id INTEGER,
+      state TEXT NOT NULL CHECK (state IN ('queued', 'admitting', 'admitted', 'applied', 'refused', 'uncertain')),
+      reason TEXT,
+      admitted_by TEXT,
+      claimed_at INTEGER,
+      attempt INTEGER NOT NULL DEFAULT 0,
+      admission_kind TEXT,
+      turn_epoch INTEGER,
+      root_id TEXT NOT NULL,
+      hop INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      binding_id TEXT,
+      binding_revision INTEGER,
+      actor_user_id TEXT,
+      wait_kind TEXT CHECK (wait_kind IS NULL OR wait_kind = 'approval'),
+      ledger_id TEXT,
+      verbatim_text TEXT,
+      verbatim_display_text TEXT,
+      UNIQUE (target_durable_id, seq)
+    )`,
+    `INSERT INTO deliveries_v15 (rowid, ${DELIVERY_COLUMNS}) SELECT rowid, ${DELIVERY_COLUMNS} FROM deliveries`,
+    "DROP TABLE deliveries",
+    "ALTER TABLE deliveries_v15 RENAME TO deliveries",
+    "CREATE INDEX deliveries_target_state_seq ON deliveries (target_durable_id, state, seq)",
+    "CREATE INDEX deliveries_root ON deliveries (root_id)",
+    "CREATE INDEX deliveries_sender_turn ON deliveries (sender, sender_turn)",
+    "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
+    ...PROVENANCE_MIGRATION,
+  ],
+
+  // v16 (#14428): a sender's collapse key, so a repeat replaces its earlier undelivered delivery to the same target.
+  [
+    "ALTER TABLE deliveries ADD COLUMN collapse_key TEXT",
+    "CREATE INDEX deliveries_collapse ON deliveries (target_durable_id, sender, collapse_key) WHERE collapse_key IS NOT NULL",
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations", "toolkit_replay_receipts"] as const
+/**
+ * Migration indexes (0-based) that rebuild a table to widen a CHECK, by the table they rebuild: migrate() runs them with
+ * foreign_keys OFF and refuses the bump when the step left a foreign-key violation referencing that table.
+ */
+export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
+  [6, "bindings"],
+  [14, "deliveries"],
+])
+
+/**
+ * Per migration (same index as GATEWAY_MIGRATIONS): the oldest gateway schema whose code may keep reading and writing a
+ * store this step has reached (#14382). A step that only adds what older code never reads (a nullable column, an index)
+ * or widens a CHECK to a value older code passes through as data keeps the floor; a step that changes what a column older
+ * code uses means sets it to its own version. Steps up to v14 predate the floor and claim nothing.
+ * v15 widens `deliveries.mode_effective` with `start`, which a v14 reader reports as the lane name it is; v16 adds the
+ * nullable `collapse_key`, which v14 writers leave NULL (no collapse).
+ * Only a binary that reads the floor relies on it (#14622 review M6): binaries released before it, schema 14 included,
+ * refuse every store newer than their own schema whatever floor it carries.
+ */
+const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
+
+export const GATEWAY_READER_FLOOR_KEY = "reader_floor"
+
+/** The oldest schema a binary must know to use a store at `version`: the highest floor of the steps that reached it. */
+export function gatewayReaderFloor(version: number): number {
+  // Checked here, not at module load: a top-level statement would keep this module (and every migration's SQL) in
+  // bundles that import only its error class. Every store open computes a floor, so a missing entry still fails loudly.
+  if (GATEWAY_READER_FLOORS.length !== GATEWAY_MIGRATIONS.length) {
+    throw new Error(
+      `GATEWAY_READER_FLOORS has ${GATEWAY_READER_FLOORS.length} entries for ${GATEWAY_MIGRATIONS.length} migrations: declare the new step's floor`,
+    )
+  }
+  return GATEWAY_READER_FLOORS.slice(0, version).reduce((floor, step) => Math.max(floor, step), 0)
+}
+
+export const GATEWAY_TABLES = [
+  "deliveries",
+  "receipts",
+  "causal_roots",
+  "causal_edges",
+  "rate_buckets",
+  "session_meta",
+  "bindings",
+  "outbox",
+  "gateway_meta",
+  "outbox_cursors",
+  "completion_arms",
+  "extension_schema",
+  "extension_objects",
+  "thread_creations",
+  "extension_registrations",
+  "toolkit_replay_receipts",
+  "woken_sessions",
+  "session_wait",
+  "wake_counts",
+  "intake_marks",
+  "intake_commands",
+] as const

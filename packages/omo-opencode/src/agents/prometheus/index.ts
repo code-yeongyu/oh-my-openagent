@@ -1,5 +1,1 @@
-export {
-  PROMETHEUS_SYSTEM_PROMPT,
-  PROMETHEUS_PERMISSION,
-  getPrometheusPrompt,
-} from "./system-prompt"
+export { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION, getPrometheusPrompt } from "./system-prompt"

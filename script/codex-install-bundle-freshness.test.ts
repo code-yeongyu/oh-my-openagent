@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { fileURLToPath } from "node:url"
 
-import { bundledWorkspaceSources, digestCodexInstallerSources, parseCodexInstallerArtifact } from "./build-codex-install"
+import {
+  bundledWorkspaceSources,
+  digestCodexInstallerSources,
+  parseCodexInstallerArtifact,
+} from "./build-codex-install"
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const trackedBundlePath = "packages/omo-codex/scripts/install-dist/install-local.mjs"
@@ -25,7 +29,9 @@ describe("committed Codex installer bundle", () => {
     const artifact = parseCodexInstallerArtifact(readTrackedBundle())
 
     // when
-    const bodyDigest = createHash("sha256").update(artifact?.body ?? "").digest("hex")
+    const bodyDigest = createHash("sha256")
+      .update(artifact?.body ?? "")
+      .digest("hex")
 
     // then
     expect(artifact).toBeDefined()

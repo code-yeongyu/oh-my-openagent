@@ -1,0 +1,217 @@
+{
+  "request": "delivery.answer",
+  "cases": [
+    {
+      "name": "a consumer answers the record it was handed",
+      "outcome": "ok",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"],
+          "handed": [
+            {
+              "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+              "sender_device": "dev-peer-1",
+              "durable_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+              "record": {
+                "type": "admit_external_message"
+              }
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "wake": false
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "delivery.inbound",
+            "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+            "sender_device": "dev-peer-1",
+            "durable_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+            "record": {
+              "type": "admit_external_message"
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "delivery.answer",
+            "sender_device": "dev-peer-1",
+            "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+            "reply": {
+              "type": "response",
+              "success": true
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "an answer for no waiting (sender device, command id) pair is unknown_delivery",
+      "outcome": "refusal",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "wake": false
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "delivery.answer",
+            "sender_device": "dev-peer-1",
+            "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+            "reply": {
+              "type": "response"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unknown_delivery"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a re-sent delivery.inbound for the same pair is answered again (idempotent)",
+      "outcome": "ok",
+      "world": {
+        "deliveries": {
+          "agent_dirs": ["/agents/a"],
+          "handed": [
+            {
+              "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+              "sender_device": "dev-peer-1",
+              "durable_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+              "record": {
+                "type": "admit_external_message"
+              }
+            },
+            {
+              "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+              "sender_device": "dev-peer-1",
+              "durable_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+              "record": {
+                "type": "admit_external_message"
+              }
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "deliveries.serve",
+            "agent_dir": "/agents/a",
+            "v": 1
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "wake": false
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "delivery.inbound",
+            "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+            "sender_device": "dev-peer-1",
+            "durable_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+            "record": {
+              "type": "admit_external_message"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "delivery.inbound",
+            "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+            "sender_device": "dev-peer-1",
+            "durable_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10",
+            "record": {
+              "type": "admit_external_message"
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "delivery.answer",
+            "sender_device": "dev-peer-1",
+            "command_id": "Q01EV0FLRTAwMDAwMDAwMQ",
+            "reply": {
+              "type": "response",
+              "success": true
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "description": "session.open accepts the P1a session keys additively (reportMode, intervention, macosKeyPriming, trace) in every listed value; a re-open that changes them answers the same capabilities shape.",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "reportMode": "null",
+          "intervention": "continue",
+          "macosKeyPriming": "on",
+          "trace": true
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "reportMode": "object",
+          "intervention": "pause",
+          "macosKeyPriming": "off",
+          "trace": false
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    }
+  ]
+}

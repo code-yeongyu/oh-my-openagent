@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { HostSessionClient } from "./session-client"
+import { HostSessionClient, HostSessionDetachedError } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 import { createSenpiRpcClient } from "./session-transport"
 
@@ -18,6 +18,71 @@ async function observedWithin(signal: Promise<void>): Promise<boolean> {
 }
 
 describe("HostSessionClient connection lifetime", () => {
+  test("#given an unacknowledged close_session #when teardown detaches #then it releases the in-flight close transport", async () => {
+    const host = await harness.fakeHost()
+    const client = harness.hostClient(host)
+    await client.open(childOpenInput("/tmp/sessions/lifetime-unacknowledged-close.jsonl"))
+    await host.waitForConnections(1)
+    host.withholdReply("close_session")
+    const requested = host.waitForCommand("close_session")
+    const released = host.waitForConnections(0)
+    const closing = client.close().catch(() => undefined)
+    try {
+      await requested
+      await client.detach()
+      expect(await observedWithin(released)).toBe(true)
+      expect(host.connections).toBe(0)
+      await closing
+    } finally {
+      host.cutConnections()
+      await closing
+    }
+  })
+
+  test("#given an open still dialing #when teardown detaches #then the open ends refused and leaves no connection on the host", async () => {
+    // given: the dial is held after the client exists and before it is bound, the window a slow transport widens (#14906)
+    const host = await harness.fakeHost()
+    const dialing = Promise.withResolvers<void>()
+    const continueDial = Promise.withResolvers<void>()
+    const client = new HostSessionClient({
+      socketPath: host.socketPath,
+      ports: {
+        probeProtocolInfo: () => host.probeProtocolInfo(),
+        createClient: async (options) => {
+          const rpc = await createSenpiRpcClient(options)
+          const start = rpc.start.bind(rpc)
+          rpc.start = async () => {
+            dialing.resolve()
+            await continueDial.promise
+            await start()
+          }
+          return rpc
+        },
+      },
+    })
+    const pending = client.open(childOpenInput("/tmp/sessions/lifetime-detach-while-dialing.jsonl")).then(
+      () => "opened",
+      (error: unknown) => error,
+    )
+    try {
+      await dialing.promise
+
+      // when
+      await client.detach()
+      continueDial.resolve()
+      const outcome = await pending
+
+      // then
+      expect(outcome).toBeInstanceOf(HostSessionDetachedError)
+      await host.waitForConnections(0)
+      expect(host.commands.filter((command) => command.type === "open_session")).toHaveLength(0)
+    } finally {
+      continueDial.resolve()
+      await pending
+      await client.detach()
+    }
+  })
+
   for (const ending of ["park", "close"] as const) {
     test(`#given an attached task session #when the host sends ${ending} #then public client occupancy returns to baseline`, async () => {
       // given

@@ -1,6 +1,43 @@
 import { test, expect } from "@playwright/test"
 
 test.describe("Docs Page", () => {
+  for (const route of ["/es/docs", "/es/docs/workflows", "/es/docs/install"]) {
+    test(`identifies English prose without changing the shell language at ${route}`, async ({
+      page,
+    }) => {
+      await page.goto(route)
+      await expect(page.locator("html")).toHaveAttribute("lang", "es")
+      await expect(page.getByRole("note")).toContainText(/inglés/i)
+      const articles = page.locator("article.docs-content")
+      await expect(articles.first()).toBeVisible()
+      expect(
+        await articles.evaluateAll((nodes) => nodes.every((node) => node.matches(":lang(en)"))),
+      ).toBe(true)
+      await expect(page.getByRole("searchbox")).toHaveCount(1)
+      expect(await page.getByRole("searchbox").evaluate((node) => node.matches(":lang(es)"))).toBe(
+        true,
+      )
+      if (route === "/es/docs") {
+        await expect(page.locator("section:has(> article.docs-content)").first()).toHaveCSS(
+          "padding-top",
+          "0px",
+        )
+      }
+    })
+  }
+
+  test("omits the English fallback notice on /docs", async ({ page }) => {
+    await page.goto("/docs")
+
+    await expect(page.locator("article.docs-content:lang(en)").first()).toBeVisible()
+    await expect(page.locator("article.docs-content:not(:lang(en))")).toHaveCount(0)
+    await expect(page.getByRole("note", { includeHidden: true })).toHaveCount(0)
+    await expect(page.locator("section:has(> article.docs-content)").first()).toHaveCSS(
+      "padding-top",
+      "0px",
+    )
+  })
+
   test("renders sidebar and config reference", async ({ page }) => {
     // given
     await page.goto("/docs")

@@ -12,11 +12,21 @@ import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 // cancel both end the session BEFORE the record turns cancelled, with only cancel_requested set.
 // A hosted child's record has no child_session_id (the host reports the durable id only later), so the
 // session's own task id from its host session context identifies it too.
-export function stoppedOwnerTask(context: LifecycleContext, sessionId: string, ownTaskId?: string): TaskRecord | undefined {
-  return context.store.list().records.find((record) =>
-    (record.child_session_id === sessionId || (ownTaskId !== undefined && record.task_id === ownTaskId))
-    && (record.killed === true || record.status === "cancelled" || record.status === "lost"
-      || record.cancel_requested !== undefined))
+export function stoppedOwnerTask(
+  context: LifecycleContext,
+  sessionId: string,
+  ownTaskId?: string,
+): TaskRecord | undefined {
+  return context.store
+    .list()
+    .records.find(
+      (record) =>
+        (record.child_session_id === sessionId || (ownTaskId !== undefined && record.task_id === ownTaskId)) &&
+        (record.killed === true ||
+          record.status === "cancelled" ||
+          record.status === "lost" ||
+          record.cancel_requested !== undefined),
+    )
 }
 
 // Stops every child the stopped owner's session holds, live or still pending, through the one
@@ -46,10 +56,17 @@ export async function stopOwnedChildren(
     }
   }
   const summary: SuspendSummary = {
-    suspended_in_process: 0, suspended_rpc: 0, suspended_pending: 0, disposed, failures, stopped_owner: owner.task_id,
+    suspended_in_process: 0,
+    suspended_rpc: 0,
+    suspended_pending: 0,
+    disposed,
+    failures,
+    stopped_owner: owner.task_id,
   }
   log("senpi-task session shutdown stopped the children of a stopped task", {
-    parentSessionId: input.parentSessionId, owner: owner.task_id, ...summary,
+    parentSessionId: input.parentSessionId,
+    owner: owner.task_id,
+    ...summary,
   })
   return summary
 }
@@ -70,6 +87,7 @@ function cancelChild(context: LifecycleContext, taskId: string, reason: string):
     const { pending_steering: _dropped, ...rest } = fresh
     return { ...rest, error_message: withDroppedSteeringNotice(reason, dropped) }
   })
-  if (dropped > 0) context.store.appendEvent(taskId, { type: "steer_dropped", payload: { count: dropped, reason: "cancelled" } })
+  if (dropped > 0)
+    context.store.appendEvent(taskId, { type: "steer_dropped", payload: { count: dropped, reason: "cancelled" } })
   context.store.appendEvent(taskId, { type: "cancelled", payload: { previous_status: before.status, reason } })
 }

@@ -12,18 +12,25 @@ export function recordMockEvent(cwd, event) {
 
 export function observeMockSignal(cwd, callId, signal) {
   recordMockEvent(cwd, {
-    type: "model_request", callId, signalPresent: !!signal, aborted: signal?.aborted ?? null,
+    type: "model_request",
+    callId,
+    signalPresent: !!signal,
+    aborted: signal?.aborted ?? null,
   })
   if (!signal) return
   let requests = signalRequests.get(signal)
   if (!requests) {
     requests = new Map()
     signalRequests.set(signal, requests)
-    signal.addEventListener("abort", () => {
-      for (const [root, callIds] of requests) {
-        recordMockEvent(root, { type: "abort_signal", callIds, reason: String(signal.reason ?? "") })
-      }
-    }, { once: true })
+    signal.addEventListener(
+      "abort",
+      () => {
+        for (const [root, callIds] of requests) {
+          recordMockEvent(root, { type: "abort_signal", callIds, reason: String(signal.reason ?? "") })
+        }
+      },
+      { once: true },
+    )
   }
   const ids = requests.get(cwd) ?? []
   ids.push(callId)
@@ -35,27 +42,37 @@ function rows(path) {
 }
 
 export function failedChildEvidence(sandbox, records) {
-  return records.filter((record) => ["error", "lost", "cancelled"].includes(record.status)).map((record) => {
-    const transcript = rows(record.host_session?.session_path)
-    const sessionId = transcript.find((entry) => entry.type === "session")?.id
-    const callIds = new Set(transcript.flatMap((entry) =>
-      entry.message?.role === "assistant" && Array.isArray(entry.message.content)
-        ? entry.message.content.filter((part) => part.type === "toolCall").map((part) => part.id) : []))
-    const events = rows(auditPath(sandbox.cwd))
-    const requests = events.filter((event) => event.type === "model_request" && callIds.has(event.callId))
-    const stored = JSON.parse(readFileSync(join(sandbox.stateDir, "tasks", `${record.task_id}.json`), "utf8"))
-    return {
-      capturedAt: new Date().toISOString(),
-      record,
-      storeStableDuringCapture: JSON.stringify(stored) === JSON.stringify(record),
-      terminalEntry: transcript.findLast((entry) => entry.message?.role === "assistant"),
-      agentEnd: events.findLast((event) => event.type === "agent_end" && event.sessionId === sessionId) ?? null,
-      signalCoverage: requests.length > 0 && requests.every((event) => event.signalPresent),
-      abortedAtRequest: requests.some((event) => event.aborted === true),
-      abortSignals: events.filter((event) => event.type === "abort_signal" && event.callIds.some((id) => callIds.has(id))),
-      shutdownEvents: events.filter((event) => event.type === "session_shutdown" &&
-        [sessionId, record.parent_session_id].includes(event.sessionId)),
-      driverTeardownStarted: events.some((event) => event.type === "driver_teardown"),
-    }
-  })
+  return records
+    .filter((record) => ["error", "lost", "cancelled"].includes(record.status))
+    .map((record) => {
+      const transcript = rows(record.host_session?.session_path)
+      const sessionId = transcript.find((entry) => entry.type === "session")?.id
+      const callIds = new Set(
+        transcript.flatMap((entry) =>
+          entry.message?.role === "assistant" && Array.isArray(entry.message.content)
+            ? entry.message.content.filter((part) => part.type === "toolCall").map((part) => part.id)
+            : [],
+        ),
+      )
+      const events = rows(auditPath(sandbox.cwd))
+      const requests = events.filter((event) => event.type === "model_request" && callIds.has(event.callId))
+      const stored = JSON.parse(readFileSync(join(sandbox.stateDir, "tasks", `${record.task_id}.json`), "utf8"))
+      return {
+        capturedAt: new Date().toISOString(),
+        record,
+        storeStableDuringCapture: JSON.stringify(stored) === JSON.stringify(record),
+        terminalEntry: transcript.findLast((entry) => entry.message?.role === "assistant"),
+        agentEnd: events.findLast((event) => event.type === "agent_end" && event.sessionId === sessionId) ?? null,
+        signalCoverage: requests.length > 0 && requests.every((event) => event.signalPresent),
+        abortedAtRequest: requests.some((event) => event.aborted === true),
+        abortSignals: events.filter(
+          (event) => event.type === "abort_signal" && event.callIds.some((id) => callIds.has(id)),
+        ),
+        shutdownEvents: events.filter(
+          (event) =>
+            event.type === "session_shutdown" && [sessionId, record.parent_session_id].includes(event.sessionId),
+        ),
+        driverTeardownStarted: events.some((event) => event.type === "driver_teardown"),
+      }
+    })
 }

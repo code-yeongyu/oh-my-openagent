@@ -18,10 +18,10 @@ impl<S: InputServer> X11Input<S> {
     /// `top` is the requested top-level window; each event goes to its
     /// deepest mapped descendant under the event's first point (a drag keeps
     /// the window its press landed in, as a real grab would).
-    pub(super) fn pointer_send_event(&mut self, top: Window, event: &PointerEvent) -> CoreResult<()> {
+    pub(super) fn pointer_send_event(&mut self, top: Window, id: &str, event: &PointerEvent) -> CoreResult<()> {
         let (x, y) = first_point(event)?;
         let (root_x, root_y) = point(x, y)?;
-        let window = self.server.target_at(top, root_x, root_y)?;
+        let window = self.background_event_window(top, id, event_kind(event), root_x, root_y)?;
         let route = Route::Window(window);
         match event {
             PointerEvent::Click {

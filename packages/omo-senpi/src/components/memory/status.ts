@@ -1,10 +1,17 @@
-import { readFile } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  createLockRecord,
+  memoryWriterLockPath,
+  readReflectionParkFile,
+  withLock,
+} from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
-import type { SyncStatusReader } from "./sync-status-surface"
+import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
+import { sequencedStatus } from "./wiring-context"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -14,8 +21,12 @@ export const MEMORY_STATUS_MAX_WIDTH = 60
 /** A streak at or above this many consecutive failures earns the `!N` badge. */
 const STREAK_BADGE_THRESHOLD = 3
 export const SYNC_BLOCKED_SEGMENT = " sync blocked"
+/** Files too large to sync are held back while everything else syncs (#12284): also never trimmed. */
+export const SYNC_HELD_SEGMENT = " sync held"
 /** Shared health history bound so footer and RPC streaks are computed from the same window. */
 export const MEMORY_HEALTH_SCAN_LIMIT = 20
+/** How long a dirty-marker sample waits for an in-flight memory write to commit before the segment is dropped. */
+const DIRTY_SAMPLE_LOCK_WAIT_MS = 2_000
 const SECOND_MS = 1_000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
@@ -42,6 +53,8 @@ export interface MemoryStatusSegments {
   readonly parked: boolean
   /** Memory sync for this repository is failing (#10637); never trimmed from the line. */
   readonly syncBlocked?: boolean
+  /** Files are held out of the push for being too large (#12284); never trimmed either. */
+  readonly syncHeld?: boolean
 }
 
 export interface MemoryStatusResult {
@@ -67,6 +80,8 @@ export interface RefreshMemoryStatusInput {
 }
 
 export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Promise<MemoryStatusResult> {
+  // Taken before the first read, so a refresh that reads older state cannot replace a newer line (#13046).
+  const status = sequencedStatus(input.ui)
   const repo = input.gitRepo ?? createGitRepo(input.context.identityPaths.repo)
   const head = await repo.head()
   if (head === null) return { notified: false, footerShown: false }
@@ -74,15 +89,10 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
   let footerShown = false
   if (input.showFooter !== false) {
     const committedAt = await repo.headCommitTimestamp()
-    const age = committedAt === null
-      ? null
-      : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
+    const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
       const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
-      input.ui.setStatus(
-        MEMORY_STATUS_KEY,
-        formatMemoryStatusLine(input.context.identity, age, segments),
-      )
+      status.setStatus(MEMORY_STATUS_KEY, formatMemoryStatusLine(input.context.identity, age, segments))
       footerShown = true
     }
   }
@@ -116,28 +126,25 @@ export async function readMemoryStatusSegments(
   sessionId: string | undefined,
   syncStatus?: SyncStatusReader,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak, parked, syncBlocked] = await Promise.all([
-    readDirty(repo),
+  const [dirty, backlogSteps, streak, parked, sync] = await Promise.all([
+    readDirty(repo, context.identityPaths.locks),
     readBacklogSteps(context, sessionId),
     readStreak(context),
     readParked(context),
-    readSyncBlocked(context, syncStatus),
+    readSyncState(context, syncStatus),
   ])
-  return { dirty, backlogSteps, streak, parked, syncBlocked }
+  return { dirty, backlogSteps, streak, parked, ...sync }
 }
 
 /**
- * Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused][ sync blocked]`, dropping the optional
- * segments right-to-left to fit. ` sync blocked` is never dropped: it is the one segment that asks
- * the person to act.
+ * Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused][ sync blocked| sync held]`, dropping the optional
+ * segments right-to-left to fit. ` sync blocked` and ` sync held` are never dropped: they are the
+ * segments that ask the person to act.
  */
-export function formatMemoryStatusLine(
-  identity: string,
-  age: string,
-  segments: MemoryStatusSegments,
-): string {
+export function formatMemoryStatusLine(identity: string, age: string, segments: MemoryStatusSegments): string {
   const base = `mem:${identity} ${age}`
-  const sync = segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : ""
+  const sync =
+    segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : segments.syncHeld === true ? SYNC_HELD_SEGMENT : ""
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
@@ -152,27 +159,44 @@ export function formatMemoryStatusLine(
   return base + sync
 }
 
-async function readSyncBlocked(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<boolean> {
-  if (syncStatus === undefined) return false
-  try {
-    return (await syncStatus(context.identityPaths.repo))?.kind === "failing"
-  } catch {
-    return false
-  }
-}
-
-async function readDirty(repo: GitRepoForStatus): Promise<boolean> {
-  try {
-    return (await repo.status()).trim().length > 0
-  } catch {
-    return false
-  }
-}
-
-async function readBacklogSteps(
+async function readSyncState(
   context: MemoryIdentityContext,
-  sessionId: string | undefined,
-): Promise<number> {
+  syncStatus: SyncStatusReader | undefined,
+): Promise<{ syncBlocked: boolean; syncHeld: boolean }> {
+  const none = { syncBlocked: false, syncHeld: false }
+  if (syncStatus === undefined) return none
+  try {
+    const status = await syncStatus(context.identityPaths.repo)
+    // A service freeze blocks every push (#12280), like a failing cycle; a held file alone only holds (#12284).
+    if (status?.kind === "frozen") return { syncBlocked: true, syncHeld: false }
+    const failure = shownSyncFailure(status)
+    if (failure === undefined) return none
+    return failure.kind === "oversized_item"
+      ? { syncBlocked: false, syncHeld: true }
+      : { syncBlocked: true, syncHeld: false }
+  } catch {
+    return none
+  }
+}
+
+/**
+ * Every memory writer leaves the tree dirty from its file write until its commit, and holds the memory-write lock
+ * for that whole span. Sampling under the same lock means the marker reports a settled tree: a refresh that lands
+ * mid-write waits for the commit instead of catching the in-between state (#13046). A locks directory that does not
+ * exist yet means no writer has ever run, so there is nothing to wait for. A lock that stays busy drops the segment.
+ */
+async function readDirty(repo: GitRepoForStatus, locksDir: string): Promise<boolean> {
+  const sample = async (): Promise<boolean> => (await repo.status()).trim().length > 0
+  try {
+    if (!existsSync(locksDir)) return await sample()
+    const record = await createLockRecord("memory status")
+    return await withLock(memoryWriterLockPath(locksDir), record, sample, { waitTimeoutMs: DIRTY_SAMPLE_LOCK_WAIT_MS })
+  } catch {
+    return false
+  }
+}
+
+async function readBacklogSteps(context: MemoryIdentityContext, sessionId: string | undefined): Promise<number> {
   if (sessionId === undefined || sessionId.length === 0) return 0
   try {
     const raw: unknown = JSON.parse(
@@ -196,10 +220,9 @@ async function readParked(context: MemoryIdentityContext): Promise<boolean> {
 
 async function readStreak(context: MemoryIdentityContext): Promise<number> {
   try {
-    const health = await readReflectionHealth(
-      join(context.identityPaths.reflection, "completions"),
-      { limit: MEMORY_HEALTH_SCAN_LIMIT },
-    )
+    const health = await readReflectionHealth(join(context.identityPaths.reflection, "completions"), {
+      limit: MEMORY_HEALTH_SCAN_LIMIT,
+    })
     return health.streak
   } catch {
     return 0
@@ -230,9 +253,7 @@ export async function estimateSystemTokens(repo: GitRepoForStatus, head: string)
   const paths = await repo.lsTree(head)
   const systemMarkdownPaths = paths.filter(isSystemMarkdown)
   if (systemMarkdownPaths.length === 0) return 0
-  const contents = await Promise.all(
-    systemMarkdownPaths.map((path) => repo.show(head, path)),
-  )
+  const contents = await Promise.all(systemMarkdownPaths.map((path) => repo.show(head, path)))
   const totalBytes = contents.reduce((sum, content) => sum + Buffer.byteLength(content, "utf8"), 0)
   return Math.floor(totalBytes / 4)
 }

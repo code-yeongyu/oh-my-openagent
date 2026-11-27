@@ -16,13 +16,15 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Category | Use | Never |
 |---|---|---|
 | Runtime | Bun (native TS, single binary) | ts-node, tsx |
-| Package manager | `pnpm` | npm, yarn (unless workspace requires it) |
+| Package manager | Bun (`bun install`); `pnpm` only when Node is forced | npm, yarn (unless workspace requires it) |
 | Linter + formatter | **oxlint + oxfmt**, with both local copy rules | New ESLint, Prettier, or Biome setups; retain them only in repositories already using them |
 | Type checker | `tsc --noEmit` with strict config | skip type checking |
 | Web framework | Hono | Express |
 | Validation | Zod | joi, yup, class-validator |
 | Testing | `bun test` or vitest | jest |
 | ORM | Drizzle | TypeORM, Prisma (unless already in project) |
+
+The CI gate is one command: `bunx oxlint --type-aware --deny-warnings && bunx oxfmt --check && bunx tsc --noEmit && bun test`.
 
 ### The iron list
 
@@ -39,7 +41,9 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 11. **as const for constants** — module-level constant objects and arrays use `as const`.
 12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`.
 13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.).
-14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`.
+14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch` on the `catch` line.
+15. **`using` for resources** — files, connections, and locks are released by `using` / `await using`. Cancellation and timeouts travel as an `AbortSignal`.
+16. **Parameters are never reassigned** — produce a new value.
 
 ### Data modeling — which construct, when
 
@@ -91,10 +95,10 @@ try {
 }
 
 // GOOD — top-level boundary (only place catch-all is acceptable)
-async function main(): Promise<void> {  // no-excuse-ok: catch
+async function main(): Promise<void> {
   try {
     await run()
-  } catch (e) {
+  } catch (e) {  // no-excuse-ok: catch
     console.error("unhandled:", e)
     process.exit(1)
   }
@@ -110,11 +114,13 @@ async function main(): Promise<void> {  // no-excuse-ok: catch
 | ORM | Drizzle | Type-safe SQL, no codegen |
 | HTTP client | `ky` | Thin fetch wrapper (5KB); auto-throw on non-2xx, retry, timeout, hooks, prefixUrl. Browser + Node + Bun + Deno |
 | HTTP client (perf) | `undici` (direct API) | When a Node backend needs connection pooling, HTTP/2, or pipelining |
-
-> **HTTP client rule** - production code must not use bare `fetch()`. It has no retry, timeout, or error-handling policy and causes silent failures during incidents. Install **`ky`** by default, and use the **`undici`** direct API when a Node backend needs high-volume requests, connection pooling, HTTP/2, or pipelining. ~~`axios`~~ is forbidden after the supply-chain compromise (2026-03). `node-fetch` is unnecessary because Node 18+ includes built-in fetch.
 | Testing | `bun test` / vitest | Fast, ESM-native |
 | Logging | `pino` | Structured JSON, fast |
-| CLI | `@clack/prompts` + `commander` | Interactive + parsing |
+| CLI / TUI | `@clack/prompts` + `commander`; ink for a full TUI | Interactive + parsing |
+| LLM / agent | Vercel AI SDK | Typed tools, streaming, provider-neutral |
+| Config from env | Zod schema over `process.env` | Parsed once at startup |
+
+> **HTTP client rule** - production code must not use bare `fetch()`. It has no retry, timeout, or error-handling policy and causes silent failures during incidents. Install **`ky`** by default, and use the **`undici`** direct API when a Node backend needs high-volume requests, connection pooling, HTTP/2, or pipelining. ~~`axios`~~ is forbidden after the supply-chain compromise (2026-03). `node-fetch` is unnecessary because Node 18+ includes built-in fetch.
 
 ## tsconfig — the one true config
 
@@ -184,14 +190,13 @@ Tests are strict too, with these exceptions (configure in `.oxlintrc.json` overr
 |---|---|
 | Use `expect()` assertions | That's how testing works |
 | Use magic numbers | Test data |
-| Access private members via bracket notation | Testing internals |
 | Skip readonly on test fixtures | Mutable setup/teardown |
 
-Tests still follow the iron list — branded types, typed errors, exhaustive switch.
+Tests still follow the iron list — branded types, typed errors, exhaustive switch — and the authoring gate in [`../testing/README.md`](../testing/README.md). Private members are reached through the public boundary, never by bracket notation: a test on internals is an implementation mirror that a behavior-preserving refactor breaks.
 
 ## Existing codebases
 
-When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.**
+When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.** The one exception is the 250 pure-LOC ceiling: if your edit adds lines to a file already over it, split the unit you are touching into its own file first (see [`../code-smells.md`](../code-smells.md) Smell 1); everything else waits for a separate change.
 
 ## Activation
 

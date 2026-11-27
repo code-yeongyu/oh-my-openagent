@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
 import {
@@ -12,14 +12,8 @@ import {
   _resetForTesting as resetClaudeCodeSessionState,
   subagentSessions,
 } from "../../features/claude-code-session-state"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
-import {
-  installRuntimeFallbackTestClock,
-  restoreRuntimeFallbackTestClock,
-} from "./test-timeout-clock.test-support"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
+import { installRuntimeFallbackTestClock, restoreRuntimeFallbackTestClock } from "./test-timeout-clock.test-support"
 import type { RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
@@ -40,12 +34,9 @@ describe("runtime-fallback", () => {
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
-    mock.module("../../shared/logger", () => ({
-      ...loggerModule,
-      log: (msg: string, data?: unknown) => {
-        logCalls.push({ msg, data })
-      },
-    }))
+    spyOn(loggerModule, "log").mockImplementation((msg, data) => {
+      logCalls.push({ msg, data })
+    })
 
     const runtimeFallbackModule: RuntimeFallbackModule = await import(`./hook?test=${cacheBuster}`)
     createRuntimeFallbackHook = runtimeFallbackModule.createRuntimeFallbackHook
@@ -356,10 +347,7 @@ describe("runtime-fallback", () => {
       const clock = installRuntimeFallbackTestClock()
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
-        pluginConfig: createMockPluginConfigWithCategoryFallback([
-          "anthropic/claude-opus-4.7",
-          "openai/gpt-5.4",
-        ]),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4.7", "openai/gpt-5.4"]),
       })
       const sessionID = "test-session-model-not-found"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -407,7 +395,9 @@ describe("runtime-fallback", () => {
       expect(fallbackLogs[1]?.data).toMatchObject({ from: "anthropic/claude-opus-4.7", to: "openai/gpt-5.4" })
 
       const nonRetryLog = logCalls.find(
-        (c) => c.msg.includes("Error not retryable") && (c.data as { sessionID?: string } | undefined)?.sessionID === sessionID
+        (c) =>
+          c.msg.includes("Error not retryable") &&
+          (c.data as { sessionID?: string } | undefined)?.sessionID === sessionID,
       )
       expect(nonRetryLog).toBeUndefined()
     })
@@ -416,10 +406,7 @@ describe("runtime-fallback", () => {
       const clock = installRuntimeFallbackTestClock()
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
-        pluginConfig: createMockPluginConfigWithCategoryFallback([
-          "anthropic/claude-opus-4.7",
-          "openai/gpt-5.4",
-        ]),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4.7", "openai/gpt-5.4"]),
       })
       const sessionID = "test-session-provider-model-not-found"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -487,11 +474,9 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithCategoryModel(
-            "quick",
-            "anthropic/claude-haiku-4-5",
-            ["openai/gpt-5.4(high)"],
-          ),
+          pluginConfig: createMockPluginConfigWithCategoryModel("quick", "anthropic/claude-haiku-4-5", [
+            "openai/gpt-5.4(high)",
+          ]),
         },
       )
       const sessionID = "test-session-category-bootstrap-session-error"
@@ -508,10 +493,12 @@ describe("runtime-fallback", () => {
       })
 
       expect(promptCalls).toHaveLength(1)
-      const promptBody = promptCalls[0]?.body as {
-        model?: { providerID?: string; modelID?: string }
-        variant?: string
-      } | undefined
+      const promptBody = promptCalls[0]?.body as
+        | {
+            model?: { providerID?: string; modelID?: string }
+            variant?: string
+          }
+        | undefined
       expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
       expect(promptBody?.variant).toBe("high")
 
@@ -539,11 +526,9 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithCategoryModel(
-            "quick",
-            "anthropic/claude-haiku-4-5",
-            ["openai/gpt-5.4(high)"],
-          ),
+          pluginConfig: createMockPluginConfigWithCategoryModel("quick", "anthropic/claude-haiku-4-5", [
+            "openai/gpt-5.4(high)",
+          ]),
         },
       )
       const sessionID = "test-delegated-empty-history-bootstrap"
@@ -566,13 +551,15 @@ describe("runtime-fallback", () => {
       })
 
       expect(promptCalls).toHaveLength(1)
-      const promptBody = promptCalls[0]?.body as {
-        model?: { providerID?: string; modelID?: string }
-        parts?: Array<{ type?: string; text?: string }>
-        system?: string
-        tools?: Record<string, boolean>
-        variant?: string
-      } | undefined
+      const promptBody = promptCalls[0]?.body as
+        | {
+            model?: { providerID?: string; modelID?: string }
+            parts?: Array<{ type?: string; text?: string }>
+            system?: string
+            tools?: Record<string, boolean>
+            variant?: string
+          }
+        | undefined
       expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
       expect(promptBody?.variant).toBe("high")
       expect(promptBody?.system).toBe("delegated child system prompt")
@@ -604,11 +591,9 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithCategoryModel(
-            "test",
-            "anthropic/claude-haiku-4-5",
-            ["openai/gpt-5.4"],
-          ),
+          pluginConfig: createMockPluginConfigWithCategoryModel("test", "anthropic/claude-haiku-4-5", [
+            "openai/gpt-5.4",
+          ]),
         },
       )
       registerDelegatedChildSessionBootstrap({
@@ -630,11 +615,13 @@ describe("runtime-fallback", () => {
       })
 
       expect(promptCalls).toHaveLength(1)
-      const promptBody = promptCalls[0]?.body as {
-        parts?: Array<{ type?: string; text?: string }>
-        system?: string
-        tools?: Record<string, boolean>
-      } | undefined
+      const promptBody = promptCalls[0]?.body as
+        | {
+            parts?: Array<{ type?: string; text?: string }>
+            system?: string
+            tools?: Record<string, boolean>
+          }
+        | undefined
       expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt")
       expect(promptBody?.system).toBe("persisted delegated child system prompt")
       expect(promptBody?.tools?.question).toBe(false)
@@ -666,8 +653,7 @@ describe("runtime-fallback", () => {
               sessionID,
               role: "assistant",
               model: "github-copilot/claude-opus-4.7",
-              status:
-                "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
+              status: "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
             },
           },
         },
@@ -827,7 +813,7 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.5"]),
-        }
+        },
       )
 
       const sessionID = "test-session-status-auto-retry"
@@ -886,7 +872,7 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.5"]),
-        }
+        },
       )
 
       const sessionID = "test-session-status-dedup"
@@ -1259,11 +1245,9 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithCategoryModel(
-            "quick",
-            "anthropic/claude-haiku-4-5",
-            ["openai/gpt-5.4(high)"],
-          ),
+          pluginConfig: createMockPluginConfigWithCategoryModel("quick", "anthropic/claude-haiku-4-5", [
+            "openai/gpt-5.4(high)",
+          ]),
         },
       )
       const sessionID = "test-session-category-bootstrap-message-updated"
@@ -1283,10 +1267,12 @@ describe("runtime-fallback", () => {
       })
 
       expect(promptCalls).toHaveLength(1)
-      const promptBody = promptCalls[0]?.body as {
-        model?: { providerID?: string; modelID?: string }
-        variant?: string
-      } | undefined
+      const promptBody = promptCalls[0]?.body as
+        | {
+            model?: { providerID?: string; modelID?: string }
+            variant?: string
+          }
+        | undefined
       expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
       expect(promptBody?.variant).toBe("high")
 
@@ -1319,7 +1305,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
-        }
+        },
       )
 
       const sessionID = "test-message-updated-inflight-race"
@@ -1395,11 +1381,8 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithCategoryFallback([
-            "provider-a/model-a",
-            "provider-b/model-b",
-          ]),
-        }
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["provider-a/model-a", "provider-b/model-b"]),
+        },
       )
       const sessionID = "test-runtime-fallback-eof-preserves-pending"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -1474,7 +1457,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
             "openai/gpt-5.4",
           ]),
-        }
+        },
       )
 
       const sessionID = "test-message-updated-inflight-retry-signal"
@@ -1514,8 +1497,7 @@ describe("runtime-fallback", () => {
               sessionID,
               role: "assistant",
               model: "github-copilot/claude-opus-4.7",
-              status:
-                "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
+              status: "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
             },
           },
         },
@@ -1563,7 +1545,7 @@ describe("runtime-fallback", () => {
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-timeout-watchdog"
@@ -1633,7 +1615,7 @@ describe("runtime-fallback", () => {
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-timeout-after-chat-message"
@@ -1663,7 +1645,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+      const output: {
+        message: { model?: { providerID: string; modelID: string } }
+        parts: Array<{ type: string; text?: string }>
+      } = {
         message: {},
         parts: [],
       }
@@ -1672,7 +1657,7 @@ describe("runtime-fallback", () => {
           sessionID,
           model: { providerID: "github-copilot", modelID: "claude-opus-4.7" },
         },
-        output
+        output,
       )
 
       await clock.advanceBy(50)
@@ -1719,7 +1704,7 @@ describe("runtime-fallback", () => {
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-timeout-abort-inflight"
@@ -1788,7 +1773,7 @@ describe("runtime-fallback", () => {
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-stop-cancels-timeout-fallback"
@@ -1864,7 +1849,7 @@ describe("runtime-fallback", () => {
             "openai/gpt-5.4",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-completed-subagent-cancels-timeout-fallback"
@@ -1909,9 +1894,7 @@ describe("runtime-fallback", () => {
     test("should not trigger second fallback after successful assistant reply", async () => {
       const clock = installRuntimeFallbackTestClock()
       const retriedModels: string[] = []
-      const mockMessages = [
-        { info: { role: "user" }, parts: [{ type: "text", text: "test" }] },
-      ]
+      const mockMessages = [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }]
 
       const hook = createRuntimeFallbackHook(
         createMockPluginInput({
@@ -1936,7 +1919,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-success-clears-timeout"
@@ -2032,7 +2015,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-copilot-retry-signal-no-error"
@@ -2103,12 +2086,9 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
-          pluginConfig: createMockPluginConfigWithCategoryFallback([
-            "openai/gpt-5.5",
-            "anthropic/claude-opus-4-7",
-          ]),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.5", "anthropic/claude-opus-4-7"]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-openai-retry-signal-no-error"
@@ -2185,7 +2165,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-no-content-non-error-update"
@@ -2262,7 +2242,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-info-message-without-persisted-text"
@@ -2339,7 +2319,7 @@ describe("runtime-fallback", () => {
             "anthropic/claude-opus-4-7",
           ]),
           session_timeout_ms: 20,
-        }
+        },
       )
 
       const sessionID = "test-session-idle-before-fallback-result"
@@ -2404,7 +2384,7 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
-        }
+        },
       )
 
       const sessionID = "test-session-error-content"
@@ -2456,7 +2436,7 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-7"]),
-        }
+        },
       )
 
       const sessionID = "test-session-mixed-content"
@@ -2513,7 +2493,7 @@ describe("runtime-fallback", () => {
         {
           config: createMockConfig({ notify_on_fallback: false }),
           pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
-        }
+        },
       )
 
       const sessionID = "test-session-normal-content"
@@ -2629,14 +2609,14 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+      const output: {
+        message: { model?: { providerID: string; modelID: string } }
+        parts: Array<{ type: string; text?: string }>
+      } = {
         message: {},
         parts: [],
       }
-      await hook["chat.message"]?.(
-        { sessionID },
-        output
-      )
+      await hook["chat.message"]?.({ sessionID }, output)
 
       expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     })
@@ -2644,11 +2624,7 @@ describe("runtime-fallback", () => {
     test("should restore configured primary when reopened on a configured fallback model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false, restore_primary_after_cooldown: true }),
-        pluginConfig: createMockPluginConfigWithCategoryModel(
-          "test",
-          "anthropic/claude-opus-4-5",
-          ["openai/gpt-5.4"],
-        ),
+        pluginConfig: createMockPluginConfigWithCategoryModel("test", "anthropic/claude-opus-4-5", ["openai/gpt-5.4"]),
       })
       const sessionID = "test-session-reopen-fallback"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -2660,7 +2636,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+      const output: {
+        message: { model?: { providerID: string; modelID: string } }
+        parts: Array<{ type: string; text?: string }>
+      } = {
         message: {},
         parts: [],
       }
@@ -2881,10 +2860,7 @@ describe("runtime-fallback", () => {
     test("should respect cooldown period before retrying failed model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ cooldown_seconds: 60, notify_on_fallback: false }),
-        pluginConfig: createMockPluginConfigWithCategoryFallback([
-          "openai/gpt-5.4",
-          "anthropic/claude-opus-4-5",
-        ]),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4", "anthropic/claude-opus-4-5"]),
       })
       const sessionID = "test-session-cooldown"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -2946,7 +2922,9 @@ describe("runtime-fallback", () => {
       }
 
       //#then - should have stopped after max attempts
-      const maxLog = logCalls.find((c) => c.msg.includes("Max fallback attempts reached") || c.msg.includes("No fallback models"))
+      const maxLog = logCalls.find(
+        (c) => c.msg.includes("Max fallback attempts reached") || c.msg.includes("No fallback models"),
+      )
       expect(maxLog).toBeDefined()
     })
   })
@@ -2979,7 +2957,7 @@ describe("runtime-fallback", () => {
               },
             },
           },
-        }
+        },
       )
       const sessionID = "test-race-retry-in-flight"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -3059,7 +3037,11 @@ describe("runtime-fallback", () => {
       const secondErrorPromise = hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
+          properties: {
+            sessionID,
+            model: "provider-a/model-a",
+            error: { statusCode: 429, message: "Rate limit again" },
+          },
         },
       })
       await clock.advanceBy(3_000)
@@ -3070,7 +3052,7 @@ describe("runtime-fallback", () => {
       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
     })
 
-    test("session.error is skipped while waiting for the dispatched fallback result", async () => {
+    test("explicitly stale model session.error is skipped while waiting for the dispatched fallback result", async () => {
       const promptCalls: Array<unknown> = []
 
       //#given
@@ -3100,7 +3082,7 @@ describe("runtime-fallback", () => {
               },
             },
           },
-        }
+        },
       )
       const sessionID = "test-race-awaiting-fallback-result"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -3123,7 +3105,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, model: "google/gemini-2.5-pro", error: { statusCode: 429, message: "Rate limit" } },
         },
       })
 
@@ -3164,7 +3146,7 @@ describe("runtime-fallback", () => {
               },
             },
           },
-        }
+        },
       )
       const sessionID = "test-race-stale-message-update-before-error"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -3240,7 +3222,7 @@ describe("runtime-fallback", () => {
               },
             },
           },
-        }
+        },
       )
       const sessionID = "test-race-stop-awaiting"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -3306,9 +3288,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const autoRetryLog = logCalls.find((call) =>
-        call.msg.includes("No user message parts found for auto-retry") &&
-        call.msg.includes("using synthetic continuation"),
+      const autoRetryLog = logCalls.find(
+        (call) =>
+          call.msg.includes("No user message parts found for auto-retry") &&
+          call.msg.includes("using synthetic continuation"),
       )
       expect(autoRetryLog).toBeDefined()
 
@@ -3320,7 +3303,11 @@ describe("runtime-fallback", () => {
         event: {
           type: "session.error",
           // model matches pendingFallbackModel so the awaiting-fallback gate lets this through
-          properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
+          properties: {
+            sessionID,
+            model: "provider-a/model-a",
+            error: { statusCode: 429, message: "Rate limit again" },
+          },
         },
       })
       await clock.advanceBy(3_000)

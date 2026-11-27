@@ -44,8 +44,8 @@ describe("memory write notice wording", () => {
   })
 
   test("#given the entry count needs an ordinal #when specified #then English suffixes are correct", () => {
-    const titles = [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map((entriesToday) =>
-      memoryWriteNoticeSpec(notice({ timeline: { entriesToday } }), NOW).title,
+    const titles = [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map(
+      (entriesToday) => memoryWriteNoticeSpec(notice({ timeline: { entriesToday } }), NOW).title,
     )
     expect(titles).toEqual([
       "● Remembered · 1st entry today",
@@ -68,11 +68,22 @@ describe("memory write notice wording", () => {
   })
 
   test.each([
-    ["a single added line", [{ path: "knowledge/deploy.md", insertions: 1, deletions: 0 }], "Added 1 line to knowledge/deploy.md."],
-    ["an in-place edit", [{ path: "knowledge/deploy.md", insertions: 12, deletions: 4 }], "Updated 1 memory file (knowledge/deploy.md)."],
+    [
+      "a single added line",
+      [{ path: "knowledge/deploy.md", insertions: 1, deletions: 0 }],
+      "Added 1 line to knowledge/deploy.md.",
+    ],
+    [
+      "an in-place edit",
+      [{ path: "knowledge/deploy.md", insertions: 12, deletions: 4 }],
+      "Updated 1 memory file (knowledge/deploy.md).",
+    ],
     [
       "several files",
-      [{ path: "knowledge/deploy.md", insertions: 12, deletions: 4 }, { path: "system/persona.md", insertions: 3, deletions: 0 }],
+      [
+        { path: "knowledge/deploy.md", insertions: 12, deletions: 4 },
+        { path: "system/persona.md", insertions: 3, deletions: 0 },
+      ],
       "Updated 2 memory files (knowledge/deploy.md, system/persona.md).",
     ],
   ] as const)("#given %s #when specified #then the why sentence names it", (_label, affected, why) => {
@@ -102,20 +113,34 @@ describe("memory write notice wording", () => {
 
   test("#given the size crosses the 10K boundary #when specified #then one decimal is used below it and an integer above", () => {
     const small = memoryWriteNoticeSpec(notice({ size: { systemBytes: 2048, totalBytes: 9_932, fileCount: 1 } }), NOW)
-    const large = memoryWriteNoticeSpec(notice({ size: { systemBytes: 10_240, totalBytes: 1_048_576, fileCount: 3 } }), NOW)
+    const large = memoryWriteNoticeSpec(
+      notice({ size: { systemBytes: 10_240, totalBytes: 1_048_576, fileCount: 3 } }),
+      NOW,
+    )
     expect(small.extra?.[0]?.text).toBe("system 2.0K injected · 9.7K total · 1 file")
     expect(large.extra?.[0]?.text).toBe("system 10K injected · 1024K total · 3 files")
   })
 
   test.each([
-    ["a week-old consolidation", { lastConsolidationAtISO: "2026-08-12T12:00:00.000Z", unreflectedSteps: 3 }, "last consolidation 7d ago · 3 steps unreflected"],
-    ["a 25-step backlog", { lastConsolidationAtISO: "2026-08-13T12:00:00.000Z", unreflectedSteps: 25 }, "last consolidation 6d ago · 25 steps unreflected"],
+    [
+      "a week-old consolidation",
+      { lastConsolidationAtISO: "2026-08-12T12:00:00.000Z", unreflectedSteps: 3 },
+      "last consolidation 7d ago · 3 steps unreflected",
+    ],
+    [
+      "a 25-step backlog",
+      { lastConsolidationAtISO: "2026-08-13T12:00:00.000Z", unreflectedSteps: 25 },
+      "last consolidation 6d ago · 25 steps unreflected",
+    ],
   ] as const)("#given %s #when specified #then the timeline line turns warning toned", (_label, timeline, text) => {
     expect(memoryWriteNoticeSpec(notice({ timeline }), NOW).extra?.at(-1)).toEqual({ text, tone: "warning" })
   })
 
   test("#given degraded gathering #when a field is missing #then only its own fragment drops", () => {
-    const spec = memoryWriteNoticeSpec(notice({ size: undefined, timeline: { entriesToday: 4, unreflectedSteps: 3 } }), NOW)
+    const spec = memoryWriteNoticeSpec(
+      notice({ size: undefined, timeline: { entriesToday: 4, unreflectedSteps: 3 } }),
+      NOW,
+    )
     expect(spec.extra).toEqual([{ text: "3 steps unreflected", tone: "dim" }])
   })
 
@@ -138,15 +163,30 @@ describe("memory refusal wording", () => {
   test.each([
     ["memory: create: block already exists at reference/a.md", "reference/a.md already exists."],
     ["memory: rename: destination already exists at reference/b.md", "reference/b.md already exists."],
-    ["memory: str_replace: old_string was not found in the target memory block", "The text to replace was not in that memory."],
+    [
+      "memory: str_replace: old_string was not found in the target memory block",
+      "The text to replace was not in that memory.",
+    ],
     ["memory: system/persona.md is read_only and cannot be modified", "system/persona.md is read-only."],
     ["memory: insert made no changes", "Nothing needed to change."],
     ["memory: create: 'file_path' must be a non-empty string", "The request had no file path."],
-    ["memory: no memory identity bound to this session yet; the binding is re-established on the next user turn", "Memory is not ready for this session yet."],
+    [
+      "memory: no memory identity bound to this session yet; the binding is re-established on the next user turn",
+      "Memory is not ready for this session yet.",
+    ],
     ["memory: writer lock is busy", "Writer lock is busy."],
-    ["memory: create: 'description' contains tool-call scaffolding (\"</description>\"); the arguments of this call were malformed and split incorrectly - resend it with a one-line description and the body in file_text", "The memory call arrived garbled, so nothing was saved."],
-    ["memory: update_description: 'description' exceeds 1024 characters (6242)", "The description was 6,242 characters; the limit is 1,024."],
-    ["memory_apply_patch: reference/a.md: 'description' must be a single line", "The description has to fit on one line."],
+    [
+      "memory: create: 'description' contains tool-call scaffolding (\"</description>\"); the arguments of this call were malformed and split incorrectly - resend it with a one-line description and the body in file_text",
+      "The memory call arrived garbled, so nothing was saved.",
+    ],
+    [
+      "memory: update_description: 'description' exceeds 1024 characters (6242)",
+      "The description was 6,242 characters; the limit is 1,024.",
+    ],
+    [
+      "memory_apply_patch: reference/a.md: 'description' must be a single line",
+      "The description has to fit on one line.",
+    ],
     ["memory_apply_patch: reference/a.md: 'description' must not be empty", "The request had no description."],
   ])("#given %s #when specified #then the why line is a plain sentence", (message, why) => {
     const spec = memoryFailureNoticeSpec(message, { command: "create" })
@@ -162,7 +202,10 @@ describe("memory pending wording", () => {
   test.each([
     [{ command: "create", file_path: "reference/a.md" }, "◌ Remembering · reference/a.md"],
     [{ command: "delete", file_path: "reference/a.md" }, "◌ Letting go · reference/a.md"],
-    [{ command: "rename", old_path: "reference/a.md", new_path: "reference/b.md" }, "◌ Moving · reference/a.md → reference/b.md"],
+    [
+      { command: "rename", old_path: "reference/a.md", new_path: "reference/b.md" },
+      "◌ Moving · reference/a.md → reference/b.md",
+    ],
     [{}, "◌ Remembering"],
   ])("#given %j #when pending #then one friendly line describes the in-flight change", (args, line) => {
     expect(memoryPendingLine(args)).toBe(line)

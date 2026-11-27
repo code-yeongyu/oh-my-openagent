@@ -7,8 +7,13 @@ describe("getBundledVersion (GH-4211)", () => {
   it("returns the published root package version, not the workspace-internal one", () => {
     // given the root package.json that the published dist ships under
     const repoRoot = join(import.meta.dir, "..", "..", "..", "..", "..", "..")
-    const rootPackageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf-8")) as { name: string; version: string }
-    const workspacePackageJson = JSON.parse(readFileSync(join(repoRoot, "packages", "omo-opencode", "package.json"), "utf-8")) as { version: string }
+    const rootPackageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf-8")) as {
+      name: string
+      version: string
+    }
+    const workspacePackageJson = JSON.parse(
+      readFileSync(join(repoRoot, "packages", "omo-opencode", "package.json"), "utf-8"),
+    ) as { version: string }
 
     // when
     const bundledVersion = getBundledVersion()

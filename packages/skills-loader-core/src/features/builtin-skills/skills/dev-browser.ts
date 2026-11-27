@@ -4,6 +4,26 @@ import type { BuiltinSkill } from "../types"
 
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url))
 
+// dev-browser's start-server.ts runs `kill -9` on whatever holds the CDP port when nothing answers on the HTTP port.
+// A SIGKILLed Chrome skips its clean exit and leaks per-launch state (the macOS code-sign clone of the app bundle), so
+// release the port first: SIGTERM, wait up to the grace window, then SIGKILL only the survivors.
+// Without curl, "is a server answering" is unknown, so the step does nothing rather than signal a live server's browser.
+// Pid lists are split through $(echo ...) because zsh does not word-split an unquoted $pids.
+export function releaseStaleCdpPortScript({ httpPort = 9222, cdpPort = 9223, graceSeconds = 5 } = {}): string {
+  return `if command -v curl >/dev/null && command -v lsof >/dev/null && ! curl -sf -m 1 -o /dev/null http://localhost:${httpPort}; then
+  pids=$(lsof -ti:${cdpPort} 2>/dev/null)
+  if [ -n "$pids" ]; then
+    for p in $(echo $pids); do kill -TERM "$p" 2>/dev/null; done
+    left=""
+    for _ in $(seq ${graceSeconds * 10}); do
+      left=""; for p in $(echo $pids); do kill -0 "$p" 2>/dev/null && left="$left $p"; done
+      [ -z "$left" ] && break; sleep 0.1
+    done
+    for p in $(echo $left); do kill -KILL "$p" 2>/dev/null; done
+  fi
+fi`
+}
+
 export const devBrowserSkill: BuiltinSkill = {
   name: "dev-browser",
   description:
@@ -28,8 +48,9 @@ Two modes available. Ask the user if unclear which to use.
 
 Launches a new Chromium browser for fresh automation sessions.
 
-**macOS/Linux:**
+**macOS/Linux:** run it as one block. The first part lets a browser left on the CDP port from an earlier run quit cleanly before \`server.sh\` would force-kill it.
 \`\`\`bash
+${releaseStaleCdpPortScript()}
 ./skills/dev-browser/server.sh &
 \`\`\`
 

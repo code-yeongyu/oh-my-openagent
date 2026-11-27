@@ -1,23 +1,13 @@
-import type {
-  ClaudeCodeMcpServer,
-  McpLocalConfig,
-  McpRemoteConfig,
-  McpServerConfig,
-} from "./types"
+import type { ClaudeCodeMcpServer, McpLocalConfig, McpRemoteConfig, McpServerConfig } from "./types"
 import { expandEnvVarsInObject } from "./env-expander"
 
-export function transformMcpServer(
-  name: string,
-  server: ClaudeCodeMcpServer
-): McpServerConfig {
+export function transformMcpServer(name: string, server: ClaudeCodeMcpServer): McpServerConfig {
   const expanded = expandEnvVarsInObject(server)
   const serverType = expanded.type ?? "stdio"
 
   if (serverType === "http" || serverType === "sse") {
     if (!expanded.url) {
-      throw new Error(
-        `MCP server "${name}" requires url for type "${serverType}"`
-      )
+      throw new Error(`MCP server "${name}" requires url for type "${serverType}"`)
     }
 
     const config: McpRemoteConfig = {

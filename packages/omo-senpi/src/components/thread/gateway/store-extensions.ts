@@ -1,5 +1,3 @@
-import type { BindingRecord } from "./bindings"
-import type { GatewayRelay } from "./relay"
 import type { SqlRow, SqlValue } from "./sql"
 
 /**
@@ -71,36 +69,45 @@ export type StoreExtensionRefusal = {
   readonly message: string
 }
 
-export type StoreExtensionResult<T> =
-  | { readonly kind: "ok"; readonly value: T }
-  | StoreExtensionRefusal
+export type StoreExtensionResult<T> = { readonly kind: "ok"; readonly value: T } | StoreExtensionRefusal
 
 export type StoreExtensionTransaction = {
   /** `orderBy` lists the statement's output columns (`"created_at, id"`); a LIMIT goes in the statement. */
-  readonly all: (columns: readonly string[], sql: string, params?: readonly SqlValue[], orderBy?: string) => readonly SqlRow[]
+  readonly all: (
+    columns: readonly string[],
+    sql: string,
+    params?: readonly SqlValue[],
+    orderBy?: string,
+  ) => readonly SqlRow[]
   readonly one: (columns: readonly string[], sql: string, params?: readonly SqlValue[]) => SqlRow | undefined
   readonly exec: (sql: string, params?: readonly SqlValue[]) => number
-  readonly enqueue: GatewayRelay["inbound"]
-  readonly outboxAck: GatewayRelay["ack"]
-  readonly bind: GatewayRelay["bind"]
-  readonly unbind: GatewayRelay["unbind"]
-  readonly rebind: GatewayRelay["rebind"]
-  readonly bindingFor: (request: {
-    readonly platform: string
-    readonly account_id: string
-    readonly chat_id: string
-    readonly thread_id: string
-  }) => Promise<BindingRecord | null>
-  /** The session's active bindings (not expired at the transaction's now), ordered by binding_id; a read in the op's own transaction. */
-  readonly bindingsForSession: (sessionDurableId: string) => Promise<readonly BindingRecord[]>
-  readonly outboxPending: GatewayRelay["outbox"]
+  /**
+   * Read-only, for importing routes an extension kept on the removed core bindings: the thread's active, unexpired
+   * binding in the `bindings` table the store still keeps (schema.ts; dropping it is #14859), or null.
+   */
+  readonly bindingFor: (where: LegacyBindingWhere) => Promise<LegacyBinding | null>
+}
+
+export type LegacyBindingWhere = {
+  readonly platform: string
+  readonly account_id: string
+  readonly chat_id: string
+  readonly thread_id: string
+}
+
+export type LegacyBinding = {
+  readonly binding_id: string
+  readonly policy_id: string
+  readonly session_durable_id: string
 }
 
 /** Export each operation by name from the compiled module. Arguments/results must be structured-cloneable. */
 export type StoreExtensionOperation = (tx: StoreExtensionTransaction, args: unknown) => unknown | Promise<unknown>
 
 export type StoreExtensionApi = {
-  readonly registerStoreExtension: (extension: StoreExtensionRegistration) => Promise<StoreExtensionResult<{ readonly version: number }>>
+  readonly registerStoreExtension: (
+    extension: StoreExtensionRegistration,
+  ) => Promise<StoreExtensionResult<{ readonly version: number }>>
   readonly extensionCall: <T = unknown>(name: string, op: string, args: unknown) => Promise<StoreExtensionResult<T>>
 }
 
@@ -122,5 +129,10 @@ export type StoreExtensionSessionApi = {
   /** Every session op declared in the store that the model calls as a tool (internal ops are not listed); a read that imports no module. */
   readonly sessionCallableOps: () => Promise<readonly DeclaredSessionOp[]>
   /** Runs a declared op as `caller`, then its declared `await` when the result carries `await_request_id`; otherwise the op's own result. */
-  readonly extensionSessionAwait: <T = unknown>(name: string, op: string, args: unknown, caller: SessionCaller) => Promise<StoreExtensionResult<T>>
+  readonly extensionSessionAwait: <T = unknown>(
+    name: string,
+    op: string,
+    args: unknown,
+    caller: SessionCaller,
+  ) => Promise<StoreExtensionResult<T>>
 }

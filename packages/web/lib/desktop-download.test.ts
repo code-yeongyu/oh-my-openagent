@@ -278,7 +278,7 @@ describe("what the page reads from the manifest", () => {
     const manifest = stableManifest({
       platforms: {
         "win-x64": {
-          url: "https://github.com/code-yeongyu/omo-desktop-app/releases/download/v0.1.0/OmO.exe",
+          url: "https://github.com/example-org/desktop-app/releases/download/v0.1.0/OmO.exe",
           sha256: HASH_C,
           size: 198_300_000,
           kind: "exe",
@@ -306,7 +306,7 @@ describe("what the page reads from the manifest", () => {
     const state = parseChannelManifest(
       "stable",
       stableManifest({
-        notesUrl: "https://github.com/code-yeongyu/omo-desktop-app/releases/tag/v0.1.0",
+        notesUrl: "https://github.com/example-org/desktop-app/releases/tag/v0.1.0",
       }),
     )
 

@@ -113,7 +113,9 @@ describe("runtime advisories before the child's real failure (#9553)", () => {
 
   test("#given an advisory we have never seen then a real error #when classified #then the real error decides, not the advisory's wording", () => {
     // given - an unknown notice whose wording alone would read as an outage
-    const child = result("note: response cache temporarily unavailable, continuing without it\nError: reflection worker could not open its session file")
+    const child = result(
+      "note: response cache temporarily unavailable, continuing without it\nError: reflection worker could not open its session file",
+    )
 
     // when
     const miss = classifyRetryableModelMiss(child)

@@ -75,9 +75,7 @@ describe("resolveMemoryIdentity explicit mode", () => {
     const expectedId = `backend-lead-${expectedHash("backend-lead")}`
     expect(identity.safeSlug).toBe("backend-lead")
     expect(identity.id).toBe(expectedId)
-    expect(identity.paths.root).toBe(
-      join(homedir(), ".omo", "memory", AGENTS_DIRNAME, expectedId),
-    )
+    expect(identity.paths.root).toBe(join(homedir(), ".omo", "memory", AGENTS_DIRNAME, expectedId))
   })
 
   it("#given an explicit id with surrounding whitespace #when resolved #then it matches the trimmed form", () => {
@@ -108,9 +106,7 @@ describe("resolveMemoryIdentity root override", () => {
     // when
     const identity = resolveMemoryIdentity("../evil", "/repo/alpha", env)
     // then
-    expect(identity.paths.root).toBe(
-      join(overrideRoot, AGENTS_DIRNAME, `evil-${expectedHash("../evil")}`),
-    )
+    expect(identity.paths.root).toBe(join(overrideRoot, AGENTS_DIRNAME, `evil-${expectedHash("../evil")}`))
     expect(identity.paths.repo).toBe(join(identity.paths.root, "repo"))
     expect(identity.paths.pushQueue).toBe(join(identity.paths.root, "runtime", "push-queue"))
   })
@@ -121,9 +117,7 @@ describe("resolveMemoryIdentity root override", () => {
     // when
     const identity = resolveMemoryIdentity("auto", "/work/proj", env)
     // then (Windows qualifies the drive; resolve() is the platform semantics the impl applies)
-    expect(identity.paths.root).toBe(
-      join(resolve("/work/proj", "qa-home"), AGENTS_DIRNAME, identity.id),
-    )
+    expect(identity.paths.root).toBe(join(resolve("/work/proj", "qa-home"), AGENTS_DIRNAME, identity.id))
   })
 
   it("#given no env argument #when OMO_MEMORY_HOME is set in the process env #then the default env read honors it", () => {

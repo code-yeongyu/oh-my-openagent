@@ -3,13 +3,17 @@
 
 import type * as FeedbackRuntime from "./runtime"
 
+import { reinstallStep } from "../reinstall/reinstall-step"
+
 export type FeedbackRuntimeModule = Pick<typeof FeedbackRuntime, "createFeedbackCore" | "runFeedbackCommand">
 export type FeedbackRuntimeLoader = () => Promise<FeedbackRuntimeModule>
 
 export const FEEDBACK_RUNTIME_ARTIFACT = "extensions/omo-feedback.js"
 
 /** One shared import per process; a failed import is not cached, so the next report retries. */
-export function createFeedbackRuntimeLoader(importRuntime: () => Promise<FeedbackRuntimeModule>): FeedbackRuntimeLoader {
+export function createFeedbackRuntimeLoader(
+  importRuntime: () => Promise<FeedbackRuntimeModule>,
+): FeedbackRuntimeLoader {
   let pending: Promise<FeedbackRuntimeModule> | undefined
   return () => {
     pending ??= importRuntime().catch((error: unknown) => {
@@ -20,9 +24,11 @@ export function createFeedbackRuntimeLoader(importRuntime: () => Promise<Feedbac
   }
 }
 
-export const loadFeedbackRuntime: FeedbackRuntimeLoader = createFeedbackRuntimeLoader(() => import("#omo-feedback-runtime"))
+export const loadFeedbackRuntime: FeedbackRuntimeLoader = createFeedbackRuntimeLoader(
+  () => import("#omo-feedback-runtime"),
+)
 
 export function feedbackRuntimeLoadFailure(error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)
-  return `Feedback is unavailable: the feedback runtime (${FEEDBACK_RUNTIME_ARTIFACT}) failed to load: ${cause}. This build's plugin payload is incomplete; reinstall omo, then start a new session.`
+  return `Feedback is unavailable: the feedback runtime (${FEEDBACK_RUNTIME_ARTIFACT}) failed to load: ${cause}. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
 }

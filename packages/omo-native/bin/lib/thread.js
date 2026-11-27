@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs"
 import { userInfo } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { integerOption, parseArgs, THREAD_EXIT } from "./thread-args.js"
+import { integerOption, parseArgs, stateOption, THREAD_EXIT, THREAD_STATES } from "./thread-args.js"
+import { escapeForDisplay } from "./display-escape.js"
 import { humanLines } from "./thread-output.js"
 
 export { THREAD_EXIT } from "./thread-args.js"
@@ -10,160 +12,110 @@ export { THREAD_EXIT } from "./thread-args.js"
 /**
  * `omo thread` - the session gateway for scripts and connectors: every thread operation the agent
  * tools offer, run through the plugin's thread SDK (`plugin/runtime/thread-sdk/sdk.js`) as
- * `cli:<uid>`. It never starts a host: sessions are listed from what the engine enumerates, and
- * bindings, the outbox and receipts live in the gateway store. JSON shapes: docs/reference/omo-thread.md.
+ * `cli:<uid>`. It never starts a host: sessions are listed from the endpoints the engine's registry names, and
+ * receipts live in the gateway store. JSON shapes: docs/reference/omo-thread.md.
  */
 
 const USAGE = [
-  "usage: omo thread <list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
+  "usage: omo thread <list|send|read|close> [options] [--json]",
   "",
-  "  list      [--all-scope]",
-  "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
-  "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
-  "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
+  "  list      [--all-scope] [--state opening|running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
+  "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
-  "  bind      <session> --platform <p> --account <id> --chat <id> [--thread <id>] [--root-message <id>]",
-  "            [--progress-message <id>] [--direction in|out|both] [--inbound-mode auto|follow_up]",
-  "            [--events <kind,...>] [--policy <id>] [--ttl <seconds>|none] [--idempotency-key <k>]",
-  "  unbind    <binding-id> --revision <n> [--idempotency-key <k>]",
-  "  rebind    <binding-id> <session> --revision <n> [--idempotency-key <k>]",
-  "  bindings  [--session <s>] [--platform <p>] [--account <id>] [--chat <id>] [--thread <id>] [--status <s>] [--cursor <c>] [--limit <n>]",
-  "  report    <session> <milestone|report|question|completion> <text> [--binding <id>] [--request-id <id>] [--request-kind question|select|confirm|input|editor] [--idempotency-key <k>]",
-  "  answer    --binding <answering-binding-id> --token <reply-token> <text>",
-  "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
-  "  outbox    <binding-id> [--after <cursor>] [--limit <n>] [--ack]",
-  "  ack       <binding-id> <cursor> [--provider-message-id <id>]",
+  "  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]",
+  "",
+  "  <target>/<session> takes a thread id, session id, alias, exact name, unique id prefix,",
+  "                or <device>/<thread> (device: id, here, name or unique device id prefix)",
   "",
   "  --all-scope  resolve sessions in every workspace, not only this directory's",
   "  --json       print the result as one JSON value",
 ].join("\n")
 
 const COMMON = ["--json", "--all-scope"]
-const AUTHOR_FLAGS = ["--author-id", "--author-name", "--author-user-id"]
 
 const COMMANDS = {
-  list: { values: [], booleans: [], arity: [0, 0], call: (sdk, _p, _o, scope) => sdk.list(scope) },
-  send: {
-    values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", ...AUTHOR_FLAGS],
+  list: {
+    values: ["--state"],
+    repeatable: ["--state"],
     booleans: [],
-    arity: [1, 2],
-    call: (sdk, p, o, scope) => sdk.send({ ...scope, ...sendTarget(p, o), mode: o["--mode"], expected_turn_id: integerOption(o, "--expected-turn"), binding_id: o["--binding"], idempotency_key: o["--idempotency-key"], author: authorInput(o) }),
+    arity: [0, 0],
+    call: (sdk, _p, o, scope) => {
+      const state = stateOption(o)
+      return sdk.list(state === undefined ? scope : { ...scope, state })
+    },
+  },
+  send: {
+    values: ["--mode", "--expected-turn", "--idempotency-key", "--collapse-key"],
+    booleans: [],
+    arity: [2, 2],
+    call: (sdk, p, o, scope) =>
+      sdk.send({
+        ...scope,
+        thread: p[0],
+        text: p[1],
+        mode: o["--mode"],
+        expected_turn_id: integerOption(o, "--expected-turn"),
+        idempotency_key: o["--idempotency-key"],
+        collapse_key: o["--collapse-key"],
+      }),
   },
   read: {
     values: ["--limit", "--max-bytes", "--cursor"],
     booleans: [],
     arity: [1, 1],
-    call: async (sdk, p, o, scope) => lastItems(await sdk.read({ ...scope, thread: p[0], max_bytes: integerOption(o, "--max-bytes"), cursor: o["--cursor"] }), integerOption(o, "--limit")),
+    call: async (sdk, p, o, scope) =>
+      lastItems(
+        await sdk.read({ ...scope, thread: p[0], max_bytes: integerOption(o, "--max-bytes"), cursor: o["--cursor"] }),
+        integerOption(o, "--limit"),
+      ),
   },
-  bind: {
-    values: ["--platform", "--account", "--chat", "--thread", "--root-message", "--progress-message", "--direction", "--inbound-mode", "--events", "--policy", "--ttl", "--idempotency-key"],
-    booleans: [],
+  close: {
+    values: ["--wait-ms", "--idempotency-key"],
+    booleans: ["--force", "--graceful"],
     arity: [1, 1],
-    call: (sdk, p, o, scope) => sdk.bind({ ...scope, session: p[0], idempotency_key: o["--idempotency-key"], binding: bindingInput(o) }),
+    // omo#14313: the thread_close tool's body; --graceful lets the turn end and hands unread messages back.
+    call: (sdk, p, o, scope, flags) =>
+      sdk.close({
+        ...scope,
+        thread: p[0],
+        ...(flags.has("--force") ? { force: true } : {}),
+        ...(flags.has("--graceful") ? { graceful: true } : {}),
+        wait_ms: integerOption(o, "--wait-ms"),
+        idempotency_key: o["--idempotency-key"],
+      }),
   },
-  unbind: { values: ["--revision", "--idempotency-key"], booleans: [], arity: [1, 1], call: (sdk, p, o) => sdk.unbind({ binding_id: p[0], expected_revision: integerOption(o, "--revision"), idempotency_key: o["--idempotency-key"] }) },
-  rebind: { values: ["--revision", "--idempotency-key"], booleans: [], arity: [2, 2], call: (sdk, p, o, scope) => sdk.rebind({ ...scope, binding_id: p[0], session: p[1], expected_revision: integerOption(o, "--revision"), idempotency_key: o["--idempotency-key"] }) },
-  bindings: {
-    values: ["--session", "--platform", "--account", "--chat", "--thread", "--status", "--cursor", "--limit"],
-    booleans: [],
-    arity: [0, 0],
-    call: (sdk, _p, o, scope) => sdk.bindings({ ...scope, session: o["--session"], platform: o["--platform"], account_id: o["--account"], chat_id: o["--chat"], thread_id: o["--thread"], status: o["--status"], cursor: o["--cursor"], limit: integerOption(o, "--limit") }),
-  },
-  report: {
-    values: ["--binding", "--request-id", "--request-kind", "--idempotency-key"],
-    booleans: [],
-    arity: [3, 3],
-    call: (sdk, p, o, scope) => sdk.report({ ...scope, session: p[0], kind: p[1], text: p[2], binding_id: o["--binding"], request_id: o["--request-id"], request_kind: o["--request-kind"], idempotency_key: o["--idempotency-key"] }),
-  },
-  answer: { values: ["--binding", "--token", ...AUTHOR_FLAGS], booleans: [], arity: [1, 1], call: (sdk, p, o) => sdk.answer({ binding_id: o["--binding"], reply_token: o["--token"], answer: p[0], author: authorInput(o) }) },
-  outbox: { values: ["--after", "--limit"], booleans: ["--ack"], arity: [1, 1], call: (sdk, p, o, _scope, flags) => drainOutbox(sdk, p[0], o, flags.has("--ack")) },
-  ack: { values: ["--provider-message-id"], booleans: [], arity: [2, 2], call: (sdk, p, o) => sdk.ack({ binding_id: p[0], cursor: Number(p[1]), provider_message_id: o["--provider-message-id"] }) },
 }
 
-const REQUIRED = { unbind: ["--revision"], rebind: ["--revision"], bind: ["--platform", "--account", "--chat"], answer: ["--binding", "--token"] }
-const INTEGER_FLAGS = ["--expected-turn", "--limit", "--max-bytes", "--revision", "--after"]
-const CHOICE_FLAGS = { "--mode": ["auto", "steer", "follow_up"], "--direction": ["in", "out", "both"] }
-
-function sendTarget(positionals, options) {
-  if (positionals.length === 2) return { thread: positionals[0], text: positionals[1] }
-  return options["--binding"] === undefined ? { thread: positionals[0], text: undefined } : { text: positionals[0] }
-}
-
-function authorInput(o) {
-  if (o["--author-id"] === undefined) return undefined
-  return { platform_user_id: o["--author-id"], display: o["--author-name"], ...(o["--author-user-id"] === undefined ? {} : { user_id: o["--author-user-id"] }) }
-}
-
-function authorProblem(o) {
-  const given = AUTHOR_FLAGS.filter((flag) => o[flag] !== undefined)
-  if (given.length === 0) return undefined
-  if (o["--binding"] === undefined) return "--author-id/--author-name/--author-user-id need --binding: only a bound external thread has authors"
-  if (o["--author-id"] === undefined || o["--author-name"] === undefined) return "--author-id and --author-name go together (--author-user-id needs both)"
-  return undefined
-}
-
-function bindingInput(o) {
-  const direction = o["--direction"] === undefined ? undefined : { inbound: o["--direction"] !== "out", outbound: o["--direction"] !== "in" }
-  const ttl = o["--ttl"] === undefined ? undefined : o["--ttl"] === "none" ? null : Number(o["--ttl"])
-  return {
-    platform: o["--platform"],
-    account_id: o["--account"],
-    chat_id: o["--chat"],
-    thread_id: o["--thread"],
-    root_message_id: o["--root-message"],
-    progress_message_id: o["--progress-message"],
-    direction,
-    inbound_mode: o["--inbound-mode"],
-    outbound_events: o["--events"]?.split(",").filter(Boolean),
-    policy_id: o["--policy"],
-    ttl_seconds: ttl,
-  }
-}
+const INTEGER_FLAGS = ["--expected-turn", "--limit", "--max-bytes"]
+const CHOICE_FLAGS = { "--mode": ["auto", "steer", "follow_up"] }
 
 function lastItems(result, limit) {
   if (limit === undefined || result.kind !== "ok") return result
   return { ...result, items: result.items.slice(Math.max(0, result.items.length - limit)) }
 }
 
-/** The connector drain: read a page, and with `--ack` acknowledge through its newest row. */
-async function drainOutbox(sdk, bindingId, options, ack) {
-  const page = await sdk.outbox({ binding_id: bindingId, after_cursor: integerOption(options, "--after"), limit: integerOption(options, "--limit") })
-  if (!ack || page.kind !== "ok") return page
-  const newest = page.rows.at(-1)
-  if (newest === undefined) return { ...page, acked: null }
-  const acked = await sdk.ack({ binding_id: bindingId, cursor: newest.cursor })
-  return acked.kind === "ok" ? { ...page, acked } : acked
-}
-
 function validate(name, parsed) {
   const [min, max] = COMMANDS[name].arity
   const count = parsed.positionals.length
   if (count < min || count > max) return `expects ${min === max ? min : `${min}-${max}`} argument(s), got ${count}`
-  for (const flag of REQUIRED[name] ?? []) if (parsed.options[flag] === undefined) return `${flag} is required`
-  for (const flag of INTEGER_FLAGS) if (Number.isNaN(integerOption(parsed.options, flag) ?? 0)) return `${flag} must be a non-negative integer`
+  for (const flag of INTEGER_FLAGS)
+    if (Number.isNaN(integerOption(parsed.options, flag) ?? 0)) return `${flag} must be a non-negative integer`
+  const unknownState = (stateOption(parsed.options) ?? []).find((state) => !THREAD_STATES.includes(state))
+  if (unknownState !== undefined) return `--state must be one of ${THREAD_STATES.join(", ")}, got '${unknownState}'`
   for (const [flag, choices] of Object.entries(CHOICE_FLAGS)) {
     const value = parsed.options[flag]
-    if (value !== undefined && !choices.includes(value)) return `${flag} must be one of ${choices.join(", ")}, got '${value}'`
+    if (value !== undefined && !choices.includes(value))
+      return `${flag} must be one of ${choices.join(", ")}, got '${value}'`
   }
-  if (name === "send") {
-    const binding = parsed.options["--binding"] !== undefined
-    if (!binding && count !== 2) return "needs <target> <text> (or --binding <id>)"
-    if (parsed.positionals.at(-1).trim() === "") return "<text> is empty"
-    if (binding && parsed.options["--mode"] === "steer") return "--binding takes --mode auto or follow_up (capped by the binding's inbound mode); a binding message never steers"
-    if (binding && parsed.options["--expected-turn"] !== undefined) return "--binding takes no --expected-turn: a binding message never steers"
-  }
-  if (name === "send" || name === "answer") {
-    const author = authorProblem(parsed.options)
-    if (author !== undefined) return author
-  }
-  if (name === "ack" && !/^\d+$/.test(parsed.positionals[1])) return "<cursor> must be a non-negative integer"
+  if (name === "send" && parsed.positionals[1].trim() === "") return "<text> is empty"
   return undefined
 }
 
 /** With `--json`, a failure the CLI answers itself is printed in the SDK's error shape, so stdout is always one JSON value. */
 function refuse({ stdout, stderr }, json, code, line, nextAction) {
-  if (json) stdout.write(`${JSON.stringify({ kind: "error", error: { code, message: line, next_action: nextAction } })}\n`)
-  stderr.write(`${line}\n`)
+  if (json)
+    stdout.write(`${JSON.stringify({ kind: "error", error: { code, message: line, next_action: nextAction } })}\n`)
+  stderr.write(`${escapeForDisplay(line)}\n`)
 }
 
 /** `--json` among the options, before `--`: a usage error is still answered in JSON when the parse itself failed. */
@@ -186,21 +138,87 @@ export function threadExitCode(result) {
  * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
  * plugin SDK that cannot be imported (a broken or partial install).
  */
-export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, identity }) {
+export async function loadThreadSdk({
+  pluginRoot,
+  agentDir,
+  env,
+  cwd,
+  stderr,
+  reinstall,
+  loadSqlite,
+  importSdk,
+  importThreadClient = () => import(pathToFileURL(threadClientPath(pluginRoot)).href),
+  identity,
+}) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {
-    return { code: "unsupported", error: `node:sqlite is unavailable in this runtime (${process.versions.bun ? `bun ${process.versions.bun}` : `node ${process.versions.node}`}); the session gateway store needs it` }
+    return {
+      code: "unsupported",
+      error: `node:sqlite is unavailable in this runtime (${process.versions.bun ? `bun ${process.versions.bun}` : `node ${process.versions.node}`}); the session gateway store needs it`,
+    }
   }
   let module
   try {
-    module = await (importSdk ?? (() => import(pathToFileURL(join(pluginRoot, "runtime", "thread-sdk", "sdk.js")).href)))()
+    module = await (
+      importSdk ?? (() => import(pathToFileURL(join(pluginRoot, "runtime", "thread-sdk", "sdk.js")).href))
+    )()
   } catch (error) {
-    return { code: "internal_error", error: `the plugin's thread SDK could not be loaded from ${join(pluginRoot, "runtime", "thread-sdk")}: ${error instanceof Error ? error.message : String(error)}` }
+    return {
+      code: "internal_error",
+      error: `the plugin's thread SDK could not be loaded from ${join(pluginRoot, "runtime", "thread-sdk")}: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
-  const engineStatusAll = async () => engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } }).stdout
-  return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll }) }
+  const remote = await cliRemoteSurface({ pluginRoot, env, cwd, stderr, reinstall, importThreadClient })
+  return {
+    sdk: module.createThreadSdk({
+      agentDir,
+      cwd,
+      uid: who.uid,
+      user: who.user,
+      env,
+      ...(remote === undefined ? {} : { remote }),
+    }),
+  }
+}
+
+/**
+ * The account's other devices and its alias registry for `omo thread` (#12833), from the plugin's own thread client and
+ * device-account sidecars: `read` then resolves an alias or another device's thread as the agent tools do. A plugin
+ * whose thread client does not offer it keeps the local-only behavior. A thread client that cannot be imported is a
+ * broken install: the local-only behavior stays, and stderr says aliases and other devices are unreachable (#12848).
+ * The SDK closes it on dispose.
+ */
+async function cliRemoteSurface({ pluginRoot, env, cwd, stderr, reinstall, importThreadClient }) {
+  let client
+  try {
+    client = await importThreadClient()
+  } catch (error) {
+    stderr.write(
+      `omo: the plugin's thread client could not be loaded from ${escapeForDisplay(threadClientPath(pluginRoot))} (${escapeForDisplay(error instanceof Error ? error.message : String(error))}); aliases and other devices' threads are unreachable, only this device's threads are.\n  next: ${escapeForDisplay(reinstall ?? "Reinstall omo, then retry.")}\n`,
+    )
+    return undefined
+  }
+  if (typeof client.createCliRemoteSurface !== "function") return undefined
+  let version = "0.0.0"
+  try {
+    const declared = JSON.parse(readFileSync(join(pluginRoot, "package.json"), "utf8")).version
+    if (typeof declared === "string") version = declared
+  } catch {
+    // A plugin manifest that cannot be read only loses the version the device service is told; reads still work.
+  }
+  const loadAccess = async () =>
+    (await import(pathToFileURL(join(pluginRoot, "extensions", "omo-device-account.js")).href)).cliServiceAccess({
+      env,
+      cwd,
+      log: (line) => stderr.write(`omo: ${escapeForDisplay(line)}\n`),
+    })
+  return client.createCliRemoteSurface({ version, loadAccess })
+}
+
+function threadClientPath(pluginRoot) {
+  return join(pluginRoot, "extensions", "omo-thread-client.js")
 }
 
 export async function runThreadCommand(args, options) {
@@ -212,29 +230,64 @@ export async function runThreadCommand(args, options) {
     return THREAD_EXIT.ok
   }
   if (name === undefined || !Object.hasOwn(COMMANDS, name)) {
-    refuse(options, json, "invalid_arguments", `omo thread: ${name === undefined ? "expects a subcommand" : `unknown subcommand '${name}'`}`, "Run omo thread --help.")
+    refuse(
+      options,
+      json,
+      "invalid_arguments",
+      `omo thread: ${name === undefined ? "expects a subcommand" : `unknown subcommand '${name}'`}`,
+      "Run omo thread --help.",
+    )
     stderr.write(`${USAGE}\n`)
     return THREAD_EXIT.usage
   }
   // Same refusal as `omo daemon` on win32: the gateway's endpoints are unix sockets.
   if (platform === "win32") {
-    refuse(options, json, "unsupported", "omo thread: a task host needs a unix socket, which win32 does not provide", "Run omo thread on macOS or Linux.")
+    refuse(
+      options,
+      json,
+      "unsupported",
+      "omo thread: a task host needs a unix socket, which win32 does not provide",
+      "Run omo thread on macOS or Linux.",
+    )
     return THREAD_EXIT.unsupported
   }
   const command = COMMANDS[name]
-  const parsed = parseArgs(args.slice(1), { booleans: [...COMMON, ...command.booleans], values: command.values })
+  const parsed = parseArgs(args.slice(1), {
+    booleans: [...COMMON, ...command.booleans],
+    values: command.values,
+    repeatable: command.repeatable ?? [],
+  })
   const problem = parsed.error ?? validate(name, parsed)
   if (problem !== undefined) {
-    refuse(options, json, "invalid_arguments", `omo thread ${name}: ${problem}`, `Run omo thread --help for the ${name} options.`)
+    refuse(
+      options,
+      json,
+      "invalid_arguments",
+      `omo thread ${name}: ${problem}`,
+      `Run omo thread --help for the ${name} options.`,
+    )
     return THREAD_EXIT.usage
   }
   const loaded = await loadThreadSdk(options)
   if (loaded.error !== undefined && loaded.code === "internal_error") {
-    refuse(options, json, "internal_error", `omo thread: ${loaded.error}`, "Reinstall omo (omo update), then retry.")
+    // `omo update` installs nothing on an install already at the latest version, so the step is the caller's reinstall.
+    refuse(
+      options,
+      json,
+      "internal_error",
+      `omo thread: ${loaded.error}`,
+      options.reinstall ?? "Reinstall omo, then retry.",
+    )
     return THREAD_EXIT.failed
   }
   if (loaded.error !== undefined) {
-    refuse(options, json, "unsupported", `omo thread: ${loaded.error}`, "Run omo thread under bun, or a node with node:sqlite.")
+    refuse(
+      options,
+      json,
+      "unsupported",
+      `omo thread: ${loaded.error}`,
+      "Run omo thread under bun, or a node with node:sqlite.",
+    )
     return THREAD_EXIT.unsupported
   }
   try {
@@ -243,15 +296,22 @@ export async function runThreadCommand(args, options) {
     const exitCode = threadExitCode(result)
     if (result.kind !== "ok") {
       if (json) stdout.write(`${JSON.stringify(result)}\n`)
-      stderr.write(`omo thread ${name}: ${result.error.code}: ${result.error.message}\n  next: ${result.error.next_action}\n`)
+      stderr.write(
+        `omo thread ${name}: ${escapeForDisplay(String(result.error.code))}: ${escapeForDisplay(String(result.error.message))}\n  next: ${escapeForDisplay(String(result.error.next_action))}\n`,
+      )
       return exitCode
     }
-    if (json) stdout.write(`${JSON.stringify(name === "list" ? result.threads : result)}\n`)
+    if (json) stdout.write(`${JSON.stringify(result)}\n`)
     else for (const line of humanLines(name, result)) stdout.write(`${line}\n`)
     return exitCode
   } finally {
     // The command's result is already printed; a store that fails to close is logged, never a new outcome.
-    await loaded.sdk.dispose().catch((error) => stderr.write(`omo thread: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`))
+    await loaded.sdk
+      .dispose()
+      .catch((error) =>
+        stderr.write(
+          `omo thread: closing the gateway store failed: ${escapeForDisplay(error instanceof Error ? error.message : String(error))}\n`,
+        ),
+      )
   }
 }
-

@@ -17,7 +17,6 @@ describe("createOpencodeTelemetryProductConfig", () => {
       cacheDirName: "oh-my-opencode",
       defaultApiKey: DEFAULT_POSTHOG_API_KEY,
       eventName: "omo_daily_active",
-      machineIdPrefix: "oh-my-openagent:",
       packageName: "oh-my-openagent",
       packageVersion: expectedVersion,
       platform: "oh-my-opencode",

@@ -123,9 +123,7 @@ describe("prompt-builder", () => {
 describe("buildSystemContent — nativeSkillInfos merging", () => {
   test("#given plan agent and a nativeSkill name not in availableSkills #when block is built #then native name appears", () => {
     // given
-    const availableSkills: AvailableSkill[] = [
-      { name: "omo-skill", description: "From OMO disk", location: "project" },
-    ]
+    const availableSkills: AvailableSkill[] = [{ name: "omo-skill", description: "From OMO disk", location: "project" }]
     const nativeSkillInfos = [
       { name: "test-driven-development", description: "TDD discipline", location: "/fake/SKILL.md" },
     ]
@@ -149,9 +147,7 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
     const availableSkills: AvailableSkill[] = [
       { name: "shared", description: "omo-version-of-shared", location: "project" },
     ]
-    const nativeSkillInfos = [
-      { name: "shared", description: "native-version-of-shared", location: "/fake/SKILL.md" },
-    ]
+    const nativeSkillInfos = [{ name: "shared", description: "native-version-of-shared", location: "/fake/SKILL.md" }]
 
     // when
     const result = buildSystemContent({

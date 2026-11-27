@@ -68,8 +68,13 @@ describe("capture never throws into the caller", () => {
     // then
     expect(run).not.toThrow()
     await transport.flush()
-    const spans = calls.filter((c) => c.url.endsWith("/v1/traces")).flatMap((c) => decodeTraces(c.body).resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)))
-    expect(spans[0]?.attributes.find((kv) => kv.key === "n")?.value?.value).toEqual({ case: "doubleValue", value: -1e30 })
+    const spans = calls
+      .filter((c) => c.url.endsWith("/v1/traces"))
+      .flatMap((c) => decodeTraces(c.body).resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)))
+    expect(spans[0]?.attributes.find((kv) => kv.key === "n")?.value?.value).toEqual({
+      case: "doubleValue",
+      value: -1e30,
+    })
   })
 
   test("#given a product projection that throws #then capture returns and the failure is diagnosed", () => {

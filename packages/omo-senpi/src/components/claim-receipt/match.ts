@@ -47,11 +47,18 @@ function judge(claim: Claim, checks: readonly CheckEvidence[], edits: readonly E
   // quotes concrete numbers, which most likely come from that later run's output the timeline could not read.
   const decisive = latest(candidates.filter((check) => check.outcome !== "unknown"))
   const quotesLaterRun = claim.reported && last.outcome === "unknown"
-  if (decisive?.outcome === "failed" && !quotesLaterRun) return { claim, status: "unsupported", reason: "last-check-failed", receipt: receiptOf(decisive) }
+  if (decisive?.outcome === "failed" && !quotesLaterRun)
+    return { claim, status: "unsupported", reason: "last-check-failed", receipt: receiptOf(decisive) }
   if (last.outcome === "unknown") return { claim, status: "unknown", receipt: receiptOf(last) }
   const stale = latest(edits.filter((edit) => edit.relevant && edit.at > last.at))
   if (stale !== undefined) {
-    return { claim, status: "unsupported", reason: "stale-after-edit", receipt: receiptOf(last), invalidatedBy: { entryId: stale.entryId, paths: stale.paths } }
+    return {
+      claim,
+      status: "unsupported",
+      reason: "stale-after-edit",
+      receipt: receiptOf(last),
+      invalidatedBy: { entryId: stale.entryId, paths: stale.paths },
+    }
   }
   return { claim, status: "supported", receipt: receiptOf(last) }
 }

@@ -12,15 +12,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
   const { clearSessionFallbackTimeout, scheduleSessionFallbackTimeout } = createFallbackTimeoutHelpers(
     deps,
     abortSessionRequest,
-    (sessionID, newModel, resolvedAgent, source) =>
-      autoRetryWithFallback(sessionID, newModel, resolvedAgent, source),
+    (sessionID, newModel, resolvedAgent, source) => autoRetryWithFallback(sessionID, newModel, resolvedAgent, source),
   )
 
-  autoRetryWithFallback = createAutoRetryDispatcher(
-    deps,
-    scheduleSessionFallbackTimeout,
-    clearSessionFallbackTimeout,
-  )
+  autoRetryWithFallback = createAutoRetryDispatcher(deps, scheduleSessionFallbackTimeout, clearSessionFallbackTimeout)
 
   return {
     abortSessionRequest,

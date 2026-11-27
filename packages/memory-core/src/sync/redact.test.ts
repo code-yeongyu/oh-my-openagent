@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test"
-import { containsSecretLikeMaterial, redactSecretLikeMaterial, redactUrl, scanSecretLikeMaterial } from "./redact"
+import {
+  containsSecretLikeMaterial,
+  maskUrlUserinfo,
+  redactSecretLikeMaterial,
+  redactUrl,
+  scanSecretLikeMaterial,
+} from "./redact"
 
 describe("redactUrl", () => {
   describe("#given an https url carrying a token", () => {
@@ -145,15 +151,54 @@ describe("redactUrl", () => {
   })
 
   describe("#given malformed PEM-shaped input", () => {
-    it("#then redaction completes within a bounded time and real PEM blocks remain masked", () => {
-      const hostile = `-----BEGIN ${"A".repeat(100_000)}-----${"B".repeat(100_000)}`
-      const started = performance.now()
-      const redacted = redactUrl(hostile)
-      expect(performance.now() - started).toBeLessThan(500)
-      expect(redacted).toBe(hostile)
+    // Linear by WORK, not by time (#14860; #12693 replaced a wall-clock bound with a fastest-of-5 time ratio, which still
+    // timed the host and went red at 9.56 on a slow macOS runner). The PEM scan walks the input with String.indexOf, so
+    // the characters indexOf examines are its work: four times the input must cost about four times the work. A scan
+    // that restarts after every failed candidate costs about sixteen times.
+    it("#then the PEM scan's work grows linearly with the input and real PEM blocks remain masked", () => {
+      const hostile = (size: number) => `-----BEGIN ${"A".repeat(size)}-----${"B".repeat(size)}`
+      const work = (input: string) => {
+        // Patched only for this synchronous call and restored in finally (also when redactUrl throws); nothing awaits in
+        // between, so no other test of this file or worker runs while it is installed.
+        const indexOf = String.prototype.indexOf
+        let scanned = 0
+        String.prototype.indexOf = function (this: string, search: string, position?: number) {
+          const from = Math.max(0, Math.min(position ?? 0, this.length))
+          const found = indexOf.call(this, search, from)
+          scanned += (found < 0 ? this.length : found + search.length) - from
+          return found
+        }
+        try {
+          expect(redactUrl(input)).toBe(input)
+        } finally {
+          String.prototype.indexOf = indexOf
+        }
+        return scanned
+      }
+
+      const small = work(hostile(12_500))
+      const large = work(hostile(50_000))
+      // A scan that stops going through indexOf (a regex, includes, a manual loop) counts nothing; fail loudly so this
+      // guard can never pass on zero work.
+      if (small <= 0 || large <= small)
+        throw new Error(
+          `the PEM scan no longer goes through String.indexOf (work ${small} -> ${large}): re-instrument this test`,
+        )
+      expect(large / small).toBeLessThan(8)
 
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
       expect(redactUrl(pem)).toBe("***")
+    }, 30_000)
+
+    // Catastrophic-backtracking guard for the regex passes (secret patterns, seams, split credentials), which run inside
+    // V8's regex engine where no work can be counted (#14860). Here time is the behaviour under test, and the bound sits
+    // far from both sides: redactUrl on this 400k-character input takes ~15-25 ms on a fast Mac (~65 ms at the 2.7x of
+    // the slowest macOS runner measured), and one quadratic pattern ("A+X") makes it ~9.7 s. The bound is 2 s.
+    it("#then the regex passes finish far below a catastrophic-backtracking bound", () => {
+      const input = `-----BEGIN ${"A".repeat(200_000)}-----${"B".repeat(200_000)}`
+      const started = performance.now()
+      expect(redactUrl(input)).toBe(input)
+      expect(performance.now() - started).toBeLessThan(2_000)
     })
   })
 
@@ -302,5 +347,92 @@ describe("scanSecretLikeMaterial / redactSecretLikeMaterial", () => {
       expect(matches.map((match) => match.class)).toContain("pem_block")
       expect(redactSecretLikeMaterial(pem)).toBe("note *** tail")
     })
+  })
+})
+
+// #14864: the URL userinfo step matches the scheme backwards from each "://" instead of with a leading regex class that
+// rescanned a long letter run from every letter (quadratic). The old pattern is the oracle: on every generated input it
+// is fast for, the new step must produce exactly what it produced.
+describe("maskUrlUserinfo", () => {
+  const OLD_URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)([^/@\s:]{1,256})(?::([^/@\s]{0,256}))?@/gi
+  const oracle = (value: string) =>
+    value.replace(OLD_URL_USERINFO, (_match, scheme: string, _user: string, password?: string) =>
+      password === undefined ? `${scheme}***@` : `${scheme}***:***@`,
+    )
+
+  const realShapes = [
+    "https://user:pass@example.com/x",
+    "https://user@example.com",
+    "chrome-extension://u:p@abc/path",
+    "git+ssh://git@github.com:a/b.git",
+    "HtTpS://User:Pw@Host",
+    "http://u:p@[::1]:8080/",
+    "https://example.com/no-userinfo",
+    "file:///etc/passwd",
+    "see https://a:b@h and ftp://c@d.",
+    "https://u:@h",
+    "https://:p@h",
+    `https://${"u".repeat(300)}@h`,
+    `${"s".repeat(40)}://u:p@h`,
+    "weird+.-scheme9://u:p@h",
+    "1http://u:p@h",
+    "-x://u@h",
+    "x://a://b@",
+    "a://b://c@d",
+    "https://ü:é@höst/ä",
+    "s://u:p@h s://v@h",
+  ]
+
+  it("#given real URL shapes #then the output is the old pattern's", () => {
+    for (const value of realShapes) expect(maskUrlUserinfo(value)).toBe(oracle(value))
+  })
+
+  it("#given a generated corpus #then every input is masked exactly as the old pattern masked it", () => {
+    const seed = 14864
+    let state = seed
+    const next = () => {
+      state = (state * 1103515245 + 12345) % 2147483648
+      return state / 2147483648
+    }
+    const alphabet = ["a", "Z", "q", "9", "+", ".", "-", ":", "/", "@", " ", "\n", "é", "ü", "://", "https://", "u:p@"]
+    for (let index = 0; index < 20_000; index++) {
+      let value = ""
+      const length = 1 + Math.floor(next() * 30)
+      for (let part = 0; part < length; part++) value += alphabet[Math.floor(next() * alphabet.length)]
+      const expected = oracle(value)
+      if (maskUrlUserinfo(value) !== expected)
+        throw new Error(`seed ${seed}, input #${index} ${JSON.stringify(value)}: expected ${JSON.stringify(expected)}`)
+    }
+  })
+
+  it("#given inputs that made the regex scheme quadratic #then doubling the input at most doubles the characters read", () => {
+    const shapes: ReadonlyArray<(size: number) => string> = [
+      (size) => `x://${"u".repeat(size)}`,
+      (size) => `${"u".repeat(size)}://`,
+      (size) => `https://${"u".repeat(size)}:`,
+      (size) => `${"u".repeat(size)}${"9://".repeat(size)}`,
+      (size) => "a://".repeat(size),
+    ]
+    const charAt = String.prototype.charAt
+    let reads = 0
+    const readsFor = (value: string) => {
+      reads = 0
+      expect(redactUrl(value)).toBe(value)
+      return reads
+    }
+    String.prototype.charAt = function (this: string, position = 0) {
+      reads++
+      return charAt.call(this, position)
+    }
+    try {
+      for (const shape of shapes) {
+        const small = readsFor(shape(5_000))
+        const large = readsFor(shape(10_000))
+        expect(small).toBeGreaterThan(0)
+        expect(large).toBeLessThanOrEqual(2 * small + 16)
+      }
+    } finally {
+      String.prototype.charAt = charAt
+    }
   })
 })

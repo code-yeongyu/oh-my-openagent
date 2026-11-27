@@ -20,7 +20,7 @@ export type CanonicalizeLegacyCategoryNamesResult = {
 }
 
 export function canonicalCategoryName(name: string): string {
-  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] : name
+  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? (LEGACY_CATEGORY_NAME_ALIASES[name] ?? name) : name
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

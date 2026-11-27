@@ -11,25 +11,37 @@ const SECOND = "2".repeat(40)
 function fixture() {
   const dir = join(tmpdir(), `agreements-read-${crypto.randomUUID()}`)
   const commands: string[][] = []
-  const contents = new Map<string, string>([[FIRST, "first ledger\n"], [SECOND, "second ledger\n"]])
+  const contents = new Map<string, string>([
+    [FIRST, "first ledger\n"],
+    [SECOND, "second ledger\n"],
+  ])
   let fail = false
   const exec: GitExec = {
     async run(argv) {
       commands.push([...argv])
-      const revision = argv.map((arg) => /^(HEAD|[0-9a-f]{40}|[0-9a-f]{64})(?::|$)/.exec(arg)?.[1])
+      const revision = argv
+        .map((arg) => /^(HEAD|[0-9a-f]{40}|[0-9a-f]{64})(?::|$)/.exec(arg)?.[1])
         .find((value) => value !== undefined)
       if (revision === undefined) throw new Error(`Unexpected git argv: ${JSON.stringify(argv)}`)
       if (fail) return { code: 128, stdout: "", stderr: "unavailable object" }
       const content = contents.get(revision)
       return {
         code: 0,
-        stdout: argv[0] === "ls-tree" ? (content === undefined ? "" : `${AGREEMENTS_PATH}\0`) : content ?? "",
+        stdout: argv[0] === "ls-tree" ? (content === undefined ? "" : `${AGREEMENTS_PATH}\0`) : (content ?? ""),
         stderr: "",
       }
     },
   }
   const open = (cwd = dir) => new GitMemoryRepo({ dir: cwd, agentId: "ledger-test", exec })
-  return { dir, commands, contents, open, fail: (value: boolean) => { fail = value } }
+  return {
+    dir,
+    commands,
+    contents,
+    open,
+    fail: (value: boolean) => {
+      fail = value
+    },
+  }
 }
 
 describe("readAgreementsAt immutable revision cache", () => {
@@ -113,7 +125,11 @@ describe("readAgreementsAt immutable revision cache", () => {
     const f = fixture()
     f.fail(true)
     let failure: unknown
-    try { await readAgreementsAt(f.open(), FIRST) } catch (error) { failure = error }
+    try {
+      await readAgreementsAt(f.open(), FIRST)
+    } catch (error) {
+      failure = error
+    }
     expect(failure).toBeInstanceOf(Error)
     // when
     f.fail(false)

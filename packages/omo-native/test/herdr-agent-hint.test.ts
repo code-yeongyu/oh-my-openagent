@@ -46,11 +46,14 @@ describe("withHerdrAgentHint (#10448)", () => {
     ["outside herdr", { HERDR_AGENT: "claude" }, [], tty],
     ["piped stdin", { HERDR_ENV: "1", HERDR_AGENT: "claude" }, [], false],
     ["a print run", { HERDR_ENV: "1", HERDR_AGENT: "claude" }, ["-p", "hi"], tty],
-  ] as const)("#given %s and an inherited marker matching it #then the marker is dropped, so the plugin keeps the user's value", (_name, env, args, stdinIsTTY) => {
-    const out = withHerdrAgentHint({ ...env, [HERDR_AGENT_MARKER]: env.HERDR_AGENT }, [...args], stdinIsTTY)
-    expect(out[HERDR_AGENT_MARKER]).toBeUndefined()
-    expect(out.HERDR_AGENT).toBe(env.HERDR_AGENT)
-  })
+  ] as const)(
+    "#given %s and an inherited marker matching it #then the marker is dropped, so the plugin keeps the user's value",
+    (_name, env, args, stdinIsTTY) => {
+      const out = withHerdrAgentHint({ ...env, [HERDR_AGENT_MARKER]: env.HERDR_AGENT }, [...args], stdinIsTTY)
+      expect(out[HERDR_AGENT_MARKER]).toBeUndefined()
+      expect(out.HERDR_AGENT).toBe(env.HERDR_AGENT)
+    },
+  )
 
   test("#given an empty HERDR_AGENT #then it is treated as unset", () => {
     expect(withHerdrAgentHint({ HERDR_ENV: "1", HERDR_AGENT: "" }, [], tty).HERDR_AGENT).toBe("pi")

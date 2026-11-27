@@ -3,11 +3,7 @@ import { join } from "node:path"
 
 import type { EnsureHostInput, TaskDaemonHostPort } from "../../lazy/senpi-barrel"
 import { DAEMON_LAUNCH_FIXTURE } from "./__fixtures__/daemon-launch"
-import {
-  ensureTaskDaemon,
-  HostUnavailableError,
-  TASK_DAEMON_REQUIRED_CAPABILITIES,
-} from "./daemon"
+import { ensureTaskDaemon, HostUnavailableError, TASK_DAEMON_REQUIRED_CAPABILITIES } from "./daemon"
 
 function delayedHost(
   ensure: (input: EnsureHostInput) => Promise<{ pid: number; socket: string; reused: boolean }>,
@@ -104,9 +100,7 @@ describe("ensureTaskDaemon single-flight", () => {
     // then
     expect(host.ensured).toHaveLength(2)
     expect(failures.every((failure) => failure instanceof HostUnavailableError)).toBe(true)
-    expect(failures).toEqual(
-      Array(4).fill(expect.objectContaining({ reason: "ensure_timed_out" })),
-    )
+    expect(failures).toEqual(Array(4).fill(expect.objectContaining({ reason: "ensure_timed_out" })))
     expect(retried.socket).toBe(join(input.agentDir, "rpc", "rpc.sock"))
   })
 
@@ -119,9 +113,9 @@ describe("ensureTaskDaemon single-flight", () => {
     })
 
     // when
-    const failure = await ensureTaskDaemon(
-      ensureInput(host, join("/tmp", "agent-host-busy-refusal")),
-    ).catch((error: unknown) => error)
+    const failure = await ensureTaskDaemon(ensureInput(host, join("/tmp", "agent-host-busy-refusal"))).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(HostUnavailableError)
@@ -137,9 +131,9 @@ describe("ensureTaskDaemon single-flight", () => {
     })
 
     // when
-    const failure = await ensureTaskDaemon(
-      ensureInput(host, join("/tmp", "agent-readiness-timeout")),
-    ).catch((error: unknown) => error)
+    const failure = await ensureTaskDaemon(ensureInput(host, join("/tmp", "agent-readiness-timeout"))).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(HostUnavailableError)

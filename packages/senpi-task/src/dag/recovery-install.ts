@@ -8,17 +8,38 @@ import { createDagScheduler } from "./scheduler"
 import { dagRunResumedEvent } from "./events"
 
 type InstallEffects = {
-  journal(record: RecoverableRecord, errors: Map<DagNodeId, DagNodeError>, results: Map<DagNodeId, RecoveryPendingTerminalResult>): DagJournal<DagRunRecordV1>
-  reconcile(journal: DagJournal<DagRunRecordV1>, outputs: Map<DagNodeId, string>, errors: Map<DagNodeId, DagNodeError>, results: Map<DagNodeId, RecoveryPendingTerminalResult>, tasks: Map<DagNodeId, string>): Promise<void>
+  journal(
+    record: RecoverableRecord,
+    errors: Map<DagNodeId, DagNodeError>,
+    results: Map<DagNodeId, RecoveryPendingTerminalResult>,
+  ): DagJournal<DagRunRecordV1>
+  reconcile(
+    journal: DagJournal<DagRunRecordV1>,
+    outputs: Map<DagNodeId, string>,
+    errors: Map<DagNodeId, DagNodeError>,
+    results: Map<DagNodeId, RecoveryPendingTerminalResult>,
+    tasks: Map<DagNodeId, string>,
+  ): Promise<void>
   release(): void
 }
 
-export async function installRecoveredDag(context: RecoveryContext, claimed: RecoverableRecord, effects: InstallEffects): Promise<InstalledDagRun> {
+export async function installRecoveredDag(
+  context: RecoveryContext,
+  claimed: RecoverableRecord,
+  effects: InstallEffects,
+): Promise<InstalledDagRun> {
   try {
     if (claimed.pause?.reason === "user_stop" && context.pausedChildren !== undefined) {
-      await recoverPausedDagChildren({
-        store: context.store, taskManager: context.taskManager, initialRecord: claimed, hostPid: context.hostPid, now: context.now,
-      }, context.pausedChildren)
+      await recoverPausedDagChildren(
+        {
+          store: context.store,
+          taskManager: context.taskManager,
+          initialRecord: claimed,
+          hostPid: context.hostPid,
+          now: context.now,
+        },
+        context.pausedChildren,
+      )
       claimed = context.store.readCheckpoint<RecoverableRecord>(claimed.runId) ?? claimed
     }
     const pendingErrors = new Map<DagNodeId, DagNodeError>()
@@ -41,8 +62,9 @@ export async function installRecoveredDag(context: RecoveryContext, claimed: Rec
       ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }),
       now: context.now,
     })
-    const settled = scheduler.run()
-      .then(record => ({ runId: claimed.runId, kind: "resumed" as const, record, reusedOutputs }))
+    const settled = scheduler
+      .run()
+      .then((record) => ({ runId: claimed.runId, kind: "resumed" as const, record, reusedOutputs }))
       .finally(() => effects.release())
     return { kind: "installed", runId: claimed.runId, scheduler, settled }
   } catch (error) {

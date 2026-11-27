@@ -1,9 +1,19 @@
 import { dirname, join } from "node:path"
 import { runChild } from "./child-process.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
-import { channelDistTagVersion, channelPackageSpec, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import {
+  channelDistTagVersion,
+  channelPackageSpec,
+  packageManifest,
+  packageRoot,
+  readJson,
+  releaseChannel,
+  resolveSenpi,
+  updateTarget,
+} from "./package-paths.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 import { findHolders, heldTarget, isLockFailure, listWindowsProcesses, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
+import { findVersionedInstall, updateVersionedInstall, versionedUpdateTarget } from "./versioned-install.js"
 
 export { isPrintOnlyUpdate }
 
@@ -35,13 +45,17 @@ export function formatVersionChange(before, after) {
  * prove the install moved (#9198). An unreachable registry falls back to the unpinned channel spec.
  * `run` defaults to `runChild` so tests inject a spawn without touching the child-process helper.
  *
+ * When the running package sits in a side-by-side versions layout (`<versions>/current -> <version>`,
+ * #12022), the update installs the target into a new version dir with bun and switches `current`
+ * (`versioned-install.js`) instead of `npm i -g`, which would install a copy PATH never runs.
+ *
  * On Windows a manager failure whose stderr says a file is held (EPERM/EBUSY, #10090) is retried with
  * backoff. If the file stays held, the report names the file, the processes of this install that hold it
  * and one action, and only an install that can no longer be read is reinstalled at the previous version; any readable version is kept.
  *
  * @typedef {{ omo: string, engine: string }} InstalledVersion
  * @typedef {{ status: number | null, signal: string | null, stderr?: string }} ChildResult
- * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, captureStderr?: boolean }} RunOptions
+ * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, captureStderr?: boolean, cwd?: string }} RunOptions
  * @typedef {import("./update-lock.js").ProcessEntry} ProcessEntry
  * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
@@ -57,14 +71,16 @@ export function formatVersionChange(before, after) {
  *   listProcesses?: () => ProcessEntry[],
  *   installDir?: string,
  *   selfPids?: number[],
+ *   root?: string,
  * }} SelfUpdateOptions
  * @param {string[]} args
  * @param {SelfUpdateOptions} [options]
  * @returns {Promise<number>}
  */
 export async function runSelfUpdate(args, options = {}) {
-  const resolveUpdate = options.resolveUpdate
-    ?? ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
+  const resolveUpdate =
+    options.resolveUpdate ??
+    ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
   const fetchDistTags = options.fetchDistTags ?? fetchNpmDistTagsSync
   const log = options.log ?? ((line) => console.log(line))
   const error = options.error ?? ((line) => console.error(line))
@@ -83,20 +99,39 @@ export async function runSelfUpdate(args, options = {}) {
   const before = readInstalled()
   const channel = releaseChannel(before.omo)
   const target = channelDistTagVersion(fetchDistTags(), before.omo)
-  const update = resolveUpdate(target)
+  const versioned = findVersionedInstall(options.root ?? packageRoot, platform)
+  if (versioned !== undefined && target === undefined) {
+    error(
+      `omo: could not confirm the ${channel} omo-ai version from the npm registry; ${versioned.versionsDir} installs exact versions only, so retry when the registry answers`,
+    )
+    return 1
+  }
+  const update = versioned === undefined ? resolveUpdate(target) : versionedUpdateTarget(versioned, target)
 
   if (target === undefined) {
-    log(`omo: could not confirm the ${channel} omo-ai version from the npm registry; installing the unpinned ${channelPackageSpec(before.omo)}`)
+    log(
+      `omo: could not confirm the ${channel} omo-ai version from the npm registry; installing the unpinned ${channelPackageSpec(before.omo)}`,
+    )
   }
   if (isPrintOnlyUpdate(args)) {
     log(formatUpdateCommand(update))
     return 0
   }
   if (target !== undefined && target === before.omo) {
+    // Already on the target, the update installs nothing, so a broken engine tree needs the reinstall named.
+    if (before.engine === "unknown") {
+      error(
+        `omo ${before.omo} is up to date, but its engine files are missing or incomplete; reinstall with: ${update.command}`,
+      )
+      return 1
+    }
     log(`omo ${before.omo} is up to date (omo-ai@${channel} is ${target})`)
     return 0
   }
   log(formatUpdateCommand(update))
+  if (versioned !== undefined) {
+    return updateVersionedInstall({ install: versioned, before: before.omo, target, run, env, platform, log, error })
+  }
 
   const install = async (target) => {
     const [command, ...argv] = target.argv
@@ -120,12 +155,23 @@ export async function runSelfUpdate(args, options = {}) {
     }
     if (!failed(result) || !heldOnWindows(result) || attempt >= LOCK_RETRY_DELAYS_MS.length) break
     const delay = LOCK_RETRY_DELAYS_MS[attempt]
-    log(`omo: ${heldTarget(result.stderr) ?? "a package file"} is held by another process; retrying in ${delay / 1000}s (attempt ${attempt + 2} of ${LOCK_RETRY_DELAYS_MS.length + 1})`)
+    log(
+      `omo: ${heldTarget(result.stderr) ?? "a package file"} is held by another process; retrying in ${delay / 1000}s (attempt ${attempt + 2} of ${LOCK_RETRY_DELAYS_MS.length + 1})`,
+    )
     await sleep(delay)
   }
 
   if (failed(result) && heldOnWindows(result)) {
-    await reportHeldInstall({ result, before, install, resolveUpdate, readInstalled, error, options, attempts: LOCK_RETRY_DELAYS_MS.length + 1 })
+    await reportHeldInstall({
+      result,
+      before,
+      install,
+      resolveUpdate,
+      readInstalled,
+      error,
+      options,
+      attempts: LOCK_RETRY_DELAYS_MS.length + 1,
+    })
     return 1
   }
   if (failed(result)) {
@@ -159,13 +205,17 @@ async function reportHeldInstall({ result, before, install, resolveUpdate, readI
   const selfPids = options.selfPids ?? [process.pid, process.ppid]
   const holders = findHolders(installDir, listProcesses(), selfPids, held)
 
-  error(`omo: update stopped: Windows would not let the package manager replace ${file}; it was still held after ${attempts} attempts.`)
+  error(
+    `omo: update stopped: Windows would not let the package manager replace ${file}; it was still held after ${attempts} attempts.`,
+  )
   if (holders.length > 0) {
     error(`omo: held by ${holders.map((holder) => `${holder.name} (pid ${holder.pid})`).join(", ")}`)
     const names = [...new Set(holders.map((holder) => holder.name))].join(", ")
     error(`omo: Quit ${names} and run omo update again.`)
   } else {
-    error("omo: No omo command-line process was found holding it. Another app (for example the OmO desktop app or an editor) or antivirus may be holding it: close it, or wait a minute, then run omo update again.")
+    error(
+      "omo: No omo command-line process was found holding it. Another app (for example the OmO desktop app or an editor) or antivirus may be holding it: close it, or wait a minute, then run omo update again.",
+    )
   }
 
   const now = readInstalledOrUndefined(readInstalled)
@@ -177,7 +227,9 @@ async function reportHeldInstall({ result, before, install, resolveUpdate, readI
   // manager can fail moving an old dependency after the new omo-ai is in place, and reinstalling over it
   // would undo a working update and hit the same held file. Only an unreadable install is restored.
   if (now !== undefined) {
-    error(`omo: omo ${now.omo} is installed, but the package manager did not finish; run omo update again afterwards to complete it.`)
+    error(
+      `omo: omo ${now.omo} is installed, but the package manager did not finish; run omo update again afterwards to complete it.`,
+    )
     return
   }
   const previous = resolveUpdate(before.omo)

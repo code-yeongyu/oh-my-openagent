@@ -1,17 +1,18 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
 import type { ExecutorContext } from "../executor-types"
 import type { DelegateTaskArgs } from "../types"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
 
-const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
-  () => null as {
-    models: Record<string, string[]>
-    connected: string[]
-    updatedAt: string
-  } | null,
+  () =>
+    null as {
+      models: Record<string, string[]>
+      connected: string[]
+      updatedAt: string
+    } | null,
 )
 
 async function importFreshSubagentResolverModule(): Promise<SubagentResolverModule> {
@@ -52,21 +53,18 @@ describe("resolveSubagentExecution agent overrides", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
     readProviderModelsCacheMock.mockReturnValue(null)
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 
@@ -84,9 +82,7 @@ describe("resolveSubagentExecution agent overrides", () => {
     readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "oracle" })
     const executorCtx = createExecutorContext(
-      async () => ([
-        { name: "oracle", mode: "subagent", model: "anthropic/claude-opus-4-7" },
-      ]),
+      async () => [{ name: "oracle", mode: "subagent", model: "anthropic/claude-opus-4-7" }],
       {
         agentOverrides: {
           oracle: {

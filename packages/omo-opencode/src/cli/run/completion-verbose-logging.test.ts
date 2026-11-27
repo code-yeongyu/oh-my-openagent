@@ -2,23 +2,21 @@ import { describe, it, expect, mock, spyOn } from "bun:test"
 import type { RunContext, ChildSession, SessionStatus } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const createMockContext = (overrides: {
-  childrenBySession?: Record<string, ChildSession[]>
-  statuses?: Record<string, SessionStatus>
-  verbose?: boolean
-} = {}): RunContext => {
-  const {
-    childrenBySession = { "test-session": [] },
-    statuses = {},
-    verbose = false,
-  } = overrides
+const createMockContext = (
+  overrides: {
+    childrenBySession?: Record<string, ChildSession[]>
+    statuses?: Record<string, SessionStatus>
+    verbose?: boolean
+  } = {},
+): RunContext => {
+  const { childrenBySession = { "test-session": [] }, statuses = {}, verbose = false } = overrides
 
   return {
     client: unsafeTestValue<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: [] })),
         children: mock((opts: { path: { id: string } }) =>
-          Promise.resolve({ data: childrenBySession[opts.path.id] ?? [] })
+          Promise.resolve({ data: childrenBySession[opts.path.id] ?? [] }),
         ),
         status: mock(() => Promise.resolve({ data: statuses })),
       },
@@ -72,8 +70,6 @@ describe("checkCompletionConditions verbose waiting logs", () => {
 
     // then
     expect(result).toBe(false)
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Waiting: session child-1... is busy")
-    )
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining("Waiting: session child-1... is busy"))
   })
 })

@@ -1,8 +1,9 @@
 //! Background delivery: `PostMessageW` straight into the target window's
 //! queue (oh-my-pi `win32/input.rs:184-560`), gated by the toolkit class
 //! matrix so a toolkit that ignores posted input yields
-//! `BackgroundUnavailable` instead of a silent no-op. The foreground and the
-//! cursor are never touched.
+//! `BackgroundUnavailable` instead of a silent no-op, and a chord that holds
+//! a modifier is refused for every class, since posted keys never set the
+//! modifier state. The foreground and the cursor are never touched.
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
@@ -15,7 +16,8 @@ use super::keys::key_message;
 use super::messages::{button_messages, WM_CHAR};
 use super::native::{self, Window};
 use crate::delivery::{
-    background_refusal_for, text_input_unsupported, text_units, EventKind, TargetTraits, TextUnit,
+    background_refusal_for, posted_chord_refusal, text_input_unsupported, text_units, EventKind,
+    TargetTraits, TextUnit,
 };
 use crate::integrity::IntegrityRid;
 
@@ -39,15 +41,25 @@ fn deliverable(id: &str, own: IntegrityRid, kind: EventKind) -> CoreResult<Windo
     refusal(id, window, kind).map_or(Ok(window), Err)
 }
 
-/// The window a background key chord of `keys` is posted to: the target's
-/// keyboard focus, after the matrix accepted the target's own class.
-pub(super) fn key_target(id: &str, own: IntegrityRid, keys: &[KeyName]) -> CoreResult<Window> {
+/// The window a background key chord of `keys`, pressed as `vks`, is posted
+/// to: the target's keyboard focus, after the matrix accepted the target's
+/// own class and the chord holds no modifier another key needs.
+pub(super) fn key_target(
+    id: &str,
+    own: IntegrityRid,
+    keys: &[KeyName],
+    vks: &[u16],
+) -> CoreResult<Window> {
     let kind = if keys.len() > 1 || keys.iter().any(|key| key.is_modifier()) {
         EventKind::KeyCombo
     } else {
         EventKind::Keystroke
     };
-    deliverable(id, own, kind).map(Window::keyboard_focus)
+    let window = deliverable(id, own, kind)?;
+    if let Some(refusal) = posted_chord_refusal(id, vks) {
+        return Err(refusal);
+    }
+    Ok(window.keyboard_focus())
 }
 
 pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM) -> CoreResult<()> {
@@ -62,6 +74,17 @@ pub(super) fn post(window: Window, message: u32, wparam: WPARAM, lparam: LPARAM)
     )))
 }
 
+/// Posts one key transition. `alt_down` is the caller's claim that Alt is
+/// down on this window route, and makes the message a `WM_SYS*` one with the
+/// context bit, as an Alt key's own transition always is. Posted input never
+/// changes the key state the target reads through `GetKeyState`, so for any
+/// other key this flag is all the target learns about Alt.
+/// [`posted_chord_refusal`] refuses a chord or hold that would post a
+/// non-modifier key under a held modifier before anything is posted. It sees
+/// only that chord's keys, so while a failed Alt release is still held in the
+/// ledger, a later plain key pressed or held on this route through the ledger
+/// goes out as a `WM_SYS*` message (typed text posts Enter with `alt_down`
+/// false).
 pub(super) fn post_key(window: Window, vk: u16, down: bool, alt_down: bool) -> CoreResult<()> {
     let (message, lparam) = key_message(vk, native::scan_code(vk), down, alt_down);
     post(window, message, usize::from(vk), lparam)

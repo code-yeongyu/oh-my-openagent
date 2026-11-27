@@ -3,6 +3,7 @@ import { reportedEffectiveModel, type CatalogModelIdentity, type EffectiveModel 
 
 import type { TaskInterruptCause } from "../../state/record-types"
 import type { NativeRunPause } from "../../pause/native-child-pause"
+import type { InputIdentity } from "../types"
 import { createInProcessRunPause, type EngineTurnWatch, type RunHoldSession } from "./native-run-pause"
 import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
 
@@ -34,14 +35,16 @@ export type ChildSession = RunHoldSession & {
   readonly sessionId: string
   readonly model?: CatalogModelIdentity
   readonly effectiveServiceTier?: string
-  prompt(text: string): Promise<void>
-  steer(text: string): Promise<QueuedInputDisposition>
-  followUp(text: string): Promise<QueuedInputDisposition>
+  prompt(text: string, options?: InputIdentity): Promise<void>
+  steer(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
+  followUp(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   abort(): Promise<void>
   subscribe(listener: ChildSessionListener): () => void
   getLastAssistantText(): string | undefined
   /** Absent on fakes that load no extensions; a live AgentSession always has one. */
   readonly extensionRunner?: ChildExtensionRunner
+  /** Absent on fakes; a live AgentSession resolves it once its shutdown-started work can no longer write. */
+  whenToolChildClosed?(): Promise<void>
   dispose(): void
 }
 
@@ -108,8 +111,8 @@ export type ChildHandle = {
   readonly runPause?: NativeRunPause
   /** The model the child session is ACTUALLY on, read live - the post-start record's source (#9722). */
   effectiveModel(): EffectiveModel | undefined
-  steer(text: string): Promise<void>
-  followUp(text: string): Promise<void>
+  steer(text: string, identity?: InputIdentity): Promise<void>
+  followUp(text: string, identity?: InputIdentity): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildSessionListener): () => void
   waitForIdle(): Promise<RunnerOutcome>
@@ -175,10 +178,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // Derive the settled turn's outcome from what it emitted. The session-level getLastAssistantText()
 // is only trusted when it CHANGED during this turn (baseline diff): on a revive, the previous run's
 // text must never masquerade as a fresh completion.
-function turnOutcome(session: ChildSession, observation: TurnObservation, completion: ChildCompletionPolicy): RunnerOutcome {
-  const provenance = observation.provider !== undefined && observation.model !== undefined
-    ? { model: `${observation.provider}/${observation.model}` }
-    : {}
+function turnOutcome(
+  session: ChildSession,
+  observation: TurnObservation,
+  completion: ChildCompletionPolicy,
+): RunnerOutcome {
+  const provenance =
+    observation.provider !== undefined && observation.model !== undefined
+      ? { model: `${observation.provider}/${observation.model}` }
+      : {}
   if (observation.stopReason === "error" || observation.stopReason === "aborted") {
     return {
       status: "error",
@@ -214,9 +222,10 @@ async function runTurn(
   isAborted: () => boolean,
   observation: TurnObservation,
   completion: ChildCompletionPolicy,
+  identity: InputIdentity | undefined,
 ): Promise<RunnerOutcome> {
   try {
-    await session.prompt(text)
+    await session.prompt(text, identity)
   } catch (error) {
     if (isAborted()) return { status: "cancelled" }
     if (error instanceof Error) {
@@ -250,7 +259,7 @@ function settledSessionOutcome(session: ChildSession, completion: ChildCompletio
 
 type TrackedChildHandle = {
   readonly handle: ChildHandle
-  beginTurn(text: string): void
+  beginTurn(text: string, identity?: InputIdentity): void
 }
 
 function createTrackedChildHandle(
@@ -264,13 +273,18 @@ function createTrackedChildHandle(
   // Seeded for the restored case; createChildHandle's beginTurn replaces it immediately.
   let running: Promise<RunnerOutcome> = Promise.resolve(settledSessionOutcome(session, completion))
   const observation: TurnObservation = {
-    text: undefined, stopReason: undefined, errorMessage: undefined, baseline: undefined, provider: undefined, model: undefined,
+    text: undefined,
+    stopReason: undefined,
+    errorMessage: undefined,
+    baseline: undefined,
+    provider: undefined,
+    model: undefined,
   }
   const unsubscribeObserver = session.subscribe((event) => observeTurnEvent(observation, event))
 
   // Start a fresh tracked turn and mark it active until it settles. waitForIdle() always returns the
   // CURRENT turn, so a revive follow-up re-arms it to the new turn instead of a stale resolved one.
-  const beginTurn = (text: string): void => {
+  const beginTurn = (text: string, identity?: InputIdentity): void => {
     aborted = false
     turnActive = true
     observation.text = undefined
@@ -279,7 +293,7 @@ function createTrackedChildHandle(
     observation.provider = undefined
     observation.model = undefined
     observation.baseline = session.getLastAssistantText()
-    running = runTurn(session, text, () => aborted, observation, completion)
+    running = runTurn(session, text, () => aborted, observation, completion, identity)
     void running.then(
       () => {
         turnActive = false
@@ -321,15 +335,15 @@ function createTrackedChildHandle(
     sessionId: session.sessionId,
     ...(runPause === undefined ? {} : { runPause }),
     effectiveModel: () => reportedEffectiveModel(session.model, session.effectiveServiceTier),
-    steer: (text) => session.steer(text).then(ignoreQueuedInputDisposition),
-    followUp: async (text) => {
+    steer: (text, identity) => session.steer(text, undefined, identity).then(ignoreQueuedInputDisposition),
+    followUp: async (text, identity) => {
       // While a turn is running, a follow-up is queued and delivered when the agent settles. Once
       // the child is idle/resident, a follow-up REVIVES it: drive a fresh turn and re-arm tracking.
       if (turnActive) {
-        await session.followUp(text)
+        await session.followUp(text, undefined, identity)
         return
       }
-      beginTurn(text)
+      beginTurn(text, identity)
     },
     abort: async () => {
       aborted = true
@@ -356,7 +370,10 @@ export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
 
 // A created child whose first prompt has not been sent: the launch decides, after creation, whether
 // to begin that turn or hold the prompt for the run's Resume.
-export function createStagedChildHandle(input: CreateChildHandleInput): { readonly handle: ChildHandle; begin(): void } {
+export function createStagedChildHandle(input: CreateChildHandleInput): {
+  readonly handle: ChildHandle
+  begin(): void
+} {
   const tracked = createTrackedChildHandle(input.taskId, input.session, input.completion)
   return { handle: tracked.handle, begin: () => tracked.beginTurn(input.promptText) }
 }
@@ -385,8 +402,12 @@ export async function discardUnstartedChildSession(session: ChildSession): Promi
 async function shutDownChildSession(session: ChildSession): Promise<void> {
   try {
     const runner = session.extensionRunner
-    if (runner?.hasHandlers("session_shutdown") === true) await runner.emit({ type: "session_shutdown", reason: "quit" })
+    if (runner?.hasHandlers("session_shutdown") === true)
+      await runner.emit({ type: "session_shutdown", reason: "quit" })
   } finally {
     session.dispose()
+    // dispose() folds the session's already-started first-start work into this barrier, so awaiting it keeps a child
+    // writer from landing after a caller removes the directory that child's agent dir lives in (#13520).
+    await session.whenToolChildClosed?.()
   }
 }

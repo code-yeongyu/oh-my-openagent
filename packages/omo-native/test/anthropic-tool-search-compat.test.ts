@@ -21,11 +21,7 @@ import { fileURLToPath } from "node:url"
 const PACKAGE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 
 /** The engine-owned Anthropic wire tokens this package must never re-declare. */
-const ENGINE_OWNED_TOOL_SEARCH_TOKENS = [
-  "tool_search_tool_bm25_20251119",
-  "defer_loading",
-  "tool_reference",
-] as const
+const ENGINE_OWNED_TOOL_SEARCH_TOKENS = ["tool_search_tool_bm25_20251119", "defer_loading", "tool_reference"] as const
 
 /**
  * `files` is `["bin", "plugin"]`; `plugin/` is a gitignored build artifact staged by

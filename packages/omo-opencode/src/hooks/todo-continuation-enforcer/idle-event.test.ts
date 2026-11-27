@@ -119,9 +119,7 @@ describe("handleSessionIdle", () => {
     // given
     const sessionID = "ses_stop_flag"
     const { store, resetCalls, trackCalls, state } = createStateStore()
-    const completedTodos = [
-      { id: "todo-1", content: "Ship", status: "completed", priority: "high" },
-    ]
+    const completedTodos = [{ id: "todo-1", content: "Ship", status: "completed", priority: "high" }]
     const ctx = {
       client: {
         session: {
@@ -168,9 +166,7 @@ describe("handleSessionIdle", () => {
             ],
           }),
           todo: async () => ({
-            data: [
-              { id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" },
-            ],
+            data: [{ id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" }],
           }),
         },
       },
@@ -204,9 +200,7 @@ describe("handleSessionIdle", () => {
             throw new Error("message endpoint failed")
           },
           todo: async () => ({
-            data: [
-              { id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" },
-            ],
+            data: [{ id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" }],
           }),
         },
       },

@@ -1,40 +1,56 @@
 /**
- * The human summary `omo thread` prints without `--json`: one line per thread, binding, row or
- * transcript item. Scripts use `--json`; these lines are for a person and may change.
+ * The human summary `omo thread` prints without `--json`: one line per thread, device or transcript
+ * item. Scripts use `--json`; these lines are for a person and may change. Every value is shown through
+ * `escapeForDisplay`; transcript content keeps its line feeds.
  */
 
-function bindingLine(binding) {
-  return `${binding.binding_id} r${binding.revision} ${binding.status} ${binding.platform}:${binding.account_id}/${binding.chat_id}/${binding.thread_id} -> ${binding.session_durable_id}`
-}
+import { escapeForDisplay } from "./display-escape.js"
 
-function rowLine(row) {
-  const token = row.reply_token === null ? "" : ` (reply token ${row.reply_token})`
-  return `#${row.cursor} ${row.event} [${row.state}] ${row.text}${token}`
+function deviceLine(device) {
+  const state = device.this_device ? "this device" : device.online ? "online" : "offline"
+  const count = `${device.threads} thread${device.threads === 1 ? "" : "s"}`
+  const listed = device.listing === "incomplete" ? "incomplete: its threads are missing from this list" : count
+  return `device ${device.name}  ${device.platform ?? "?"}  ${state}  ${listed}`
 }
 
 const RENDER = {
-  list: (result) =>
-    result.threads.length === 0
-      ? [`no threads in ${result.scope === "all" ? "any workspace" : "this workspace"} (try --all-scope)`]
-      : result.threads.map((thread) => `${thread.thread_id}  ${thread.surface ?? "?"}  ${thread.status}  ${thread.name || "(unnamed)"}  ${thread.cwd}`),
-  send: (result) => [`${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread_id}${result.deduplicated ? " (already sent)" : ""}`],
+  list: (result) => {
+    const devices = result.devices ?? []
+    const nameOf = new Map(devices.map((device) => [device.device, device.name]))
+    return [
+      ...(result.threads.length === 0
+        ? [`no threads in ${result.scope === "all" ? "any workspace" : "this workspace"} (try --all-scope)`]
+        : result.threads.map(
+            (thread) =>
+              `${thread.thread}  ${thread.surface ?? "?"}  ${thread.state ?? thread.status}  ${thread.name || "(unnamed)"}  ${thread.cwd}${
+                thread.device === undefined ? "" : `  on ${nameOf.get(thread.device) ?? thread.device}`
+              }`,
+          )),
+      ...devices.map(deviceLine),
+      ...(result.remote_unavailable === undefined ? [] : [`remote: ${result.remote_unavailable}`]),
+    ]
+  },
+  send: (result) => [
+    `${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread}${result.deduplicated ? " (already sent)" : ""}`,
+  ],
   read: (result) => [
-    ...result.items.map((item) => `[${item.role}] ${item.content}`),
-    ...(result.truncated ? [`(truncated; continue with --cursor ${result.next_cursor})`] : []),
+    ...result.items.map(
+      (item) =>
+        `[${escapeForDisplay(String(item.role))}] ${escapeForDisplay(String(item.content), { keepLineFeeds: true })}`,
+    ),
+    ...(result.truncated ? [escapeForDisplay(`(truncated; older messages: --cursor ${result.next_cursor})`)] : []),
   ],
-  bind: (result) => [`bound ${bindingLine(result.binding)}${result.deduplicated ? " (already bound)" : ""}`],
-  unbind: (result) => [`unbound ${bindingLine(result.binding)}${result.already_closed ? " (already closed)" : ""}`],
-  rebind: (result) => [`rebound ${bindingLine(result.binding)}`],
-  bindings: (result) => [...result.bindings.map(bindingLine), ...(result.next_cursor === null ? [] : [`(more: --cursor ${result.next_cursor})`])],
-  report: (result) => [`reported ${result.event} to ${result.binding_id} at cursor ${result.cursor}${result.reply_token ? ` (reply token ${result.reply_token})` : ""}`],
-  answer: (result) => [`answered through ${result.binding_id} (cursor ${result.cursor})`],
-  outbox: (result) => [
-    ...result.rows.map(rowLine),
-    `next cursor ${result.next_cursor}, acked through ${result.acked === undefined || result.acked === null ? result.acked_cursor : result.acked.acked_cursor}`,
+  close: (result) => [
+    result.closed
+      ? `closed ${result.thread}${result.graceful === undefined ? "" : ` after turn ${result.graceful.turn} (${result.graceful.waited_ms} ms)`}`
+      : `${result.thread} was not running`,
+    ...(result.dropped_deliveries.length === 0
+      ? []
+      : [`returned to their senders: ${result.dropped_deliveries.join(", ")}`]),
   ],
-  ack: (result) => [`acked ${result.binding_id} through ${result.acked_cursor}${result.changed ? "" : " (no change)"}`],
 }
 
 export function humanLines(name, result) {
-  return RENDER[name](result)
+  const lines = RENDER[name](result)
+  return name === "read" ? lines : lines.map((line) => escapeForDisplay(line))
 }

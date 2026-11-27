@@ -209,7 +209,7 @@ A single `make ci` target combining the four works fine.
 
 ## Enforcement summary
 
-The config above, combined with `scripts/check-no-excuse-rules.py`, enforces:
+The config above, combined with `scripts/python/check-no-excuse-rules.py`, enforces:
 
 | What | How |
 |---|---|

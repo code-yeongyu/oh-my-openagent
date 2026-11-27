@@ -40,16 +40,22 @@ describe("no-sisyphus-gpt hook", () => {
     const output2 = createOutput()
 
     // when - chat.message is called repeatedly with display name
-    await hook["chat.message"]?.({
-      sessionID: "ses_1",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-4.1" },
-    }, output1)
-    await hook["chat.message"]?.({
-      sessionID: "ses_1",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-4.1" },
-    }, output2)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_1",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-4.1" },
+      },
+      output1,
+    )
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_1",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-4.1" },
+      },
+      output2,
+    )
 
     // then - toast is shown for every message
     expect(showToast).toHaveBeenCalledTimes(2)
@@ -73,11 +79,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs with gpt-5.4
-    await hook["chat.message"]?.({
-      sessionID: "ses_gpt54",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_gpt54",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.4" },
+      },
+      output,
+    )
 
     // then - no toast, agent NOT switched to Hephaestus
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -92,11 +101,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs with gpt-5.5
-    await hook["chat.message"]?.({
-      sessionID: "ses_gpt55",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_gpt55",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.5" },
+      },
+      output,
+    )
 
     // then - no toast, agent NOT switched to Hephaestus
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -110,11 +122,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when chat.message applies the compatibility guard
-    await hook["chat.message"]?.({
-      sessionID: "ses_gpt56_sol",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.6-sol" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_gpt56_sol",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.6-sol" },
+      },
+      output,
+    )
 
     // then Sisyphus remains selected with its configured Sol effort
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -130,11 +145,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs with gpt-5.5
-    await hook["chat.message"]?.({
-      sessionID: "ses_gpt55_medium",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_gpt55_medium",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.5" },
+      },
+      output,
+    )
 
     // then - Sisyphus stays active and receives its configured GPT-5.5 variant
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -150,11 +168,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output: HookOutput = { message: { variant: "high" }, parts: [] }
 
     // when - chat.message runs with gpt-5.5
-    await hook["chat.message"]?.({
-      sessionID: "ses_gpt55_high",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_gpt55_high",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.5" },
+      },
+      output,
+    )
 
     // then - user-selected variant is not overwritten
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -170,11 +191,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs
-    await hook["chat.message"]?.({
-      sessionID: "ses_2",
-      agent: SISYPHUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_2",
+        agent: SISYPHUS_DISPLAY,
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
 
     // then - no toast
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -189,11 +213,14 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs
-    await hook["chat.message"]?.({
-      sessionID: "ses_3",
-      agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_3",
+        agent: HEPHAESTUS_DISPLAY,
+        model: { providerID: "openai", modelID: "gpt-5.4" },
+      },
+      output,
+    )
 
     // then - no toast
     expect(showToast).toHaveBeenCalledTimes(0)
@@ -211,10 +238,13 @@ describe("no-sisyphus-gpt hook", () => {
     const output = createOutput()
 
     // when - chat.message runs without input.agent
-    await hook["chat.message"]?.({
-      sessionID: "ses_4",
-      model: { providerID: "openai", modelID: "gpt-4o" },
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_4",
+        model: { providerID: "openai", modelID: "gpt-4o" },
+      },
+      output,
+    )
 
     // then - toast shown via session-agent fallback
     expect(showToast).toHaveBeenCalledTimes(1)

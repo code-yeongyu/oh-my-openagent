@@ -147,11 +147,7 @@ describe("createFsSkillLoader", () => {
     const skillsDir = join(cwd, ".senpi", "skills")
     mkdirSync(skillsDir, { recursive: true })
     const skillPath = join(skillsDir, "direct.md")
-    writeFileSync(
-      skillPath,
-      "---\nname: direct\ndescription: Direct root skill\n---\nDIRECT BODY\n",
-      "utf8",
-    )
+    writeFileSync(skillPath, "---\nname: direct\ndescription: Direct root skill\n---\nDIRECT BODY\n", "utf8")
     const loader = createFsSkillLoader({ homeDir: scratch() })
 
     // when

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, statSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import bundleBudget from "../bundle-budget.json"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
@@ -167,7 +168,27 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // Batch #10 (bundle train, 4 cars: #11150 #10528 #11161 #11147) on dev bf748ed461: dev measures 1,407,569 B; the
 // batch #10 regen head measures 1,419,994 B (+12,425) after the canonical regen (two clean linux containers, node 24 +
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
-const BUDGET_BYTES = 1_420_000
+// Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
+// Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+// Raised 1,476,000 -> 1,478,000 for the #13037 wake train (#13458): a fresh build at the W1 head 6dfefeea6c measures
+// 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
+// #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
+// 1,140-byte margin instead of failing it by 860 bytes.
+// Train omo-5173 (#13627, 22 members) on dev 71cc3ecf70 (1,481,163 B): the train-top regen measures 1,485,337 B (+4,174);
+// budget = measured + 4 KiB (lead rule) = 1,489,433.
+// Remerged on dev 050c1879cb (dev ceiling 1,493,600): the regenerated train-top omo.js measures 1,497,747 B;
+// budget = measured + 4 KiB (lead rule) = 1,501,843.
+// Release train #14077 (senpi 2026.11.15-4, device-service 0.1.40, thread paging/wait/one-field) on dev fe95296518:
+// the regenerated train-top omo.js measures 1,505,934 B; budget = measured + 4 KiB (lead rule) = 1,510,030.
+// Train omotrain2-20261118 (#14141, 10 thread cars) on dev e79f804ce0 (1,506,330 B): the train-top regen measures
+// 1,515,915 B (+9,585; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,520,011.
+// A4 memory-sync train (#14097, 6 members) remerged on dev 9b94b6f3dd: the train-top regen measures 1,522,653 B
+// (linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,526,749.
+// Thread-sweep train (32 thread members) remerged on dev 5d290d8119 (dev ceiling 1,526,749): the train-top regen
+// measures 1,537,619 B (+10,870; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,541,715.
+// Thread train 4 (8 members) on dev abfb5be796 (dev omo.js 1,540,734 B, ceiling 1,541,715): the train-top regen
+// measures 1,541,622 B (+888; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,545,718.
+const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
@@ -176,5 +197,19 @@ describe("omo-senpi bundle size budget", () => {
     // A trip here means the bundle grew past budget: split, lazy-load, or trim a dependency.
     // Never raise this ceiling to the failing value.
     expect(bytes).toBeLessThanOrEqual(BUDGET_BYTES)
+  })
+})
+
+describe("omo-senpi bundle size budget has one source", () => {
+  it("#given the two omo.js size checks #when their limits are read #then both come from bundle-budget.json", () => {
+    // One number from one source (lead ruling, batch #20): the build-extension check must not carry its own byte literal.
+    const buildTest = readFileSync(join(packageRoot, "plugin", "scripts", "build-extension.test.mjs"), "utf8")
+    const mainCap = buildTest.match(/expect\(Buffer\.byteLength\(main\)\)\.toBeLessThanOrEqual\(([^)]*)\)/)
+    expect(mainCap, "build-extension.test.mjs must cap the main entry").not.toBeNull()
+    expect(mainCap?.[1]).toBe("bundleBudget.omoJsBytes")
+    expect(buildTest).toContain('from "../../bundle-budget.json"')
+    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain(
+      'from "../bundle-budget.json"',
+    )
   })
 })

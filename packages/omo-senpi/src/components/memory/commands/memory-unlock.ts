@@ -15,9 +15,12 @@ function pidList(pids: readonly number[] | null, unknown: string): string {
 
 function describeWriter(writer: UnlockFindings["writer"]): string {
   switch (writer.kind) {
-    case "none": return "none"
-    case "alive": return `pid ${writer.pid}${writer.pid === process.pid ? " (this session's process)" : ""}`
-    case "unknown": return "could not be determined on this system"
+    case "none":
+      return "none"
+    case "alive":
+      return `pid ${writer.pid}${writer.pid === process.pid ? " (this session's process)" : ""}`
+    case "unknown":
+      return "could not be determined on this system"
   }
 }
 
@@ -31,9 +34,10 @@ function describeFindings(findings: UnlockFindings): string[] {
 }
 
 function refusal(findings: UnlockFindings): string {
-  const reason = findings.writer.kind === "unknown"
-    ? `Not removed: the memory writer could not be determined (its lock record ${findings.writerLockPath ?? ""} is unreadable, from another host, or its process cannot be checked). If no memory session is running, remove that record and run /memory unlock again.`
-    : "Not removed: a live process is still using this lock. Let it finish (or stop it), then run /memory unlock again."
+  const reason =
+    findings.writer.kind === "unknown"
+      ? `Not removed: the memory writer could not be determined (its lock record ${findings.writerLockPath ?? ""} is unreadable, from another host, or its process cannot be checked). If no memory session is running, remove that record and run /memory unlock again.`
+      : "Not removed: a live process is still using this lock. Let it finish (or stop it), then run /memory unlock again."
   return [...describeFindings(findings), "", reason].join("\n")
 }
 
@@ -49,7 +53,11 @@ export async function runMemoryUnlock(
 
   const inspection = await inspectStrandedGitLock(repoDir, lockPath)
   if (inspection.kind === "not-a-git-lock") {
-    return respond(ctx, `${lockPath} is not a git lock file of the memory repository at ${repoDir}; nothing was removed`, "error")
+    return respond(
+      ctx,
+      `${lockPath} is not a git lock file of the memory repository at ${repoDir}; nothing was removed`,
+      "error",
+    )
   }
   if (inspection.kind === "missing") return respond(ctx, `${lockPath} no longer exists; nothing to unlock`)
   if (inspection.verdict === "refuse") return respond(ctx, refusal(inspection), "error")
@@ -57,9 +65,15 @@ export async function runMemoryUnlock(
   const findings = describeFindings(inspection).join("\n")
   if (!force) {
     if (!isInteractive(ctx)) {
-      return respond(ctx, `${findings}\n\nNo live process was found using this lock. Run /memory unlock ${inspection.lockPath} --force to remove it.`)
+      return respond(
+        ctx,
+        `${findings}\n\nNo live process was found using this lock. Run /memory unlock ${inspection.lockPath} --force to remove it.`,
+      )
     }
-    const confirmed = await ctx.ui?.confirm?.("Remove stranded git lock?", `${findings}\n\nRemove only if no git command or other session is working on this memory.`)
+    const confirmed = await ctx.ui?.confirm?.(
+      "Remove stranded git lock?",
+      `${findings}\n\nRemove only if no git command or other session is working on this memory.`,
+    )
     if (confirmed !== true) return respond(ctx, `${inspection.lockPath} was kept; nothing was removed`)
   }
 
@@ -70,11 +84,19 @@ export async function runMemoryUnlock(
     case "refused":
       return respond(ctx, refusal(outcome.inspection), "error")
     case "changed":
-      return respond(ctx, `${outcome.lockPath} changed after it was checked (a git process took it again); it was kept. Run /memory unlock again once that process is done.`, "error")
+      return respond(
+        ctx,
+        `${outcome.lockPath} changed after it was checked (a git process took it again); it was kept. Run /memory unlock again once that process is done.`,
+        "error",
+      )
     case "missing":
       return respond(ctx, `${lockPath} no longer exists; nothing to unlock`)
     case "not-a-git-lock":
-      return respond(ctx, `${lockPath} is no longer a git lock file of the memory repository; nothing was removed`, "error")
+      return respond(
+        ctx,
+        `${lockPath} is no longer a git lock file of the memory repository; nothing was removed`,
+        "error",
+      )
     case "unlink-failed":
       return respond(ctx, `${outcome.lockPath} could not be removed: ${outcome.message}`, "error")
   }

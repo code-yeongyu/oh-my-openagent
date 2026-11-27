@@ -8,7 +8,7 @@ function formatOkSummary(result: DoctorResult, headline: string, installedVersio
   const latest = result.latestVersion ?? LATEST_UNAVAILABLE_TEXT
   return [
     ` ${color.green(SYMBOLS.check)} ${color.green(
-      `${headline} · Edition: ${EDITION_LABELS[target]} · Installed: ${installedVersion} · Latest: ${latest}`
+      `${headline} · Edition: ${EDITION_LABELS[target]} · Installed: ${installedVersion} · Latest: ${latest}`,
     )}`,
     `   Update: ${UPDATE_COMMANDS[target]}`,
   ]

@@ -54,10 +54,7 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
   return false
 }
 
-async function findEmptyMessageIdsFromSDK(
-  client: OpencodeClient,
-  sessionID: string,
-): Promise<string[]> {
+async function findEmptyMessageIdsFromSDK(client: OpencodeClient, sessionID: string): Promise<string[]> {
   try {
     const response = (await client.session.messages({
       path: { id: sessionID },

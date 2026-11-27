@@ -8,7 +8,4 @@ export {
   type MemoryUsageEntry,
 } from "./memory-usage-ledger"
 export { extractMemoryUsagePath, MemoryUsageTracker } from "./memory-usage-tracker"
-export {
-  registerMemoryUsage,
-  type MemoryUsageOptions,
-} from "./memory-usage-wiring"
+export { registerMemoryUsage, type MemoryUsageOptions } from "./memory-usage-wiring"

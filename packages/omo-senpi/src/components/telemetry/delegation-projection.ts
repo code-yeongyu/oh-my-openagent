@@ -62,7 +62,7 @@ export function projectDelegationCompleted(input: DelegationProjectionInput): De
     tool_calls: finiteCount(stats?.tool_calls),
     ...tokenTotals(stats),
     token_status: stats?.token_status ?? "unavailable",
-    ...(costOf(stats)),
+    ...costOf(stats),
     stats_status: statsStatusOf(record),
     task_send_running_count: finiteCount(input.steerCounts.running),
     task_send_queued_count: finiteCount(input.steerCounts.queued),

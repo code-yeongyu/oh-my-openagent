@@ -44,7 +44,12 @@ const FIRST_TURN_EVENTS = ["input", "before_agent_start"] as const
 export interface HostPrewarmEngine {
   readonly settings: Pick<
     OmoTaskSettings,
-    "process_runner" | "default_execution_mode" | "host_shard_prewarm" | "resume_children" | "reattach_on_reconcile" | "residency_max_children"
+    | "process_runner"
+    | "default_execution_mode"
+    | "host_shard_prewarm"
+    | "resume_children"
+    | "reattach_on_reconcile"
+    | "residency_max_children"
   >
   readonly runtime: {
     captureFrom(ctx: LiveTaskContext): void
@@ -79,7 +84,8 @@ export function wireHostPrewarm(
   if (engine.settings.process_runner !== "host" || platform === "win32") return handle
   const revived = createOncePerSessionGuard()
   const treeRoot = readSessionRole(pi) === undefined
-  const configured = treeRoot && engine.settings.default_execution_mode !== "in-process" ? engine.settings.host_shard_prewarm : "off"
+  const configured =
+    treeRoot && engine.settings.default_execution_mode !== "in-process" ? engine.settings.host_shard_prewarm : "off"
   const mode = configured === "first-turn" && runsInDesktopThreadHost(pi) ? "intent" : configured
   const attachedSession = (eventCtx: unknown): string | undefined => {
     if (typeof eventCtx === "object" && eventCtx !== null) engine.runtime.captureFrom(eventCtx)
@@ -87,7 +93,10 @@ export function wireHostPrewarm(
   }
   const warmOwnHost = (sessionId: string): void => {
     if (warmed.has(sessionId)) return
-    warmed.set(sessionId, warmHost(engine).catch(() => undefined))
+    warmed.set(
+      sessionId,
+      warmHost(engine).catch(() => undefined),
+    )
   }
 
   pi.on("session_start", (_payload, eventCtx) => {
@@ -105,12 +114,19 @@ export function wireHostPrewarm(
     return undefined
   }
   if (mode === "first-turn") {
-    for (const event of FIRST_TURN_EVENTS) pi.on(event, (payload, eventCtx) => {
-      if (typeof payload === "object" && payload !== null && "preview" in payload && payload.preview === true) return undefined
-      return warmOnEdge(eventCtx)
-    }, event === "before_agent_start" ? { previewSafe: true } : undefined)
+    for (const event of FIRST_TURN_EVENTS)
+      pi.on(
+        event,
+        (payload, eventCtx) => {
+          if (typeof payload === "object" && payload !== null && "preview" in payload && payload.preview === true)
+            return undefined
+          return warmOnEdge(eventCtx)
+        },
+        event === "before_agent_start" ? { previewSafe: true } : undefined,
+      )
   }
-  if (mode === "intent") pi.on("message_update", (payload, eventCtx) => (startsDelegation(payload) ? warmOnEdge(eventCtx) : undefined))
+  if (mode === "intent")
+    pi.on("message_update", (payload, eventCtx) => (startsDelegation(payload) ? warmOnEdge(eventCtx) : undefined))
   return handle
 }
 
@@ -121,12 +137,13 @@ async function warmHost(engine: HostPrewarmEngine): Promise<void> {
   // Only a session whose children will run on its host warms one up; in-process children never open there.
   if (gate.current() !== "process") return
   const socket = engine.host.shardSocket()
-  const warm = engine.host.warmHost ?? ((target: string, cwd: string) => warmTaskHost({ socket: target, cwd, agentDir: engine.host.agentDir }))
+  const warm =
+    engine.host.warmHost ??
+    ((target: string, cwd: string) => warmTaskHost({ socket: target, cwd, agentDir: engine.host.agentDir }))
   await warm(socket, engine.runtime.cwd()).catch((error: unknown) => {
     log("omo-senpi task host warm failed", { socket, error: error instanceof Error ? error.message : String(error) })
   })
 }
-
 
 function contextSessionId(eventCtx: unknown): string | undefined {
   if (typeof eventCtx !== "object" || eventCtx === null) return undefined

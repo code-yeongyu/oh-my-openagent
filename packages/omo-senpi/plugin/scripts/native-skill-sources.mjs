@@ -28,10 +28,6 @@ export function createNativeSkillSources(repoRoot) {
   /** @type {SkillSource[]} */
   const sources = [
     {
-      name: "dag-library",
-      source: join(nativeSkillsRoot, "dag-library"),
-    },
-    {
       name: "give-me-tips",
       source: join(nativeSkillsRoot, "give-me-tips"),
     },
@@ -46,6 +42,10 @@ export function createNativeSkillSources(repoRoot) {
     {
       name: "mass-ulw",
       source: join(nativeSkillsRoot, "mass-ulw"),
+    },
+    {
+      name: "omo-relay",
+      source: join(nativeSkillsRoot, "omo-relay"),
     },
     {
       name: "onboarding",
@@ -67,7 +67,16 @@ export function createNativeSkillSources(repoRoot) {
       // shared pool and are overlaid at sync time instead of being duplicated into the native source.
       name: "ulw-research",
       source: join(nativeSkillsRoot, "ulw-research"),
-      sharedAssets: ["scripts", "references/report-gates.md", "references/deliverable-phase.md", "references/report-visualization.md", "references/fact-ledger-grammar.md", "references/fidelity-claim-kinds.md", "references/unit-rules.md", "references/fact-ledger.md"],
+      sharedAssets: [
+        "scripts",
+        "references/report-gates.md",
+        "references/deliverable-phase.md",
+        "references/report-visualization.md",
+        "references/fact-ledger-grammar.md",
+        "references/fidelity-claim-kinds.md",
+        "references/unit-rules.md",
+        "references/fact-ledger.md",
+      ],
     },
     {
       name: "visualize",

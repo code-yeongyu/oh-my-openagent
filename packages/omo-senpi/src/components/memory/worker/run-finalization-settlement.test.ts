@@ -58,11 +58,16 @@ describe("run finalization settlement", () => {
     }
 
     // when
-    const result = await settleReservationRun({
-      identity,
-      reservation,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, runDir, ledger(), { outcome: "merged" })
+    const result = await settleReservationRun(
+      {
+        identity,
+        reservation,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      runDir,
+      ledger(),
+      { outcome: "merged" },
+    )
 
     // then
     expect(result.outcome).toBe("merged")
@@ -71,10 +76,9 @@ describe("run finalization settlement", () => {
       runId: "run-1",
       outcome: "merged",
     })
-    expect(JSON.parse(await readFile(
-      join(identity.paths.reflection, "completions", "run-1.json"),
-      "utf8",
-    ))).toMatchObject({
+    expect(
+      JSON.parse(await readFile(join(identity.paths.reflection, "completions", "run-1.json"), "utf8")),
+    ).toMatchObject({
       category: "deep",
       conversationIds: ["conversation-a"],
       outcome: "merged",
@@ -110,7 +114,12 @@ describe("run finalization settlement", () => {
       consecutiveFailures: 3,
       delivery: { status: "consumed" },
     })
-    const reservation = { readState: async () => ({}), complete: async () => { throw new Error("must not complete") } }
+    const reservation = {
+      readState: async () => ({}),
+      complete: async () => {
+        throw new Error("must not complete")
+      },
+    }
     const context = { identity, reservation, now: () => Date.parse("2026-08-11T12:00:00.000Z") }
 
     // when: settlement runs twice, as two launches would.
@@ -120,8 +129,13 @@ describe("run finalization settlement", () => {
     // then: the durable record wins, final.json exists, and nothing throws on replay.
     expect(first.completion).toMatchObject({ finishedAt: "2026-08-11T10:00:30.000Z", consecutiveFailures: 3 })
     expect(second.completion).toEqual(first.completion)
-    expect(JSON.parse(await readFile(join(runDir, "final.json"), "utf8"))).toMatchObject({ runId: "run-1", outcome: "failed" })
-    expect(JSON.parse(await readFile(join(completionsDir, "run-1.json"), "utf8"))).toMatchObject({ consecutiveFailures: 3 })
+    expect(JSON.parse(await readFile(join(runDir, "final.json"), "utf8"))).toMatchObject({
+      runId: "run-1",
+      outcome: "failed",
+    })
+    expect(JSON.parse(await readFile(join(completionsDir, "run-1.json"), "utf8"))).toMatchObject({
+      consecutiveFailures: 3,
+    })
   })
 
   test("#given an active run #when settlement is retried after completion #then complete is called exactly once", async () => {
@@ -182,14 +196,21 @@ describe("run finalization settlement", () => {
     await writeRunJsonAtomic(join(runDir, "ledger.json"), legacy)
 
     // when
-    const settlement = settleReservationRun({
-      identity,
-      reservation: {
-        readState: async () => ({}),
-        complete: async () => { throw new Error("inactive") },
+    const settlement = settleReservationRun(
+      {
+        identity,
+        reservation: {
+          readState: async () => ({}),
+          complete: async () => {
+            throw new Error("inactive")
+          },
+        },
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
       },
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, runDir, legacy, { outcome: "merged" })
+      runDir,
+      legacy,
+      { outcome: "merged" },
+    )
 
     // then
     await expect(settlement).rejects.toThrow("completion identity")

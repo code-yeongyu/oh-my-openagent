@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative, sep } from "node:path"
 import * as resilient from "../../fs/resilient"
@@ -11,7 +11,8 @@ import * as cryptoIndex from "./index.ts"
 import { createRejectionCounter } from "./rejection.ts"
 import { genesisEntry, newDeviceKeyring, newRecoveryCredential } from "./testing/genesis.ts"
 import { ACCOUNT, fixtureAnchor, mainChain, record } from "./testing/sync-v1.test-support.ts"
-import { forgetTrustAnchor, loadTrustAnchor, pinTrustAnchor, TrustPinError } from "./trust-pin.ts"
+import { retireSyncDevice } from "../device-retire.ts"
+import { forgetTrustAnchor, loadTrustAnchor, pinTrustAnchor, rootChangeNotice, TrustPinError } from "./trust-pin.ts"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -23,7 +24,8 @@ const stateDir = (): string => {
   dirs.push(dir)
   return dir
 }
-const pinPath = (dir: string, account = ACCOUNT): string => join(dir, "trust-anchor", createHash("sha256").update(account).digest("base64url"), "pin.json")
+const pinPath = (dir: string, account = ACCOUNT): string =>
+  join(dir, "trust-anchor", createHash("sha256").update(account).digest("base64url"), "pin.json")
 
 const provenCandidate = async (): Promise<PinCandidate> => {
   const outcome = await appendEntries(emptyChain(ACCOUNT, fixtureAnchor()), mainChain(), createRejectionCounter())
@@ -34,7 +36,11 @@ const provenCandidate = async (): Promise<PinCandidate> => {
 const otherCandidate = async (): Promise<PinCandidate> => {
   const keyring = await newDeviceKeyring()
   const other = await genesisEntry(ACCOUNT, keyring, "W".repeat(43), newRecoveryCredential())
-  const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)), [other], createRejectionCounter())
+  const walked = await appendEntries(
+    emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)),
+    [other],
+    createRejectionCounter(),
+  )
   if (!walked.ok || walked.state.pin === null) throw new Error("other root walk")
   return walked.state.pin
 }
@@ -52,13 +58,20 @@ describe("the pinned root: set once from a proven walk, then the only root", () 
     const loaded = await loadTrustAnchor(dir, ACCOUNT)
     expect(loaded.ok && loaded.anchor.genesisDigest).toBe(record("genesis").digest)
     if (!loaded.ok) return
-    expect((await appendEntries(emptyChain(ACCOUNT, loaded.anchor), mainChain(), createRejectionCounter())).ok).toBe(true)
+    expect((await appendEntries(emptyChain(ACCOUNT, loaded.anchor), mainChain(), createRejectionCounter())).ok).toBe(
+      true,
+    )
     expect(anchor.genesisDigest).toBe(loaded.anchor.genesisDigest)
   })
 
   test("a candidate no verified walk minted is never pinned", async () => {
     const dir = stateDir()
-    const handBuilt = { account: ACCOUNT, genesisDigest: record("genesis").digest, pinnedBy: "creator" as const, at: { seq: 1, keyring_link: record("genesis").keyring_link } }
+    const handBuilt = {
+      account: ACCOUNT,
+      genesisDigest: record("genesis").digest,
+      pinnedBy: "creator" as const,
+      at: { seq: 1, keyring_link: record("genesis").keyring_link },
+    }
     // @ts-expect-error only a walk that met its anchor mints a PinCandidate
     await expect(pinTrustAnchor(dir, ACCOUNT, handBuilt)).rejects.toMatchObject({ problem: "not_verified" })
     await expectNoAnchor(dir, "no_pin")
@@ -70,7 +83,11 @@ describe("the pinned root: set once from a proven walk, then the only root", () 
     const before = readFileSync(pinPath(dir), "utf8")
     const keyring = await newDeviceKeyring()
     const other = await genesisEntry(ACCOUNT, keyring, "W".repeat(43), newRecoveryCredential())
-    const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)), [other], createRejectionCounter())
+    const walked = await appendEntries(
+      emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)),
+      [other],
+      createRejectionCounter(),
+    )
     if (!walked.ok || walked.state.pin === null) throw new Error("other root walk")
     await expect(pinTrustAnchor(dir, ACCOUNT, walked.state.pin)).rejects.toBeInstanceOf(TrustPinError)
     expect(readFileSync(pinPath(dir), "utf8")).toBe(before)
@@ -108,7 +125,9 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     const accountDir = dirname(pinPath(dir))
     mkdirSync(accountDir, { recursive: true })
     await expectNoAnchor(dir, "corrupt_pin")
-    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({ problem: "corrupt_pin" })
+    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({
+      problem: "corrupt_pin",
+    })
     expect(readdirSync(accountDir)).toEqual([])
   })
 
@@ -116,7 +135,10 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     ["truncated", (pin: string) => pin.slice(0, pin.length / 2)],
     ["garbage", () => "\u0000\u00ff not json"],
     ["wrong version", (pin: string) => JSON.stringify({ ...JSON.parse(pin), version: 2 })],
-    ["an inner account that is not the expected one", (pin: string) => JSON.stringify({ ...JSON.parse(pin), account: "another-account" })],
+    [
+      "an inner account that is not the expected one",
+      (pin: string) => JSON.stringify({ ...JSON.parse(pin), account: "another-account" }),
+    ],
     ["a malformed root digest", (pin: string) => JSON.stringify({ ...JSON.parse(pin), genesis_digest: "short" })],
     ["an extra field", (pin: string) => JSON.stringify({ ...JSON.parse(pin), trust: "server" })],
   ])("%s", async (_name, mutate) => {
@@ -124,7 +146,9 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     await pinned(dir)
     writeFileSync(pinPath(dir), mutate(readFileSync(pinPath(dir), "utf8")))
     await expectNoAnchor(dir, "corrupt_pin")
-    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({ problem: "corrupt_pin" })
+    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({
+      problem: "corrupt_pin",
+    })
   })
 
   test("a crash before the publishing rename leaves no pin, and the next load removes the candidate", async () => {
@@ -146,7 +170,11 @@ describe("publishing the pin is durable, and a lost race is decided by the winne
     const root = join(dir, "trust-anchor")
     const [syncFile, syncDirectory, rename] = [durable.syncJournalFile, durable.syncJournalDirectory, resilient.rename]
     const calls: string[] = []
-    const name = (path: unknown) => (relative(root, String(path)) || ".").split(sep).join("/").replace(/\.\d+\.[0-9a-f]{12}\.tmp/, ".tmp")
+    const name = (path: unknown) =>
+      (relative(root, String(path)) || ".")
+        .split(sep)
+        .join("/")
+        .replace(/\.\d+\.[0-9a-f]{12}\.tmp/, ".tmp")
     spyOn(durable, "syncJournalFile").mockImplementation(async (path) => {
       calls.push(`file ${name(path)}`)
       await syncFile(path)
@@ -181,5 +209,129 @@ describe("publishing the pin is durable, and a lost race is decided by the winne
     const loaded = await loadTrustAnchor(dir, ACCOUNT)
     expect(loaded.ok && loaded.anchor.genesisDigest).toBe(winner.genesisDigest)
     expect(readdirSync(join(dir, "trust-anchor"))).toEqual([dirname(relative(join(dir, "trust-anchor"), pinPath(dir)))])
+  })
+})
+
+// #12280 R-B5: a retired pin never blocks a ceremony, and a ceremony that pins a different root than the
+// one retired is flagged (a non-blocking notice), never refused.
+describe("a pin retired when its principal's keys are discarded (#12280)", () => {
+  test("#given a retired pin #when a ceremony pins the same root #then no root change is reported", async () => {
+    const dir = stateDir()
+    const candidate = await provenCandidate()
+    await pinTrustAnchor(dir, ACCOUNT, candidate)
+    await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+    await expectNoAnchor(dir, "no_pin")
+    await pinTrustAnchor(dir, ACCOUNT, candidate)
+    expect(await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)).toEqual({})
+  })
+
+  test("#given a retired pin #when a ceremony pins a different root #then it is pinned, not refused, and the change is reported", async () => {
+    const dir = stateDir()
+    await pinned(dir)
+    await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+    const other = await otherCandidate()
+    expect((await pinTrustAnchor(dir, ACCOUNT, other)).genesisDigest).toBe(other.genesisDigest)
+    expect(await rootChangeNotice(dir, ACCOUNT, other.genesisDigest)).toEqual({ rootChanged: true })
+  })
+
+  test("#given no pin ever retired #then no root change is reported", async () => {
+    const dir = stateDir()
+    expect(await rootChangeNotice(dir, ACCOUNT, (await provenCandidate()).genesisDigest)).toEqual({})
+  })
+
+  // #12382: the notice runs after a join or enable has pinned, so it is best-effort. Write and search permission without
+  // read on the anchor root makes its readdir fail EACCES while the pin itself still loads by path.
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "#given a pinned account whose anchor root cannot be listed #when the notice check runs #then it reports the check as skipped with the reason, and the pin still loads",
+    async () => {
+      // given
+      const dir = stateDir()
+      const candidate = await provenCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      const anchors = join(dir, "trust-anchor")
+      chmodSync(anchors, 0o300)
+
+      // when
+      let notice: Awaited<ReturnType<typeof rootChangeNotice>>
+      try {
+        notice = await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)
+      } finally {
+        chmodSync(anchors, 0o700)
+      }
+
+      // then
+      expect(notice).toEqual({ rootCheck: { kind: "skipped", reason: "EACCES" } })
+      const loaded = await loadTrustAnchor(dir, ACCOUNT)
+      expect(loaded.ok && loaded.anchor.genesisDigest).toBe(candidate.genesisDigest)
+    },
+  )
+
+  // #14098 (#13641 review L1): an unreadable newest retired pin must not let the check fall back to an older one and
+  // report "unchanged": the notice says the check was skipped.
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "#given the newest retired pin cannot be read #when a ceremony pins the same root as an older retired pin #then the check is reported skipped, not unchanged",
+    async () => {
+      // given
+      const dir = stateDir()
+      const candidate = await provenCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+      const other = await otherCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, other)
+      await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      const root = join(dir, "trust-anchor")
+      const newest = readdirSync(root)
+        .filter((name) => name.includes(".retired-"))
+        .sort(
+          (a, b) => Number(b.split(".retired-")[1]?.split("-")[0]) - Number(a.split(".retired-")[1]?.split("-")[0]),
+        )[0]
+      const unreadable = join(root, newest ?? "", "pin.json")
+      chmodSync(unreadable, 0o000)
+
+      // when
+      let notice: Awaited<ReturnType<typeof rootChangeNotice>>
+      try {
+        notice = await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)
+      } finally {
+        chmodSync(unreadable, 0o600)
+      }
+
+      // then
+      expect(notice).toEqual({ rootCheck: { kind: "skipped", reason: "EACCES" } })
+    },
+  )
+
+  // #14157 item 1: a newest retired pin that exists but does not parse is not a missing pin.
+  test.each(["{", '{"version":1}', ""])(
+    "#given the newest retired pin does not parse (%j) #when a ceremony pins the same root as an older retired pin #then the check is reported skipped, not unchanged",
+    async (content) => {
+      // given
+      const dir = stateDir()
+      const candidate = await provenCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+      const other = await otherCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, other)
+      await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      const root = join(dir, "trust-anchor")
+      const newest = readdirSync(root)
+        .filter((name) => name.includes(".retired-"))
+        .sort(
+          (a, b) => Number(b.split(".retired-")[1]?.split("-")[0]) - Number(a.split(".retired-")[1]?.split("-")[0]),
+        )[0]
+      writeFileSync(join(root, newest ?? "", "pin.json"), content)
+
+      // when
+      const notice = await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)
+
+      // then
+      expect(notice).toEqual({ rootCheck: { kind: "skipped", reason: "PIN_UNREADABLE" } })
+    },
+  )
+
+  test("the retire seam stays out of the crypto barrel", () => {
+    expect(Object.keys(cryptoIndex)).not.toContain("retireSyncDevice")
   })
 })

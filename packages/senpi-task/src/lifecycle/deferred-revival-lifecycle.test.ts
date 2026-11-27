@@ -13,11 +13,18 @@ describe("deferred revival retries end with their session (omo#9498 review)", ()
     test(`a pending retry stops on session ${stop}: the child is neither revived nor marked lost`, async () => {
       const gate = Promise.withResolvers<void>()
       const firstWait = Promise.withResolvers<void>()
-      const h = harness({ succeeds: true, gateWait: () => { firstWait.resolve(); return gate.promise } })
+      const h = harness({
+        succeeds: true,
+        gateWait: () => {
+          firstWait.resolve()
+          return gate.promise
+        },
+      })
       try {
         await h.lifecycle.reconcileOnSessionStart("parent-1")
         await firstWait.promise
-        if (stop === "shutdown") await h.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
+        if (stop === "shutdown")
+          await h.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
         else h.lifecycle.dispose?.()
         gate.resolve()
         await settled()
@@ -95,7 +102,15 @@ describe("deferred revival retries end with their session (omo#9498 review)", ()
   }, 10_000)
 
   test("each deferral reason maps to what happens next", () => {
-    for (const reason of ["model_unavailable", "lock_contended", "host_unreachable", "capacity", "foreign_live_owner", "reattach_disabled", "tools_unavailable"]) {
+    for (const reason of [
+      "model_unavailable",
+      "lock_contended",
+      "host_unreachable",
+      "capacity",
+      "foreign_live_owner",
+      "reattach_disabled",
+      "tools_unavailable",
+    ]) {
       for (const host of [false, true]) expect(deferralOutlookFor(reason, host)).toBe("recovering")
     }
     for (const reason of ["host_incompatible", "spawn_spec_unavailable"]) {
@@ -104,8 +119,13 @@ describe("deferred revival retries end with their session (omo#9498 review)", ()
   })
 
   test("a daemon-hosted child reports the same bounded recovery outlook", () => {
-    const daemonHosted = { ...hostSessionRecordInput("st_94980010", hostSession("st_94980010")), task_id: "st_94980010",
-      residency_state: "rpc_detached", suspension_reason: "revival_deferred", revival_deferred_reason: "model_unavailable" }
+    const daemonHosted = {
+      ...hostSessionRecordInput("st_94980010", hostSession("st_94980010")),
+      task_id: "st_94980010",
+      residency_state: "rpc_detached",
+      suspension_reason: "revival_deferred",
+      revival_deferred_reason: "model_unavailable",
+    }
     const text = notContinuableReason(daemonHosted as unknown as Parameters<typeof notContinuableReason>[0])
     expect(text).toContain(deferralOutlookText("recovering"))
   })

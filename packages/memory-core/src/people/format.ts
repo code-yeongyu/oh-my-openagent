@@ -18,25 +18,11 @@ import { sanitizeToSlug } from "../identity/resolve"
 
 export type CardPrefix = "IDENTITY" | "ATTRIBUTE" | "RELATIONSHIP" | "INSTRUCTION"
 
-const VALID_PREFIXES = new Set<CardPrefix>([
-  "IDENTITY",
-  "ATTRIBUTE",
-  "RELATIONSHIP",
-  "INSTRUCTION",
-])
+const VALID_PREFIXES = new Set<CardPrefix>(["IDENTITY", "ATTRIBUTE", "RELATIONSHIP", "INSTRUCTION"])
 
-export type ObservationSection =
-  | "Explicit"
-  | "Deductive"
-  | "Inductive"
-  | "Contradiction"
+export type ObservationSection = "Explicit" | "Deductive" | "Inductive" | "Contradiction"
 
-const VALID_SECTIONS = new Set<ObservationSection>([
-  "Explicit",
-  "Deductive",
-  "Inductive",
-  "Contradiction",
-])
+const VALID_SECTIONS = new Set<ObservationSection>(["Explicit", "Deductive", "Inductive", "Contradiction"])
 
 export interface CardEntry {
   readonly prefix: CardPrefix
@@ -74,18 +60,14 @@ export interface PeopleCardParseResult {
 }
 
 const OBSERVATION_SECTION_RE = /^##\s+(.+)$/
-const OBSERVATION_ENTRY_RE =
-  /^-\s+\[(\d{4}-\d{2}-\d{2})\]\s+(.*)$/
+const OBSERVATION_ENTRY_RE = /^-\s+\[(\d{4}-\d{2}-\d{2})\]\s+(.*)$/
 const COMMENT_RE = /<!--\s*(.+?)\s*-->$/
 
 /**
  * Parse a people card body into structured entries and observation groups.
  * Returns diagnostics for invalid lines; never throws.
  */
-export function parsePeopleCard(
-  text: string,
-  limits: PeopleLimits,
-): PeopleCardParseResult {
+export function parsePeopleCard(text: string, limits: PeopleLimits): PeopleCardParseResult {
   const diagnostics: string[] = []
   const entries: CardEntry[] = []
   const observations: ObservationGroup[] = []
@@ -138,9 +120,7 @@ export function parsePeopleCard(
     const entryMatch = line.match(OBSERVATION_ENTRY_RE)
     if (entryMatch) {
       if (currentSection === null) {
-        diagnostics.push(
-          `line ${i + 1}: observation entry outside any section`,
-        )
+        diagnostics.push(`line ${i + 1}: observation entry outside any section`)
         continue
       }
       const date = entryMatch[1]!
@@ -175,40 +155,30 @@ export function parsePeopleCard(
 
       if (VALID_PREFIXES.has(prefix as CardPrefix)) {
         if (content === "") {
-          diagnostics.push(
-            `line ${i + 1}: ${prefix} entry has empty content`,
-          )
+          diagnostics.push(`line ${i + 1}: ${prefix} entry has empty content`)
           continue
         }
         if (content.length > limits.maxEntryChars) {
-          diagnostics.push(
-            `line ${i + 1}: entry exceeds ${limits.maxEntryChars} chars (got ${content.length})`,
-          )
+          diagnostics.push(`line ${i + 1}: entry exceeds ${limits.maxEntryChars} chars (got ${content.length})`)
         }
         entries.push({ prefix: prefix as CardPrefix, content })
         continue
       }
 
-      diagnostics.push(
-        `line ${i + 1}: invalid prefix '${prefix}' (expected: ${[...VALID_PREFIXES].join(", ")})`,
-      )
+      diagnostics.push(`line ${i + 1}: invalid prefix '${prefix}' (expected: ${[...VALID_PREFIXES].join(", ")})`)
       continue
     }
 
     // Unrecognized non-empty line outside a section
     if (currentSection === null) {
-      diagnostics.push(
-        `line ${i + 1}: unrecognized line format`,
-      )
+      diagnostics.push(`line ${i + 1}: unrecognized line format`)
     }
   }
 
   flushSection()
 
   if (entries.length > limits.maxEntries) {
-    diagnostics.push(
-      `card has ${entries.length} entries, exceeding max ${limits.maxEntries}`,
-    )
+    diagnostics.push(`card has ${entries.length} entries, exceeding max ${limits.maxEntries}`)
   }
 
   const card: PeopleCard = {
@@ -222,10 +192,7 @@ export function parsePeopleCard(
 /**
  * Serialize a PeopleCard back into text form.
  */
-export function serializePeopleCard(
-  card: PeopleCard,
-  _limits: PeopleLimits,
-): string {
+export function serializePeopleCard(card: PeopleCard, _limits: PeopleLimits): string {
   const parts: string[] = []
 
   for (const entry of card.entries) {
@@ -315,10 +282,7 @@ export function isReservedSlug(slug: string): boolean {
  * Resolve a slug collision by appending -2, -3, ... (IC-14).
  * Returns the first unused slug.
  */
-export function resolveSlugCollision(
-  baseSlug: string,
-  existingSlugs: ReadonlySet<string>,
-): string {
+export function resolveSlugCollision(baseSlug: string, existingSlugs: ReadonlySet<string>): string {
   if (!existingSlugs.has(baseSlug)) return baseSlug
 
   let suffix = 2

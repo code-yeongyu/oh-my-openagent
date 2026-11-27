@@ -40,7 +40,10 @@ async function makeRuntimeFixture(): Promise<{
   await writeText(join(sourceDist, "client.d.ts"), "export {}\n")
   await writeText(join(sourceDist, "daemon-client.js"), "export {}\n")
   await writeText(join(sourceDist, "daemon-client.d.ts"), "export {}\n")
-  await writeText(join(sourceDist, "package.json"), JSON.stringify({ name: "@code-yeongyu/lsp-daemon", version: "0.1.0", type: "module" }))
+  await writeText(
+    join(sourceDist, "package.json"),
+    JSON.stringify({ name: "@code-yeongyu/lsp-daemon", version: "0.1.0", type: "module" }),
+  )
   await writeText(join(repoRoot, "packages", "lsp-daemon", "src", "index.ts"), "export const daemon = true\n")
   await writeText(join(repoRoot, "packages", "lsp-core", "src", "index.ts"), "export const core = true\n")
   await writeText(join(repoRoot, "packages", "mcp-stdio-core", "src", "index.ts"), "export const mcp = true\n")
@@ -48,11 +51,7 @@ async function makeRuntimeFixture(): Promise<{
     repoRoot,
     sourceDist,
     targetDist,
-    inputCandidates: [
-      "packages/lsp-daemon/src",
-      "packages/lsp-core/src",
-      "packages/mcp-stdio-core/src",
-    ],
+    inputCandidates: ["packages/lsp-daemon/src", "packages/lsp-core/src", "packages/mcp-stdio-core/src"],
   }
 }
 

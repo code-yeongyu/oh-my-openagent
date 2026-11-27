@@ -132,9 +132,8 @@ describe("a leg that skipped tests the change needed", () => {
 })
 
 describe("a leg that skipped tests on purpose", () => {
-  // Pull requests run macOS and Windows only when a platform-specific path changed (or a
-  // full-matrix label is set); every other change, runtime code included, is proven there by
-  // the post-merge dev push, which always runs the full matrix.
+  // Pull requests run macOS and Windows only with the ci:full-matrix label (#13802); every other
+  // change is proven there by the post-merge dev push, which always runs the full matrix.
   test("#given a pull request outside the full matrix on a Windows leg #then the leg passes and says tests were intentionally not run", () => {
     const result = runLeg({
       outcomes: ["skipped", "skipped", "skipped"],
@@ -186,28 +185,47 @@ describe("macOS status jobs forwarding combined-job outcomes", () => {
     ["heavy work disabled", "skipped", "", "false", "true", "true", 0],
     ["unexpected skip", "skipped", "", "true", "true", "true", 1],
     ["classification missing", "skipped", "", "", "", "", 1],
-  ])("#given %s #when the real status script runs #then it propagates the verdict", (
-    _name, jobStatus, outcomes, runHeavy, fullMatrix, runtimeTouching, exitCode,
-  ) => {
-    const root = mkdtempSync(join(tmpdir(), "ci-macos-status-"))
-    scratchRoots.push(root)
-    const result = spawnSync("bash", [fileURLToPath(new URL("../.github/scripts/ci-macos-status.sh", import.meta.url))], {
-      cwd: fileURLToPath(new URL("..", import.meta.url)),
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        GITHUB_STEP_SUMMARY: join(root, "summary.md"),
-        LEG_OS: "macos-latest",
-        LEG_JOB_STATUS: jobStatus,
-        TEST_OUTCOMES: outcomes,
-        RUN_HEAVY: runHeavy,
-        FULL_MATRIX: fullMatrix,
-        RUNTIME_TOUCHING: runtimeTouching,
-      },
-    })
-    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: exitCode, stderr: "" })
-    if (jobStatus === "skipped" && exitCode === 0) {
-      expect(result.stdout).toContain("::notice title=tests intentionally not run::")
-    }
-  })
+    ["both source jobs passed", "success success", "success success success", "true", "true", "true", 0],
+    ["the other source job failed elsewhere", "success failure", "success success success", "true", "true", "true", 0],
+    ["a part in the second source job failed", "success failure", "success failure success", "true", "true", "true", 1],
+    ["both source jobs skipped as intended", "skipped skipped", "missing missing missing", "true", "false", "false", 0],
+    ["one source job never ran", "success skipped", "success missing success", "true", "true", "true", 1],
+    [
+      "one source job cancelled before its parts",
+      "success cancelled",
+      "success missing success",
+      "true",
+      "true",
+      "true",
+      1,
+    ],
+  ])(
+    "#given %s #when the real status script runs #then it propagates the verdict",
+    (_name, jobStatus, outcomes, runHeavy, fullMatrix, runtimeTouching, exitCode) => {
+      const root = mkdtempSync(join(tmpdir(), "ci-macos-status-"))
+      scratchRoots.push(root)
+      const result = spawnSync(
+        "bash",
+        [fileURLToPath(new URL("../.github/scripts/ci-macos-status.sh", import.meta.url))],
+        {
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GITHUB_STEP_SUMMARY: join(root, "summary.md"),
+            LEG_OS: "macos-latest",
+            LEG_JOB_STATUS: jobStatus,
+            TEST_OUTCOMES: outcomes,
+            RUN_HEAVY: runHeavy,
+            FULL_MATRIX: fullMatrix,
+            RUNTIME_TOUCHING: runtimeTouching,
+          },
+        },
+      )
+      expect({ status: result.status, stderr: result.stderr }).toEqual({ status: exitCode, stderr: "" })
+      if (jobStatus === "skipped" && exitCode === 0) {
+        expect(result.stdout).toContain("::notice title=tests intentionally not run::")
+      }
+    },
+  )
 })
