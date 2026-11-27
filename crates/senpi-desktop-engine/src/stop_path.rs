@@ -42,14 +42,21 @@ fn platform_listener() -> Option<Listener> {
     Some(Box::new(senpi_desktop_backend_macos::CgEventTapListener::new()))
 }
 
-/// Mirrors the session's display-server choice: `WAYLAND_DISPLAY` wins over
-/// `DISPLAY` (an XWayland session sets both), and no display means no listener.
+/// Mirrors the session's backend choice: `WAYLAND_DISPLAY` wins over
+/// `DISPLAY` (an XWayland session sets both), no display means no listener,
+/// and a sway session the portal backend skipped takes the sway binding
+/// listener (its GlobalShortcuts counterpart cannot start there anyway).
 #[cfg(target_os = "linux")]
 fn platform_listener() -> Option<Listener> {
     if std::env::var_os("WAYLAND_DISPLAY").is_some() {
-        Some(Box::new(
-            senpi_desktop_backend_wayland::GlobalShortcutsListener::new(),
-        ))
+        let sway_socket = senpi_desktop_backend_wlroots::sway_socket_path(&|name| std::env::var_os(name));
+        if sway_socket.is_some() && !senpi_desktop_backend_wayland::remote_desktop_portal_offered() {
+            Some(Box::new(senpi_desktop_backend_wlroots::SwayBindListener::new()))
+        } else {
+            Some(Box::new(
+                senpi_desktop_backend_wayland::GlobalShortcutsListener::new(),
+            ))
+        }
     } else if std::env::var_os("DISPLAY").is_some() {
         Some(Box::new(senpi_desktop_backend_x11::Xi2Listener::new()))
     } else {

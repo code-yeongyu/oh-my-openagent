@@ -2649,6 +2649,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "senpi-desktop-backend-wlroots"
+version = "0.0.0"
+dependencies = [
+ "image",
+ "parking_lot",
+ "senpi-desktop-core",
+ "senpi-desktop-safety",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "senpi-desktop-backend-x11"
 version = "0.0.0"
 dependencies = [
@@ -2692,6 +2705,7 @@ dependencies = [
  "senpi-desktop-backend-macos",
  "senpi-desktop-backend-wayland",
  "senpi-desktop-backend-win32",
+ "senpi-desktop-backend-wlroots",
  "senpi-desktop-backend-x11",
  "senpi-desktop-core",
  "senpi-desktop-safety",
@@ -2730,6 +2744,7 @@ dependencies = [
  "senpi-desktop-backend-macos",
  "senpi-desktop-backend-wayland",
  "senpi-desktop-backend-win32",
+ "senpi-desktop-backend-wlroots",
  "senpi-desktop-backend-x11",
  "senpi-desktop-core",
  "senpi-desktop-safety",

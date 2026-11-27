@@ -8,6 +8,7 @@ members = [
     "crates/senpi-desktop-backend-macos",
     "crates/senpi-desktop-backend-x11",
     "crates/senpi-desktop-backend-wayland",
+    "crates/senpi-desktop-backend-wlroots",
     "crates/senpi-desktop-backend-win32",
     "crates/senpi-desktop-engine",
     "crates/senpi-desktop-xpc",
