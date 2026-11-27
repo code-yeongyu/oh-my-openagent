@@ -42,7 +42,9 @@ Specialty categories are chosen by the kind of work, never by difficulty:
 | `deep-high` | The same, when the central decision cannot be settled from evidence: a trade-off, a cross-package contract, a mechanism with no in-repo pattern, or correctness argued from invariants. |
 | `ultrabrain` | At most ONE node per graph - the single genuinely hard reasoning problem everything else depends on. |
 
-A graph whose every node is `deep-low` or `deep-high` pays the most expensive worker for mechanical lanes.
+A graph whose every node is `deep-low` or `deep-high` pays the most expensive worker for mechanical lanes. Implementation nodes that build, install, drive a device or emulator, or wire config mechanically stay on `quick` or `unspecified-*` however critical they are.
+
+Verify nodes run the other way: an adversarial verify or review node routes to `deep-high`, or `deep-low` when it only runs fixed commands and reads their output, even when the work it checks ran on `quick`. A node that repairs another (a `retry` prompt, an `amend`, a fix or "finish" node) keeps the category of the node it repairs; across all its repairs it climbs at most one rung in total on the ladder `quick` -> `unspecified-low` -> `unspecified-high` -> `deep-low` -> `deep-high`, with the reason said out loud, and specialty categories stay where they are. A failed build, a flaky device or a missing credential is an environment problem, not a reason to escalate. A verify node that builds or installs keeps its verify route. When a plan's todo carries `Recommended task executor category:`, its node uses that category under the same rule.
 
 ## Write scopes and capacity
 
@@ -78,6 +80,7 @@ const probe = await sdk.wait((await sdk.start(probeDag)).run_id)
 const findings = probe.details.result.nodes["probe"].output
 if (findings.includes("critical")) {
   const fix = sdk.define({ key: `fix-${today}`, name: "Fix" })
+  // A fresh fix from new findings, not a repair of a failed node: route it by its own difficulty.
   fix.node({ id: "fix", category: "deep-low", prompt: `TASK: ... FINDINGS:\n${findings}` })
   await sdk.start(fix)
 }
@@ -123,7 +126,7 @@ Make PASS/FAIL decidable from the prompt alone ("exit code 0 and `dist/index.js`
 
 ## Verification
 
-Node outputs are claims. Before you report done, prove the deliverable with a real check: the test command, the build, the endpoint call, the file itself. Run it yourself when it is one command. Give it a verification node only when the check is long, splits into parallel parts, or needs a fresh context; that node's prompt names the exact invocation and the binary observable that decides PASS vs FAIL. A node that builds on an upstream result re-checks the specific facts it depends on (the file exists, the symbol is exported) before trusting them.
+Node outputs are claims. Before you report done, prove the deliverable with a real check: the test command, the build, the endpoint call, the file itself. Run it yourself when it is one command. Give it a verification node only when the check is long, splits into parallel parts, or needs a fresh context; that node's prompt names the exact invocation and the binary observable that decides PASS vs FAIL, and it routes as a verify node (see Category routing). A node that builds on an upstream result re-checks the specific facts it depends on (the file exists, the symbol is exported) before trusting them.
 
 A paginated deliverable - PDF, DOCX, deck, print HTML - is verified by its rendered pages, not by file size, keyword grep, or page count. Render EVERY page to an image and inspect each one for blank or near-empty pages, wrong page breaks, orphaned keep-together blocks, split tables, and clipped text, then fix and re-render until the pages are clean. Sampling a few pages is not verification: the defect sits on the page nobody opened.
 
