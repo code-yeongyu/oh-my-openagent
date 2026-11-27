@@ -18,6 +18,8 @@ async function setup(
     readonly timers?: Timer[]
     /** Wraps the store the holder's consumer reads, to hold or count its reads. */
     readonly holderStore?: (store: GatewayStore) => GatewayStore
+    /** Collects what the holder's consumer reports through onError. */
+    readonly errors?: unknown[]
   } = {},
 ) {
   const h = createGatewayHarness()
@@ -74,6 +76,7 @@ async function setup(
     wake: async () => {
       counts.wakes++
     },
+    ...(options.errors === undefined ? {} : { onError: (error: unknown) => options.errors?.push(error) }),
     ...(options.timers === undefined
       ? {}
       : {
@@ -553,6 +556,45 @@ test("a settlement pass that read the rows before a send was committed never can
     await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
     await x.consumer.idle()
     expect(timers.filter((timer) => !timer.cancelled).map((timer) => timer.ms)).toEqual([86_400_000])
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a settlement pass that fails with nothing armed arms a retry, so the deadline is not left to a later send", async () => {
+  const timers: Timer[] = []
+  const errors: unknown[] = []
+  let failing = false
+  const x = await setup("deliver", {
+    timers,
+    holderStore: (store) => ({
+      ...store,
+      intakeMarks: {
+        ...store.intakeMarks,
+        openSessions: async () => {
+          if (failing) throw new Error("injected store failure")
+          return await store.intakeMarks.openSessions()
+        },
+      },
+    }),
+    errors,
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    failing = true
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+    await x.consumer.idle()
+    expect(errors.map(String)).toContain("Error: injected store failure")
+    const retry = timers.filter((timer) => !timer.cancelled)
+    expect(retry.map((timer) => timer.ms)).toEqual([60_000])
+    failing = false
+    x.h.clock.now += 60_000
+    setSystemTime(x.h.clock.now)
+    retry[0]?.run()
+    await x.consumer.idle()
+    expect(timers.filter((timer) => !timer.cancelled && timer !== retry[0]).map((timer) => timer.ms)).toEqual([
+      86_400_000 - 60_000,
+    ])
   } finally {
     await x.cleanup()
   }
