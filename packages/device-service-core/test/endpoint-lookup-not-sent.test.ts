@@ -77,8 +77,8 @@ describe("DeviceService.endpointCommand: a failed endpoint lookup is not_sent", 
 
 // omo#14195: a remote create opens on the device's primary engine endpoint, never on whichever key the host listed first
 // (an owner shard, or the engine of another registered agent dir that may predate the records a later send needs).
-const SHARD = "c2hhcmQtZW5kcG9pbnQtMD"
-const OTHER_DIR = "b3RoZXItYWdlbnQtZGlyLT"
+const SHARD = "FAKE_endpoint_key_tst3"
+const OTHER_DIR = "FAKE_endpoint_key_tst2"
 const PRIMARY = "cHJpbWFyeS1lbmRwb2ludC"
 
 describe("DeviceService.endpointCommand: opens on the device's primary engine endpoint (omo#14195)", () => {
