@@ -19,7 +19,12 @@ import type { TaskManager } from "../../manager/types"
 import { runTaskOutput } from "../output/output"
 import { runTaskCancel } from "./cancel"
 
-afterEach(cleanupProjects)
+const lifecycles: TaskLifecycle[] = []
+
+afterEach(() => {
+  for (const lifecycle of lifecycles.splice(0)) lifecycle.dispose?.()
+  return cleanupProjects()
+})
 
 const ROOT = "sess-R"
 
@@ -64,6 +69,7 @@ function managerWithLifecycle() {
     registry: registryOver(() => built.manager),
     config,
   })
+  lifecycles.push(lifecycle)
   return { ...built, lifecycle }
 }
 
