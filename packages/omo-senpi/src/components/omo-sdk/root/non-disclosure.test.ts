@@ -450,7 +450,11 @@ type HealthyRow = {
   readonly scanned: boolean
   readonly owner?: string
   readonly reason?: string
+  /** Principals the boundary refuses this call to on a ruling: the cell pins the refusal, and no content is produced to scan. */
+  readonly notServed?: Readonly<Partial<Record<string, string>>>
 }
+const NOT_SERVED_CONFIG =
+  "not served to a session or a service until its output is shown to carry nothing from the files it reads"
 const HEALTHY: Readonly<Record<string, HealthyRow>> = {
   "account.devices": {
     kinds: { script: ["ok"], person: ["ok"], session: ["ok"] },
@@ -468,10 +472,16 @@ const HEALTHY: Readonly<Record<string, HealthyRow>> = {
     scanned: true,
   },
   "config.status": {
-    kinds: { script: ["ok"], person: ["ok"], session: ["ok"], service: ["ok"] },
+    kinds: {
+      script: ["ok"],
+      person: ["ok"],
+      session: ["sender_not_allowed"],
+      service: ["sender_not_allowed"],
+    },
     scanned: true,
     owner: "C1b",
     reason: "answers with no port (PORT_GAPS)",
+    notServed: { session: NOT_SERVED_CONFIG, service: NOT_SERVED_CONFIG },
   },
   "daemon.warm": { kinds: { script: ["not_implemented", "ok"], person: ["not_implemented", "ok"] }, scanned: true },
   "deviceService.status": {
@@ -756,7 +766,7 @@ describe("the non-disclosure scan over the whole root", () => {
           expect(captured.filter((entry) => kindOf(entry) === "internal_error").map((entry) => entry.key)).toEqual([])
           const observed = Object.fromEntries(
             [...new Set(captured.map((entry) => entry.key))]
-              .filter((key) => !refused.has(key))
+              .filter((key) => !refused.has(key) || HEALTHY[key]?.kinds[who] !== undefined)
               .map((key) => [key, [...new Set(captured.filter((entry) => entry.key === key).map(kindOf))].toSorted()])
               .filter(([, found]) => !Bun.deepEquals(found, ["not_implemented"])),
           )
@@ -776,9 +786,10 @@ describe("the non-disclosure scan over the whole root", () => {
           expect(rows.filter(([, row]) => !row.scanned && row.kinds[who]?.includes("ok")).map(([key]) => key)).toEqual(
             [],
           )
-          const notScanned = rows.filter(([, row]) => !row.scanned)
+          const notServed = rows.filter(([, row]) => row.notServed?.[who] !== undefined)
+          const notScanned = rows.filter(([, row]) => !row.scanned && row.notServed?.[who] === undefined)
           console.info(
-            `non-disclosure healthy pass, ${who}: ${rows.length - notScanned.length} calls scanned through their answer, ${notScanned.length} not: ${notScanned.map(([key, row]) => `${key} (${row.owner}: ${row.reason})`).join("; ")}`,
+            `non-disclosure healthy pass, ${who}: ${rows.length - notScanned.length - notServed.length} calls scanned through their answer, ${notServed.length} refused on a ruling for a root built with this principal, a session's own eval-cell root being a script (design 4.5) (${notServed.map(([key]) => key).join(", ")}), ${notScanned.length} not: ${notScanned.map(([key, row]) => `${key} (${row.owner}: ${row.reason})`).join("; ")}`,
           )
         }
         // Reach by case, with every port faulting: a refused cell and a pure call stop before any port; a call that is

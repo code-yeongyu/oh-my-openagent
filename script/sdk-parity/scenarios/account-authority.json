@@ -389,6 +389,41 @@
       ]
     },
     {
+      "id": "account.devices/account-devices-refuses-connector",
+      "row": "account.devices",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.devices/account-devices-refuses-service",
+      "row": "account.devices",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "account.signIn/sign-in-refuses-connector",
       "row": "account.signIn",
       "input": {

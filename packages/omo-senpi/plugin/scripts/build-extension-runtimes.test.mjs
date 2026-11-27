@@ -186,7 +186,9 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // 896,370 with #15033 merged onto P1b's 699c480398: revision 22's matrix lines and the held cells, +3,740 B over P1b's head
 // (on a8ac23291f they were +3,742, 751,758 -> 755,500; per input, unminified: principal-matrix/threads.ts +1,596, account.ts
 // +1,452, host.ts +639, root/pending-cells.ts -481, root/held-allows.ts +659, root/authority.ts +108; ruling (a)).
-const OMO_SDK_RUNTIME_BYTES = 896_370
+// 896,429 with held cells answering their own text and account.devices on its 4.2 line (root/held-allows.ts, root/authority.ts;
+// root/pending-cells.ts -3 entries; net +59 B; ruling (a)).
+const OMO_SDK_RUNTIME_BYTES = 896_429
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,

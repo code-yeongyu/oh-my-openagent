@@ -11,6 +11,9 @@ export type HeldAllow = {
   readonly principal: PrincipalKind
   readonly condition: string
   readonly owner: string
+  /** What the boundary answers for the pair (code sender_not_allowed, details.reason "held"): its own text, never the default. */
+  readonly message: string
+  readonly next_action: string
 }
 
 const NON_DISCLOSURE =
@@ -18,9 +21,32 @@ const NON_DISCLOSURE =
 
 const CONFIG_FILES = "its output is shown to carry nothing from the files it reads (security design 4.3)"
 
+const ACCOUNT_READ = (call: RootCallKey) =>
+  ({
+    message: `${call} is not served to a session until the non-disclosure run for a session shows its output holds no credential.`,
+    next_action: "Ask the person on this device for the account details; a session cannot read them yet.",
+  }) as const
+const CONFIG_READ = (principal: "session" | "service") =>
+  ({
+    message: `config.status is not served to a ${principal} until its output is shown to carry nothing from the files it reads.`,
+    next_action: `Ask the person on this device for the configuration status; a ${principal} cannot read it yet.`,
+  }) as const
+
 export const HELD_ALLOWS: readonly HeldAllow[] = [
-  { call: "account.show", principal: "session", condition: NON_DISCLOSURE, owner: "A1b" },
-  { call: "account.signInCheck", principal: "session", condition: NON_DISCLOSURE, owner: "A1b" },
-  { call: "config.status", principal: "session", condition: CONFIG_FILES, owner: "C1b" },
-  { call: "config.status", principal: "service", condition: CONFIG_FILES, owner: "C1b" },
+  {
+    call: "account.show",
+    principal: "session",
+    condition: NON_DISCLOSURE,
+    owner: "A1b",
+    ...ACCOUNT_READ("account.show"),
+  },
+  {
+    call: "account.signInCheck",
+    principal: "session",
+    condition: NON_DISCLOSURE,
+    owner: "A1b",
+    ...ACCOUNT_READ("account.signInCheck"),
+  },
+  { call: "config.status", principal: "session", condition: CONFIG_FILES, owner: "C1b", ...CONFIG_READ("session") },
+  { call: "config.status", principal: "service", condition: CONFIG_FILES, owner: "C1b", ...CONFIG_READ("service") },
 ]

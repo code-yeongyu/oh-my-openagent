@@ -33,9 +33,7 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
     section: "4.2",
     capability: ACCOUNT_DEVICES_ROW,
     slug: "account-devices",
-    rows: [],
-    noRow:
-      "the registry has no row for it yet: the remote SDK (#14881) adds account.devices as a call beside devices.list",
+    rows: ["account.devices"],
     cells: columns({
       people: allow(),
       session: allow("through the SDK in an eval cell, as for account.whoami; the answer holds no credential"),

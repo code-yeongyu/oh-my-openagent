@@ -15,24 +15,6 @@ export type PendingCell = {
 
 export const PENDING_CELLS: readonly PendingCell[] = [
   {
-    call: "account.devices",
-    principal: "person",
-    served_by: "the shipped omo SDK's account.devices (omo-sdk/account/index.ts)",
-    owner: "#15033 (revision 22, section 4.2)",
-  },
-  {
-    call: "account.devices",
-    principal: "script",
-    served_by: "the shipped omo SDK's account.devices (omo-sdk/account/index.ts)",
-    owner: "#15033 (revision 22, section 4.2)",
-  },
-  {
-    call: "account.devices",
-    principal: "session",
-    served_by: "the shipped omo SDK's account.devices through an eval cell (omo-sdk/account/index.ts)",
-    owner: "#15033 (revision 22, section 4.2)",
-  },
-  {
     call: "threads.resolve",
     principal: "person",
     served_by: "the same OS user (security design 3): remote module factories sessions.resolve (remote/client.ts:460)",

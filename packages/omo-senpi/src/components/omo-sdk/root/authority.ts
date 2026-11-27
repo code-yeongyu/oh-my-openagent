@@ -46,8 +46,15 @@ export function boundaryRefusals(
           details: { principal: principal.kind },
         })
   }
-  const held = HELD_ALLOWS.filter((entry) => entry.principal === principal.kind).map((entry) => entry.call)
-  for (const call of [...UNLINED_CALLS, ...held]) {
+  for (const entry of HELD_ALLOWS.filter((held) => held.principal === principal.kind))
+    refusals.set(entry.call, {
+      code: "sender_not_allowed",
+      message: entry.message,
+      next_action: entry.next_action,
+      details: { principal: principal.kind, reason: "held" },
+    })
+  for (const call of UNLINED_CALLS) {
+    if (refusals.has(call)) continue
     if (PENDING_CELLS.some((pending) => pending.call === call && pending.principal === principal.kind)) continue
     refusals.set(call, {
       code: "sender_not_allowed",

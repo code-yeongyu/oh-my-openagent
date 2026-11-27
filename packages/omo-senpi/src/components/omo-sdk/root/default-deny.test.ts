@@ -48,7 +48,7 @@ describe("default deny at the root's boundary", () => {
     expect(PENDING_CELLS.filter((cell) => cell.principal === "connector" || cell.principal === "service")).toEqual([])
   })
 
-  test("#given the held allows #then each holds a conditional allow or an n/a cell, no pair repeats, and each is refused exactly as a call with no cell", () => {
+  test("#given the held allows #then each holds a conditional allow or an n/a cell, no pair repeats, and each is refused with its own text", () => {
     const cellOf = (call: RootCallKey, kind: (typeof PRINCIPAL_KINDS)[number]) =>
       PRINCIPAL_MATRIX.find((line) => line.input === undefined && (line.rows as readonly string[]).includes(call))
         ?.cells[kind]
@@ -61,13 +61,17 @@ describe("default deny at the root's boundary", () => {
     ).toEqual([])
     const pairs = HELD_ALLOWS.map((entry) => `${entry.call} ${entry.principal}`)
     expect(pairs.length).toBe(new Set(pairs).size)
-    expect(HELD_ALLOWS.filter((entry) => entry.condition === "" || entry.owner === "")).toEqual([])
+    expect(
+      HELD_ALLOWS.filter(
+        (entry) => entry.condition === "" || entry.owner === "" || entry.message === "" || entry.next_action === "",
+      ),
+    ).toEqual([])
     for (const entry of HELD_ALLOWS)
       expect(boundaryRefusals(PRINCIPALS[entry.principal], {}).get(entry.call)).toEqual({
         code: "sender_not_allowed",
-        message: `${entry.call} has no cell for a ${entry.principal} principal in security design 4, so it is refused.`,
-        next_action: expect.any(String),
-        details: { principal: entry.principal, reason: "no_matrix_cell" },
+        message: entry.message,
+        next_action: entry.next_action,
+        details: { principal: entry.principal, reason: "held" },
       })
   })
 
@@ -114,4 +118,34 @@ describe("default deny at the root's boundary", () => {
       details: { reason: "no_matrix_cell" },
     })
   })
+})
+
+// One case per held pair through a built root (design lane ruling on held cells' text): the call answers its entry's own
+// code, message, next_action and reason, generated from the entry, before any core or port.
+describe("a held pair answers its own refusal through the root", () => {
+  for (const entry of HELD_ALLOWS)
+    test(`#given a ${entry.principal} root #when ${entry.call} is called #then it answers the held refusal`, async () => {
+      const root = assembleOmoSdk(
+        {
+          env: { OMO_SERVICE_API_URL: "https://accounts.example.test" },
+          cwd: tmpdir(),
+          agentDir: tmpdir(),
+          principal: PRINCIPALS[entry.principal],
+        },
+        {},
+      )
+      const member = entry.call.split(".").reduce<unknown>((node, part) => Reflect.get(Object(node), part), root) as (
+        input: unknown,
+      ) => Promise<unknown>
+      expect(await member({})).toEqual({
+        kind: "error",
+        error: {
+          code: "sender_not_allowed",
+          message: entry.message,
+          next_action: entry.next_action,
+          details: { principal: entry.principal, reason: "held" },
+        },
+      })
+      await root.dispose()
+    })
 })
