@@ -82,7 +82,7 @@ export function track(proc, label) {
 }
 
 /** Register a teardown step; steps run in reverse registration order, after every child is gone. */
-export function onCleanup(fn) {
+function onCleanup(fn) {
   closers.push(fn)
 }
 
@@ -108,7 +108,7 @@ function signalGroup(pid, signal) {
 }
 
 /** Wait until `pid` is gone; resolved by polling `kill -0` on the exit edge of a process we do not own. */
-export async function waitGone(pid, timeoutMs = 10_000) {
+async function waitGone(pid, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs
   while (alive(pid)) {
     if (Date.now() > deadline) return false
@@ -136,7 +136,7 @@ function sandboxPids() {
   return [...pids]
 }
 
-export const swept = []
+const swept = []
 
 let cleaned = false
 export async function cleanupAll() {
@@ -182,7 +182,7 @@ export function installCleanupHooks() {
 /* ------------------------------------------------------------------ reporting */
 
 /** Same line format as `lib/harness.mjs` (`PASS|FAIL|SKIP <label>/<name>`), so `run-all.mjs` counts it. */
-export function createReport(label) {
+function createReport(label) {
   const lines = []
   const steps = []
   const defects = []
@@ -232,7 +232,7 @@ export function createReport(label) {
   }
 }
 
-export function flag(name) {
+function flag(name) {
   const index = process.argv.indexOf(name)
   return index === -1 ? undefined : process.argv[index + 1]
 }
@@ -242,7 +242,7 @@ export function hasFlag(name) {
 }
 
 /** Where a scenario writes its evidence: `--evidence-dir`, else `--out`'s dir, else a scratch-independent tmp dir. */
-export function evidenceDir(label) {
+function evidenceDir(label) {
   const explicit = flag("--evidence-dir")
   const out = flag("--out")
   const dir =
@@ -304,7 +304,7 @@ export function waitFor(check, { label, timeoutMs = 60_000 } = {}) {
 }
 
 /** Report file-system activity under `dir` to the bus for the life of the scenario. */
-export function watchTree(dir) {
+function watchTree(dir) {
   let watcher
   try {
     watcher = watch(dir, { recursive: true }, () => tick("fs"))
@@ -355,7 +355,7 @@ function kitDependenciesPresent() {
 }
 
 /** Install the released engine (and the screen emulators) into the kit once; later calls reuse it. */
-export async function ensureKit() {
+async function ensureKit() {
   if (!sameVersion(installedEngineVersion(), ENGINE_VERSION) || !kitDependenciesPresent()) {
     mkdirSync(KIT_DIR, { recursive: true })
     writeFileSync(
@@ -380,7 +380,7 @@ export async function ensureKit() {
  * replaces and why; `buildOmoInstall` refuses a patch that does not match exactly once, so a rebuilt
  * bundle can never silently skip one.
  */
-export const PATCHES = {
+const PATCHES = {
   /**
    * `receiver-crash`: the drain's `_test.afterAdmit` seam, reachable from the environment. With
    * `THREAD_QA_CRASH_AFTER_ADMIT=<kind>` the receiver SIGKILLs itself right after
@@ -533,9 +533,10 @@ function contentText(message) {
  *   (registered by `fake.script`) or `QA:CALL <tool> <b64>` lines -> those tool calls; with `QA:HOLD <tag>` -> a stream held open until `release(tag)`
  *   (with tool calls too, the calls arrive on release, so input the user steers in while it is held enters the run at that tool boundary);
  *   otherwise -> `QA-ACK <every QA-TOKEN-* in it>`.
- * Every request is recorded with the directive it answered.
+ * Every request is recorded with the directive it answered. Usage reports one prompt token unless `promptTokens(body)`
+ * says otherwise (a world that needs the engine's context estimate to follow the request size passes one).
  */
-export async function startFakeModel() {
+export async function startFakeModel({ promptTokens } = {}) {
   const requests = []
   const holds = new Map()
   const scripts = new Map()
@@ -612,7 +613,7 @@ export async function startFakeModel() {
           turn = { text: `QA-ACK ${tokens.length === 0 ? "none" : tokens.join(" ")}` }
         }
       }
-      writeSse(res, turn, body.model ?? "mock-model", holds)
+      writeSse(res, turn, body.model ?? "mock-model", holds, promptTokens?.(body) ?? 1)
       tick("model")
     })
   })
@@ -650,14 +651,14 @@ export async function startFakeModel() {
   }
 }
 
-function writeSse(res, turn, model, holds) {
+function writeSse(res, turn, model, holds, promptTokens) {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" })
   const base = { id: "chatcmpl-qa", object: "chat.completion.chunk", created: 0, model }
   const send = (delta, finish = null) =>
     res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`)
   const complete = () => {
     res.write(
-      `data: ${JSON.stringify({ ...base, choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`,
+      `data: ${JSON.stringify({ ...base, choices: [], usage: { prompt_tokens: promptTokens, completion_tokens: 1, total_tokens: promptTokens + 1 } })}\n\n`,
     )
     res.write("data: [DONE]\n\n")
     res.end()
@@ -712,7 +713,7 @@ function writeSse(res, turn, model, holds) {
 }
 
 /** Every finished model answer of a given kind, in order. */
-export function answers(fake, kind) {
+function answers(fake, kind) {
   return fake.requests.filter((request) => request.answer?.kind === kind).map((request) => request.answer)
 }
 
@@ -795,7 +796,7 @@ const KEYS = {
  * screen is an xterm emulator fed the same bytes. `keystrokes` counts every byte this harness wrote
  * to the pty, which is what "no keystroke on its pty" is asserted against.
  */
-export class Tui {
+class Tui {
   static async start(scratch, install, { label, args = [], cols = 120, rows = 40, evidence, env = {} }) {
     const term = await headlessTerminal(cols, rows)
     const tui = new Tui(label, term, evidence)
@@ -1071,7 +1072,7 @@ export class EndpointClient {
 /* ------------------------------------------------------------------ registry, store, session file */
 
 /** Every endpoint record of the agent dir's registry (`rpc-host-daemon/<16hex>/endpoint.json`). */
-export function registryEndpoints(agentDir) {
+function registryEndpoints(agentDir) {
   const root = join(agentDir, "rpc-host-daemon")
   if (!existsSync(root)) return []
   const endpoints = []
@@ -1199,7 +1200,7 @@ function capture(command, args) {
  * socket under it held by anyone, the fake model's port closed, the scratch tree gone. Written to
  * `<evidence>/cleanup-receipt.json` and asserted as `cleanup-no-leftovers`.
  */
-export async function finishWithReceipt(report, { scratch, fake, evidence, extra = {} }) {
+async function finishWithReceipt(report, { scratch, fake, evidence, extra = {} }) {
   const pids = [...children].map((entry) => ({ label: entry.label, pid: entry.pid }))
   await cleanupAll()
   const scratchDir = scratch?.dir
@@ -1252,7 +1253,7 @@ export async function finishWithReceipt(report, { scratch, fake, evidence, extra
 }
 
 /** Write the scenario's machine-readable result next to its text log. */
-export function writeResult(report, evidence, extra = {}) {
+function writeResult(report, evidence, extra = {}) {
   if (evidence === undefined) return
   writeFileSync(
     join(evidence, "result.json"),
