@@ -3,6 +3,23 @@ import { existsSync, readFileSync } from "node:fs"
 import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineCommand } from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
+const workflowJobs = (Bun.YAML.parse(workflow) as { jobs: Record<string, WorkflowJob> }).jobs
+
+interface WorkflowJob {
+  readonly name?: string
+  readonly needs?: readonly string[]
+  readonly if?: string
+  readonly "runs-on"?: string
+  readonly strategy?: { readonly matrix?: { readonly include?: ReadonlyArray<Record<string, string>> } }
+  readonly steps?: ReadonlyArray<{ readonly id?: string; readonly run?: string }>
+}
+
+// The arguments of every `windows-ci-telemetry.ps1 -Invocation <name>` call in a job, keyed by invocation name.
+function telemetryInvocations(jobId: string): Map<string, string> {
+  const runs = (workflowJobs[jobId]?.steps ?? []).map((step) => step.run ?? "").join("\n")
+  const calls = runs.split("& .github/scripts/windows-ci-telemetry.ps1").slice(1)
+  return new Map(calls.map((call) => [/-Invocation "([^"]+)"/.exec(call)?.[1] ?? "", call]))
+}
 const posixShard2 = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
 const windowsTelemetryScript = readFileSync(
   new URL("../.github/scripts/windows-ci-telemetry.ps1", import.meta.url),
@@ -101,10 +118,14 @@ describe("root test CI partition", () => {
     expect(matrix).not.toContain("- os: macos-latest")
     expect(matrix).not.toContain('shard: "1/2"')
     expect(matrix).toContain('shard: "2/2"')
-    expect(windowsShard1StatusJob()).toContain(
-      "name: test\n    needs: [ci-mode, test-windows-1]\n    if: ${{ always() && !cancelled() }}\n    runs-on: ubuntu-26.04",
-    )
-    expect(windowsShard1StatusJob()).toContain('- os: windows-latest\n            shard: "1/2"')
+    const status = workflowJobs["windows-test-1-status"]
+    expect(status).toMatchObject({
+      name: "test",
+      needs: ["ci-mode", "test-windows-1"],
+      if: "${{ always() && !cancelled() }}",
+      "runs-on": "ubuntu-26.04",
+    })
+    expect(status?.strategy?.matrix?.include).toEqual([{ os: "windows-latest", shard: "1/2" }])
     expect(matrix).not.toContain("config:")
     expect(matrix).not.toContain("test_args:")
     expect(matrix).not.toContain("parallel_args:")
@@ -292,9 +313,9 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
 
     expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(3)
-    expect([...windowsShard1Job().matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(2)
-    expect(windowsShard1Job()).toContain('-Invocation "shard-1a" `\n            -TimingRecord `')
-    expect(windowsShard1Job()).toContain('-Invocation "shard-1b" `\n            -TimingRecord `')
+    const shard1 = telemetryInvocations("test-windows-1")
+    expect([...shard1.keys()].sort()).toEqual(["shard-1a", "shard-1b"])
+    for (const call of shard1.values()) expect(call).toMatch(/-TimingRecord\b/)
     expect(job).toContain('-Invocation "shard-2-quarantine"')
     expect(job).toContain('-Invocation "shard-2-rpc-host"')
     expect(job).toContain('-Invocation "shard-2-remainder"')

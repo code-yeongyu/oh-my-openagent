@@ -47,7 +47,9 @@ if (($TestArguments -contains "test") -and -not ($TestArguments | Where-Object {
 
 # A part of a split Windows suite (#14942) also writes Bun's per-file timing record, which lists every test file the
 # run loaded, including files that register no test on Windows and so never reach the JUnit report. The Linux status
-# jobs check the parts' records against the unsplit suite with script/ci-shard-coverage.ts.
+# jobs check the parts' records against the unsplit suite with script/ci-shard-coverage.ts. `--timings=<path>` alone only
+# reads that file to balance shards; `--update-timings` makes Bun write the record of this run to it, which is the part
+# the coverage check needs.
 if ($TimingRecord -and ($TestArguments -contains "test")) {
   New-Item -ItemType Directory -Force -Path $ArtifactDirectory | Out-Null
   $timingPath = Join-Path $ArtifactDirectory "$Invocation.timings.json"
