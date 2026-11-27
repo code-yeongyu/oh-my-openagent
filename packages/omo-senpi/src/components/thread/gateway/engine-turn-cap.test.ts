@@ -86,7 +86,7 @@ describe("a delivery the engine-turn cap holds (senpi#7138)", () => {
     const { receiver, send } = fixture()
     receiver.runtime.engineTurnCap = CAP
     const output = await send("are you there")
-    expect(output.details.result).toMatchObject({ kind: "ok", delivery: PARKED })
+    expect(output.details.result).toMatchObject({ kind: "ok", delivery: PARKED, effective_mode: "follow_up" })
     expect(output.details.result.delivery.kind).not.toBe("started")
     expect(receiver.runtime.enqueueCalls).toEqual([])
     expect(rendered(output)[0]).toBe(
@@ -129,6 +129,10 @@ describe("a delivery the engine-turn cap holds (senpi#7138)", () => {
     const { receiver, send } = fixture()
     receiver.runtime.sessionHolds = ["session_hold"]
     const output = await send("held")
-    expect(output.details.result).toMatchObject({ kind: "ok", delivery: { kind: "queued", waiting_on: { kind: "hold" } } })
+    expect(output.details.result).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", waiting_on: { kind: "hold" } },
+      effective_mode: "follow_up",
+    })
   })
 })

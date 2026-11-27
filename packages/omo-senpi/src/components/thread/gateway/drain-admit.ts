@@ -103,7 +103,8 @@ export function createClaimedAdmitter(deps: AdmitterDeps): ClaimedAdmitter {
       kind: written ? "applied" : "admitted",
       admission_kind: kind,
       turn_epoch: result.turn_epoch,
-      mode_effective: lane,
+      // A held delivery started no turn: it runs in the turn a person's release starts, a follow-up (as the relay leg says).
+      mode_effective: kind === "held" && lane === "start" ? "follow_up" : lane,
       ...(cap === undefined ? {} : { engine_turn_cap: cap }),
       // A delivery queued while the session waits on a question waits on that approval (#13014), as the relay leg reports it.
       ...(kind === "queued" && runtime.phase() === "waiting_question" ? { wait_kind: "approval" as const } : {}),
