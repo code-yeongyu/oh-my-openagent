@@ -2,7 +2,8 @@
 //!
 //! Row 41: the window enumerator, capture through the persistent capture helper (the SkyLight
 //! window route behind its symbol probe), exclusion of the engine's own windows, `displays()`
-//! and the preview lane.
+//! and the preview lane. Row 43: accessibility (`ax`).
 
+pub mod ax;
 pub mod capture;
 pub mod displays;
