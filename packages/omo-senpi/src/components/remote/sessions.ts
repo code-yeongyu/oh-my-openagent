@@ -30,6 +30,7 @@ import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
 import { sessionDetail } from "./session-detail"
+import { attachPreSend, followsSend, type PreSend, preSendView, SEND_TAIL } from "./send-transcript"
 import type {
   DeviceRow,
   SessionRow,
@@ -42,8 +43,28 @@ import type {
   RemoteFailure,
   SendReceipt,
   SendRequest,
+  ReadPage,
   ThreadHandle,
 } from "./types"
+
+/** One page of a session's history on another device, through a short-lived attach. */
+async function readOn(
+  svc: DeviceService,
+  target: Target,
+  page?: { readonly before?: string; readonly tail?: number },
+): R<ReadPage> {
+  const attached = await svc.attach(target.device, target.session)
+  try {
+    return await attached
+      .read({
+        ...(page?.before === undefined ? {} : { before: page.before }),
+        ...(page?.tail === undefined ? {} : { tail: page.tail }),
+      })
+      .then(ok, readFailureFromError)
+  } finally {
+    await attached.detach()
+  }
+}
 
 type SessionMembers = Pick<
   RemoteClient["sessions"],
@@ -485,7 +506,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const from = gatewaySender()
     if ("kind" in from) return from
     const device = target.deviceRow
-    return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
+    let preSend: PreSend | undefined
+    const sent = await core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device))
         return from.sender.kind === "person"
           ? await localSend(thread, target, device, request, from.caller)
@@ -499,6 +521,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         from.sender.kind === "person" && mode !== "steer"
           ? clientMessageIdOf(from.caller, request.idempotency_key)
           : undefined
+      // A follow waits on this send: what the session held before it went out tells an engine's id-less turn from an
+      // earlier identical send's (send-transcript.ts). A send nobody follows reads nothing.
+      if (clientMessageId !== undefined && followsSend(core, thread))
+        preSend = await preSendView(request.text, () => readOn(svc, target, { tail: SEND_TAIL }))
       const sent = await legOf(svc).relay.deliver({
         sender: from.sender,
         caller_id: from.caller,
@@ -550,6 +576,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           return ok({ ...base, lane: "queued_offline", queue_position: delivery.queue_position, wake: "none" })
       }
     })
+    if (sent.kind === "ok" && preSend !== undefined) attachPreSend(sent.value, preSend)
+    return sent
   }
 
   const open = async (request: OpenRequest, opts?: Opts): R<OpenResult> => {
@@ -702,17 +730,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
         if (await isThisDevice(svc, target.device))
           return await onThisDevice(target.device, (local) => local.read(target, page))
-        const attached = await svc.attach(target.device, target.session)
-        try {
-          return await attached
-            .read({
-              ...(page?.before === undefined ? {} : { before: page.before }),
-              ...(page?.tail === undefined ? {} : { tail: page.tail }),
-            })
-            .then(ok, readFailureFromError)
-        } finally {
-          await attached.detach()
-        }
+        return await readOn(svc, target, page)
       })
     },
     // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).

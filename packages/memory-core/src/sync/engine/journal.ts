@@ -109,6 +109,8 @@ export interface EngineState {
    * an older build wrote. The account feed carries every space, so a cursor is only valid in its own.
    */
   readonly space: string | null
+  /** The account whose chain this journal synced (#14481); null in a journal an older build wrote. */
+  readonly account: string | null
 }
 
 const EMPTY_STATE: EngineState = {
@@ -124,6 +126,7 @@ const EMPTY_STATE: EngineState = {
   updatedWhileOffline: null,
   peer: null,
   space: null,
+  account: null,
 }
 
 export class SyncJournal {
@@ -169,7 +172,10 @@ export class SyncJournal {
       log?.("sync: journal belongs to another memory space; retiring it and adopting the working tree")
       await this.retire()
     }
-    if (owner !== peer || state.space !== space || otherSpace) await this.updateState({ peer, space })
+    // The account stamp is the device's sign-in, not the retired journal's content: a fresh journal keeps it, or an
+    // offline restart would ask whose memory this is (#14491 review r9 Opus L1).
+    if (owner !== peer || state.space !== space || otherSpace)
+      await this.updateState({ peer, space, account: state.account })
     return otherSpace && !otherPeer
   }
 

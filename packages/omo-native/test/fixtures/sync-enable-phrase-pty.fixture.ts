@@ -1,7 +1,7 @@
 import { Command } from "commander"
 
 import { fixture } from "../../../memory-core/src/sync/account/testing/genesis-enable.test-support"
-import { configureSyncCommands, PHRASE_GENESIS_FLAG } from "../../sync-cli"
+import { configureSyncCommands } from "../../sync-cli"
 
 // Runs `omo sync enable` against an in-process chain server with the REAL controlling terminal. The driver gives
 // this process a pty as its terminal and redirects stdout and stderr to files; words may only reach the pty. The
@@ -16,7 +16,7 @@ configureSyncCommands(program, {
   error: (line) => console.error(line),
   confirm: async () => false,
   interactive: true,
-  env: { [PHRASE_GENESIS_FLAG]: "1" },
+  env: {},
   phraseFloor: async () => "on",
 })
 try {

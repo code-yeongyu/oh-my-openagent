@@ -145,6 +145,7 @@ test("#given another device's genesis landed while the service refused this phra
     currentEpoch: 1,
     rotationPending: false,
     acceptsPhraseKeys: false,
+    phraseKeyBlockers: [],
   }
   const result = await enableSync({
     ...s.input,

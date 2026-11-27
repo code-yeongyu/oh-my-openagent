@@ -7,7 +7,7 @@ export const SHIPPED_SKILLS: ReadonlyArray<{ readonly name: string; readonly blu
   { name: "debugging", blurb: "hypothesis loop, failing test first" },
   { name: "ulw-research", blurb: "thousands of sources, claim graph, cited report" },
   { name: "data-scientist", blurb: "DuckDB, Polars, charts from raw files" },
-  { name: "git-master", blurb: "atomic commits, rebase, bisect" },
+  { name: "git", blurb: "commits, worktrees, base sync, history" },
   { name: "ultimate-browsing", blurb: "JS pages, logins, screenshots" },
   { name: "browser", blurb: "a real browser, driven from code" },
   { name: "visual-qa", blurb: "HIG checklist, light and dark, phone and desktop" },

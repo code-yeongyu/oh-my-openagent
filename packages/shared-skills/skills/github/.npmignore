@@ -1,0 +1,2 @@
+# Unit tests run in this repository's CI and never ship.
+scripts/tests/
