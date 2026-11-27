@@ -840,4 +840,22 @@ describe("memory guard on the Cursor exec event order (#12466)", () => {
 
     expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: {} }])
   })
+
+  test("#given an allowed ancestor enumeration whose end is reported first #when nothing foreign appeared #then its slot is released and its result passes through", async () => {
+    const setup = ancestorFixture()
+    const session = { sessionManager: { getSessionId: () => "session-1" } }
+    let allowed = 0
+    while (allowed < 10_000 && (await enumerate(setup, "grep", setup.memoryRoot, `call-${allowed}`)) === undefined)
+      allowed += 1
+    expect(allowed).toBeLessThan(10_000)
+
+    await setup.pi.dispatch(
+      "tool_execution_end",
+      { type: "tool_execution_end", toolCallId: "call-0", toolName: "grep", result: {}, isError: false },
+      session,
+    )
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-next")).toBeUndefined()
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-0")).toEqual([])
+  })
 })
