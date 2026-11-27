@@ -224,4 +224,34 @@ describe("a disposed or closed root", () => {
     expect(answers["threads.extensions.call"]).toBe("root_disposed")
     expect(answers["daemon.warm"]).toBe("root_disposed")
   })
+
+  // Review of #14983 at 699c480398 (LOW 3): when the core's creation failed, dispose() awaited the rejected core and
+  // never released the caller's ports. The caller's store and remote sessions are released whatever the core did.
+  test("#given a threads namespace whose core failed to build #when it is disposed #then the caller's store and remote sessions are released", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-sdk-disposed-failed-core-"))
+    dirs.push(dir)
+    const released: string[] = []
+    const store = {
+      get now(): never {
+        throw new Error("store unavailable")
+      },
+      dispose: async () => {
+        released.push("store")
+      },
+    }
+    const remote = { sessions: { close: async () => void released.push("remote") } }
+    const namespace = threadsNamespace({
+      agentDir: dir,
+      cwd: dir,
+      uid: 501,
+      user: "probe",
+      env: { HOME: dir },
+      principal: { kind: "script", uid: 501 },
+      ports: { store, remote } as never,
+    })
+    const listed = (namespace.members["threads.list"] as (input: unknown) => Promise<unknown>)({})
+    await expect(listed).rejects.toThrow("store unavailable")
+    await namespace.dispose?.()
+    expect(released.toSorted()).toEqual(["remote", "store"])
+  })
 })

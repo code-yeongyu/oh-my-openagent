@@ -34,9 +34,10 @@ export function boundaryRefusals(
 ): ReadonlyMap<RootCallKey, OmoFailure["error"]> {
   const refusals = new Map<RootCallKey, OmoFailure["error"]>()
   for (const line of boundaryLines(facts)) {
-    const cell = line.cells[principal.kind]
-    if (cell.outcome !== "refuse") continue
-    const code = registered(cell.code) ? cell.code : "internal_error"
+    // An own cell only: a kind the matrix has no cell for is refused, never read off Object.prototype.
+    const cell = Object.hasOwn(line.cells, principal.kind) ? line.cells[principal.kind] : undefined
+    if (cell !== undefined && cell.outcome !== "refuse") continue
+    const code = cell === undefined ? "sender_not_allowed" : registered(cell.code) ? cell.code : "internal_error"
     for (const row of line.rows as RootCallKey[])
       if (!refusals.has(row))
         refusals.set(row, {
