@@ -149,3 +149,24 @@ describe("a held pair answers its own refusal through the root", () => {
       await root.dispose()
     })
 })
+
+// The held pairs, enumerated (LEAD rulings: the session's account reads and config.status for a session and a service): a
+// removed entry would let its pair fall to its line's conditional allow, so the list itself is pinned (review 6084226979, L1).
+// The structural check (no allow whose condition is unmet) is the first commit of omo#15015.
+test("#given the held list #then it holds exactly the four ruled pairs", () => {
+  expect(HELD_ALLOWS.map((entry) => `${entry.call} ${entry.principal}`).toSorted()).toEqual([
+    "account.show session",
+    "account.signInCheck session",
+    "config.status service",
+    "config.status session",
+  ])
+})
+
+// A held next step asks the person; it names no command of the CLI and no flag (review 6084226979, L2).
+test("#given every held entry #then its next_action names no omo command, verb or flag", () => {
+  expect(
+    HELD_ALLOWS.filter((entry) => /`|\bomo\s+[a-z]|--[a-z]/i.test(entry.next_action)).map(
+      (entry) => `${entry.call} ${entry.principal}: ${entry.next_action}`,
+    ),
+  ).toEqual([])
+})
