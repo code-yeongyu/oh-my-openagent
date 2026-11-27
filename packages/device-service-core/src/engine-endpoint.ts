@@ -18,7 +18,7 @@ export class NoPrimaryEndpointError extends NotSentError {
       "unsupported",
       `${device} lists ${listed} engine endpoint(s) and names none as its own engine; nothing was opened`,
       {
-        action: `On ${device} run \`omo host ensure\`; if it refuses, save its output and \`omo host status --json\`, stop only the primary host (\`omo host stop\`; never \`--force\`, which ends its live sessions) and ensure again; with no \`omo host\` command (omob), restart that omo; if it still names no engine, update the device service on both devices.`,
+        action: `On ${device} run \`omo host ensure\`; if it answers primary_without_product_plugin, run \`omo host handoff\` once that host's sessions are idle; if it refuses, save its output and \`omo host status --json\`, stop only the primary host (\`omo host stop\`; never \`--force\`, which ends its live sessions) and ensure again; with no \`omo host\` command (omob), restart that omo; if it still names no engine, update the device service on both devices.`,
       },
     )
   }
