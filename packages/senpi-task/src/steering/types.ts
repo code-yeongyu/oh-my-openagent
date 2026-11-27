@@ -132,11 +132,18 @@ export type InterruptOutcome =
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
+// The session a tool call acts for. When present, only that session's tasks resolve and an undefined
+// session id resolves nothing; the engine's own callers omit it.
+export type CallerScope = { readonly sessionId: string | undefined }
+
+export type InterruptOptions = { readonly caller?: CallerScope }
+
 export type CancelOptions = {
   readonly abort?: "request" | "skip"
   // Cancel only the run a handle minted at this epoch names: any other run answers `stale` and
   // nothing is cancelled. task_cancel never sets it.
   readonly expectedRunEpoch?: number
+  readonly caller?: CallerScope
 }
 
 export type CancelOutcome =
@@ -189,15 +196,18 @@ export type RedispatchOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
-  // The one resolution of a task address (id first, then name) every steering verb uses.
-  resolve(idOrName: string): TaskRecord | undefined
-  // The one scope decision for a send: the denial an out-of-scope caller gets, or undefined.
+  // The task a cancel acts on, resolved in the caller's scope by steering/scope-resolver.ts: undefined when nothing in
+  // that scope matches, so the entry answers as the engine does for a missing id.
+  resolveCancelTarget(idOrName: string, caller?: CallerScope): TaskRecord | undefined
+  // The task a send addresses: the caller's own first, then any session; scopeDenial then decides.
+  resolveSendTarget(idOrName: string, callerSessionId: string | undefined): TaskRecord | undefined
+  // The one scope decision for a send: the refusal an out-of-scope caller gets, or undefined.
   scopeDenial(record: TaskRecord, input: SendInput): SendOutcome | undefined
   hasPendingSends(taskId: string): boolean
   hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.
   sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
+  interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.
   notifyStarted(taskId: string): Promise<void>

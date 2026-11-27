@@ -28,11 +28,12 @@ import type { AwaitingInputReason, LiveRunStats, ResolvedModelRecord, TaskRecord
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { ownedClaims, ownedStartResult } from "./owned-claims"
 import { ContinuedRuns } from "./continued-run"
-import { createSteeringEngine } from "../steering"
+import { createSteeringEngine, ownsTask, resolveTaskCallerFirst } from "../steering"
 import type {
   CancelOptions,
   CancelOutcome,
   DestructionPort,
+  InterruptOptions,
   InterruptOutcome,
   RedispatchOutcome,
   SendInput,
@@ -774,8 +775,8 @@ class TaskManagerImpl implements TaskManager {
     return outcome
   }
 
-  async interruptTask(idOrName: string): Promise<InterruptOutcome> {
-    const outcome = await this.#steering.interruptTask(idOrName)
+  async interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome> {
+    const outcome = await this.#steering.interruptTask(idOrName, options)
     if (outcome.kind === "interrupted") {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)
@@ -784,7 +785,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const taskId = this.#steering.resolve(idOrName)?.task_id ?? idOrName
+    const record = this.#steering.resolveCancelTarget(idOrName, options?.caller)
+    if (record === undefined && options?.caller !== undefined)
+      return this.#steering.cancelTask(idOrName, reason, options)
+    const taskId = record?.task_id ?? idOrName
     const refused = cancelBehindRefusedStop(this.#refusedStops, taskId, () => this.#tryLoad(taskId)?.status)
     if (refused !== undefined) return refused
     const outcome = await this.#steering.cancelTask(taskId, reason, options)
@@ -812,18 +816,16 @@ class TaskManagerImpl implements TaskManager {
   // under the same task identity and a new run epoch. Only a non-terminal flagged task may take it.
   // Callers passing no callerSessionId act across sessions (task_send forwards none under all_scope).
   async redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome> {
-    const listed = this.list({ scope: "all" })
-    const record =
-      listed.find((entry) => entry.record.task_id === idOrName)?.record ??
-      listed.find((entry) => entry.record.name === idOrName)?.record
+    const listed = this.list({ scope: "all" }).map((entry) => entry.record)
+    const record = resolveTaskCallerFirst(
+      { load: (taskId) => listed.find((entry) => entry.task_id === taskId), list: () => listed },
+      idOrName,
+      callerSessionId,
+    )
     if (record === undefined) {
       return { kind: "not_found", reason: `No task named ${idOrName}.` }
     }
-    if (
-      callerSessionId !== undefined &&
-      callerSessionId !== record.parent_session_id &&
-      callerSessionId !== record.root_session_id
-    ) {
+    if (callerSessionId !== undefined && !ownsTask(callerSessionId, record)) {
       return {
         kind: "scope_denied",
         task_id: record.task_id,

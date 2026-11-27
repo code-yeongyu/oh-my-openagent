@@ -164,7 +164,7 @@ Sizing is a two-branch decision made per checkbox, before dispatch:
 - **Splittable work splits.** When the checkbox decomposes into independent pieces, dispatch them as a swarm of `quick`/`unspecified-low` workers in ONE parallel burst — many small cheap workers in parallel beat one large delegation.
 - **Cohesive hard work stays whole.** When splitting would sever shared reasoning (one algorithm, one migration, one subtle bug), send the WHOLE problem to `deep-low`, `deep-high` or `ultrabrain` as ONE delegation. Never force-split work whose parts share one insight.
 
-Git operations are not a category: route them to a `quick` worker and name the `git-master` skill in its brief (`load_skills` where the spawn tool takes it).
+Git operations are not a category: route them to a `quick` worker and name the `git` skill in its brief (`load_skills` where the spawn tool takes it). Pull requests, CI waits and merges go through the `github` skill, never the gh CLI.
 
 Each sub-task message must include:
 
