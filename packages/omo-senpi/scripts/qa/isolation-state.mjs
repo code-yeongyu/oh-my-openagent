@@ -16,11 +16,11 @@ import {
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
 // Files that can hold secrets (sign-in tokens, provider API keys). Their contents are never read: every check
 // records only the mode and size (#15311). The other protected files are settings, compared by content.
-export const SECRET_FILES = ["auth.json", "models.json"]
+const SECRET_FILES = ["auth.json", "models.json"]
 const isSecretFile = (name) => SECRET_FILES.includes(name.split(/[\\/]/).pop())
 
 /** "absent", or the mode and size of a secret-bearing file; any lstat failure other than ENOENT throws. */
-export function secretFileStat(path, lstat = lstatSync) {
+function secretFileStat(path, lstat = lstatSync) {
   try {
     return secretStatText(lstat(path))
   } catch (error) {
