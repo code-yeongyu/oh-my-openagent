@@ -8,10 +8,11 @@ import { startFakeHost } from "./__fixtures__/fake-host"
 import { askHost } from "./host-request"
 import { RpcIdentityError } from "./socket-auth"
 import { withContractHost, type ContractHost, type ContractHostOptions } from "./testing/contract-host"
+import { DIAL_SCENES } from "./testing/dial-refusals"
 
-const warm = (host: ContractHost) =>
+const warm = (host: ContractHost, socket = host.socket) =>
   Reflect.apply(askHost, undefined, [
-    host.socket,
+    socket,
     { type: "warm", id: "warm-contract", cwd: host.root, kind: "worker" },
     2000,
     { keyRoot: host.root },
@@ -31,12 +32,34 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
     })
   })
 
-  test("#given a today host #when warm runs #then no authenticate is sent", async () => {
+  test("#given a host with no key record that never challenges #when warm runs #then it is served without authenticate", async () => {
     await withContractHost({ legacy: true }, async (host) => {
       expect(await warm(host)).toMatchObject({ success: true })
       expect(host.frames.some(({ frame }) => frame.type === "authenticate")).toBe(false)
     })
   })
+
+  test.each(Object.entries(DIAL_SCENES))(
+    "#given %s #when warm runs #then it answers as every client does",
+    async (_name, scene) => {
+      await withContractHost(scene.options, async (host) => {
+        const file = scene.arrange(host)
+        const dialed = scene.dialed?.(host) ?? host.socket
+        const outcome = await warm(host, dialed).then(
+          (reply) => reply,
+          (error: unknown) => error,
+        )
+        if (scene.refusal === "authenticated") {
+          expect(outcome).toMatchObject({ success: true, data: { warmed: true } })
+          expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "authenticate", "warm"])
+          return
+        }
+        expect(outcome).toBeInstanceOf(RpcIdentityError)
+        expect((outcome as Error).message).toBe(scene.refusal(host, file, dialed))
+        expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info"])
+      })
+    },
+  )
 
   test("#given a wrong server proof #when warm runs #then the connection closes without sending client proof or warm", async () => {
     await withContractHost({ auth: true, badProof: true }, async (host) => {
@@ -145,7 +168,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
     })
   })
 
-  test("#given a missing record #when an enforcing host challenges twice #then grace logs the remedy once to the omo log, never stderr, and the refusal names the endpoint and the remedy", async () => {
+  test("#given a missing record #when a host challenges twice #then each dial is refused naming the record and the remedy, nothing follows the challenge, and nothing is logged", async () => {
     await withContractHost({ auth: true, prepareRecord: (path) => rmSync(path) }, async (host) => {
       const lines: string[] = []
       configureSharedSubunitLogger((message) => {
@@ -160,21 +183,17 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
             (error: unknown) => error,
           )
           expect(refusal).toBeInstanceOf(RpcIdentityError)
-          expect((refusal as RpcIdentityError).code).toBe("auth_required")
-          expect((refusal as Error).message).toContain(host.socket)
-          expect((refusal as Error).message).toContain("SENPI_RPC_KEY_ROOT")
+          expect((refusal as RpcIdentityError).code).toBe("unsafe_key_record")
+          expect((refusal as Error).message).toBe(
+            `unsafe_key_record:${host.recordPath}: missing; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+          )
         }
-        expect(lines.filter((line) => line.includes("SENPI_RPC_KEY_ROOT"))).toHaveLength(1)
+        expect(lines).toEqual([])
         expect(warning).not.toHaveBeenCalled()
         expect(stderr.mock.calls.map((call) => String(call[0])).filter((line) => line.includes("senpi rpc"))).toEqual(
           [],
         )
-        expect(host.frames.map(({ frame }) => frame.type)).toEqual([
-          "get_protocol_info",
-          "warm",
-          "get_protocol_info",
-          "warm",
-        ])
+        expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "get_protocol_info"])
       } finally {
         warning.mockRestore()
         stderr.mockRestore()

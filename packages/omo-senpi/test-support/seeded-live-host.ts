@@ -24,6 +24,10 @@ export type SeededFault =
   | "key_short"
   | "auth_refused"
   | "closes_mid_handshake"
+  /** A live key record names the endpoint, and the endpoint answers get_protocol_info without an auth block. */
+  | "no_challenge_with_record"
+  /** No key record at all, and the endpoint answers without an auth block: a host from before key records. */
+  | "no_challenge_no_record"
 
 export type SeededCanaries = {
   /** 64 hex characters: the rpc key record's key, which must reach no answer. */
@@ -43,6 +47,8 @@ export type SeededLiveHost = {
   readonly socket: string
   readonly keyRecord: string
   readonly cwd: string
+  /** Every frame type the endpoint received, in order, across connections. */
+  readonly received: readonly string[]
   readonly close: () => Promise<void>
 }
 
@@ -61,21 +67,29 @@ export async function seededLiveHost(canaries: SeededCanaries, fault: SeededFaul
   chmodSync(join(keyRoot, "rpc", "keys"), 0o700)
   const keyRecord = join(keyRoot, "rpc", "keys", LAUNCH_ID)
   const key = Buffer.from(canaries.keyHex, "hex")
-  if (fault !== "key_absent") {
+  const socket = join(socketDir, "h.sock")
+  const challenges = fault !== "no_challenge_with_record" && fault !== "no_challenge_no_record"
+  if (fault !== "key_absent" && fault !== "no_challenge_no_record") {
     const body =
       fault === "key_record_invalid"
         ? `{"version":1,"key":"${canaries.keyHex}"`
         : fault === "key_short"
           ? JSON.stringify({ version: 1, launch_id: LAUNCH_ID, key: canaries.keyHex.slice(0, 40) })
-          : JSON.stringify({ version: 1, launch_id: LAUNCH_ID, key: canaries.keyHex })
+          : JSON.stringify({
+              version: 1,
+              launch_id: LAUNCH_ID,
+              key: canaries.keyHex,
+              pid: process.pid,
+              endpoint: socket,
+            })
     writeFileSync(keyRecord, body, { mode: 0o600 })
     chmodSync(keyRecord, fault === "key_mode_wrong" ? 0o644 : 0o600)
   }
-  const socket = join(socketDir, "h.sock")
   const session = { sessionId: ROUTING, durableSessionId: SEEDED_THREAD, cwd, name: canaries.row.name, status: "open" }
   const answer = (frame: Frame, serverNonce: string): Readonly<Record<string, unknown>> => {
     switch (frame["type"]) {
       case "get_protocol_info": {
+        if (!challenges) return { data: {} }
         const clientNonce = String(Reflect.get(Object(frame["auth"]), "client_nonce") ?? "")
         const proof = hmac(key, ["senpi-rpc-server", LAUNCH_ID, clientNonce, serverNonce])
         return { data: { auth: { launch_id: LAUNCH_ID, server_nonce: serverNonce, server_proof: proof } } }
@@ -101,6 +115,7 @@ export async function seededLiveHost(canaries: SeededCanaries, fault: SeededFaul
     }
   }
   const sockets = new Set<Socket>()
+  const received: string[] = []
   const server = createServer((connection) => {
     sockets.add(connection)
     connection.once("close", () => sockets.delete(connection))
@@ -111,6 +126,7 @@ export async function seededLiveHost(canaries: SeededCanaries, fault: SeededFaul
       for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
         const frame = JSON.parse(buffer.slice(0, newline)) as Frame
         buffer = buffer.slice(newline + 1)
+        received.push(String(frame["type"]))
         if (fault === "closes_mid_handshake" && frame["type"] === "authenticate") {
           connection.destroy()
           return
@@ -137,6 +153,7 @@ export async function seededLiveHost(canaries: SeededCanaries, fault: SeededFaul
     socket,
     keyRecord,
     cwd,
+    received,
     close: async () => {
       const closed = once(server, "close")
       for (const open of sockets) open.destroy()
