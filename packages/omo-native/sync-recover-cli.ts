@@ -11,7 +11,7 @@ import {
   openControllingTerminal,
 } from "./sync-phrase-tty"
 
-export const RECOVER_ELSEWHERE =
+const RECOVER_ELSEWHERE =
   "Recovering memory with your passkey runs in the OmO desktop app, which can use the passkey on this computer. " +
   "On a machine without it, approve this device from a device that already syncs: run `omo sync enable` here, then `omo sync approve` there."
 

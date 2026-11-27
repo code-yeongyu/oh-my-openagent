@@ -150,7 +150,7 @@ export const RECOVER_AGAIN = "start recovery again" as const
  * channel proxy decodes main's replies against exactly this list; `fixtures/recover-refusals-v1.json` is the copy
  * both repos assert equality with (D12 section 1).
  */
-export const RECOVER_REFUSALS = [
+const RECOVER_REFUSALS = [
   "cancelled",
   "no-prf",
   "no-user-verification",
