@@ -1,6 +1,9 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { OmoGitMasterSettingsSchema, type OmoGitMasterSettings } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -67,20 +70,22 @@ const defaultSettings = (): OmoGitMasterSettings => OmoGitMasterSettingsSchema.p
 const footerOptIn = (): OmoGitMasterSettings => OmoGitMasterSettingsSchema.parse({ commit_footer: true })
 
 describe("omo-senpi git-master attribution component", () => {
-  it("#given default settings #when a git-master SKILL.md read result arrives #then the env-prefix section rides the skill content and the co-author directive is appended once", async () => {
+  it("#given default settings #when a git SKILL.md read result arrives #then the env-prefix section rides the skill content and the co-author directive is appended once", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
 
     // when
-    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
     expect(transform).toBeDefined()
     if (transform === undefined) return
     expect(transform.content).toHaveLength(2)
     const text = transform.content[0]?.text ?? ""
-    expect(text).toContain("GIT_MASTER=1 git status")
+    expect(occurrences(text, "<git_env_prefix>")).toBe(1)
+    expect(text).toContain('GIT_MASTER: "1"')
+    expect(text).toContain("GIT_MASTER=1 git")
     expect(text).not.toContain(TRAILER)
     const appended = appendedTextOf(transform)
     expect(appended).toContain(`--trailer "${TRAILER}"`)
@@ -91,8 +96,8 @@ describe("omo-senpi git-master attribution component", () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
-    const first = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
-    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
+    const first = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
+    const payload = readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md")
     payload.content = first?.content ?? []
 
     // when
@@ -104,13 +109,13 @@ describe("omo-senpi git-master attribution component", () => {
     expect(occurrences(allText, `--trailer "${TRAILER}"`)).toBe(1)
   })
 
-  it("#given the footer opted in #when a git-master SKILL.md read result arrives #then the directive carries the footer and the co-author trailer", async () => {
+  it("#given the footer opted in #when a git SKILL.md read result arrives #then the directive carries the footer and the co-author trailer", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, footerOptIn())
 
     // when
-    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
     expect(transform).toBeDefined()
@@ -121,20 +126,20 @@ describe("omo-senpi git-master attribution component", () => {
     expect(appended).toContain(`--trailer "${TRAILER}"`)
   })
 
-  it("#given the co-author turned off #when a git-master SKILL.md read result arrives #then no co-author identity reaches the model", async () => {
+  it("#given the co-author turned off #when a git SKILL.md read result arrives #then no co-author identity reaches the model", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, OmoGitMasterSettingsSchema.parse({ include_co_authored_by: false }))
 
     // when
-    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
     expect(transform?.content).toHaveLength(1)
     expect(transform?.content[0]?.text ?? "").not.toContain("sisyphus-dev-ai")
   })
 
-  it("#given both attribution settings disabled and the env prefix disabled #when a git-master SKILL.md read result arrives #then the result is untouched", async () => {
+  it("#given both attribution settings disabled and the env prefix disabled #when a git SKILL.md read result arrives #then the result is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(
@@ -143,37 +148,73 @@ describe("omo-senpi git-master attribution component", () => {
     )
 
     // when
-    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
     expect(transform).toBeUndefined()
   })
 
-  it("#given default settings #when the skill body carries bash git commands #then every git command in the bash blocks is prefixed", async () => {
+  it("#given default settings #when a read of the legacy git-master SKILL.md path arrives #then it gets the same settings as the git path", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
-    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
-    payload.content = [
-      {
-        type: "text",
-        text: '# Git Master\n\n```bash\ngit add -A .\ngit commit -m "x"\necho done\n```',
-      },
-    ]
 
     // when
-    const transform = await dispatchRead(pi, payload)
+    const legacy = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const current = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
-    expect(transform).toBeDefined()
-    if (transform === undefined) return
-    const text = transform.content[0]?.text ?? ""
-    expect(text).toContain("GIT_MASTER=1 git add -A .")
-    expect(text).toContain('GIT_MASTER=1 git commit -m "x"')
-    expect(text).toContain("\necho done")
+    expect(legacy).toBeDefined()
+    expect(legacy?.content).toEqual(current?.content ?? [])
   })
 
-  it("#given senpi started from a non-bash login shell #when a git-master SKILL.md read result arrives #then the prefix uses the bash form senpi's bash tool runs", async () => {
+  it("#given an installed skills dir that holds only git #when a read of the legacy git-master SKILL.md path is called #then the call reads the git skill file", async () => {
+    // given
+    const skillsDir = mkdtempSync(join(tmpdir(), "omo-git-alias-"))
+    try {
+      mkdirSync(join(skillsDir, "git"), { recursive: true })
+      writeFileSync(join(skillsDir, "git", "SKILL.md"), "---\nname: git\ndescription: x\n---\n")
+      const pi = new FakeExtensionAPI()
+      await registerWithSettings(pi, defaultSettings())
+      const call = {
+        type: "tool_call",
+        toolCallId: "tc-1",
+        toolName: "read",
+        input: { path: join(skillsDir, "git-master", "SKILL.md") },
+      }
+
+      // when
+      await pi.dispatch("tool_call", call)
+
+      // then
+      expect(call.input.path).toBe(join(skillsDir, "git", "SKILL.md"))
+    } finally {
+      rmSync(skillsDir, { recursive: true, force: true })
+    }
+  })
+
+  it("#given a user skills dir with its own git-master skill #when a read of that path is called #then the path is left alone", async () => {
+    // given
+    const skillsDir = mkdtempSync(join(tmpdir(), "omo-git-alias-"))
+    try {
+      mkdirSync(join(skillsDir, "git-master"), { recursive: true })
+      writeFileSync(join(skillsDir, "git-master", "SKILL.md"), "---\nname: git-master\ndescription: mine\n---\n")
+      const pi = new FakeExtensionAPI()
+      await registerWithSettings(pi, defaultSettings())
+      const legacyPath = join(skillsDir, "git-master", "SKILL.md")
+      const call = { type: "tool_call", toolCallId: "tc-2", toolName: "read", input: { path: legacyPath } }
+
+      // when
+      await pi.dispatch("tool_call", call)
+
+      // then
+      expect(call.input.path).toBe(legacyPath)
+    } finally {
+      rmSync(skillsDir, { recursive: true, force: true })
+    }
+  })
+
+  it("#given senpi started from a non-bash login shell #when a git SKILL.md read result arrives #then the prefix uses the bash form senpi's bash tool runs", async () => {
     // given
     const saved = { SHELL: process.env["SHELL"], PSModulePath: process.env["PSModulePath"] }
     try {
@@ -182,15 +223,15 @@ describe("omo-senpi git-master attribution component", () => {
         process.env["PSModulePath"] = "C:\\Program Files\\PowerShell\\Modules"
         const pi = new FakeExtensionAPI()
         await registerWithSettings(pi, defaultSettings())
-        const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
-        payload.content = [{ type: "text", text: "# Git Master\n\n```bash\ngit status\n```" }]
+        const payload = readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md")
+        payload.content = [{ type: "text", text: "# Git\n" }]
 
         // when
         const transform = await dispatchRead(pi, payload)
 
         // then
         const text = transform?.content[0]?.text ?? ""
-        expect(text).toContain("\nGIT_MASTER=1 git status\n```")
+        expect(text).toContain("GIT_MASTER=1 git")
         expect(text).not.toContain("setenv")
         expect(text).not.toContain("$env:")
       }
@@ -202,19 +243,19 @@ describe("omo-senpi git-master attribution component", () => {
     }
   })
 
-  it("#given a skill file with YAML frontmatter #when a git-master SKILL.md read result arrives #then the prefix section follows the frontmatter", async () => {
+  it("#given a skill file with YAML frontmatter #when a git SKILL.md read result arrives #then the prefix section follows the frontmatter", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
-    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
-    payload.content = [{ type: "text", text: "---\nname: git-master\ndescription: x\n---\n# Git Master\n" }]
+    const payload = readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md")
+    payload.content = [{ type: "text", text: "---\nname: git\ndescription: x\n---\n# Git\n" }]
 
     // when
     const transform = await dispatchRead(pi, payload)
 
     // then
     const text = transform?.content[0]?.text ?? ""
-    expect(text.startsWith("---\nname: git-master\ndescription: x\n---\n")).toBe(true)
+    expect(text.startsWith("---\nname: git\ndescription: x\n---\n")).toBe(true)
     expect(text.indexOf("<git_env_prefix>")).toBeGreaterThan(text.indexOf("description: x"))
   })
 
@@ -230,28 +271,25 @@ describe("omo-senpi git-master attribution component", () => {
     expect(transform).toBeUndefined()
   })
 
-  it("#given a failed read of the git-master skill #when the result arrives #then the result is untouched", async () => {
+  it("#given a failed read of the git skill #when the result arrives #then the result is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, footerOptIn())
 
     // when
-    const transform = await dispatchRead(
-      pi,
-      readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md", true),
-    )
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md", true))
 
     // then
     expect(transform).toBeUndefined()
   })
 
-  it("#given a custom footer string #when a git-master SKILL.md read result arrives #then the custom footer replaces the builtin text", async () => {
+  it("#given a custom footer string #when a git SKILL.md read result arrives #then the custom footer replaces the builtin text", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, OmoGitMasterSettingsSchema.parse({ commit_footer: "Shipped with omo" }))
 
     // when
-    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
     expect(transform).toBeDefined()
@@ -261,7 +299,7 @@ describe("omo-senpi git-master attribution component", () => {
     expect(appended).not.toContain("Ultraworked with")
   })
 
-  it("#given the co-author enabled without the footer or env prefix #when a git-master SKILL.md read result arrives #then only the co-author directive is appended and the skill text is untouched", async () => {
+  it("#given the co-author enabled without the footer or env prefix #when a git SKILL.md read result arrives #then only the co-author directive is appended and the skill text is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(
@@ -270,7 +308,7 @@ describe("omo-senpi git-master attribution component", () => {
     )
 
     // when
-    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git/SKILL.md"))
 
     // then
     expect(transform?.content).toHaveLength(2)
@@ -286,10 +324,7 @@ describe("omo-senpi git-master attribution component", () => {
     await registerWithSettings(pi, footerOptIn())
 
     // when
-    const transform = await dispatchRead(
-      pi,
-      readResultPayload("C:\\Users\\dev\\.omo\\agent\\skills\\git-master\\SKILL.md"),
-    )
+    const transform = await dispatchRead(pi, readResultPayload("C:\\Users\\dev\\.omo\\agent\\skills\\git\\SKILL.md"))
 
     // then
     expect(transform).toBeDefined()
