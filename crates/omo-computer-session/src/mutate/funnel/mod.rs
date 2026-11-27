@@ -3,7 +3,7 @@
 
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::Delivered;
+use omo_computer_core::backend::{Delivered, Route};
 use omo_computer_core::error::Reason;
 use omo_computer_core::intervention::BackendClock;
 use omo_computer_core::params::ReportMode;
@@ -38,6 +38,8 @@ struct Held {
     /// The call's pause ceiling in object mode; the takeover hold is checked again under it
     /// right before delivery (review M2 of #13355).
     pausing: Option<u64>,
+    /// The route the funnel resolved before planning (review M1 of #13788).
+    route: Route,
 }
 
 impl Session {
@@ -63,17 +65,23 @@ impl Session {
         let target = target_id(&mutation.call.target);
         let secure = self.funnel.secure.secure(self.backend.as_ref(), target);
         let record = Record::new(&self.funnel, &mutation, &call_id, secure);
+        // Review M1 of #13788: a route refused at the call site (a background call that names no
+        // window) is refused here, after NOT_OPEN and with its audit line and session stamp,
+        // before a plan is made for a route that does not exist.
+        let route = match mutation.route.clone() {
+            Ok(route) => route,
+            Err(refusal) => {
+                let refused = self.stamp(refusal.into(), object);
+                return Err(self.refuse(record, Some("Route".to_owned()), refused));
+            }
+        };
         self.reconcile_stop();
         let mut epoch = self.guard.supervisor().stop_epoch();
-        let call = (
-            mutation.method,
-            &mutation.call.target,
-            mutation.route.clone(),
-        );
+        let call = (mutation.method, &mutation.call.target, route.clone());
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         let pausing = object.then_some(ceiling);
         let admission =
-            match self.admit_call(&mutation.call, mutation.route.clone(), plan.stages, pausing) {
+            match self.admit_call(&mutation.call, route.clone(), plan.stages, pausing) {
                 Ok(admission) => admission,
                 Err(blocked) => {
                     let detail = match blocked.stage.as_str() {
@@ -109,7 +117,7 @@ impl Session {
             // R70s(1), the fold: a stop during the wait ends the lease through the funnel, the
             // epoch is read fresh, the plan (consent, lease, reservations) is made again, and the
             // gate admits the call again on that new plan before anything is taken or sent.
-            match self.readmit(&mutation) {
+            match self.readmit(&mutation, &route) {
                 Ok(fresh) => (plan, epoch) = fresh,
                 Err(refused) => {
                     let (stage, out) = *refused;
@@ -133,6 +141,7 @@ impl Session {
             target: target.map(str::to_owned),
             binding: plan.audit_binding.clone(),
             pausing,
+            route,
         };
         let result = self.admitted(mutation, record, (call_id, report_mode, tag), held);
         self.funnel.control.reported(&plan);
@@ -155,6 +164,7 @@ impl Session {
             target,
             binding,
             pausing,
+            route,
         } = held;
         let target = target.as_deref();
         let identity_unavailable = binding::bind_audit(&mut record, binding.as_ref());
@@ -179,7 +189,7 @@ impl Session {
         // interaction lock, a takeover wait): the last pass runs the gate again under the lock,
         // after every wait, and nothing is SENT before it. (The exec permit and the marker
         // recovery come earlier; they send nothing.)
-        let lock = match self.last_pass(&mutation, &mut admission, pausing, object) {
+        let lock = match self.last_pass(&mutation, &route, &mut admission, pausing, object) {
             Ok(lock) => lock,
             Err(refused) => {
                 let (stage, out) = *refused;
@@ -194,7 +204,7 @@ impl Session {
             .pid
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
         let outcome =
-            self.send_watched(mutation.events, mutation.route.clone(), tag, watch, target);
+            self.send_watched(mutation.events, route.clone(), tag, watch, target);
         drop(lock);
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
@@ -253,7 +263,7 @@ impl Session {
             }
             None => {
                 let sent = Sent {
-                    route: mutation.route,
+                    route,
                     count,
                     of,
                     effect: read_back.effect,

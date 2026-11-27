@@ -53,6 +53,22 @@ fn ta3b_a_background_input_to_an_exited_window_is_refused_with_nothing_sent() {
 }
 
 #[test]
+fn ta3c_a_background_pid_input_reaches_only_a_live_listed_process() {
+    let mut fake = load("two-displays-one-window.json");
+    let refused = fake
+        .post_input(&click(), Route::BackgroundPid { pid: 9999 })
+        .expect_err("no listed window has pid 9999");
+    assert_eq!(
+        (refused.code, refused.reason),
+        (EngineCode::BackgroundUnavailable, Some(Reason::TargetUnknown))
+    );
+    assert!(fake.sink().is_empty(), "nothing sent");
+    fake.post_input(&click(), Route::BackgroundPid { pid: 4242 })
+        .expect("window 101 runs as pid 4242");
+    assert_eq!(fake.sink().len(), 1, "one event went out");
+}
+
+#[test]
 fn ta4_a_foreground_input_carries_no_window_and_still_goes_out() {
     let mut fake = load("two-displays-one-window.json");
     fake.post_input(&click(), Route::ForegroundHid).expect("foreground");

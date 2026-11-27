@@ -38,15 +38,23 @@ impl FakeBackend {
                 }
                 _ => {}
             }
-            if let Route::BackgroundWindow { window } = route {
-                if !state.windows.iter().any(|w| &w.id == window)
-                    || state.exited.contains(window)
-                {
-                    return Err(Refusal::new(
-                        EngineCode::BackgroundUnavailable,
-                        Reason::TargetUnknown,
-                    ));
+            // A background input reaches only a listed, live address: a window by its id, a
+            // process by the pid of one of its live windows (review L1 of #13788).
+            let addressed = match route {
+                Route::BackgroundWindow { window } => {
+                    state.windows.iter().any(|w| &w.id == window) && !state.exited.contains(window)
                 }
+                Route::BackgroundPid { pid } => state
+                    .windows
+                    .iter()
+                    .any(|w| w.pid == *pid && !state.exited.contains(&w.id)),
+                Route::Ax | Route::ForegroundHid => true,
+            };
+            if !addressed {
+                return Err(Refusal::new(
+                    EngineCode::BackgroundUnavailable,
+                    Reason::TargetUnknown,
+                ));
             }
             state.last_input_window = match route {
                 Route::BackgroundWindow { window } => Some(window.clone()),

@@ -63,13 +63,14 @@ impl Record {
             scope: funnel.binding.scope.clone(),
             action: action.clone(),
             target: target.clone(),
-            delivery: match mutation.route {
-                Route::ForegroundHid => DeliveryKind::Foreground,
-                Route::Ax | Route::BackgroundWindow { .. } | Route::BackgroundPid { .. } => {
-                    DeliveryKind::Background
-                }
+            // A refused route is a background call that named no window: background delivery,
+            // no route taken.
+            delivery: match &mutation.route {
+                Ok(Route::ForegroundHid) => DeliveryKind::Foreground,
+                Ok(Route::Ax | Route::BackgroundWindow { .. } | Route::BackgroundPid { .. })
+                | Err(_) => DeliveryKind::Background,
             },
-            route: Some(mutation.route.wire().to_owned()),
+            route: mutation.route.as_ref().ok().map(|route| route.wire().to_owned()),
             tier: Tier::Exec,
             frame_id: mutation.frame_id.clone(),
             text: text.clone(),
