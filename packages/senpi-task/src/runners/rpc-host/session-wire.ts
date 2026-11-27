@@ -28,6 +28,8 @@ export class HostSessionOpenError extends Error {
   override readonly name = "HostSessionOpenError"
   readonly code: string
   readonly sessionPath: string
+  /** The host's own refusal text, carried structurally so the parent can name the cause (#11681). */
+  readonly detail: string
   /** The host's retry hint (`errorData.retry_after_ms`) when the refusal is temporary. */
   readonly retryAfterMs: number | undefined
 
@@ -35,6 +37,7 @@ export class HostSessionOpenError extends Error {
     super(`open_session for ${sessionPath} was refused (${code}): ${detail}`)
     this.code = code
     this.sessionPath = sessionPath
+    this.detail = detail
     this.retryAfterMs = retryAfterMs
   }
 }

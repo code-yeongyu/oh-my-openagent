@@ -62,6 +62,13 @@ export type RunnerFailure = {
   readonly message: string
   readonly reason?: RunnerFailureReason
   readonly cause?: unknown
+  /**
+   * The host's own refusal detail for a typed `open_session` refusal, captured at the wire boundary
+   * where the typed error is parsed (`runners/rpc-host/open-session.ts`). Unlike `message`, which can
+   * be stderr-derived child output and never reaches a public surface, this field is first-party host
+   * text and is what carries the refusal's cause to the parent (#11681).
+   */
+  readonly refusal_detail?: string
   // Set only with `launch_spec_insecure`: the refused spec path omo resolved itself, never child
   // output, so the public start failure may name the file and its fix (#9208).
   readonly launch_spec_path?: string
