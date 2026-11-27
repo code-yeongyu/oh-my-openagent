@@ -8,6 +8,7 @@ import { removeTree } from "../../../../test-support/remove-tree"
 import { createNodeGitExec } from "./exec"
 import { GitMemoryRepo } from "./repo"
 import { ensureRepoConfigDefaults } from "./repo-config-defaults"
+import { HERMETIC_GIT_CONFIG } from "../../../../test-hermetic-home"
 
 const AUTHOR = { agentId: "agent", authorName: "Agent" }
 const MIXED = "---\ndescription: mixed endings\n---\n# Note\r\n\r\nBody line.  \r\nlast\n"
@@ -34,7 +35,8 @@ async function git(cwd: string, argv: readonly string[]): Promise<string> {
 // same setting at the global layer on any OS, below the repository's own local config.
 async function withWindowsDefaultAutocrlf<T>(root: string, task: () => Promise<T>): Promise<T> {
   const globalConfig = join(root, "global.gitconfig")
-  await writeFile(globalConfig, "[core]\n\tautocrlf = true\n")
+  // The hermetic no-auto-maintenance settings plus the Windows default autocrlf this simulates (#15109).
+  await writeFile(globalConfig, `${HERMETIC_GIT_CONFIG}[core]\n\tautocrlf = true\n`)
   const previous = { global: process.env.GIT_CONFIG_GLOBAL, nosystem: process.env.GIT_CONFIG_NOSYSTEM }
   process.env.GIT_CONFIG_GLOBAL = globalConfig
   process.env.GIT_CONFIG_NOSYSTEM = "1"

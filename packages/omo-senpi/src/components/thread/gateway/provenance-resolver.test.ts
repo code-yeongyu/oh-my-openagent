@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 
+import { HERMETIC_GIT_CONFIG } from "../../../../../../test-hermetic-home"
 import { loadProvenanceWorkspaces } from "./provenance-config"
 import { resolveProvenance, type ExecGit, type GitRun, type ProvenanceRuntime } from "./provenance-resolver"
 import { settled } from "./testing/settled"
@@ -141,6 +142,8 @@ test("#given a real sender repository #when reading its origin from a nested cwd
   root = mkdtempSync(join(tmpdir(), "omo-provenance-git-"))
   const nested = join(root, "nested")
   mkdirSync(nested)
+  // The global config carries the hermetic no-auto-maintenance settings, not an absent file (#15109).
+  writeFileSync(join(root, "no-config"), HERMETIC_GIT_CONFIG)
   const env = {
     ...process.env,
     HOME: root,
@@ -166,7 +169,10 @@ test("#given a sender git URL rewrite #when resolving its origin #then the sende
   const env = { ...process.env, HOME: cwd, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1", GIT_MASTER: "1" }
   execFileSync("git", ["init", "-q", cwd], { env, windowsHide: true })
   execFileSync("git", ["remote", "add", "origin", "sender-alias:remote-project.git"], { cwd, env, windowsHide: true })
-  writeFileSync(config, '[url "https://example.invalid/example-owner/"]\n\tinsteadOf = sender-alias:\n')
+  writeFileSync(
+    config,
+    `${HERMETIC_GIT_CONFIG}[url "https://example.invalid/example-owner/"]\n\tinsteadOf = sender-alias:\n`,
+  )
   expect(await resolveProvenance({ cwd, env, workspaces: runtime.workspaces })).toEqual({
     workspace: "Owner workspace",
     project: "remote-project",
@@ -201,6 +207,7 @@ test("#given a cwd outside any repository and a git that answers in another lang
 
 test("#given a sender repository without an origin #when resolving #then git's exit code, not its message, marks it unclassified", async () => {
   const cwd = (root = mkdtempSync(join(tmpdir(), "omo-provenance-no-origin-")))
+  writeFileSync(join(cwd, "no-config"), HERMETIC_GIT_CONFIG)
   const env = {
     ...process.env,
     HOME: cwd,
@@ -237,6 +244,7 @@ test("#given a cwd left behind by a pruned worktree #when resolving #then its da
 
 test("#given a repository above the sender's git ceiling #when resolving below that ceiling #then git's discovery boundary is honored", async () => {
   root = mkdtempSync(join(tmpdir(), "omo-provenance-ceiling-"))
+  writeFileSync(join(root, "no-config"), HERMETIC_GIT_CONFIG)
   const env = {
     ...process.env,
     HOME: root,
@@ -343,7 +351,8 @@ test("#given a broken sender git configuration #when resolving #then the send go
   const config = join(cwd, "gitconfig")
   const env = { ...process.env, HOME: cwd, GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: "1", GIT_MASTER: "1" }
   execFileSync("git", ["init", "-q", cwd], { env, windowsHide: true })
-  writeFileSync(config, "[invalid\n")
+  // The hermetic prefix parses; the invalid line still makes git fail the read (#15109).
+  writeFileSync(config, `${HERMETIC_GIT_CONFIG}[invalid\n`)
   const warnings: string[] = []
   const result = await settled(
     resolveProvenance({ cwd, env, workspaces: [], onWarning: (message) => warnings.push(message) }),

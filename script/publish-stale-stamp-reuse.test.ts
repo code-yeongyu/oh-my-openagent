@@ -1,12 +1,22 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
+import { HERMETIC_GIT_CONFIG } from "../test-hermetic-home"
 import { createMergedSelectionFixture } from "./fixtures/publish-merged-selection"
+
+// The git children here commit, fetch and tag: /dev/null as GIT_CONFIG_GLOBAL would drop the hermetic
+// no-auto-maintenance config the preload installs, and a loose-object estimate that crosses git's gc
+// threshold leaves a detached `git maintenance run --auto` writing into the scratch repo after the
+// test removed it (#15109).
+const hermeticGitGlobal = join(mkdtempSync(join(tmpdir(), "omo-publish-stale-git-")), ".gitconfig")
+writeFileSync(hermeticGitGlobal, HERMETIC_GIT_CONFIG)
+const hermeticGitGlobalRoot = hermeticGitGlobal.slice(0, hermeticGitGlobal.lastIndexOf("/"))
+afterAll(() => rmSync(hermeticGitGlobalRoot, { recursive: true, force: true }))
 
 /**
  * Executes the release-state reuse decision of publish.yml's "prepare" step against a real git
@@ -48,7 +58,7 @@ function git(cwd: string, args: string[], input?: string): string {
     cwd,
     encoding: "utf8",
     input,
-    env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
+    env: { ...process.env, GIT_CONFIG_GLOBAL: hermeticGitGlobal, GIT_CONFIG_SYSTEM: "/dev/null" },
   })
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`)
   return result.stdout.trim()
@@ -151,7 +161,7 @@ ${step.run.slice(start, end)}`,
     timeout: 20_000,
     env: {
       ...process.env,
-      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_GLOBAL: hermeticGitGlobal,
       GIT_CONFIG_SYSTEM: "/dev/null",
       FIXTURE_STAMP: stamp,
       FIXTURE_MERGE: merge,
@@ -176,7 +186,7 @@ function runPrepare(
     encoding: "utf8",
     env: {
       ...process.env,
-      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_GLOBAL: hermeticGitGlobal,
       GIT_CONFIG_SYSTEM: "/dev/null",
       VERSION: version,
       OMO_AI_VERSION: version,

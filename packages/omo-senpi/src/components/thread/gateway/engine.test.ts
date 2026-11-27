@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { HERMETIC_GIT_CONFIG } from "../../../../../../test-hermetic-home"
 import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
@@ -626,7 +627,10 @@ describe("workspace_scope", () => {
     const h = open()
     const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-scope-")))
     try {
-      const env = { ...process.env, HOME: root, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" }
+      // A real global config with the hermetic maintenance settings, not /dev/null: the inits and
+      // commits here must not race a detached auto-maintenance child (#15109).
+      writeFileSync(join(root, "gitconfig"), HERMETIC_GIT_CONFIG)
+      const env = { ...process.env, HOME: root, GIT_CONFIG_GLOBAL: join(root, "gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
       const repos = ["one", "two"].map((name) => {
         const repo = join(root, name)
         mkdirSync(repo)

@@ -8,6 +8,7 @@ import { join } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { collectGitDiffStats } from "./collect-git-diff-stats"
 import { formatFileChanges } from "./format-file-changes"
+import { HERMETIC_GIT_CONFIG } from "../../../../test-hermetic-home"
 
 // GIT_CONFIG_GLOBAL is set per test to an empty file: os.devNull is `\\.\nul` on Windows, which git cannot open.
 const HERMETIC_GIT_ENV: Record<string, string> = {
@@ -48,7 +49,9 @@ describe("collectGitDiffStats with a real repository", () => {
     for (const key of REPOSITORY_SELECTING_GIT_ENV) delete process.env[key]
     Object.assign(process.env, HERMETIC_GIT_ENV)
     root = mkdtempSync(join(tmpdir(), "omo-diff-stats-"))
-    writeFileSync(join(root, "gitconfig"), "")
+    // A real global config with the hermetic maintenance settings, not an empty file: the commits
+    // and fetches here must not race a detached auto-maintenance child (#15109).
+    writeFileSync(join(root, "gitconfig"), HERMETIC_GIT_CONFIG)
     process.env.GIT_CONFIG_GLOBAL = join(root, "gitconfig")
     repo = join(root, "repo")
     mkdirSync(repo)

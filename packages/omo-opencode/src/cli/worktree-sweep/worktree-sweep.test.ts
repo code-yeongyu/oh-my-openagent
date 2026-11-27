@@ -2,9 +2,11 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import fs from "node:fs/promises"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
+import { HERMETIC_GIT_CONFIG } from "../../../../../test-hermetic-home"
 import { DEFAULT_EXCLUDE_PREFIXES, isExcludedPath } from "./classify"
 import { formatClassification, formatSummary } from "./format"
 import { linkedWorktrees, parseWorktreeList } from "./parse-worktree-list"
@@ -20,6 +22,13 @@ const GIT_COMMAND_TIMEOUT_MS = 10_000
 const GIT_HEAVY_TEST_TIMEOUT_MS = 30_000
 const temporaryDirectories: string[] = []
 
+// Hermetic global config, not /dev/null: the sweep's git children must never inherit the user's
+// config, and they must never start an automatic `git maintenance run --auto` (#15109).
+const hermeticGitGlobalRoot = path.join(mkdtempSync(path.join(tmpdir(), "omo-worktree-sweep-git-")))
+writeFileSync(path.join(hermeticGitGlobalRoot, ".gitconfig"), HERMETIC_GIT_CONFIG)
+temporaryDirectories.push(hermeticGitGlobalRoot)
+const hermeticGitGlobal = path.join(hermeticGitGlobalRoot, ".gitconfig")
+
 afterAll(async () => {
   for (const directory of temporaryDirectories.reverse()) {
     await fs.rm(directory, { recursive: true, force: true })
@@ -28,7 +37,7 @@ afterAll(async () => {
 
 const GIT_ENV = {
   ...process.env,
-  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_GLOBAL: hermeticGitGlobal,
   GIT_CONFIG_SYSTEM: "/dev/null",
   GIT_TERMINAL_PROMPT: "0",
 }

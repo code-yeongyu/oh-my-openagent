@@ -94,6 +94,7 @@ function installHermeticSecrets(): void {
 // gc.auto is left alone: commands reach `gc --auto` only through auto maintenance, and product code reads gc.auto to
 // pick its own repository defaults.
 const HERMETIC_GIT_CONFIG = "[maintenance]\n\tauto = false\n\tautoDetach = false\n[gc]\n\tautoDetach = false\n"
+export { HERMETIC_GIT_CONFIG }
 
 function installHermeticGitConfig(home: string): void {
   const path = join(home, ".gitconfig")
