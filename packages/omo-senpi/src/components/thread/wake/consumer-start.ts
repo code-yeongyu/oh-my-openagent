@@ -103,9 +103,13 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
         const target = resolveWakeTarget(input.sessionsDirectory, durableId)
         return input.sameDevice(target.kind === "found" ? target.cwd : undefined)
       },
-      closedAt: (durableId) => {
+      closure: (durableId) => {
         const target = resolveWakeTarget(input.sessionsDirectory, durableId)
-        return target.kind === "found" ? target.closed_at : undefined
+        if (target.kind !== "found") return {}
+        return {
+          ...(target.closed_at === undefined ? {} : { closed_at: target.closed_at }),
+          ...(target.retired === undefined ? {} : { retired_at: target.retired.retired_at }),
+        }
       },
     })
     // The rows the sweep settled (refused, or closed under them) leave their marks drained: the service is told now, so

@@ -48,6 +48,7 @@ export function receiptOutcomeOf(value: unknown): ReceiptOutcome {
         case "not_steerable":
         case "turn_conflict":
         case "target_closed":
+        case "target_retired":
           return { kind, reason }
       }
     }

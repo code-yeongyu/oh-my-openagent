@@ -51,9 +51,13 @@ async function sweep(
     },
     sameDevice,
     // The production reader over the harness's sessions directory: a close is what the session's transcript records.
-    closedAt: (durableId) => {
+    closure: (durableId) => {
       const target = resolveWakeTarget(join(h.agentDir, "sessions"), durableId)
-      return target.kind === "found" ? target.closed_at : undefined
+      if (target.kind !== "found") return {}
+      return {
+        ...(target.closed_at === undefined ? {} : { closed_at: target.closed_at }),
+        ...(target.retired === undefined ? {} : { retired_at: target.retired.retired_at }),
+      }
     },
   })
   return woken.sort()
@@ -129,7 +133,7 @@ describe("the pending sweep", () => {
     expect(await store.intakeMarks.openSessions()).toEqual([])
   })
 
-  test("#given a closed thread that is sent to after its close #when the sweep runs #then only the row from before the close is refused and the later send wakes it", async () => {
+  test("#given a closed thread that is sent to after its close #when the sweep runs #then the row from before the close is refused target_closed, the later send target_retired, and nothing is woken", async () => {
     const h = (harness = createGatewayHarness())
     const store = h.store()
     const path = writeSessionFile(join(h.agentDir, "sessions"), "t-closed")
@@ -139,12 +143,12 @@ describe("the pending sweep", () => {
     h.clock.now += 60_000
     await store.intake(intake(h, "d-after", "dev-b", "t-closed"))
 
-    expect(await sweep(h, () => "admitted")).toEqual(["t-closed"])
+    expect(await sweep(h, () => "admitted")).toEqual([])
 
     const rows = [...(await store.list({ target_durable_id: "t-closed" }))].sort((a, b) => a.created_at - b.created_at)
     expect(rows.map((row) => [row.state, row.reason ?? null])).toEqual([
       ["refused", "target_closed"],
-      ["queued", null],
+      ["refused", "target_retired"],
     ])
   })
 

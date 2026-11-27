@@ -32,6 +32,8 @@ import {
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
+import { retiredFailure, retirementOf } from "./retired"
+import { retirementHere } from "./wake/session-target"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
@@ -54,15 +56,14 @@ import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import {
-  closeOptions,
-  closeThread,
+  closeLocated,
   interruptThread,
   NOT_LIVE,
   setModelOn,
   setThinkingLevelOn,
 } from "./control/operations"
 import { renameThread } from "./control/rename"
-import { controlIdentity, controlRefusalOf } from "./control/port"
+import { controlRefusalOf } from "./control/port"
 import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 import { createMonitorTargetResolver, installMonitorTargetResolution } from "./tools/monitor-target"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -488,10 +489,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       execute("thread_close", id, args, ectx, async (current, value, _operationId, callerId) => {
         const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
         if (located.kind === "error") return located.result
-        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (located.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(located.control, closeOptions(value))
+        return await closeLocated(located, value, {
+          sessions: options.sessionsDirectory?.(),
+          now: () => options.store.now(),
+        })
       }),
   }
   const handoff: AnyTool = {
@@ -718,6 +719,12 @@ async function deliverThrough(
       "A gateway send needs the calling session's durable id.",
       "Retry from a session that passes its execution context.",
     )
+  const sessions = options.sessionsDirectory?.()
+  if (target.kind === "local" && sessions !== undefined) {
+    const live = current.sessions.some((session) => (session.durableSessionId ?? session.sessionId) === target.thread_id)
+    const retired = live ? retirementOf(sessions, target.thread_id) : retirementHere(sessions, target.thread_id)
+    if (retired !== undefined) return retiredFailure(target.thread_id, retired)
+  }
   const turn = options.callerTurnId?.()
   const cause = options.callerCause?.()
   const name = options.callerName?.()?.trim()

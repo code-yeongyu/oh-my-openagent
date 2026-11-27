@@ -160,17 +160,29 @@ describe("thread_close: close a thread on this device or on another one", () => 
     })
   })
 
-  test("#given a thread with a session file but no live owner #when thread_close names it #then it answers closed false and closes nothing", async () => {
+  // 2026-11-27: a seat's old session whose terminal had closed answered thread_close `not_live`, and the next delivery
+  // to it woke it for a headless turn. A close retires the thread whether or not anything runs it.
+  test("#given a thread with a session file but no live owner #when a seat takeover closes it naming its role and successor #then it is retired: a send is refused target_retired naming them, and a second close answers already_retired", async () => {
     const a = account()
-    const { run, closed } = surface(a.remote, { diskSessions: ["dur-saved"] })
-    expect(await run("thread_close", { thread: "dur-saved" })).toEqual({
+    const { run, closed, enqueuedFor } = surface(a.remote, { diskSessions: ["dur-saved"], sessionsDirectory: true })
+    expect(
+      await run("thread_close", { thread: "dur-saved", role: "kakao-dori", successor: "dur-next-seat" }),
+    ).toMatchObject({ kind: "ok", thread: "dur-saved", closed: true, reason: "retired", dropped_deliveries: [] })
+    expect(closed).toEqual([])
+    expect(await run("thread_send", { thread: "dur-saved", message: "report" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "target_retired",
+        details: { thread: "dur-saved", role: "kakao-dori", successor: "dur-next-seat" },
+      },
+    })
+    expect(enqueuedFor("dur-saved")).toBe(0)
+    expect(await run("thread_close", { thread: "dur-saved" })).toMatchObject({
       kind: "ok",
       thread: "dur-saved",
       closed: false,
-      reason: "not_live",
-      dropped_deliveries: [],
+      reason: "already_retired",
     })
-    expect(closed).toEqual([])
   })
 
   test("#given a thread held by an interactive terminal #when thread_close names it #then it is refused unsupported and the terminal keeps it", async () => {

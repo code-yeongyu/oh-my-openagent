@@ -490,6 +490,25 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
   })
 
+  // 2026-11-27: a thread this device closed was read minutes later, and the read reopened it on its holder (find_session,
+  // open_session), where it ran again. A thread closed here is retired: no read or send reopens it.
+  test("#given this device closed b's thread #when thread_read and thread_send name it after b parked it #then neither reopens it on b and both answer target_retired", async () => {
+    const a = account({ rows: [B_ROW] })
+    const { run } = surface(a.remote, { sessionsDirectory: true })
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true })
+    // b parked it: nothing on b runs it, as b's find_session answered (`open: false`).
+    a.live.clear()
+    expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "target_retired", details: { thread: "dur-on-b", device: "b" } },
+    })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
+      kind: "error",
+      error: { code: "target_retired", details: { thread: "dur-on-b", device: "b" } },
+    })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
   test("#given b's thread was closed here and reopened elsewhere under a new relay key, while this device's listing still names the old key #when thread_send names it #then the send is delivered to the key the session runs under now, never the old one (#14179 review M1)", async () => {
     const a = account({ rows: [B_ROW], relayKeys: new Map([["dur-on-b", "rk-reopened"]]) })
     const { run } = surface(a.remote)

@@ -198,7 +198,9 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
           ? "ambiguous_session"
           : target.session_kind !== "interactive"
             ? "not_wakeable"
-            : undefined
+            : target.retired !== undefined
+              ? "target_retired"
+              : undefined
     const pair = { sender_device: event.sender_device, command_id: event.command_id }
     const record = intakeRecord(event)
     if (target.kind !== "found" || reason !== undefined || record === undefined) {

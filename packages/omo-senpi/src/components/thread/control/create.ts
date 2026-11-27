@@ -38,6 +38,7 @@ import type { PromptStart } from "./prompt-start"
 import { controlRefusalOf } from "./port"
 import { createdThreadId, type HostedThread, type SessionOpenOutcome } from "./session-host"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
+import { recordReopen } from "../retired"
 
 /** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
 const RENAME_REASON_MAX_CHARS = 300
@@ -234,6 +235,10 @@ export async function createThread(
       }
     if (outcome.kind === "error") return outcome
     opened = outcome.thread
+    // An explicit reopen is the one way a retired thread runs again (`retired.ts`).
+    const sessions = options.sessionsDirectory?.()
+    if (!plan.creates && plan.reopenedId !== undefined && sessions !== undefined)
+      recordReopen(sessions, plan.reopenedId, options.store.now())
     const created: ThreadToolResult = {
       ...openedResult(outcome.thread, deduplicated),
       ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),

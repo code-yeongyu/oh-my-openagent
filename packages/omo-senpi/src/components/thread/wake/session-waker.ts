@@ -9,6 +9,8 @@ export type WakeOutcome =
   | { readonly kind: "gone" }
   | { readonly kind: "ambiguous"; readonly session_paths: readonly string[] }
   | { readonly kind: "not_wakeable"; readonly session_kind: Exclude<WakeSessionKind, "interactive"> }
+  /** The thread is retired (`retired.ts`); nothing is opened. */
+  | { readonly kind: "retired" }
   | { readonly kind: "not_yet"; readonly next_attempt_at: number }
   | { readonly kind: "busy"; readonly code: string; readonly retry_after_ms?: number }
   | { readonly kind: "deferred"; readonly attempts: number; readonly next_attempt_at: number }
@@ -61,6 +63,7 @@ async function wake(options: SessionWakerOptions, durableId: string): Promise<Wa
   if (target.kind === "gone") return target
   if (target.kind === "ambiguous") return target
   if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
+  if (target.retired !== undefined) return { kind: "retired" }
 
   await options.store.woken.request({ durable_id: durableId, session_file: target.session_path })
   const started = await options.store.woken.start({ durable_id: durableId })

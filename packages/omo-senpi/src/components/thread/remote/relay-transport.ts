@@ -18,6 +18,7 @@ import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, engineNotReady, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
 import { reopenParkedRow } from "./reopen-parked"
+import { retiredFailure, type Retirement } from "../retired"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
 import { reconcileRemoteReceipt } from "./receipt"
 
@@ -39,6 +40,8 @@ export type RelayTransportOptions = {
   /** The highest chain hop an input of the caller's current run arrived with from another device (K8). */
   readonly callerChainHop?: () => number
   readonly log?: (line: string) => void
+  /** This device's retirement of a thread (`retired.ts`): a session its holder does not run is neither woken nor reopened. */
+  readonly retired?: (durableId: string) => Retirement | undefined
   /** The waits between background re-sends of a delivery the receiver's open draft holds; after the last one it gives up. Test seam. */
   readonly heldRetryDelaysMs?: readonly number[]
   readonly retryDelay?: (ms: number, signal: AbortSignal) => Promise<void>
@@ -461,6 +464,8 @@ export function createRelayTransport(
       )
     if (parked !== undefined && view === "unknown") return parked
     if (view !== "running") {
+      const retired = listed.durable_id === undefined ? undefined : options.retired?.(listed.durable_id)
+      if (retired !== undefined) return retiredFailure(thread, retired, listed.device)
       // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
       const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
       if (wakeable && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }

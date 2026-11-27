@@ -1,6 +1,7 @@
 import { closeSync, fstatSync, openSync, readSync } from "node:fs"
 
 import { findDiskSessions } from "../address-book"
+import { retirementOf, type Retirement } from "../retired"
 import { SESSION_CLOSED_ENTRY } from "../gateway/graceful-close-returns"
 import { parseSessionLines, SESSION_FACTS_WINDOW_BYTES, summarizeSessionEntries } from "../session-facts"
 
@@ -21,6 +22,8 @@ export type WakeTarget =
        * sent no effect id).
        */
       readonly closed_at?: number
+      /** The thread is retired (`retired.ts`): no wake opens it and every row for it is refused `target_retired`. */
+      readonly retired?: Retirement
     }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -106,17 +109,25 @@ function sessionKindOf(header: Record<string, unknown> | null): WakeSessionKind 
   return "unknown"
 }
 
+/** The thread's retirement as this device knows it: its holder's transcript and mark when its file is here, else the mark. */
+export function retirementHere(sessionsDirectory: string, durableId: string): Retirement | undefined {
+  const target = resolveWakeTarget(sessionsDirectory, durableId)
+  return target.kind === "found" ? target.retired : retirementOf(sessionsDirectory, durableId)
+}
+
 export function resolveWakeTarget(sessionsDirectory: string, durableId: string): WakeTarget {
   const found = findDiskSessions(sessionsDirectory, durableId, { id_only: true })
   const [only] = found
   if (only === undefined) return { kind: "gone" }
   if (found.length > 1) return { kind: "ambiguous", session_paths: found.map((session) => session.session_path) }
   const closedAt = closedAtOf(only.session_path)
+  const retired = retirementOf(sessionsDirectory, durableId, closedAt)
   return {
     kind: "found",
     session_path: only.session_path,
     cwd: only.cwd,
     session_kind: sessionKindOf(headerOf(only.session_path)),
     ...(closedAt === undefined ? {} : { closed_at: closedAt }),
+    ...(retired === undefined ? {} : { retired }),
   }
 }

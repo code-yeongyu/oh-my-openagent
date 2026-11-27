@@ -164,7 +164,7 @@ describe("#13215: a session another device holds but lists nowhere answers read 
       return { run: local.run, lookups: [] as readonly unknown[] }
     }
     const b = account({ wakeFeature: true, ended: { b: { [CLOSED]: "rk-closed" } } })
-    return { run: surface(b.remote).run, lookups: b.lookups }
+    return { run: surface(b.remote, { sessionsDirectory: true }).run, lookups: b.lookups }
   }
 
   // omo#14799: a read of it answers its transcript on both legs; the remote leg reopens it on b to read it.
@@ -191,7 +191,8 @@ describe("#13215: a session another device holds but lists nowhere answers read 
     const withoutDevice = ({ device: _device, ...rest }: Record<string, unknown>) => rest
     const closedHere = (await local.run("thread_close", { thread: CLOSED })) as Record<string, unknown>
     const closedThere = (await remote.run("thread_close", { thread: CLOSED })) as Record<string, unknown>
-    expect(closedHere).toMatchObject({ kind: "ok", closed: false, reason: "not_live" })
+    // A close retires a thread nothing runs, on either leg (retired.ts).
+    expect(closedHere).toMatchObject({ kind: "ok", closed: true, reason: "retired" })
     expect(withoutDevice(closedThere)).toEqual(withoutDevice(closedHere))
   })
 })

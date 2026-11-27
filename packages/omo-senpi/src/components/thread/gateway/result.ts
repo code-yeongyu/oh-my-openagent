@@ -20,6 +20,10 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
     code: "not_resumable",
     next: "The thread was closed before it read this message; reopen it (tool.thread_create({ thread }) in an eval cell) and send again if it still matters.",
   },
+  target_retired: {
+    code: "target_retired",
+    next: "The thread was retired (closed, or its seat taken over); send to the session that holds its role now.",
+  },
   superseded: {
     code: "not_resumable",
     next: "A newer message from the same sender with the same collapse_key replaced this one before the target read it; nothing to do.",

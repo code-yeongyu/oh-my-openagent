@@ -393,7 +393,7 @@ describe("a wake that settles a closed session's intake", () => {
 
     await running?.wake("dur-closed")
 
-    expect(outcomes.at(-1)).toBe("nothing_queued")
+    expect(outcomes.at(-1)).toBe("retired")
     expect(service.calls.filter((call) => call.type === "delivery.drained").slice(drainedBefore)).toEqual([
       { type: "delivery.drained", sender_device: "device-b", session_id: "dur-closed", last_command_id: "c-1" },
     ])

@@ -22,9 +22,9 @@ import {
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
-import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
+import { answered, closeLocated, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
-import { controlIdentity, controlRefusalOf } from "./control/port"
+import { controlRefusalOf } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -498,10 +498,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       control(threadToolParamSchemas.thread_close, request, async (value) => {
         const found = await located(value.thread ?? "self", value.all_scope)
         if (found.kind === "error") return found.result
-        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (found.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(found.control, closeOptions(value))
+        return await closeLocated(found, value, { sessions: join(options.agentDir, "sessions"), now: Date.now })
       }),
     rename: (request) =>
       control(threadToolParamSchemas.thread_rename, request, async (value) =>

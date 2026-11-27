@@ -7,6 +7,7 @@ import { createRelayControl, reopenParkedRow } from "../remote/lazy-ops"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "../control/port"
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
+import { retiredFailure, retirementOf } from "../retired"
 import { threadLink } from "../thread-link"
 import { addressBook, degradedSummary, failure, rowNamed, sendAddressBook, summary } from "./internals"
 import { readItem } from "./read-item"
@@ -143,6 +144,10 @@ export async function readThread(
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live" && located.row !== undefined && options.remote !== undefined) {
+    const sessions = options.sessionsDirectory?.()
+    const durableId = located.row.durable_id
+    const retired = sessions === undefined || durableId === undefined ? undefined : retirementOf(sessions, durableId)
+    if (retired !== undefined) return retiredFailure(located.thread_id, retired, located.row.device)
     // omo#14799: a session another device parked is reopened there and read live, never answered not_resumable.
     const reopened = await reopenParkedRow(options.remote, located.row)
     if ("result" in reopened) return reopened.result

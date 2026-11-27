@@ -11,6 +11,7 @@ export const THREAD_ERROR_CODES = [
   "scope_denied",
   "name_conflict",
   "not_resumable",
+  "target_retired",
   "orphaned",
   "foreign_live_owner",
   "no_active_turn",

@@ -5,7 +5,7 @@ export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "refused" | "uncertain"
 
 /** Application evidence, separate from the historical admission lane of a retained receipt. */
-export type ReceiptRefusalReason = "expired" | "not_steerable" | "turn_conflict" | "target_closed"
+export type ReceiptRefusalReason = "expired" | "not_steerable" | "turn_conflict" | "target_closed" | "target_retired"
 
 export type ReceiptOutcome =
   | { readonly kind: "pending" | "admitted" | "applied" | "outcome_unavailable" }
@@ -33,6 +33,8 @@ export type RefusalReason =
   | "sender_not_admitted"
   /** The target was closed on request after the row was queued, before it took the message (#14273). */
   | "target_closed"
+  /** The target is retired (`retired.ts`): closed on request, or its seat taken over; it takes no message. */
+  | "target_retired"
   /** A newer delivery from the same sender under the same collapse key replaced it before the target took it (#14428). */
   | "superseded"
 

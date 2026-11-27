@@ -2,6 +2,7 @@ import { toGatewayAddressEntries } from "../address-book"
 import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter"
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
 import { createLocalTransport } from "../gateway/local-transport"
+import { retirementOf } from "../retired"
 import { createDeliveryPipeline, type DeliveryPipeline } from "../gateway/pipeline"
 import { createRelayTransport } from "../remote/lazy-ops"
 import type { GatewayStore } from "../gateway/store"
@@ -83,6 +84,10 @@ export function createGatewayServices(
             senderProvenance,
             ...(options.callerCause === undefined ? {} : { callerCause: options.callerCause }),
             ...(options.callerChainHop === undefined ? {} : { callerChainHop: options.callerChainHop }),
+            retired: (durableId) => {
+              const sessions = options.sessionsDirectory?.()
+              return sessions === undefined ? undefined : retirementOf(sessions, durableId)
+            },
           }),
         }),
   })

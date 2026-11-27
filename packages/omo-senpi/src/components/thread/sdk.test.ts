@@ -890,7 +890,7 @@ describe("thread SDK: session controls (#13413)", () => {
     ).toEqual(["interrupt", "set_session_name", "get_available_models", "set_model", "unload_session"])
   })
 
-  test("#given a thread that ended on device b #when a script closes it #then it answers closed false for device b and nothing reaches b's engine", async () => {
+  test("#given a thread that ended on device b #when a script closes it #then it retires it for device b and nothing reaches b's engine", async () => {
     const account = remoteFixture.account({
       rowState: "ended",
       aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]),
@@ -900,8 +900,8 @@ describe("thread SDK: session controls (#13413)", () => {
       kind: "ok",
       thread: "dur-on-b",
       device: "b",
-      closed: false,
-      reason: "not_live",
+      closed: true,
+      reason: "retired",
       dropped_deliveries: [],
     })
     expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])

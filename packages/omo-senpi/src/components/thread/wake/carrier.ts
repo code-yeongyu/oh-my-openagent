@@ -38,6 +38,8 @@ export type CarrierWakeOutcome =
   | { readonly kind: "switched_off" }
   /** The session holds no queued row at all, so there is nothing to open for; the record is ended (A3.1.6). */
   | { readonly kind: "nothing_queued" }
+  /** The thread is retired (`retired.ts`): nothing opens, and its rows are refused. */
+  | { readonly kind: "retired" }
 
 export type CarrierEvaluation =
   | { readonly kind: "released" }
@@ -361,6 +363,12 @@ export function createCarrier(options: CarrierOptions): Carrier {
     const target = resolveWakeTarget(options.sessionsDirectory, durableId)
     if (target.kind === "gone" || target.kind === "ambiguous") return target
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
+    if (target.retired !== undefined) {
+      await settleClosedIntake(store, durableId, target.closed_at, target.retired.retired_at)
+      const record = (await store.woken.list()).find((row) => row.durable_id === durableId)
+      if (record?.state === "requested") await store.woken.end({ durable_id: durableId, generation: record.generation })
+      return { kind: "retired" }
+    }
     const wait = await store.sessionWait.read({ durable_id: durableId })
     if (wait?.wait === "held" && waitBlocksDelivery(wait) && wait.file_size === fileSize(target.session_path))
       return { kind: "held" }
@@ -443,7 +451,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (taken.kind !== "taken_over") return
     const target = resolveWakeTarget(options.sessionsDirectory, durableId)
     // The same refusals a wake makes: a session that is gone, ambiguous, or no longer interactive is not reopened.
-    if (target.kind !== "found" || target.session_kind !== "interactive") {
+    if (target.kind !== "found" || target.session_kind !== "interactive" || target.retired !== undefined) {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
     }
@@ -472,12 +480,12 @@ export function createCarrier(options: CarrierOptions): Carrier {
    */
   const openAllowance = async (
     durableId: string,
-    target: { readonly cwd: string; readonly closed_at?: number },
+    target: { readonly cwd: string; readonly closed_at?: number; readonly retired?: { readonly retired_at: number } },
   ): Promise<"open" | "switched_off" | "nothing_queued"> => {
     const sameDevice = options.sameDevice?.(target.cwd) ?? false
     const remoteWake = options.remoteWake?.() ?? false
     let queued = false
-    for (const row of await settleClosedIntake(store, durableId, target.closed_at)) {
+    for (const row of await settleClosedIntake(store, durableId, target.closed_at, target.retired?.retired_at)) {
       queued = true
       if (typeof row.ledger_id !== "string") {
         if (sameDevice) return "open"

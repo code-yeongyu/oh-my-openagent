@@ -293,7 +293,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
         throw error
       })
       // The rows a close settled during this wake leave drained marks no carry ending will report (#14273 follow-up).
-      if (outcome.kind === "nothing_queued") await reportDrained()
+      if (outcome.kind === "nothing_queued" || outcome.kind === "retired") await reportDrained()
       if (outcome.kind === "failed")
         input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
       options.onWake?.(durableId, outcome)

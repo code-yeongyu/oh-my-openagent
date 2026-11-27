@@ -372,7 +372,8 @@ export type ThreadCloseResult =
       readonly kind: "ok"
       readonly thread: string
       readonly closed: boolean
-      readonly reason: "closed" | "not_live"
+      /** `retired`: nothing ran it and the close retired it; `already_retired`: an earlier close had (`retired.ts`). */
+      readonly reason: "closed" | "not_live" | "retired" | "already_retired"
       readonly dropped_deliveries: readonly string[]
       readonly graceful?: {
         readonly turn: number

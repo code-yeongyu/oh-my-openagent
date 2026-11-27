@@ -11,8 +11,11 @@ export type PendingSweepOptions = {
    * their session only when it is on for that session.
    */
   readonly sameDevice: (durableId: string) => boolean
-  /** When the session was last closed on request (`session-target.ts` `closed_at`); undefined when never (#14273). */
-  readonly closedAt: (durableId: string) => number | undefined
+  /**
+   * When the session was last closed on request (`session-target.ts` `closed_at`, #14273) and, when it is retired, when
+   * (`retired.ts`); both undefined when neither.
+   */
+  readonly closure: (durableId: string) => { readonly closed_at?: number; readonly retired_at?: number }
 }
 
 /**
@@ -34,8 +37,12 @@ export async function runPendingSweep(options: PendingSweepOptions): Promise<voi
     return answer
   }
   for (const session of await store.intakeMarks.openSessions()) {
-    const closedAt = options.closedAt(session.durable_id)
-    if (closedAt !== undefined && (await settleClosedIntake(store, session.durable_id, closedAt)).length === 0) continue
+    const { closed_at: closedAt, retired_at: retiredAt } = options.closure(session.durable_id)
+    if (
+      (closedAt !== undefined || retiredAt !== undefined) &&
+      (await settleClosedIntake(store, session.durable_id, closedAt, retiredAt)).length === 0
+    )
+      continue
     // Local first: a session that is not local can never wake this way, so its project's setting is never read.
     let wake = session.local && options.sameDevice(session.durable_id)
     for (const device of session.devices) {

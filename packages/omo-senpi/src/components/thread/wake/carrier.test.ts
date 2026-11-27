@@ -201,7 +201,7 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await store.woken.list()).toEqual([])
   })
 
-  test("#given rows queued for a session that was then closed on request #when it is woken #then nothing opens, the rows are refused target_closed, and a send after the close opens it (#14273)", async () => {
+  test("#given rows queued for a session that was then closed on request #when it is woken #then nothing opens, the rows are refused target_closed, and a send after the close is refused target_retired without opening it", async () => {
     const { fake, h, store, carrier, path, intakeRow } = await setup({
       remoteWake: () => true,
       admitIntake: async () => "admitted",
@@ -212,15 +212,22 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     recordUnloadEffect(file, "s1", h.clock.now, "done")
     h.clock.now += 60_000
 
-    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(await carrier.wake("s1")).toEqual({ kind: "retired" })
     expect(sent(fake, "open_session")).toEqual([])
     expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
       ["refused", "target_closed"],
       ["refused", "target_closed"],
     ])
 
+    // 2026-11-27: a delivery after the close woke a retired session for a headless turn. A close retires it for good.
     await intakeRow("s1", "d-after")
-    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
+    expect(await carrier.wake("s1")).toEqual({ kind: "retired" })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason]).sort()).toEqual([
+      ["refused", "target_closed"],
+      ["refused", "target_closed"],
+      ["refused", "target_retired"],
+    ])
   })
 
   test("#given rows queued before a close on request that another path settles first #when it is woken #then the rows it lost are not counted queued and nothing opens (#14273 follow-up)", async () => {
@@ -244,7 +251,7 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     recordUnloadEffect(file, "s1", h.clock.now, "done")
     h.clock.now += 60_000
 
-    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(await carrier.wake("s1")).toEqual({ kind: "retired" })
     expect(sent(fake, "open_session")).toEqual([])
     expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
       ["refused", "sender_not_admitted"],

@@ -26,7 +26,7 @@ export function createSameDeviceWake(options: SameDeviceWakeOptions): SameDevice
     afterSend: async (result) => {
       if (result.kind !== "ok" || result.delivery.kind !== "queued_offline") return result
       const target = resolveWakeTarget(options.sessionsDirectory, result.thread_id)
-      if (target.kind !== "found" || target.session_kind !== "interactive") return result
+      if (target.kind !== "found" || target.session_kind !== "interactive" || target.retired !== undefined) return result
       if (!options.enabled(target.cwd)) return result
       await options.store.woken.request({ durable_id: result.thread_id, session_file: target.session_path })
       const { queue_position } = result.delivery

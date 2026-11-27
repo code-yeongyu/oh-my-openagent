@@ -1114,6 +1114,7 @@ function currentReceiptOutcome(ctx: StoreContext, row: DeliveryRow | undefined, 
       switch (row.reason) {
         case "expired":
         case "target_closed":
+        case "target_retired":
         case "turn_conflict":
         case "not_steerable":
           return { kind: "refused", reason: row.reason }
@@ -1146,7 +1147,7 @@ export function refusalNotices(ctx: StoreContext, now: number): readonly Refusal
   const rows = ctx.sql
     .all(
       DELIVERY_COLUMNS,
-      `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE state = 'refused' AND reason IN ('expired', 'not_steerable', 'turn_conflict', 'target_closed') AND ledger_id IS NOT NULL AND updated_at > ? AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.operation = 'outcome_notice' AND r.delivery_id = deliveries.delivery_id) ORDER BY updated_at LIMIT 32`,
+      `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE state = 'refused' AND reason IN ('expired', 'not_steerable', 'turn_conflict', 'target_closed', 'target_retired') AND ledger_id IS NOT NULL AND updated_at > ? AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.operation = 'outcome_notice' AND r.delivery_id = deliveries.delivery_id) ORDER BY updated_at LIMIT 32`,
       [now - GATEWAY_RECEIPT_RETENTION_MS],
     )
     .map(rowFrom)

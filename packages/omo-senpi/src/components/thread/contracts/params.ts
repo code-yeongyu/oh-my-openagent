@@ -115,6 +115,21 @@ const ThreadCloseParams = Type.Object({
   thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
+  role: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "The role or seat the thread held, when a takeover retires it; a send to the retired thread is refused naming it.",
+    }),
+  ),
+  successor: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 200,
+      description: "The thread that holds the role now; a send to the retired thread is refused pointing at it.",
+    }),
+  ),
   force: Type.Optional(
     Type.Boolean({
       description:

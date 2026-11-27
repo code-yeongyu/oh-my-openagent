@@ -1,4 +1,7 @@
-import type { ThreadModel, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
+import type { ThreadCloseInput, ThreadModel, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
+import { retireThread } from "../retired"
+import { retirementHere } from "../wake/session-target"
+import type { LocatedControl } from "./locate"
 import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
 import type { ThreadCloseOptions } from "../tools/ports"
@@ -84,6 +87,40 @@ export async function closeThread(
     dropped_deliveries: [...dropped_deliveries],
     ...(graceful === undefined ? {} : { graceful }),
   }
+}
+
+/**
+ * `thread_close` of a located thread (the tools and the SDK): a close retires the thread (`retired.ts`), live or not, so
+ * no later delivery, wake or reopen for a read or a send resumes it (2026-11-27). A thread nothing runs is retired
+ * without a record to the engine (`retired`); one already retired answers `already_retired`. `sessions` absent (a
+ * surface with no session directory) closes as before, retiring nothing.
+ */
+export async function closeLocated(
+  located: Exclude<LocatedControl, { readonly kind: "error" }>,
+  value: Pick<ThreadCloseInput, "force" | "graceful" | "wait_ms" | "role" | "successor">,
+  retirement: { readonly sessions: string | undefined; readonly now: () => number },
+): Promise<ThreadToolResult> {
+  const { sessions } = retirement
+  const retire = (thread: string): void => {
+    if (sessions === undefined) return
+    retireThread(sessions, thread, {
+      retired_at: retirement.now(),
+      ...(value.role === undefined ? {} : { role: value.role }),
+      ...(value.successor === undefined ? {} : { successor: value.successor }),
+    })
+  }
+  if (located.kind === "not_live") {
+    const answer = { kind: "ok" as const, ...controlIdentity(located), dropped_deliveries: [] }
+    if (sessions === undefined) return { ...answer, closed: false, reason: "not_live" }
+    if (retirementHere(sessions, located.thread_id) !== undefined)
+      return { ...answer, closed: false, reason: "already_retired" }
+    retire(located.thread_id)
+    return { ...answer, closed: true, reason: "retired" }
+  }
+  const closed = await closeThread(located.control, closeOptions(value))
+  if (closed.kind !== "ok" || sessions === undefined) return closed
+  retire(located.control.thread_id)
+  return "reason" in closed && closed.reason === "not_live" ? { ...closed, closed: true, reason: "retired" } : closed
 }
 
 /**
