@@ -9,3 +9,7 @@ export const phraseCreationGuidance = {
     "OmO could not confirm that the service accepts recovery phrases for this account. First-device setup stopped. Try again later.",
   "no-surface": RUN_IT_YOURSELF,
 }
+
+/** the per-account phrase gate: the service names the devices that must update before the first recovery phrase is accepted. */
+export const updateDeviceFirst = (label: string): string =>
+  `Update OmO on ${label} first (it is older than 5.1.74), then run \`omo sync enable\` again.`
