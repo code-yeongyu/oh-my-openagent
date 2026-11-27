@@ -29,7 +29,7 @@ for (const resident of [true, false]) {
         ],
       }))
 
-      const result = await runTaskCancel(h.manager, { task_id: h.record.task_id })
+      const result = await runTaskCancel(h.manager, { task_id: h.record.task_id }, h.record.parent_session_id)
 
       expect(result.details).toMatchObject({ kind: "released", undelivered_messages: 2 })
       expect(h.store.load(h.record.task_id)?.pending_steering).toBeUndefined()

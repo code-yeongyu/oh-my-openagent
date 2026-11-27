@@ -14,6 +14,15 @@ const REMOTE = "packages/omo-senpi/src/components/remote/"
 // surface importing another surface file (the TUI's own files) is not reaching the layer. Scope: S3 sees direct static
 // imports, require() and literal import() only; a route through another module, or bin/lib/thread.js loading built
 // bundles by a non-literal import() (frozen by NON_LITERAL_IMPORT_OFFENDERS), is outside it.
+// The `omo-ai/remote` SDK (#13413) shares the CLI files' remote- prefix. Its entry, remote-sdk.ts, is a caller like any
+// surface (the barrel only). remote-sdk-api.ts is its published declaration surface: it names components/remote's leaf
+// types directly, type-only, so the shipped declarations stay that small closure (#13782); S3 allows that and nothing else.
+const REMOTE_SDK_DECLARATIONS = "packages/omo-native/remote-sdk-api.ts"
+export const REMOTE_SDK_ENTRY: ReadonlySet<string> = new Set([
+  "packages/omo-native/remote-sdk.ts",
+  REMOTE_SDK_DECLARATIONS,
+])
+
 const isRemoteSurface = (file: string): boolean =>
   file.startsWith("packages/omo-senpi/src/components/thread/") ||
   file.startsWith(`${REMOTE}tui/`) ||
@@ -51,7 +60,12 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     "packages/omo-native/device-service-handoff.ts",
     "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
-  s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
+  s3: {
+    surface: isRemoteSurface,
+    layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY],
+    entries: [`${REMOTE}index.ts`, `${REMOTE}lazy.ts`, `${REMOTE}admin.ts`],
+    declarations: { files: new Set([REMOTE_SDK_DECLARATIONS]), reaches: REMOTE },
+  },
 }
 
 type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
@@ -104,93 +118,27 @@ export const ADAPTER_RULES: AdapterRules = {
 
 // Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
 // removes a use also removes its row.
-export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
-    uses: [BUNSHIN_TS_RELAY],
-    removedBy: "omo PR 4c-3",
-  },
-  "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: [BUNSHIN_TS_RELAY], removedBy: "omo PR 4c-3" },
-}
+export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
-export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
-  "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
-    uses: ["createRelayTransport"],
-    removedBy: "omo PR 4c-3",
-  },
-  "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: ["createRelayTransport"], removedBy: "omo PR 4c-3" },
-}
+export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
 // S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.
 export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-attach-dialogs.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-attach-presentation.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-attach.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
+  // The device-service administration adapters stay on device-service-core until they call the omo SDK's deviceService.*
+  // capabilities (routing them through remote/admin.ts would only hide the same dependency).
   "packages/omo-native/remote-bootstrap.ts": {
     uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-cli.ts": {
-    uses: [DEVICE_SERVICE_CORE, REMOTE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+    removedBy: "omo#15032 (deviceService.* through the omo SDK, #14943)",
   },
   "packages/omo-native/remote-cold-wake.ts": {
     uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-entry.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-local.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-render.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-session-verbs.ts": {
-    uses: [DEVICE_SERVICE_CORE, REMOTE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+    removedBy: "omo#15032 (deviceService.* through the omo SDK, #14943)",
   },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
-  "packages/omo-senpi/src/components/thread/remote/attach-pool.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
-  "packages/omo-senpi/src/components/thread/live-surface.ts": {
-    uses: [REMOTE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/default-remote.ts": {
-    uses: [REMOTE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/outcome.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
   "packages/omo-senpi/src/components/thread/remote/ports.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/remote-ops.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
