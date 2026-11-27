@@ -165,6 +165,27 @@ describe("TaskManager.startOwned", () => {
     expect(inProcess.startedSpecs).toHaveLength(1)
   })
 
+  test("#given a still-running owner from an older execAttempt #when the next attempt starts #then it refuses with owner_conflict naming that task and starts nothing", async () => {
+    // given - #11381: an amend or retry bumps the node's execAttempt; a child of the replaced attempt
+    // that is live again must never run beside a fresh one. The DAG layer decides what the claim is.
+    const { manager, store, inProcess } = makeManager()
+    const first = await manager.startOwned(baseSpec(), { ...owner, execAttempt: 0 })
+    if (first.kind !== "started") throw new Error("expected first start")
+
+    // when
+    const next = await manager.startOwned(baseSpec(), { ...owner, fingerprint: "fingerprint-2", execAttempt: 1 })
+
+    // then
+    expect(next).toEqual({
+      kind: "owner_conflict",
+      task_id: first.task_id,
+      existing_fingerprint: "fingerprint-1",
+      requested_fingerprint: "fingerprint-2",
+    })
+    expect(store.list().records).toHaveLength(1)
+    expect(inProcess.startedSpecs).toHaveLength(1)
+  })
+
   test("#given a TERMINAL owner with a different fingerprint #when started again #then ownership is replaced and a fresh task runs", async () => {
     // given - a retried DAG node presents the same (kind,runId,nodeId) with an execAttempt-scoped
     // fingerprint; the settled record must release its claim instead of failing the retry.

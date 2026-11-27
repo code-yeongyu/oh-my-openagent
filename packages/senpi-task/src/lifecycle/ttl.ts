@@ -4,7 +4,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
 import type { ExpungeOwner } from "../store"
-import { TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { attemptInFlight, holdAttempt } from "./expunge-attempts"
 import { endClosingFallbackChild } from "./fallback-closing-child"
@@ -263,9 +263,7 @@ function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: num
 // admission lock, respawns outside it - during that window no live handle exists in the registry
 // yet, but the claim is no less real). Deleting either would orphan a live owner.
 function hasLiveHostClaim(context: LifecycleContext, record: TaskRecord): boolean {
-  return (
-    record.residency_state === "resident" && record.host_pid !== undefined && context.signaller.isAlive(record.host_pid)
-  )
+  return record.residency_state === "resident" && claimantAlive(context, record)
 }
 
 // TTL must never delete a terminal record (or its completion spill) whose notification is still

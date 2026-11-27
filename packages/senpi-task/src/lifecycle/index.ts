@@ -18,6 +18,7 @@ export type {
   HostSessionRetryPolicy,
 } from "./host-session"
 export type { HostSessionParkOptions, HostSessionParkOutcome } from "./host-session-revive"
+export type { PendingRevivals } from "./revival-pending"
 export {
   getLifecycleDetachedRevivalRollback,
   getLifecycleReattachPorts,

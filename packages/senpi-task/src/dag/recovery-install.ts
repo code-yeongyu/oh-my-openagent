@@ -19,6 +19,7 @@ type InstallEffects = {
     errors: Map<DagNodeId, DagNodeError>,
     results: Map<DagNodeId, RecoveryPendingTerminalResult>,
     tasks: Map<DagNodeId, string>,
+    awaiting: Map<DagNodeId, string>,
   ): Promise<void>
   release(): void
 }
@@ -27,7 +28,7 @@ export async function installRecoveredDag(
   context: RecoveryContext,
   claimed: RecoverableRecord,
   effects: InstallEffects,
-): Promise<InstalledDagRun> {
+): Promise<Omit<InstalledDagRun, "release">> {
   try {
     if (claimed.pause?.reason === "user_stop" && context.pausedChildren !== undefined) {
       await recoverPausedDagChildren(
@@ -36,6 +37,7 @@ export async function installRecoveredDag(
           taskManager: context.taskManager,
           initialRecord: claimed,
           hostPid: context.hostPid,
+          reservations: context.reservations,
           now: context.now,
         },
         context.pausedChildren,
@@ -47,25 +49,38 @@ export async function installRecoveredDag(
     const journal = effects.journal(claimed, pendingErrors, pendingTerminalResults)
     const reusedOutputs = new Map<DagNodeId, string>()
     const reattachedTasks = new Map<DagNodeId, string>()
+    const awaitingRevival = new Map<DagNodeId, string>()
     if ((claimed.retryOnResume?.length ?? 0) > 0) resetDagNodes(journal, claimed.retryOnResume ?? [])
-    await effects.reconcile(journal, reusedOutputs, pendingErrors, pendingTerminalResults, reattachedTasks)
+    await effects.reconcile(
+      journal,
+      reusedOutputs,
+      pendingErrors,
+      pendingTerminalResults,
+      reattachedTasks,
+      awaitingRevival,
+    )
     const generation = journal.snapshot().generation + 1
     journal.append(dagRunResumedEvent({ generation }))
     const scheduler = createDagScheduler({
       store: context.store,
       taskManager: context.taskManager,
+      reservations: context.reservations,
       initialRecord: journal.snapshot(),
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
       ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
       ...(reattachedTasks.size === 0 ? {} : { preAttachedTasks: reattachedTasks }),
+      ...(awaitingRevival.size === 0 || context.pendingRevivals === undefined
+        ? {}
+        : { awaitingRevival: { tasks: awaitingRevival, revivals: context.pendingRevivals } }),
       ...(context.ancestry === undefined ? {} : { ancestry: context.ancestry }),
       ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }),
       now: context.now,
     })
     const settled = scheduler
       .run()
+      // The lease leaves with the write that ends this host's holding (a terminal status or a pause),
+      // never when the scheduler merely retires: a shutdown writes its pause after that (#15125).
       .then((record) => ({ runId: claimed.runId, kind: "resumed" as const, record, reusedOutputs }))
-      .finally(() => effects.release())
     return { kind: "installed", runId: claimed.runId, scheduler, settled }
   } catch (error) {
     effects.release()
