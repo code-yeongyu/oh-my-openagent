@@ -61,6 +61,11 @@ export type ContractHostOptions = {
   readonly currentTurnId?: string
   /** What `get_state` answers, whole, instead of the default: the host's state when the read lands. */
   readonly state?: Frame
+  /**
+   * Records written ahead of the `open_session` answer, as an engine's start-up records race it; `sessionId` "rpc-1"
+   * unless the record names one (another session's broadcast).
+   */
+  readonly beforeOpen?: readonly Frame[]
 }
 export type ContractHost = {
   readonly socket: string
@@ -329,6 +334,9 @@ export async function withContractHost(
           }
           if (frame.type === "open_session") {
             attached = true
+            attachedClients.add(client)
+            client.once("close", () => attachedClients.delete(client))
+            for (const record of options.beforeOpen ?? []) client.write(streamed(record))
             if (typeof frame.permissionPreset === "string") preset = frame.permissionPreset
             respond(frame, { sessionId: "rpc-1", state: session() })
             continue

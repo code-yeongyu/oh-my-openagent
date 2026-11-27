@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { createConnection, type Socket } from "node:net"
-import { StringDecoder } from "node:string_decoder"
+import type { Socket } from "node:net"
 import {
   type AttachEnd,
   type CommandResult,
@@ -8,11 +7,7 @@ import {
   type RemoteAttach,
   type RemoteAttachEvent,
 } from "@oh-my-opencode/device-service-core/device-service"
-import {
-  authenticateRpcHost,
-  resolveRpcSocketTransport,
-  type RpcObject,
-} from "@oh-my-opencode/senpi-task/rpc-socket-client"
+import { openRpcSocketStream, type RpcObject, RpcStreamError } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveThreadSocket } from "../thread/live-surface-paths"
 import { LocalEngineUnavailable } from "./codes"
@@ -35,20 +30,25 @@ export type LocalAttachTarget = { readonly device: string; readonly session: str
 
 const REQUEST_TIMEOUT_MS = 30_000
 const READ_TAIL = 50
-// A connect failure that means no engine serves the endpoint: no socket there, or a stale one its engine left behind.
-const NO_ENGINE: ReadonlySet<unknown> = new Set(["ENOENT", "ECONNREFUSED"])
 
 /**
- * A failure reaching this device's engine, as the engine's own: nothing serves the endpoint (NO_ENGINE), or anything else
- * that stops this client using it (another connect error such as EACCES, the endpoint's RpcIdentityError). Never the
- * device service's. The local API errors this file raises itself already say what failed.
+ * A failure reaching this device's engine, as the engine's own: nothing serves the endpoint (no socket there, or a stale
+ * one its engine left behind), or anything else that stops this client using it (another connect error such as EACCES,
+ * the endpoint's RpcIdentityError). Never the device service's. The local API errors this file raises already say what
+ * failed.
  */
-function engineFailure(endpoint: string, error: unknown): unknown {
+function engineFailure(error: unknown): unknown {
   if (error instanceof LocalApiError) return error
-  const code = error instanceof Error && "code" in error ? error.code : undefined
-  if (NO_ENGINE.has(code))
-    return new LocalEngineUnavailable("not_running", `no engine answers at ${endpoint}: ${String(code)}`)
+  if (error instanceof RpcStreamError && error.code === "not_running")
+    return new LocalEngineUnavailable("not_running", error.message)
   return new LocalEngineUnavailable("unreachable", error instanceof Error ? error.message : String(error))
+}
+
+/** The shared stream's refusals of a request, as the local API errors the client already maps. */
+function requestFailure(error: unknown): unknown {
+  if (!(error instanceof RpcStreamError)) return error
+  if (error.code === "request_timeout") return new LocalApiError("request_timeout", error.message)
+  return new LocalApiError("closed", "the operator endpoint closed")
 }
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -58,77 +58,38 @@ const text = (value: unknown): string | undefined => (typeof value === "string" 
 // Every reply is a parsed JSON line, so it is a JsonObject; the RPC host auth reads it as its own RpcObject.
 type Connection = { readonly request: (command: RpcObject) => Promise<JsonObject>; readonly close: () => void }
 
-/** One connection to the endpoint: correlated requests; every other line goes to `onLine`, its close to `onClose`. */
+/**
+ * One authenticated connection to the endpoint over senpi-task's shared host stream: correlated requests; every other
+ * line goes to `onLine`, its close to `onClose`.
+ */
 async function connectEndpoint(
   endpoint: string,
-  connect: (address: string) => Socket,
+  keyRoot: string | (() => string),
+  connect: ((address: string) => Socket) | undefined,
   onLine: (line: JsonObject) => void,
   onClose: () => void,
 ): Promise<Connection> {
-  const transport = await resolveRpcSocketTransport(endpoint)
-  if (transport === undefined)
-    throw new LocalEngineUnavailable("not_running", `no operator endpoint answers at ${endpoint}`)
-  const socket = connect(transport.address)
-  await new Promise<void>((resolve, reject) => {
-    socket.once("connect", resolve)
-    socket.once("error", reject)
+  const stream = await openRpcSocketStream(endpoint, {
+    keyRoot,
+    onFrame: (frame) => {
+      if (isObject(frame)) onLine(frame)
+    },
+    onClose,
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    ...(connect === undefined ? {} : { connect }),
   }).catch((error: unknown) => {
-    throw engineFailure(endpoint, error)
+    throw engineFailure(error)
   })
-  if (transport.secret !== undefined) socket.write(transport.secret)
-  const pending = new Map<
-    string,
-    { readonly resolve: (reply: JsonObject) => void; readonly reject: (error: Error) => void }
-  >()
-  const decoder = new StringDecoder("utf8")
-  let buffer = ""
-  socket.on("data", (chunk: Buffer) => {
-    buffer += decoder.write(chunk)
-    for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
-      const raw = buffer.slice(0, newline)
-      buffer = buffer.slice(newline + 1)
-      let line: unknown
-      try {
-        line = JSON.parse(raw)
-      } catch {
-        continue
-      }
-      if (!isObject(line)) continue
-      const id = line["id"]
-      const waiting = line["type"] === "response" && typeof id === "string" ? pending.get(id) : undefined
-      if (waiting !== undefined && typeof id === "string") {
-        pending.delete(id)
-        waiting.resolve(line)
-      } else onLine(line)
-    }
-  })
-  socket.on("error", () => socket.destroy())
-  socket.once("close", () => {
-    for (const waiting of pending.values()) waiting.reject(new LocalApiError("closed", "the operator endpoint closed"))
-    pending.clear()
-    onClose()
-  })
-  const request = (command: RpcObject): Promise<JsonObject> =>
-    new Promise((resolve, reject) => {
-      const id = randomUUID()
-      const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new LocalApiError("request_timeout", `${String(command["type"])} got no answer`))
-      }, REQUEST_TIMEOUT_MS)
-      timer.unref?.()
-      pending.set(id, {
-        resolve: (reply) => {
-          clearTimeout(timer)
-          resolve(reply)
+  return {
+    request: (command) =>
+      stream.request(command).then(
+        (reply) => (isObject(reply) ? reply : {}),
+        (error: unknown) => {
+          throw requestFailure(error)
         },
-        reject: (error) => {
-          clearTimeout(timer)
-          reject(error)
-        },
-      })
-      socket.write(`${JSON.stringify({ ...command, id })}\n`)
-    })
-  return { request, close: () => socket.end() }
+      ),
+    close: stream.close,
+  }
 }
 
 // The engine's refusals of the caller's own arguments (get-entries-command.js: an unknown `before` is not_found, a page
@@ -224,13 +185,8 @@ export function createLocalAttach(
       if (snapshotted) records([record])
       else early.push(record)
     }
-    const connection = await connectEndpoint(endpoint, options.connect ?? createConnection, onLine, () =>
-      finish("closed"),
-    )
+    const connection = await connectEndpoint(endpoint, keyRoot, options.connect, onLine, () => finish("closed"))
     const snapshot = await (async () => {
-      await authenticateRpcHost(connection.request, endpoint, keyRoot).catch((error: unknown) => {
-        throw engineFailure(endpoint, error)
-      })
       const listed = dataOf(await connection.request({ type: "list_sessions" }), "list_sessions")["sessions"]
       const row = (Array.isArray(listed) ? listed : []).find(
         (session) => isObject(session) && session["durableSessionId"] === target.durableId,
