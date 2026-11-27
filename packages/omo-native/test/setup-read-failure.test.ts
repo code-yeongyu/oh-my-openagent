@@ -5,7 +5,12 @@
 // scratch home is removed before it exits.
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { applyModelChoices } from "../bin/lib/setup-model-choices-import.js"
+import { scanSetup } from "../bin/lib/setup-stream.js"
 
 const DRIVER = fileURLToPath(new URL("setup-read-failure.driver.mjs", import.meta.url))
 const NODE = Bun.which("node")
@@ -110,3 +115,48 @@ for (const [name, binary] of runtimes) {
     })
   })
 }
+
+// The model-choice stage, in process: its failures are not parser output from a sibling's file, so
+// no runtime witness applies; each fault carries a synthetic token in its message instead.
+describe("setup model-choice failures", () => {
+  const CATALOG_TOKEN = "sk-test-SYNTHETIC-CATALOG"
+  const WRITE_TOKEN = "SYNTH-WRITE"
+
+  test("#given the engine's model list fails to load #when setup plans model choices #then the notice keeps only the failure kind", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-read-failure-"))
+    try {
+      mkdirSync(join(home, ".config", "opencode"), { recursive: true })
+      writeFileSync(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({ model: "openai/gpt-5" }))
+      const loadModelCatalog = () => Promise.reject(new Error(`catalog failed near ${CATALOG_TOKEN}`))
+      const notices: string[] = []
+      for await (const result of scanSetup(
+        { home, env: { HOME: home }, loadModelCatalog },
+        join(home, ".omo", "agent"),
+      ))
+        if (result.source === "model-choices") notices.push(...result.notices)
+      expect(notices).toContain(
+        "WARN senpi: could not read the engine's model list (an unexpected error); model choices were not carried",
+      )
+      expect(leaked(notices.join("\n"), CATALOG_TOKEN)).toBe(0)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a target the edit cannot reproduce #when model choices are applied #then the warning keeps only the failure kind", () => {
+    const path = join(tmpdir(), "omo-read-failure-never-written.jsonc")
+    const reports: string[] = []
+    const target = { path, text: `{"a":${WRITE_TOKEN}}`, document: {} }
+    const item = {
+      state: "pending",
+      label: "category demo",
+      target,
+      path: ["[senpi]", "categories"],
+      members: [["demo", {}]],
+    }
+    applyModelChoices({ items: [item] }, { report: (line: string) => reports.push(line) })
+    expect(reports).toEqual([
+      `WARN senpi: could not edit ${path} safely (not valid JSON); these model choices were not written: category demo`,
+    ])
+  })
+})
