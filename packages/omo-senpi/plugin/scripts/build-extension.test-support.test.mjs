@@ -180,6 +180,10 @@ guarded(
     )
     await expectTreeGone(error, dir)
   },
+  // Under load the spinning child accumulates its 1 CPU second over several wall seconds before the guard even
+  // samples it; bun's 5 s default fired first (#15176). 30 s covers cap + sampling + the 3 s expectTreeGone budget
+  // while still failing hard if the guard stops killing a runaway.
+  30_000,
 )
 
 // The guard samples the build's process tree, not this test process, so CPU burned here must not read as progress.
