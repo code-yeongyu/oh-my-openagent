@@ -2,12 +2,10 @@ import { boundedServiceFloor } from "@oh-my-opencode/memory-core/sync-account-po
 import { z } from "zod"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
 import { syncErrorFields } from "./sync-rpc-operation"
-import { recoverFeature } from "./sync-rpc-recover"
 import type { SyncRpcContext, SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
 const enableRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
-const recoverRequest = z.object({ method: z.enum(["passkey", "phrase"]) }).strict()
 const acknowledgeRequest = z
   .object({
     notice: z.literal("phrase_void"),
@@ -62,7 +60,6 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
     "features",
     "acknowledge",
     "disable",
-    "recover",
   ] as const) {
     rpc.handle(`omo.memory.sync.${verb}`, async (data, context) => {
       if (!coordinator.check(context)) return { kind: "unavailable", reason: "A live trusted connection is required." }
@@ -78,11 +75,6 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
           const { method } = parsed.data
           return await coordinator.enable(context, method === undefined ? {} : { method })
         }
-        if (verb === "recover") {
-          const parsed = recoverRequest.safeParse(data)
-          if (!parsed.success) return { kind: "refused", reason: "Invalid recover request." }
-          return await coordinator.recover(context, parsed.data)
-        }
         if (verb === "acknowledge") {
           const parsed = acknowledgeRequest.safeParse(data)
           if (!parsed.success) return { kind: "refused", reason: "Invalid acknowledge request." }
@@ -91,11 +83,9 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
         }
         if (!empty.safeParse(data).success) return { kind: "refused", reason: "This request takes no parameters." }
         switch (verb) {
-          case "features": {
+          case "features":
             // Phrase genesis is listed only while the service accepts phrase keys for this account (#14432).
-            const base = (await phraseGenesisOffered(coordinator, context, options)) ? FEATURES : WITHOUT_PHRASE
-            return { features: (await recoverFeature(options)) ? [...base, "recover"] : base }
-          }
+            return { features: (await phraseGenesisOffered(coordinator, context, options)) ? FEATURES : WITHOUT_PHRASE }
           case "status":
             return await coordinator.status(context)
           case "disable":

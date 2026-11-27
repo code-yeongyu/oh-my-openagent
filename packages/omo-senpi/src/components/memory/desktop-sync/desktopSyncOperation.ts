@@ -1,6 +1,5 @@
 import {
   decodeSyncHandle,
-  type RecoverOp,
   DesktopSyncRefused,
   type DesktopSyncAuthority,
   type DesktopSyncRequest,
@@ -8,7 +7,7 @@ import {
 } from "./desktopSyncProtocol"
 
 type OperationRequest = {
-  readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun" | RecoverOp
+  readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun"
   readonly data: unknown
 }
 

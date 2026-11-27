@@ -12,7 +12,6 @@ import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
 import { desktopSyncBoundary } from "./desktopSyncBoundary"
-import { desktopRecoveryBridge } from "./desktopRecoveryBridge"
 import { openDesktopSyncOperation } from "./desktopSyncOperation"
 import { DesktopSyncServiceError, SyncDescriptor } from "./desktopSyncPortSchema"
 import { DesktopSyncRefused, type DesktopSyncEvent, type DesktopSyncWire } from "./desktopSyncProtocol"
@@ -185,8 +184,7 @@ async function openAccount(
       close: operation.close,
     }
     const phrase = descriptor.phraseGenesis === "supported"
-    const recover = descriptor.phraseRecover === "supported"
-    if (descriptor.genesis !== "supported" && !phrase && !recover) return ports
+    if (descriptor.genesis !== "supported" && !phrase) return ports
     try {
       const offered =
         descriptor.genesis === "supported"
@@ -210,14 +208,7 @@ async function openAccount(
           },
         }),
       }
-      // Recovery runs in main over this operation's handle too (D12); the PRF flag gates only the passkey method.
-      const recovery = recover
-        ? {
-            recovery: (report: (code: "bridge_result_invalid") => void) =>
-              desktopRecoveryBridge(operation, offered.prfSupported, report),
-          }
-        : {}
-      return { ...ports, ...(descriptor.genesis === "supported" || phrase ? { genesis } : {}), ...recovery }
+      return { ...ports, genesis }
     } catch (error) {
       await operation.close()
       throw error
