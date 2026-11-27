@@ -8,13 +8,13 @@ import type { TeardownStepDeadline } from "../../lifecycle/teardown-budget"
 import type { DestructionPort } from "../../steering"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
 import { ImmediateRunner } from "./controlled-runner"
+import { resultPersistingManager } from "./result-persisting-manager"
 import { ownedTaskState, ownedTaskStateDir } from "../../store/__fixtures__/owned-task-state"
 import type { DagDefinition, DagNodeInput } from "../graph"
 import { createDagWaitSurface, type DagRunResult } from "../handle"
 import type { RetrySchedule } from "../infrastructure-retry"
 import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartResult } from "../manager"
 import { createDagOwnerResumeFence } from "../owner-resume-fence"
-import { persistDagNodeResult } from "../results"
 import type { TaskRecord } from "../../state"
 import {
   createDagScheduler,
@@ -24,7 +24,9 @@ import {
   type DagScheduler,
 } from "../scheduler"
 import type { createDagSkillMaterializer } from "../skills"
+import { createDagRunReservations } from "../run-reservations"
 import { createDagFileStore, type DagFileStore } from "../store"
+import { noLiveHolder } from "./reattached-run"
 import type { DagNodeId, DagRunEvent, DagRunId } from "../types"
 
 export const parentSessionId = "session-e2e-failure-parent"
@@ -66,25 +68,7 @@ export function planner(spec: Parameters<ChildPlanner>[0]): ReturnType<ChildPlan
   }
 }
 
-export function resultPersistingManager(manager: TaskManager, store: DagFileStore): TaskManager {
-  return new Proxy(manager, {
-    get(target, property) {
-      if (property !== "waitFor") {
-        const value: unknown = Reflect.get(target, property, target)
-        return typeof value === "function" ? value.bind(target) : value
-      }
-      return async (taskId: string, options?: { readonly signal?: AbortSignal }) => {
-        const record = await target.waitFor(taskId, options)
-        const owner = record.owner
-        if (owner?.kind === "dag" && record.status === "completed") {
-          const persisted = persistDagNodeResult({ store, runId: owner.runId, nodeId: owner.nodeId, record })
-          if (persisted.kind === "failed") throw new Error(persisted.diagnostic.message)
-        }
-        return record
-      }
-    },
-  })
-}
+export { resultPersistingManager } from "./result-persisting-manager"
 
 export type E2eFixtureOptions = {
   readonly project?: string
@@ -170,9 +154,17 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
         ? {}
         : {
             ownerResumeFence: (record: TaskRecord) =>
-              createDagOwnerResumeFence({ store, cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false })(
-                record,
-              ),
+              createDagOwnerResumeFence({
+                store,
+                cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false,
+                heldTriggers: {
+                  reservations,
+                  store,
+                  taskManager,
+                  hostPid: process.pid,
+                  isProcessAlive: (pid) => pid === process.pid,
+                },
+              })(record),
           }),
     }),
     store,
@@ -188,6 +180,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
     ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
   })
   const schedulers = new Map<DagRunId, DagScheduler>()
+  const reservations = createDagRunReservations()
   const runs = new Map<DagRunId, Promise<DagRunRecordV1>>()
   const waitSurface = createDagWaitSurface({
     store,
@@ -211,6 +204,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       const runId = started.snapshot.runId
       if (!schedulers.has(runId) && started.snapshot.status === "pending") {
         const scheduler = createDagScheduler({
+          reservations,
           store,
           taskManager,
           initialRecord: manager.record(runId, parentSessionId),
@@ -253,8 +247,9 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
       return reentry
     },
     async amend(input, runId) {
-      await manager.amend({ runId, definition: input, parentSessionId })
+      await manager.amend({ holder: noLiveHolder, runId, definition: input, parentSessionId })
       const reentry = reenterDagRun({
+        reservations,
         store,
         taskManager,
         initialRecord: manager.record(runId, parentSessionId),
@@ -276,6 +271,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
     const existing = schedulers.get(runId)
     if (existing !== undefined) return existing
     const fresh = createDagScheduler({
+      reservations,
       store,
       taskManager,
       initialRecord: manager.record(runId, parentSessionId),

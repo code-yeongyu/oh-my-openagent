@@ -1,6 +1,8 @@
 import type { OwnerResumeFence, OwnerResumeVerdict } from "../manager/types"
+import { recordHeldTrigger } from "./held-trigger"
 import type { DagRunRecordV1 } from "./manager"
 import { ownedClaimAge } from "./owned-attempt"
+import type { DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
 import { TERMINAL_DAG_RUN_STATUSES, type DagRunId } from "./types"
 
@@ -16,12 +18,16 @@ const ALLOW: OwnerResumeVerdict = { kind: "allow" }
  * settled. A refusal also says what happens to the run it stops: a superseded or removed claim, or a
  * cancelled or cancelling run, is retired; a current claim of a failed or completed run is held. A
  * loaded scheduler may only ADD a refusal - a cancellation that started but has not journaled yet -
- * and never allows what the checkpoint refuses. An unknown run, or an active one with no scheduler
- * loaded, keeps today's behaviour: the child reopens and is re-watched.
+ * and never allows what the checkpoint refuses. A current claim of a run the USER stopped is held too:
+ * the child stays resident with its result, and the hold is recorded on its node through the one write
+ * to a stopped run (`heldTriggers`, the run's write ports; without them nothing is recorded). A run
+ * paused for a shutdown keeps allowing: the next holder follows the turn. An unknown run, or an active
+ * one with no scheduler loaded, keeps today's behaviour: the child reopens and is re-watched.
  */
 export function createDagOwnerResumeFence(ports: {
   readonly store: DagFileStore
   readonly cancelling?: (runId: DagRunId) => boolean
+  readonly heldTriggers?: Omit<DagSchedulerOptions, "initialRecord">
 }): OwnerResumeFence {
   return (task) => {
     const owner = task.owner
@@ -34,17 +40,27 @@ export function createDagOwnerResumeFence(ports: {
       const reason = removed
         ? `its DAG node "${owner.nodeId}" was removed`
         : `it is a ${age} claim of DAG node "${owner.nodeId}"`
-      return refuse(reason, "retire")
+      return refuse(reason, "retire", RETRY_NODE)
     }
-    if (run.status === "cancelled") return refuse(`its DAG run "${run.runId}" was cancelled`, "retire")
+    if (run.status === "cancelled") return refuse(`its DAG run "${run.runId}" was cancelled`, "retire", RUN_CANCELLED)
     // A current claim of a failed or completed run keeps the explicit send/revive contract: only the
     // unsolicited turn stops, and the child stays as resident and revivable as it was.
     if (TERMINAL_DAG_RUN_STATUSES.has(run.status)) return refuse(`its DAG run "${run.runId}" is ${run.status}`, "hold")
-    if (ports.cancelling?.(run.runId) === true) return refuse(`its DAG run "${run.runId}" is being cancelled`, "retire")
-    return ALLOW
+    if (ports.cancelling?.(run.runId) === true)
+      return refuse(`its DAG run "${run.runId}" is being cancelled`, "retire", RUN_CANCELLED)
+    if (run.status !== "paused" || run.pause?.reason !== "user_stop") return ALLOW
+    const held = refuse(`its DAG run "${run.runId}" is stopped by the user`, "hold")
+    const write = ports.heldTriggers
+    return write === undefined
+      ? held
+      : { ...held, record: () => recordHeldTrigger(write, run, owner.nodeId, task.task_id) }
   }
 }
 
-function refuse(reason: string, disposition: "retire" | "hold"): OwnerResumeVerdict {
-  return { kind: "refuse", reason, disposition }
+// What an explicit send to a retired claim should do instead (the manager answers it as `not_continuable`).
+const RETRY_NODE = "Retry the DAG node to run its current attempt."
+const RUN_CANCELLED = "Its DAG run was cancelled; retry the node to run it again."
+
+function refuse(reason: string, disposition: "retire" | "hold", remedy?: string): OwnerResumeVerdict {
+  return { kind: "refuse", reason, disposition, ...(remedy === undefined ? {} : { remedy }) }
 }

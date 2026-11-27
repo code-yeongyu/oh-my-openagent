@@ -3,7 +3,7 @@ import type { TaskRecord } from "../state"
 import type { CancelOutcome } from "../steering/types"
 import type { DagRunRecordV1 } from "./manager"
 import { isLiveOwnedTask } from "./scheduler-context"
-import type { DagRunId } from "./types"
+import type { DagNode, DagRunId } from "./types"
 
 export class DagRunChildrenLiveError extends Error {
   readonly taskIds: readonly string[]
@@ -19,14 +19,22 @@ export class DagRunChildrenLiveError extends Error {
   }
 }
 
-/** Keyed by run, not by today's nodes: an amendment can remove a node whose child still runs. */
+/**
+ * The run's children: every task whose owner record names the run - keyed by run, not by today's
+ * nodes, since an amendment can remove a node whose child still runs - plus a child a node of the run
+ * names that carries no owner record at all (started outside `startOwned`), which only the node's
+ * `taskId` ties to the run. Read without nodes (a cached list summary), the owned records alone.
+ */
 export function liveRunChildren(
-  taskManager: Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending">,
-  record: Pick<DagRunRecordV1, "runId">,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending"> & Partial<Pick<TaskManager, "get">>,
+  record: Pick<DagRunRecordV1, "runId"> & { readonly nodes?: readonly Pick<DagNode, "taskId">[] },
 ): readonly TaskRecord[] {
-  return taskManager
-    .findOwnedTasks({ kind: "dag", runId: record.runId })
-    .filter((task) => isLiveOwnedTask(taskManager, task))
+  const owned = taskManager.findOwnedTasks({ kind: "dag", runId: record.runId })
+  const unowned = (record.nodes ?? []).flatMap((node) => {
+    const task = node.taskId === undefined ? undefined : taskManager.get?.(node.taskId)
+    return task === undefined || task.owner !== undefined ? [] : [task]
+  })
+  return [...owned, ...unowned].filter((task) => isLiveOwnedTask(taskManager, task))
 }
 
 /**
@@ -72,7 +80,7 @@ export async function stopRunChildren(
 }
 
 export async function stopSettledRunChildren(
-  taskManager: TaskManager,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "cancelTask" | "selfResumeStopPending">,
   record: DagRunRecordV1,
   reason?: string,
 ): Promise<void> {

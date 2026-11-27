@@ -2,7 +2,7 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 
 import { lintDagDefinitionNodes } from "./dag-lint"
 import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
-import { DagManagerError, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
+import { DagManagerError, heldTriggerNotice, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 // The per-node control verbs are not on the package's dag barrel; the runtime already reaches the
 // scheduler module by path for the same reason, and both resolve to the same source file, so the
 // instanceof check below stays sound.
@@ -176,16 +176,19 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       case "attach": {
         const handle = deps.manager.attach(runId as DagRunId, deps.parentSessionId())
         const snapshot = handle.snapshot()
-        return toolResult(`Attached to dag run ${runId} (${snapshot.status}).${stopNotice(snapshot)}`, {
-          kind: "attached",
-          run_id: runId,
-          snapshot,
-        })
+        return toolResult(
+          `Attached to dag run ${runId} (${snapshot.status}).${stopNotice(snapshot)}${heldTriggerNotice(snapshot.nodes)}`,
+          {
+            kind: "attached",
+            run_id: runId,
+            snapshot,
+          },
+        )
       }
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
         return toolResult(
-          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${stopNotice(snapshot)}${quietNodesNotice(snapshot.nodes, Date.now())}`,
+          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${stopNotice(snapshot)}${heldTriggerNotice(snapshot.nodes)}${quietNodesNotice(snapshot.nodes, Date.now())}`,
           {
             kind: "snapshot",
             run_id: runId,

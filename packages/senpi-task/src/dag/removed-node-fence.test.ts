@@ -14,6 +14,7 @@ import {
   parentSessionId,
 } from "./__fixtures__/controlled-dag-e2e"
 import { ControlledRunner, completed } from "./__fixtures__/controlled-runner"
+import { createDagRunReservations } from "./run-reservations"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
@@ -94,6 +95,7 @@ test("#11381 #given an active run whose removed node's child cannot be stopped #
   }
   fixture.store.writeCheckpoint(runId, active)
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store: fixture.store,
     taskManager: fixture.taskManager,
     initialRecord: active,

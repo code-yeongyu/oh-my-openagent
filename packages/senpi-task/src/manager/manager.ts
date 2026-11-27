@@ -24,16 +24,10 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
-import type {
-  AwaitingInputReason,
-  EffectiveModelRecord,
-  LiveRunStats,
-  ResolvedModelRecord,
-  TaskRecord,
-  TaskRunStats,
-} from "../state"
+import type { AwaitingInputReason, LiveRunStats, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { ownedClaims, ownedStartResult } from "./owned-claims"
+import { ContinuedRuns } from "./continued-run"
 import { createSteeringEngine } from "../steering"
 import type {
   CancelOptions,
@@ -105,7 +99,9 @@ import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
 import { defaultSignaller } from "../lifecycle/context"
 import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
-import { cancelBehindRefusedStop, RefusedStops, sendBehindRefusedStop } from "./refused-stops"
+import { cancelBehindRefusedStop, RefusedStops } from "./refused-stops"
+import { explicitSendChecks } from "./explicit-send"
+import { REDISPATCH_HOLDER_WAIT_MS, redispatchLockPath, redispatchRefusal } from "./redispatch-guard"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
 import { AdmissionBarrier, type ResumeCredential } from "../pause/admission-barrier"
@@ -189,30 +185,6 @@ type ReattachingTaskManager = TaskManager &
 export const START_REPORT_WINDOW_MS = 250
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
-// A re-dispatch holds its lock across a child launch, which can take far longer than a record write.
-const REDISPATCH_HOLDER_WAIT_MS = 120_000
-
-function redispatchLockPath(stateDir: string, taskId: string): string {
-  return join(stateDir, "redispatch-locks", taskId)
-}
-
-function redispatchRefusal(record: TaskRecord): RedispatchOutcome | undefined {
-  if (isTerminalRecord(record)) {
-    return {
-      kind: "invalid_state",
-      task_id: record.task_id,
-      reason: `Task ${record.task_id} is ${record.status}; only a task waiting for input can be re-dispatched.`,
-    }
-  }
-  if (record.awaiting_input === undefined) {
-    return {
-      kind: "invalid_state",
-      task_id: record.task_id,
-      reason: `Task ${record.task_id} is not waiting for input; only a flagged "resumed, waiting for input" task can be re-dispatched.`,
-    }
-  }
-  return undefined
-}
 function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
   const ownerKey = `${owner.kind}\0${owner.runId}\0${owner.nodeId}`
   const digest = createHash("sha256").update(ownerKey).digest("hex")
@@ -233,6 +205,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #names = new NameRegistry()
   readonly #taskSequence = new TaskSequence()
   readonly #live = new Map<string, LiveTask>()
+  readonly #continuedRuns = new ContinuedRuns()
   // Children whose teardown rejected and that have no pid or daemon session for the orphan path. They
   // are resident for the lifecycle (eviction, idle reclaim, shutdown and TTL see them and retry their
   // teardown) but are not live children: steering never reaches them, and only a teardown that
@@ -793,9 +766,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
-    const behind = await sendBehindRefusedStop(this.#refusedStops, input.idOrName)
-    if (behind !== undefined) return behind
-    const outcome = await this.#steering.sendToTask(input)
+    const checks = explicitSendChecks(this.#steering, this.#options.ownerResumeFence, this.#refusedStops, input)
+    const answer = checks.answer === undefined ? undefined : await checks.answer
+    if (answer !== undefined) return answer
+    const outcome = await this.#steering.sendToTask({ ...input, idOrName: checks.taskId })
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
     return outcome
   }
@@ -810,13 +784,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const refused = await cancelBehindRefusedStop(
-      this.#refusedStops,
-      idOrName,
-      () => this.#tryLoad(idOrName)?.status ?? "completed",
-    )
+    const taskId = this.#steering.resolve(idOrName)?.task_id ?? idOrName
+    const refused = cancelBehindRefusedStop(this.#refusedStops, taskId, () => this.#tryLoad(taskId)?.status)
     if (refused !== undefined) return refused
-    const outcome = await this.#steering.cancelTask(idOrName, reason, options)
+    const outcome = await this.#steering.cancelTask(taskId, reason, options)
     if (outcome.kind === "cancelled") {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)
@@ -1205,6 +1176,7 @@ class TaskManagerImpl implements TaskManager {
     handle: ManagedChildHandle,
     awaitingInput?: { readonly reason: AwaitingInputReason },
   ): Promise<ReattachResult> {
+    const followContinuation = this.#continuedRuns.follower(record.task_id, handle)
     const result = await reattachManagedTask({
       record,
       handle,
@@ -1229,7 +1201,10 @@ class TaskManagerImpl implements TaskManager {
         void this.#steering.notifyStarted(fresh.task_id)
       },
       ...(awaitingInput === undefined ? {} : { awaitingInput }),
+      ...(followContinuation === undefined ? {} : { followContinuation }),
     })
+    // A concurrent revival attached first: this one is done when that one has decided its continued run.
+    if (!result.ok && result.kind === "already_attached") await this.#continuedRuns.settled(record.task_id)
     const paused = result.ok ? this.get(record.task_id) : undefined
     if (paused?.status === "paused") this.#runPause.park(paused.task_id, paused.notification.run_epoch)
     // The flag is user-visible state: a live progress row leaves "starting" for
@@ -1685,14 +1660,15 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
-    return subscribeChildFacts({
+    const unsubscribe = subscribeChildFacts({
       handle,
       taskId,
       store: this.#options.store,
       now: this.#now,
       runStats: this.#runStats,
       fallbackExhaustions: this.#nativeFallbackExhaustions,
-      reopen: () => reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle),
+      reopen: () =>
+        this.#continuedRuns.reopening(handle, reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle)),
       onMotion: () => this.#clearAwaitingInput(taskId),
       onLiveness: (status) => {
         if (status.state === "running") void this.#steering.notifyStarted(taskId)
@@ -1703,6 +1679,10 @@ class TaskManagerImpl implements TaskManager {
         if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)
       },
     })
+    return () => {
+      unsubscribe()
+      this.#continuedRuns.released(handle)
+    }
   }
 
   async #tryRuntimeFallback(input: {
