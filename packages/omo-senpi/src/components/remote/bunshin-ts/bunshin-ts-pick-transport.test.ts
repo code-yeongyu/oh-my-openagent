@@ -135,6 +135,16 @@ describe("bunshin-ts pickTransport", () => {
     expect(probes).toEqual([])
   })
 
+  // The hub reaches no device service, so an env with no home must not stop it (only the relay needs a state dir).
+  it("#given an env naming no home #when hub is chosen or auto falls back to it #then the home is never asked for", async () => {
+    const { home: _seam, ...withoutHome } = deps({ connected: true, hub: "bundled" })
+    expect((await pickTransport({ BUNSHIN_TS_TRANSPORT: "hub" }, withoutHome)).kind).toBe("hub")
+    expect((await pickTransport({}, withoutHome)).kind).toBe("hub")
+    expect(withoutHome.probes).toEqual([])
+    const { home: _none, ...noHub } = deps({ connected: true })
+    expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "hub" }, noHub))).toBe("hub_not_bundled")
+  })
+
   it("#given this process's environment without HOME #when the shipped process picker runs #then it probes the OS home's service", async () => {
     const probes: string[] = []
     const before = process.env["HOME"]

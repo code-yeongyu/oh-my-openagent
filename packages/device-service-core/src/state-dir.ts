@@ -15,7 +15,11 @@ const isAbsoluteOn = (platform: NodeJS.Platform, path: string): boolean =>
 
 function defaultStateDir(platform: NodeJS.Platform, env: Env, home: string | undefined): string | undefined {
   if (platform !== "win32") return home === undefined ? undefined : join(home, ".omo", "device-service")
-  const localAppData = nonEmpty(env.LOCALAPPDATA) ?? (home === undefined ? undefined : join(home, "AppData", "Local"))
+  // Held to the home's rule: a relative LOCALAPPDATA would resolve against the process's cwd.
+  const given = nonEmpty(env.LOCALAPPDATA)
+  const localAppData =
+    (given !== undefined && isAbsoluteOn(platform, given) ? given : undefined) ??
+    (home === undefined ? undefined : join(home, "AppData", "Local"))
   return localAppData === undefined ? undefined : join(localAppData, "OmO", "device-service")
 }
 

@@ -41,16 +41,17 @@ const nonEmpty = (value: string | undefined): string | undefined => {
 // beside the default dir, else the default. Resolved here, so the vendored relay SDK never guesses.
 // The home comes from `deps.home`, else from the env the caller passed, never from this process: a sandboxed env must not
 // reach the machine's own device service. An env that names neither a state dir nor a home has no service to reach.
-const stateDirOf = (env: Env, deps: PickTransportDeps): string => {
-  const stateDir = deviceServiceStateDirIn(process.platform, env, deps.home)
-  if (stateDir !== undefined) return stateDir
-  throw new BunshinSessionError(
+// Only the relay needs it: an explicit hub choice and the auto hub fallback never reach the device service.
+const stateDirIn = (env: Env, deps: PickTransportDeps): string | undefined =>
+  deviceServiceStateDirIn(process.platform, env, deps.home)
+
+const noHome = (): BunshinSessionError =>
+  new BunshinSessionError(
     "no_transport",
     "the environment names no home and no device-service state dir, so there is no device service to reach",
     "pass HOME (USERPROFILE on Windows) or OMO_DEVICE_SERVICE_STATE_DIR in the env given to pickTransport",
     { details: { reason: "no_home" } },
   )
-}
 
 const relayTransport = (env: Env, stateDir: string): MachineHubTransport => {
   const sessionRef = nonEmpty(env[SESSION_REF_ENV])
@@ -71,11 +72,6 @@ const parseChoice = (raw: string | undefined): TransportChoice => {
 }
 
 /**
- * The transport a cell's fleet client rides. `relay` and `hub` are taken as asked; `auto` uses this device's
- * service when its status answers `connected`, else the hub when this build bundles it and a hub config
- * resolves. A service that is installed but insecure or unproven still throws from the status probe.
- */
-/**
  * The transport for this process's own environment: the process's home is its own to use, so an environment without
  * `HOME` (a service unit, `env -i`) still reaches the OS home's device service. A given env never falls back to it.
  */
@@ -83,10 +79,18 @@ export function pickProcessTransport(deps: PickTransportDeps = BUNDLED): Promise
   return pickTransport(process.env, { ...deps, home: deps.home ?? homedir() })
 }
 
+/**
+ * The transport a cell's fleet client rides. `relay` and `hub` are taken as asked; `auto` uses this device's
+ * service when its status answers `connected`, else the hub when this build bundles it and a hub config
+ * resolves. A service that is installed but insecure or unproven still throws from the status probe.
+ */
 export async function pickTransport(env: Env, deps: PickTransportDeps = BUNDLED): Promise<MachineHubTransport> {
   const choice = parseChoice(env[TRANSPORT_CHOICE_ENV])
-  const stateDir = stateDirOf(env, deps)
-  if (choice === "relay") return relayTransport(env, stateDir)
+  if (choice === "relay") {
+    const stateDir = stateDirIn(env, deps)
+    if (stateDir === undefined) throw noHome()
+    return relayTransport(env, stateDir)
+  }
   if (choice === "hub") {
     if (deps.hub === undefined)
       throw new BunshinSessionError(
@@ -96,9 +100,10 @@ export async function pickTransport(env: Env, deps: PickTransportDeps = BUNDLED)
       )
     return deps.hub.create()
   }
-  const status = await deps.relayStatus({ stateDir })
-  if (status.connected) return relayTransport(env, stateDir)
+  const stateDir = stateDirIn(env, deps)
+  if (stateDir !== undefined && (await deps.relayStatus({ stateDir })).connected) return relayTransport(env, stateDir)
   if (deps.hub !== undefined && (await deps.hub.configResolves())) return deps.hub.create()
+  if (stateDir === undefined) throw noHome()
   throw new BunshinSessionError(
     "no_transport",
     "no transport: the device service is not connected and no hub transport is available",

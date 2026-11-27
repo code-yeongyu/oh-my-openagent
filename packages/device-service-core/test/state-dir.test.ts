@@ -126,6 +126,13 @@ describe("deviceServiceStateDirIn", () => {
     ],
     ["win32, HOME only", "win32", { HOME: "C:\\Users\\a" }, undefined],
     ["win32, a relative USERPROFILE", "win32", { USERPROFILE: "a" }, undefined],
+    [
+      "win32, a relative LOCALAPPDATA beside USERPROFILE",
+      "win32",
+      { LOCALAPPDATA: "rel", USERPROFILE: "C:\\Users\\a" },
+      "C:\\Users\\a\\AppData\\Local\\OmO\\device-service",
+    ],
+    ["win32, a relative LOCALAPPDATA alone", "win32", { LOCALAPPDATA: "rel" }, undefined],
   ] as const)(
     "#given %s #when resolved without a home argument #then the dir follows the env alone",
     (_, platform, env, expected) => {
