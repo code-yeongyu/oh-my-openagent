@@ -77,7 +77,10 @@ export async function cutWithReopenHeld(world: HostWorld): Promise<void> {
 
 export async function cancelUnreachable(lane: CancelLane, record: TaskRecord): Promise<void> {
   await cutWithReopenHeld(lane.world)
-  const cancelled = await bounded(runTaskCancel(lane.parent.manager, { task_id: record.task_id }), "task_cancel")
+  const cancelled = await bounded(
+    runTaskCancel(lane.parent.manager, { task_id: record.task_id }, lane.parent.sessionId),
+    "task_cancel",
+  )
   if (cancelled.details.kind !== "cancel_pending")
     throw new Error(`expected cancel_pending, got ${cancelled.details.kind}`)
 }

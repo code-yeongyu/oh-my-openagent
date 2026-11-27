@@ -1,3 +1,4 @@
+import type { PendingRevivals } from "../lifecycle/revival-pending"
 import type { TaskManager } from "../manager/types"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { TaskRecord } from "../state"
@@ -8,15 +9,7 @@ import type { InfrastructureRetries } from "./infrastructure-retry"
 import type { DagExecutionModeSources } from "./execution-mode"
 import type { DagNodeSpawnPolicy } from "./scheduler"
 import { dagNodeTransitionedEvent } from "./events"
-import type {
-  DagNode,
-  DagNodeId,
-  DagNodeState,
-  DagNodeError,
-  DagNodeErrorCode,
-  DagNodeTransitionReason,
-  DagNodeCounts,
-} from "./types"
+import type { DagNode, DagNodeId, DagNodeState, DagNodeError, DagNodeErrorCode, DagNodeTransitionReason } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
 export const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["completed", "failed", "cancelled", "skipped"])
@@ -24,9 +17,34 @@ export const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["complet
 export type AttachedTaskSettlement =
   | { readonly nodeId: DagNodeId; readonly kind: "record"; readonly record: TaskRecord }
   | { readonly nodeId: DagNodeId; readonly kind: "error"; readonly error: unknown }
+  // A child whose pending revival ended without bringing it back (#15150).
+  | { readonly nodeId: DagNodeId; readonly kind: "orphaned"; readonly message: string }
+  // A waiting node let go unjournaled because its lifecycle stopped; the run parks for the next recovery.
+  | { readonly nodeId: DagNodeId; readonly kind: "released" }
+  // A waiting node's child is revived or ended: attach it through the one attachment path (#15150). With
+  // `fenceStale`, another task of the run is a live stale child: the frontier fences it after the fold.
+  | { readonly nodeId: DagNodeId; readonly kind: "followed"; readonly taskId: string; readonly fenceStale: boolean }
+  // A waiting node's revived child is not its current attempt: the frontier stops it and decides the node.
+  | {
+      readonly nodeId: DagNodeId
+      readonly kind: "not_current"
+      readonly taskId: string
+      readonly message: string
+      readonly revivals: PendingRevivals
+    }
+
+export type RevivalFenceRequest =
+  | { readonly rule: "stale_live"; readonly taskId: string }
+  | {
+      readonly rule: "not_current"
+      readonly taskId: string
+      readonly message: string
+      readonly revivals: PendingRevivals
+    }
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId
+  selfResumed: boolean
   readonly settled: Promise<AttachedTaskSettlement>
   readonly folded: Promise<void>
   readonly resolveFolded: () => void
@@ -84,6 +102,12 @@ export type SchedulerContext = {
   // waitFor resolves only at terminal, so this watch is the only signal that folds the task
   // engine's later queue promotion into a scheduled -> running node transition.
   readonly promotionWatches: Map<DagNodeId, () => void>
+  // Stale-child fences a waiting node's fold asked for (#15150): run by the frontier's own loop, between
+  // admission passes, never from a fold, so the admission flag has one holder at a time.
+  readonly revivalFences: Map<DagNodeId, RevivalFenceRequest>
+  // omo#10487: armed before waitFor, kept through completion so an early self-resume supersedes
+  // the attached settlement and a later one reopens the node; disposed at run end.
+  readonly selfResumeWatches: Map<DagNodeId, () => void>
 }
 
 export function nodeById(record: DagRunRecordV1, nodeId: DagNodeId): DagNode {
@@ -100,6 +124,33 @@ export function transition(
 ): void {
   const from = nodeById(context.journal.snapshot(), nodeId).state
   context.journal.append(dagNodeTransitionedEvent({ nodeId, from, to, reason }))
+}
+
+/**
+ * Every owned task of the node that can still do work, whether or not this controller attached it.
+ * Not only the newest: an earlier attempt's finished child can resume on its own after the next
+ * attempt's task exists (#11381).
+ */
+export function liveOwnedTasks(context: SchedulerContext, nodeId: DagNodeId): readonly TaskRecord[] {
+  return context.taskManager
+    .findOwnedTasks({ kind: "dag", runId: context.journal.snapshot().runId, nodeId })
+    .filter((task) => isLiveOwnedTask(context.taskManager, task))
+}
+
+/**
+ * The one liveness predicate for a run's owned children (#11381): a record that can still do work, or
+ * one whose refused self-started turn the manager has not confirmed stopped. Every reader of a run's
+ * live children - cancel drain, outstanding stop, admission fence, sweep, recovery - asks here.
+ */
+export function isLiveOwnedTask(
+  tasks: Pick<TaskManager, "selfResumeStopPending">,
+  task: TaskRecord | null | undefined,
+): boolean {
+  return isLiveTask(task) || (task != null && tasks.selfResumeStopPending?.(task.task_id) === true)
+}
+
+export function isLiveTask(task: TaskRecord | null | undefined): boolean {
+  return task?.status === "pending" || task?.status === "running" || task?.status === "paused"
 }
 
 export function failNode(context: SchedulerContext, nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void {

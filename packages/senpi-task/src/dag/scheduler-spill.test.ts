@@ -7,6 +7,7 @@ import { createDagManager } from "./manager"
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagRunEvent } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
@@ -100,6 +101,7 @@ describe("DAG scheduler wave spill-through", () => {
     })
     const runId = started.snapshot.runId
     const scheduler = createDagScheduler({
+      reservations: createDagRunReservations(),
       store: dagStore,
       taskManager,
       initialRecord: dagManager.record(runId, parentSessionId),

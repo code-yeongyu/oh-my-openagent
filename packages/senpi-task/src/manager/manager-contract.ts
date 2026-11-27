@@ -1,10 +1,11 @@
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { DagTaskOwner, DagTaskOwnerKey, DagTaskOwnerScope, OwnedStartResult } from "../dag/owner"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { PauseParticipant } from "../pause/registry"
 import type { LiveRunStats, TaskRecord, TaskRunStats } from "../state"
 import type {
   CancelOptions,
   CancelOutcome,
+  InterruptOptions,
   InterruptOutcome,
   RedispatchOutcome,
   SendInput,
@@ -30,9 +31,16 @@ export type TaskManager = {
   settleLaunchesForShutdown?(boundMs: number): Promise<void>
   startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
+  /**
+   * Every record the owner key ever claimed, oldest first; without a nodeId, every record of the run,
+   * nodes an amendment removed included.
+   */
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[]
+  /** A refused self-started turn of this task is not confirmed stopped yet: the task still counts as live. */
+  selfResumeStopPending?(taskId: string): boolean
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
+  interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // senpi#3266: one-step re-dispatch of a flagged "resumed, waiting for input" task onto a fresh
   // live session, replaying its persisted prompt under the same task identity and a new run epoch.
@@ -62,6 +70,9 @@ export type TaskManager = {
   getResidentHandle(taskId: string): ManagedChildHandle | undefined
   // Subscribe at the runner-agnostic handle seam now or when a queued task is promoted.
   subscribeChild(taskId: string, listener: ManagedChildListener): () => void
+  // omo#10487: told when a settled task reopens itself (task_self_resumed), after its record is
+  // back to running, so an owner that already folded its outcome can wait for the resumed run's end.
+  subscribeSelfResumed?(taskId: string, listener: () => void): () => void
   residentTaskIds(): readonly string[]
   // #8396: session-scoped residency wake. Resolves the next time the parent session's residency
   // picture changes - a resident child reaches a terminal status, is forgotten (evicted, suspended,

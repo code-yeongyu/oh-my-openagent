@@ -21,6 +21,13 @@ export function isSuspensionExpiry(record: TaskRecord): boolean {
   )
 }
 
+const expiriesInFlight = new WeakMap<LifecycleContext, Map<string, number>>()
+
+/** An expiry of this child is running: from before its claim until its terminal write or its return. */
+export function expiryInFlight(context: LifecycleContext, taskId: string): boolean {
+  return (expiriesInFlight.get(context)?.get(taskId) ?? 0) > 0
+}
+
 /**
  * Claim the stopped run BEFORE any close I/O. Keep suspended residency, with killed as the existing
  * no-revival fence; neither cold revival nor session_start may take a new residency claim. The
@@ -31,6 +38,19 @@ export async function expireSuspendedChild(
   observed: TaskRecord,
   parentLive: () => boolean,
 ): Promise<void> {
+  const running = expiriesInFlight.get(context) ?? new Map<string, number>()
+  expiriesInFlight.set(context, running)
+  running.set(observed.task_id, (running.get(observed.task_id) ?? 0) + 1)
+  try {
+    await expireOnce(context, observed, parentLive)
+  } finally {
+    const left = (running.get(observed.task_id) ?? 1) - 1
+    if (left > 0) running.set(observed.task_id, left)
+    else running.delete(observed.task_id)
+  }
+}
+
+async function expireOnce(context: LifecycleContext, observed: TaskRecord, parentLive: () => boolean): Promise<void> {
   let retries = stopRetries.get(context)
   if (retries === undefined) {
     retries = new Map()

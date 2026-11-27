@@ -1,9 +1,12 @@
+import type { OwnerProcessView } from "../lifecycle/owner-process"
 import type { TaskManager } from "../manager/types"
 import type { ResumeCredential } from "../pause/admission-barrier"
+import type { DagRunReservation, DagRunReservations } from "./run-reservations"
 import type { DagExecutionModeSources } from "./execution-mode"
 import { createDagJournal, subscribeDagJournal, type DagJournalListener } from "./journal"
 import { skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
-import { retryDagNodes, type DagRetryOptions, type DagRunReentry } from "./node-retry"
+import { retryDagNodes, type DagRetryOptions } from "./node-retry"
+import type { DagRunReentry } from "./run-reentry"
 import { sendToDagNode, type DagNodeSendResult } from "./node-send"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
@@ -18,12 +21,15 @@ import { applyDagSchedulerEvent } from "./scheduler-projection"
 import { cancelRun, whenAdmissionIdle } from "./scheduler-cancellation"
 import { runFrontier } from "./scheduler-frontier"
 import { attachTaskSettlement, watchRevivedInScheduler, disposePromotionWatch } from "./scheduler-task-attachment"
+import { disposeSelfResumeWatches, followCompletedNodeTasks } from "./scheduler-self-resume"
 import { createInfrastructureRetries, type RetrySchedule } from "./infrastructure-retry"
+import { followPendingRevivals, type AwaitingRevival } from "./scheduler-pending-revival"
 export { applyDagSchedulerEvent } from "./scheduler-projection"
 export { DAG_NODE_CONTROL_ERROR_CODES, DagNodeControlError } from "./node-control-context"
 export type { DagNodeControlErrorCode } from "./node-control-context"
-export { reenterDagRun } from "./node-retry"
-export type { DagRetryOptions, DagRunReentry } from "./node-retry"
+export { reenterDagRun } from "./run-reentry"
+export type { DagRetryOptions } from "./node-retry"
+export type { DagRunReentry } from "./run-reentry"
 export type { DagNodeSendResult } from "./node-send"
 
 export type DagSchedulerOptions = {
@@ -42,14 +48,23 @@ export type DagSchedulerOptions = {
    * long-running child before the run leaves `paused`.
    */
   readonly preAttachedTasks?: ReadonlyMap<DagNodeId, string>
+  // Children whose revival this host's lifecycle still owes: their nodes follow the revival (#15150).
+  readonly awaitingRevival?: AwaitingRevival
   // Skill materialization for a retry that carries a prompt override (it re-runs the amend path).
   readonly materializeSkills?: DagMaterializeSkills
   // Lease identity for the control verbs: a run leased by a DIFFERENT live process is not ours to
   // retry. Defaults to this process and the lifecycle port's signal-0 probe.
   readonly hostPid?: number
   readonly isProcessAlive?: (pid: number) => boolean
+  // The start view a node child's owner is judged by (`holderProbeOf`); see lifecycle/owner-process.ts.
+  readonly ownerProcesses?: OwnerProcessView
   readonly now?: () => number
   readonly scheduleRetry?: RetrySchedule
+  // The in-process reservation a control verb already holds for this run (`run-acquisition.ts`).
+  readonly reservation?: DagRunReservation
+  // This process's per-run reservations, required: a revive watcher's fold always waits on them
+  // (`node-send-revive.ts`). A scheduler built by hand without a runtime passes a registry of its own.
+  readonly reservations: DagRunReservations
 }
 
 // Harness-injected gate for agent-routed nodes, evaluated once per admission before startOwned:
@@ -73,6 +88,8 @@ export type DagScheduler = {
   /** Retires this controller without cancelling children; await before releasing its lease. */
   readonly suspend: () => Promise<void>
   readonly snapshot: () => DagRunRecordV1
+  /** True from the moment cancel starts, before the run's cancellation is journaled. */
+  readonly cancelling: () => boolean
   readonly subscribe: (listener: DagJournalListener) => () => void
   readonly whenIdle: () => Promise<void>
   /**
@@ -146,6 +163,8 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
     promotionWatches: new Map<DagNodeId, () => void>(),
+    revivalFences: new Map(),
+    selfResumeWatches: new Map<DagNodeId, () => void>(),
   }
   // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
   // instance, and a journal cache refreshes only on its own appends. Without this subscription a
@@ -165,13 +184,25 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     if (status === "completed" || status === "failed" || status === "cancelled") unsubscribeCommits()
   })
   for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
-    context.attachedTaskIds.set(nodeId, taskId)
     attachTaskSettlement(context, nodeId, taskId)
   }
+  if (options.awaitingRevival !== undefined) followPendingRevivals(context, options.awaitingRevival, "first decision")
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
-    run: () => (running ??= runFrontier(context)),
+    // A frontier that returns the run paused (parked or held) has exited for good, so it stops
+    // listening for commits like a terminal one; later commits belong to whoever resumes the run.
+    run: () => {
+      if (running !== undefined) return running
+      followCompletedNodeTasks(context)
+      running = runFrontier(context)
+        .then((record) => {
+          if (record.status === "paused") unsubscribeCommits()
+          return record
+        })
+        .finally(() => disposeSelfResumeWatches(context))
+      return running
+    },
     cancel: (runId, reason) => cancelRun(context, runId, reason),
     suspend: async () => {
       context.suspended = true
@@ -179,6 +210,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       context.resolveCancellationRequested()
       unsubscribeCommits()
       for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
+      disposeSelfResumeWatches(context)
       await whenAdmissionIdle(context)
       if (context.cancellationOperation !== undefined) await context.cancellationOperation
       await journal.whenIdle()
@@ -187,6 +219,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       context.attachedTaskIds.clear()
     },
     snapshot: journal.snapshot,
+    cancelling: () => context.cancellationStarted,
     subscribe: journal.subscribe,
     whenIdle: journal.whenIdle,
     retryNode: (runId, nodeIds, retryOptions) => retryDagNodes(options, runId, nodeIds, retryOptions),

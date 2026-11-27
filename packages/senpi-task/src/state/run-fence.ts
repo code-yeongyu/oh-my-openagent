@@ -27,6 +27,26 @@ export function nextRunEpoch(record: TaskRecord): number {
   return Math.max(record.notification.run_epoch, record.burnt_epoch ?? 0) + 1
 }
 
+/**
+ * `restored` with the run `undone` was running burnt: a rollback took that run back, but its epoch was issued once (a
+ * handle may name it), so `nextRunEpoch` starts every later run above it. The one implementation of that rule, shared by
+ * every rollback.
+ */
+export function burnUndoneRun(restored: TaskRecord, undone: TaskRecord): TaskRecord {
+  return {
+    ...restored,
+    burnt_epoch: Math.max(restored.burnt_epoch ?? 0, undone.burnt_epoch ?? 0, undone.notification.run_epoch),
+  }
+}
+
+/**
+ * A stop accepted for the running run (durable `cancel_requested`, written before its terminal) owns how that run ends.
+ * A revival whose prompt was refused never takes such a run back: the pending stop settles it as cancelled.
+ */
+export function acceptedStopOwnsRun(record: TaskRecord): boolean {
+  return record.status === "running" && record.cancel_requested !== undefined
+}
+
 // A record written before run_start_epoch existed names no run start, and its run_epoch moves inside a
 // run (model fallback, reattach), so it cannot key a run. Every such run gets this one fixed key until
 // its first revive, which always writes a real run_start_epoch.

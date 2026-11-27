@@ -1,7 +1,9 @@
 import {
+  DAG_UNATTACHED_NODES_PAUSE_REASON,
   dagRunStartedEvent,
   dagRunFailedEvent,
   dagRunCompletedEvent,
+  dagRunPausedEvent,
   dagWaveStartedEvent,
   dagWaveCompletedEvent,
 } from "./events"
@@ -13,8 +15,9 @@ import {
   TERMINAL_NODE_STATES,
   type SchedulerContext,
 } from "./scheduler-context"
-import { cancelledSnapshot } from "./scheduler-cancellation"
+import { cancelledSnapshot, disposeSupersededChildren, supersededChildren } from "./scheduler-cancellation"
 import { admitFrontier } from "./scheduler-admission"
+import { runRevivalFences } from "./scheduler-pending-revival"
 import { settleOne } from "./scheduler-task-attachment"
 import type { DagNode, DagNodeId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
@@ -24,9 +27,18 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
   if (context.journal.snapshot().status === "pending") {
     context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
   }
+  const superseded = supersededChildren(context)
+  if (superseded.length > 0) await disposeSupersededChildren(context, superseded)
 
   for (;;) {
     if (context.suspended || context.cancellationStarted) return cancelledSnapshot(context)
+    // A waiting node's stale-child fence runs here, between admission passes, where no admission holds
+    // the admission flag (#15150): never from the fold that asked for it. It re-arms a waiter only "after
+    // an event", so no fold, fence and re-arm cycle can repeat on microtasks alone (stack review 3).
+    if (context.revivalFences.size > 0) {
+      await runRevivalFences(context)
+      continue
+    }
     // The skip cascade runs only at frontier quiescence (nothing attached), generalizing the
     // barrier-era rule that dependents were skipped between waves: a failed node stays revivable
     // (send -> revive) while any sibling is still mid-flight, and a revived outcome can complete
@@ -41,12 +53,18 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
     if (context.attachedTasks.size === 0 && !context.infrastructureRetries.pending()) {
       // A retry timer may fire while the admission await yields, after its frontier scan.
       if (context.infrastructureRetries.takeReady()) continue
+      // A waiting node's fold detached it until its fence runs at the top of the loop (#15150).
+      if (context.revivalFences.size > 0) continue
       // #8396 (second symptom): every admission of this pass failed at start, so nothing is
       // attached while the dependents still sit pending. Their skip cascade runs at the top of the
       // loop; throwing here instead left the run `running` forever (28 leaves failed at admission,
       // 2 aggregators pending, retry refused with run_still_active).
       if (hasCascadableDependent(current)) continue
-      throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
+      // Nodes are recorded active, yet this scheduler holds none of their children and can admit
+      // nothing: they belong to a scheduler that is gone. Throwing here left the run `running`
+      // with nobody scheduling it. Parked as paused, recovery reattaches or fails each node.
+      context.journal.append(dagRunPausedEvent({ reason: DAG_UNATTACHED_NODES_PAUSE_REASON }))
+      return context.journal.snapshot()
     }
     if (!(await settleOne(context))) return cancelledSnapshot(context)
   }
@@ -114,7 +132,7 @@ export function emitWaveAdmissions(context: SchedulerContext, scheduled: readonl
   }
 }
 
-function emitCompletedWaves(context: SchedulerContext): void {
+export function emitCompletedWaves(context: SchedulerContext): void {
   if (context.emittedWaveAdmissions.size === 0) return
   const snapshot = context.journal.snapshot()
   const states = new Map(snapshot.nodes.map((node) => [node.id, node.state]))
