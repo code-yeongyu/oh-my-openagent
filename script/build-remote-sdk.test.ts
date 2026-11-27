@@ -117,7 +117,7 @@ describe("omo-ai/remote build", () => {
       const artifacts = new Map([[join(repo, "lib/types/a.d.ts"), "export {}\n"]])
       const indexed = await indexedFiles(repo, join(repo, "lib"))
       expect(staleArtifacts(artifacts, join(repo, "lib/types"), indexed).map((path) => relative(repo, path))).toEqual([
-        "lib/types/a.d.ts",
+        join("lib", "types", "a.d.ts"),
       ])
     } finally {
       rmSync(repo, { recursive: true, force: true })
