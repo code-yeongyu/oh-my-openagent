@@ -310,6 +310,9 @@ export const HELD_CODES: Readonly<Record<string, HeldCode>> = {
     row: "threads.create",
     note: "carried inside an ok answer: the thread is created and the first prompt's failure is its prompt.error",
   },
+  unknown_path: { because: "held-rows", rows: ["config.explain"] },
+  path_not_allowed: { because: "held-rows", rows: ["config.explain", "config.check"] },
+  session_not_found: { because: "held-rows", rows: ["config.modelSwaps"] },
   reply_target_mismatch: {
     because: "principal-only",
     note: "the reply policy refuses a session answering a delivery (T1a); a script holds no reply allowance",

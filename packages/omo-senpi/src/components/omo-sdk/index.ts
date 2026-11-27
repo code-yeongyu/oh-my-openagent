@@ -3,24 +3,40 @@ import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state
 import { type AccessPorts, createAccountAccess } from "./access"
 import { type AccountApi, createAccountApi, type SignInProcess } from "./account"
 import { launcherSignInProcess } from "./account/sign-in-process"
-import { type ConfigApi, createConfigApi } from "./config"
+import { type ConfigApi, type ConfigPorts, createConfigApi } from "./config"
 import { createDeviceServiceApi, type DeviceServiceApi, type DeviceServiceStatusPort } from "./device-service"
 import { createDevicesApi, type DeviceListing, type DevicesApi } from "./devices"
 
 export type { CredentialStorePort, SessionPort } from "./access"
 export type { SignedIn, SignInOptions, SignInProcess, UserCode, WhoAmI } from "./account"
-export type { ConfigStatus } from "./config"
+export type {
+  CheckOptions,
+  ConfigEdit,
+  ConfigExplanation,
+  ConfigPorts,
+  ConfigScope,
+  ConfigStatus,
+  ExplainedLayer,
+  ExplainedValue,
+  ModelSwap,
+  ModelSwaps,
+  PolicyCheck,
+  PolicyFinding,
+  PolicyRule,
+  RoutingEntry,
+} from "./config"
 export type { DeviceServiceStatus, DeviceServiceStatusPort } from "./device-service"
 export type { ListedDevice, LiveDevice } from "./devices"
 export type { OmoError, OmoErrorCode, OmoResult } from "./result"
 
-export type OmoSdkPorts = AccessPorts & {
-  readonly deviceServiceStatus?: DeviceServiceStatusPort
-  /** The clock of devices.list's device-service client; absent, real timers. */
-  readonly remoteTimers?: DeviceListing["timers"]
-  /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
-  readonly signInProcess?: SignInProcess
-}
+export type OmoSdkPorts = AccessPorts &
+  ConfigPorts & {
+    readonly deviceServiceStatus?: DeviceServiceStatusPort
+    /** The clock of devices.list's device-service client; absent, real timers. */
+    readonly remoteTimers?: DeviceListing["timers"]
+    /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
+    readonly signInProcess?: SignInProcess
+  }
 
 export type OmoSdkOptions = {
   /** The account service origin; else `OMO_SERVICE_API_URL` from `env`, else the production API. */
@@ -61,7 +77,7 @@ export function createOmoSdk(options: OmoSdkOptions = {}): OmoSdk {
       stateDir,
       ...(ports.deviceServiceStatus === undefined ? {} : { status: ports.deviceServiceStatus }),
     }),
-    config: createConfigApi({ cwd, env }),
+    config: createConfigApi({ cwd, env, ports }),
     close: access.close,
   }
 }

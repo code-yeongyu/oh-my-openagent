@@ -78,7 +78,8 @@ function secretKeys(value: unknown, path = "$"): string[] {
   if (typeof value === "string") return SECRETS.some((secret) => value.includes(secret)) ? [path] : []
   if (typeof value !== "object" || value === null) return []
   return Object.entries(value).flatMap(([key, child]) => [
-    ...(/token|secret|privateKey/i.test(key) ? [`${path}.${key}`] : []),
+    // A number is a count (the engine's reserveTokens / keepRecentTokens budgets), never a credential.
+    ...(/token|secret|privateKey/i.test(key) && typeof child !== "number" ? [`${path}.${key}`] : []),
     ...secretKeys(child, `${path}.${key}`),
   ])
 }
@@ -400,7 +401,10 @@ describe("config.status", () => {
       ])
         writeFileSync(file, body)
       const env = { HOME: home, OMO_CODING_AGENT_DIR: agentDir, PI_SESSION_FILE: join(base, "session.jsonl") }
-      const answers = await everyConfigRead(createOmoSdk({ env, cwd: project }).config, join(base, "CANARY-PATH-18.jsonl"))
+      const answers = await everyConfigRead(
+        createOmoSdk({ env, cwd: project }).config,
+        join(base, "CANARY-PATH-18.jsonl"),
+      )
       expect(answers.filter(([, answer]) => "threw" in answer)).toEqual([])
       expect(leaks(answers, base)).toEqual({ canaries: [], path: false })
     })

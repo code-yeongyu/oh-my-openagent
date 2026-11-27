@@ -24,19 +24,24 @@ describe("config.status routing", () => {
     )
   })
 
-  test("#given a category whose name breaks the name rule #when status runs #then it is skipped", async () => {
+  test("#given categories and agents a config file defines #when status runs #then only builtin names are listed", async () => {
     sandbox = configSandbox()
-    sandbox.userConfig({ categories: { "Upper Case": { model: "openai/gpt-5.5" }, "my-lane": { model: "openai/gpt-5.5" } } })
-    const names = valueOf(await sandbox.config().status()).routing.categories.map((entry) => entry.name)
-    expect(names).toContain("my-lane")
-    expect(names).not.toContain("Upper Case")
+    sandbox.userConfig({
+      categories: { "Upper Case": { model: "openai/gpt-5.5" }, "my-lane": { model: "openai/gpt-5.5" } },
+      agents: { "my-agent": { model: "openai/gpt-5.5" } },
+    })
+    const { routing } = valueOf(await sandbox.config().status())
+    expect(JSON.stringify(routing)).not.toMatch(/Upper Case|my-lane|my-agent/)
+    expect(routing.categories.map((entry) => entry.name)).toContain("quick")
   })
 
   test("#given a chain holding a credential-shaped model #when status runs #then that rung is dropped and the entry is marked withheld", async () => {
     sandbox = configSandbox()
     sandbox.userConfig({ categories: { quick: { models: ["openai/gpt-5.5", "sk-CANARYCANARYCANARYCANARY"] } } })
     const quick = valueOf(await sandbox.config().status()).routing.categories.find((entry) => entry.name === "quick")
-    expect(quick).toMatchObject({ chain: ["openai/gpt-5.5"], value_withheld: true })
+    expect(quick).toMatchObject({ source: "user", value_withheld: true })
+    expect(quick?.chain[0]).toBe("openai/gpt-5.5")
+    expect(JSON.stringify(quick)).not.toContain("CANARY")
   })
 })
 
