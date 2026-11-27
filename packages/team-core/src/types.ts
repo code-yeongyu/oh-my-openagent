@@ -167,6 +167,9 @@ const RuntimeStateMemberSchema = z
     status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
     color: z.string().optional(),
     worktreePath: z.string().optional(),
+    /** The topmost directory team creation made for this member's worktreePath. Teardown removes only this, never a
+     * worktreePath that already existed (#11072). Absent means nothing was created, so nothing is removed. */
+    worktreeCreated: z.string().optional(),
     lastInjectedTurnMarker: z.string().optional(),
     pendingInjectedMessageIds: z.array(z.string()).default([]),
   })

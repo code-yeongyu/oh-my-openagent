@@ -179,7 +179,8 @@ async function deleteTeamResources(
     }
   }
 
-  const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.worktreePath))
+  // Only directories team creation made; a member worktreePath that already existed is left alone (#11072).
+  const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.worktreeCreated))
 
   if (runtimeState.status !== "deleted") {
     await transitionRuntimeState(

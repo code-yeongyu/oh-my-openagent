@@ -12,6 +12,7 @@ import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 type SpawnedMemberResource = {
   taskId?: string
   worktreePath?: string
+  worktreeCreated?: string
 }
 
 function normalizeError(error: unknown): Error {
@@ -61,12 +62,13 @@ export async function cleanupTeamRunResources(args: {
       }
     }
 
-    if (resource.worktreePath) {
+    // Only what creation made: a worktreePath that already existed is the user's, never ours to remove (#11072).
+    if (resource.worktreeCreated) {
       try {
-        await rm(resource.worktreePath, { recursive: true, force: true })
-        cleanupReport.removedWorktrees.push(resource.worktreePath)
+        await rm(resource.worktreeCreated, { recursive: true, force: true })
+        cleanupReport.removedWorktrees.push(resource.worktreeCreated)
       } catch (cleanupError) {
-        cleanupReport.errors.push(`worktree ${resource.worktreePath}: ${normalizeError(cleanupError).message}`)
+        cleanupReport.errors.push(`worktree ${resource.worktreeCreated}: ${normalizeError(cleanupError).message}`)
       }
     }
   }

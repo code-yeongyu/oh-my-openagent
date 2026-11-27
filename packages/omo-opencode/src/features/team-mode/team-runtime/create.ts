@@ -30,6 +30,7 @@ const SESSION_ID_POLL_MS = 25
 type SpawnedMemberResource = {
   taskId?: string
   worktreePath?: string
+  worktreeCreated?: string
 }
 
 type CreateTeamRunOptions = {
@@ -87,12 +88,16 @@ async function findExistingRuntime(
   }
 }
 
-async function createMemberWorktree(memberWorktreePath: string, projectRoot: string): Promise<string> {
+/** `created` is the topmost directory this call made, or undefined when the path already existed (#11072). */
+async function createMemberWorktree(
+  memberWorktreePath: string,
+  projectRoot: string,
+): Promise<{ path: string; created?: string }> {
   const absolutePath = path.isAbsolute(memberWorktreePath)
     ? memberWorktreePath
     : path.resolve(projectRoot, memberWorktreePath)
-  await mkdir(absolutePath, { recursive: true })
-  return absolutePath
+  const created = await mkdir(absolutePath, { recursive: true })
+  return created === undefined ? { path: absolutePath } : { path: absolutePath, created }
 }
 
 async function waitForTaskSessionId(
@@ -211,8 +216,11 @@ export async function createTeamRun(
           if (!resource) return
 
           try {
-            if (member.worktreePath)
-              resource.worktreePath = await createMemberWorktree(member.worktreePath, ctx.directory)
+            if (member.worktreePath) {
+              const worktree = await createMemberWorktree(member.worktreePath, ctx.directory)
+              resource.worktreePath = worktree.path
+              if (worktree.created !== undefined) resource.worktreeCreated = worktree.created
+            }
             if (reusesCallerLeadSession && member.name === spec.leadAgentId) {
               if (resource.worktreePath) {
                 await updateMemberInRuntimeState(
@@ -221,6 +229,7 @@ export async function createTeamRun(
                   (currentMember) => ({
                     ...currentMember,
                     worktreePath: resource.worktreePath,
+                    ...(resource.worktreeCreated ? { worktreeCreated: resource.worktreeCreated } : {}),
                   }),
                   config,
                 )
@@ -293,6 +302,7 @@ export async function createTeamRun(
                 sessionId,
                 status: "running",
                 worktreePath: resource.worktreePath,
+                ...(resource.worktreeCreated ? { worktreeCreated: resource.worktreeCreated } : {}),
                 subagent_type: resolvedMember.agentToUse,
                 ...(member.kind === "category" ? { category: member.category } : {}),
                 ...(persistedModel ? { model: persistedModel } : {}),

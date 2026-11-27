@@ -3,7 +3,7 @@
 // allow: SIZE_OK - team runtime creation tests share filesystem and tmux mock state; this release adds small lock/spawn coverage and future edits should split by runtime phase.
 
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { access, mkdtemp, readdir, rm } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -373,6 +373,40 @@ describe("createTeamRun", () => {
 
     // then
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-1"))).toBe(false)
+    expect(await pathExists(path.resolve(baseDir, "./worktrees/member-2"))).toBe(false)
+  })
+
+  test("keeps a worktreePath that already existed when spawn fails after worktree setup (#11072)", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-existing-worktree-"))
+    temporaryDirectories.push(baseDir)
+    const existing = path.resolve(baseDir, "./worktrees/member-1")
+    await mkdir(existing, { recursive: true })
+    await writeFile(path.join(existing, "work.txt"), "unpushed work")
+    let launchCount = 0
+    const { manager } = createManager(baseDir, async () => {
+      launchCount += 1
+      if (launchCount === 2) throw new Error("launch-2 failed")
+      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
+    })
+
+    // when
+    await createTeamRun(
+      createSpec(2, true),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
+      .then(() => {
+        throw new Error("expected createTeamRun to reject")
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof TeamRunCreateError)) throw error
+      })
+
+    // then
+    expect(await readFile(path.join(existing, "work.txt"), "utf8")).toBe("unpushed work")
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-2"))).toBe(false)
   })
 
