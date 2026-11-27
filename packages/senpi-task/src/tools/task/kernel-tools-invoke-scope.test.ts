@@ -16,6 +16,7 @@ import { createTaskRecordStore } from "../../store"
 import { buildTaskExecute } from "./execute"
 import { makeDeps } from "./__fixtures__/task-tool-fakes"
 import type { TaskToolContext, TaskToolDetails } from "./types"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const roots: string[] = []
 afterEach(() => {
@@ -35,7 +36,7 @@ const CURATED: AgentDefinition = { name: "explore" }
 function harness() {
   const root = mkdtempSync(join(tmpdir(), "omp-b2-scope-"))
   roots.push(root)
-  const store = createTaskRecordStore({ project_dir: root })
+  const store = createTaskRecordStore(ownedTaskState(root))
   const sessions: CreateAgentSessionOptions[] = []
   const bindings = createKernelToolBindings()
   const inProcess = new InProcessRunner({

@@ -2,6 +2,7 @@
 //! shapes, and the imported corpus values against the contract's types.
 
 mod imported;
+mod receipt_delivery;
 mod receipts;
 mod shape_cases;
 mod shapes;
@@ -28,8 +29,12 @@ fn parts(disposition: Disposition, effect: Effect, evidence: Vec<Evidence>) -> R
         warning: None,
         audit_ids: Vec::new(),
         timings: None,
+        settle: None,
         evidence,
         observation: UntrustedText,
+        paused: Vec::new(),
+        session: None,
+        target: None,
     }
 }
 

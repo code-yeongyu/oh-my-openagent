@@ -54,7 +54,7 @@ describe("LA6 an insecure state dir is refused", () => {
     chmodSync(target, 0o755)
     const link = join(freshStateDir(), "link")
     symlinkSync(target, link)
-    expect(await rejectionOf(posixSecureFile(link, "dir"))).toMatchObject({
+    expect(await rejectionOf(posixSecureFile(link, "dir", "existing"))).toMatchObject({
       code: "insecure_state_dir",
     })
     expect(statSync(target).mode & 0o777).toBe(0o755)

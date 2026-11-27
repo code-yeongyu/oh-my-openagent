@@ -95,7 +95,7 @@ const { omowright } = await loadOmowright()
 A browser your code launches with a task-owned profile. `connectPipe` opens no listening port; `connectCloakProfile` launches CloakBrowser with a pinned fingerprint seed and is the path for WAF, Cloudflare and bot-scored pages.
 
 ```js
-const browser = await omowright.connectPipe({ browserPath, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
+const browser = await omowright.connectPipe({ browserPath: omowright.detectBrowsers().find((b) => b.installed)?.binary, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
 try {
   const page = await browser.newTab(url)
   const tree = omowright.compactSnapshot(await page.snapshot())   // the read; refs come from it

@@ -40,21 +40,26 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
       // A failed read says nothing about sync, so it changes no notice; the next change reads again.
       const status = await read(repo).catch(() => undefined)
       if (status === undefined) return
+      const shown = shownSyncFailure(status)
       const failure =
-        status?.kind === "frozen"
-          ? (await import("#omo-memory-sync-runtime")).freezeFailure(status)
-          : shownSyncFailure(status)
+        status?.kind === "frozen" ? (await import("#omo-memory-sync-runtime")).freezeFailure(status) : shown
       const previous = announced.get(repo)
       if (failure === undefined) {
         announced.delete(repo)
-        if (previous !== undefined) ui?.notify(SYNC_RECOVERED_NOTICE, "info")
+        // A repo with no engine (sync turned off on this device, #14093) has no status: it did not recover.
+        if (previous !== undefined && status !== null) ui?.notify(SYNC_RECOVERED_NOTICE, "info")
         return
       }
       const key = `${failure.kind}\n${failure.action}`
       // Background transitions must not consume a notice the person has never seen.
       if (previous === key || ui === undefined) return
       const prefix = failure.kind === "oversized_item" ? SYNC_HELD_NOTICE_PREFIX : SYNC_BLOCKED_NOTICE_PREFIX
-      ui.notify(`${prefix} ${failure.reason} ${failure.action}`, "warning")
+      // A cause exists only while the engine runs, so its words ship in the sync sidecar with it (#13635).
+      const cause =
+        shown !== undefined && "cause" in shown
+          ? ` ${(await import("#omo-memory-sync-runtime")).causeNote(shown.cause)}`
+          : ""
+      ui.notify(`${prefix} ${failure.reason} ${failure.action}${cause}`, "warning")
       announced.set(repo, key)
     },
   }

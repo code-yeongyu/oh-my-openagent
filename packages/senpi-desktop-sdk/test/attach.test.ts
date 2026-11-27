@@ -25,6 +25,7 @@ interface FakeDaemon {
   received(method: string): Promise<void>
   push(line: unknown): void
   dropAll(): void
+  endAll(): void
 }
 
 const cleanup: Array<() => Promise<void> | void> = []
@@ -34,8 +35,11 @@ afterEach(async () => {
   for (const step of cleanup.splice(0).reverse()) await step()
 })
 
+// A unix socket path holds about 104 bytes: under a longer TMPDIR the fake daemon's `listen` fails EINVAL.
+const BASE = path.join(tmpdir(), "senpi-attach-XXXXXX", "e.sock").length < 100 ? tmpdir() : "/tmp"
+
 function privateDir(mode = 0o700): string {
-  const dir = fs.mkdtempSync(path.join(tmpdir(), "senpi-attach-"))
+  const dir = fs.mkdtempSync(path.join(BASE, "senpi-attach-"))
   fs.chmodSync(dir, mode)
   cleanup.push(() => fs.rmSync(dir, { recursive: true, force: true }))
   return dir
@@ -94,6 +98,9 @@ async function fakeDaemon(dir = privateDir(), unanswered = ""): Promise<FakeDaem
       }),
     dropAll: () => {
       for (const socket of sockets) socket.destroy()
+    },
+    endAll: () => {
+      for (const socket of sockets) socket.end()
     },
     push: (line) => {
       for (const socket of sockets) socket.write(`${JSON.stringify(line)}\n`)
@@ -255,6 +262,18 @@ describe.skipIf(process.platform === "win32")("sdk attach over a unix socket", (
     expect(daemon.connections).toEqual([[]])
   })
 
+  it("#given an already-aborted signal #when a call is made #then it is cancelled and nothing is sent", async () => {
+    const daemon = await fakeDaemon()
+    const port = await attachUds(daemon.endpoint, environment({}))
+    cleanup.push(() => port.close())
+
+    const outcome = port.call("windows", {}, { signal: AbortSignal.abort() }).catch((error: unknown) => error)
+    await port.call("capabilities", {})
+
+    expect(await outcome).toMatchObject({ code: "Cancelled", nothingSent: true })
+    expect(daemon.connections[0]?.map((line) => JSON.parse(line).method)).toEqual(["capabilities"])
+  })
+
   it("#given a request in flight #when the daemon drops the connection #then the call rejects as Closed", async () => {
     const daemon = await fakeDaemon(privateDir(), "windows")
     const port = await attachUds(daemon.endpoint, environment({}))
@@ -267,4 +286,32 @@ describe.skipIf(process.platform === "win32")("sdk attach over a unix socket", (
     expect(await outcome).toMatchObject({ code: "Closed" })
     await expect(port.call("windows", {})).rejects.toMatchObject({ code: "Closed", nothingSent: true })
   })
+
+  it("#given an oversized request #when the daemon answers request_too_large under its id #then the call rejects with that reason", async () => {
+    const daemon = await fakeDaemon(privateDir(), "windows")
+    const port = await attachUds(daemon.endpoint, environment({}))
+    const arrived = daemon.received("windows")
+
+    const outcome = port.call("windows", {}).catch((error: unknown) => error)
+    await arrived
+    daemon.push({ jsonrpc: "2.0", id: 1, error: { code: -32603, message: "too large", data: TOO_LARGE } })
+
+    expect(await outcome).toMatchObject({ rpcCode: -32603, data: TOO_LARGE })
+    await port.close()
+  })
+
+  it("#given an oversized request whose id the daemon cannot read #when it refuses with a null id and closes #then the pending call rejects with that refusal", async () => {
+    const daemon = await fakeDaemon(privateDir(), "windows")
+    const port = await attachUds(daemon.endpoint, environment({}))
+    const arrived = daemon.received("windows")
+
+    const outcome = port.call("windows", {}).catch((error: unknown) => error)
+    await arrived
+    daemon.push({ jsonrpc: "2.0", id: null, error: { code: -32603, message: "too large, closing", data: TOO_LARGE } })
+    daemon.endAll()
+
+    expect(await outcome).toMatchObject({ message: "too large, closing", rpcCode: -32603, data: TOO_LARGE })
+  })
 })
+
+const TOO_LARGE = { code: "Internal", reason: "request_too_large" }

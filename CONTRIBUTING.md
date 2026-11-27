@@ -366,6 +366,16 @@ Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the 
 - [ ] Updated documentation if needed (README, AGENTS.md)
 - [ ] No version changes in `package.json`
 
+### CI on pull requests: Linux only, macOS/Windows on request
+
+Pull request CI runs on Linux. macOS and Windows run after merge, on the push to `dev`, and in the release workflows. To run them on a pull request, add the `ci:full-matrix` label. The label is honored only when the diff touches a platform-specific path (native crates, launchers, platform packages, OS-named files) or the PR body contains this line:
+
+```
+Platform-reason: <why this change needs macOS/Windows on the pull request>
+```
+
+Without either, the label's gate fails within seconds and CI stays on Linux. Add the line and re-apply the label, or remove the label.
+
 ## Publishing
 
 **Important**: Publishing is handled exclusively through GitHub Actions.

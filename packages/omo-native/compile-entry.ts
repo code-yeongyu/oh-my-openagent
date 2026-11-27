@@ -43,13 +43,15 @@ import {
   loadCompiledModelCatalog,
 } from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
+import { enterOwnHostScope } from "./host-scope"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
 import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
-import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
+import { refreshSessionHostUnit, runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
+import { runtimeGate } from "./release-version"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
@@ -391,6 +393,16 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  // #13449: in a compiled binary the kill guard's shims ask THIS executable `__kill-guard check ...` before every kill,
+  // so this branch hands it to the engine's judge before any boot step: on this route there is no handoff, no
+  // migration and no agent-dir write. It is the one exception to the #10697 line below; every other start still runs
+  // it. The literal path is load-bearing for the same reason as the engine import (see the note above).
+  if (process.argv[2] === "__kill-guard") {
+    const { dispatchKillGuardCommand } =
+      await import("../../node_modules/@code-yeongyu/senpi/dist/cli/kill-guard-command.js")
+    await dispatchKillGuardCommand(process.argv.slice(2))
+    return
+  }
   // The #10697 plaintext file goes before ANY command, including the answers below that return early.
   removeLegacyServiceCredentials()
   // Before anything opens TLS, and on every start: `host ensure`, the host daemon and the
@@ -508,6 +520,9 @@ async function main(): Promise<void> {
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
+    // Before the prune: a session host unit must never keep naming a runtime this launch is about to remove.
+    const isOlder = runtimeGate(manifest.omoAiVersion)
+    if (isOlder !== undefined) await refreshSessionHostUnit(isOlder)
     reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
     removeReplacedLauncher(launch.launcher)
   }
@@ -538,7 +553,11 @@ async function main(): Promise<void> {
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
-  if (isInternalSupervisorLaunch(process.argv.slice(2)) && (await runInternalSupervisor(process.argv.slice(2)))) return
+  if (isInternalSupervisorLaunch(process.argv.slice(2))) {
+    // #14341: before the supervisor spawns its host, so the host and its tool children are born in the scope.
+    await enterOwnHostScope(process.argv.slice(2))
+    if (await runInternalSupervisor(process.argv.slice(2))) return
+  }
   await claimMemorySyncAtBoot(process.argv.slice(2))
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above

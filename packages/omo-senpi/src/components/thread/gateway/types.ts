@@ -4,9 +4,37 @@ export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
 export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "refused" | "uncertain"
 
-export type EffectiveLane = "steer" | "follow_up"
+/** Application evidence, separate from the historical admission lane of a retained receipt. */
+export type ReceiptRefusalReason = "expired" | "not_steerable" | "turn_conflict" | "target_closed"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed"
+export type ReceiptOutcome =
+  | { readonly kind: "pending" | "admitted" | "applied" | "outcome_unavailable" }
+  | { readonly kind: "refused"; readonly reason: ReceiptRefusalReason }
+
+export type RefusalNotice = {
+  readonly row_id: string
+  readonly delivery_id: string
+  readonly device: string
+  readonly session: string
+  readonly target_durable_id: string
+  readonly reason: ReceiptRefusalReason
+}
+
+/**
+ * The lane a delivery took at its receiver: `start` began a turn on an idle session (through the engine's followUp lane),
+ * `steer` joined the running turn, `follow_up` waits behind a turn or a hold.
+ */
+export type EffectiveLane = "start" | "steer" | "follow_up"
+
+export type RefusalReason =
+  | "not_steerable"
+  | "turn_conflict"
+  | "expired"
+  | "sender_not_admitted"
+  /** The target was closed on request after the row was queued, before it took the message (#14273). */
+  | "target_closed"
+  /** A newer delivery from the same sender under the same collapse key replaced it before the target took it (#14428). */
+  | "superseded"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -16,25 +44,12 @@ export type ProcessIdentity = {
   readonly runtime_instance: string | null
 }
 
-/**
- * The human who wrote a binding inbound message (or answered a question), as the connector
- * authenticated them: the platform's user id, their display name, and optionally the omo user
- * the connector mapped them to. Validated at the relay boundary (`author.ts`).
- */
-export type ExternalAuthor = {
-  readonly platform_user_id: string
-  readonly display: string
-  readonly user_id?: string
-}
-
 export type ExternalOrigin = {
   readonly platform: string
   readonly account_id: string
   readonly chat_id: string
   readonly thread_id: string
   readonly message_id: string
-  /** Absent on a message sent without an author, and on every row written before authors existed. */
-  readonly author?: ExternalAuthor
 }
 
 export type EnvelopeOrigin = { readonly session: string } | { readonly external: ExternalOrigin }
@@ -56,6 +71,12 @@ export type Provenance = {
 /** No device service is set up here, it did not answer, or it answered without a device id. */
 export type DeviceAbsentReason = "no_device_service" | "device_service_unavailable" | "no_device_id"
 
+/**
+ * `creator`: the first prompt of a thread_create, sent by the session that created the target (#14045). The target
+ * receives it as its own first user message, with the creator's authority, instead of a relayed peer message.
+ */
+export type DeliveryAuthority = "creator"
+
 export type DeliveryEnvelope = {
   readonly provenance: Provenance
   readonly origin: EnvelopeOrigin
@@ -64,6 +85,7 @@ export type DeliveryEnvelope = {
   readonly root_id: string
   readonly hop: number
   readonly delivery_id: string
+  readonly authority?: DeliveryAuthority
 }
 
 /** JSON written before provenance was recorded remains readable, never attributed to the receiver. */
@@ -95,14 +117,56 @@ export type DeliveryRow = {
   readonly created_at: number
   readonly updated_at: number
   readonly expires_at: number
-  readonly binding_id: string | null
-  readonly binding_revision: number | null
-  readonly actor_user_id: string | null
+  /** The engine ledger key of a delivery taken in from another device (`device:<attested device>/<sender's id>`); null on every other row. */
+  readonly ledger_id?: string | null
+  /** The sender's rendered text and display text of such a delivery, handed to the engine unrendered; null on every other row. */
+  readonly verbatim_text?: string | null
+  readonly verbatim_display_text?: string | null
+  /** The sender's collapse key (#14428); null on a row sent without one. */
+  readonly collapse_key?: string | null
+}
+
+/** A delivery record another device's service attested, as the sender's relay leg writes it (`remote/relay-transport.ts`). */
+export type IntakeRecord = {
+  readonly sessionId: string
+  readonly deliveryId: string
+  readonly text: string
+  readonly displayText: string
+  readonly sender: { readonly kind: string; readonly session_id?: string; readonly name?: string }
+  readonly deliverAs: "followUp" | "steer"
+  readonly chainCount: number
 }
 
 /**
+ * Takes a record in for a session on this device that is not running (#13037). `attested_device` comes from the receiving
+ * device service, never from the record; `target_session_kind` and `chain_count_limit` are this device's facts.
+ */
+export type IntakeRequest = {
+  readonly now: number
+  readonly attested_device: string
+  readonly record: IntakeRecord
+  readonly provenance: Pick<Provenance, "workspace" | "project" | "lane" | "session">
+  readonly target_session_kind: "interactive" | "worker" | "child"
+  /** The machine's chain limit setting; absent when the user set none. */
+  readonly chain_count_limit?: number
+}
+
+export type IntakeOutcome =
+  | {
+      readonly kind: "queued"
+      /** The sender's own delivery id. */
+      readonly delivery_id: string
+      readonly row_id: string
+      readonly ledger_id: string
+      readonly queue_position: number
+      readonly deduplicated: boolean
+    }
+  | StoreRefusal
+  | { readonly kind: "busy" }
+
+/**
  * Who is sending. Every kind maps to one receipt/budget principal and one causal-graph node:
- * a session is `session:<durable id>`, the CLI is `cli:<uid>`, a connector is `binding:<id>`.
+ * a session is `session:<durable id>`, the CLI is `cli:<uid>`, a person is `person:<uid>`.
  * `turn_id` and `cause_delivery_id` come from the sender's runtime context, never from a model.
  */
 export type GatewaySender =
@@ -116,12 +180,6 @@ export type GatewaySender =
   | { readonly kind: "cli"; readonly uid: number; readonly user: string }
   /** The person at a terminal sending their own input to a session on another device (`omo remote send`): a prompt, never a delivery with an envelope. */
   | { readonly kind: "person"; readonly uid: number; readonly user: string }
-  | {
-      readonly kind: "external"
-      readonly origin: ExternalOrigin
-      readonly binding_id: string
-      readonly binding_revision: number
-    }
 
 export type EnqueueRequest = {
   readonly provenance: Provenance
@@ -129,22 +187,29 @@ export type EnqueueRequest = {
   readonly delivery_id: string
   readonly target_durable_id: string
   readonly sender_principal: string
-  /** The pair rate bucket's sender key; `sender_principal` when absent (a binding sender with an author is `binding:<id>#author:<platform user id>`). */
+  /** The pair rate bucket's sender key; `sender_principal` when absent. */
   readonly rate_principal?: string
   readonly sender_node: string
   readonly sender_turn: string | null
   readonly cause_delivery_id: string | null
   /** The highest hop an input of the sender's run arrived with from another device (no row here); the chain continues from it (K8). */
   readonly inbound_hop?: number
+  readonly authority?: DeliveryAuthority
   readonly claimed_root_id: string | null
   readonly origin: EnvelopeOrigin
   readonly actor: string
   readonly body: string
   readonly mode: GatewayDeliveryMode
   readonly expected_turn_id: number | null
-  readonly binding: { readonly binding_id: string; readonly revision: number } | null
+  /**
+   * Always null: no send carries a binding since #14312. Kept on the wire because a store worker of an older build reads it
+   * on every enqueue, and a session still running schema 14 keeps that worker across an upgrade (#14382).
+   */
+  readonly binding: null
   readonly receipt: { readonly idempotency_key: string; readonly args_hash: string }
   readonly endpoint_kind: "rpc_host" | "tui" | null
+  /** Replaces the sender's earlier undelivered delivery to this target under the same key (#14428). */
+  readonly collapse_key?: string
 }
 
 export type StoreRefusal = {
@@ -156,6 +221,8 @@ export type StoreRefusal = {
 
 export type EnqueueOutcome =
   | { readonly kind: "inserted"; readonly row: DeliveryRow; readonly queue_position: number }
+  /** The sender's earlier delivery under the same collapse key, already in the session's runtime, absorbed this one. */
+  | { readonly kind: "collapsed"; readonly row: DeliveryRow; readonly queue_position: number }
   | { readonly kind: "replay"; readonly result: unknown }
   | StoreRefusal
   | { readonly kind: "busy" }
@@ -200,12 +267,15 @@ export type OutcomeRecord =
       readonly admission_kind: string
       readonly turn_epoch: number
       readonly wait_kind?: "approval"
+      /** The lane the admission actually took, when it differs from the one claimed (decided again at admission). */
+      readonly mode_effective?: EffectiveLane
     }
   | {
       readonly kind: "applied"
       readonly admission_kind: string
       readonly turn_epoch: number
       readonly wait_kind?: "approval"
+      readonly mode_effective?: EffectiveLane
     }
   | { readonly kind: "requeue" }
   | { readonly kind: "refused"; readonly reason: RefusalReason }
@@ -219,13 +289,16 @@ export type RecordOutcomeRequest = {
 
 export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
-  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  | { readonly kind: "queued"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+  /** `reason: wake_unavailable`: the same-device switch is on and the target was asked to wake, but no carrier runs (#13037). */
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
- * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
- * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
+ * What the receiver is parked on while the delivery waits (omo#13037 5.1): an approval (a tool permission or question) a
+ * human must answer on that device, a hold on the session, or the wake of a session no engine runs. `device` is the account
+ * device it waits on; absent when this install has no device identity (#13014).
  */
-export type DeliveryWait = { readonly kind: "approval"; readonly device?: string }
+export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"
@@ -233,9 +306,12 @@ export type GatewayDeliverySuccess = {
   readonly delivery_id: string
   readonly message_seq: number
   readonly delivery: GatewayDeliveryDelivery
+  readonly outcome?: ReceiptOutcome
   readonly effective_mode: GatewayDeliveryMode | EffectiveLane
   readonly endpoint_kind: "rpc_host" | "tui" | null
   readonly deduplicated: boolean
+  /** A collapse-key repeat the target already held an earlier message for: this send's text was not delivered (#14428). */
+  readonly collapsed?: true
 }
 
 export type GatewayDeliveryResult =

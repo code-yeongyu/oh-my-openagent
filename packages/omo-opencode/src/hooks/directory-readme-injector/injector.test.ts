@@ -1,13 +1,14 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { PluginInput } from "@opencode-ai/plugin"
+import * as logger from "../../shared/logger"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const storageMaps = new Map<string, Set<string>>()
-const logMock = mock(() => undefined)
 
 mock.module("./storage", () => ({
   loadInjectedPaths: (sessionID: string) => storageMaps.get(sessionID) ?? new Set<string>(),
@@ -15,10 +16,7 @@ mock.module("./storage", () => ({
     storageMaps.set(sessionID, paths)
   },
 }))
-
-mock.module("../../shared/logger", () => ({
-  log: logMock,
-}))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
@@ -45,15 +43,17 @@ function createTruncator(input?: { truncated?: boolean; result?: string }) {
 
 describe("processFilePathForReadmeInjection", () => {
   let testRoot = ""
+  let logSpy: ReturnType<typeof spyOn<typeof logger, "log">>
 
   beforeEach(() => {
     testRoot = join(tmpdir(), `directory-readme-injector-${randomUUID()}`)
     mkdirSync(testRoot, { recursive: true })
     storageMaps.clear()
-    logMock.mockClear()
+    logSpy = spyOn(logger, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {
+    logSpy.mockRestore()
     rmSync(testRoot, { recursive: true, force: true })
     storageMaps.clear()
   })
@@ -279,7 +279,7 @@ describe("processFilePathForReadmeInjection", () => {
     expect(output.output).toBe("base")
     expect(storageMaps.has(sessionID)).toBe(false)
     expect(sessionCaches.get(sessionID)?.has(sourceDirectory) ?? false).toBe(false)
-    expect(logMock).toHaveBeenCalledWith(
+    expect(logSpy).toHaveBeenCalledWith(
       "[directory-readme-injector] Skipped README injection after read/truncate failure",
       {
         error: "truncator unavailable",

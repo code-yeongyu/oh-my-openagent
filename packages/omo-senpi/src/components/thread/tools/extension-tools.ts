@@ -6,6 +6,7 @@
  * inside the op's transaction. There is never an argument fallback for the caller.
  */
 import type { AgentToolResult } from "@code-yeongyu/senpi"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 import type { ThreadToolResult } from "../contracts"
 import type { DeclaredSessionOp, StoreExtensionResult } from "../gateway/store"
@@ -44,10 +45,7 @@ export async function recordThreadCreator(
   runtimeId: string,
   created: ThreadToolResult,
 ): Promise<ThreadToolResult> {
-  const createdId =
-    created.kind === "ok"
-      ? (created as { readonly thread?: { readonly thread_id?: unknown } }).thread?.thread_id
-      : undefined
+  const createdId = created.kind === "ok" ? (created as { readonly thread?: unknown }).thread : undefined
   if (typeof createdId !== "string") return created
   const creator = resolveCallerDurableId(options, view, runtimeId)
   if (creator !== undefined && creator !== createdId)
@@ -56,7 +54,11 @@ export async function recordThreadCreator(
 }
 
 function output(result: ExtensionCallResult): ExtensionToolOutput {
-  return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    details: { result },
+    ...(result.kind === "ok" ? {} : { isError: true }),
+  }
 }
 
 function extensionTool(options: ThreadToolSurfaceOptions, op: DeclaredSessionOp): AnyTool {
@@ -90,7 +92,7 @@ export async function buildExtensionTools(options: ThreadToolSurfaceOptions): Pr
 
 export type ExtensionToolHost = {
   registerTool(tool: Record<string, unknown>): void
-  on?(event: string, handler: () => void): void
+  on?(event: string, handler: (event: unknown, ctx?: unknown) => unknown): void
   /** senpi's tool registry for the session (builtins and every extension's tools). */
   getAllTools?(): readonly { readonly name: string }[]
 }
@@ -119,7 +121,7 @@ export function registerExtensionTools(
   const skip = (name: string, why: string): void => {
     if (reported.has(name)) return
     reported.add(name)
-    log(`thread gateway: extension session tool ${name} was not registered: ${why}`)
+    log(`thread gateway: extension session tool ${escapeForDisplay(name)} was not registered: ${why}`)
   }
   pi.on("session_start", () => {
     void buildExtensionTools(options).then(

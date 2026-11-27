@@ -1,0 +1,72 @@
+{
+  "domain": "boulder",
+  "rows": [
+    {
+      "id": "boulder.status",
+      "kind": "capability",
+      "sdk": "boulder.status",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "work_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "boulder"
+          ],
+          "flags": {
+            "-d": "directory",
+            "--directory": "directory",
+            "-w": "work_id",
+            "--work-id": "work_id",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Planned (OC2)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "position": 11,
+      "ids": [
+        "boulder.status"
+      ],
+      "cells": [
+        "`boulder.status({ directory?, work_id? })`, over `packages/boulder-state`",
+        "`boulder [-d\\|--directory] [-w\\|--work-id] [--json]`",
+        "**no**",
+        "Planned (OC2)",
+        "OC2"
+      ]
+    }
+  ]
+}

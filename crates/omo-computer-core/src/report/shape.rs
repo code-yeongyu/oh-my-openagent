@@ -117,6 +117,13 @@ fn check_effect(shape: &Shape<'_>, verb: Option<VerbClass>) -> Result<(), Report
         Effect::SuspectedNoop if observations().next().is_some() => {
             Err(ReportRejection::SuspectedNoopWithObservation)
         }
+        _ if matches!(
+            delivery,
+            Delivery::NotDelivered | Delivery::DeliveredUnverified | Delivery::Unknown
+        ) && receipts().next().is_some() =>
+        {
+            Err(ReportRejection::ReceiptWithoutVerifiedDelivery { delivery })
+        }
         _ => Ok(()),
     }
 }

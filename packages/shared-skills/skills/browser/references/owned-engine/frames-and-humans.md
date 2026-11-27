@@ -20,9 +20,15 @@ miss has another cause and you climb the ladder instead.
 ## Dialogs never block
 
 `alert`, `confirm`, `prompt`, and `beforeunload` are answered at the protocol layer, before the
-page sees them: by a `dialog` listener that answers, otherwise by the `dialogPolicy` passed to
-`connectPipe` (or `browser.setDialogPolicy`). Default to accepting (`{ accept: true }`; a policy
-function receives a plain `{ type, message, defaultPrompt, url }` and returns `{ accept, promptText }`).
+page sees them: by a `dialog` listener that answers, otherwise by the `dialogPolicy` passed when
+the connection is made (`connectPipe`, `connect(url, { dialogPolicy })` or `connectNamed(name, {
+dialogPolicy })`). Default to accepting (`{ accept: true }`; a policy function receives a plain
+`{ type, message, defaultPrompt, url }` and returns `{ accept, promptText }`).
+
+Pass the policy at connect time rather than calling `browser.setDialogPolicy` later. Attaches made
+with `connect(url)` or `connectNamed` in one process share one connection per browser, and on a
+connection with two or more holders `setDialogPolicy` throws `SharedConnectionError` (code
+`shared_connection`). Passing `dialogPolicy` when attaching gives you a connection of your own.
 
 `page.on("dialog", (dialog) => ...)` hands each listener a Playwright-style `Dialog` object, not a
 plain object: read it through methods (`dialog.type()`, `dialog.message()`, `dialog.defaultValue()`,
@@ -30,6 +36,7 @@ and the `dialog.url` getter). A listener can answer it itself, which replaces th
 dialog; a listener that only observes leaves it to the policy:
 
 ```js
+// given: page, omowright
 page.on("dialog", (dialog) => dialog.type() === "prompt" ? dialog.accept("42") : dialog.dismiss())
 ```
 
@@ -50,12 +57,18 @@ When every rung fails on a login, a one-time code, or a challenge you cannot cle
 the fallback, not the failure:
 
 ```js
-const { outcome } = await omowright.requestHuman(page, {
+const flag = `${(await import("node:os")).tmpdir()}/signed-in-${Date.now()}.flag`
+await tool.monitor({ description: "sign-in finished", path: flag, event: "create" })   // subscribe first
+globalThis.handoff = omowright.requestHuman(page, {
   prompt: "Please finish the sign-in in this window.",
   until: { url: /\/dashboard/ },          // or { selector } or async (page) => boolean
   timeoutMs: 300_000,
-})
+}).then((r) => Bun.write(flag, r.outcome), (e) => Bun.write(flag, `failed: ${e.message}`))
 ```
+
+Never `await` it in the cell: a person takes longer than a cell, and the page stays usable from
+other cells while the handoff is pending (measured: a second cell snapshotted the page 6 s in,
+before the person finished).
 
 It brings the window to the front, shows a banner with a Done button, and waits on a
 **condition** with a bounded timeout rather than a fixed delay. Respect the answer: `timed_out`

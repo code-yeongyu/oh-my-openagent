@@ -13,6 +13,7 @@ import {
   extensionBuildPaths,
   GATEWAY_STORE_WORKER_NAME,
   memorySyncAssetSources,
+  OMO_SDK_RELATIVE_PATH,
   resolveOutputs,
   THREAD_SDK_RELATIVE_PATH,
 } from "./build-extension-core.mjs"
@@ -36,6 +37,7 @@ export async function checkExtensionCurrent(options = {}) {
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     bunshinTsOutput,
+    omoSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
     memoryDoctorOutput,
@@ -50,6 +52,7 @@ export async function checkExtensionCurrent(options = {}) {
     telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
+    wakeOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
     desktopToolkitOutput,
@@ -61,6 +64,8 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
   const currentBunshinTs = await readBuiltEntry(bunshinTsOutput)
   if (currentBunshinTs === undefined) return { ok: false, reason: "missing-output", output: bunshinTsOutput }
+  const currentOmoSdk = await readBuiltEntry(omoSdkOutput)
+  if (currentOmoSdk === undefined) return { ok: false, reason: "missing-output", output: omoSdkOutput }
   const currentRollbackRuntime = await readBuiltEntry(rollbackRuntimeOutput)
   if (currentRollbackRuntime === undefined)
     return { ok: false, reason: "missing-output", output: rollbackRuntimeOutput }
@@ -117,6 +122,8 @@ export async function checkExtensionCurrent(options = {}) {
     return { ok: false, reason: "missing-output", output: telemetryPosthogOutput }
   if (currentTelemetryOtlp === undefined) return { ok: false, reason: "missing-output", output: telemetryOtlpOutput }
   if (currentThreadClient === undefined) return { ok: false, reason: "missing-output", output: threadClientOutput }
+  const currentWake = await readBuiltEntry(wakeOutput)
+  if (currentWake === undefined) return { ok: false, reason: "missing-output", output: wakeOutput }
   const currentTelemetryRecovery = await readBuiltEntry(telemetryRecoveryOutput)
   if (currentTelemetryRecovery === undefined)
     return { ok: false, reason: "missing-output", output: telemetryRecoveryOutput }
@@ -154,6 +161,7 @@ export async function checkExtensionCurrent(options = {}) {
     onboardingScanRuntimeOutputPath: join(tempRoot, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
     bunshinTsOutputPath: join(tempRoot, "runtime", "bunshin-ts", "sdk.js"),
+    omoSdkOutputPath: join(tempRoot, OMO_SDK_RELATIVE_PATH),
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
@@ -167,6 +175,7 @@ export async function checkExtensionCurrent(options = {}) {
     telemetryOtlpOutputPath: join(tempRoot, "omo-telemetry-otlp.js"),
     memorySyncOutputPath: join(tempRoot, "omo-memory-sync.js"),
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
+    wakeOutputPath: join(tempRoot, "omo-wake.js"),
     telemetryRecoveryOutputPath: join(tempRoot, "omo-telemetry-recovery.js"),
     feedbackOutputPath: join(tempRoot, "omo-feedback.js"),
     desktopToolkitOutputPath: join(tempRoot, "omo-desktop-toolkit.js"),
@@ -181,6 +190,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentRollbackRuntime, expected.rollbackRuntimeOutputPath, rollbackRuntimeOutput],
       [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
       [currentBunshinTs, expected.bunshinTsOutputPath, bunshinTsOutput],
+      [currentOmoSdk, expected.omoSdkOutputPath, omoSdkOutput],
       [currentMain, expected.outputPath, output],
       [currentTask, expected.taskOutputPath, taskOutput],
       [currentMember, expected.memberOutputPath, memberOutput],
@@ -200,6 +210,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentTelemetryOtlp, expected.telemetryOtlpOutputPath, telemetryOtlpOutput],
       [currentMemorySync, expected.memorySyncOutputPath, memorySyncOutput],
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
+      [currentWake, expected.wakeOutputPath, wakeOutput],
       [currentTelemetryRecovery, expected.telemetryRecoveryOutputPath, telemetryRecoveryOutput],
       [currentFeedback, expected.feedbackOutputPath, feedbackOutput],
       [currentDesktopToolkit, expected.desktopToolkitOutputPath, desktopToolkitOutput],
@@ -236,6 +247,7 @@ export async function checkExtensionCurrent(options = {}) {
       computerUseOutput,
       gatewayStoreWorkerOutput,
       threadSdkOutput,
+      wakeOutput,
     }
   } finally {
     if (ownsReproduction) await rm(tempRoot, { recursive: true, force: true })

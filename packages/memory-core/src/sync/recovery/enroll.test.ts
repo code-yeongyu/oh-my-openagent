@@ -102,6 +102,7 @@ describe("enrolling and removing recovery passkeys (sync-design section 7)", () 
       expect(outcome).toEqual({
         ok: true,
         epoch: 2,
+        removedKind: "passkey",
         platformSignal: "signalled",
         deleteFromPasskeyManager: true,
       })

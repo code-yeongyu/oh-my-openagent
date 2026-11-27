@@ -47,6 +47,7 @@ const REFUSAL_CODES = [
   "trust-user-extras-unrecoverable",
   "trust-path-unrepresentable",
   "trust-userns-unattested",
+  "trust-kind-local-only",
   "trust-tmpdir-unsafe",
 ] as const
 
@@ -94,7 +95,7 @@ const PLAIN_CODES = [
   "openssl-default-file-malformed",
   ...MODULE_CODES,
 ] as const
-const KINDS = ["static", "long-lived", "short-host-cli", "one-shot-network"] as const
+const KINDS = ["static", "long-lived", "short-host-cli", "one-shot-network", "local-only"] as const
 const ACTIONS = ["adopt", "import-exec", "refuse", "ensure"] as const
 /** 5.2: the adoption check a `trust-load-mismatch` refusal failed. */
 const LOAD_CHECKS = ["file", "loaded-set", "provenance", "extras"] as const

@@ -9,6 +9,7 @@ import { createTaskRecordStore } from "../store"
 import { baseSpec, cleanupProjects, FakeRunner, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -127,7 +128,7 @@ describe("runtime fallback of a daemon-session child", () => {
   test("#given the failed rung's session is still closing #when a daemon-side session reconciles #then the live parent keeps its task and only the next rung's result lands", async () => {
     // given
     const runner = new SlowCloseRunner()
-    const store = createTaskRecordStore({ project_dir: tempProject() })
+    const store = createTaskRecordStore(ownedTaskState(tempProject()))
     const config = settings({ default_execution_mode: "process" })
     const owner = createTaskManager({
       store,

@@ -78,6 +78,10 @@ const toolkitSdkOutputPath = join(
 )
 const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
 const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
+// The account, device, device-service and configuration SDK eval cells import from OMO_SDK_ROOT.
+export const OMO_SDK_RELATIVE_PATH = join("runtime", "omo-sdk", "sdk.js")
+const omoSdkEntryPath = join(packageRoot, "src", "extension", "omo-sdk.ts")
+const omoSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, OMO_SDK_RELATIVE_PATH)
 // The `omo thread` CLI and connector scripts import this SDK without an agent session; it points
 // the gateway store at the worker sidecar in `extensions/` (two levels up from its own file).
 export const THREAD_SDK_RELATIVE_PATH = join("runtime", "thread-sdk", "sdk.js")
@@ -157,6 +161,7 @@ export function loroWasmSourcePath() {
   )
 }
 const threadClientEntryPath = join(packageRoot, "src", "components", "thread", "live-surface.ts")
+const wakeEntryPath = join(packageRoot, "src", "components", "thread", "wake", "wake-runtime.ts")
 const telemetryRecoveryEntryPath = join(packageRoot, "src", "components", "telemetry", "session-summary-recovery.ts")
 const feedbackEntryPath = join(packageRoot, "src", "components", "feedback", "runtime.ts")
 const desktopToolkitEntryPath = join(packageRoot, "src", "components", "desktop-toolkit", "runtime.ts")
@@ -217,6 +222,7 @@ const threadClientOutputPath = join(
   "extensions",
   "omo-thread-client.js",
 )
+const wakeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-wake.js")
 const telemetryRecoveryOutputPath = join(
   process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot,
   "extensions",
@@ -264,6 +270,7 @@ const externalSpecifiers = [
   "#omo-telemetry-otlp-runtime",
   "#omo-memory-sync-runtime",
   "#omo-thread-client-runtime",
+  "#omo-wake-runtime",
   "#omo-telemetry-recovery-runtime",
   // telemetry-core loads its immediate sender through this import; the plugin manifest maps it to the recovery sidecar.
   "#telemetry-immediate-send",
@@ -276,6 +283,14 @@ const externalSpecifiers = [
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
 ]
 const sdkExternalSpecifiers = [...builtinModuleNames, ...builtinModuleNames.map((name) => `node:${name}`)]
+// #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside any engine, and
+// the compiled runtime ships no node_modules, so a bare `typebox` there cannot resolve. The sidecar inlines TypeBox
+// instead of leaning on the engine's loader alias. TypeBox 1.x tags schemas with plain `~kind` string keys, so the
+// sidecar's copy produces schemas the engine's TypeBox reads as its own.
+const TYPEBOX_LOADER_ALIASES = new Set(
+  SENPI_LOADER_ALIASES.filter((specifier) => /^(@sinclair\/)?typebox(\/|$)/.test(specifier)),
+)
+const threadClientExternalSpecifiers = externalSpecifiers.filter((specifier) => !TYPEBOX_LOADER_ALIASES.has(specifier))
 const BUILD_SETTINGS = JSON.stringify({
   target: "node",
   format: "esm",
@@ -285,6 +300,16 @@ const BUILD_SETTINGS = JSON.stringify({
   secondaryMinifier: "terser@5.44.0",
   loaderAliases: SENPI_LOADER_ALIASES,
 })
+// #13155: the externals list carries the running node's builtinModules (node 26 adds node:ffi), and it
+// feeds the marker digest, so a byte-identical bundle built under another node read as stale. The digest
+// therefore records the builtin family as ONE stable token and digests only the source-derived
+// externals, which is what freshness must track.
+const NODE_BUILTIN_SET_MARKER = "<node-builtins>"
+export function digestSettingsFor(externals, builtinNames) {
+  const builtins = new Set(builtinNames)
+  const sourceDerived = externals.filter((specifier) => !builtins.has(specifier) && !specifier.startsWith("node:"))
+  return JSON.stringify({ settings: BUILD_SETTINGS, externals: [...sourceDerived, NODE_BUILTIN_SET_MARKER] })
+}
 
 export const extensionBuildPaths = {
   scriptDir,
@@ -297,6 +322,7 @@ export const extensionBuildPaths = {
   supervisorOutputPath,
   toolkitSdkOutputPath,
   bunshinTsOutputPath,
+  omoSdkOutputPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
   sidePanelRuntimeOutputPath,
@@ -315,6 +341,7 @@ export const extensionBuildPaths = {
   telemetryOtlpOutputPath,
   memorySyncOutputPath,
   threadClientOutputPath,
+  wakeOutputPath,
   telemetryRecoveryOutputPath,
   feedbackOutputPath,
   desktopToolkitOutputPath,
@@ -353,6 +380,7 @@ export function resolveOutputs(options) {
       join("runtime", "agent-toolkit-sdk", "sdk.js"),
     ),
     bunshinTsOutput: sibling(options.bunshinTsOutputPath, bunshinTsOutputPath, join("runtime", "bunshin-ts", "sdk.js")),
+    omoSdkOutput: sibling(options.omoSdkOutputPath, omoSdkOutputPath, OMO_SDK_RELATIVE_PATH),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(
       options.rollbackRuntimeOutputPath,
@@ -375,6 +403,7 @@ export function resolveOutputs(options) {
     telemetryOtlpOutput: sibling(options.telemetryOtlpOutputPath, telemetryOtlpOutputPath, "omo-telemetry-otlp.js"),
     memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
+    wakeOutput: sibling(options.wakeOutputPath, wakeOutputPath, "omo-wake.js"),
     telemetryRecoveryOutput: sibling(
       options.telemetryRecoveryOutputPath,
       telemetryRecoveryOutputPath,
@@ -411,6 +440,7 @@ export async function buildExtension(options = {}) {
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     bunshinTsOutput,
+    omoSdkOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
@@ -426,6 +456,7 @@ export async function buildExtension(options = {}) {
     telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
+    wakeOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
     desktopToolkitOutput,
@@ -434,6 +465,7 @@ export async function buildExtension(options = {}) {
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
+  const omoSdkInputs = await buildEntry(omoSdkEntryPath, omoSdkOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
@@ -464,7 +496,13 @@ export async function buildExtension(options = {}) {
   const memorySyncInputs = await buildEntry(memorySyncEntryPath, memorySyncOutput, buildDefines, externalSpecifiers, {
     assets: true,
   })
-  const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
+  const threadClientInputs = await buildEntry(
+    threadClientEntryPath,
+    threadClientOutput,
+    buildDefines,
+    threadClientExternalSpecifiers,
+  )
+  const wakeInputs = await buildEntry(wakeEntryPath, wakeOutput, buildDefines)
   const telemetryRecoveryInputs = await buildEntry(telemetryRecoveryEntryPath, telemetryRecoveryOutput, buildDefines)
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
   const desktopToolkitInputs = await buildEntry(desktopToolkitEntryPath, desktopToolkitOutput, buildDefines)
@@ -483,7 +521,15 @@ export async function buildExtension(options = {}) {
     buildDefines,
     sdkExternalSpecifiers,
   )
-  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, sdkExternalSpecifiers)
+  // #14616: the SDK's default account surface loads the plugin's thread client and device-account sidecars at run time
+  // through the plugin manifest's import map, so neither is inlined into it; its send loads the wake sidecar the same way
+  // to wake a parked session (#14972).
+  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, [
+    ...sdkExternalSpecifiers,
+    "#omo-thread-client-runtime",
+    "#omo-device-account-runtime",
+    "#omo-wake-runtime",
+  ])
   // Bundling inlines assets.ts but its markdown is read from disk at runtime next to the bundle,
   // so the persona and the computer-use prelude are staged into the directory the loader runs from.
   await Promise.all([
@@ -500,6 +546,7 @@ export async function buildExtension(options = {}) {
     onboardingScanRuntimeInputs,
     toolkitSdkInputs,
     bunshinTsInputs,
+    omoSdkInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     computerRunWorkerInputs,
@@ -515,6 +562,7 @@ export async function buildExtension(options = {}) {
     telemetryOtlpInputs,
     memorySyncInputs,
     threadClientInputs,
+    wakeInputs,
     telemetryRecoveryInputs,
     feedbackInputs,
     desktopToolkitInputs,
@@ -555,7 +603,7 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
       metafile,
       buildDefines,
       repoRoot,
-      buildSettings: JSON.stringify({ settings: BUILD_SETTINGS, externals }),
+      buildSettings: digestSettingsFor(externals, builtinModuleNames),
       buildScriptPath,
     })
   } finally {

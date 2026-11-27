@@ -18,6 +18,7 @@ import { createDagRecovery } from "./recovery"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 type DagRunEventType = DagRunEvent["type"]
 
@@ -253,7 +254,7 @@ describe("DAG resume without blocking on a reattached child", () => {
     // given - the production checkpoint shape: the still-running node is ordered FIRST, so the old
     // blocking reconcile hit it before it ever emitted a reuse event for the completed sibling.
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new LongRunningTaskManager()
     const input: DagDefinition = {
       key: "nonblocking-resume",
@@ -311,7 +312,7 @@ describe("DAG resume without blocking on a reattached child", () => {
   test("#given a scheduler built with pre-attached tasks #when a node is retried #then the fresh instance does not re-attach the settled child", async () => {
     // given - a run that already settled through a pre-attached reattachment, with one failed node
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new LongRunningTaskManager()
     const input: DagDefinition = {
       key: "reentry-guard",
