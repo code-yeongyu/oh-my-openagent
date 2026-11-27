@@ -21,7 +21,7 @@ describe("runTaskCancel", () => {
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
 
-    const result = await runTaskCancel(manager, { task_id: started.task_id, reason: "no longer needed" })
+    const result = await runTaskCancel(manager, { task_id: started.task_id, reason: "no longer needed" }, "p1")
 
     expect(result.details.kind).toBe("cancelled")
     if (result.details.kind !== "cancelled") throw new Error("expected cancelled")
@@ -34,7 +34,7 @@ describe("runTaskCancel", () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
-    const cancelled = await runTaskCancel(manager, { task_id: started.task_id })
+    const cancelled = await runTaskCancel(manager, { task_id: started.task_id }, "p1")
     expect(cancelled.details.kind).toBe("cancelled")
 
     const result = await runTaskSend(manager, { to: started.task_id, message: "continue anyway" }, "p1")
@@ -48,9 +48,9 @@ describe("runTaskCancel", () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
-    await runTaskCancel(manager, { task_id: started.task_id })
+    await runTaskCancel(manager, { task_id: started.task_id }, "p1")
 
-    const result = await runTaskCancel(manager, { task_id: started.task_id })
+    const result = await runTaskCancel(manager, { task_id: started.task_id }, "p1")
 
     expect(result.details.kind).toBe("noop")
     if (result.details.kind !== "noop") throw new Error("expected noop")
@@ -60,7 +60,7 @@ describe("runTaskCancel", () => {
   test("#given an unknown id #when cancelled #then not_found is returned", async () => {
     const { manager } = makeManager({})
 
-    const result = await runTaskCancel(manager, { task_id: "st_deadbeef" })
+    const result = await runTaskCancel(manager, { task_id: "st_deadbeef" }, "p1")
 
     expect(result.details.kind).toBe("not_found")
   })
@@ -78,7 +78,7 @@ describe("runTaskCancel", () => {
       }),
     }
 
-    const result = await runTaskCancel(stale, { task_id: "st_0000abcd" })
+    const result = await runTaskCancel(stale, { task_id: "st_0000abcd" }, "p1")
 
     expect(result.details).toEqual({
       kind: "noop",
@@ -88,10 +88,28 @@ describe("runTaskCancel", () => {
     })
   })
 
+  test("#given the tool #when executed from a session #then it cancels only that session's task and answers not found for another's", async () => {
+    const { manager } = makeManager({})
+    const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
+    if (started.kind !== "started") throw new Error("expected started")
+    const tool = createTaskCancelTool({ manager })
+    const from = (sessionId: string) => ({ sessionManager: { getSessionId: () => sessionId } }) as never
+
+    const missing = await tool.execute("call-1", { task_id: "st_00000000" }, undefined, undefined, from("p2"))
+    const foreign = await tool.execute("call-2", { task_id: started.task_id }, undefined, undefined, from("p2"))
+
+    expect(foreign).toEqual(JSON.parse(JSON.stringify(missing).replaceAll("st_00000000", started.task_id)))
+    expect(manager.get(started.task_id)?.status).toBe("running")
+
+    const own = await tool.execute("call-3", { task_id: started.task_id }, undefined, undefined, from("p1"))
+
+    expect(own.details).toMatchObject({ kind: "cancelled", task_id: started.task_id })
+  })
+
   test("#given no identifier #when cancelled #then invalid_arguments is returned", async () => {
     const { manager } = makeManager({})
 
-    const result = await runTaskCancel(manager, {})
+    const result = await runTaskCancel(manager, {}, "p1")
 
     expect(result.details.kind).toBe("invalid_arguments")
   })
