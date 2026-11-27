@@ -76,6 +76,7 @@ Watch a thread with the monitor tool's session watch, `tool.monitor({ type: "rpc
 | `scope_denied` | The thread is outside this workspace and `all_scope` was not passed. | Retry with `all_scope: true`. |
 | `not_found` | Every device answered and none holds a thread under that id, name or prefix. With a device in front, `details` names the device that was asked. | Use a `thread` value from the list. |
 | `host_unavailable` (`details.reason: "device_unanswered"`) | A device did not answer the lookup round, so the thread could not be ruled in or out. Seen on a send by bare id while a device was slow. | Retry that target only, addressed as `<device name>/<thread>` so only that device is asked. A send retried this way was delivered. |
+| `not_resumable` | The thread is not running on its device and this device cannot wake it there: an idle or parked thread on another machine ("The thread is not running on device ...", "Device ... cannot wake that session"), or a control call on a thread with no live owner. | List to see the thread's current state. Retry when it runs again, or have the work sent from the machine that holds the thread. Do not resend in a loop. |
 | `internal_error` ("connection closed before the response arrived") | A create on this device. | List first: if no thread was made, retry once (the retry worked). Never create twice without checking. |
 
 For a code not listed here, do what its `next_action` says.
