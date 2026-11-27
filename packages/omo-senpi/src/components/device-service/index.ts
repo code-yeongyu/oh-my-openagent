@@ -7,6 +7,7 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { hostSocketOf } from "../thread/gateway/registration"
 import { isThreadSocket } from "../thread/live-surface-paths"
 import type { DeviceServiceRuntimeOptions } from "./runtime"
+import { absolutePath, skipsDeviceService } from "./start-eligibility"
 
 // The device service at engine start (#12051, #12379): every interactive omo start makes sure this device's OmO device
 // service is installed, connected and holding the signed-in device (the TUI bootstrap), and every tui or rpc engine
@@ -52,6 +53,7 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
       // its first open - so a daemon the device service cold-starts has an engine endpoint before any session runs and
       // can be handed the delivery it was started for (#13037 cold wake). Its later sessions find the latch claimed.
       const env = options.env ?? process.env
+      if (skipsDeviceService(env)) return
       const hostSocket = hostSocketOf(pi)
       if (hostSocket !== undefined && isThreadSocket(hostSocket, env)) {
         const fromRegistry = daemonAgentDir(env)
@@ -80,6 +82,11 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
         // senpi's run mode: the TUI and RPC engines (the desktop's) publish endpoints; print, json and app-server do not.
         const mode = Reflect.get(Object(eventCtx), "mode")
         if (mode !== "tui" && mode !== "rpc") return undefined
+        // Bare engines still register a resolved agent directory even when they cannot bootstrap.
+        const canRegister = absolutePath(Reflect.get(Object(eventCtx), "agentDir"))
+        const canBootstrap =
+          mode === "tui" && Reflect.get(Object(eventCtx), "hasUI") === true && absolutePath(env.OMO_BIN)
+        if (!canRegister && !canBootstrap) return undefined
         deferUntilAfterFirstPaint(ctx, "device service start", () =>
           loadRuntime().then((runtime) =>
             runtime.startAtSession(eventCtx, ctx.logger, { scope: processScope, ...options }),

@@ -5,11 +5,11 @@
 import { isAbsolute } from "node:path"
 
 import { isOmoDeviceServiceEnabled, type OmoDeviceServiceConfigView } from "@oh-my-opencode/omo-config-core"
-import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import type { ComponentLogger } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { isCi, type RegistrantStartOptions, startRegistrantAtStart } from "./registrant-start"
+import { type RegistrantStartOptions, startRegistrantAtStart } from "./registrant-start"
+import { skipsDeviceService } from "./start-eligibility"
 import { type BootstrapReport, runBootstrapWorker } from "./runner"
 
 export interface ProcessLatch {
@@ -68,14 +68,7 @@ export async function bootstrapAtStart(
   const omoBin = env.OMO_BIN
   const notify = notifierOf(eventCtx)
   const latch = options.latch ?? processLatch()
-  if (
-    latch.claimed ||
-    omoBin === undefined ||
-    !isAbsolute(omoBin) ||
-    isCi(env) ||
-    env[OMO_SENPI_TASK_RPC_CHILD] === "1" ||
-    notify === undefined
-  )
+  if (latch.claimed || omoBin === undefined || !isAbsolute(omoBin) || skipsDeviceService(env) || notify === undefined)
     return
   latch.claimed = true
   const cwd = isRecord(eventCtx) && typeof eventCtx.cwd === "string" ? eventCtx.cwd : process.cwd()

@@ -105,10 +105,20 @@ describe("device-service start-up bootstrap", () => {
     ["a print run", { OMO_BIN }, false, "print"],
     ["a task child that runs a TUI", { OMO_BIN, OMO_SENPI_TASK_RPC_CHILD: "1" }, true, "tui"],
   ])("%s runs nothing", async (_label, env, hasUI, mode) => {
-    const h = harness({ env, hasUI, mode })
+    let loads = 0
+    const h = harness({
+      env,
+      hasUI,
+      mode,
+      loadRuntime: async () => {
+        loads++
+        return import("./runtime")
+      },
+    })
     h.component.register(h.pi, h.ctx)
     h.start()
     await h.flush()
+    expect(loads).toBe(0)
     expect(h.runs).toEqual([])
   })
 
