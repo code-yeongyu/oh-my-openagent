@@ -20,6 +20,17 @@ impl MacScreen {
 }
 
 impl ScreenProbe for MacScreen {
+    fn picture_state(&self) -> senpi_desktop_core::protocol_results::PictureState {
+        use senpi_desktop_core::protocol_results::PictureState;
+        match crate::cursor::probe_screen_locked() {
+            Some(true) => PictureState::Locked,
+            _ if crate::stop_path::secure_input_enabled() => PictureState::SecureInput,
+            _ if !crate::capture::capture_permission() => PictureState::PermissionMissing,
+            None => PictureState::Unknown,
+            Some(false) => PictureState::Available,
+        }
+    }
+
     fn screen_state(&self, display: Option<&DisplaySelector>) -> ScreenState {
         let selector = display.unwrap_or(&self.display);
         ScreenState {

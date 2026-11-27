@@ -176,6 +176,11 @@ function handle(request) {
     case "stopPath.start":
     case "stopPath.status":
       return reply(id, status())
+    case "session.viewerStatus":
+      if (stalled === method) return cancellable.add(id)
+      if (process.env.FAKE_ENGINE_PICTURE_STATE === "unsupported")
+        return fail(id, "Internal", "Method not found", -32601)
+      return reply(id, { ...status(), pictureState: process.env.FAKE_ENGINE_PICTURE_STATE ?? "available" })
     case "stopPath.stop":
       suspended = true
       control = { active: false }

@@ -15,6 +15,7 @@ export function closedService(): ComputerService {
     onAudit: () => () => undefined,
     capabilities: unreachable,
     stopPathStatus: unreachable,
+    viewerStatus: unreachable,
     stop: unreachable,
     resume: unreachable,
     close: () => Promise.resolve(),

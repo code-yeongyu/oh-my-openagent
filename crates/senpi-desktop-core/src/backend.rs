@@ -347,6 +347,11 @@ pub trait EpochSource: Send + Sync {
 
 /// Live lock and display-sleep state, safe to read from any thread.
 pub trait ScreenProbe: Send + Sync {
+    /// A backend without a positive live privacy check must never authorize showing a picture.
+    fn picture_state(&self) -> crate::protocol_results::PictureState {
+        crate::protocol_results::PictureState::Unknown
+    }
+
     /// `display` names the display a request aims at; `None` means every
     /// display of the session.
     fn screen_state(&self, display: Option<&DisplaySelector>) -> ScreenState;

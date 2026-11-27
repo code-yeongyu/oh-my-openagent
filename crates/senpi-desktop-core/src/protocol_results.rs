@@ -93,6 +93,26 @@ pub struct StopPathStatus {
     pub reason: Option<String>,
 }
 
+/// Whether the backend permits displaying a result picture at the instant of the status read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PictureState {
+    Available,
+    SecureInput,
+    Locked,
+    PermissionMissing,
+    Unknown,
+}
+
+/// The status read, as distinct from a stop-path notification or a request to change the stop.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStatus {
+    #[serde(flatten)]
+    pub stop: StopPathStatus,
+    pub picture_state: PictureState,
+}
+
 /// The `audit` notification: one per mutating request, success or failure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

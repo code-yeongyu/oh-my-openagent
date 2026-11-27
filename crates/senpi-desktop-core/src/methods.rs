@@ -18,7 +18,7 @@ use crate::protocol_params::{
 };
 use crate::protocol_results::{
     AuditEvent, AxInputResult, ControlStateResult, EngineLog, EpochChanged, HelloResult, SessionOpenResult,
-    StopPathStatus,
+    SessionStatus, StopPathStatus,
 };
 use crate::report::ActionReport;
 use crate::types::{
@@ -90,6 +90,7 @@ method_table! {
     EngineHello = "engine.hello", Read, Public, EmptyParams => HelloResult;
     SessionOpen = "session.open", Exec, HostOnly, DesktopSessionOptions => SessionOpenResult;
     SessionClose = "session.close", Exec, HostOnly, EmptyParams => ();
+    SessionViewerStatus = "session.viewerStatus", Read, HostOnly, EmptyParams => SessionStatus;
     ControlGrant = "control.grant", Exec, HostOnly, ControlGrantParams => ControlStateResult;
     ControlRevoke = "control.revoke", Exec, HostOnly, EmptyParams => ();
     ControlState = "control.state", Read, Public, EmptyParams => ControlStateResult;

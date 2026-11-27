@@ -23,6 +23,8 @@ import {
   START_TIMEOUT_MS,
 } from "./timeouts"
 import type { Connection, DesiredSession, DesktopSessionOpenParams } from "./session-state"
+import { sessionOpenWire } from "./session-open-wire"
+import { readViewerStatus } from "./viewer-status"
 
 export interface DesktopServiceOptions {
   readonly createChild?: ChildFactory
@@ -142,6 +144,11 @@ export class DesktopService {
   /** Reads the live stop-path state; it never arms or latches anything. */
   async stopPathStatus(): Promise<StopPathStatus> {
     return this.#stopPath(await this.#live(), "stopPath.status", {})
+  }
+
+  /** Best-effort viewer metadata for the host; see `readViewerStatus`. */
+  viewerStatus(signal?: AbortSignal): Promise<unknown> {
+    return readViewerStatus(this.#connection, () => this.#connection, signal)
   }
 
   async stop(): Promise<StopPathStatus> {
@@ -277,35 +284,6 @@ export class DesktopService {
   #drop(connection: Connection): void {
     clearInterval(connection.heartbeat)
     if (this.#connection === connection) this.#connection = undefined
-  }
-}
-
-/**
- * Defaults of the feature-gated `session.open` keys. `reportMode` is the omo default (every omo session asks for an
- * `ActionReport` per exec); the others are the engine's own defaults, which the engine never moves.
- */
-const GATED_OPTION_DEFAULTS = {
-  reportMode: "object",
-  intervention: "pause",
-  macosKeyPriming: "off",
-  trace: false,
-} as const
-
-/**
- * The `session.open` params this engine accepts. An engine rejects keys it does not know
- * (`additionalProperties: false`), so each newer key goes out only when hello advertises its feature:
- * each always, with the caller's value or else the default (`reportMode: "object"` unless the caller asked for
- * `"null"`).
- */
-function sessionOpenWire(params: DesktopSessionOpenParams, features: readonly string[]): DesktopSessionOpenParams {
-  const { reportMode, intervention, macosKeyPriming, trace, ...base } = params
-  const has = (feature: string) => features.includes(feature)
-  return {
-    ...base,
-    ...(has("action-report") ? { reportMode: reportMode ?? GATED_OPTION_DEFAULTS.reportMode } : {}),
-    ...(has("intervention-policy") ? { intervention: intervention ?? GATED_OPTION_DEFAULTS.intervention } : {}),
-    ...(has("key-priming") ? { macosKeyPriming: macosKeyPriming ?? GATED_OPTION_DEFAULTS.macosKeyPriming } : {}),
-    ...(has("trace") ? { trace: trace ?? GATED_OPTION_DEFAULTS.trace } : {}),
   }
 }
 

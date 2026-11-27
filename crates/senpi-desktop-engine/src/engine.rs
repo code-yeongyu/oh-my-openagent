@@ -146,6 +146,13 @@ impl Engine {
         &self.stop_paths
     }
 
+    pub fn session_status(&self) -> senpi_desktop_core::protocol_results::SessionStatus {
+        senpi_desktop_core::protocol_results::SessionStatus {
+            stop: self.stop_paths.status(),
+            picture_state: self.session.picture_state(),
+        }
+    }
+
     pub const fn shared_agent(&self) -> bool { self.shared_agent }
 
     pub fn outbox(&self) -> &Outbox {

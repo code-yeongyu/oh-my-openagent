@@ -13,6 +13,7 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("engine.hello", "read", "public"),
     ("session.open", "exec", "hostOnly"),
     ("session.close", "exec", "hostOnly"),
+    ("session.viewerStatus", "read", "hostOnly"),
     ("control.grant", "exec", "hostOnly"),
     ("control.revoke", "exec", "hostOnly"),
     ("control.state", "read", "public"),

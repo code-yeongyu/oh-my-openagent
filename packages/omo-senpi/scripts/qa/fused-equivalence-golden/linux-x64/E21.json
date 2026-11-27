@@ -5187,6 +5187,28 @@
          ],
          "timings": null,
          "legacy": false
+        },
+        "computerSession": {
+         "id": "<uuid:5>",
+         "lifecycle": "open",
+         "picture": {
+          "kind": "withheld",
+          "reason": "unknown"
+         },
+         "stopped": false,
+         "point": {
+          "space": "frame",
+          "action": "click",
+          "target": "display:2",
+          "x": 20,
+          "y": 10
+         },
+         "capture": {
+          "frameId": "<frame:1>",
+          "target": "display:2",
+          "width": 2880,
+          "height": 1800
+         }
         }
        }
       },
@@ -5254,6 +5276,28 @@
          ],
          "timings": null,
          "legacy": false
+        },
+        "computerSession": {
+         "id": "<uuid:5>",
+         "lifecycle": "open",
+         "picture": {
+          "kind": "withheld",
+          "reason": "unknown"
+         },
+         "stopped": false,
+         "point": {
+          "space": "frame",
+          "action": "click",
+          "target": "display:2",
+          "x": 20,
+          "y": 10
+         },
+         "capture": {
+          "frameId": "<frame:1>",
+          "target": "display:2",
+          "width": 2880,
+          "height": 1800
+         }
         }
        },
        "isError": false,
@@ -5322,6 +5366,28 @@
          ],
          "timings": null,
          "legacy": false
+        },
+        "computerSession": {
+         "id": "<uuid:5>",
+         "lifecycle": "open",
+         "picture": {
+          "kind": "withheld",
+          "reason": "unknown"
+         },
+         "stopped": false,
+         "point": {
+          "space": "frame",
+          "action": "click",
+          "target": "display:2",
+          "x": 20,
+          "y": 10
+         },
+         "capture": {
+          "frameId": "<frame:1>",
+          "target": "display:2",
+          "width": 2880,
+          "height": 1800
+         }
         }
        },
        "isError": false,
@@ -5395,6 +5461,28 @@
           ],
           "timings": null,
           "legacy": false
+         },
+         "computerSession": {
+          "id": "<uuid:5>",
+          "lifecycle": "open",
+          "picture": {
+           "kind": "withheld",
+           "reason": "unknown"
+          },
+          "stopped": false,
+          "point": {
+           "space": "frame",
+           "action": "click",
+           "target": "display:2",
+           "x": 20,
+           "y": 10
+          },
+          "capture": {
+           "frameId": "<frame:1>",
+           "target": "display:2",
+           "width": 2880,
+           "height": 1800
+          }
          }
         },
         "isError": false,
@@ -5507,6 +5595,28 @@
           ],
           "timings": null,
           "legacy": false
+         },
+         "computerSession": {
+          "id": "<uuid:5>",
+          "lifecycle": "open",
+          "picture": {
+           "kind": "withheld",
+           "reason": "unknown"
+          },
+          "stopped": false,
+          "point": {
+           "space": "frame",
+           "action": "click",
+           "target": "display:2",
+           "x": 20,
+           "y": 10
+          },
+          "capture": {
+           "frameId": "<frame:1>",
+           "target": "display:2",
+           "width": 2880,
+           "height": 1800
+          }
          }
         },
         "isError": false,
@@ -5897,6 +6007,28 @@
           ],
           "timings": null,
           "legacy": false
+         },
+         "computerSession": {
+          "id": "<uuid:5>",
+          "lifecycle": "open",
+          "picture": {
+           "kind": "withheld",
+           "reason": "unknown"
+          },
+          "stopped": false,
+          "point": {
+           "space": "frame",
+           "action": "click",
+           "target": "display:2",
+           "x": 20,
+           "y": 10
+          },
+          "capture": {
+           "frameId": "<frame:1>",
+           "target": "display:2",
+           "width": 2880,
+           "height": 1800
+          }
          }
         },
         "isError": false,
@@ -6003,7 +6135,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 0
        },
        "waitingOn": {
@@ -6032,7 +6164,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 1
        },
        "waitingOn": {
@@ -6065,7 +6197,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 2
        },
        "waitingOn": {
@@ -6094,7 +6226,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 3
        },
        "waitingOn": {
@@ -6130,7 +6262,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 4
        },
        "waitingOn": {
@@ -6159,7 +6291,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 5
        },
        "waitingOn": {
@@ -6192,7 +6324,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 6
        },
        "waitingOn": {
@@ -6268,7 +6400,7 @@
        "role": "root",
        "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:6>",
         "revision": 0
        },
        "waitingOn": {
@@ -6298,7 +6430,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:6>",
+        "id": "<uuid:7>",
         "method": "setWidget",
         "widgetKey": "todo-sidebar"
        }
@@ -6309,13 +6441,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:7>",
+        "id": "<uuid:8>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:8>",
+        "id": "<uuid:9>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        }
@@ -6326,13 +6458,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:9>",
+        "id": "<uuid:10>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:10>",
+        "id": "<uuid:11>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        }
@@ -6343,13 +6475,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:11>",
+        "id": "<uuid:12>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:12>",
+        "id": "<uuid:13>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        }
@@ -6360,13 +6492,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:13>",
+        "id": "<uuid:14>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:14>",
+        "id": "<uuid:15>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        }
@@ -6377,13 +6509,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:15>",
+        "id": "<uuid:16>",
         "method": "setStatus",
         "statusKey": "monitors"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:16>",
+        "id": "<uuid:17>",
         "method": "setStatus",
         "statusKey": "monitors"
        }
@@ -6392,12 +6524,6 @@
      "setStatus:pi-websearch": {
       "count": 3,
       "snapshots": [
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:17>",
-        "method": "setStatus",
-        "statusKey": "pi-websearch"
-       },
        {
         "type": "extension_ui_request",
         "id": "<uuid:18>",
@@ -6409,18 +6535,18 @@
         "id": "<uuid:19>",
         "method": "setStatus",
         "statusKey": "pi-websearch"
+       },
+       {
+        "type": "extension_ui_request",
+        "id": "<uuid:20>",
+        "method": "setStatus",
+        "statusKey": "pi-websearch"
        }
       ]
      },
      "setWidget:pi-websearch": {
       "count": 3,
       "snapshots": [
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:20>",
-        "method": "setWidget",
-        "widgetKey": "pi-websearch"
-       },
        {
         "type": "extension_ui_request",
         "id": "<uuid:21>",
@@ -6432,6 +6558,12 @@
         "id": "<uuid:22>",
         "method": "setWidget",
         "widgetKey": "pi-websearch"
+       },
+       {
+        "type": "extension_ui_request",
+        "id": "<uuid:23>",
+        "method": "setWidget",
+        "widgetKey": "pi-websearch"
        }
       ]
      },
@@ -6440,13 +6572,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:23>",
+        "id": "<uuid:24>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:24>",
+        "id": "<uuid:25>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        }
@@ -6457,13 +6589,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:25>",
+        "id": "<uuid:26>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:26>",
+        "id": "<uuid:27>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        }
@@ -6474,13 +6606,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:27>",
+        "id": "<uuid:28>",
         "method": "setStatus",
         "statusKey": "todo-waiting"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:28>",
+        "id": "<uuid:29>",
         "method": "setStatus",
         "statusKey": "todo-waiting"
        }
@@ -6491,13 +6623,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:29>",
+        "id": "<uuid:30>",
         "method": "setStatus",
         "statusKey": "goal"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:30>",
+        "id": "<uuid:31>",
         "method": "setStatus",
         "statusKey": "goal"
        }
@@ -6508,7 +6640,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:31>",
+        "id": "<uuid:32>",
         "method": "setWidget",
         "widgetKey": "prompt-url"
        }
@@ -6519,14 +6651,14 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:32>",
+        "id": "<uuid:33>",
         "method": "setStatus",
         "statusKey": "  omo-native",
         "statusText": "(😺 OmO Native by Q Kim)"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:33>",
+        "id": "<uuid:34>",
         "method": "setStatus",
         "statusKey": "  omo-native",
         "statusText": "(😺 OmO Native by Q Kim)"
@@ -6538,13 +6670,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:34>",
+        "id": "<uuid:35>",
         "method": "setStatus",
         "statusKey": "memory"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:35>",
+        "id": "<uuid:36>",
         "method": "setStatus",
         "statusKey": "memory"
        }
@@ -6555,7 +6687,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:36>",
+        "id": "<uuid:37>",
         "method": "setStatus",
         "statusKey": "loop"
        }
@@ -6660,7 +6792,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:37>",
+        "id": "<uuid:38>",
         "method": "setWidget",
         "widgetKey": "todo-sidebar"
        }
@@ -6671,13 +6803,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:38>",
+        "id": "<uuid:39>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:39>",
+        "id": "<uuid:40>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        }
@@ -6688,13 +6820,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:40>",
+        "id": "<uuid:41>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:41>",
+        "id": "<uuid:42>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        }
@@ -6705,13 +6837,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:42>",
+        "id": "<uuid:43>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:43>",
+        "id": "<uuid:44>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        }
@@ -6722,13 +6854,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:44>",
+        "id": "<uuid:45>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:45>",
+        "id": "<uuid:46>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        }
@@ -6739,13 +6871,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:46>",
+        "id": "<uuid:47>",
         "method": "setStatus",
         "statusKey": "monitors"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:47>",
+        "id": "<uuid:48>",
         "method": "setStatus",
         "statusKey": "monitors"
        }
@@ -6756,13 +6888,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:48>",
+        "id": "<uuid:49>",
         "method": "setStatus",
         "statusKey": "pi-websearch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:49>",
+        "id": "<uuid:50>",
         "method": "setStatus",
         "statusKey": "pi-websearch"
        }
@@ -6773,13 +6905,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:50>",
+        "id": "<uuid:51>",
         "method": "setWidget",
         "widgetKey": "pi-websearch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:51>",
+        "id": "<uuid:52>",
         "method": "setWidget",
         "widgetKey": "pi-websearch"
        }
@@ -6790,13 +6922,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:52>",
+        "id": "<uuid:53>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:53>",
+        "id": "<uuid:54>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        }
@@ -6807,13 +6939,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:54>",
+        "id": "<uuid:55>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:55>",
+        "id": "<uuid:56>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        }
@@ -6824,7 +6956,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:56>",
+        "id": "<uuid:57>",
         "method": "setStatus",
         "statusKey": "todo-waiting"
        }
@@ -6835,7 +6967,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:57>",
+        "id": "<uuid:58>",
         "method": "setStatus",
         "statusKey": "goal"
        }
@@ -6846,7 +6978,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:58>",
+        "id": "<uuid:59>",
         "method": "setWidget",
         "widgetKey": "prompt-url"
        }
@@ -6857,7 +6989,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:59>",
+        "id": "<uuid:60>",
         "method": "setStatus",
         "statusKey": "  omo-native",
         "statusText": "(😺 OmO Native by Q Kim)"
@@ -6869,13 +7001,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:60>",
+        "id": "<uuid:61>",
         "method": "setStatus",
         "statusKey": "memory"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:61>",
+        "id": "<uuid:62>",
         "method": "setStatus",
         "statusKey": "memory"
        }
@@ -6886,7 +7018,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:62>",
+        "id": "<uuid:63>",
         "method": "setStatus",
         "statusKey": "loop"
        }
@@ -7149,6 +7281,28 @@
         ],
         "timings": null,
         "legacy": false
+       },
+       "computerSession": {
+        "id": "<uuid:5>",
+        "lifecycle": "open",
+        "picture": {
+         "kind": "withheld",
+         "reason": "unknown"
+        },
+        "stopped": false,
+        "point": {
+         "space": "frame",
+         "action": "click",
+         "target": "display:2",
+         "x": 20,
+         "y": 10
+        },
+        "capture": {
+         "frameId": "<frame:1>",
+         "target": "display:2",
+         "width": 2880,
+         "height": 1800
+        }
        }
       },
       "isError": false,
@@ -7260,7 +7414,7 @@
        "human": []
       },
       "holds": [],
-      "runId": "<uuid:5>",
+      "runId": "<uuid:6>",
       "sessionId": "<uuid:1>",
       "attentionSeq": 0,
       "synthetic": [],
@@ -7294,7 +7448,7 @@
        "human": []
       },
       "holds": [],
-      "runId": "<uuid:5>",
+      "runId": "<uuid:6>",
       "completionId": "<uuid:1>:1",
       "completion": {
        "kind": "reply",
@@ -7333,7 +7487,7 @@
       "restoring": false,
       "persisted": true,
       "completionId": "<uuid:1>:1",
-      "runId": "<uuid:5>",
+      "runId": "<uuid:6>",
       "waitingOn": {
        "children": 0,
        "background": [],

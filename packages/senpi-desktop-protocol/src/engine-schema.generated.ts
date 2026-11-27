@@ -12,6 +12,7 @@ export const ENGINE_METHODS = [
 	"engine.hello",
 	"session.open",
 	"session.close",
+	"session.viewerStatus",
 	"control.grant",
 	"control.revoke",
 	"control.state",

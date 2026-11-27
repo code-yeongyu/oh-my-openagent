@@ -28,6 +28,17 @@ fn string_ids_are_echoed_verbatim() {
 }
 
 #[test]
+fn a_backend_without_a_privacy_probe_withholds_pictures_without_changing_public_status() {
+    let mut engine = Engine::spawn(&[fake_backend(TWO_DISPLAYS)]);
+    engine.call(1, "session.open", json!({}));
+    let host = engine.call(2, "session.viewerStatus", json!({}));
+    assert_eq!(host["result"]["pictureState"], "unknown");
+    let public = engine.call(3, "stopPath.status", json!({}));
+    assert!(public["result"].get("pictureState").is_none());
+    assert!(engine.finish().success());
+}
+
+#[test]
 fn an_unconstructible_backend_reports_unavailable_and_exits_zero_at_eof() {
     // Given: the selected scenario cannot be loaded, so no backend exists.
     let mut engine = Engine::spawn(&[fake_backend("does/not/exist.json")]);

@@ -137,6 +137,12 @@ impl Session {
         self.epochs.take_announcements()
     }
 
+    /// A fresh viewer decision, independent of cached backend capabilities.
+    #[must_use]
+    pub fn picture_state(&self) -> senpi_desktop_core::protocol_results::PictureState {
+        self.notes.picture_state()
+    }
+
     /// The latest capabilities the session thread observed, with the display
     /// sleep read live; never waits on a busy backend.
     #[must_use]

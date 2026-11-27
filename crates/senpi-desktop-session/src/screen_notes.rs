@@ -17,6 +17,11 @@ use crate::request::Op;
 pub(crate) struct ScreenNotes(Arc<Mutex<Option<Arc<dyn ScreenProbe>>>>);
 
 impl ScreenNotes {
+    pub(crate) fn picture_state(&self) -> senpi_desktop_core::protocol_results::PictureState {
+        let probe = self.0.lock().clone();
+        probe.map_or(senpi_desktop_core::protocol_results::PictureState::Unknown, |p| p.picture_state())
+    }
+
     pub(crate) fn install(&self, probe: Option<Arc<dyn ScreenProbe>>) {
         *self.0.lock() = probe;
     }
