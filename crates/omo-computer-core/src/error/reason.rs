@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [144] {
+    Reason [145] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -133,6 +133,7 @@ closed_names! {
         SendOnEnter = "send_on_enter",
         WindowsUnsupported = "windows_unsupported",
         DisplaysUnsupported = "displays_unsupported",
+        NoDisplayServer = "no_display_server",
         CaptureUnsupported = "capture_unsupported",
         InputUnsupported = "input_unsupported",
         SnapshotUnsupported = "snapshot_unsupported",

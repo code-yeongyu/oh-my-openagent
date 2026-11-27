@@ -26,7 +26,7 @@ import { validateHello, validateRequest } from "../../../src/local-api/validate.
 import { compareVersions } from "../../../src/release/version.ts"
 import { dispatch } from "./fake-owner-handlers.ts"
 import { type FakeOwnerMode, TERMINAL_COMMANDS, type Withheld } from "./fake-owner-modes.ts"
-import type { Conn, OwnerState } from "./fake-owner-state.ts"
+import type { Conn, Outcome, OwnerState } from "./fake-owner-state.ts"
 import type { World } from "./world.ts"
 
 // The reference owner the conformance fixtures run against: every request of the vocabulary over a real local
@@ -54,6 +54,8 @@ export type FakeOwnerOptions = {
   readonly terminalCommands?: readonly string[]
   /** Called when the mode keeps an answer back, so a test can await it before moving a fake clock. */
   readonly onWithheld?: (what: Withheld) => void
+  /** Answers a request before the World does; `undefined` leaves it to the World (the X1a proof's fake relay). */
+  readonly intercept?: (state: OwnerState, conn: Conn, request: LocalRequest) => Outcome | undefined
 }
 
 const noopSecure: SecureFile = async () => {}
@@ -177,7 +179,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
         state.withheld("response")
         return
       }
-      const outcome = dispatch(state, conn, request)
+      const outcome = options.intercept?.(state, conn, request) ?? dispatch(state, conn, request)
       send(
         "error" in outcome.reply
           ? errorReply(

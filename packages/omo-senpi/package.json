@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.1.83",
+  "version": "5.1.84",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -26,7 +26,7 @@
     "#omo-memory-sync-runtime": "./src/components/memory/sync-runtime.ts",
     "#omo-agent-toolkit-sdk": "./src/extension/agent-toolkit-sdk.ts",
     "#senpi-private-fds": "@code-yeongyu/senpi/private-fds",
-    "#bunshin-ts": "./src/extension/bunshin-ts-sdk.ts",
+    "#bunshin-ts": "./src/components/remote/bunshin-ts/bunshin-ts-sdk.ts",
     "#bunshin-ts-dep/@sinclair/typebox": "@sinclair/typebox",
     "#bunshin-ts-dep/@sinclair/typebox/*": "@sinclair/typebox/*"
   },

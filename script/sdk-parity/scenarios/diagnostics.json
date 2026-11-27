@@ -1,0 +1,307 @@
+{
+  "domain": "diagnostics",
+  "inert": {
+    "diagnostics.run.status": "An output mode only: the OpenCode doctor runs the same checks and reads the same files and processes with or without it, and only picks the formatter (omo-opencode/src/cli/doctor/runner.ts:163-167); no port call changes.",
+    "diagnostics.run.verbose": "An output mode only: the OpenCode doctor runs the same checks with or without it and only picks the formatter (omo-opencode/src/cli/doctor/runner.ts:163-167); no port call changes."
+  },
+  "scenarios": [
+    {
+      "id": "diagnostics.run/native-report",
+      "row": "diagnostics.run",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": []
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "args": {
+            "all": true,
+            "include_workers": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.run/opencode-platform",
+      "row": "diagnostics.run",
+      "kind": "effect",
+      "input": {
+        "platform": "opencode"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.config/opencode/opencode.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.run/codex-platform",
+      "row": "diagnostics.run",
+      "kind": "effect",
+      "input": {
+        "platform": "codex"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "~/.codex/config.toml"
+          }
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.run/unknown-platform",
+      "row": "diagnostics.run",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "platform": "claude"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.models/model-chains",
+      "row": "diagnostics.models",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/models.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.fixReflectionLock/reap-stale-locks",
+      "row": "diagnostics.fixReflectionLock",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "list",
+          "args": {
+            "path": "~/.omo/memory/agents"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.fixReflectionLock/dry-run-removes-nothing",
+      "row": "diagnostics.fixReflectionLock",
+      "kind": "effect",
+      "input": {
+        "dry_run": true
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "list",
+          "args": {
+            "path": "~/.omo/memory/agents"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.fixReflectionLock/dry-run-not-boolean",
+      "row": "diagnostics.fixReflectionLock",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "dry_run": "yes"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/signals-orphaned-engine",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "effect",
+      "input": {
+        "pids": [
+          4242
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": [
+            {
+              "pid": 4242,
+              "ppid": 1,
+              "engine": true,
+              "interactive": true
+            }
+          ]
+        },
+        {
+          "port": "process",
+          "op": "signal",
+          "args": {
+            "pid": 4242,
+            "signal": "SIGTERM"
+          }
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/pid-not-an-engine",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "pids": [
+          4242
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": []
+        },
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/managed-engine",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "pids": [
+          4242
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": [
+            {
+              "pid": 4242,
+              "ppid": 1,
+              "engine": true,
+              "interactive": false
+            }
+          ]
+        },
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/launcher-alive",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "refusal",
+      "refusal": "foreign_live_owner",
+      "input": {
+        "pids": [
+          4242
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": [
+            {
+              "pid": 4242,
+              "ppid": 777,
+              "engine": true,
+              "interactive": true
+            }
+          ]
+        },
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/no-pids",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "pids": []
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { failed as fail, type Failed as Failure } from "../address/refusals"
 import { resolveTypedDevice } from "../address/device"
-import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import type { CommandResult } from "../../remote/index"
 import { accountState } from "../address/account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
@@ -110,7 +110,7 @@ const isRecord = (value: unknown): value is JsonObject =>
 const READ_TAIL = 256
 
 /** The joined text of a transcript message entry, or undefined for anything that is not one. */
-const entryTextOf = (entry: JsonObject): string | undefined => {
+export const entryTextOf = (entry: JsonObject): string | undefined => {
   const message = isRecord(entry["message"]) ? entry["message"] : entry["role"] !== undefined ? entry : undefined
   if (message === undefined) return undefined
   const content = message["content"]
@@ -129,7 +129,7 @@ export const isUserEntry = (entry: JsonObject): boolean => {
 }
 
 /** The client message id senpi stamped on a stored user entry (`clientMessageId` on the message), if any. */
-const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
+export const entryClientMessageIdOf = (entry: JsonObject): string | undefined => {
   const message = isRecord(entry["message"]) ? entry["message"] : entry
   const id = message["clientMessageId"]
   return typeof id === "string" && id !== "" ? id : undefined
@@ -504,6 +504,14 @@ export async function followRemote(
       const ownPrompt = byId >= 0 ? byId : byText
       const settledAlready =
         ownPrompt >= 0 && buffer.slice(ownPrompt + 1).some((record) => record["type"] === "agent_settled")
+      // Only a stamped prompt identifies this send without consulting the transcript. If its run is still
+      // current, its buffered deltas are live output, not attach history (#13512).
+      if (byId >= 0 && byId > runStart && !settledAlready) {
+        for (const record of buffer.slice(byId + 1)) {
+          if (record["type"] === "message_start" && isUserEntry(record)) break
+          streamRecord(record)
+        }
+      }
       void probe(settledAlready, ownPrompt >= 0, byId < 0 && options?.clientMessageId !== undefined)
     }
   }

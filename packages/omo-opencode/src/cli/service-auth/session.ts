@@ -403,8 +403,14 @@ export function createSession(options: {
         return await locked(async () => {
           let current: Credentials | null = null
           let account: string | undefined
+          // #11065: the teardown below must never run after the store itself failed the read - a stalled keyring
+          // has been waited on once already, and its clear()/read() would only wait on it a second time. A read
+          // that answered with an unusable item (InvalidCredentialState) still gets the teardown, so it is cleared.
+          let readSettled = false
+          let storeUnavailable = false
           try {
             current = await store.readAuthoritative()
+            readSettled = true
             if (current !== null) {
               if (current.refreshState === "uncertain") return false
               const access =
@@ -421,22 +427,32 @@ export function createSession(options: {
             return true
           } catch (error) {
             if (error instanceof SessionEnded) return error.deviceRevoked
+            // A store failure of the initial read is the one storage error logout reports as
+            // store-unavailable (exit 9); store errors after a settled read keep the sign-out's own outcome.
+            if (!readSettled && error instanceof CredentialStoreError) {
+              storeUnavailable = true
+              throw error
+            }
             if (error instanceof SignInError) return false
             throw error
           } finally {
             // Marker first: it only counts once the store is empty, so an unlocked reader never sees an empty store
             // without it, and a failed marker write leaves the credentials in place instead of half-signing-out.
-            await writeSignedOutMarker(markerPath, current?.device.id ?? null)
-            // A refresh refusal inside this logout already cleared the store (and retired the pin).
-            const stored = current === null ? null : await store.read().catch(() => current)
-            if (stored !== null)
-              await beforeKeysDiscarded(
-                discardedOf(
-                  stored.accountId === undefined && account !== undefined ? { ...stored, accountId: account } : stored,
-                  "logout",
-                ),
-              )
-            await store.clear()
+            if (!storeUnavailable) {
+              await writeSignedOutMarker(markerPath, current?.device.id ?? null)
+              // A refresh refusal inside this logout already cleared the store (and retired the pin).
+              const stored = current === null ? null : await store.read().catch(() => current)
+              if (stored !== null)
+                await beforeKeysDiscarded(
+                  discardedOf(
+                    stored.accountId === undefined && account !== undefined
+                      ? { ...stored, accountId: account }
+                      : stored,
+                    "logout",
+                  ),
+                )
+              await store.clear()
+            }
           }
         })
       } finally {

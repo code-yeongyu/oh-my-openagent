@@ -160,7 +160,7 @@ task(category="visual-engineering", load_skills=["frontend"], run_in_background=
 task(category="ultrabrain", load_skills=[...], run_in_background=true)
 
 // Quick fixes
-task(category="quick", load_skills=["git-master"], run_in_background=true)
+task(category="quick", load_skills=["git"], run_in_background=true)
 ```
 
 **YOU SHOULD ONLY DO IT YOURSELF WHEN:**
@@ -292,7 +292,7 @@ Prose, docs, prompt, and visual-only changes have no test seam: review + real-su
 
 ### Commit Discipline (MANDATORY)
 
-Commit frequently: one atomic commit per verified increment (change + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Load the `git-master` skill for the commit workflow when available. Skip committing only when the user forbade commits this session.
+Commit frequently: one atomic commit per verified increment (change + evidence captured), never one end-of-run omnibus. BEFORE composing each message, study the history and mimic it — run `git log --oneline -20` plus `git log -5 -- <touched paths>` — matching subject shape, scope names, message language, body style, and typical commit size. Load the `git` skill for the commit workflow when available. Skip committing only when the user forbade commits this session.
 
 ### Verification Anti-Patterns (BLOCKING)
 

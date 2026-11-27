@@ -18,6 +18,8 @@ const FAN_IN =
   "capture fan-in: reaches a transport only through the session client the gate created; opted-out hashes are dropped"
 const THROUGH_FAN_IN = "hands the event to the component fan-in, which forwards only through the gated session client"
 const NOTICE_MARKER = "claimNotice runs only after isOmoNativeTelemetryEnabled returned true"
+const CONSENT_MARKER =
+  "persists the first-run consent answer itself; it deliberately runs without the telemetry gate, which reads its output (#14920 wave B)"
 const GATE: GateRoute = { kind: "gate" }
 const VIA_FAN_IN: GateRoute = { kind: "fan-in" }
 const VIA_SESSION_CLIENT: GateRoute = { kind: "session-client" }
@@ -259,18 +261,18 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     reason: THROUGH_FAN_IN,
   },
   {
-    file: "omo-native-notice.ts",
-    fn: "claimNotice",
+    file: "omo-native-consent.ts",
+    fn: "recordOmoNativeConsent",
     guard: "",
     call: "mkdirSync(stateDir)",
-    reason: NOTICE_MARKER,
+    reason: CONSENT_MARKER,
   },
   {
-    file: "omo-native-notice.ts",
-    fn: "claimNotice",
+    file: "omo-native-consent.ts",
+    fn: "recordOmoNativeConsent",
     guard: "",
-    call: "writeFileSync(join(stateDir, MARKER_FILE_NAME))",
-    reason: NOTICE_MARKER,
+    call: "writeFileSync(join(stateDir, CONSENT_MARKER_FILE_NAME))",
+    reason: CONSENT_MARKER,
   },
   {
     file: "omo-native-parallel-summary.ts",

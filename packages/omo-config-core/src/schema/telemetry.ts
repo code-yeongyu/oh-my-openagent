@@ -19,7 +19,7 @@ export type OmoTelemetrySettings = z.infer<typeof OmoTelemetrySettingsSchema>
 export type OmoTelemetrySettingsLayer = z.infer<typeof OmoTelemetrySettingsLayerSchema>
 
 export interface OmoTelemetryConfigView {
-  readonly telemetry?: OmoTelemetrySettings
+  readonly telemetry?: OmoTelemetrySettings | undefined
 }
 
 type TelemetrySettingKey = keyof OmoTelemetrySettings

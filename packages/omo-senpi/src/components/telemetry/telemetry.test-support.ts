@@ -11,6 +11,8 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 
 import type { ComponentLogger } from "../../extension/types"
+import { recordOmoNativeConsent } from "./omo-native-consent"
+import { getOmoNativeStateDir } from "./product-identity"
 
 export type RecordedTransport = {
   readonly messages: readonly TelemetryCaptureMessage[]
@@ -32,13 +34,17 @@ export function createOsProvider(hostname: string): TelemetryOsProvider {
 }
 
 export function createEnabledEnv(agentDir: string): TelemetryEnv {
-  return {
+  const env = {
     POSTHOG_API_KEY: "test-api-key",
     SENPI_CODING_AGENT_DIR: agentDir,
     HOME: agentDir,
     USERPROFILE: agentDir,
     OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
   }
+  // An "enabled" machine is a consenting one (#14920 wave B): seed the recorded accept the
+  // first-run question would have written, so enabled-flow tests exercise telemetry, not the gate.
+  recordOmoNativeConsent(getOmoNativeStateDir(env), "accepted")
+  return env
 }
 
 export function createTransportRecorder(): RecordedTransport {

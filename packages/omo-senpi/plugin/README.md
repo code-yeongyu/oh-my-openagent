@@ -9,17 +9,17 @@ The plugin ships 28 skills by default:
 - `ast-grep` — structural code search and rewrites
 - `browser` — drive a real browser from the js eval kernel: signed-in sites, forms, screenshots, web QA
 - `coding-agent-sessions` — find, read, and reconstruct coding-agent session transcripts
-- `dag-library` — save a DAG definition once and re-run it by name
 - `data-scientist` — analyze CSV/parquet/JSON data with DuckDB and Polars
 - `debugging` — hypothesis-driven runtime debugging across languages
 - `eval-integrity` — check whether an eval, benchmark, or metric claim is trustworthy
 - `frontend` — UI/UX/visual design, styling, layout, and frontend implementation
-- `git-master` — advanced Git operations, history surgery, and workflow automation
+- `git` — local git from eval cells: commits, worktrees, base sync, push, history search (`git-master` still resolves as an alias)
+- `github` — GitHub work through a typed SDK, CLI and MCP: pull requests, CI waits, issues, Actions, releases, repositories
 - `give-me-tips` — explain any senpi tip, including the Tip: lines in the TUI
 - `hyperplan` — adversarial 5-member cross-critique planning
 - `init-deep` — deep project initialization and scaffold setup
 - `lsp-setup` — Language Server configuration and troubleshooting
-- `mass-ulw` — dependency-ordered child work through the native workflow tool
+- `mass-ulw` — dependency-ordered child work through the native workflow tool, plus saved graphs re-run by name
 - `omo-relay` — work on the account's other machines and threads, one at a time or all at once
 - `onboarding` — guide a first-time omo user through setup and the core workflow
 - `programming` — type-strict, modern-stack programming guidance

@@ -60,7 +60,6 @@ describe("remote sessions on by default", () => {
       owner.stateDir,
       SIGNED_IN,
       testBootstrap(),
-      undefined,
       remote,
     )
     expect(code).toBe(REMOTE_EXIT.ok)
@@ -71,13 +70,13 @@ describe("remote sessions on by default", () => {
 
   test("disable records the opt-out, and the next bootstrap keeps everything off even when the switch came back on", async () => {
     const { owner, connect, record, remote } = await device(true)
-    const off = await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
+    const off = await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), remote)
     expect([off.code, record.off, off.coldWake]).toEqual([REMOTE_EXIT.ok, true, ["uninstall"]])
     // The device service's switch comes back on by itself (a reinstall or a forget resets it to its default).
     const service = await connect()
     await service.setEnabled(true)
     service.close()
-    const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
+    const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), remote)
     expect(JSON.parse(restart.out.join("")).status.enabled).toBe(false)
     expect([owner.state.status.enabled, restart.coldWake, owner.state.adoptions]).toEqual([false, ["uninstall"], 0])
   })
@@ -94,7 +93,7 @@ describe("remote sessions on by default", () => {
       record: () => (record.off = true),
       clear: () => (record.off = false),
     }
-    const { code, coldWake } = await run(["disable"], privateDir(), account, testBootstrap(), undefined, { optOut })
+    const { code, coldWake } = await run(["disable"], privateDir(), account, testBootstrap(), { optOut })
     expect([code, record.off, coldWake]).toEqual([REMOTE_EXIT.unavailable, true, ["uninstall"]])
   })
 
@@ -107,7 +106,7 @@ describe("remote sessions on by default", () => {
         throw new Error("~/.omo is not writable")
       },
     }
-    const { code, err, coldWake } = await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, {
+    const { code, err, coldWake } = await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), {
       ...remote,
       optOut: failing,
     })
@@ -126,7 +125,7 @@ describe("remote sessions on by default", () => {
       clear: () => {},
     }
     const signedOut = { exitCode: 4, stdout: '{"signedIn":false}' }
-    const { code, err } = await run(["disable"], privateDir(), signedOut, testBootstrap(), undefined, {
+    const { code, err } = await run(["disable"], privateDir(), signedOut, testBootstrap(), {
       optOut: failing,
     })
     expect(code).toBe(REMOTE_EXIT.failed)
@@ -135,10 +134,10 @@ describe("remote sessions on by default", () => {
 
   test("enable after disable clears the opt-out, and the bootstrap keeps it on again", async () => {
     const { owner, record, remote } = await device(true)
-    await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
-    const on = await run(["enable", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
+    await run(["disable"], owner.stateDir, SIGNED_IN, testBootstrap(), remote)
+    const on = await run(["enable", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), remote)
     expect([JSON.parse(on.out.join("")), record.off, on.coldWake]).toEqual([{ enabled: true }, false, ["install"]])
-    const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
+    const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), remote)
     expect([owner.state.status.enabled, restart.coldWake]).toEqual([true, ["install"]])
   })
 
@@ -147,7 +146,7 @@ describe("remote sessions on by default", () => {
     const service = await connect()
     await service.setEnabled(false)
     service.close()
-    const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, remote)
+    const restart = await run(["bootstrap", "--json"], owner.stateDir, SIGNED_IN, testBootstrap(), remote)
     expect([owner.state.status.enabled, restart.coldWake]).toEqual([false, ["uninstall"]])
   })
 })
