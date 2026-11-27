@@ -28,14 +28,24 @@ export type AwaitingRevival = {
  * lifecycle has no obligation left (the node fails as orphaned), or the lifecycle stopped for shutdown
  * or was disposed (the node is released unjournaled and the run parks). Each lifecycle pass wakes it.
  */
-export function followPendingRevivals(context: SchedulerContext, awaiting: AwaitingRevival): void {
+/**
+ * The waiter's invariant (#15150 stack review 3): after its first decision a waiter never decides again
+ * without having awaited an event - the lifecycle's pass signal, the cancellation signal, or (once it
+ * follows) its own child's settlement. The loop in `revivalSettlement` enforces it: every decision after
+ * the first is preceded by that await. A waiter armed "after an event" (the frontier re-arming a node whose
+ * stop is unconfirmed) has already decided once, so it awaits an event before its first decision too; the
+ * frontier never re-arms a waiter that could settle again on microtasks alone.
+ */
+export type WaiterArm = "first decision" | "after an event"
+
+export function followPendingRevivals(context: SchedulerContext, awaiting: AwaitingRevival, arm: WaiterArm): void {
   for (const [nodeId, taskId] of awaiting.tasks) {
     const folded = deferredSignal()
     context.attachedTaskIds.set(nodeId, taskId)
     context.attachedTasks.set(nodeId, {
       nodeId,
       selfResumed: false,
-      settled: revivalSettlement(context, nodeId, taskId, awaiting.revivals),
+      settled: revivalSettlement(context, nodeId, taskId, awaiting.revivals, arm),
       folded: folded.promise,
       resolveFolded: folded.resolve,
     })
@@ -48,8 +58,17 @@ async function revivalSettlement(
   nodeId: DagNodeId,
   taskId: string,
   revivals: PendingRevivals,
+  arm: WaiterArm,
 ): Promise<AttachedTaskSettlement> {
-  for (;;) {
+  for (let awaitEvent = arm === "after an event"; ; awaitEvent = true) {
+    if (awaitEvent) {
+      // A cancelled or suspended scheduler stops listening; its settle loop has already returned.
+      const woken = await Promise.race([
+        revivals.changed().then(() => true),
+        context.cancellationRequested.then(() => false),
+      ])
+      if (!woken) return new Promise<AttachedTaskSettlement>(() => undefined)
+    }
     const record = context.taskManager.get(taskId)
     if (
       record !== undefined &&
@@ -61,12 +80,6 @@ async function revivalSettlement(
       const ended = obligationEnd(revivals, nodeId, taskId, record)
       if (ended !== undefined) return ended
     }
-    // A cancelled or suspended scheduler stops listening; its settle loop has already returned.
-    const woken = await Promise.race([
-      revivals.changed().then(() => true),
-      context.cancellationRequested.then(() => false),
-    ])
-    if (!woken) return new Promise<AttachedTaskSettlement>(() => undefined)
   }
 }
 
@@ -148,7 +161,12 @@ export async function runRevivalFences(context: SchedulerContext): Promise<void>
       nodeId,
       `${request.message}; it was asked to stop and is still live, so the node waits until its stop lands`,
     )
-    followPendingRevivals(context, { tasks: new Map([[nodeId, request.taskId]]), revivals: request.revivals })
+    // Re-armed after an event only: its child just answered not_current, and would again at once.
+    followPendingRevivals(
+      context,
+      { tasks: new Map([[nodeId, request.taskId]]), revivals: request.revivals },
+      "after an event",
+    )
   }
 }
 

@@ -33,7 +33,8 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
   for (;;) {
     if (context.suspended || context.cancellationStarted) return cancelledSnapshot(context)
     // A waiting node's stale-child fence runs here, between admission passes, where no admission holds
-    // the admission flag (#15150): never from the fold that asked for it.
+    // the admission flag (#15150): never from the fold that asked for it. It re-arms a waiter only "after
+    // an event", so no fold, fence and re-arm cycle can repeat on microtasks alone (stack review 3).
     if (context.revivalFences.size > 0) {
       await runRevivalFences(context)
       continue

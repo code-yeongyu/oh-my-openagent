@@ -186,7 +186,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
   for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
     attachTaskSettlement(context, nodeId, taskId)
   }
-  if (options.awaitingRevival !== undefined) followPendingRevivals(context, options.awaitingRevival)
+  if (options.awaitingRevival !== undefined) followPendingRevivals(context, options.awaitingRevival, "first decision")
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {
