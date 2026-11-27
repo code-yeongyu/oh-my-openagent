@@ -17,6 +17,10 @@ const PID_ROUTES = [
   ["sl", "SLEventPostToPid"],
 ] as const
 
+type ArmObservation = <T>(read: () => T, accept: (value: T) => boolean, deadlineMs: number) => () => Promise<T>
+
+const armHostedObservation: ArmObservation = (read, accept, deadlineMs) => () => until(read, accept, deadlineMs)
+
 function stateLines(file: string): string[] {
   return existsSync(file)
     ? readFileSync(file, "utf8")
@@ -25,13 +29,18 @@ function stateLines(file: string): string[] {
     : []
 }
 
-async function nextState(file: string, before: number, settleMs: number): Promise<string | undefined> {
-  const lines = await until(
+function observeState(probe: Probe, observe: ArmObservation): () => Promise<string | undefined> {
+  const file = probe.fixture.stateFile
+  const before = stateLines(file).length
+  const settled = observe(
     () => stateLines(file),
     (read) => read.length > before,
-    settleMs,
+    probe.settleMs,
   )
-  return lines.length > before ? lines.at(-1) : undefined
+  return async () => {
+    const lines = await settled()
+    return lines.length > before ? lines.at(-1) : undefined
+  }
 }
 
 function frameOf(read: Json): readonly number[] | null {
@@ -47,16 +56,22 @@ type Click = {
   readonly note: string
 }
 
-async function clickAt(probe: Probe, aim: readonly string[], route: string, times = 1): Promise<Click | string> {
+async function clickAt(
+  probe: Probe,
+  observe: ArmObservation,
+  aim: readonly string[],
+  route: string,
+  times = 1,
+): Promise<Click | string> {
   const { fixture } = probe
-  const before = stateLines(fixture.stateFile).length
+  const state = observeState(probe, observe)
   const eventsBefore = stateLines(fixture.eventFile).length
   for (let index = 0; index < times; index += 1) {
     const click = probe.invoke(["click", String(fixture.pid), String(fixture.windowNumber), ...aim, route])
     const error = failed(click)
     if (error !== null) return error
   }
-  const toggled = await nextState(fixture.stateFile, before, probe.settleMs)
+  const toggled = await state()
   const delivered = stateLines(fixture.eventFile).slice(eventsBefore)
   const arrival = delivered.length === 0 ? "window saw nothing" : `window saw ${short(delivered)}`
   return { toggled, delivered, note: `${route}x${times}: ${toggled ?? "no toggle"}; ${arrival}` }
@@ -88,32 +103,35 @@ async function frontmost(probe: Probe, pid: string): Promise<boolean | null> {
 
 async function activateFixture(
   probe: Probe,
+  observe: ArmObservation,
   pid: string,
 ): Promise<{ readonly active: boolean; readonly note: string }> {
-  const call = probe.control(["activate", pid])
-  if (failed(call) !== null) return { active: false, note: `activate call failed: ${short(call)}` }
-  const settled = await until(
+  const observation = observe(
     () => probe.control(["frontmost", pid]),
     (read) => failed(read) === null && read.frontmost === true,
     5_000,
   )
+  const call = probe.control(["activate", pid])
+  if (failed(call) !== null) return { active: false, note: `activate call failed: ${short(call)}` }
+  const settled = await observation()
   const active = failed(settled) === null && settled.frontmost === true
   return { active, note: `NSRunningApplication activate ${short(call)}, frontmost=${active}` }
 }
 
 async function axPressControl(
   probe: Probe,
+  observe: ArmObservation,
   pid: string,
 ): Promise<{ readonly toggled: boolean; readonly note: string }> {
-  const before = stateLines(probe.fixture.stateFile).length
+  const observation = observeState(probe, observe)
   const press = probe.control(["ax-press", pid])
   if (failed(press) !== null) return { toggled: false, note: `AX press control failed: ${short(press)}` }
-  const state = await nextState(probe.fixture.stateFile, before, probe.settleMs)
+  const state = await observation()
   const toggled = state !== undefined && !state.startsWith("first-mouse")
   return { toggled, note: `AX press control ${short(press)}: ${state ?? "no toggle"}` }
 }
 
-export async function askPidClick(probe: Probe): Promise<Answer> {
+export async function askPidClick(probe: Probe, observe: ArmObservation = armHostedObservation): Promise<Answer> {
   const pid = String(probe.fixture.pid)
   const target = probe.control(["ax-checkbox", pid])
   const aim = aimOf(probe, target, "frame")
@@ -124,16 +142,16 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
 
   const defaultClicks: (Click | string)[] = []
   let precondition = ""
-  const double = await clickAt(probe, aim, "hid", 2)
+  const double = await clickAt(probe, observe, aim, "hid", 2)
   defaultClicks.push(double)
   notes.push(`two global clicks ${noteOf(double)}`)
   if (toggledDefault(double)) precondition = "none (a second global click at the same point)"
 
   if (precondition === "") {
-    const activation = await activateFixture(probe, pid)
+    const activation = await activateFixture(probe, observe, pid)
     notes.push(activation.note)
     if (activation.active) {
-      const single = await clickAt(probe, aim, "hid")
+      const single = await clickAt(probe, observe, aim, "hid")
       defaultClicks.push(single)
       notes.push(`activated-click ${noteOf(single)}`)
       if (toggledDefault(single)) precondition = "app active (NSRunningApplication activate)"
@@ -145,11 +163,11 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
   if (typeof firstMouseAim === "string") {
     notes.push(`first-mouse control not aimed: ${firstMouseAim}`)
   } else {
-    const firstMouse = await clickAt(probe, firstMouseAim, "hid")
+    const firstMouse = await clickAt(probe, observe, firstMouseAim, "hid")
     notes.push(`first-mouse ${noteOf(firstMouse)}`)
     firstMouseToggled = typeof firstMouse !== "string" && firstMouse.toggled !== undefined
     if (firstMouseToggled && precondition === "") {
-      const afterFirstMouse = await clickAt(probe, aim, "hid")
+      const afterFirstMouse = await clickAt(probe, observe, aim, "hid")
       defaultClicks.push(afterFirstMouse)
       notes.push(`default click after the first-mouse toggle ${noteOf(afterFirstMouse)}`)
       if (toggledDefault(afterFirstMouse))
@@ -159,7 +177,7 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
 
   const pidClicks: (Click | string)[] = []
   for (const [route, name] of PID_ROUTES) {
-    const pidClick = await clickAt(probe, aim, route)
+    const pidClick = await clickAt(probe, observe, aim, route)
     pidClicks.push(pidClick)
     notes.push(`${name} ${noteOf(pidClick)}`)
     if (toggledDefault(pidClick)) {
@@ -196,7 +214,7 @@ export async function askPidClick(probe: Probe): Promise<Answer> {
     return contradicts(
       `pid-routed delivery refused: global clicks at the proven aim reached the window with the app active, while pid-routed events never reached the window; ${notes.join("; ")}`,
     )
-  const press = await axPressControl(probe, pid)
+  const press = await axPressControl(probe, observe, pid)
   notes.push(press.note)
   if (press.toggled)
     return unmeasured(
