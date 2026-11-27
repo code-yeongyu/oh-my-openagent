@@ -373,6 +373,8 @@ export type {
   TaskConcurrencyConfig,
   TaskManager,
   TaskManagerOptions,
+  OwnerResumeFence,
+  OwnerResumeVerdict,
   TrustedRespawnLaunch,
   TrustedRespawnLaunchResolver,
 } from "./manager"

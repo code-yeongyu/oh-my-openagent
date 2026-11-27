@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cleanupProjects } from "./__fixtures__/manager-fakes"
+import { cleanupProjects, makeHandle } from "./__fixtures__/manager-fakes"
 import { reconciliationHarness, stoppedChild } from "./host-reconciliation.test-support"
 import { runTaskOutput } from "../tools/output/output"
 import { childIdentityOf } from "./manager-helpers"
@@ -33,10 +33,13 @@ describe("receipt-driven host respawn lifecycle", () => {
         if (result.applied) statuses.push(result.record.status)
         return result
       }
-      expect(await f.manager.reattach(f.record, f.result.handle)).toEqual({ ok: true })
+      // The revival ends once the continued run reopened the record, so the run's start is released first (#15125).
+      const revival = f.manager.reattach(f.record, f.result.handle)
       expect(f.store.load(f.record.task_id)?.final_response).toBeUndefined()
       expect(f.store.load(f.record.task_id)?.error_message).toBeUndefined()
       f.startContinuation()
+      expect(await revival).toEqual({ ok: true })
+      expect(f.store.load(f.record.task_id)).toMatchObject({ status: "running", resumed_run_epoch: 1 })
       await f.resumed
       expect(statuses).toContain("interrupted")
       expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(2)
@@ -48,6 +51,18 @@ describe("receipt-driven host respawn lifecycle", () => {
       await f.result.handle.dispose()
     })
   }
+
+  test("a concurrent revival that finds the child attached returns only once the continued run reopened the record", async () => {
+    const f = await stoppedChild({ state: "done", outcome: { kind: "interrupted_by_reopen" } })
+    const winner = f.manager.reattach(f.record, f.result.handle)
+    const loser = f.manager
+      .reattach(f.record, makeHandle(f.record.task_id).handle)
+      .then((result) => ({ kind: result.ok ? "ok" : result.kind, status: f.store.load(f.record.task_id)?.status }))
+    f.startContinuation()
+    expect(await loser).toEqual({ kind: "already_attached", status: "running" })
+    expect(await winner).toEqual({ ok: true })
+    await f.result.handle.dispose()
+  })
 
   test("accepted input becomes idle_queued, not orphaned running work", async () => {
     const f = await stoppedChild({ state: "accepted" })

@@ -68,6 +68,8 @@ export interface FakeHost {
   failReply(type: string, error: string | undefined): void
   requestUi(routingId: string, request: Readonly<Record<string, unknown>>): void
   emitRecord(routingId: string, record: Readonly<Record<string, unknown>>): void
+  /** What the session's `get_state` reports as the engine's SessionLifecycle; `undefined` reports none. */
+  setLifecycle(routingId: string, lifecycle: unknown): void
   /** The host loop stalled: a connection-level notice every attached client sees. */
   stall(driftMs: number): void
   /** Finish the turn in flight with an assistant answer, exactly as a real session would. */
@@ -258,6 +260,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
         table.setStreaming(routingId, true)
       sendTo(routingId, payload)
     },
+    setLifecycle: (routingId, lifecycle) => table.setLifecycle(routingId, lifecycle),
     stall: (driftMs) => {
       for (const socket of [...sockets]) writeFrame(socket, { type: "host_stalled", driftMs })
     },

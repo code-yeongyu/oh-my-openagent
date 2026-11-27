@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@code-yeongyu/senpi"
 
 import { readMemberSessionIdentity, readSessionRole } from "../../runners/rpc-host/session-role"
 import { resolveChildSessionDir } from "../../runners/rpc/spawn"
+import { MEMBER_RESIDENCY_WAKE_SOURCE } from "../../runners/pending-async-work"
 import { parseMemberExtensionEnv, type ParsedMemberExtensionEnv } from "./parse-env"
 
 /**
@@ -33,7 +34,7 @@ export function resolveMemberExtensionConfig(
 
 /** senpi's monitor-state event: a session with a live wake source is never parked mid-run. */
 export const MEMBER_WAKE_SOURCE_STATE_EVENT = "wake_source_state"
-export const MEMBER_WAKE_SOURCE = "senpi-task-member"
+export const MEMBER_WAKE_SOURCE = MEMBER_RESIDENCY_WAKE_SOURCE
 
 export interface MemberWakeSource {
   /** The team run is live: this member is on duty until it says otherwise. */

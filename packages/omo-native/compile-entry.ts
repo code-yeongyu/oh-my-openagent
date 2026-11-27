@@ -61,6 +61,7 @@ import { runAccountCommand } from "./account-cli"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { runDeviceServiceBootstrapCommand } from "./device-service-bootstrap-entry"
 import { refreshSessionHostUnit, runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
+import { sessionHostRuntimeVersion } from "./remote-cold-wake"
 import { runtimeGate } from "./release-version"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
@@ -582,7 +583,23 @@ async function main(): Promise<void> {
     // Before the prune: a session host unit must never keep naming a runtime this launch is about to remove.
     const isOlder = runtimeGate(manifest.omoAiVersion)
     if (isOlder !== undefined) await refreshSessionHostUnit(isOlder)
-    reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
+    // The refresh skips a unit that serves another agent dir (omo#15029), so the prune also keeps the runtime the
+    // installed unit still names (#15264 review M1). A unit that cannot be read skips the prune for this launch.
+    let unitRuntime: string | undefined
+    let unitKnown = true
+    try {
+      unitRuntime = sessionHostRuntimeVersion()
+    } catch {
+      unitKnown = false
+    }
+    if (unitKnown)
+      reportRuntimePrune(
+        pruneProvisionedRuntimes({
+          root: dirname(dirname(expected)),
+          current: manifest.omoAiVersion,
+          keep: unitRuntime === undefined ? [] : [unitRuntime],
+        }),
+      )
     removeReplacedLauncher(launch.launcher)
   }
   if (launch.handOff) {

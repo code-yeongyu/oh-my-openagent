@@ -120,6 +120,8 @@ function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReaso
       return "Parent kernel tools are unavailable for this child."
     case "model_unavailable":
       return MODEL_UNAVAILABLE_MESSAGE
+    case "usage_limit":
+      return "Every available model is behind a remembered usage limit. Retry once it resets or select another provider."
     case "session_unavailable":
       return reason !== undefined && SESSION_REFUSAL_REASONS.has(reason)
         ? `The task host refused the child session (${reason}).`
@@ -136,6 +138,8 @@ function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReaso
       return "The child could not be resumed."
     case "model_chain_exhausted":
       return "Every designated model for this task was refused, and a child never runs on any other model."
+    case "async_work_pending":
+      return "The child ended its turn while its own async work was still pending."
     default:
       return assertNever(kind)
   }
