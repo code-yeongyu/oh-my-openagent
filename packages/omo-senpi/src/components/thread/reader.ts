@@ -54,6 +54,8 @@ export type ThreadReadSourceRef =
       readonly kind: "jsonl"
       /** Absolute path of the session's append-only JSONL file. */
       readonly path: string
+      /** A tool read pages message payloads; raw transcript consumers page every entry. */
+      readonly view?: "messages"
       /**
        * Whether a live host currently holds this session. Absent or false is
        * the restart shape and yields `source_incomplete: true`.
@@ -227,7 +229,7 @@ function decodeCursor(raw: string): Cursor | null {
     return null
   }
   const [version, revision = "", ...positions] = decoded.split(":")
-  if (!/^\d+\.[0-9a-z]+$/.test(revision)) return null
+  if (!/^\d+\.[0-9a-z]+(?:\.m)?$/.test(revision)) return null
   const offsets = positions.map(Number)
   if (offsets.some((offset) => !Number.isSafeInteger(offset) || offset < 0)) return null
   const [first = 0, second = 0] = offsets
@@ -240,6 +242,12 @@ function decodeCursor(raw: string): Cursor | null {
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
+
+function durableMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry[] {
+  const message = entry.message
+  if (entry.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
+  return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
+}
 
 /**
  * Read one bounded slice of a session transcript.
@@ -331,8 +339,10 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     loaded = file
   }
 
-  const entries = loaded.entries
-  const revision = revisionOf(entries)
+  const messageView = source.kind === "jsonl" && source.view === "messages"
+  // Positions in a visible-message window cannot resume an old raw-entry cursor (or vice versa).
+  // Both views still invalidate on changes to the full file, including bookkeeping.
+  const revision = revisionOf(loaded.entries) + (messageView ? ".m" : "")
 
   if (cursor !== null && cursor.revision !== revision) {
     return fail(
@@ -342,6 +352,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     )
   }
 
+  const entries = messageView ? loaded.entries.flatMap(durableMessage) : loaded.entries
   const base: Omit<ThreadTranscriptReadOk, "items" | "truncated" | "next_cursor" | "encoded_bytes"> = {
     kind: "ok",
     source: readSourceKind,

@@ -1,5 +1,4 @@
-import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
-import type { RemoteSender } from "../../remote/types"
+import { createLazyRemoteSurface, type RemoteSender } from "../../remote/lazy"
 import type { AliasRegistry, RemoteThreadSurface, SessionProjector } from "./ports"
 
 type SignIn = {

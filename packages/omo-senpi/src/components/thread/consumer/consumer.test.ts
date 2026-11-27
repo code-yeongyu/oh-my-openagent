@@ -415,6 +415,62 @@ describe("A5: the consumer's side of the local delivery messages", () => {
     ])
   })
 
+  // #14623 review M3: a refusal notice may wait on a slow peer; the drained marks are reported without waiting for it.
+  test("#given a refusal notice whose peer never answers #when the consumer reports #then the drained mark is reported at once and the notice is still sent", async () => {
+    const h = (harness = createGatewayHarness())
+    const service = createFakeDeliveryService({ admitted: false })
+    const sessions = join(h.agentDir, "sessions")
+    writeSessionFile(sessions, "t")
+    const real = h.store()
+    const notice = { device: "dev-b", session: "s-b", delivery_id: "d-x", target_durable_id: "t", reason: "expired" }
+    let claimed = false
+    const store: typeof real = {
+      ...real,
+      refusalNotices: async () => (claimed ? [] : [notice as never]),
+      claimRefusalNotice: async () => {
+        claimed = true
+        return true
+      },
+    }
+    const sent: string[] = []
+    let answer: () => void = () => {}
+    let started: () => void = () => {}
+    const noticeStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const consumer = createDeliveryConsumer({
+      store,
+      port: {
+        ...service.port,
+        // Only the notice's peer is admitted: the intake's sender stays refused, so its mark drains.
+        peerAdmitted: async (device) => device === notice.device || (await service.port.peerAdmitted(device)),
+        notice: async (n) => {
+          sent.push(n.delivery_id)
+          await new Promise<void>((resolve) => {
+            answer = resolve
+            started()
+          })
+        },
+      },
+      agentDir: h.agentDir,
+      sessionsDirectory: sessions,
+      chainCountLimit: async () => undefined,
+      wake: async () => {},
+    })
+    consumers.push(consumer)
+    await consumer.start()
+    await service.inbound({ command_id: "c-1", sender_device: "dev-a", durable_id: "t", record: record("d-1") })
+    await consumer.idle()
+
+    await consumer.reportDrained()
+
+    expect(service.calls.filter((call) => call.type === "delivery.drained")).toHaveLength(1)
+    await noticeStarted
+    expect(sent).toEqual(["d-x"])
+    answer()
+    await consumer.idle()
+  })
+
   test("#given the service keeps the mark and names a command it still expects #when this directory holds no open row for that command #then the consumer reports that command drained", async () => {
     const { h, sessions, service, consumer } = setup()
     writeSessionFile(sessions, "t")

@@ -37,6 +37,23 @@ function result(
   )
 }
 
+/** The tone of each drawn line: a theme that writes the color name instead of an escape. */
+function tones(name: ThreadToolName, value: ThreadToolResult, args: Record<string, unknown> = {}): string[] {
+  const named = { fg: (color: ThemeColor, text: string) => `<${color}>${text}`, bold: (text: string) => text }
+  const output = { content: [{ type: "text" as const, text: JSON.stringify(value) }], details: { result: value } }
+  return renderThreadResult(name)(
+    output,
+    { expanded: false, isPartial: false },
+    named as unknown as Theme,
+    {
+      args,
+      isError: false,
+    } as never,
+  )
+    .render(WIDE)
+    .map((line) => /^<(\w+)>/.exec(line)?.[1] ?? "")
+}
+
 const failed = (code: string, message: string, next: string): ThreadToolResult =>
   ({ kind: "error", error: { code, message, next_action: next } }) as ThreadToolResult
 
@@ -70,10 +87,6 @@ describe("thread tool call lines", () => {
       "thread_set_reasoning planner -> high (this turn)",
     ],
     ["thread_close", {}, "thread_close this thread"],
-    ["thread_report", { kind: "question", text: "ship it?\nmore" }, 'thread_report question "ship it?"'],
-    ["thread_outbox", { binding_id: "bnd-7" }, "thread_outbox bnd-7"],
-    ["thread_outbox_ack", { binding_id: "bnd-7", cursor: 12 }, "thread_outbox_ack bnd-7 through #12"],
-    ["thread_answer", { binding_id: "bnd-7", reply_token: "tok", answer: "yes" }, 'thread_answer "yes"'],
   ] as const)(
     "#given %s args #when the call renders #then it is one line: verb, target, message head",
     (name, args, expected) => {
@@ -113,11 +126,29 @@ describe("thread_send / thread_handoff results", () => {
     ])
   })
 
-  test("#given a steered delivery #when it renders #then it says it joined the running turn", () => {
-    expect(
-      result("thread_send", sent({ kind: "steered", turn_id: "12" }, { effective_mode: "steer" }), sendArgs),
-    ).toEqual(["-> planner  steered into the running turn (turn 12)"])
+  // Q 2026-11-27: a steer waits in the target's steering queue until its next tool boundary (the real case was read 24 s
+  // after the send answered), so the row says it waits and is not drawn in the tone of an arrival.
+  test("#given a steered delivery #when it renders #then it says the steer waits for the running turn's next tool boundary, in the warning tone", () => {
+    const steered = sent({ kind: "steered", turn_id: "12" }, { effective_mode: "steer" })
+    expect(result("thread_send", steered, sendArgs)).toEqual([
+      "-> planner  steer queued for turn 12: delivers at its next tool boundary",
+    ])
+    expect(tones("thread_send", steered, sendArgs)).toEqual(["warning"])
   })
+
+  test.each([
+    ["absent", undefined],
+    ["unknown", { kind: "held_draft" }],
+  ])(
+    "#given a delivery whose kind is %s #when it renders #then it never claims the message was sent",
+    (_case, delivery) => {
+      const value = sent({}, { delivery }) as ThreadToolResult
+      const lines = result("thread_send", value, sendArgs)
+      expect(lines.join("\n")).not.toContain("sent")
+      expect(lines[0]).toStartWith("-> planner  delivery state unknown")
+      expect(tones("thread_send", value, sendArgs)).toEqual(["warning"])
+    },
+  )
 
   test("#given a queued delivery #when it renders #then it says where it waits", () => {
     expect(result("thread_send", sent({ kind: "queued", queue_position: 2 }), sendArgs)).toEqual([
@@ -170,7 +201,7 @@ describe("thread_send / thread_handoff results", () => {
     } as ThreadToolResult
     expect(result("thread_send", offline, { thread: "reviewer", message: "hi" })).toEqual([
       "-> reviewer  queued #1: thread is offline, delivers when it starts",
-      "  already sent under this key; not delivered twice",
+      "  already accepted under this key; not delivered twice",
     ])
   })
 
@@ -427,89 +458,8 @@ describe("control and relay results", () => {
       { thread: "self", level: "high" },
       ["this thread reasoning: high for this turn"],
     ],
-    [
-      "thread_report",
-      {
-        kind: "ok",
-        binding_id: "bnd-7",
-        revision: 1,
-        event: "question",
-        cursor: 5,
-        reply_token: "tok",
-        armed: false,
-        deduplicated: false,
-      },
-      { kind: "question", text: "?" },
-      ["question sent; waiting for a reply"],
-    ],
-    [
-      "thread_report",
-      {
-        kind: "ok",
-        binding_id: "bnd-7",
-        revision: 1,
-        event: "completion",
-        cursor: null,
-        reply_token: null,
-        armed: true,
-        deduplicated: false,
-      },
-      { kind: "completion", text: "done" },
-      ["completion armed; sent when this run settles"],
-    ],
-    [
-      "thread_outbox_ack",
-      { kind: "ok", binding_id: "bnd-7", acked_cursor: 12, changed: true },
-      { binding_id: "bnd-7", cursor: 12 },
-      ["acked through #12"],
-    ],
-    [
-      "thread_outbox_ack",
-      { kind: "ok", binding_id: "bnd-7", acked_cursor: 12, changed: false },
-      { binding_id: "bnd-7", cursor: 9 },
-      ["already acked through #12"],
-    ],
-    [
-      "thread_answer",
-      { kind: "ok", binding_id: "bnd-7", cursor: 5, session_durable_id: PEER },
-      { binding_id: "bnd-7", reply_token: "tok", answer: "yes" },
-      ["answer delivered to the waiting question"],
-    ],
   ] as const)("#given a %s result #when it renders #then one outcome line", (name, value, args, expected) => {
     expect(result(name, value as ThreadToolResult, args)).toEqual([...expected])
-  })
-
-  test("#given outbox rows #when thread_outbox renders #then it counts pending rows and shows the newest heads", () => {
-    const row = (cursor: number, event: string, text: string, state: string) => ({
-      cursor,
-      binding_id: "bnd-7",
-      revision: 2,
-      event,
-      text,
-      state,
-      created_at: "t",
-      edit_message_id: null,
-      provider_message_id: null,
-      reply_token: null,
-      question_state: null,
-      outcome: null,
-      answered_by: null,
-      answer_state: null,
-    })
-    const outbox = {
-      kind: "ok",
-      binding_id: "bnd-7",
-      revision: 2,
-      status: "active",
-      rows: [row(3, "milestone", "50% done\nmore", "acked"), row(4, "question", "ship it?", "pending")],
-      next_cursor: 4,
-      acked_cursor: 3,
-    } as ThreadToolResult
-    expect(result("thread_outbox", outbox, { binding_id: "bnd-7" })).toEqual([
-      "2 outbox rows, 1 pending",
-      "  #3 milestone: 50% done",
-      "  #4 question: ship it?",
-    ])
   })
 
   test("#given fields carrying terminal escape codes #when the call and the result render #then no escape reaches the terminal", () => {

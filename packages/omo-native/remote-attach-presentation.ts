@@ -7,9 +7,10 @@ import type {
   RemoteAttach,
   RemoteAttachEvent,
   SnapshotBody,
-} from "../device-service-core/src/index.ts"
+} from "../omo-senpi/src/components/remote/index"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
 import { MirroredDialogs, pendingIds } from "./remote-attach-dialogs"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 // A person drives these records (a slash command an extension runs, a compaction, a bash call), and the engine replies
 // only when the command finishes, so the attach terminal waits far longer than a tool call would; it still never waits
@@ -131,7 +132,7 @@ export class Presentation {
       type: "extension_ui_request",
       id: randomUUID(),
       method: "notify",
-      message,
+      message: escapeForDisplay(message, { keepLineFeeds: true }),
       notifyType,
       sessionId: LOCAL_SESSION_ID,
     })

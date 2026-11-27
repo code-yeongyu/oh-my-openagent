@@ -6,6 +6,7 @@ import {
   normalizeRendererText,
   stripTerminalControls,
 } from "@oh-my-opencode/senpi-task/renderer-text"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 
 import type { ThreadToolName, ThreadToolResult } from "../contracts"
 import type { AnyTool } from "./internals"
@@ -26,13 +27,15 @@ type ResultView = { readonly tone: Tone; readonly headline: string; readonly det
 const MESSAGE_HEAD_WIDTH = 60
 const LABEL_WIDTH = 40
 const LIST_HEAD = 5
-const OUTBOX_HEAD = 3
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const LINK = /^\[((?:\\.|[^\]\\])*)\]\(omo-thread:\/\/v1\/[^)]*\)$/
 /** `threadLink`'s label when the session has no name: not a title worth showing. */
 const UNNAMED_LINK_LABEL = "thread"
 
 /** Installs the thread family's call and result renderers on one tool definition. */
+/** A line shown to a person: terminal sequences removed, then the shared display escaping (the result itself is untouched). */
+const shownLine = (line: string): string => escapeForDisplay(stripTerminalControls(line))
+
 export function withThreadRenderers(tool: AnyTool): AnyTool {
   const name = tool.name as ThreadToolName
   return { ...tool, renderCall: renderThreadCall(name), renderResult: renderThreadResult(name) }
@@ -40,7 +43,7 @@ export function withThreadRenderers(tool: AnyTool): AnyTool {
 
 export function renderThreadCall(name: ThreadToolName) {
   return (args: unknown, theme: Theme, _context?: unknown): RenderComponent => {
-    const tail = stripTerminalControls(callTail(name, argsOf(args)))
+    const tail = shownLine(callTail(name, argsOf(args)))
     const head = theme.fg("toolTitle", theme.bold(name))
     return new Text(tail.length === 0 ? head : `${head} ${theme.fg("accent", tail)}`, 0, 0)
   }
@@ -58,14 +61,14 @@ export function renderThreadResult(name: ThreadToolName) {
     // Every printed field can come from a peer, a device or the model's own arguments: a row is cleaned whole, so no
     // field that skipped `text()` can carry a terminal escape to the screen.
     const lines = [
-      theme.fg(view.tone, stripTerminalControls(view.headline)),
-      ...view.details.map((line) => theme.fg("muted", `  ${stripTerminalControls(line)}`)),
+      theme.fg(view.tone, shownLine(view.headline)),
+      ...view.details.map((line) => theme.fg("muted", `  ${shownLine(line)}`)),
     ]
     if (options.expanded && result !== undefined)
       lines.push(
         ...JSON.stringify(result, null, 2)
           .split("\n")
-          .map((line) => theme.fg("dim", line)),
+          .map((line) => theme.fg("dim", escapeForDisplay(line))),
       )
     return new Text(lines.join("\n"), 0, 0)
   }
@@ -111,17 +114,6 @@ function callTail(name: ThreadToolName, args: Args): string {
       ])
     case "thread_close":
       return target ?? "this thread"
-    case "thread_outbox":
-      return label(args.binding_id) ?? ""
-    case "thread_outbox_ack":
-      return joinRendererTokens([
-        label(args.binding_id),
-        typeof args.cursor === "number" ? `through #${args.cursor}` : undefined,
-      ])
-    case "thread_report":
-      return joinRendererTokens([text(args.kind), quoted(args.text)])
-    case "thread_answer":
-      return quoted(args.answer) ?? ""
     default:
       return target ?? ""
   }
@@ -143,6 +135,8 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
     case "thread_handoff":
       return sendView(r, args)
     case "thread_read":
+      if ("outcome" in r && typeof r.outcome === "object" && r.outcome !== null)
+        return { tone: "muted", headline: `${target}: delivery ${String(Reflect.get(r.outcome, "kind"))}`, details: [] }
       return readView(r, target)
     case "thread_list":
       return listView(r)
@@ -193,43 +187,6 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
         headline: `${r.archived === true ? "archived" : "unarchived"} ${target}`,
         details: device(r),
       }
-    case "thread_report":
-      return {
-        tone: "success",
-        headline: reportHeadline(r),
-        details: r.deduplicated === true ? ["already reported under this key"] : [],
-      }
-    case "thread_outbox": {
-      const rows =
-        (r.rows as
-          | readonly {
-              readonly cursor: number
-              readonly event: string
-              readonly text: string
-              readonly state: string
-            }[]
-          | undefined) ?? []
-      const pending = rows.filter((row) => row.state === "pending").length
-      return {
-        tone: "success",
-        headline:
-          rows.length === 0
-            ? "outbox empty"
-            : `${plural(rows.length, "outbox row", "outbox rows")}, ${pending} pending`,
-        details: [
-          ...rows.slice(-OUTBOX_HEAD).map((row) => `#${row.cursor} ${row.event}: ${firstLine(row.text)}`),
-          ...(r.status === "active" ? [] : [`binding ${text(r.status)}`]),
-        ],
-      }
-    }
-    case "thread_outbox_ack":
-      return {
-        tone: r.changed === true ? "success" : "muted",
-        headline: `${r.changed === true ? "" : "already "}acked through #${r.acked_cursor}`,
-        details: [],
-      }
-    case "thread_answer":
-      return { tone: "success", headline: "answer delivered to the waiting question", details: [] }
   }
 }
 
@@ -282,18 +239,19 @@ function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView 
     delivery.kind === "started"
       ? `${mode}delivered (turn ${short(delivery.turn_id)})`
       : delivery.kind === "steered"
-        ? `steered into the running turn (turn ${short(delivery.turn_id)})`
+        ? `steer queued for turn ${short(delivery.turn_id)}: delivers at its next tool boundary`
         : delivery.kind === "queued"
           ? queuedLine(delivery)
           : delivery.kind === "queued_offline"
             ? `queued #${delivery.queue_position}: thread is offline, delivers when it starts`
-            : "sent"
+            : `delivery state unknown${delivery.kind === undefined ? "" : ` (${text(delivery.kind)})`}`
   return {
-    tone: delivery.kind === "started" || delivery.kind === "steered" ? "success" : "warning",
+    // Only a started turn has taken the message; a steer waits in the target's queue until its next tool boundary.
+    tone: delivery.kind === "started" ? "success" : "warning",
     headline: `-> ${target}  ${outcome}`,
     details: [
       ...(r.resolved_by === "fuzzy" ? ["matched by fuzzy name"] : []),
-      ...(r.deduplicated === true ? ["already sent under this key; not delivered twice"] : []),
+      ...(r.deduplicated === true ? ["already accepted under this key; not delivered twice"] : []),
       ...device(r),
     ],
   }
@@ -341,13 +299,6 @@ function listView(r: Readonly<Record<string, unknown>>): ResultView {
       ...(typeof r.remote_unavailable === "string" ? [`other devices unavailable: ${r.remote_unavailable}`] : []),
     ],
   }
-}
-
-function reportHeadline(r: Readonly<Record<string, unknown>>): string {
-  if (r.event === "question") return "question sent; waiting for a reply"
-  if (r.event === "completion")
-    return r.armed === true ? "completion armed; sent when this run settles" : "completion already written"
-  return `${text(r.event)} posted`
 }
 
 function device(r: Readonly<Record<string, unknown>>): string[] {

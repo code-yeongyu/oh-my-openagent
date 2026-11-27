@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs"
 import { isAbsolute, resolve } from "node:path"
 
 import {
@@ -14,9 +15,11 @@ import type { RemoteOptOut } from "./remote-opt-out"
 import { REMOTE_EXIT } from "./remote-exit"
 import { statusLines } from "./remote-render"
 
-// `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
-// omo-senpi device-service component starts it). One JSON line with --json: {state: "connected", status} or
-// {state, notice}; the component shows the notice for every stop but signed_out, store_unavailable and not_published.
+// The device service bootstrap; `bootstrapOnce` is its one body. The omo-senpi device-service component runs it in the
+// background at every interactive omo start through `omo __device-service-bootstrap --json`
+// (device-service-bootstrap-entry.ts, on the service client); `omo remote bootstrap` runs it for a person. One JSON
+// line with --json: {state: "connected", status} or {state, notice}; the component shows the notice for every stop but
+// signed_out, store_unavailable and not_published.
 
 /** Everything the bootstrap needs besides the account read, the state dir and the connection `omo remote` already has. */
 export type BootstrapSetup = Omit<BootstrapDependencies, "accountShow" | "stateDir" | "connect">
@@ -56,17 +59,36 @@ export function deviceServiceBootstrapSetup(options: {
   }
 }
 
+const isNpmLauncher = (argv1: string): boolean => {
+  let target = argv1
+  try {
+    target = realpathSync(argv1)
+  } catch {
+    // A path that does not resolve is judged as written.
+  }
+  return target.replaceAll("\\", "/").endsWith("/bin/omo.js")
+}
+
 /**
- * The binary the service runs to refresh its token: the omo the engine was launched from (OMO_BIN), else this
- * compiled binary, else this npm launcher script.
+ * The binary the unit renders and the service refreshes its token with: the omo that ran this command - this compiled
+ * binary, or this npm launcher script when the launcher itself runs the verb - never an older runtime's OMO_BIN the
+ * environment carries (omo#14258); OMO_BIN answers only for the engine, which is not an omo. A global npm install started
+ * under node keeps its npm-prefix bin symlink as argv[1], so the launcher is recognized by the file the path
+ * resolves to, and the unit keeps naming the path as invoked.
  */
-export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> = process.env): string {
-  const declared = env.OMO_BIN
-  if (declared !== undefined && isAbsolute(declared)) return declared
+export function omoBinaryPath(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  running: { readonly execPath?: string; readonly argv1?: string; readonly compiled?: boolean } = {},
+): string {
+  const execPath = running.execPath ?? process.execPath
+  const argv1 = running.argv1 ?? process.argv[1]
   const bun: unknown = Reflect.get(globalThis, "Bun")
   const embedded: unknown = typeof bun === "object" && bun !== null ? Reflect.get(bun, "embeddedFiles") : undefined
-  if (Array.isArray(embedded) && embedded.length > 0) return process.execPath
-  return resolve(process.argv[1] ?? process.execPath)
+  if (running.compiled ?? (Array.isArray(embedded) && embedded.length > 0)) return execPath
+  if (argv1 !== undefined && isNpmLauncher(argv1)) return resolve(argv1)
+  const declared = env.OMO_BIN
+  if (declared !== undefined && isAbsolute(declared)) return declared
+  return resolve(argv1 ?? execPath)
 }
 
 // `quietSuppressed`: the setup after `omo login` says nothing when the install changed nothing because this machine has
@@ -241,20 +263,51 @@ export async function runBootstrapVerb(
   remote: RemoteSetup,
   json: boolean,
 ): Promise<"connected" | "stopped"> {
-  const outcome = await bootstrap(io, setup, json)
-  if (outcome.kind === "stopped") return "stopped"
+  const report = await bootstrapOnce(io, setup, remote)
+  if (report.kind === "stopped") {
+    if (json) io.output(JSON.stringify({ state: report.state, notice: report.notice }))
+    else io.error(report.notice)
+    return "stopped"
+  }
+  if (json) io.output(JSON.stringify({ state: "connected", status: report.status }))
+  else for (const line of statusLines(report.status, report.serviceVersion)) io.output(line)
+  return "connected"
+}
+
+type ServiceState = Extract<BootstrapOutcome, { readonly kind: "connected" }>["status"]
+
+/** What one bootstrap ended with: connected with the service's status and version, or stopped with its notice. */
+export type BootstrapReport =
+  | { readonly kind: "connected"; readonly status: ServiceState; readonly serviceVersion: string }
+  | { readonly kind: "stopped"; readonly state: string; readonly notice: string }
+
+/**
+ * One bootstrap and what follows it on a connected service: a recorded opt-out turns the switch off, an enabled service
+ * with no device is linked, and the session host unit is set to match. The body of `omo remote bootstrap` and of the
+ * internal entry the engine starts (`device-service-bootstrap-entry.ts`, #13414 4c-3). It prints nothing.
+ */
+export async function bootstrapOnce(
+  io: Pick<BootstrapIo, "accountShow" | "stateDir" | "connect" | "error">,
+  setup: BootstrapSetup,
+  remote: RemoteSetup,
+): Promise<BootstrapReport> {
+  const outcome = await bootstrapDeviceService({
+    accountShow: io.accountShow,
+    stateDir: io.stateDir,
+    connect: io.connect,
+    ...setup,
+  })
+  if (outcome.kind === "stopped") return { kind: "stopped", state: outcome.state, notice: outcome.notice }
   const optedOut = remote.optOut.read()
   let status = outcome.status
   try {
     if (optedOut && status.enabled) await outcome.service.setEnabled(false)
     if (!optedOut && status.enabled && status.device === null) await remote.linkDevice()
     if (optedOut || status.device === null) status = await outcome.service.status()
-    if (json) io.output(JSON.stringify({ state: "connected", status }))
-    else for (const line of statusLines(status, outcome.service.serviceVersion)) io.output(line)
   } finally {
     outcome.service.close()
   }
   // After the connection is closed: a changed table restarts the device service, which would cut it.
   await applyColdWake(remote.coldWake, !optedOut && status.state !== "disabled", io.error)
-  return "connected"
+  return { kind: "connected", status, serviceVersion: outcome.service.serviceVersion }
 }

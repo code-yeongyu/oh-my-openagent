@@ -21,7 +21,8 @@
   // tests read a newer service's frames with a released client's decoders; their unused exports are that release's.
   // The device service local API client, vendored byte for byte from omo-relay-daemon (pinned by its PIN.json, with the
   // relay-spec symbols it imports ported in spec-proto.ts); its exports are the upstream client's API.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/device-service-core/src/local-api/**"],
+  // The surface library inside the github skill, vendored byte for byte (sha256 per file in its SOURCE.json).
+  "ignore": ["packages/shared-skills/skills/github/scripts/vendor/**", "packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/device-service-core/src/local-api/**", "packages/omo-native/bin/lib/remote-sdk-types/**"],
   // The Electron conformance fixture's main process and preload import "electron", which the Electron binary running them
   // provides at run time (its CI job fetches one pinned release); scoped to those two files so an unlisted import elsewhere
   // still fails.

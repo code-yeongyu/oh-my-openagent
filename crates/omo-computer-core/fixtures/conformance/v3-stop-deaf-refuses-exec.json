@@ -1,7 +1,7 @@
 {
   "description": "A stop listener that exists and cannot hear keys refuses every exec StopPathUnavailable{reason:deaf} before any OS call, under the default policy and with allowHostRelayOnlyStop and a fresh host heartbeat: the relay is never its fallback. The sink stays empty.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "deaf"
   },
