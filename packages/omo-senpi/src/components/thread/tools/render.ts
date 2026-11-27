@@ -233,8 +233,13 @@ function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView 
     readonly turn_id?: string
     readonly queue_position?: number
     readonly waiting_on?: { readonly kind?: string; readonly device?: string }
+    readonly next_action?: { readonly resume?: string; readonly tool?: string; readonly thread?: string }
   }
   const mode = r.effective_mode === "follow_up" ? "follow-up " : ""
+  const offlineNext =
+    delivery.next_action?.tool === "thread_create" && delivery.next_action.thread !== undefined
+      ? `; nothing wakes it on its own - reopen with tool.thread_create({ thread: "${delivery.next_action.thread}" })`
+      : ""
   const outcome =
     delivery.kind === "started"
       ? `${mode}delivered (turn ${short(delivery.turn_id)})`
@@ -243,7 +248,7 @@ function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView 
         : delivery.kind === "queued"
           ? queuedLine(delivery)
           : delivery.kind === "queued_offline"
-            ? `queued #${delivery.queue_position}: thread is offline, delivers when it starts`
+            ? `queued #${delivery.queue_position}: thread is offline, delivers when it starts${offlineNext}`
             : `delivery state unknown${delivery.kind === undefined ? "" : ` (${text(delivery.kind)})`}`
   return {
     // Only a started turn has taken the message; a steer waits in the target's queue until its next tool boundary.
