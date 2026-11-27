@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, relative } from "node:path"
+import { join, posix, relative, win32 } from "node:path"
 import { fileURLToPath } from "node:url"
 import { buildRemoteSdk, indexedFiles, staleArtifacts } from "./build-remote-sdk"
 
@@ -77,21 +77,30 @@ describe("omo-ai/remote build", () => {
   // --check judges what a commit ships, git's index, never the working tree (#15186): a car checkout without the
   // generated outputs reports them stale instead of crashing, and an install's prepare build that rewrote the tree
   // cannot make stale committed bytes look current.
+  // Every key is built with the platform's path module (backslashes on Windows), so the comparison runs with both.
   const BUILT = { "types/a.d.ts": "export {}\n", "bundle.js": "new" } as const
-  test.each([
+  const ROWS = [
     ["current", BUILT, []],
     ["nothing indexed (a car without the outputs)", {}, ["types/a.d.ts", "bundle.js"]],
     ["an artifact indexed with other bytes", { ...BUILT, "bundle.js": "old" }, ["bundle.js"]],
     ["a declaration built but never added", { "bundle.js": "new" }, ["types/a.d.ts"]],
     ["an indexed declaration the build no longer emits", { ...BUILT, "types/gone.d.ts": "" }, ["types/gone.d.ts"]],
-  ] as const)("#given %s #when compared #then the stale paths are listed", (_, index, expected) => {
-    const at = (path: string) => join("/repo", path)
-    const artifacts = new Map(Object.entries(BUILT).map(([path, text]) => [at(path), text]))
-    const indexed = new Map(Object.entries(index).map(([path, text]) => [at(path), text]))
-    expect(staleArtifacts(artifacts, at("types"), indexed).map((path) => relative("/repo", path))).toEqual([
-      ...expected,
-    ])
-  })
+    ["a sibling folder whose name starts with the types folder's", { ...BUILT, "types-old/b.d.ts": "" }, []],
+  ] as const
+  const PLATFORMS = [
+    ["posix", posix, "/repo"],
+    ["win32", win32, "C:\\repo"],
+  ] as const
+  test.each(PLATFORMS.flatMap(([platform, paths, base]) => ROWS.map((row) => [platform, ...row, paths, base] as const)))(
+    "#given %s paths and %s #when compared #then the stale paths are listed",
+    (_, __, index, expected, paths, base) => {
+      const at = (path: string) => paths.join(base, path)
+      const artifacts = new Map(Object.entries(BUILT).map(([path, text]) => [at(path), text]))
+      const indexed = new Map(Object.entries(index).map(([path, text]) => [at(path), text]))
+      const stale = staleArtifacts(artifacts, at("types"), indexed, paths)
+      expect(stale.map((path) => paths.relative(base, path).split(paths.sep).join("/"))).toEqual([...expected])
+    },
+  )
 
   test("#given stale bytes committed and fresh bytes rebuilt but not committed #when the index is read #then the output is stale", async () => {
     const repo = mkdtempSync(join(tmpdir(), "omo-remote-sdk-index-"))
