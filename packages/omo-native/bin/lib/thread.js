@@ -17,12 +17,13 @@ export { THREAD_EXIT } from "./thread-args.js"
  */
 
 const USAGE = [
-  "usage: omo thread <list|send|read|close> [options] [--json]",
+  "usage: omo thread <list|send|read|close|resume> [options] [--json]",
   "",
   "  list      [--all-scope] [--state opening|running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
   "  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]",
+  "  resume    <target>  (interrupted runs only)",
   "",
   "  <target>/<session> takes a thread id, session id, alias, exact name, unique id prefix,",
   "                or <device>/<thread> (device: id, here, name or unique device id prefix)",
@@ -34,6 +35,12 @@ const USAGE = [
 const COMMON = ["--json", "--all-scope"]
 
 const COMMANDS = {
+  resume: {
+    values: [],
+    booleans: [],
+    arity: [1, 1],
+    call: (sdk, p, _o, scope) => sdk.resume({ ...scope, thread: p[0] }),
+  },
   list: {
     values: ["--state"],
     repeatable: ["--state"],

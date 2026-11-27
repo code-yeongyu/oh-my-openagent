@@ -1,9 +1,17 @@
 import type { ThreadState } from "../contracts/state"
 import { createHash } from "node:crypto"
 
+/** Relay v8's closed mirror of the engine's SESSION_ROW_HOLD_KEYS, never an arbitrary ledger key. */
+const PUBLIC_KEYS = {
+  session_hold: ["interrupted-run", "session_hold"],
+  inherited_hold: ["inherited_hold"],
+  unattended: ["unattended", "closing", "host-drain"],
+} as const
+type HoldKind = keyof typeof PUBLIC_KEYS
+type HoldKey = (typeof PUBLIC_KEYS)[HoldKind][number] | "other"
 export type RowHold = {
-  readonly kind: "session_hold" | "inherited_hold" | "unattended"
-  readonly key: string
+  readonly kind: HoldKind
+  readonly key: HoldKey
   readonly since?: string
   readonly queue_depth: number
 }
@@ -17,22 +25,28 @@ export type RowLiveness =
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value)
 
+export function holdFamily(value: unknown): { kind: HoldKind; key: HoldKey } | undefined {
+  if (!record(value)) return undefined
+  const { kind, key } = value
+  if (kind !== "session_hold" && kind !== "inherited_hold" && kind !== "unattended") return undefined
+  const family =
+    kind === "session_hold" && typeof key === "string" && /^session_hold:[0-9]{1,16}$/.test(key) ? "session_hold" : key
+  return { kind, key: PUBLIC_KEYS[kind].find((v) => v === family) ?? "other" }
+}
+
 export function publicHold(value: unknown, depthField: "queueDepth" | "queue_depth"): RowHold | undefined {
   if (!record(value)) return undefined
-  const { kind, key, since } = value
+  const { since } = value
   const depth = value[depthField]
-  if (kind !== "session_hold" && kind !== "inherited_hold" && kind !== "unattended") return undefined
+  const family = holdFamily(value)
+  if (!family) return undefined
   const validTime =
     typeof since === "string" &&
     since.length <= 27 &&
     Number.isFinite(Date.parse(since)) &&
     new Date(since).toISOString() === since
   if (typeof depth !== "number" || !Number.isSafeInteger(depth) || depth < 0) return undefined
-  const known =
-    (kind === "session_hold" && (key === "interrupted-run" || key === "session_hold")) ||
-    (kind === "inherited_hold" && key === "inherited_hold") ||
-    (kind === "unattended" && (key === "unattended" || key === "host-drain" || key === "closing"))
-  return { kind, key: known ? String(key) : "other", ...(validTime ? { since } : {}), queue_depth: depth }
+  return { ...family, ...(validTime ? { since } : {}), queue_depth: depth }
 }
 
 /** Never forward an unvalidated wire object, including a future hold's private fields. */

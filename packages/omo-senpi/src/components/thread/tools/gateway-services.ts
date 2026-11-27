@@ -10,6 +10,7 @@ import { resolveProvenance } from "../gateway/provenance-resolver"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 import { sendView } from "./send-view"
+import { refuseUnanswered } from "./unknown-send"
 import { stampThisDevice } from "../remote/this-device"
 
 /** A host without the gateway port reaches no endpoint: every gateway send lands `queued_offline`. */
@@ -35,9 +36,18 @@ export type GatewayServices = {
  * A published owner is listed on its own socket only (`sendView`), so its session file is found on disk with no endpoint. When
  * that one socket was refused for its host's identity, the refusal belongs to the owner's thread: it is not offline.
  */
-function withOwnerRefusal(book: readonly AddressEntry[], current: ThreadHostView, address: string): readonly AddressEntry[] {
+function withOwnerRefusal(
+  book: readonly AddressEntry[],
+  current: ThreadHostView,
+  address: string,
+): readonly AddressEntry[] {
   const [owner, ...others] = current.hosts
-  if (owner === undefined || others.length > 0 || owner.reason !== "identity_unproven" || !(owner.error instanceof Error))
+  if (
+    owner === undefined ||
+    others.length > 0 ||
+    owner.reason !== "identity_unproven" ||
+    !(owner.error instanceof Error)
+  )
     return book
   const refusal = owner.error
   return book.map((entry) =>
@@ -63,10 +73,13 @@ export function createGatewayServices(
   const resolve: GatewayResolve = async (address, request) => {
     const current = await sendView(options, address, view)
     const book = sendAddressBook(options, current, address, request.all_scope)
-    return await resolveFromEntries(
-      () => toGatewayAddressEntries(withOwnerRefusal(book, current, address)),
-      options.callerWorkspaceRoot,
-    )(address, request)
+    return refuseUnanswered(
+      book,
+      await resolveFromEntries(
+        () => toGatewayAddressEntries(withOwnerRefusal(book, current, address)),
+        options.callerWorkspaceRoot,
+      )(address, request),
+    )
   }
   const store = options.store
   const now = options.now ?? store.now

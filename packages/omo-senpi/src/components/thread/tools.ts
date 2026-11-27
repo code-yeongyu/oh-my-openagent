@@ -11,6 +11,7 @@ import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
 import { type ThreadAddressEntry } from "./addressing"
 import { resolveAddress } from "./address/lazy"
+import { resumeAddress } from "./control/resume"
 import {
   parseThreadParams,
   threadToolParamSchemas,
@@ -232,7 +233,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           ...scope,
           now: at,
           args_hash: hashArgs(value),
-          retry_uncertain: name === "thread_create",
+          retry_uncertain: name === "thread_create" && !("resume" in value && value.resume === true),
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -403,11 +404,23 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
    */
   const create: AnyTool = {
     ...metadata("thread_create"),
+    permissionParser: (input) =>
+      (input.resume === true ? threadSendPermission(options) : threadToolPermission("thread_create", options))(input),
     parameters: threadToolParamSchemas.thread_create,
     promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES],
     execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) =>
-      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) =>
-        createThread(options, current, value, {
+      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) => {
+        if (value.resume)
+          return resumeAddress(options, current, value, callerId, () =>
+            locate(current, value.thread ?? "", value.all_scope, callerId),
+          )
+        if (value.all_scope !== undefined)
+          return failure(
+            "invalid_arguments",
+            "all_scope applies only to resume.",
+            "Remove all_scope or request resume.",
+          )
+        return createThread(options, current, value, {
           operationId,
           callerId,
           retrying,
@@ -423,8 +436,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
                 FIRST_PROMPT_START_RESERVE_MS,
               ),
             ),
-        }),
-      ),
+        })
+      }),
   }
   const list: AnyTool = {
     ...metadata("thread_list"),

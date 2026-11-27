@@ -69,6 +69,7 @@ export type ThreadSessionPort = Pick<
   ThreadHost,
   | "getMessages"
   | "getState"
+  | "resumeGuarded"
   | "prompt"
   | "interrupt"
   | "setSessionName"
@@ -133,6 +134,7 @@ export type ThreadHost = {
     readonly model?: unknown
     readonly thinkingLevel?: unknown
   }>
+  readonly resumeGuarded?: (routing: string, durable: string) => Promise<import("../control/resume").ResumeAnswer>
   readonly prompt: (
     sessionId: string,
     message: string,

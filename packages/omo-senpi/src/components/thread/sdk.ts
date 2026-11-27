@@ -20,6 +20,7 @@ import {
   type ThreadToolResult,
 } from "./contracts"
 import { createThread } from "./control/create"
+import { resumeAddress } from "./control/resume"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
@@ -147,6 +148,7 @@ export type ThreadSdk = StoreExtensionApi & {
    * itself, never as a session, so `self` is `caller_context_missing` and a created thread records no creator.
    */
   readonly create: (request: ThreadCreateInput) => Promise<ThreadToolResult>
+  readonly resume: (request: Scoped & { readonly thread: string }) => Promise<ThreadToolResult>
   readonly interrupt: (request: ThreadInterruptInput) => Promise<ThreadToolResult>
   readonly close: (request: ThreadCloseInput) => Promise<ThreadToolResult>
   readonly rename: (request: ThreadRenameInput) => Promise<ThreadToolResult>
@@ -327,6 +329,22 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     return inSendResultOrder({ ...facts, thread: thread_id })
   }
 
+  const resume = async (value: ThreadCreateInput) => {
+    const current = await hostView(surface, { offline: true })
+    return resumeAddress(controls, current, value, principal, async () => {
+      const address = value.thread ?? ""
+      const found = await resolveAddress(
+        resolveContext(toThreadAddressEntries(sendAddressBook(surface, current, bareOf(address), true))),
+        address,
+        { all_scope: value.all_scope },
+      )
+      if (found.kind === "error") return { kind: "error", result: { kind: "error", error: found } }
+      return found.where.kind === "device"
+        ? { kind: "remote", row: found.where.row }
+        : { kind: "local", thread_id: found.thread }
+    })
+  }
+
   return {
     registerStoreExtension: store.registerStoreExtension,
     extensionCall: store.extensionCall,
@@ -455,9 +473,13 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           thread: { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive },
         } as const
       }),
+    resume: (request) => control(threadToolParamSchemas.thread_create, { ...request, resume: true as const }, resume),
     create: (request) =>
-      control(threadToolParamSchemas.thread_create, request, async (value) =>
-        createThread(controls, await view(), value, {
+      control(threadToolParamSchemas.thread_create, request, async (value) => {
+        if (value.resume) return resume(value)
+        if (value.all_scope !== undefined)
+          return fail("invalid_arguments", "all_scope applies only to resume.", "Remove all_scope or request resume.")
+        return createThread(controls, await view(), value, {
           operationId: value.idempotency_key ?? `auto:${randomUUID()}`,
           callerId: UNKNOWN_CALLER,
           view,
@@ -486,8 +508,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
                 FIRST_PROMPT_START_RESERVE_MS,
               ),
             ),
-        }),
-      ),
+        })
+      }),
     interrupt: (request) =>
       control(threadToolParamSchemas.thread_interrupt, request, async (value) => {
         const found = await located(value.thread, value.all_scope)

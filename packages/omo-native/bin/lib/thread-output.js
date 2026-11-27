@@ -33,6 +33,9 @@ const RENDER = {
   send: (result) => [
     `${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread}${result.deduplicated ? " (already sent)" : ""}`,
   ],
+  resume: (result) => [
+    `Resumed ${result.thread}; turn ${result.turn_started ? "started" : "not started"}. Held peer deliveries before resume: ${result.held_deliveries ?? "unknown"}.`,
+  ],
   read: (result) => [
     ...result.items.map(
       (item) =>

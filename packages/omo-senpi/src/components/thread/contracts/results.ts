@@ -448,6 +448,7 @@ export type ThreadSetReasoningResult =
   | ThreadDataError
 
 export type ThreadToolResult =
+  | import("../control/resume").ResumeAnswer
   | ThreadCreateResult
   | ThreadListResult
   | ThreadReadResult

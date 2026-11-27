@@ -11,6 +11,7 @@ import {
 import { resolveThreadSocket } from "./live-surface-paths"
 import { holderVersion } from "./tools/thread-state"
 import { engineEvidence } from "./tools/row-liveness"
+import { resumeLocalSocket } from "./control/resume"
 import { isIdentityRefusal } from "./tools/session-error"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -822,6 +823,12 @@ export function createLiveThreadSurface(
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId, durableId) => send("get_state", { sessionId }, durableId),
+    resumeGuarded: async (routing, durable) => {
+      const path = socket ?? legacy
+      const { tui, dial, secret } = await dialFor(path, "resume_session")
+      if (tui) throw new Error("unsupported:resume_session")
+      return resumeLocalSocket(path, routing, durable, dial, secret, keyRoot)
+    },
     watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
     interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
