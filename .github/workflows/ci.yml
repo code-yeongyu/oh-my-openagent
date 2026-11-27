@@ -8,6 +8,9 @@ on:
     types: [opened, synchronize, reopened]
   merge_group:
     types: [checks_requested]
+  # publish.yml dispatches CI on a release-ci/<sha>-<run>-<attempt> ref at a pinned release source, so the release owns a run that no
+  # later dev merge can cancel while it is pending (#15094).
+  workflow_dispatch:
   workflow_call:
 
 concurrency:
