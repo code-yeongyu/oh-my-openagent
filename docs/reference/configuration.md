@@ -23,7 +23,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [Commands](#commands)
   - [Browser Automation](#browser-automation)
   - [Tmux Integration](#tmux-integration)
-  - [Git Master](#git-master)
+  - [Git](#git)
   - [Comment Checker](#comment-checker)
   - [Notification](#notification)
   - [MCPs](#mcps)
@@ -526,7 +526,7 @@ The OpenCode edition's orchestration key (`sisyphus_agent`) and its file-based t
 
 Skills bring domain-specific expertise and embedded MCPs.
 
-Selected built-in skills: `playwright`, `playwright-cli`, `dev-browser`, `git-master`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
+Selected built-in skills: `playwright`, `playwright-cli`, `dev-browser`, `git`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
 
 Disable built-in skills: `{ "disabled_skills": ["playwright"] }`. `disabled_skills` is also a shared base key of `~/.omo/omo.jsonc`, honored by every harness including OmO Native (for example `{ "disabled_skills": ["frontend", "visual-qa"] }`); user and project layers are unioned. `skills.enable` below only filters config-sourced skills, not builtin, native, or bundled ones - use `disabled_skills` to hide those.
 
@@ -1058,19 +1058,19 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 | `agent_pane_min_width` | `40`            | Min agent pane columns                                                              |
 | `isolation`            | `inline`        | `inline` / `window` / `session`                                                     |
 
-### Git Master
+### Git
 
-Configure git commit behavior:
+The `git_master` key keeps its name; it configures the `git` skill (formerly `git-master`, which still resolves as an alias). Configure git commit behavior:
 
 ```json
 { "git_master": { "include_co_authored_by": true, "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
 ```
 
-`include_co_authored_by` (default `true`) adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit git-master writes, exactly once: it is passed with `git -c trailer.ifexists=addIfDifferent commit --trailer`, so amending or rewording a commit that already has it does not add a second copy, and after a squash git-master rewrites the joined message once. It needs git 2.32 or newer. Set it to `false` to keep the trailer out of your history. `commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Either way, commits keep your own git author and committer.
+`include_co_authored_by` (default `true`) adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit the git skill writes, exactly once: it is passed with `git -c trailer.ifexists=addIfDifferent commit --trailer`, so amending or rewording a commit that already has it does not add a second copy, and after a squash the skill rewrites the joined message once. It needs git 2.32 or newer. Set it to `false` to keep the trailer out of your history. `commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Either way, commits keep your own git author and committer.
 
 This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-native-harness).
 
-`git_env_prefix` (default `"GIT_MASTER=1"`) is prepended to git commands; set it to `""` to disable.
+`git_env_prefix` (default `"GIT_MASTER=1"`) is the environment the skill tells the model to run git with: chained as `.env({ ...process.env, GIT_MASTER: "1" })` onto `Bun.$` in an eval cell, or as a prefix on a shell line. Set it to `""` to disable.
 
 ### Comment Checker
 

@@ -27,6 +27,8 @@ export interface SyncSession {
   readonly space: string
   /** The per-device `local:` space this repository synced before it moved to the default space (#13720). */
   readonly legacySpace?: string
+  /** The account the session is signed in to (#14481): the repository's journal is that account's. */
+  readonly account?: string
   readonly freeze?: FreezeSettler
 }
 

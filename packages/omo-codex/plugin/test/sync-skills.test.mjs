@@ -243,18 +243,18 @@ test("#given shipped Codex skill payloads #when legacy ultraresearch alias is in
   }
 })
 
-test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {
+test("#given synced git skill #when inspected #then commits and git history route through it and the retired name stays searchable", async () => {
   // given
-  const skillRoot = join(root, "skills", "git-master")
+  const skillRoot = join(root, "skills", "git")
 
   // when
   const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8")
   const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8")
 
   // then
-  assert.match(skill, /^---\r?\nname: git-master\r?\n/m)
-  assert.match(interfaceMetadata, /display_name: "\(OmO\) git-master"/)
-  assert.match(interfaceMetadata, /- "git commit"/)
+  assert.match(skill, /^---\r?\nname: git\r?\n/m)
+  assert.match(interfaceMetadata, /display_name: "\(OmO\) git"/)
+  assert.match(interfaceMetadata, /- "git-master"/)
   assert.match(interfaceMetadata, /- "history search"/)
 })
 

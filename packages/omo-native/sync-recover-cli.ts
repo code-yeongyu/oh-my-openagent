@@ -1,3 +1,5 @@
+import { turnDeviceSyncOn } from "../memory-core/src/sync/account/index.ts"
+import { pairingOperation } from "../memory-core/src/sync/account/operation-ports.ts"
 import { createRejectionCounter } from "../memory-core/src/sync/crypto/rejection.ts"
 import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts"
 import type { PasskeyAuthenticator } from "../memory-core/src/sync/recovery/ports.ts"
@@ -26,6 +28,9 @@ const noPasskeys: PasskeyAuthenticator = {
 
 const RECOVER_YOURSELF = "Run `omo sync recover` yourself in a terminal."
 const RECOVERED = "Your memory is recovered on this device and memory sync is on."
+// Review LOWs (#14454 @ b2e5a69): the line keeps the cause, and a read-only join is not called a full recovery.
+const recoveredSyncOff = (readOnly: boolean, reason: string): string =>
+  `${readOnly ? "This device can read your recovered memory" : "Your memory is recovered on this device"}, but memory sync could not be turned on (${reason}). Run \`omo sync enable\` to turn it on.`
 const RECOVERED_READ_ONLY =
   "This device can read your recovered memory, but another step is still pending before it can write. Run `omo sync recover` again later."
 
@@ -55,6 +60,17 @@ export async function recover(dependencies: SyncCommandDependencies, context: Sy
       method: "phrase",
     })
     if (outcome.ok) {
+      // #14453: the service gates every sync read on the account's and this device's switches, as enable sets them.
+      const pairing = pairingOperation(context.pairing, context)
+      try {
+        await pairing.setAccountSync(true)
+        await turnDeviceSyncOn({ ...context, pairing })
+      } catch (error) {
+        // The recovery itself landed; only the switches failed, and enable sets them again (review L2).
+        const reason = error instanceof Error ? error.message : "unknown error"
+        dependencies.error(recoveredSyncOff(outcome.state !== "recovered", reason))
+        return 1
+      }
       dependencies.output(outcome.state === "recovered" ? RECOVERED : RECOVERED_READ_ONLY)
       return 0
     }

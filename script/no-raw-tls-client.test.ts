@@ -35,6 +35,13 @@ const ALLOWLIST: AllowlistEntry[] = [
     reason:
       'no TLS and no remote host: `t` is the SDK\'s relay transport, whose connect() opens the local device service through node:net createConnection({ path: <stateDir>/<socket> }) or, on Windows, { host: "127.0.0.1", port } (vendor/bunshin-ts-relay/index.js:766); the bundle imports no node:tls/https/http2 and has no wss URL (#12258, senpi#3078).',
   },
+  {
+    file: "packages/omo-senpi/plugin/runtime/omo-sdk/sdk.js",
+    call: "t.connect",
+    count: 1,
+    reason:
+      "no TLS and no remote host: the remote module's client (components/remote/client.ts, bundled since the SDK's devices.list goes through it, #13413) calls its `connect` dependency, defaulting to device-service-core connectDeviceService, which opens the local device service through node:net createConnection on <stateDir>/<socket> or, on Windows, 127.0.0.1; the bundle imports no node:tls/https/http2.",
+  },
   ...["omo-codex", "omo-senpi"].flatMap((edition) =>
     ["https", "tls"].map((module) => ({
       file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,

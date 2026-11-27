@@ -175,6 +175,17 @@ describe("full-matrix classification", () => {
     })
   })
 
+  describe("#given a run dispatched on a release's pinned commit (no diff to read)", () => {
+    test("#then it runs the full matrix and heavy work, like a push", () => {
+      // given / when
+      const mode = classify({ eventName: "workflow_dispatch", diffAvailable: false })
+
+      // then
+      expect(mode.fullMatrix).toBe(true)
+      expect(mode.runHeavy).toBe(true)
+    })
+  })
+
   describe("#given a pull request that touches code a test can load", () => {
     test.each([
       ["a package source file (the #7676 shape)", "packages/omo-config-core/src/display/format-path.ts"],

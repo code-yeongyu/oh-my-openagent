@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdirSync, writeFileSync } from "node:fs"
-import { gitMasterSkill, playwrightSkill } from "../builtin-skills/skills/index"
+import { gitSkill, playwrightSkill } from "../builtin-skills/skills/index"
 import { clearSkillCache, resolveMultipleSkillsAsync } from "./skill-content"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
@@ -43,9 +43,9 @@ afterEach(() => {
 describe("resolveMultipleSkillsAsync", () => {
   it("should resolve builtin skills async", async () => {
     // given: builtin skill names
-    const skillNames = ["playwright", "git-master"]
+    const skillNames = ["playwright", "git"]
 
-    // when: resolving multiple skills async without git-master transformations
+    // when: resolving multiple skills async without git settings transformations
     const result = await resolveMultipleSkillsAsync(skillNames, {
       directory: testConfigDir,
       gitMasterConfig: {
@@ -58,7 +58,7 @@ describe("resolveMultipleSkillsAsync", () => {
     // then: all builtin skills resolve to their source templates in request order
     expect([...result.resolved.entries()]).toEqual([
       ["playwright", playwrightSkill.template],
-      ["git-master", gitMasterSkill.template],
+      ["git", gitSkill.template],
     ])
     expect(result.notFound).toEqual([])
   })
