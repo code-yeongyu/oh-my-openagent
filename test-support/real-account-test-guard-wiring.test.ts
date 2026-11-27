@@ -79,7 +79,6 @@ describe("real-account guards are wired into each preload entry", () => {
       expect(probe["marked"]).toBe(true)
       if (entry !== "test-setup.ts") expect(probe["read"]).toBe("refused")
     },
-    60_000,
   )
 })
 
