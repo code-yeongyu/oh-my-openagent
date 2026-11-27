@@ -31,6 +31,8 @@ export type GateInput = {
   readonly scenarios: readonly Scenario[]
   readonly closures: ReadonlyMap<string, ReadonlySet<string>>
   readonly changedFiles: readonly string[]
+  // The files that produce or normalize an outcome (outcome-producers.ts, computed from the runner's imports).
+  readonly outcomeProducers: readonly string[]
   readonly body: string
   readonly headSha: string
   // presentation.json at the merge base (undefined when it has none) and at the head; only the rows the pull request
@@ -52,11 +54,6 @@ export type GateInput = {
 // The closed, named list of exemptions the one failing place consults (#15199). Adding a provider is a change of the
 // gate's rule, read as such: a test enumerates this list.
 export const EXEMPTION_PROVIDERS: Readonly<Record<string, ExemptionProvider>> = { declared: declaredProvider }
-
-// Both trees run the HEAD's runner and its normalizer, so a change to them changes what every comparison sees and no
-// outcome difference shows it. Such a change is a gate change: it is printed, and it enters the reviewer's digest, so
-// the check needs a signed review (the security reader's) even when no capability is a candidate.
-export const OUTCOME_PRODUCERS = ["script/sdk-parity/scenario-run.ts", "script/sdk-parity/tool-registry.ts"]
 
 export type GateReport = {
   readonly failures: readonly string[]
@@ -322,7 +319,9 @@ export function gateReport(
     .map((row) => row.id)
     .toSorted()
   const changedSet = new Set(input.changedFiles)
-  const gateChanges = OUTCOME_PRODUCERS.filter((file) => changedSet.has(file)).map((file) => `${file}#gate-change`)
+  // Both trees run the HEAD's runner and its normalizer, so a change to them changes what every comparison sees and no
+  // outcome difference shows it: it is printed and enters the reviewer's digest, so the check needs a signed review.
+  const gateChanges = input.outcomeProducers.filter((file) => changedSet.has(file)).map((file) => `${file}#gate-change`)
   return {
     failures,
     candidates,

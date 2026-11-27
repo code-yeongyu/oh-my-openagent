@@ -18,7 +18,8 @@ import { conformanceProblems } from "./conformance"
 import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import { loadBaseScenarioTable } from "./declared-change"
-import type { DomainFile } from "./schema"
+import { GOLDENS_PATH, readBaseInputs } from "./base-inputs"
+import { outcomeProducers } from "./outcome-producers"
 import type { DiscoveredTool } from "./tool-check"
 
 // The CI entry of the changed-capability gate: bun script/sdk-parity/gate-cli.ts --base <ref> [--body <file>]
@@ -35,16 +36,6 @@ const git = (...args: string[]): string =>
 const show = (ref: string, path: string): string | undefined => showAtRef(REPO_ROOT, ref, path)
 const LOOP_CLI = "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts"
 const OPENCODE_CLI = "packages/omo-opencode/src/cli/index.ts"
-const GOLDENS_PATH = "script/sdk-parity/goldens.json"
-
-function baseRows(ref: string): DomainFile[] | undefined {
-  const listed = show(ref, "script/sdk-parity/rows/")
-  if (listed === undefined) return undefined
-  return listed
-    .split("\n")
-    .filter((name) => name.endsWith(".json"))
-    .map((name) => JSON.parse(show(ref, `script/sdk-parity/rows/${name}`) ?? "{}") as DomainFile)
-}
 
 function runSide(tree: string): { outcomes: Record<string, Outcome>; tools: DiscoveredTool[] } {
   const text = execFileSync(
@@ -92,19 +83,19 @@ try {
   // Only a merge base without the table skips the rule that a scenario's call may not change; a table that exists and
   // does not load fails the check with its error.
   let baseTableProblem: string | undefined
-  const baseScenarios =
-    show(mergeBase, "script/sdk-parity/scenarios.ts") === undefined
-      ? undefined
-      : await loadBaseScenarioTable(join(baseTree, "script/sdk-parity/scenarios.ts")).catch((error: unknown) => {
-          baseTableProblem = `the merge base's scenario table exists and does not load: ${error instanceof Error ? error.message : String(error)}`
-          return []
-        })
+  const baseInputs = readBaseInputs(show, mergeBase)
+  const baseScenarios = !baseInputs.scenarioTable
+    ? undefined
+    : await loadBaseScenarioTable(join(baseTree, "script/sdk-parity/scenarios.ts")).catch((error: unknown) => {
+        baseTableProblem = `the merge base's scenario table exists and does not load: ${error instanceof Error ? error.message : String(error)}`
+        return []
+      })
   const headSide = runSide(REPO_ROOT)
   const comparedMs = Date.now() - started
   const files = loadDomainFiles(ROWS_DIR)
   const rows = allRows(files)
   const unresolvedText = readFileSync(join(REPO_ROOT, UNRESOLVED_PATH), "utf8")
-  const baseUnresolvedText = show(mergeBase, UNRESOLVED_PATH)
+  const baseUnresolvedText = baseInputs.unresolvedText
   const findings = {
     native: nativeArgvInventory(REPO_ROOT, NATIVE_ENTRY_POINTS),
     loop: nativeArgvInventory(REPO_ROOT, [LOOP_CLI]),
@@ -116,7 +107,7 @@ try {
     .filter((line) => line !== "")
   const body =
     arg("--body") === undefined ? (process.env.SDK_PARITY_PR_BODY ?? "") : readFileSync(arg("--body") ?? "", "utf8")
-  const baseRowFiles = baseRows(mergeBase)
+  const baseRowFiles = baseInputs.rows
   const base: Side = {
     rows: baseRowFiles === undefined ? undefined : allRows(baseRowFiles),
     tools: baseSide.tools,
@@ -125,14 +116,15 @@ try {
   }
   const unresolved = JSON.parse(unresolvedText) as Baseline
   const goldens = JSON.parse(readFileSync(join(REPO_ROOT, GOLDENS_PATH), "utf8")) as Record<string, Outcome>
-  const baseGoldensText = show(mergeBase, GOLDENS_PATH)
-  const baseRowsText = show(mergeBase, "script/sdk-parity/presentation.json")
+  const baseGoldensText = baseInputs.goldensText
+  const baseRowsText = baseInputs.presentationText
   const report = gateReport({
     base,
     head: { rows, tools: headSide.tools, outcomes: headSide.outcomes, unresolved: unresolved.entries },
     scenarios: SCENARIOS,
     closures,
     changedFiles,
+    outcomeProducers: outcomeProducers(REPO_ROOT),
     body,
     headSha: git("rev-parse", "HEAD").trim(),
     versions: { base: baseVersions, head: headVersions },
@@ -149,7 +141,7 @@ try {
   // The checks that read the merge base's tree run here, in the dedicated job that fetches it, and nowhere else: the
   // ordinary test shards have a shallow checkout without the base ref (design 7.4; train review of 6871a012b9).
   const evidence = await runEffectScenarios(rows)
-  const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
+  const recorded = baseInputs.offendersText
   const baseFailures = [
     ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
     ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
@@ -162,8 +154,8 @@ try {
     evidence,
     context: P0_CONTEXT,
     atBase: {
-      originalText: show(mergeBase, ORIGINAL_PATH),
-      pinText: show(mergeBase, PIN_PATH),
+      originalText: baseInputs.originalText,
+      pinText: baseInputs.pinText,
       unresolved: base.unresolved === undefined ? undefined : { version: 1, entries: base.unresolved },
     },
   })

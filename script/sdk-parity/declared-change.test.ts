@@ -6,15 +6,8 @@ import { join } from "node:path"
 
 import { sha256 } from "./baseline"
 import { type ExemptionProvider, loadBaseScenarioTable } from "./declared-change"
-import {
-  candidateDigest,
-  EXEMPTION_PROVIDERS,
-  type GateInput,
-  gateReport,
-  OUTCOME_PRODUCERS,
-  renderReport,
-} from "./gate"
-import { HEAD, input, rows, text, unresolved } from "./gate-fixture"
+import { candidateDigest, EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
+import { HEAD, input, PRODUCERS, rows, text, unresolved } from "./gate-fixture"
 import type { Outcome } from "./scenario-run"
 import { SCENARIOS, type Scenario } from "./scenarios"
 import { readDeclaredVersions } from "./version-mask"
@@ -247,7 +240,7 @@ describe("the merge base's scenario table", () => {
   // Tripwire on the entry's wiring: only an absent file skips the rule; a load failure is a failure of the check.
   test("#given the command-line entry #then it skips the rule only when the base has no table file", async () => {
     const source = await Bun.file(new URL("./gate-cli.ts", import.meta.url)).text()
-    expect(source).toContain('show(mergeBase, "script/sdk-parity/scenarios.ts") === undefined')
+    expect(source).toContain("const baseScenarios = !baseInputs.scenarioTable")
     expect(source).toContain("...(baseTableProblem === undefined ? [] : [baseTableProblem])")
     // A table that fails to load is bound as an empty one, so the report says '0 merge-base scenarios bound', never
     // that the merge base has no table.
@@ -462,7 +455,7 @@ describe("a change to how outcomes are produced or normalized", () => {
   const verdictFor = (output: string) =>
     `Verdict: CLEAR at ${HEAD}\nSDK-Parity-Reviewed: ${output.match(/digest=([0-9a-f]{24})/)?.[1] ?? ""}\n`
 
-  for (const file of OUTCOME_PRODUCERS)
+  for (const file of PRODUCERS)
     test(`#given ${file} in the diff #then the report flags it, the digest binds it and a review is required`, () => {
       const gate = input({ changedFiles: [file] })
       const report = gateReport(gate)

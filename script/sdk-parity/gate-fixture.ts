@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import { type Baseline, ORIGINAL_PATH, UNRESOLVED_PATH } from "./baseline"
 import type { GateInput } from "./gate"
+import { outcomeProducers } from "./outcome-producers"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import type { Scenario } from "./scenarios"
 
@@ -14,6 +15,7 @@ export const text = (path: string): string => readFileSync(join(REPO_ROOT, path)
 export const original = text(ORIGINAL_PATH)
 export const unresolved = JSON.parse(text(UNRESOLVED_PATH)) as Baseline
 export const HEAD = "a".repeat(40)
+export const PRODUCERS = outcomeProducers(REPO_ROOT)
 export const EARLIER = "b".repeat(40)
 const scenario: Scenario = {
   id: "s1",
@@ -28,6 +30,7 @@ export const input = (overrides: Partial<GateInput> = {}): GateInput => ({
   scenarios: [scenario],
   closures: new Map([["threads.send", new Set(["packages/omo-native/bin/lib/thread.js"])]]),
   changedFiles: [],
+  outcomeProducers: PRODUCERS,
   body: "",
   headSha: HEAD,
   presentation: { base: [], head: [] },
