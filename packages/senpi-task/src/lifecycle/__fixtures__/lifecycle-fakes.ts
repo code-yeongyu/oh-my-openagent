@@ -8,6 +8,7 @@ import type { HostSessionIdentity, ResidencyState, RunnerKind, TaskRecord, TaskS
 import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
 import type { ResidentHandle, ResidencyRegistry } from "../port"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -18,7 +19,7 @@ export function cleanupProjects(): void {
 export function tempStore(): TaskRecordStore {
   const directory = mkdtempSync(join(tmpdir(), "senpi-task-lifecycle-"))
   cleanupRoots.push(directory)
-  return createTaskRecordStore({ project_dir: directory })
+  return createTaskRecordStore(ownedTaskState(directory))
 }
 
 export function settings(overrides: Record<string, unknown> = {}): OmoTaskSettings {

@@ -8,6 +8,7 @@ import {
 } from "../memory-core/src/sync/account/index.ts"
 import type { DeviceKeyring } from "../memory-core/src/sync/keyring-port"
 import type { SyncOperationAuthority } from "../memory-core/src/sync/operation-authority"
+import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
@@ -16,6 +17,7 @@ import {
   createCredentialStore,
   INTERACTIVE_READ_WAIT,
 } from "../omo-opencode/src/cli/service-auth/keystore"
+import { type LiveDevice, listLiveDevices } from "../omo-opencode/src/cli/service-auth/devices"
 import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
@@ -33,6 +35,8 @@ export interface SyncContext {
    * built from: a logout or a different sign-in in another process retires the operation (#12303).
    */
   readonly authority: SyncOperationAuthority
+  /** The account's live devices, through the same read `omo account devices` uses. */
+  readonly listDevices?: () => Promise<readonly LiveDevice[]>
 }
 
 export interface SyncContextOptions {
@@ -64,6 +68,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const session = createSession({
     api,
     store,
+    log: (line) => process.stderr.write(`${line}\n`),
     beforeKeysDiscarded: retireSyncPinOnDiscard({
       pinDir: () => pinDir,
       log: (line) => process.stderr.write(`${line}\n`),
@@ -71,7 +76,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   })
   const token = () => session.accessToken()
   const doFetch = options.fetch ?? fetch
-  const me = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${await token()}` } })
+  const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(await token()) })
   if (!me.ok) {
     const body: unknown = await me.json().catch(() => null)
     const code = isRecord(body) && isRecord(body["error"]) ? body["error"]["code"] : undefined
@@ -90,7 +95,11 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     // A credential stored before generations existed gets its generation from this write.
     held = (await store.readAuthoritative()) ?? held
   })
-  const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
+  const http = {
+    baseUrl: api,
+    token,
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+  }
   const retired = new AbortController()
   const authority: SyncOperationAuthority = {
     signal: retired.signal,
@@ -120,5 +129,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
+    listDevices: () => listLiveDevices(session),
   }
 }

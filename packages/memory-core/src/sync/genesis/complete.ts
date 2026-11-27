@@ -6,6 +6,7 @@ import { pinTrustAnchor } from "../crypto/trust-pin.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { checkSyncOperation, type SyncOperationOptions } from "../operation-authority.ts"
 import { GenesisEnableError } from "./bridge.ts"
+import type { PhraseKeyBlocker } from "./phrase-gate.ts"
 import { retireGenesisIntent } from "./intent-store.ts"
 import { type GenesisIntent, verifyCompetingGenesis } from "./intent-verify.ts"
 
@@ -41,6 +42,12 @@ export const completeAccountChain = async (
   return walked
 }
 
+/** The service refused the phrase key; `devices` names what must update first, empty when it gave no cause. */
+export interface PhraseRefused {
+  readonly refused: "phrase"
+  readonly devices: ReadonlyArray<PhraseKeyBlocker>
+}
+
 /** Resume only this exact transaction. Never mint again or re-sign at a nonzero base. */
 export const completeGenesis = async (
   input: {
@@ -52,13 +59,19 @@ export const completeGenesis = async (
     readonly chain: AccountHttp
   } & SyncOperationOptions,
   intent: GenesisIntent,
-): Promise<"created" | "join_required"> => {
+): Promise<"created" | "join_required" | PhraseRefused> => {
   const before = await input.chain.listKeys()
   if (before === null) throw new GenesisEnableError("malformed_reply")
   if (before[0]?.digest !== intent.genesisDigest) {
     const appended = await input.chain.appendKeys(intent.request)
     checkSyncOperation(input)
     if (!appended.ok) {
+      // A1.1-M1/M4.4: the service refused a phrase key (its flag off). The words were shown but never saved:
+      // retire the intent so the phrase marker reads void, and never resume it again.
+      if (appended.reason === "phrase_keys_not_accepted") {
+        await retireGenesisIntent(input)
+        return { refused: "phrase", devices: appended.devices ?? [] }
+      }
       if (appended.reason !== "stale_base") throw new GenesisEnableError("append_refused")
       const current = await input.chain.listKeys()
       if (current === null || current.length === 0) throw new GenesisEnableError("incomplete_chain")

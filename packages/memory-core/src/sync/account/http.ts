@@ -6,6 +6,8 @@
 
 import type { KeyringEntry } from "../crypto/entry.ts"
 import { admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
+import { syncRequestHeaders } from "../contract-version.ts"
+import { type PhraseKeyBlocker, phraseKeyBlockersOf, refusalBlockersOf } from "../genesis/phrase-gate.ts"
 import type {
   AppendResult,
   ChainRow,
@@ -26,6 +28,10 @@ export interface AccountState {
   readonly head: { readonly seq: number; readonly link: string; readonly keyring_link: string }
   readonly currentEpoch: number
   readonly rotationPending: boolean
+  /** omo-service `accepts_phrase_keys` (#1070): true only while the service accepts new phrase keys; absent reads false. */
+  readonly acceptsPhraseKeys: boolean
+  /** the per-account phrase gate `phrase_key_blockers`: devices that must update before phrase keys are accepted; absent is none. */
+  readonly phraseKeyBlockers: ReadonlyArray<PhraseKeyBlocker>
 }
 
 export interface AccountHttp extends RecoveryTransport {
@@ -43,7 +49,12 @@ export class AccountHttpError extends Error {
   }
 }
 
-const REFUSALS: ReadonlySet<string> = new Set<TransportRefusal>(["stale_base", "rate_limited", "not_found"])
+const REFUSALS: ReadonlySet<string> = new Set<TransportRefusal>([
+  "stale_base",
+  "rate_limited",
+  "not_found",
+  "phrase_keys_not_accepted",
+])
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -62,7 +73,7 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
     body: unknown,
     operation: SyncOperationOptions = options,
   ): Promise<Response> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}` }
+    const headers = syncRequestHeaders(await options.token())
     if (body !== undefined) headers["content-type"] = "application/json"
     const signal = syncOperationSignal(operation)
     return admitSyncOperation(operation, () =>
@@ -74,14 +85,15 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
       }),
     )
   }
-  const codeOf = async (response: Response): Promise<string> =>
+  const errorOf = async (response: Response): Promise<Record<string, unknown>> =>
     response.json().then(
-      (b: unknown) => {
-        const error = isRecord(b) ? b["error"] : undefined
-        return isRecord(error) && typeof error["code"] === "string" ? error["code"] : "unknown"
-      },
-      () => "unknown",
+      (b: unknown) => (isRecord(b) && isRecord(b["error"]) ? b["error"] : {}),
+      () => ({}),
     )
+  const codeOf = async (response: Response): Promise<string> => {
+    const code = (await errorOf(response))["code"]
+    return typeof code === "string" ? code : "unknown"
+  }
   const read = async (path: string, operation?: SyncOperationOptions): Promise<unknown> => {
     const response = await send("GET", path, undefined, operation)
     if (!response.ok)
@@ -103,8 +115,15 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
       return { ok: true, seq }
     }
     if (response.status >= 500) throw new AccountHttpError("unavailable", response.status)
-    const code = await codeOf(response)
-    return { ok: false, reason: REFUSALS.has(code) ? (code as TransportRefusal) : "refused" }
+    const error = await errorOf(response)
+    const code = typeof error["code"] === "string" ? error["code"] : "unknown"
+    // the per-account phrase gate: a phrase refusal may name the devices that must update first.
+    const devices = refusalBlockersOf(code, error["detail"])
+    return {
+      ok: false,
+      reason: REFUSALS.has(code) ? (code as TransportRefusal) : "refused",
+      ...(devices.length > 0 ? { devices } : {}),
+    }
   }
   const entriesAfter = async (
     after: number,
@@ -139,6 +158,8 @@ export function createAccountHttp(options: AccountHttpOptions): AccountHttp {
         head: { seq, link, keyring_link: keyringLink },
         currentEpoch: epoch,
         rotationPending: body["rotation_pending"] === true,
+        acceptsPhraseKeys: body["accepts_phrase_keys"] === true,
+        phraseKeyBlockers: phraseKeyBlockersOf(body["phrase_key_blockers"]),
       }
     },
   }

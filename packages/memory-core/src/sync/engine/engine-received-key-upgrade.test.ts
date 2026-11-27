@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { afterEach, expect, test } from "bun:test"
 
-import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
+import { ACCOUNT, type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
 import type { CycleRecord, EngineState, IncomingRecord, RenderRecord } from "./journal"
 import { besideRoot, sealedItems } from "./received-keys.test-support"
@@ -65,6 +65,8 @@ test(
       lastSyncedAt: null,
       updatedWhileOffline: 0,
       peer: null,
+      space: null,
+      account: ACCOUNT,
     }
     await writeJsonFile(join(sync, "state.json"), state)
     const incoming1: IncomingRecord = {

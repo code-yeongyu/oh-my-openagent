@@ -12,12 +12,13 @@ import { createTaskManager } from "../../manager"
 import { createTaskRecordStore } from "../../store"
 import { CTX, makeDeps } from "./__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "./execute"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
 function buildCollisionExecute() {
   const project = tempProject()
-  const inner = createTaskRecordStore({ project_dir: project })
+  const inner = createTaskRecordStore(ownedTaskState(project))
   const manager = createTaskManager({
     store: collisionStore(inner).store,
     runners: { "in-process": new FakeRunner(), process: new FakeRunner() },

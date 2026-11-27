@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -13,7 +12,7 @@ const preload = readFileSync(join(repoRoot, "test-setup.ts"), "utf8")
 describe("per-file test timeout budget", () => {
   test(
     "#given a sequential multi-file run #when files rely on the preload default #then only the first file gets it, and an explicit --timeout covers both (the Bun defect this contract guards)",
-    () => {
+    async () => {
       // Two files, each sleeping past Bun's 5000ms built-in but inside test-setup.ts's budget. Without
       // an explicit --timeout the second file must die at 5000ms; with it both must pass. This is the
       // whole reason ci.yml and the Windows wrapper pass the flag explicitly.
@@ -40,15 +39,27 @@ describe("per-file test timeout budget", () => {
         const probeEnv = { ...process.env }
         delete probeEnv.CI
         delete probeEnv.GITHUB_ACTIONS
-        const run = (...extra: string[]) =>
-          spawnSync(process.execPath, ["test", ...extra, dir], { cwd: repoRoot, encoding: "utf8", env: probeEnv })
+        const run = async (...extra: string[]) => {
+          const child = Bun.spawn([process.execPath, "test", ...extra, dir], {
+            cwd: repoRoot,
+            env: probeEnv,
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          const [stdout, stderr] = await Promise.all([
+            new Response(child.stdout).text(),
+            new Response(child.stderr).text(),
+            child.exited,
+          ])
+          return `${stdout}${stderr}`
+        }
         // Without the flag the second file falls back to Bun's 5000ms built-in. When Bun fixes that,
         // this half goes red and the explicit flags in ci.yml and the Windows wrapper can be revisited.
-        const implicit = run()
-        expect(`${implicit.stdout}${implicit.stderr}`).toMatch(/timed out after 5000ms/)
-        const explicit = run("--timeout", "20000")
-        expect(`${explicit.stdout}${explicit.stderr}`).toMatch(/\b2 pass\b/)
-        expect(`${explicit.stdout}${explicit.stderr}`).not.toMatch(/timed out after 5000ms/)
+        // Each runner still executes its two files in sequence; the runners only share read-only inputs.
+        const [implicit, explicit] = await Promise.all([run(), run("--timeout", "20000")])
+        expect(implicit).toMatch(/timed out after 5000ms/)
+        expect(explicit).toMatch(/\b2 pass\b/)
+        expect(explicit).not.toMatch(/timed out after 5000ms/)
       } finally {
         rmSync(root, { recursive: true, force: true })
       }

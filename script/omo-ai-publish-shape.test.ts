@@ -380,7 +380,7 @@ describe("beta follows latest on a stable release (#12987)", () => {
     expect(result.status).toBe(0)
   })
 
-  test("a second installer mirror moves get.omo.dev channels/beta after a stable mirror", () => {
+  test("a stable release moves get.omo.dev channels/beta beside channels/latest, once the assets are mirrored and npm is verified", () => {
     const mirrorBeta = job("installer-mirror-beta")
     expect(mirrorBeta.uses).toBe("./.github/workflows/installer-mirror.yml")
     expect(mirrorBeta.with).toEqual({
@@ -388,8 +388,35 @@ describe("beta follows latest on a stable release (#12987)", () => {
       channel: "beta",
       dry_run: false,
     })
-    expect(mirrorBeta.needs).toContain("installer-mirror")
-    expect(mirrorBeta.if).toContain("needs.installer-mirror.result == 'success'")
+    for (const channelJob of [mirrorBeta, job("installer-mirror")]) {
+      expect(channelJob.needs).toEqual(expect.arrayContaining(["installer-mirror-assets", "post-publish-verify"]))
+      expect(channelJob.if).toContain("needs.installer-mirror-assets.result == 'success'")
+      expect(channelJob.if).toContain("needs.post-publish-verify.result == 'success'")
+    }
+    expect(mirrorBeta.needs).not.toContain("installer-mirror")
     expect(mirrorBeta.if).toContain("needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'")
+  })
+
+  test("the assets are mirrored beside post-publish-verify and move no channel", () => {
+    const assets = job("installer-mirror-assets")
+    expect(assets.uses).toBe("./.github/workflows/installer-mirror.yml")
+    expect(assets.with).toEqual({
+      tag: `v${actionsExpression("needs.release-metadata.outputs.version")}`,
+      channel: "none",
+      dry_run: false,
+    })
+    expect(assets.needs).toContain("release")
+    expect(assets.needs).not.toContain("post-publish-verify")
+  })
+
+  test("the registry wait runs beside the release job and gates post-publish-verify", () => {
+    const wait = job("registry-wait")
+    expect(wait.needs).toContain("publish-main")
+    expect(wait.needs).not.toContain("release")
+    expect(steps("registry-wait").map((step) => step.name)).toContain(
+      "Wait for every published package on the registry",
+    )
+    expect(job("post-publish-verify").needs).toContain("registry-wait")
+    expect(job("post-publish-verify").if).toContain("needs.registry-wait.result == 'success'")
   })
 })

@@ -50,13 +50,18 @@ export interface AppendRequest {
   readonly epoch: number
   readonly link: string
   readonly recordSig: string
+  /** The sealed object itself, sent in the append instead of an upload (`uploadId` is then ignored). */
+  readonly inline?: Uint8Array
 }
 
 export interface StreamHandlers {
   /** `sync.advanced` / `sync.keyring.changed`: a trigger carrying the advertised head, never data. */
   readonly onAdvanced: (head: number) => void
-  /** The stream connected (true) or dropped (false); while down the engine polls. */
-  readonly onConnected: (connected: boolean) => void
+  /**
+   * The stream connected (true), or it is down (false): it dropped, or a connect attempt failed, `cause` naming why
+   * (the HTTP status and code, or the error). Sent again on every failed retry; while down the engine polls.
+   */
+  readonly onConnected: (connected: boolean, cause?: string) => void
   /** `sync.state.changed`: the account state moved without an append (a rotation is pending, or sync was toggled). */
   readonly onStateChanged: () => void
 }
@@ -93,7 +98,11 @@ export interface FreezeSettler {
 
 export interface Transport {
   /** Entries with `seq > after`, in sequence order, at most `limit` of them. */
-  pull(after: number, limit: number): Promise<PullPage>
+  /**
+   * `advertised`: the highest head the event stream announced; a transport may answer from the entries alone when
+   * they reach it, instead of reading the head first.
+   */
+  pull(after: number, limit: number, advertised?: number): Promise<PullPage>
   /** Object bytes, fetched through the Worker after the account check. */
   download(objectId: string): Promise<Uint8Array>
   /** Reserve exactly `size` bytes with this SHA-256; returns the upload id. */
@@ -105,6 +114,8 @@ export interface Transport {
    * that its own landed append has already moved, and answering "stale" there would duplicate it.
    */
   append(request: AppendRequest): Promise<AppendResult>
+  /** The largest batch the service takes inline in the append; 0 or absent when it does not (send an upload). */
+  inlineBytes?(): number
   /** Subscribe to the account event stream; returns the unsubscribe. */
   subscribe(handlers: StreamHandlers): () => void
 }
@@ -170,6 +181,15 @@ export interface Sealer {
     readonly link: string
     readonly recordSig: string
   }): Promise<boolean>
+  /** The service appended this session's own sealed batch at `seq`: the chain may take it without reading it back. */
+  appended?(own: {
+    readonly seq: number
+    readonly baseSeq: number
+    readonly digest: string
+    readonly epoch: number
+    readonly link: string
+    readonly recordSig: string
+  }): Promise<void>
 }
 
 /** The item model (#10203 device API) as the engine uses it. */
@@ -180,6 +200,14 @@ export interface ItemStore {
   peer(): string
   /** Item keys the store knows, live or dead. */
   keys(): readonly string[]
+  /**
+   * Whether `ops` (this device's unsent ops for the key, oldest first) are its very first capture of the key, the only
+   * history-less copy a join may rewind (#13730 review L1): "first" when the oldest op starts from an empty version and
+   * the doc holds nothing but this device's ops; "rewound" when they start from an empty version but the doc holds no
+   * ops any more (a rewind that reached the store before the journal dropped them, review M1); "no" otherwise, e.g. a
+   * key this device created and already sent.
+   */
+  firstCapture(key: string, ops: readonly Uint8Array[]): Promise<"first" | "rewound" | "no">
   /** captureOnDevice: the working text against the item's materialised baseline; null = no edit. */
   capture(key: string, workingText: string | null): Promise<Uint8Array | null>
   /** Import a verified remote update (or this device's own captured ops). */
@@ -250,3 +278,9 @@ export interface SyncRepo {
   /** True when a commit reachable from HEAD carries `Sync-Seq: <range>`. */
   hasSyncCommit(range: string): Promise<boolean>
 }
+
+/**
+ * The engine's log line. A failed cycle is a warning a person or harness must see (#13635); every
+ * other line is routine and stays at info.
+ */
+export type SyncLog = (line: string, level?: "info" | "warn") => void

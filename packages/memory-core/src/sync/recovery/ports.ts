@@ -1,6 +1,9 @@
 import type { KeyringBody, KeyringEntry, SyncAuthor, VerifiedWrap, WrapEntry } from "../crypto/entry.ts"
 import type { Principal, RecoveryKey } from "../crypto/parse.ts"
+import type { PhraseKeyBlocker } from "../genesis/phrase-gate.ts"
 import type { SyncOperationOptions } from "../operation-authority.ts"
+import type { PhraseEnrollBridgeRequest } from "./bridge-enroll-phrase.ts"
+import type { PhraseRecoverBeginRequest } from "./bridge-recover-phrase.ts"
 
 /**
  * The platform passkey API the native bridge drives (macOS AuthenticationServices, the Windows
@@ -184,6 +187,10 @@ export interface RecoveryBridge {
   recoverFinish(request: RecoverFinishRequest): Promise<RecoverBridgeResult>
   recoverAbort(handle: string): Promise<void>
   signalRemoved(rpId: string, credentialId: string): Promise<"signalled" | "unsupported">
+  /** Phrase recovery begin (contract 6): same result and handle as `recoverBegin`; absent where no phrase surface exists. */
+  recoverBeginWithPhrase?(request: PhraseRecoverBeginRequest): Promise<RecoverBeginResult>
+  /** Phrase enrollment with the engine-drawn credential id (M3); absent where no phrase surface exists. */
+  enrollPhrase?(request: PhraseEnrollBridgeRequest): Promise<EnrollBridgeResult>
 }
 
 /** A row of `GET /v1/sync/entries`: ciphertext-free chain metadata. */
@@ -218,10 +225,17 @@ export type KeyringAppendRequest = {
   readonly wraps: ReadonlyArray<WrapEntry>
 }
 
-export type TransportRefusal = "stale_base" | "rate_limited" | "not_found" | "refused"
+/** `phrase_keys_not_accepted`: the service refuses a record introducing a phrase key while its flag is off (A1.1-M1). */
+export type TransportRefusal = "stale_base" | "rate_limited" | "not_found" | "refused" | "phrase_keys_not_accepted"
 
 export type AppendResult =
-  { readonly ok: true; readonly seq: number } | { readonly ok: false; readonly reason: TransportRefusal }
+  | { readonly ok: true; readonly seq: number }
+  | {
+      readonly ok: false
+      readonly reason: TransportRefusal
+      /** Set on `phrase_keys_not_accepted` when the service names the devices to update first (per-account phrase gate). */
+      readonly devices?: ReadonlyArray<PhraseKeyBlocker>
+    }
 
 /** The signed-in account's sync routes this module uses (contract 1.17.0 bootstrap reads and appends). */
 export interface RecoveryTransport {
@@ -240,3 +254,4 @@ export type RecoveryEvent =
   | "sync.recovery.recover_refused"
   | "sync.recovery.removed"
   | "sync.trust.root_changed"
+  | "sync.trust.root_check_skipped"

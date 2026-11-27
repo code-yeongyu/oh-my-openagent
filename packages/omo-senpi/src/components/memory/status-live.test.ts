@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { MEMORY_REFLECTING_FRAMES, createMemoryFooterLive, type MemoryFooterTimers } from "./status-live"
 import { MEMORY_STATUS_KEY } from "./status"
+import { readUi } from "./wiring-context"
 
 interface FakeTimers extends MemoryFooterTimers {
   readonly live: () => number
@@ -268,5 +269,38 @@ describe("memory footer live", () => {
 
     expect(timers.live()).toBe(0)
     expect(ui.calls).toEqual([])
+  })
+
+  test("#given a footer refresh still reading when a run starts and ends #when it finishes after the restore began #then the restore still replaces the spinner", async () => {
+    // #14825 follow-up: a refresh that started before the spinner finished after the restore had begun. It recorded
+    // its fingerprint although its own line was dropped as stale, so the restore and later refreshes saw an unchanged
+    // fingerprint, published nothing, and the spinner frame stayed on screen.
+    const timers = fakeTimers()
+    const { calls, ui: host } = recorder()
+    // The production handle: spinner frames and refreshes publish through the same per-host bookkeeping.
+    const ui = readUi({ ui: { ...host, notify: () => {} } })
+    if (ui === undefined) throw new Error("readUi returned no handle")
+    const fingerprints: Array<(value: string) => void> = []
+    const live = createMemoryFooterLive({
+      timers,
+      fingerprint: () => new Promise<string>((resolve) => fingerprints.push(resolve)),
+      refreshSegments: async () => "mem:agent just now",
+    })
+
+    // Request 1 starts reading; request 2 starts later, finishes first and publishes.
+    const older = live.refresh("agent", ui)
+    const newer = live.refresh("agent", ui)
+    fingerprints[1]?.("head|clean")
+    await newer
+    // A reflection runs and ends: the restore (request 3) starts reading.
+    live.setActive("agent", true, ui)
+    live.setActive("agent", false, ui)
+    // Request 1 finishes now; its line is stale and dropped.
+    fingerprints[0]?.("head|clean")
+    await older
+    fingerprints[2]?.("head|clean")
+    await live.settled()
+
+    expect(calls.at(-1)).toEqual({ key: MEMORY_STATUS_KEY, text: "mem:agent just now" })
   })
 })

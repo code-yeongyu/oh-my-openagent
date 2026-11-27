@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { posixSecureFile, type SecureFile } from "../local-api/access.ts"
-import { currentUserSid, windowsSecureFile } from "../local-api/dacl.ts"
+import { makeDir, posixSecureFile, type SecureFile } from "../local-api/access.ts"
+import { refuseIfLocalOnly } from "../local-only.ts"
+import { currentUserSid } from "../local-api/dacl.ts"
+import { windowsSecureFile } from "./windows-dacl.ts"
 import {
   BINARY_MAX_BYTES,
   CHECKSUMS,
@@ -70,7 +72,7 @@ const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes)
 
 const platformSecure: SecureFile =
   process.platform === "win32"
-    ? async (path, kind) => windowsSecureFile(await currentUserSid())(path, kind)
+    ? async (path, kind, origin) => windowsSecureFile(await currentUserSid())(path, kind, origin)
     : posixSecureFile
 
 // "not_found" is an HTTP 404; "missing" is every other failed fetch (a throw, a timeout, a 5xx, another status).
@@ -108,8 +110,7 @@ const install = async (
   const secure = options.secure ?? platformSecure
   const bin = join(options.stateDir, "bin")
   for (const dir of [options.stateDir, bin]) {
-    mkdirSync(dir, { recursive: true, mode: 0o700 })
-    await secure(dir, "dir")
+    await secure(dir, "dir", makeDir(dir))
   }
   const staging = mkdtempSync(join(bin, ".staging-"))
   const releaseDir = join(bin, options.version)
@@ -137,6 +138,7 @@ const install = async (
  * then latest.json against the pinned version and the bundled engine.
  */
 export const acquireDeviceService = async (options: AcquireOptions): Promise<AcquireResult> => {
+  refuseIfLocalOnly("device-service-core/release/acquire.ts acquireDeviceService")
   const keys = releaseKeySetBytes(options.releaseKeys ?? DEVICE_SERVICE_RELEASE_KEYS)
   if (keys === undefined)
     return refuse(

@@ -1,0 +1,10 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "crates/omo-computer-core/src/error/tests/check-design-citations.mjs",
+      ]
+    }
+  }
+}

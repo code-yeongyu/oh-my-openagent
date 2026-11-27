@@ -7,12 +7,10 @@ import {
   currentUserSid,
   DESCRIBE_DACL_SCRIPT,
   describeDacl,
-  verifyExactDacl,
-  windowsSecureFile,
   type PowerShellRunner,
   runPowerShell,
-  userSidToken,
 } from "../../src/local-api/dacl.ts"
+import { userSidToken, verifyExactDacl, windowsSecureFile } from "../../src/release/windows-dacl.ts"
 import { LocalApiError } from "../../src/local-api/errors.ts"
 import { rejectionOf } from "./conformance/rejection.ts"
 import { cleanup, freshStateDir } from "./support.ts"

@@ -10,6 +10,8 @@ export type { SyncOperationAuthority } from "../operation-authority"
 /** Public selected-account identity. Credentials and private key material have no fields here. */
 export interface DesktopSyncDescriptor {
   readonly genesis: "supported" | "unsupported"
+  /** Whether this process owns a protected recovery-phrase surface; the only phrase flag the engine trusts. */
+  readonly phraseGenesis?: "supported" | "unsupported"
   readonly rpId: string | null
   readonly userName: string | null
   readonly serviceOrigin: string

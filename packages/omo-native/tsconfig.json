@@ -15,5 +15,6 @@
     "lib": ["ESNext"],
     "types": ["bun-types"]
   },
-  "include": ["*.ts", "test/**/*", "bin/**/*", "keychain-helper/**/*.ts"]
+  "include": ["*.ts", "test/**/*", "bin/**/*", "keychain-helper/**/*.ts"],
+  "exclude": ["bin/lib/remote-sdk-types/**"]
 }

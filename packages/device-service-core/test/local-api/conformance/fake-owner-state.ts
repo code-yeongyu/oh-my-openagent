@@ -2,6 +2,7 @@ import type {
   ClientInfo,
   CommandRpc,
   ControlAttachState,
+  ControlSessionWakeState,
   EnforcementReport,
   ErrorCode,
   JsonObject,
@@ -9,6 +10,7 @@ import type {
   Status,
 } from "../../../src/local-api/protocol.ts"
 import type { UploadAssembler } from "../../../src/local-api/upload.ts"
+import type { FakeOwnerMode, Withheld } from "./fake-owner-modes.ts"
 import type { World, WorldSession } from "./world.ts"
 
 export type Conn = {
@@ -17,6 +19,10 @@ export type Conn = {
   readonly attaches: Set<string>
   readonly client: () => ClientInfo | undefined
   subscribed: boolean
+  // omo#13037: the agent dir this connection serves deliveries for, its waiting hand-offs and open questions.
+  serving?: string
+  readonly handed?: Set<string>
+  readonly asks?: Set<string>
 }
 export type OwnerState = {
   readonly stateDir: string
@@ -35,9 +41,14 @@ export type OwnerState = {
   readonly reports: Omit<EnforcementReport, "id" | "type">[]
   refresher: { readonly binary_path: string; readonly version: string } | null
   attach: ControlAttachState
+  sessionWake: ControlSessionWakeState
   readonly now: () => number
   readonly mint: () => string
   stop: () => Promise<void>
+  readonly mode?: FakeOwnerMode
+  /** The engine records a `terminal` owner's endpoint takes; any other is answered as an unknown command. */
+  readonly terminalCommands: ReadonlySet<string>
+  readonly withheld: (what: Withheld) => void
 }
 export type Reply =
   | { readonly data: JsonObject }

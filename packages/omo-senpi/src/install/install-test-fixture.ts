@@ -9,7 +9,8 @@ const REQUIRED_SKILL_NAMES = [
   "coding-agent-sessions",
   "debugging",
   "frontend",
-  "git-master",
+  "git",
+  "github",
   "init-deep",
   "lsp-setup",
   "programming",
@@ -50,6 +51,7 @@ export async function createPluginFixture(
   await writeFixtureFile(join(pluginPath, "extensions", "loro_wasm_bg.wasm"), "")
   await writeFixtureFile(join(pluginPath, "extensions", "CaseFolding.txt"), "")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-thread-client.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-wake.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-feedback.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-desktop-toolkit.js"), "export {}\n")
@@ -57,6 +59,7 @@ export async function createPluginFixture(
   await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "runtime", "omo-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")

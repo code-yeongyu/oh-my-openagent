@@ -17,6 +17,7 @@ import {
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The parent dies after the handoff is committed but before the failed rung's daemon session closed.
 // Revival must close that retained session before it opens the next rung, on the real daemon wire.
@@ -35,7 +36,7 @@ function rung(id: string): ResolvedModelRecord {
 test("#given the parent dies before the failed rung's session closes #when another session revives the handoff #then the retained session is closed and only the next rung stays open", async () => {
   // given
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const host = await harness.fakeHost({ transcripts: true })
   const rpc = harness.runnerOver(host)
   const closing = Promise.withResolvers<void>()

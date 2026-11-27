@@ -18,6 +18,7 @@ import {
 } from "@oh-my-opencode/omo-opencode/service-auth"
 import { randomUUID } from "node:crypto"
 import type { HeldDeviceCredential } from "@oh-my-opencode/device-service-core"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { deviceKeyringFromMaterial } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { cliAccountOperation, scopedCliKeyring } from "./cli-account-operation"
 
@@ -87,7 +88,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
 async function accountIdOf(api: string, token: string, doFetch: typeof fetch): Promise<string> {
-  const response = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${token}` } })
+  const response = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(token) })
   if (!response.ok) throw new Error(`memory sync: the account read failed (${response.status})`)
   const body: unknown = await response.json()
   const account = isRecord(body) ? body["account"] : undefined
@@ -98,7 +99,7 @@ async function accountIdOf(api: string, token: string, doFetch: typeof fetch): P
 
 /** The service device this token authenticates: the one row the device list marks current. */
 async function currentDeviceOf(api: string, token: string, doFetch: typeof fetch): Promise<string | null> {
-  const response = await doFetch(`${api}/v1/devices`, { headers: { authorization: `Bearer ${token}` } })
+  const response = await doFetch(`${api}/v1/devices`, { headers: syncRequestHeaders(token) })
   if (!response.ok) throw new Error(`memory sync: the device read failed (${response.status})`)
   return currentServiceDevice(await response.json())
 }
@@ -185,6 +186,7 @@ export function createCliAccountSource(options: {
       store,
       ...(options.home === undefined ? {} : { home: options.home }),
       beforeKeysDiscarded,
+      log: (line) => options.logger?.warn(line),
       // A sign-in the service ends on refresh is a local end of the sign-in: the device service forgets the device.
       ...(relay === undefined
         ? {}
@@ -254,21 +256,26 @@ export function createCliAccountSource(options: {
       current.accountId === accountId &&
       current.credentialGeneration === generation &&
       sameKeys(current, captured)
+    // #13739: one transiently empty read is read again under the same lock before the capture is retired; a cleared
+    // store (a real sign-out) reads empty twice and still ends sync.
+    const confirmed = async (stored: Credentials | null): Promise<Credentials | null> =>
+      stored ?? (await store.readAuthoritative())
     const isCurrent = async (): Promise<boolean> => {
       if (abort.signal.aborted) return false
-      const current = await session.update(async (stored) => stored)
+      const current = await session.update(confirmed)
       const same = sameCaptured(current)
       if (!same) abort.abort()
       return same && !abort.signal.aborted
     }
     const boundary = async <T>(dispatch: () => T): Promise<T> => {
-      const result = await session.update((current) => {
+      const result = await session.update(async (stored) => {
+        const current = await confirmed(stored)
         if (abort.signal.aborted || !sameCaptured(current)) {
           abort.abort()
           throw new Error("The CLI sync account is no longer current.")
         }
         // Box the return value: release the lock after dispatch itself, not an in-flight request.
-        return Promise.resolve({ value: dispatch() })
+        return { value: dispatch() }
       })
       return result.value
     }
@@ -295,6 +302,7 @@ export function createCliAccountSource(options: {
     await check()
     const descriptor: DesktopSyncDescriptor = {
       genesis: "unsupported",
+      phraseGenesis: "unsupported",
       rpId: null,
       userName: null,
       serviceOrigin: api,

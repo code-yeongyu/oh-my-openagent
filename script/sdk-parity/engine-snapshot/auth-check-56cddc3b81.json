@@ -1,0 +1,125 @@
+{
+  "source": {
+    "repo": "code-yeongyu/senpi",
+    "pull_request": 7463,
+    "commit": "56cddc3b8137e0ff6f63975ed6e94fcf63c779e9",
+    "files": [
+      "packages/coding-agent/src/engine/result-free-fields.ts",
+      "packages/coding-agent/src/engine/auth-session.ts",
+      "packages/coding-agent/src/cli/auth-account-check.ts"
+    ]
+  },
+  "note": "A copy of what the engine exports at that commit, for engine.auth.check, until omo's engine pin carries @code-yeongyu/senpi/engine. The awaiting entry in authority-expected.ts fails once it does; then delete this file and import the engine's contract.",
+  "free_fields": [
+    {
+      "call": "auth.check",
+      "field": "value.provider",
+      "origin": "caller",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].name",
+      "origin": "configuration",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].displayName",
+      "origin": "configuration",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].email",
+      "origin": "provider",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].subscriptionType",
+      "origin": "provider",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].orgName",
+      "origin": "provider",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].usageUrl",
+      "origin": "configuration",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].blockedModels.[].model",
+      "origin": "configuration",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].check.model",
+      "origin": "configuration",
+      "may_embed": true
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].check.message",
+      "origin": "engine",
+      "may_embed": false
+    },
+    {
+      "call": "auth.check",
+      "field": "value.accounts.[].check.provider_text.*",
+      "origin": "provider",
+      "may_embed": true
+    }
+  ],
+  "check_codes": [
+    "rate_limit",
+    "overloaded",
+    "auth_error",
+    "login_unreadable",
+    "billing",
+    "org_not_allowed",
+    "entitlement",
+    "long_context_unavailable",
+    "other",
+    "timeout",
+    "cancelled",
+    "no_result",
+    "unrecognized"
+  ],
+  "session_answer": {
+    "provider": "string",
+    "status": [
+      "ready",
+      "not_ready",
+      "invalid"
+    ],
+    "reason": [
+      "provider_not_found",
+      "credentials_not_configured",
+      "credential_not_available",
+      "invalid_state"
+    ],
+    "auth_type": [
+      "api_key",
+      "oauth"
+    ],
+    "accounts[].signed_in": "boolean",
+    "accounts[].check": [
+      "ok",
+      "AuthAccountCheckCode"
+    ]
+  },
+  "session_required": [
+    "provider",
+    "status",
+    "accounts",
+    "accounts[].signed_in"
+  ]
+}

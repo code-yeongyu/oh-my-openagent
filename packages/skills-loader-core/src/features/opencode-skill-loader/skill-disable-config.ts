@@ -1,3 +1,5 @@
+import { resolveSkillAlias } from "./skill-name-aliases"
+
 export type SkillDisableConfig = {
   readonly disabled_skills?: readonly string[]
   readonly skills?: unknown
@@ -9,7 +11,7 @@ type SkillsConfigRecord = {
 }
 
 export function normalizeSkillAliasName(name: string): string {
-  return name.toLowerCase()
+  return resolveSkillAlias(name.toLowerCase())
 }
 
 function isSkillsConfigRecord(value: unknown): value is SkillsConfigRecord {

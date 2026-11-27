@@ -62,6 +62,10 @@ function runEngine(ws: Workspace, options: RunOptions = {}): ReturnType<typeof f
     stdout: sink,
     stderr: sink,
     platform: "darwin",
+    // The warm `run` sends after its ensure is not what these tests read.
+    threadSdk: async () => ({
+      sdk: { warmDaemon: async () => ({ kind: "warm", state: "warmed" }), dispose: async () => undefined },
+    }),
   })
   return engine
 }
@@ -220,5 +224,28 @@ describe("omo daemon task.host_idle_exit_ms source (#9192)", () => {
     expect(args[args.indexOf("--policy") + 1]).toBe("fallback")
     expect(engine.envs[0]?.SENPI_RPC_HOST_IDLE_EXIT_MS).toBe("5000")
     expect(configWarns(doctorLines(ws))).toEqual([legacyWarn(ws, "host_idle_exit_ms")])
+  })
+})
+
+// omo#13594: the always-on session host unit runs `omo daemon run --pinned`; only that ensure asks for a host that never
+// idle-exits (the engine's SENPI_RPC_HOST_COLD_START=persistent), and nothing else does.
+describe("omo daemon run --pinned", () => {
+  test("pins the host the run ensures and leaves a plain run and other subcommands alone", () => {
+    const ws = workspace()
+    expect(runEngine(ws, { args: ["--pinned"] }).envs[0]?.SENPI_RPC_HOST_COLD_START).toBe("persistent")
+    expect(runEngine(ws).envs[0]?.SENPI_RPC_HOST_COLD_START).toBeUndefined()
+    const engine = fakeEngine()
+    runDaemonCommand(["stop", "--pinned"], {
+      engine,
+      pluginRoot: ws.pluginRoot,
+      agentDir: ws.agentDir,
+      env: { HOME: ws.home },
+      cwd: ws.home,
+      loadTaskConfig: () => taskConfigRuntime,
+      stdout: sink,
+      stderr: sink,
+      platform: "darwin",
+    })
+    expect(engine.envs[0]?.SENPI_RPC_HOST_COLD_START).toBeUndefined()
   })
 })

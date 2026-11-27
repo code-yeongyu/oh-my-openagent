@@ -2,6 +2,12 @@
 // Chain parsing is not cryptographic verification; memory-core still verifies every record.
 import { z } from "zod"
 
+// Upper bound for every array in a sync-service reply (GHSA-mrhx-c7xc-m3w5: zod collects one issue per failing element, so an
+// uncapped array lets an oversized reply cost unbounded memory). listEntries is unpaged and returns the whole chain, one row per
+// push (pushes are debounced to one per 2 s), so a very long-lived busy account can eventually exceed this; paging listEntries is
+// tracked separately. Until then an over-cap chain fails validation instead of being read in full.
+export const SYNC_REPLY_MAX_ITEMS = 100_000
+
 export const SyncInteger = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
 const SyncPrincipal = z.object({
   kind: z.literal("device"),
@@ -29,27 +35,30 @@ const keyringRow = z.object({
   kind: z.literal("keyring"),
   keyring_link: z.string(),
   body: z.record(z.string(), z.json()),
-  wraps: z.array(SyncWrap),
+  wraps: z.array(SyncWrap).max(SYNC_REPLY_MAX_ITEMS),
 })
 const bodyFields = z.object({ kind: z.string(), account: z.string(), epoch: SyncInteger })
 export const decodeSyncKeys = (input: unknown) =>
   z
-    .object({ entries: z.array(keyringRow) })
+    .object({ entries: z.array(keyringRow).max(SYNC_REPLY_MAX_ITEMS) })
     .parse(input)
     .entries.map((entry) => ({
       ...entry,
       body: { ...entry.body, ...bodyFields.parse(entry.body) },
     }))
-export const decodeSyncEntries = (input: unknown) => z.object({ entries: z.array(SyncChainRow) }).parse(input)
+export const decodeSyncEntries = (input: unknown) =>
+  z.object({ entries: z.array(SyncChainRow).max(SYNC_REPLY_MAX_ITEMS) }).parse(input)
 export const decodeRecoveryWraps = (input: unknown) =>
   z
     .object({
-      wraps: z.array(
-        z.object({
-          record: z.object({ seq: SyncInteger, digest: z.string(), keyring_link: z.string() }),
-          entry: SyncWrap,
-        }),
-      ),
+      wraps: z
+        .array(
+          z.object({
+            record: z.object({ seq: SyncInteger, digest: z.string(), keyring_link: z.string() }),
+            entry: SyncWrap,
+          }),
+        )
+        .max(SYNC_REPLY_MAX_ITEMS),
     })
     .parse(input)
 export const SyncPending = z.object({
@@ -66,6 +75,7 @@ export const decodeSyncPending = (input: unknown) => {
 }
 export const SyncDescriptor = z.object({
   genesis: z.enum(["supported", "unsupported"]),
+  phraseGenesis: z.enum(["supported", "unsupported"]).optional(),
   rpId: z.string().nullable(),
   userName: z.string().nullable(),
   serviceOrigin: z.string(),
@@ -78,21 +88,23 @@ export const SyncDescriptor = z.object({
 })
 export type SyncDescriptor = z.infer<typeof SyncDescriptor>
 export const SyncDevices = z.object({
-  devices: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      kind: z.enum(["desktop", "cli"]),
-      platform: z.enum(["macos", "linux", "windows"]),
-      createdAt: z.string(),
-      lastSeenAt: z.string(),
-      approximateLocation: z.string().optional(),
-      current: z.boolean(),
-      syncing: z.boolean(),
-      revokedAt: z.string().nullable(),
-      syncPrincipal: z.string().nullable(),
-    }),
-  ),
+  devices: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        kind: z.enum(["desktop", "cli"]),
+        platform: z.enum(["macos", "linux", "windows"]),
+        createdAt: z.string(),
+        lastSeenAt: z.string(),
+        approximateLocation: z.string().optional(),
+        current: z.boolean(),
+        syncing: z.boolean(),
+        revokedAt: z.string().nullable(),
+        syncPrincipal: z.string().nullable(),
+      }),
+    )
+    .max(SYNC_REPLY_MAX_ITEMS),
 })
 const reply = z.union([
   z.strictObject({ kind: z.literal("json"), status: SyncInteger, body: z.unknown() }),
@@ -103,19 +115,27 @@ export class DesktopSyncServiceError extends Error {
   override readonly name = "DesktopSyncServiceError"
   readonly code: string
   readonly status: number
-  constructor(code: string, status: number) {
+  /** The refusal's `error.detail`, untrusted; read only through a typed decoder. */
+  readonly detail: unknown
+  constructor(code: string, status: number, detail?: unknown) {
     super(`Desktop sync service refused the request (${status}).`)
     this.code = code
     this.status = status
+    this.detail = detail
   }
 }
-const errorCode = z.object({ error: z.object({ code: z.string() }) })
+const errorCode = z.object({ error: z.object({ code: z.string(), detail: z.unknown().optional() }) })
 export function requireSyncSuccess(input: unknown) {
   const response = reply.parse(input)
   if (response.status < 200 || response.status >= 300) {
     const parsed = response.kind === "json" ? errorCode.safeParse(response.body) : undefined
     const code = parsed?.success === true ? parsed.data.error.code : "unknown"
-    throw new DesktopSyncServiceError(response.status >= 500 ? "unavailable" : code, response.status)
+    if (response.status >= 500) throw new DesktopSyncServiceError("unavailable", response.status)
+    throw new DesktopSyncServiceError(
+      code,
+      response.status,
+      parsed?.success === true ? parsed.data.error.detail : undefined,
+    )
   }
   return response
 }

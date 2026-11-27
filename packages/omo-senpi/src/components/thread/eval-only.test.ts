@@ -15,6 +15,7 @@ import {
 import type { ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_METADATA } from "./metadata"
+import { createThreadSdk } from "./sdk"
 import { createThreadTools, registerThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
 // The eval-only contract (oh-my-openagent#12903) is senpi's policy over omo's declarations, so it is
@@ -32,7 +33,13 @@ const roots: string[] = []
 const stores: GatewayStore[] = []
 const sessions: Session[] = []
 afterEach(async () => {
-  for (const session of sessions.splice(0)) session.dispose()
+  // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+  await Promise.all(
+    sessions.splice(0).map((session) => {
+      session.dispose()
+      return session.whenToolChildClosed()
+    }),
+  )
   await Promise.all(stores.splice(0).map((store) => store.dispose()))
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -176,8 +183,8 @@ describe("thread tools are eval-only, like bash", () => {
 
     // then: the call reached the tool and listed the fixture peer
     expect(listed).toMatchObject({ kind: "ok", scope: "all" })
-    const threads = (listed as unknown as { threads: Array<{ thread_id: string; cwd: string }> }).threads
-    expect(threads.map((thread) => thread.thread_id)).toEqual(["dur-peer"])
+    const threads = (listed as unknown as { threads: Array<{ thread: string; cwd: string }> }).threads
+    expect(threads.map((thread) => thread.thread)).toEqual(["dur-peer"])
     expect(threads[0]?.cwd).toBe(root)
     // then: the eval path did not activate the tool
     expect(session.getActiveToolNames().filter((name) => THREAD_TOOL_NAMES.includes(name))).toEqual([])
@@ -224,6 +231,37 @@ describe("thread tools are eval-only, like bash", () => {
     expect(withEval.f.getMessages).not.toHaveBeenCalled()
     // then: the eval path is not a privileged bypass of what the direct path enforces
     expect(evalPath).toEqual(directPath)
+  })
+
+  // #14312: bindings are gone with no alias. Every surface a caller reaches a thread verb through - the engine's tool
+  // registry (what an eval cell and the RPC host call), the thread SDK, and the gateway store - names none of them.
+  test("#given the family on a real engine session, the thread SDK and the gateway store #when a binding verb is looked up or called #then none exists and the engine refuses each as an unknown tool", async () => {
+    // given
+    const removedTools = [
+      "thread_bind",
+      "thread_unbind",
+      "thread_rebind",
+      "thread_bindings",
+      "thread_report",
+      "thread_outbox",
+      "thread_outbox_ack",
+      "thread_answer",
+    ]
+    const removedVerb =
+      /^(bind|unbind|rebind|bindings|bindingFor|bindingsForSession|report|outbox|outboxAck|outboxPending|ack|answer|completion|closeQuestion|deliveryReceipt|recoverDelivery)$/
+    const { session, f, root } = await openSession({ withEval: true })
+    const sdk = createThreadSdk({ agentDir: root, cwd: root, uid: 501, user: "qa-user", host: f.host, store: f.store })
+
+    // when
+    const registered = session.getAllTools().map((tool) => tool.name)
+    const called = await Promise.all(removedTools.map((name) => outcomeOf(session, name, {})))
+
+    // then: the registry holds exactly the family, and a call by a removed name reaches no tool
+    expect(registered.filter((name) => name.startsWith("thread_"))).toEqual(THREAD_TOOL_NAMES)
+    expect(called).toEqual(removedTools.map((toolName) => ({ threw: { code: "unknown_tool", toolName } })))
+    // then: neither the SDK nor the store exposes a binding verb
+    expect(Object.keys(sdk).filter((key) => removedVerb.test(key))).toEqual([])
+    expect(Object.keys(f.store).filter((key) => removedVerb.test(key))).toEqual([])
   })
 
   test("#given no eval tool #when the family registers #then every tool is an ordinary direct tool with no redirect", async () => {

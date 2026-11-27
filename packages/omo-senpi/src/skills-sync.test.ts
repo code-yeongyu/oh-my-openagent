@@ -13,17 +13,18 @@ const expectedSkillNames = [
   "ast-grep",
   "browser",
   "coding-agent-sessions",
-  "dag-library",
   "data-scientist",
   "debugging",
   "eval-integrity",
   "frontend",
-  "git-master",
+  "git",
+  "github",
   "give-me-tips",
   "hyperplan",
   "init-deep",
   "lsp-setup",
   "mass-ulw",
+  "omo-relay",
   "onboarding",
   "programming",
   "refactor",
@@ -43,11 +44,11 @@ const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
 // Skills authored directly against the omo-senpi tool surface. They already speak native Senpi tools,
 // so they carry no OpenCode examples and need no "Senpi Harness Tool Compatibility" translation banner.
 const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
-  "dag-library": true,
   "give-me-tips": true,
   hyperplan: true,
   "init-deep": true,
   "mass-ulw": true,
+  "omo-relay": true,
   onboarding: true,
   ultrawork: true,
   "ulw-loop": true,
@@ -135,7 +136,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 27 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly the expected roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
