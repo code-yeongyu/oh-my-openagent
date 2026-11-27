@@ -19,6 +19,7 @@ import {
   type AcquireOptions,
   DEVICE_SERVICE_RELEASE_KEYS,
   deviceServiceAssetName,
+  type FetchRelease,
   verifyReleaseSignature,
 } from "../src/release/acquire.ts"
 import { parseReleaseKeySet } from "../src/release/release-signature.ts"
@@ -30,6 +31,7 @@ import {
   releaseKey,
   serveRelease,
 } from "./release-fixture.ts"
+import { fakeClock } from "./local-api/conformance/fake-clock.ts"
 import { nativeEd25519Verify } from "./strict-ed25519/native-control.ts"
 
 const dirs: string[] = []
@@ -431,5 +433,165 @@ describe("verified acquisition of the device service", () => {
       ok: true,
       binary: join(passedState, "bin", PIN_VERSION, deviceServiceAssetName(host)),
     })
+  })
+})
+
+// #13223/#13224: the downloader's body read. A timeout or reset while the ~90 MB binary streams, a link slower than
+// the old 120 s total budget, and a body cut short of its content-length are all download failures — never an
+// uncaught exception, never a fixed total cap on a progressing link, never a checksum verdict on a broken transfer.
+describe("download body failures and stall bounds (#13223, #13224)", () => {
+  const binaryName = deviceServiceAssetName(HOST)
+
+  const entryFilesWithoutBinary = (release: ReadonlyMap<string, Uint8Array>): ReadonlyMap<string, Uint8Array> =>
+    new Map([...release].filter(([name]) => name !== binaryName))
+
+  // A circuit breaker, not a synchronization primitive: on the broken base nothing settles and the test fails here.
+  const settleWithin = async <T>(pending: Promise<T>, what: string): Promise<T> =>
+    Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        const breaker = setTimeout(() => reject(new Error(`circuit breaker: waited 2s for ${what}`)), 2_000)
+        breaker.unref?.()
+      }),
+    ])
+
+  // One pump round: enough microtask turns for the downloader's read loop, plus one zero-delay event-loop turn for
+  // the buffered entry-file reads the runtime resolves there. This is ordering, not waiting: nothing ever sleeps for a
+  // duration, and a download that cannot settle still trips the circuit breaker.
+  const pump = async (): Promise<void> => {
+    for (let step = 0; step < 8; step++) await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
+
+  test("a body read that times out mid-stream resolves as download_failed, not an uncaught TimeoutError", async () => {
+    const key = releaseKey()
+    const release = buildRelease({ key, host: HOST })
+    const served = serveRelease(entryFilesWithoutBinary(release))
+    const fetchTimedOutBody: FetchRelease = (url, init) =>
+      url.endsWith(binaryName)
+        ? Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                start(controller) {
+                  controller.enqueue(new Uint8Array(1024))
+                  controller.error(new DOMException("The operation timed out.", "TimeoutError"))
+                },
+              }),
+            ),
+          )
+        : served.fetch(url, init)
+    const state = stateDir()
+
+    const result = await settleWithin(
+      acquireDeviceService(options(state, served, key.publicHex, { fetch: fetchTimedOutBody })),
+      "the timed-out body read to be refused",
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      refusal: "download_failed",
+      action: "Could not download the OmO device service. Check the connection and try again.",
+    })
+    expect(existsSync(state)).toBe(false)
+  })
+
+  test("a body shorter than its declared content-length is download_failed, not checksum", async () => {
+    const key = releaseKey()
+    const release = buildRelease({ key, host: HOST })
+    const binary = release.get(binaryName) ?? new Uint8Array()
+    const served = serveRelease(entryFilesWithoutBinary(release))
+    const half = binary.slice(0, Math.ceil(binary.byteLength / 2))
+    const fetchShortBody: FetchRelease = (url, init) =>
+      url.endsWith(binaryName)
+        ? Promise.resolve(new Response(half, { headers: { "content-length": String(binary.byteLength) } }))
+        : served.fetch(url, init)
+    const state = stateDir()
+
+    const result = await acquireDeviceService(options(state, served, key.publicHex, { fetch: fetchShortBody }))
+
+    expect(result).toEqual({
+      ok: false,
+      refusal: "download_failed",
+      action: "Could not download the OmO device service. Check the connection and try again.",
+    })
+    expect(existsSync(state)).toBe(false)
+  })
+
+  // The bound is a stall, not a total transfer deadline: four chunks, one every 30 s of the virtual clock, finish at
+  // 150 s — past the old fixed 120 s cap — and must still install.
+  test("a slow but steady stream installs past the old 120 s total cap on the virtual clock", async () => {
+    const key = releaseKey()
+    const release = buildRelease({ key, host: HOST })
+    const binary = release.get(binaryName) ?? new Uint8Array()
+    const served = serveRelease(entryFilesWithoutBinary(release))
+    const clock = fakeClock()
+    const started = clock.now()
+    const chunks = 4
+    const chunkSize = Math.ceil(binary.byteLength / chunks)
+    const fetchPaced: FetchRelease = (url, init) =>
+      url.endsWith(binaryName)
+        ? Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                start(controller) {
+                  for (let index = 0; index < chunks; index++)
+                    clock.after((index + 1) * 30_000, () =>
+                      controller.enqueue(binary.slice(index * chunkSize, (index + 1) * chunkSize)),
+                    )
+                  clock.after((chunks + 1) * 30_000, () => controller.close())
+                },
+              }),
+            ),
+          )
+        : served.fetch(url, init)
+    const state = stateDir()
+
+    const pending = acquireDeviceService(options(state, served, key.publicHex, { fetch: fetchPaced, timers: clock }))
+    // The pipeline's own awaits (signature verification sits between the entry files and the binary) consume real
+    // event-loop turns before the paced stream arms, so drive virtual 30 s ticks until the download settles.
+    for (let tick = 0; tick < 20; tick++) {
+      clock.advance(30_000)
+      await pump()
+    }
+    const result = await settleWithin(pending, "the paced download to install")
+
+    expect(result).toMatchObject({ ok: true, version: PIN_VERSION })
+    expect(clock.now() - started).toBeGreaterThan(120_000)
+    expect(existsSync(join(state, "bin", PIN_VERSION, binaryName))).toBe(true)
+  })
+
+  test("a stalled body aborts as download_failed once no bytes arrive for the stall budget", async () => {
+    const key = releaseKey()
+    const release = buildRelease({ key, host: HOST })
+    const binary = release.get(binaryName) ?? new Uint8Array()
+    const served = serveRelease(entryFilesWithoutBinary(release))
+    const clock = fakeClock()
+    const fetchStalled: FetchRelease = (url, init) =>
+      url.endsWith(binaryName)
+        ? Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                start(controller) {
+                  controller.enqueue(binary.slice(0, 1))
+                },
+              }),
+            ),
+          )
+        : served.fetch(url, init)
+    const state = stateDir()
+
+    const pending = acquireDeviceService(options(state, served, key.publicHex, { fetch: fetchStalled, timers: clock }))
+    for (let tick = 0; tick < 8; tick++) {
+      clock.advance(30_000)
+      await pump()
+    }
+    const result = await settleWithin(pending, "the stalled download to be refused")
+
+    expect(result).toEqual({
+      ok: false,
+      refusal: "download_failed",
+      action: "Could not download the OmO device service. Check the connection and try again.",
+    })
+    expect(existsSync(state)).toBe(false)
   })
 })
