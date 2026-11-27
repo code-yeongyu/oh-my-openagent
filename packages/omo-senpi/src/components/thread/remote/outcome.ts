@@ -196,8 +196,8 @@ export function outcomeFailure(
     return fail(
       "host_unavailable",
       `Device ${device} does not list its own engine, so nothing was opened (no_primary_endpoint).`,
-      "Start or restart omo on that device; if that does not help, update the device service on both devices. Then retry.",
-      { device, reason: outcome.reason, remedy: "restart_omo_or_update_device_service" },
+      "Run `omo host ensure` on that device; if it refuses, restart omo there. Then retry.",
+      { device, reason: outcome.reason, remedy: "host_ensure_then_restart_omo" },
     )
   if (UNANSWERED.has(outcome.reason))
     return fail(
