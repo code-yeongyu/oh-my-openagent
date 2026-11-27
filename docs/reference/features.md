@@ -456,7 +456,7 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 
 ### Built-in Skill Sets
 
-Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git-master`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
+Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git`, `init-deep`, `playwright`, `playwright-cli`, `remove-ai-slops`, `review-work`, `security-research`, `security-review`, `team-mode`, and `visual-qa`. Browser provider selection activates one browser skill, and `team-mode` is available only when Team Mode is enabled. The table below highlights selected skills.
 
 #### init-deep
 
@@ -464,7 +464,7 @@ Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git-ma
 
 | Skill set              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **git-master**         | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced).                              |
+| **git**                | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced). Formerly `git-master`, which still resolves as an alias. |
 | **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
 | **visual-qa**          | Browser rendering and screenshot evidence               | omowright from js eval: the owned engine for renders on a task-owned profile, the attached engine for pages that need the user's login. |
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
@@ -475,7 +475,7 @@ Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git-ma
 
 `ulw-research` is intentionally explicit. Ordinary questions and normal implementation context-gathering will not trigger a saturation swarm. Use `ulw-research` when the research itself is the deliverable and every claim needs a citation, a proof artifact, or an execution-backed verdict.
 
-#### git-master Core Principles
+#### git Core Principles
 
 **Multiple Commits by Default**:
 
@@ -493,9 +493,9 @@ Selected built-in skills include `debugging`, `dev-browser`, `frontend`, `git-ma
 **Usage**:
 
 ```
-/git-master commit these changes
-/git-master rebase onto main
-/git-master who wrote this authentication code?
+/git commit these changes
+/git rebase onto main
+/git who wrote this authentication code?
 ```
 
 #### frontend Design Process
@@ -604,7 +604,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 #### The Maintainer (Quick Fixes)
 
 - **Category**: `quick`
-- **load_skills**: `["git-master"]`
+- **load_skills**: `["git"]`
 - **Effect**: Uses cost-effective models to quickly fix code and generate clean commits.
 
 ### task Prompt Guide
