@@ -1,68 +1,25 @@
 import { describe, expect, test } from "bun:test"
 
-import { DETACHED_CELL_WAITS, FINAL_RESULT, PROGRESS_NOTE, lifecycleSnapshot } from "../async-work.test-support"
+import { FINAL_RESULT } from "../async-work.test-support"
 import { createManualSettlementScheduler, flushSettlement } from "../rpc/turn-settlement.test-support"
-import {
-  createChildHandle,
-  type ChildSession,
-  type ChildSessionEvent,
-  type ChildSessionListener,
-  type RunnerOutcome,
-} from "./child-handle"
+import { assistantEnd, heldWorkSession } from "./__fixtures__/held-work-session"
+import { createChildHandle, type RunnerOutcome } from "./child-handle"
 
 const INTERVAL_MS = 1_000
 const STALE_LIMIT_MS = 5_000
 const STALE_CHECKS = 5
 
-function assistantEnd(text: string): ChildSessionEvent & { readonly text: string } {
-  return {
-    type: "message_end",
-    text,
-    message: { role: "assistant", content: [{ type: "text", text }], stopReason: "stop" },
-  }
-}
-
 /**
  * The in-process runner (the `auto` fallback) over a session that behaves like senpi's
- * AgentSession: `prompt()` resolves when the turn ends, `lifecycle` reports the work the session
- * still owns, and that work's completion starts a new engine turn on its own. Before omo#10487 this
- * runner settled every clean turn on `prompt()` resolution and never looked at the lifecycle.
+ * AgentSession (held-work-session.ts). Before omo#10487 this runner settled every clean turn on
+ * `prompt()` resolution and never looked at the lifecycle.
  */
 function harness() {
   const scheduler = createManualSettlementScheduler()
-  const listeners = new Set<ChildSessionListener>()
-  let waits: unknown = DETACHED_CELL_WAITS
-  let lastText: string | undefined
-  let endPrompt: (() => void) | undefined
-  const emit = (event: ChildSessionEvent & { readonly text?: string }): void => {
-    if (event.text !== undefined) lastText = event.text
-    for (const listener of [...listeners]) listener(event)
-  }
-  const session: ChildSession = {
-    sessionId: "child-10487",
-    get lifecycle() {
-      return lifecycleSnapshot(waits)
-    },
-    get isSessionBusy() {
-      return waits !== undefined
-    },
-    prompt: () =>
-      new Promise<void>((resolve) => {
-        endPrompt = resolve
-      }),
-    steer: async () => "handled",
-    followUp: async () => "handled",
-    abort: async () => {},
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    getLastAssistantText: () => lastText,
-    dispose: () => {},
-  }
+  const fake = heldWorkSession()
   const handle = createChildHandle({
     taskId: "st_10487_inproc",
-    session,
+    session: fake.session,
     promptText: "run the delayed eval, then answer FINAL-RESULT",
     asyncWork: { schedule: scheduler.scheduler, intervalMs: INTERVAL_MS, staleLimitMs: STALE_LIMIT_MS },
   })
@@ -73,18 +30,15 @@ function harness() {
   return {
     handle,
     scheduler,
-    emit,
+    emit: fake.emit,
     settled: () => settled,
-    setWaits: (next: unknown) => {
-      waits = next
-    },
+    setWaits: fake.setWaits,
     confirm: async () => {
       scheduler.runNext()
       await flushSettlement()
     },
     endTurnWithDetachedCell: async () => {
-      emit(assistantEnd(PROGRESS_NOTE))
-      endPrompt?.()
+      fake.endTurnWithDetachedCell()
       await flushSettlement()
     },
   }
