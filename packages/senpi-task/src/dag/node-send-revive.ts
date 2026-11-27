@@ -1,7 +1,6 @@
 // The take-over half of send (#15125): which record a send decides from, the run it acquires before
 // reviving a child of a settled run, the release when no revive happened, and the watcher that folds
 // a revived child's outcome (the write whose reducer gives the lease up).
-import { defaultSignaller } from "../lifecycle/context"
 import type { TaskRecord, TaskStatus } from "../state"
 import { dagNodeTransitionedEvent } from "./events"
 import type { DagRunRecordV1 } from "./manager"
@@ -14,6 +13,7 @@ import {
 } from "./node-control-context"
 import { persistDagNodeResult } from "./results"
 import { acquireDagRun, classifySend, dagRunEligibility, decideDagRun, type DagSendClass } from "./run-acquisition"
+import { holderProbeOf } from "./run-lease"
 import { reserveWhenFree } from "./run-reservations"
 import type { DagSchedulerOptions } from "./scheduler"
 import {
@@ -39,11 +39,7 @@ export function decideSend(options: DagSchedulerOptions, runId: DagRunId, nodeId
   const parentSessionId = options.initialRecord.parentSessionId
   const acquired = acquireDagRun<DagRunRecordV1>(options.store, runId, {
     operation: "send",
-    probe: {
-      taskManager: options.taskManager,
-      hostPid: options.hostPid ?? process.pid,
-      isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-    },
+    probe: holderProbeOf(options),
     ...(options.reservation === undefined ? {} : { reservation: options.reservation }),
     eligible: dagRunEligibility.send(parentSessionId, nodeId),
     leaseWhen: (fresh) => fresh.status === "failed",
@@ -76,11 +72,7 @@ export function steerRecordRefused(
   options: DagSchedulerOptions,
   nodeId: DagNodeId,
 ): (fresh: DagRunRecordV1) => boolean {
-  const probe = {
-    taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-  }
+  const probe = holderProbeOf(options)
   const eligible = dagRunEligibility.send(options.initialRecord.parentSessionId, nodeId)
   return (fresh) => decideDagRun(fresh, { probe, eligible }).kind !== "free"
 }

@@ -107,6 +107,7 @@ import {
 import { createHeldSend } from "./held-send"
 import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
+import { ownerProcessViewFor } from "../lifecycle/owner-process"
 import { defaultSignaller } from "../lifecycle/context"
 import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
 import { cancelBehindRefusedStop, RefusedStops } from "./refused-stops"
@@ -391,6 +392,7 @@ class TaskManagerImpl implements TaskManager {
             store: options.store,
             hostPid: this.#hostPid,
             isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+            ownerProcesses: ownerProcessViewFor(options.isProcessAlive, options.ownerProcesses),
             respawn: (paused, sessionPath) => this.respawn(paused, sessionPath, undefined, { paused: true }),
             reattach: (paused, handle) => this.reattach(paused, handle),
             liveHandle: (taskId) => this.#live.get(taskId)?.handle,

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto"
 import { addGuidance, changeGuidance, type Guidance } from "../pause/guidance"
 import type { DagRunRecordV1 } from "./manager"
-import { defaultSignaller } from "../lifecycle/context"
 import type { DagJournal } from "./journal"
 import { controlJournal, DagNodeControlError, ownedRecord } from "./node-control-context"
 import { dagRunEligibility, decideDagRun } from "./run-acquisition"
+import { holderProbeOf } from "./run-lease"
 import type { DagSchedulerOptions } from "./scheduler"
 import type { DagNodeId, DagRunEventPayload, DagRunId } from "./types"
 
@@ -58,11 +58,7 @@ export function appendWhileStopped(
   record: DagRunRecordV1,
   payload: DagRunEventPayload,
 ): DagJournal<DagRunRecordV1> {
-  const probe = {
-    taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-  }
+  const probe = holderProbeOf(options)
   const eligible = dagRunEligibility.stoppedWrite(record.pause?.pauseSeq)
   let refusal: DagNodeControlError | undefined
   const journal = controlJournal(options, record, undefined, (fresh) => {

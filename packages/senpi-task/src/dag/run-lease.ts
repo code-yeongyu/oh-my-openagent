@@ -1,8 +1,16 @@
 // Who holds a DAG run: the durable lease a scheduler records, and the evidence that stands in for it
 // on a checkpoint written before every scheduler recorded one.
+import { defaultSignaller } from "../lifecycle/context"
+import {
+  observeRecordOwners,
+  ownerProcessViewFor,
+  recordOwnerAlive,
+  type OwnerProcessView,
+} from "../lifecycle/owner-process"
 import { isTerminalRecord } from "../manager/manager-helpers"
 import type { TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
+import type { HostClaim } from "../state/record-types"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
 import { TERMINAL_DAG_RUN_STATUSES, type DagNode, type DagNodeId, type DagRunEvent, type DagRunId } from "./types"
@@ -11,10 +19,37 @@ export type DagRunHolderProbe = {
   readonly taskManager: Pick<TaskManager, "get" | "findOwnedTask">
   readonly hostPid: number
   readonly isProcessAlive: (pid: number) => boolean
+  // The start evidence a child's owner is judged by (the lifecycle's own `recordOwnerAlive`); absent,
+  // or never observed for the pid, the pid alone answers, as it does for a record with no stamp.
+  readonly ownerProcesses?: OwnerProcessView
 }
+
+/** A holder: a lease names a bare pid; a node's child names its owner with that owner's claim. */
+export type DagRunHolder = { readonly pid: number; readonly claim?: HostClaim }
 
 type LeasedRecord = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
 type LeaseStore = Pick<DagFileStore, "withRunLock" | "readCheckpoint" | "writeCheckpoint">
+type OwnerLivenessOptions = {
+  readonly isProcessAlive?: (pid: number) => boolean
+  readonly ownerProcesses?: OwnerProcessView
+}
+
+/**
+ * The one way a DAG caller judges a recorded owner: signal-0, and the start view the lifecycle uses
+ * (an injected probe without its own view learns nothing from the OS, exactly as in the lifecycle).
+ */
+export function ownerLiveness(options: OwnerLivenessOptions) {
+  return {
+    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+    ownerProcesses: ownerProcessViewFor(options.isProcessAlive, options.ownerProcesses),
+  }
+}
+
+export function holderProbeOf(
+  options: OwnerLivenessOptions & Pick<DagRunHolderProbe, "taskManager"> & { readonly hostPid?: number },
+): DagRunHolderProbe {
+  return { taskManager: options.taskManager, hostPid: options.hostPid ?? process.pid, ...ownerLiveness(options) }
+}
 
 function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
   return { kind: "dag" as const, runId: record.runId, nodeId }
@@ -34,33 +69,61 @@ export function currentNodeTask(
   )
 }
 
+// The unfinished current child of every active node: an ended child holds nothing even though its
+// resident record keeps the pid of the host that ran it.
+function activeChildren(probe: DagRunHolderProbe, record: DagRunRecordV1): TaskRecord[] {
+  return record.nodes.flatMap((node) => {
+    if (node.state !== "scheduled" && node.state !== "running") return []
+    const task = currentNodeTask(probe.taskManager, record, node)
+    return task === undefined || isTerminalRecord(task) ? [] : [task]
+  })
+}
+
 // A run checkpointed before schedulers recorded a lease names no holder, so the process that still
 // owns its active children stands in for it. Lifecycle reconcile runs first and takes over the
-// children of a dead owner, so a child still under a live foreign pid means that process runs it.
-// An ended child holds nothing even though its resident record keeps the pid of the host that ran it.
-function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): number | undefined {
-  for (const node of record.nodes) {
-    if (node.state !== "scheduled" && node.state !== "running") continue
-    const task = currentNodeTask(probe.taskManager, record, node)
-    if (task === undefined || isTerminalRecord(task)) continue
-    const owner = task.host_pid
-    if (owner !== undefined && owner !== probe.hostPid && probe.isProcessAlive(owner)) return owner
+// children of a dead owner, so a child still under a live foreign owner means that process runs it.
+// The owner is judged as the lifecycle judges it: a pid now held by a process whose start contradicts
+// the claim's stamp owns nothing, even while a reconcile that could not take the claim left it there.
+function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): DagRunHolder | undefined {
+  const view = probe.ownerProcesses ?? ownerProcessViewFor(probe.isProcessAlive, undefined)
+  for (const task of activeChildren(probe, record)) {
+    const pid = task.host_pid
+    if (pid === undefined || pid === probe.hostPid || !recordOwnerAlive(probe.isProcessAlive, view, task)) continue
+    return task.host_claim?.pid === pid && task.host_claim.start !== undefined
+      ? { pid, claim: task.host_claim }
+      : { pid }
   }
   return undefined
 }
 
 /**
+ * Reads the start of every stamped foreign owner of the record's active children, so the holder rule
+ * decided right after it can tell a reused pid from its owner. Every entry that can await calls it
+ * before deciding (recovery's claim, the controls, cancel, Stop); undefined when nothing needs reading.
+ */
+export function observeChildOwners(probe: DagRunHolderProbe, record: DagRunRecordV1 | null): Promise<void> | undefined {
+  if (record === null || probe.ownerProcesses === undefined) return undefined
+  return observeRecordOwners(probe.ownerProcesses, activeChildren(probe, record), probe.hostPid)
+}
+
+/**
  * The one answer to "who holds this run": its lease, else the host that paused it for shutdown and
  * may still be draining, else (for a record naming neither) the live owner of an active child. The
- * claim, the unheld cancel and the shutdown pause all ask this (#15125).
+ * claim, the unheld cancel and the shutdown pause all ask this (#15125). The lease and the previous
+ * holder are bare pids on the run record, with no start stamp, so a pid alone answers for them.
  */
-function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): number | undefined {
-  return record.leaseHolderPid ?? record.previousLeaseHolderPid ?? liveChildOwner(probe, record)
+function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): DagRunHolder | undefined {
+  const leased = record.leaseHolderPid ?? record.previousLeaseHolderPid
+  return leased === undefined ? liveChildOwner(probe, record) : { pid: leased }
+}
+
+export function liveForeignHolderOf(probe: DagRunHolderProbe, record: LeasedRecord): DagRunHolder | undefined {
+  const holder = runHolder(probe, record)
+  return holder !== undefined && holder.pid !== probe.hostPid && probe.isProcessAlive(holder.pid) ? holder : undefined
 }
 
 export function liveForeignHolder(probe: DagRunHolderProbe, record: LeasedRecord): number | undefined {
-  const holder = runHolder(probe, record)
-  return holder !== undefined && holder !== probe.hostPid && probe.isProcessAlive(holder) ? holder : undefined
+  return liveForeignHolderOf(probe, record)?.pid
 }
 
 export function releaseDagRunLease(store: LeaseStore, runId: DagRunId, hostPid: number): void {

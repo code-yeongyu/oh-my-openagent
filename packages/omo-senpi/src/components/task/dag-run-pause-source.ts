@@ -2,10 +2,10 @@ import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 import type { DagRecovery, InstalledDagRun } from "../../../../senpi-task/src/dag/recovery"
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunId } from "../../../../senpi-task/src/dag/types"
-import { controlJournal } from "../../../../senpi-task/src/dag/node-control-context"
+import { controlJournal, observeRunOwners } from "../../../../senpi-task/src/dag/node-control-context"
 import { appendWhileStopped } from "../../../../senpi-task/src/dag/paused-controls"
 import { dagRunEligibility, decideDagRun } from "../../../../senpi-task/src/dag/run-acquisition"
-import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
+import { holderProbeOf } from "../../../../senpi-task/src/dag/run-lease"
 import { dispatchGuidance } from "../../../../senpi-task/src/pause/guidance"
 import type { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
 import { RunPauseAdmissionHeld } from "../../../../senpi-task/src/manager/run-pause"
@@ -32,11 +32,7 @@ function stopUnderHolderRule(
   record: DagRunRecordV1,
   pauseSeq: number,
 ): number | undefined {
-  const probe = {
-    taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-  }
+  const probe = holderProbeOf(options)
   let refusedBy: number | undefined
   const journal = controlJournal({ ...options, initialRecord: record }, record, undefined, (fresh) => {
     const decision = decideDagRun(fresh, { probe, eligible: dagRunEligibility.userStop(pauseSeq) })
@@ -130,6 +126,8 @@ export function createDagRunPauseSource(ports: {
       try {
         const failure = retired.find((outcome) => outcome.status === "rejected")
         if (failure?.status === "rejected") throw failure.reason
+        const observing = records.flatMap((record) => observeRunOwners(ports.options(record), record.runId) ?? [])
+        if (observing.length > 0) await Promise.all(observing)
         stopRuns(ports, records, pauseSeq)
       } finally {
         for (const release of releases) release()
