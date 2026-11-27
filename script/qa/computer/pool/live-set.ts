@@ -77,7 +77,12 @@ export type SetSummary = { readonly line: string; readonly exitCode: number }
 export function summarizeSet(os: string, receipts: readonly ScenarioReceipt[], cores: number): SetSummary {
   const count = (kind: ScenarioOutcome["kind"]) => receipts.filter((receipt) => receipt.outcome.kind === kind).length
   const degraded = receipts.filter((receipt) => degradedPass(receipt, cores)).length
-  const hostLoad = receipts.reduce((max, receipt) => Math.max(max, receipt.hostLoad), 0)
+  // The highest load that was read: an unreadable (NaN) leg load is already DEGRADED on its own line and must not
+  // hide the real maximum (review L3 of #15142).
+  const hostLoad = receipts.reduce(
+    (max, receipt) => (Number.isFinite(receipt.hostLoad) ? Math.max(max, receipt.hostLoad) : max),
+    0,
+  )
   const passes = count("pass") - degraded
   const reasons = [
     ...new Set(

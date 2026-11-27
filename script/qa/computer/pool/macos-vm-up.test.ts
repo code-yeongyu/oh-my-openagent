@@ -112,5 +112,6 @@ describe("guest process pattern", () => {
     const pattern = new RegExp(guestProcessPattern("omo-cu-macos15-5"))
     expect(pattern.test(["/opt/hv/bin/vmctl", ...guestRunArgv("omo-cu-macos15-5")].join(" "))).toBe(true)
     expect(pattern.test(["/opt/hv/bin/vmctl", ...guestRunArgv("omo-cu-macos15-50")].join(" "))).toBe(false)
+    expect(pattern.test("/opt/hv/bin/vmctl run --no-graphics omo-cu-macos15-5")).toBe(true)
   })
 })

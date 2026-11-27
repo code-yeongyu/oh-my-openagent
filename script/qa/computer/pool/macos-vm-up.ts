@@ -5,9 +5,11 @@ import { GUEST_RUN_FLAGS, type GuestPlan } from "./macos-vm-plan.ts"
 export const UP_HOLD_TAG = "omo-pool-up-hold"
 
 // The pgrep -f pattern for a guest's live processes: an --up's hold, the clone that creates it and the run that boots
-// it (all end in its name). The run alternative is built from the same flags the --up spawn uses.
+// it (all end in its name). The run alternative is built from the same flags the --up spawn uses; the clipboard flag is
+// optional so a guest an earlier --up started with plain `run --no-graphics` is still counted (review L2 of #15142).
 export function guestProcessPattern(name: string): string {
-  return `(${UP_HOLD_TAG}|clone [^ ]+|${GUEST_RUN_FLAGS.join(" ")}) ${name}$`
+  const run = GUEST_RUN_FLAGS.filter((flag) => flag !== "--no-clipboard").join(" ")
+  return `(${UP_HOLD_TAG}|clone [^ ]+|${run}(?: --no-clipboard)?) ${name}$`
 }
 
 export type UpSteps = {

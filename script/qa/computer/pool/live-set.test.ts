@@ -99,6 +99,19 @@ describe("receipt lines", () => {
     )
   })
 
+  test("an unreadable leg load is degraded but does not hide the highest load that was read", () => {
+    expect(
+      summarizeSet(
+        "macos",
+        [
+          { ...pass, hostLoad: Number.NaN },
+          { ...pass, hostLoad: 3.5 },
+        ],
+        cores,
+      ).line,
+    ).toBe("SET macos pass=1 fail=0 blocked=0 degraded=1 hostLoad=3.5 cores=10 p99Ms=2500")
+  })
+
   test("a fail and a blocked scenario carry their measured duration on their lines too", () => {
     const blocked: ScenarioReceipt = {
       scenario: "off-space-capture",

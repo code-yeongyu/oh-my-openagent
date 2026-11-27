@@ -26,7 +26,7 @@ guests: one clone per macOS major per run, on a Mac compute host the lead places
    then one summary line, `SET macos pass=<n> fail=<n> blocked=<n> degraded=<n>[ reason=<reasons>] hostLoad=<max leg load> cores=<n> p99Ms=<n>`.
    Each scenario carries the host's 1-minute load sampled while it ran; a pass whose load exceeds the core count, or
    whose load is missing or not a number, reads `DEGRADED` on its line and counts in `degraded=`, never in `pass=`.
-   `hostLoad=` is the highest load any leg ran under. `p99Ms` is the nearest-rank p99 of the `durationMs` of the legs
+   `hostLoad=` is the highest load read for any leg (a leg whose load could not be read is degraded and left out of it). `p99Ms` is the nearest-rank p99 of the `durationMs` of the legs
    that ran (blocked legs are left out; the slowest one at today's set size). A set with a failure, or with no scenario at all, exits 1; a set where nothing passed (every scenario
    blocked) exits 3, and so does a set whose passes are all degraded, so a job never shows green while nothing green
    ran. Before the macOS backend exists every scenario reads `BLOCKED reason=backend_not_built`, which is the honest
