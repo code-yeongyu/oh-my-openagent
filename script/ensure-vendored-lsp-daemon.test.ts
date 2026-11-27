@@ -32,7 +32,9 @@ describe("ensureVendoredLspDaemonBuilt", () => {
     const built = await ensureVendoredLspDaemonBuilt({
       packageDir: import.meta.dir,
       exists: () => true,
-      runCommand: async () => { throw new Error("unexpected build") },
+      runCommand: async () => {
+        throw new Error("unexpected build")
+      },
     })
     expect(built).toBe(false)
   })

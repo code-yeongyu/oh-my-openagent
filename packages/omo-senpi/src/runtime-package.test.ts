@@ -116,7 +116,10 @@ describe("Senpi LSP daemon runtime staging", () => {
   test("#given changed source inputs #when freshness is checked #then stale inputs remain rejected", async () => {
     const fixture = await makeRuntimeFixture()
     await stageLspDaemonRuntime(fixture)
-    await writeText(join(fixture.repoRoot, "packages", "lsp-daemon", "src", "index.ts"), "export const changed = true\n")
+    await writeText(
+      join(fixture.repoRoot, "packages", "lsp-daemon", "src", "index.ts"),
+      "export const changed = true\n",
+    )
     await expect(checkRuntimeDistFresh(fixture)).rejects.toThrow("manifest is stale")
   })
 

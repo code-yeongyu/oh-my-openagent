@@ -195,7 +195,9 @@ async function validateRequiredOutputs(distDir, staged = false) {
 }
 
 function runtimeStale(reason) {
-  return new Error(`Senpi LSP runtime stale: ${reason}; run node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs`)
+  return new Error(
+    `Senpi LSP runtime stale: ${reason}; run node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs`,
+  )
 }
 
 async function listFiles(path) {
