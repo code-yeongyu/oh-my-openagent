@@ -8,7 +8,6 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { cleanupProjects } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { bounded, liveParentFixture } from "../lifecycle/__fixtures__/live-parent-fakes"
 import { cleanupProjects as cleanupManagers } from "../manager/__fixtures__/manager-fakes"
-import type { TaskManager } from "../manager/types"
 import {
   cleanupPendingRevivalRuns,
   finishRun,
@@ -23,12 +22,17 @@ import {
   seedStaleChildOfRemovedNode,
   attachedTask,
 } from "./__fixtures__/pending-revival-run"
+import {
+  journalEvent,
+  makeNotCurrent,
+  managerWith,
+  nodeFlag,
+  withUnconfirmedStop,
+} from "./__fixtures__/pending-revival-gate"
 import { runId } from "./__fixtures__/reattached-run"
-import { subscribeDagJournal } from "./journal"
 import { settled } from "../lifecycle/__fixtures__/deferred-revival-harness"
 import type { DagRunRecordV1 } from "./manager"
 import { isLiveTask } from "./scheduler-context"
-import type { DagFileStore } from "./store"
 import type { DagNodeId } from "./types"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
@@ -45,63 +49,6 @@ afterEach(() => {
 })
 
 const WAITING = ["k-hang:running", "k-after:pending"]
-
-/** The real manager with some of its methods replaced. */
-function managerWith(manager: TaskManager, overrides: Partial<TaskManager>): TaskManager {
-  return new Proxy(manager, {
-    get(target, property) {
-      const override: unknown = Reflect.get(overrides, property)
-      if (override !== undefined) return override
-      const value: unknown = Reflect.get(target, property, target)
-      return typeof value === "function" ? value.bind(target) : value
-    },
-  })
-}
-
-/** The real manager, except that a stop of `unconfirmed` is answered cancel_pending and changes nothing. */
-function withUnconfirmedStop(manager: TaskManager, unconfirmed: string): TaskManager {
-  return managerWith(manager, {
-    cancelTask: (taskId, ...rest) =>
-      taskId === unconfirmed
-        ? Promise.resolve({
-            kind: "cancel_pending" as const,
-            task_id: taskId,
-            previous_status: "running" as const,
-            reason: "child unreachable",
-          })
-        : manager.cancelTask(taskId, ...rest),
-  })
-}
-
-/** The message of the next node flag journaled for `nodeId`, subscribed before the action. */
-function nodeFlag(store: DagFileStore, nodeId: string): Promise<string> {
-  const seen = Promise.withResolvers<string>()
-  const stop = subscribeDagJournal(store, runId, (event) => {
-    if (event.type !== "dag.diagnostic.added" || event.diagnostic.kind !== "node_flag") return
-    if (event.diagnostic.nodeId !== nodeId) return
-    stop()
-    seen.resolve(event.diagnostic.message)
-  })
-  return seen.promise
-}
-
-/** Resolves on the run's next journal event of `type`, subscribed before the action. */
-function journalEvent(store: DagFileStore, type: string): Promise<undefined> {
-  const seen = Promise.withResolvers<undefined>()
-  const stop = subscribeDagJournal(store, runId, (event) => {
-    if (event.type !== type) return
-    stop()
-    seen.resolve(undefined)
-  })
-  return seen.promise
-}
-
-/** Makes the node's own child a stale attempt of its node (its owner names an earlier attempt). */
-function makeNotCurrent(f: ReturnType<typeof liveParentFixture>, taskId: string): void {
-  f.store.mutate(taskId, (record) =>
-    record.owner === undefined ? record : { ...record, owner: { ...record.owner, execAttempt: -1 } },
-  )
-}
 
 describe("the child gate on a waiting node's revived child (#15150, stack review 1)", () => {
   test("#given a live child of a node the run no longer has #when the waiting node's child is revived #then the stale child is stopped and the node follows its own child to completion", async () => {
