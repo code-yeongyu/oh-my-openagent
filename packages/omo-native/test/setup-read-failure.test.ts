@@ -103,6 +103,22 @@ for (const [name, binary] of runtimes) {
       expect(result.notices).toContain("WARN opencode: could not parse auth.json: not valid JSON")
     })
 
+    // A JSONC parse error is reported at the line and column of the file the user wrote, not of the
+    // comment-stripped copy the second parse reads (V8 reports a position; JavaScriptCore does not).
+    test.skipIf(name !== "node")(
+      "#given an opencode.jsonc with comments and an error after them #when setup scans #then the position points into the user's file",
+      () => {
+        const line = '{ /* a comment that would shift the column */ "mcp": {} "x": 1 }'
+        const result = scan(binary, [[".config/opencode/opencode.jsonc", `// header\n${line}`]])
+        const column = line.indexOf('"x"') + 1
+        expect(
+          result.notices.some((notice) =>
+            notice.includes(`opencode.jsonc: not valid JSON at line 2 column ${column};`),
+          ),
+        ).toBe(true)
+      },
+    )
+
     test("#given a valid credential beside a malformed config #when setup scans #then the credential is still planned and its value never shown", () => {
       const auth = JSON.stringify({ openai: { type: "api", key: VALID_KEY } })
       const result = scan(binary, [
@@ -157,6 +173,22 @@ describe("setup model-choice failures", () => {
     applyModelChoices({ items: [item] }, { report: (line: string) => reports.push(line) })
     expect(reports).toEqual([
       `WARN senpi: could not edit ${path} safely (not valid JSON); these model choices were not written: category demo`,
+    ])
+  })
+  test("#given a target the edit refuses for its own reason #when model choices are applied #then the warning shows that reason", () => {
+    const path = join(tmpdir(), "omo-read-failure-never-written.jsonc")
+    const reports: string[] = []
+    const target = { path, text: '{ "[senpi]": { "categories": { "demo": {} } } }', document: {} }
+    const item = {
+      state: "pending",
+      label: "category demo",
+      target,
+      path: ["[senpi]", "categories"],
+      members: [["demo", {}]],
+    }
+    applyModelChoices({ items: [item] }, { report: (line: string) => reports.push(line) })
+    expect(reports).toEqual([
+      `WARN senpi: could not edit ${path} safely ([senpi].categories.demo already exists); these model choices were not written: category demo`,
     ])
   })
 })
