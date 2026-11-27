@@ -44,3 +44,26 @@ export async function runAll(
   print(setLine({ pass, fail, blocked }))
   return { pass, fail, blocked, exitCode: fail > 0 ? 1 : 0 }
 }
+
+/**
+ * The QA job's gate over --all's output (R70br(3)): exactly one SET line, at least one scenario that
+ * ran and passed, no failure, and every block a named precondition counted in the SET line. Answers
+ * the problems; empty means green.
+ */
+export function gateSet(lines: readonly string[]): string[] {
+  const sets = lines.filter((line) => line.startsWith("SET windows "))
+  if (sets.length !== 1) return [`expected one SET windows line, found ${sets.length}`]
+  const match = /^SET windows pass=(\d+) fail=(\d+) blocked=(\d+)$/.exec(sets[0] ?? "")
+  if (match === null) return [`unreadable SET line: ${sets[0]}`]
+  const [pass, fail, blocked] = [Number(match[1]), Number(match[2]), Number(match[3])]
+  const problems: string[] = []
+  if (pass < 1) problems.push("pass=0: no scenario ran and passed")
+  if (fail !== 0) problems.push(`fail=${fail}`)
+  const blocks = lines.filter((line) => line.startsWith("BLOCKED "))
+  for (const block of blocks) {
+    // 'BLOCKED <name> <reason>': the reason is everything after the name, and blank is none (review L1 of #13443).
+    if (block.split(" ").slice(2).join(" ").trim() === "") problems.push(`${block} names no reason`)
+  }
+  if (blocks.length !== blocked) problems.push(`blocked=${blocked} but ${blocks.length} BLOCKED lines`)
+  return problems
+}

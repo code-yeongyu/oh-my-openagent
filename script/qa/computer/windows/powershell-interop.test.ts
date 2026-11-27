@@ -13,8 +13,24 @@ function wideImportsWithoutUnicode(source: string): string[] {
   const missing: string[] = []
   // Every import: its method name, its EntryPoint and its parameter list decide whether it is wide
   // (a ...W method or entry point) or marshals a string (string / StringBuilder parameter).
-  for (const match of source.matchAll(/\[DllImport\(([^\]]*)\)\][^;(]*?\b(\w+)\s*\(([^)]*)\)/g)) {
-    const [, attributes = "", name = "", parameters = ""] = match
+  // The method is the name before the first '(' after 'extern' (a [return: ...] attribute comes
+  // before it), and its parameter list is read with balanced parentheses (a parameter may carry
+  // its own [MarshalAs(...)] attribute).
+  for (const match of source.matchAll(/\[DllImport\(([^\]]*)\)\]/g)) {
+    const attributes = match[1] ?? ""
+    const rest = source.slice((match.index ?? 0) + match[0].length)
+    const method = /\bextern\b[^(;]*?\b(\w+)\s*\(/.exec(rest)
+    if (method === null) continue
+    const name = method[1] ?? ""
+    const open = method.index + method[0].length
+    let depth = 1
+    let end = open
+    while (end < rest.length && depth > 0) {
+      if (rest[end] === "(") depth += 1
+      else if (rest[end] === ")") depth -= 1
+      end += 1
+    }
+    const parameters = rest.slice(open, end - 1)
     const entryPoint = /EntryPoint\s*=\s*"(\w+)"/.exec(attributes)?.[1] ?? ""
     const wide = name.endsWith("W") || entryPoint.endsWith("W")
     const marshalsString = /\b(string|StringBuilder)\b/.test(parameters)
@@ -61,6 +77,26 @@ describe("Windows QA PowerShell interop", () => {
     expect(
       wideImportsWithoutUnicode(
         '[DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetClassNameW")] public static extern int ClassName(IntPtr h, StringBuilder name, int n);',
+      ),
+    ).toEqual([])
+  })
+
+  // Review L1 (#13348 at 7f5cb94cf0): an attribute between the import and the method, and an
+  // attribute inside the parameter list, must not hide the import or a later string parameter.
+  test("the check reads past a [return: ...] attribute and past an attribute inside the parameter list", () => {
+    expect(
+      wideImportsWithoutUnicode(
+        '[DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool GetUserObjectInformationW(IntPtr o, int i, StringBuilder s, int l, out int n);',
+      ),
+    ).toEqual(["GetUserObjectInformationW"])
+    expect(
+      wideImportsWithoutUnicode(
+        '[DllImport("user32.dll")] public static extern int GetClassName([MarshalAs(UnmanagedType.SysInt)] IntPtr h, StringBuilder name, int n);',
+      ),
+    ).toEqual(["GetClassName"])
+    expect(
+      wideImportsWithoutUnicode(
+        '[DllImport("user32.dll", CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool GetWindowTextW([MarshalAs(UnmanagedType.SysInt)] IntPtr h, StringBuilder s, int n);',
       ),
     ).toEqual([])
   })
