@@ -25,6 +25,11 @@ export type DeliveryConsumerOptions = {
   readonly wake: (durableId: string) => Promise<void>
   /** A tracked step that failed (a wake, an answer, a held reply): reported here, never left as an unhandled rejection. */
   readonly onError?: (error: unknown) => void
+  /**
+   * Arms the one timer at the earliest deadline of an intake row still queued here (#14266), which runs the drained
+   * report then; answers its cancel. Absent, nothing is armed and only the report's other callers settle expired rows.
+   */
+  readonly schedule?: (run: () => void, ms: number) => () => void
 }
 
 export type DeliveryConsumer = {
@@ -119,6 +124,94 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
    * The reply is the engine's RPC response envelope, as the live path answers the same record (A5 addendum 2).
    * `unknown_delivery`: the service no longer waits on this pair; the row stays and the wake goes on (A5.1).
    */
+  /**
+   * #14266: an intake row is left to its session's own reconcile, which first checks whether the delivery reached the
+   * transcript live (gateway retention skips intake rows, #14466). A session this device never woke never reconciles,
+   * so past its deadline the row is settled here exactly as a receipt query settles it: applied when the transcript
+   * holds it, else refused `expired`, which the refusal notices then tell its sender. The timer is then armed for the
+   * earliest deadline of the intake rows still queued.
+   */
+  let cancelDeadline: (() => void) | undefined
+  const settleExpiredIntake = async (): Promise<void> => {
+    const now = store.now()
+    let next = Number.POSITIVE_INFINITY
+    for (const session of await store.intakeMarks.openSessions()) {
+      let sessionPath: string | undefined
+      let resolved = false
+      for (const row of await store.list({ target_durable_id: session.durable_id })) {
+        if (row.state !== "queued" || row.ledger_id?.startsWith(`${row.sender}/`) !== true) continue
+        if (row.expires_at > now) {
+          next = Math.min(next, row.expires_at)
+          continue
+        }
+        if (!resolved) {
+          const target = resolveWakeTarget(options.sessionsDirectory, session.durable_id)
+          sessionPath = target.kind === "found" ? target.session_path : undefined
+          resolved = true
+        }
+        await store.receiptOutcome({
+          now,
+          principal: row.sender,
+          delivery_id: row.ledger_id.slice(row.sender.length + 1),
+          target_durable_id: session.durable_id,
+          ...(sessionPath === undefined ? {} : { session_path: sessionPath }),
+        })
+      }
+    }
+    cancelDeadline?.()
+    cancelDeadline = undefined
+    if (options.schedule === undefined || !serving || next === Number.POSITIVE_INFINITY) return
+    cancelDeadline = options.schedule(
+      () => {
+        cancelDeadline = undefined
+        track(reportDrained())
+      },
+      Math.max(next - store.now(), 0),
+    )
+  }
+
+  const reportDrained = async (): Promise<void> => {
+    await settleExpiredIntake()
+    // The refusal notices are best-effort and each may wait on a slow peer, so they run beside the drained report,
+    // never ahead of it: startup and the service's marks do not wait on another device (#14623 review M3).
+    const send = port.notice
+    if (send !== undefined)
+      track(
+        (async () => {
+          for (const notice of await store.refusalNotices(store.now())) {
+            if (!(await port.peerAdmitted(notice.device))) {
+              await store.claimRefusalNotice({ now: store.now(), notice, suppress: true })
+              continue
+            }
+            if (!(await store.claimRefusalNotice({ now: store.now(), notice }))) continue
+            if (!(await port.peerAdmitted(notice.device))) continue
+            await send(notice).catch((error: unknown) => options.onError?.(error))
+          }
+        })(),
+      )
+    if (!marksKept) return
+    for (const pair of await store.intakeMarks.marked()) {
+      const result = await store.intakeMarks.drained(pair)
+      if (!result.drained) continue
+      try {
+        const reply = await port.drained({ ...pair, last_command_id: result.last_command_id })
+        if (
+          reply.kept &&
+          !(await store.intakeMarks.openForCommand({
+            sender_device: pair.sender_device,
+            command_id: reply.expecting,
+          }))
+        )
+          await port.drained({ ...pair, last_command_id: reply.expecting })
+      } catch (error) {
+        if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) {
+          marksKept = false
+          return
+        }
+      }
+    }
+  }
+
   const answer = async (
     pair: { readonly sender_device: string; readonly command_id: string },
     reply: Record<string, unknown>,
@@ -246,6 +339,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       waiting_on: (await store.sessionWait.waitingOn({ durable_id: event.durable_id })) ?? { kind: "wake" },
     })
     track(settleAfterAnswer(event, outcome.row_id))
+    if (!outcome.deduplicated) track(settleExpiredIntake())
   }
 
   const reportPending = async (): Promise<void> => {
@@ -294,48 +388,10 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       }
       serving = true
       await reportPending()
+      track(settleExpiredIntake())
       return "serving"
     },
-    reportDrained: async () => {
-      // The refusal notices are best-effort and each may wait on a slow peer, so they run beside the drained report,
-      // never ahead of it: startup and the service's marks do not wait on another device (#14623 review M3).
-      const send = port.notice
-      if (send !== undefined)
-        track(
-          (async () => {
-            for (const notice of await store.refusalNotices(store.now())) {
-              if (!(await port.peerAdmitted(notice.device))) {
-                await store.claimRefusalNotice({ now: store.now(), notice, suppress: true })
-                continue
-              }
-              if (!(await store.claimRefusalNotice({ now: store.now(), notice }))) continue
-              if (!(await port.peerAdmitted(notice.device))) continue
-              await send(notice).catch((error: unknown) => options.onError?.(error))
-            }
-          })(),
-        )
-      if (!marksKept) return
-      for (const pair of await store.intakeMarks.marked()) {
-        const result = await store.intakeMarks.drained(pair)
-        if (!result.drained) continue
-        try {
-          const reply = await port.drained({ ...pair, last_command_id: result.last_command_id })
-          if (
-            reply.kept &&
-            !(await store.intakeMarks.openForCommand({
-              sender_device: pair.sender_device,
-              command_id: reply.expecting,
-            }))
-          )
-            await port.drained({ ...pair, last_command_id: reply.expecting })
-        } catch (error) {
-          if (UNKNOWN_SHAPE.has(refusalCode(error) ?? "")) {
-            marksKept = false
-            return
-          }
-        }
-      }
-    },
+    reportDrained,
     idle: async () => {
       while (follow.size > 0) await Promise.allSettled([...follow])
     },
@@ -343,6 +399,8 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       for (const off of unsubscribe) off()
       unsubscribe = []
       serving = false
+      cancelDeadline?.()
+      cancelDeadline = undefined
     },
   }
 }

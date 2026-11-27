@@ -19,6 +19,8 @@ export type ConsumerStartInput = {
   readonly chainCountLimit: (cwd: string) => Promise<number | undefined>
   /** `session_wake.same_device`, read per swept session for ITS own cwd (its project's configuration). */
   readonly sameDevice: (cwd?: string) => boolean
+  /** The consumer's deadline timer for the intake rows it holds (`consumer.ts` `schedule`, #14266). */
+  readonly schedule?: (run: () => void, ms: number) => () => void
   /** The consumer had a port and died (its start failed, or its serving connection ended): it may be started again. */
   readonly onDied?: () => void
   readonly log: (line: string) => void
@@ -58,6 +60,7 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
     sessionsDirectory: input.sessionsDirectory,
     chainCountLimit: input.chainCountLimit,
     wake: input.wake,
+    ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
   })
   input.onConsumer?.(consumer)
   let started: ConsumerStart

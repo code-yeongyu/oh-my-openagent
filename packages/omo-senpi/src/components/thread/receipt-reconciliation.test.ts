@@ -9,7 +9,12 @@ import { createFakeDeliveryService } from "./consumer/testing/fake-delivery-serv
 import { writeSessionFile } from "./wake/testing/fake-wake-host"
 import type { JsonObject, RemoteThreadSurface } from "./remote/ports"
 
-async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
+type Timer = { readonly run: () => void; readonly ms: number; cancelled: boolean }
+
+async function setup(
+  noticeMode: "deliver" | "drop" | "duplicate" = "deliver",
+  options: { readonly timers?: Timer[] } = {},
+) {
   const h = createGatewayHarness()
   const f = createRemoteThreadFixture()
   const store = h.store()
@@ -64,6 +69,17 @@ async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
     wake: async () => {
       counts.wakes++
     },
+    ...(options.timers === undefined
+      ? {}
+      : {
+          schedule: (run: () => void, ms: number) => {
+            const timer: Timer = { run, ms, cancelled: false }
+            options.timers?.push(timer)
+            return () => {
+              timer.cancelled = true
+            }
+          },
+        }),
   })
   await consumer.start()
   const account = f.account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
@@ -460,6 +476,99 @@ test.each([86_399_999, 86_400_000])(
       expect(held?.result.outcome).toEqual(due ? { kind: "refused", reason: "expired" } : undefined)
       expect(x.runtime.enqueueCalls).toHaveLength(0)
       expect(x.counts).toEqual({ forward: 1, reverse: due ? 1 : 0, wakes: 1, queries: 0 })
+    } finally {
+      await x.cleanup()
+    }
+  },
+)
+
+test("the holder's own timer reports a never-woken delivery at its deadline, with no other drained report", async () => {
+  const timers: Timer[] = []
+  const x = await setup("deliver", { timers })
+  try {
+    setSystemTime(x.h.clock.now)
+    const first = await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+    if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+      throw new Error("send did not return a delivery id")
+    await x.consumer.idle()
+    const armed = timers.filter((timer) => !timer.cancelled)
+    expect(armed.map((timer) => timer.ms)).toEqual([86_400_000])
+    x.h.clock.now += 86_400_000
+    setSystemTime(x.h.clock.now)
+    armed[0]?.run()
+    await x.consumer.idle()
+    await x.noticesSettled()
+    const held = await x.sender.store.remoteReceipt({
+      now: x.sender.store.now(),
+      principal: "session:dur-caller",
+      delivery_id: first.delivery_id,
+    })
+    expect(held?.result.outcome).toEqual({ kind: "refused", reason: "expired" })
+    // Nothing is left queued, so nothing is armed again.
+    expect(timers.filter((timer) => !timer.cancelled && timer !== armed[0])).toEqual([])
+    expect(x.counts).toEqual({ forward: 1, reverse: 1, wakes: 1, queries: 0 })
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a holder that wakes the session late but before the deadline delivers once, and nothing is reported expired", async () => {
+  const x = await setup()
+  try {
+    setSystemTime(x.h.clock.now)
+    const args = { thread: "dur-on-b", message: "one", idempotency_key: "k" }
+    const first = await x.sender.run("thread_send", args)
+    if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+      throw new Error("send did not return a delivery id")
+    const ledgerId = `device:a/${first.delivery_id}`
+    x.h.clock.now += 86_399_999
+    setSystemTime(x.h.clock.now)
+    await x.drain.drain({ reason: "command" })
+    x.runtime.endTurn()
+    x.h.clock.now += 1
+    setSystemTime(x.h.clock.now)
+    await x.consumer.reportDrained()
+    await x.noticesSettled()
+    expect(x.runtime.enqueueCount(ledgerId)).toBe(1)
+    expect(x.runtime.transcriptEntries(ledgerId)).toBe(1)
+    expect(await x.sender.run("thread_send", args)).toMatchObject({ outcome: { kind: "applied" } })
+    expect(x.counts).toEqual({ forward: 1, reverse: 0, wakes: 1, queries: 1 })
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test.each(["settled first", "woken first"] as const)(
+  "a holder that wakes the session after the deadline delivers nothing the sender was told expired (%s)",
+  async (order) => {
+    const x = await setup()
+    try {
+      setSystemTime(x.h.clock.now)
+      const args = { thread: "dur-on-b", message: "one", idempotency_key: "k" }
+      const first = await x.sender.run("thread_send", args)
+      if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+        throw new Error("send did not return a delivery id")
+      x.h.clock.now += 86_400_000
+      setSystemTime(x.h.clock.now)
+      if (order === "settled first") {
+        await x.consumer.reportDrained()
+        await x.drain.drain({ reason: "command" })
+      } else {
+        await x.drain.drain({ reason: "command" })
+        await x.consumer.reportDrained()
+      }
+      await x.noticesSettled()
+      expect(x.runtime.enqueueCalls).toHaveLength(0)
+      expect(await x.store.list({ target_durable_id: "dur-on-b" })).toMatchObject([
+        { state: "refused", reason: "expired" },
+      ])
+      const held = await x.sender.store.remoteReceipt({
+        now: x.sender.store.now(),
+        principal: "session:dur-caller",
+        delivery_id: first.delivery_id,
+      })
+      expect(held?.result.outcome).toEqual({ kind: "refused", reason: "expired" })
+      expect(x.counts).toEqual({ forward: 1, reverse: 1, wakes: 1, queries: 0 })
     } finally {
       await x.cleanup()
     }
