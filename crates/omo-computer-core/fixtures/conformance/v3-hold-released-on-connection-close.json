@@ -96,7 +96,7 @@
                   "stale": false
                 }
               },
-              "resumeToken": "b54de0eca8a2c60a17c154fa5e6578d6"
+              "resumeToken": "per-process-random"
             }
           },
           "variable": [
@@ -367,7 +367,7 @@
                   "stale": false
                 }
               },
-              "resumeToken": "b54de0eca8a2c60a17c154fa5e6578d6"
+              "resumeToken": "per-process-random"
             }
           },
           "variable": [
