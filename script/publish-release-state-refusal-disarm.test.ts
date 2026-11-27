@@ -96,6 +96,8 @@ function run(input: Case): Outcome {
       ENABLE_FAILS: input.enableFails ? "1" : "",
       RELEASE_BRANCH: "release/v9.9.9-source-state",
       RELEASE_REF: input.releaseRef ?? "dev",
+      // The merge wait's poll count (120 in a release); a few polls reach its timeout branch the same way.
+      RELEASE_STATE_MERGE_WAIT_ATTEMPTS: "3",
       VERSION: "9.9.9",
       GITHUB_OUTPUT: join(root, "output"),
       GITHUB_REPOSITORY: "code-yeongyu/oh-my-openagent",

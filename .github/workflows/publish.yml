@@ -1225,7 +1225,10 @@ jobs:
 
           enable_release_auto_merge
 
-          for attempt in $(seq 1 120); do
+          # 120 polls x 30 s = 60 minutes. The release-state test sets a few, so its timeout case does not run all 120
+          # polls through its gh/jq stubs (over 30 s on Windows Git Bash, #15231).
+          MERGE_WAIT_ATTEMPTS="${RELEASE_STATE_MERGE_WAIT_ATTEMPTS:-120}"
+          for attempt in $(seq 1 "$MERGE_WAIT_ATTEMPTS"); do
             PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
               release_pr_settled=true
