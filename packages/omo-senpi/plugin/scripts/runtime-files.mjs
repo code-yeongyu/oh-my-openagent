@@ -14,7 +14,7 @@ export const SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
     lazy: false,
-    ceiling: 612_302,
+    ceiling: 612_539,
     staticSet: "omo-sdk-static-modules.json",
     packages: ["jsonc-parser", "typebox", "zod"],
   },

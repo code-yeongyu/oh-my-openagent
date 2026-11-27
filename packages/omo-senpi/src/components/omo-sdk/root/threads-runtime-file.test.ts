@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 import { UNEXPECTED_LOG_UNWRITTEN, unexpectedLogNamed } from "../unexpected-port"
 import { RUNTIME_STAMP } from "../runtime-stamp"
-import { CORE_CALLS, RUNTIME_FILE_MISMATCH, RUNTIME_FILE_UNAVAILABLE, type ThreadsRuntime } from "./thread-runtime-file"
+import { OMO_CODE_REGISTRY } from "../contract/codes"
+import {
+  CORE_CALLS,
+  RUNTIME_FILE_MISMATCH,
+  RUNTIME_FILE_UNAVAILABLE,
+  type threadCoreAccess,
+  type ThreadsRuntime,
+} from "./thread-runtime-file"
 import { ROOT_DISPOSED } from "./assemble"
 import { threadsNamespace } from "./threads"
 
@@ -488,6 +495,57 @@ describe("a dispose that races the first thread call", () => {
     expect(callbacks.filter((prefix) => /\bawait\b|\.then\(/.test(prefix))).toEqual([])
   })
 
+  // Architecture contract (the design lane's ruling on use()'s outcome): the core's own refusals are error-kind like the
+  // root's, so no member may read a field of what use() answered without first narrowing on `ran`. A member hands the
+  // core's answer on unchanged only as the whole expression it returns, `answered(await use(...))`; a member that
+  // inspects the answer keeps the outcome in a const whose first read is `.ran`.
+  test("#given the threads namespace source #then no member reads the core's answer off use() without narrowing on ran", async () => {
+    const source = await Bun.file(new URL("./threads.ts", import.meta.url)).text()
+    const closing = (from: number): number => {
+      let depth = 0
+      for (let index = from; index < source.length; index += 1) {
+        if (source[index] === "(") depth += 1
+        if (source[index] === ")" && --depth === 0) return index
+      }
+      return -1
+    }
+    const misuses: string[] = []
+    const handedOn = [...source.matchAll(/\banswered\(\s*await use\(/g)]
+    for (const match of handedOn) {
+      const start = match.index ?? 0
+      const before = source.slice(0, start).trimEnd()
+      const after = source.slice(closing(start + "answered".length) + 1).trimStart()
+      if (!/(?:\breturn|=>|\?\?)$/.test(before)) misuses.push(`answered() not returned whole at ${start}`)
+      if (!/^[),;}]/.test(after)) misuses.push(`a field read off answered() at ${start}`)
+    }
+    const kept = [...source.matchAll(/\bconst (\w+) = await use\(/g)]
+    for (const match of kept) {
+      const name = match[1] ?? ""
+      const rest = source.slice(closing((match.index ?? 0) + match[0].length - 1) + 1)
+      const firstRead = rest.match(new RegExp(`\\b${name}\\.(\\w+)`))?.[1]
+      if (firstRead !== "ran") misuses.push(`${name} read as .${firstRead} before .ran`)
+      if (new RegExp(`\\b${name}\\s+as\\b`).test(rest)) misuses.push(`${name} cast, which skips the narrowing`)
+    }
+    const uses = source.match(/\buse\(async/g)?.length ?? 0
+    expect({ uses, accounted: handedOn.length + kept.length, misuses }).toEqual({
+      uses,
+      accounted: uses,
+      misuses: [],
+    })
+  })
+
+  // The compile-time half of the same contract: the outcome has none of an answer's keys at its top level, and the
+  // core's answer is reachable only on the branch where the core ran. A change that breaks it fails the typecheck.
+  test("#given use()'s outcome type #then an answer's keys are not on it and its value exists only where the core ran", () => {
+    type Outcome = Awaited<ReturnType<ReturnType<typeof threadCoreAccess>["use"]>>
+    const noAnswerKeys: [Extract<keyof Outcome, "kind" | "error" | "value">] extends [never] ? true : never = true
+    const refusedHasNoValue: Extract<Outcome, { readonly ran: false }> extends { readonly value: unknown }
+      ? never
+      : true = true
+    const ranHasValue: "value" extends keyof Extract<Outcome, { readonly ran: true }> ? true : never = true
+    expect([noAnswerKeys, refusedHasNoValue, ranHasValue]).toEqual([true, true, true])
+  })
+
   test("#given the dispose matrix #then it covers 16 cells: every outcome before and during the load, every construction outcome during construction, and a ready core", () => {
     const cells = Object.entries(OUTCOMES).flatMap(([outcome, { stage }]) =>
       MOMENTS.filter((moment) => exists(stage, moment, outcome)),
@@ -740,4 +798,69 @@ describe("an operation of a built core that throws keeps P1b's boundaries", () =
       },
     })
   })
+})
+
+// The design lane's ruling on use()'s outcome, behaviour half (t72y's acceptance): for every member the namespace serves,
+// a core that ran and answered an error-kind refusal is answered as that core refusal (in the root's shape), and a
+// refusal of the root (dispose began) is answered as the root's own, with no core method called.
+describe("a core's refusal and the root's refusal are told apart for every member", () => {
+  const THREAD_REFUSAL = { kind: "error", error: { code: "not_found", message: "no such row", next_action: "list it" } }
+  const STORE_REFUSAL = { kind: "error", code: "extension_unknown_name", message: "no such extension" }
+  const refusingRuntime = (calls: string[]): ThreadsRuntime => ({
+    ...runtimeWith(() => THREAD_REFUSAL),
+    createThreadCore: (() => {
+      const refuse = (name: string, answer: unknown) => async () => {
+        calls.push(name)
+        return answer
+      }
+      return fullCore({
+        ...Object.fromEntries(CORE_CALLS.map((name) => [name, refuse(name, THREAD_REFUSAL)])),
+        extensions: {
+          register: refuse("extensions.register", STORE_REFUSAL),
+          call: refuse("extensions.call", STORE_REFUSAL),
+        },
+        dispose: async () => undefined,
+      })
+    }) as unknown as ThreadsRuntime["createThreadCore"],
+  })
+  // What each member answers for a core refusal: the thread members pass the core's failure on in the root's shape, the
+  // store-extension members map the store's code, and the warm reports whatever the core's warm answered.
+  const coreRefusalAnswer = (member: string): unknown => {
+    if (member === "daemon.warm") return { kind: "ok", value: THREAD_REFUSAL }
+    if (member.startsWith("threads.extensions."))
+      return {
+        kind: "error",
+        error: {
+          code: "not_found",
+          message: STORE_REFUSAL.message,
+          next_action: OMO_CODE_REGISTRY.not_found.next_action,
+          details: { code: STORE_REFUSAL.code },
+        },
+      }
+    return THREAD_REFUSAL
+  }
+  const members = Object.keys(namespace(() => Promise.resolve(refusingRuntime([]))).members)
+
+  test("#given the members the namespace serves #then the pair below covers every one of them", () => {
+    expect(members.length).toBe(13)
+  })
+
+  for (const member of members) {
+    test(`#given a core that ran and refused #when ${member} runs #then it answers the core's refusal`, async () => {
+      const calls: string[] = []
+      const answer = await callMember(
+        namespace(() => Promise.resolve(refusingRuntime(calls))),
+        member,
+      )(MEMBER_INPUTS[member] ?? {})
+      expect({ answer, called: calls.length }).toEqual({ answer: coreRefusalAnswer(member), called: 1 })
+    })
+
+    test(`#given dispose began before the call #when ${member} runs #then it answers the root's refusal and no core method runs`, async () => {
+      const calls: string[] = []
+      const served = namespace(() => Promise.resolve(refusingRuntime(calls)))
+      served.disposing?.()
+      const answer = await callMember(served, member)(MEMBER_INPUTS[member] ?? {})
+      expect({ answer, calls }).toEqual({ answer: { kind: "error", error: ROOT_DISPOSED }, calls: [] })
+    })
+  }
 })

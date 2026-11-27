@@ -98,6 +98,15 @@ const importThreadsRuntime = (): Promise<ThreadsRuntime> => import("#omo-sdk-thr
 export const isFailure = (value: object): value is OmoFailure => (value as { readonly kind?: unknown }).kind === "error"
 
 /**
+ * What `use` answers: the root refused and the core never ran, or the core ran and answered (whatever kind its answer
+ * is). Only `use` builds one, so no answer of the core can pass for the root's refusal or the other way round.
+ */
+type CoreOutcome<R> = { readonly ran: false; readonly refusal: OmoFailure } | { readonly ran: true; readonly value: R }
+
+/** For a member that hands the core's answer on unchanged: its return expression, never a value it inspects. */
+export const answered = <R>(outcome: CoreOutcome<R>): R | OmoFailure => (outcome.ran ? outcome.value : outcome.refusal)
+
+/**
  * The thread core of one threads namespace, reached on ONE path (review 6076881626, the design lane's ruling): `acquire`
  * loads the file, checks it, builds the core with `construct` and checks the core; the pending creation is assigned before
  * any await, so `dispose` waits for it and disposes what it built, and a creation that resumes after a dispose builds
@@ -187,11 +196,13 @@ export function threadCoreAccess(options: {
   // awaits the creation, then checks the disposed mark and calls `run` with the core in the same tick, with no await
   // between the check and the call. A member awaits anything else it needs (its input checks) BEFORE it calls `use`, and
   // `run` reaches the core before its own first await (a source check in threads-runtime-file.test.ts holds both).
-  const use = async <R>(run: (core: ThreadCore) => Promise<R>): Promise<R | OmoFailure> => {
+  // It answers a tagged outcome, never the core's answer itself: the core's own refusals are error-kind too, so a member
+  // that inspects the answer must first learn whether the root refused (the core never ran) or the core ran.
+  const use = async <R>(run: (core: ThreadCore) => Promise<R>): Promise<CoreOutcome<R>> => {
     const ready = await acquire()
-    if (isFailure(ready)) return ready
-    if (disposed) return DISPOSED
-    return run(ready.core)
+    if (isFailure(ready)) return { ran: false, refusal: ready }
+    if (disposed) return { ran: false, refusal: DISPOSED }
+    return { ran: true, value: await run(ready.core) }
   }
   // The checked runtime values (no core) for a member that reads them before it calls `use`.
   const runtimeOf = async (): Promise<CheckedRuntime | OmoFailure> => {

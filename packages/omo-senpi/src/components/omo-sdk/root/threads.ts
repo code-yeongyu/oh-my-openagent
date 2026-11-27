@@ -10,7 +10,7 @@ import { extensionFailure } from "./extension-codes"
 import type { Members, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
 import { onRoot, threadFailure } from "./thread-failures"
-import { isFailure, threadCoreAccess, type ThreadsRuntime } from "./thread-runtime-file"
+import { answered, isFailure, threadCoreAccess, type ThreadsRuntime } from "./thread-runtime-file"
 
 /** The thread options of design 4.1: the facade's own options of the same meaning. */
 export type ThreadNamespaceOptions = {
@@ -141,55 +141,64 @@ export function threadsNamespace(options: {
   const members: Members = {
     "threads.list": async (input = {}) =>
       (await unbuilt("threads.list", input, LIST)) ??
-      use(async (core) => onRoot((await core.list(input)) as result.ThreadListResult)),
+      answered(await use(async (core) => onRoot((await core.list(input)) as result.ThreadListResult))),
     "threads.read": async (input) =>
       (await unbuilt("threads.read", input, READ)) ??
-      use(async (core) => onRoot((await core.read(input)) as result.ThreadReadResult)),
+      answered(await use(async (core) => onRoot((await core.read(input)) as result.ThreadReadResult))),
     "threads.send": async (input) => {
       if (input?.author !== undefined) {
         const runtime = await runtimeOf()
         if (isFailure(runtime)) return runtime
         return threadFailure(runtime.authorRefusal)
       }
-      return (await unbuilt("threads.send", input, SEND)) ?? use(async (core) => onRoot(await core.send(input)))
+      return (
+        (await unbuilt("threads.send", input, SEND)) ??
+        answered(await use(async (core) => onRoot(await core.send(input))))
+      )
     },
     "threads.locate": async (input) =>
-      use(async (core) => {
-        const located = await core.locate(input)
-        if (located.kind === "error") return threadFailure(located.error)
-        return {
-          kind: "ok" as const,
-          thread: located.thread.address ?? located.thread.thread_id,
-          located: located.thread,
-        }
-      }),
+      answered(
+        await use(async (core) => {
+          const located = await core.locate(input)
+          if (located.kind === "error") return threadFailure(located.error)
+          return {
+            kind: "ok" as const,
+            thread: located.thread.address ?? located.thread.thread_id,
+            located: located.thread,
+          }
+        }),
+      ),
     "threads.create": async (input) => {
       if (typeof input?.prompt === "object") return notImplemented("threads.create")() as Promise<OmoFailure>
       const runtime = await runtimeOf()
       if (isFailure(runtime)) return runtime
       return (
         (await unbuilt("threads.create", input, runtime.createFields)) ??
-        use(async (core) =>
-          onRoot((await core.create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult),
+        answered(
+          await use(async (core) =>
+            onRoot((await core.create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult),
+          ),
         )
       )
     },
     "threads.interrupt": async (input) =>
-      use(async (core) => onRoot((await core.interrupt(input)) as result.ThreadInterruptResult)),
+      answered(await use(async (core) => onRoot((await core.interrupt(input)) as result.ThreadInterruptResult))),
     "threads.close": async (input = {}) =>
-      use(async (core) => onRoot((await core.close(input)) as result.ThreadCloseResult)),
+      answered(await use(async (core) => onRoot((await core.close(input)) as result.ThreadCloseResult))),
     "threads.rename": async (input = {}) =>
-      use(async (core) => onRoot((await core.rename(input)) as result.ThreadRenameResult)),
+      answered(await use(async (core) => onRoot((await core.rename(input)) as result.ThreadRenameResult))),
     "threads.setModel": async (input) =>
-      use(async (core) => onRoot((await core.setModel(input)) as result.ThreadSetModelResult)),
+      answered(await use(async (core) => onRoot((await core.setModel(input)) as result.ThreadSetModelResult))),
     "threads.release": async (input) => {
       const refused = await unbuilt("threads.release", input, ["thread", "interrupt", "force"])
       if (refused !== undefined) return refused
-      const released = await use(async (core) => onRoot(await core.release(input)))
+      const outcome = await use(async (core) => onRoot(await core.release(input)))
+      if (!outcome.ran) return outcome.refusal
+      const released = outcome.value
       if (released.kind === "error") return released
       // Design lane ruling: the root's failures are refusals; the engine's release_unsupported reply (a row with no
       // local endpoint) is answered as one. The thread facade keeps the engine's shape through its own path.
-      if (released.kind === "ok" && !released.value.success && released.value.error === "release_unsupported")
+      if (!released.value.success && released.value.error === "release_unsupported")
         return {
           kind: "error",
           error: {
@@ -212,35 +221,41 @@ export function threadsNamespace(options: {
             details: { field: "moduleUrl" },
           },
         }
-      return use(async (core) => {
-        const registered = await settledExtension(async () => core.extensions.register(input))
-        if (registered === undefined) return EXTENSION_UNEXPECTED
-        return registered.kind === "ok" ? registered : extensionFailure(registered)
-      })
+      return answered(
+        await use(async (core) => {
+          const registered = await settledExtension(async () => core.extensions.register(input))
+          if (registered === undefined) return EXTENSION_UNEXPECTED
+          return registered.kind === "ok" ? registered : extensionFailure(registered)
+        }),
+      )
     },
     "threads.extensions.call": async (input) => {
-      return use(async (core) => {
-        const answered = await settledExtension(async () => core.extensions.call(input.name, input.op, input.args))
-        if (answered === undefined) return EXTENSION_UNEXPECTED
-        return answered.kind === "ok" ? answered : extensionFailure(answered)
-      })
+      return answered(
+        await use(async (core) => {
+          const answered = await settledExtension(async () => core.extensions.call(input.name, input.op, input.args))
+          if (answered === undefined) return EXTENSION_UNEXPECTED
+          return answered.kind === "ok" ? answered : extensionFailure(answered)
+        }),
+      )
     },
     "daemon.warm": async (input = {}) => {
       const refused = await unbuilt("daemon.warm", input, [])
       if (refused !== undefined) return refused
-      return use(async (core) => {
-        try {
-          return { kind: "ok" as const, value: await core.warm() }
-        } catch (error) {
-          // The warm's own transport error, as `omo daemon run` prints it today; slice C1a words it as the daemon core's.
-          const message = error instanceof Error ? error.message : String(error)
-          const failure: OmoFailure = {
-            kind: "error",
-            error: { code: "internal_error", message, next_action: "Run omo daemon run again." },
+      return answered(
+        await use(async (core) => {
+          try {
+            return { kind: "ok" as const, value: await core.warm() }
+          } catch (error) {
+            // The warm's own transport error, as `omo daemon run` prints it today; slice C1a words it as the daemon core's.
+            const message = error instanceof Error ? error.message : String(error)
+            const failure: OmoFailure = {
+              kind: "error",
+              error: { code: "internal_error", message, next_action: "Run omo daemon run again." },
+            }
+            return failure
           }
-          return failure
-        }
-      })
+        }),
+      )
     },
   }
   return {
@@ -248,10 +263,10 @@ export function threadsNamespace(options: {
     // The thread facade's release (design lane ruling on threads.release): the row its caller located, released where
     // that row is served, with no second lookup. Reachable only through the internal assembly, never the public root.
     releaseLocated: async (located, request) => {
-      const released = await use(async (core) => core.releaseRow(located, request))
-      return isFailure(released)
-        ? ({ success: false, error: "internal_error" } as Awaited<ReturnType<ThreadCore["releaseRow"]>>)
-        : released
+      const outcome = await use(async (core) => core.releaseRow(located, request))
+      return outcome.ran
+        ? outcome.value
+        : ({ success: false, error: "internal_error" } as Awaited<ReturnType<ThreadCore["releaseRow"]>>)
     },
     disposing,
     dispose,
