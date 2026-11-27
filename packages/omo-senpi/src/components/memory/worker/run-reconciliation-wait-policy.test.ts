@@ -4,7 +4,11 @@ import { join } from "node:path"
 
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
-import { cleanupReconciliationFixtures, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
+import {
+  cleanupReconciliationFixtures,
+  FIXTURE_HOST,
+  reconciliationFixture as fixture,
+} from "./run-reconciliation.test-support"
 
 afterEach(cleanupReconciliationFixtures)
 
@@ -31,7 +35,7 @@ describe("per-turn reconcile never waits on a run's deadline (#11976, DESIGN.r3 
     const results = await reconcileReflectionRuns({
       identity: item.identity,
       reservation: item.store,
-      hostname: () => "fixture-host",
+      hostname: () => FIXTURE_HOST,
       now: () => NOW,
       getPidLiveness: (pid) => (pid === WAITING_SUPERVISOR ? "alive" : "dead"),
       waitForOutcome: async () => {

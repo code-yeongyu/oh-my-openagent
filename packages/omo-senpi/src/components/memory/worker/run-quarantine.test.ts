@@ -21,6 +21,7 @@ import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import {
   cleanupReconciliationFixtures,
+  FIXTURE_HOST,
   queuePendingReservation,
   reconciliationFixture as fixture,
 } from "./run-reconciliation.test-support"
@@ -35,7 +36,7 @@ type Item = Awaited<ReturnType<typeof fixture>>
 
 function deadLauncher() {
   return {
-    hostname: () => "fixture-host",
+    hostname: () => FIXTURE_HOST,
     now: () => Date.parse("2026-08-10T00:10:00.000Z"),
     getPidLiveness: () => "dead" as const,
   }
@@ -213,6 +214,121 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect((await item.store.readState()).active).toBeUndefined()
     expect(await readFile(join(item.runDir, "abandoned.json"), "utf8")).toBe(sentinel)
     expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
+  }, 30_000)
+
+  test("#given a settled run on a different machine with the same hostname #when reconciled #then its reservation is kept", async () => {
+    const item = await fixture()
+    const lock = join(item.identity.paths.reflection, "active.lock")
+    const active = JSON.parse(await readFile(lock, "utf8"))
+    await writeFile(lock, JSON.stringify({ ...active, launcherHostId: "foreign-machine" }))
+    await writeRunJsonAtomic(join(item.runDir, "abandoned.json"), {
+      version: 1,
+      runId: "run-orphan",
+      reason: "processes_dead",
+      generation: active.reservedAt,
+    })
+
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+      hostId: () => "local-machine",
+    })
+
+    expect(results).not.toContainEqual({ runId: "run-orphan", outcome: "failed" })
+    expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+  }, 30_000)
+
+  test.each([
+    { name: "same hostname", hostname: FIXTURE_HOST, hostId: "foreign-machine", outcome: false },
+    { name: "different hostname", hostname: `${FIXTURE_HOST}-remote`, hostId: "foreign-machine", outcome: false },
+    { name: "legacy foreign hostname", hostname: `${FIXTURE_HOST}-remote`, hostId: undefined, outcome: false },
+    { name: "missing hostname", hostname: undefined, hostId: "foreign-machine", outcome: false },
+    { name: "recorded outcome", hostname: FIXTURE_HOST, hostId: "foreign-machine", outcome: true },
+  ])(
+    "#given a foreign active run with $name #when reconciled #then its reservation and run stay untouched",
+    async ({ hostname, hostId, outcome }) => {
+      const item = await fixture()
+      const lock = join(item.identity.paths.reflection, "active.lock")
+      const active = JSON.parse(await readFile(lock, "utf8"))
+      await writeFile(lock, JSON.stringify({ ...active, launcherHostname: hostname, launcherHostId: hostId }))
+      if (outcome) {
+        await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
+          version: 1,
+          runId: item.ledger.runId,
+          finishedAt: "2026-08-10T00:00:30.000Z",
+          childExit: { code: 0, signal: null },
+          timedOut: false,
+        })
+      }
+      const lockBefore = await readFile(lock, "utf8")
+      const ledgerBefore = await readFile(join(item.runDir, "ledger.json"), "utf8")
+
+      const results = await reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        ...deadLauncher(),
+        hostId: () => "local-machine",
+      })
+
+      expect(results).toEqual([])
+      expect(await readFile(lock, "utf8")).toBe(lockBefore)
+      expect(await readFile(join(item.runDir, "ledger.json"), "utf8")).toBe(ledgerBefore)
+      for (const name of ["final.json", "abandoned.json", "quarantined.json"])
+        expect(existsSync(join(item.runDir, name))).toBe(false)
+      expect(existsSync(item.worktree.dir)).toBe(true)
+    },
+    30_000,
+  )
+
+  test("#given ownership changes during prelaunch #when the run is scanned #then the foreign reservation is kept", async () => {
+    const item = await fixture()
+    const lock = join(item.identity.paths.reflection, "active.lock")
+    const active = JSON.parse(await readFile(lock, "utf8"))
+    await writeFile(lock, JSON.stringify({ ...active, launcherHostId: "local-machine" }))
+    let switched = false
+
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+      hostId: async () => {
+        if (!switched) {
+          switched = true
+          await writeFile(lock, JSON.stringify({ ...active, launcherHostId: "foreign-machine" }))
+        }
+        return "local-machine"
+      },
+    })
+
+    expect(switched).toBe(true)
+    expect(results).toEqual([])
+    expect((await item.store.readState()).active?.launcherHostId).toBe("foreign-machine")
+    expect(existsSync(join(item.runDir, "final.json"))).toBe(false)
+    expect(existsSync(item.worktree.dir)).toBe(true)
+  }, 30_000)
+
+  test("#given a malformed stored host id on this hostname #when a dead launcher is reconciled #then the reservation is released", async () => {
+    const item = await fixture()
+    const lock = join(item.identity.paths.reflection, "active.lock")
+    const active = JSON.parse(await readFile(lock, "utf8"))
+    await writeFile(lock, JSON.stringify({ ...active, launcherHostId: 42 }))
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "not-a-date",
+    })
+
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+      hostId: () => "local-machine",
+    })
+
+    expect(results).toContainEqual({ runId: "run-orphan", outcome: "failed" })
+    expect((await item.store.readState()).active).toBeUndefined()
   }, 30_000)
 
   test("#given an unreadable ledger under a dead launcher and a signal that fires right after the sentinel is written #when reconciled #then the reservation is still released in the same call (C29 3, DESIGN.r4 c.21)", async () => {

@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 import { mkdtempSync, readdirSync, realpathSync } from "node:fs"
 
@@ -20,6 +20,7 @@ import { writeRunJsonAtomic } from "./run-artifacts"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
+export const FIXTURE_HOST = hostname()
 export const PHASE_IDLE_MS = process.platform === "win32" ? 10_000 : 2_000
 const GIT_PROCESS_ENDED = /"event":"(?:exit|atexit|signal)"/
 /** trace2 names each event file after the process's session id, whose last field is `P<pid in hex>`. */
@@ -55,7 +56,7 @@ export async function reconciliationFixture(trigger: "step-count" | "dream" = "s
     getJournal: async () => journal,
     createRunId: () => "run-orphan",
     now: () => new Date("2026-08-10T00:00:00.000Z"),
-    launcherIdentity: async () => ({ pid: 111, hostname: "fixture-host", processStart: "launcher-start" }),
+    launcherIdentity: async () => ({ pid: 111, hostname: FIXTURE_HOST, processStart: "launcher-start" }),
   })
   const snapshot = await journal.captureReflectionSnapshot()
   if (snapshot === null) throw new Error("expected snapshot")

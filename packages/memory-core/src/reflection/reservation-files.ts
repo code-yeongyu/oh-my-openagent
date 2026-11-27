@@ -5,10 +5,12 @@ import { dirname, join } from "node:path"
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "../fs/resilient"
 import { getProcessStartIdentity } from "../locks"
 import type { ReflectionRequest, ReservedRun } from "./machine"
+import { getStableLocalHostId } from "./stale-holder"
 
 export interface ReflectionLauncherIdentity {
   readonly pid: number
   readonly hostname: string
+  readonly hostId?: string
   readonly processStart: string | null
 }
 
@@ -96,9 +98,11 @@ export async function moveTornReservationAside(
 }
 
 export async function currentLauncherIdentity(): Promise<ReflectionLauncherIdentity> {
+  const hostId = await getStableLocalHostId()
   return {
     pid: process.pid,
     hostname: hostname(),
+    ...(hostId ? { hostId } : {}),
     processStart: await getProcessStartIdentity(process.pid),
   }
 }
