@@ -2,6 +2,14 @@ import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
 import { usageLimitScope } from "../../manager/credential-failure"
 import type { RunnerOutcome } from "../in-process/child-handle"
+import { createAsyncWorkHold } from "../async-work-hold"
+import {
+  finishedTurnOutcome,
+  pendingWorkOf,
+  type PendingAsyncWork,
+  type PendingWorkEvidence,
+  type UnfinishedOutcome,
+} from "../pending-async-work"
 import { agentEndOutcome } from "./turn-outcome"
 import { retryDelayMs } from "./retry-delay"
 
@@ -47,6 +55,19 @@ export type TurnSettlementInput = {
   // forever.
   readonly maxUnreadableProbes?: number
   readonly wakeSourcesLive?: () => boolean
+  // senpi#3492 / omo#10487: the child's own async work (a detached eval cell, a background terminal
+  // job, a monitor, a goal timer, a child task it still owns) as the engine's lifecycle reports it.
+  // senpi still emits `agent_idle` while that work runs, so a COMPLETED outcome is not terminal then:
+  // the work's completion wakes the child into the turn that produces its real answer. The outcome is
+  // held from that `agent_idle` (createAsyncWorkHold) and settles once the work drains and the probe
+  // reads an idle session with no new turn - always as the typed `async_work_pending` failure, never the
+  // interim note - or the same way if it stops progressing for `asyncWorkStaleLimitMs`. Absent: a
+  // completed outcome settles on `agent_idle`.
+  readonly pendingAsyncWork?: () => PendingAsyncWork | undefined
+  // The work the held answer was given against (its evidence window, turn-async-work.ts): what decides
+  // whether that answer is held at idle or ends as the abandoned work. Absent: the current snapshot.
+  readonly answerWork?: () => PendingAsyncWork | undefined
+  readonly asyncWorkStaleLimitMs?: number
   // Teardown detached/tore down the handle while a probe was in flight: that flight must never
   // report the held error as failed - the exit path owns the outcome from here (senpi#3262 review).
   readonly disposed?: () => boolean
@@ -55,11 +76,29 @@ export type TurnSettlementInput = {
 
 export type TurnSettlement = {
   readonly observe: (event: AgentSessionEvent) => void
-  readonly pending: () => RunnerOutcome | undefined
+  // While a completed turn is held on pending async work this is what the turn amounts to if it ends
+  // now (exit, park, teardown): the typed failure naming the abandoned work, never the interim note,
+  // or `cancelled` when the parent itself terminated the child.
+  readonly pending: (end?: "terminated") => RunnerOutcome | undefined
+  // The turn is ending (teardown, exit, park): disarm every confirmation. What the turn amounts to
+  // stays readable through `pending`.
   readonly cancelConfirmation: () => void
   // A wake source the handle tracks just dropped: re-offer the held error a confirmation chance.
   // No-op when nothing is held, a confirmation is already armed, or no probe was wired.
   readonly reconfirmHeld: () => void
+  // An outcome read outside the event stream (a re-joined session's reconciliation, a finished
+  // transcript) ends the turn exactly as an `agent_end` then `agent_idle` would: a completed outcome
+  // is held while the engine still reports the child's own async work (omo#10487). Re-offering the
+  // note a hold already keeps back leaves that hold alone. `evidence` is what a durable record says
+  // about the child's own work after that answer: its pending work holds the note when the live
+  // engine reports none (omo#10487).
+  readonly adopt: (finalResponse: string, evidence: PendingWorkEvidence) => void
+  // An end read outside the event stream that is not an answer (cancelled, failed): it replaces any
+  // held turn and its confirmations at once.
+  readonly finish: (outcome: UnfinishedOutcome) => void
+  // The session that owned the held turn's work is gone (reopened from its file): the turn ends as
+  // that abandoned work. `false` when no turn is held on async work.
+  readonly abandon: () => boolean
 }
 
 /**
@@ -107,6 +146,27 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   let retryWaitMs = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
   const maxUnreadableProbes = input.maxUnreadableProbes ?? 3
+  const probe = input.probe
+  const answerWork = (): PendingAsyncWork | undefined => (input.answerWork ?? input.pendingAsyncWork)?.()
+  const asyncWork =
+    input.pendingAsyncWork === undefined || probe === undefined || input.settleConfirmMs === undefined
+      ? undefined
+      : createAsyncWorkHold({
+          pending: input.pendingAsyncWork,
+          idle: async () => {
+            const state = await probe()
+            return state === undefined ? undefined : sessionIsIdle(state)
+          },
+          settle: (outcome) => {
+            held = undefined
+            input.settle(outcome)
+          },
+          schedule: scheduleConfirmation,
+          intervalMs: input.settleConfirmMs,
+          staleLimitMs: input.asyncWorkStaleLimitMs,
+          maxUnreadable: maxUnreadableProbes,
+          disposed: input.disposed,
+        })
   const endOutcome = (event: AgentEndEvent): RunnerOutcome =>
     agentEndOutcome(event, input.baseline(), input.finalText(), input.abortedByUser())
 
@@ -179,14 +239,36 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     confirmation = scheduleConfirmation(confirmHeld, input.settleConfirmMs + retryWaitMs)
   }
 
-  const clearConfirmation = (): void => {
+  const disarmConfirmation = (): void => {
     if (confirmation === undefined) return
     confirmation.cancel()
     confirmation = undefined
   }
 
+  // A new run or a final interrupt replaces the held turn: drop the hold with its timers.
+  const clearConfirmation = (): void => {
+    asyncWork?.cancel()
+    disarmConfirmation()
+  }
+
+  const atIdle = (durableWork?: PendingAsyncWork): void => {
+    // A turn already held on its pending work ends only by a new run, the hold's own confirmation,
+    // or teardown: a repeated idle record carries no answer (omo#10487).
+    if (asyncWork?.holding() === true) return
+    clearConfirmation()
+    const outcome = held
+    const work = outcome?.status === "completed" ? (answerWork() ?? durableWork) : undefined
+    if (asyncWork !== undefined && outcome?.status === "completed" && work !== undefined) {
+      asyncWork.begin(outcome, work)
+      return
+    }
+    held = undefined
+    if (outcome !== undefined) input.settle(outcome)
+  }
+
   return {
     observe: (event) => {
+      asyncWork?.activity()
       switch (event.type) {
         case "agent_start":
           clearConfirmation()
@@ -234,19 +316,46 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           if (outcome.status === "error") rearm()
           return
         }
-        case "agent_idle": {
-          clearConfirmation()
-          const outcome = held
-          held = undefined
-          if (outcome !== undefined) input.settle(outcome)
+        case "agent_idle":
+          atIdle()
           return
-        }
         default:
           return
       }
     },
-    pending: () => held,
-    cancelConfirmation: clearConfirmation,
+    pending: (end) => {
+      // A held turn, or a completed answer whose agent_idle never came while the engine already
+      // reported the child's own work pending: the turn ends now, so that work decides (omo#10487).
+      if (asyncWork?.holding() === true) return end === "terminated" ? { status: "cancelled" } : asyncWork.abandoned()
+      const work = held?.status === "completed" ? answerWork() : undefined
+      if (held?.status !== "completed" || work === undefined) return held
+      return end === "terminated" ? { status: "cancelled" } : finishedTurnOutcome(held.finalResponse, work)
+    },
+    cancelConfirmation: () => {
+      asyncWork?.disarm()
+      disarmConfirmation()
+    },
     reconfirmHeld: rearm,
+    adopt: (finalResponse, evidence) => {
+      const keptBack =
+        asyncWork?.holding() === true && held?.status === "completed" && finalResponse === held.finalResponse
+      if (keptBack) return
+      clearConfirmation()
+      held = { status: "completed", finalResponse }
+      atIdle(pendingWorkOf(evidence))
+    },
+    finish: (outcome) => {
+      clearConfirmation()
+      held = undefined
+      input.settle(outcome)
+    },
+    abandon: () => {
+      const outcome = asyncWork?.abandoned()
+      if (outcome === undefined) return false
+      clearConfirmation()
+      held = undefined
+      input.settle(outcome)
+      return true
+    },
   }
 }

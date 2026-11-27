@@ -155,7 +155,7 @@ export function observeModelRefusals(input: {
 
 type TerminalFields = {
   readonly error_message: string
-  readonly failure_kind?: "child-unresponsive" | typeof MODEL_CHAIN_EXHAUSTED
+  readonly failure_kind?: "child-unresponsive" | "async_work_pending" | typeof MODEL_CHAIN_EXHAUSTED
 }
 
 /**
@@ -175,7 +175,12 @@ export function terminalFailureFields(
   const final = refusalOf(record, failure.message, record.updated_at)
   const candidates = runtimeFallbackCandidates(record, failure.message, limits)
   if (!modelFailure || final.reason === "error" || candidates.remaining.length > 0) {
-    return { error_message: message, ...(failure.kind === "child-unresponsive" ? { failure_kind: failure.kind } : {}) }
+    return {
+      error_message: message,
+      ...(failure.kind === "child-unresponsive" || failure.kind === "async_work_pending"
+        ? { failure_kind: failure.kind }
+        : {}),
+    }
   }
   const skipped = candidates.skipped.map((model) => {
     const spent = limits?.spentReason(model.provider, model.model_id)

@@ -1,6 +1,6 @@
 import type { ChildEventListener } from "../types"
 import { type ChildExtensionListener, createChildExtensionEvents } from "../child-extension-events"
-import type { HostSessionParked } from "./session-client"
+import type { HostSessionParkNotice } from "./handle-port"
 import type { HostSessionReplaced } from "./session-client-contract"
 
 type ChildEvent = Parameters<ChildEventListener>[0]
@@ -9,7 +9,7 @@ type ChildEvent = Parameters<ChildEventListener>[0]
 export interface ListenerRegistrations {
   subscribe(listener: ChildEventListener): () => boolean
   subscribeExtensionEvents(listener: ChildExtensionListener): () => void
-  onParked(listener: (event: HostSessionParked) => void): () => boolean
+  onParked(listener: (event: HostSessionParkNotice) => void): () => boolean
   onReplaced(listener: (event: HostSessionReplaced) => void): () => boolean
   /** A durable session id learned after spawn (the open's own read failed); #10873. */
   onDurableSessionId(listener: (id: string) => void): () => boolean
@@ -21,7 +21,7 @@ export interface HandleListeners {
   readonly extensionEvents: ReturnType<typeof createChildExtensionEvents>
   readonly registrations: ListenerRegistrations
   emitEvent(event: ChildEvent): void
-  emitParked(event: HostSessionParked): void
+  emitParked(event: HostSessionParkNotice): void
   emitReplaced(event: HostSessionReplaced): void
   emitDurableSessionId(id: string): void
   emitTurnResumed(): void
@@ -70,7 +70,7 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     }
     if (earlyEvents !== undefined) replayed.add(listener)
   }
-  const parkedListeners = new Set<(event: HostSessionParked) => void>()
+  const parkedListeners = new Set<(event: HostSessionParkNotice) => void>()
   const replacedListeners = new Set<(event: HostSessionReplaced) => void>()
   const durableIdListeners = new Set<(id: string) => void>()
   const turnResumedListeners = new Set<() => void>()

@@ -7,6 +7,7 @@ import { adaptRpcHandle } from "../../manager/child-handle"
 import { createTaskRecord } from "../../state"
 import { runTaskOutput } from "../../tools/output/output"
 import type { RunnerOutcome } from "../in-process/child-handle"
+import { finishedTurnOutcome, type PendingWorkEvidence } from "../pending-async-work"
 import { isHostSessionHandle } from "../rpc-host"
 import { childSpec, hostRunnerHarness } from "../rpc-host.test-support"
 import {
@@ -61,6 +62,9 @@ function scenario(
     ...(options.receipt === undefined ? {} : { lastInputEffect: options.receipt }),
     settle: (outcome: RunnerOutcome) => {
       outcomes.push(outcome)
+    },
+    adopt: (finalResponse: string, evidence: PendingWorkEvidence) => {
+      outcomes.push(finishedTurnOutcome(finalResponse, evidence))
     },
     notify: (notice: ReconciledTurnNotice) => {
       notices.push(notice)

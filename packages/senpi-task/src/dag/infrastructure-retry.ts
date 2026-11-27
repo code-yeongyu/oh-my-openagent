@@ -38,6 +38,7 @@ export function isInfrastructureFailure(task: TaskRecord): boolean {
     case "usage_limit":
     case "tools_unavailable":
     case "model_chain_exhausted":
+    case "async_work_pending":
     case undefined:
       return false
     default:
