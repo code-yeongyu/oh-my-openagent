@@ -74,8 +74,9 @@
         "js-yaml": "^5.4.2",
         "jsonc-parser": "^3.3.1",
         "knip": "6.43.0",
+        "libsodium-wrappers": "^0.8.4",
         "node-pty": "^1.1.0",
-        "omowright": "^0.3.4",
+        "omowright": "^0.3.10",
         "oxc-parser": "0.148.0",
         "oxlint": "1.89.0",
         "picocolors": "^1.1.1",
@@ -85,18 +86,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.83",
-        "oh-my-opencode-darwin-x64": "5.1.83",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.83",
-        "oh-my-opencode-linux-arm64": "5.1.83",
-        "oh-my-opencode-linux-arm64-musl": "5.1.83",
-        "oh-my-opencode-linux-x64": "5.1.83",
-        "oh-my-opencode-linux-x64-baseline": "5.1.83",
-        "oh-my-opencode-linux-x64-musl": "5.1.83",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.83",
-        "oh-my-opencode-windows-arm64": "5.1.83",
-        "oh-my-opencode-windows-x64": "5.1.83",
-        "oh-my-opencode-windows-x64-baseline": "5.1.83",
+        "oh-my-opencode-darwin-arm64": "5.1.84",
+        "oh-my-opencode-darwin-x64": "5.1.84",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.84",
+        "oh-my-opencode-linux-arm64": "5.1.84",
+        "oh-my-opencode-linux-arm64-musl": "5.1.84",
+        "oh-my-opencode-linux-x64": "5.1.84",
+        "oh-my-opencode-linux-x64-baseline": "5.1.84",
+        "oh-my-opencode-linux-x64-musl": "5.1.84",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.84",
+        "oh-my-opencode-windows-arm64": "5.1.84",
+        "oh-my-opencode-windows-x64": "5.1.84",
+        "oh-my-opencode-windows-x64-baseline": "5.1.84",
       },
     },
     "packages/agents-md-core": {
@@ -222,7 +223,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.83",
+      "version": "5.1.84",
       "dependencies": {
         "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -322,7 +323,7 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.83",
+      "version": "5.1.84",
       "bin": {
         "omo": "bin/omo.js",
       },
@@ -369,7 +370,7 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.83",
+      "version": "5.1.84",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.23",
@@ -1751,6 +1752,10 @@
 
     "kubernetes-types": ["kubernetes-types@1.30.0", "", {}, "sha512-Dew1okvhM/SQcIa2rcgujNndZwU8VnSapDgdxlYoB84ZlpAD43U6KLAFqYo17ykSFGHNPrg0qry0bP+GJd9v7Q=="],
 
+    "libsodium": ["libsodium@0.8.4", "", {}, "sha512-lMcYaRi0zcs7tarATsQUYC7rstliIXZuoq0c6zXSgNtSNtdvBgkSegjWhpMJAXzKX3SUSwIp7+zEsob+j3LuRw=="],
+
+    "libsodium-wrappers": ["libsodium-wrappers@0.8.4", "", { "dependencies": { "libsodium": "^0.8.0" } }, "sha512-mu8aAWucZjTB5O/BtGXtW4e1agy7uHxNYG7zPthmmD1jU43LCDmSWZLN4JhflbdPXj3yDO4lxM1O9hLDgIOXDw=="],
+
     "lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
     "lightningcss-android-arm64": ["lightningcss-android-arm64@1.32.0", "", { "os": "android", "cpu": "arm64" }, "sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg=="],
@@ -1875,7 +1880,7 @@
 
     "omo-ai": ["omo-ai@workspace:packages/omo-native"],
 
-    "omowright": ["omowright@0.3.4", "", { "dependencies": { "ws": "^8.23.0", "zod": "^4.6.7" }, "bin": { "omowright-cloak": "dist/bin/omowright-cloak.js" } }, "sha512-Un2qcPtVbWfYIgaXVHlVAyCl8AEhNEltoGxPAA9HE7X2QYRJVX2Ex+0DGWRsle1qBpNrGT3RL0fTtNXAGRmMkw=="],
+    "omowright": ["omowright@0.3.10", "", { "dependencies": { "ws": "^8.23.0", "zod": "^4.6.7" }, "bin": { "omowright-cloak": "dist/bin/omowright-cloak.js" } }, "sha512-/mY4xr9JE2BVcwIT2MONr5sAWaBnQcnANvu5yfGSeOeHK9a0FhPneybvuMMnOq+7fKCBBDFibuqz+wfJ3/tRdQ=="],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 

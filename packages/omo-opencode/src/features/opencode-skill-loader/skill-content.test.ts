@@ -262,7 +262,7 @@ describe("resolveMultipleSkillsAsync", () => {
     // then: all builtin skills resolved
     expect(result.resolved.size).toBe(2)
     expect(result.notFound).toEqual([])
-    expect(result.resolved.get("git-master")).toContain("Git Master Agent")
+    expect(result.resolved.get("git-master")).toBe((await resolveSkillContentAsync("git")) ?? "")
   })
 
   it("should handle partial success with non-existent skills async", async () => {

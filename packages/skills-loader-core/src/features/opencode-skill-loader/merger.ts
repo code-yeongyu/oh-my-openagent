@@ -7,6 +7,7 @@ import { mergeSkillDefinitions } from "./merger/skill-definition-merger"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { SCOPE_PRIORITY } from "./merger/scope-priority"
 import { isDisabledSkillAlias } from "./skill-discovery"
+import { normalizeSkillAliasName } from "./skill-disable-config"
 import { getSkillSourceProvenance } from "./config-source-discovery"
 
 export interface MergeSkillsOptions {
@@ -18,10 +19,6 @@ function isDisabledConfigEntry(entry: boolean | SkillDefinition): boolean {
   if (entry === false) return true
   if (entry === true) return false
   return entry.disable === true
-}
-
-function normalizeSkillAliasName(name: string): string {
-  return name.toLowerCase()
 }
 
 function collectDisabledSkillNames(normalizedConfig: ReturnType<typeof normalizeSkillsConfig>): Set<string> {

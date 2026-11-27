@@ -93,7 +93,18 @@ describe("bundled skill disable on the Native surface", () => {
 
     expect(names).not.toContain("frontend")
     expect(names).not.toContain("visual-qa")
-    expect(names).toContain("git-master")
+    expect(names).toContain("git")
+  })
+
+  it("#given disabled_skills names the legacy git-master alias #when the Native skill set resolves #then the git skill is absent", async () => {
+    mkdirSync(join(home, ".omo"), { recursive: true })
+    writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify({ disabled_skills: ["git-master"] }), "utf-8")
+
+    const names = await resolveNativeSkillNames(cwd)
+
+    expect(names).not.toContain("git")
+    expect(names).not.toContain("git-master")
+    expect(names).toContain("frontend")
   })
 
   it("#given user and project configs each disable a different skill #when the Native skill set resolves #then the denylists union", async () => {
@@ -110,6 +121,6 @@ describe("bundled skill disable on the Native surface", () => {
 
     expect(names).not.toContain("frontend")
     expect(names).not.toContain("visual-qa")
-    expect(names).toContain("git-master")
+    expect(names).toContain("git")
   })
 })
