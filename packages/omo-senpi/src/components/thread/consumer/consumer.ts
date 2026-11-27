@@ -69,6 +69,9 @@ function intakeRecord(event: DeliveryInboundEvent): IntakeRecord | undefined {
 
 const UNKNOWN_SHAPE = new Set(["unknown_type", "unsupported"])
 
+/** A settlement pass that failed with no deadline timer armed is tried again after this long (#15241 review). */
+const SETTLE_RETRY_MS = 60_000
+
 /** The numbers a refusal's details carry to the sender: a chain limit's counts, the pair loop guard's burst and wait. */
 const REFUSAL_NUMBERS = ["chain_count", "limit", "burst", "window_ms", "retry_after_ms"] as const
 
@@ -131,11 +134,25 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   let cancelDeadline: (() => void) | undefined
   let generation = 0
   let passes = 0
+  const arm = (ms: number): void => {
+    if (options.schedule === undefined || !serving) return
+    cancelDeadline = options.schedule(
+      () => {
+        cancelDeadline = undefined
+        track(reportDrained())
+      },
+      Math.max(ms, 0),
+    )
+  }
   const settleExpiredIntake = async (): Promise<void> => {
     const pass = ++generation
     passes++
     try {
       await settlePass(pass)
+    } catch (error) {
+      // The older passes deferred to this one, so a failure here with nothing armed would leave no timer: retry later.
+      if (pass === generation && cancelDeadline === undefined) arm(SETTLE_RETRY_MS)
+      throw error
     } finally {
       passes--
     }
@@ -169,14 +186,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
     if (pass !== generation) return
     cancelDeadline?.()
     cancelDeadline = undefined
-    if (options.schedule === undefined || !serving || next === Number.POSITIVE_INFINITY) return
-    cancelDeadline = options.schedule(
-      () => {
-        cancelDeadline = undefined
-        track(reportDrained())
-      },
-      Math.max(next - store.now(), 0),
-    )
+    if (next !== Number.POSITIVE_INFINITY) arm(next - store.now())
   }
 
   const reportDrained = async (): Promise<void> => {
