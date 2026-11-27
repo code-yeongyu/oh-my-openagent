@@ -80,20 +80,19 @@ impl Session {
         let call = (mutation.method, &mutation.call.target, route.clone());
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         let pausing = object.then_some(ceiling);
-        let admission =
-            match self.admit_call(&mutation.call, route.clone(), plan.stages, pausing) {
-                Ok(admission) => admission,
-                Err(blocked) => {
-                    let detail = match blocked.stage.as_str() {
-                        "Consent" => plan.consent_detail.clone(),
-                        "Lease" => plan.lease_detail.clone(),
-                        _ => None,
-                    };
-                    let mut refused = self.stamp(*blocked.refused, object);
-                    refused.detail = detail.map(Box::new);
-                    return Err(self.refuse(record, Some(blocked.stage), refused));
-                }
-            };
+        let admission = match self.admit_call(&mutation.call, route.clone(), plan.stages, pausing) {
+            Ok(admission) => admission,
+            Err(blocked) => {
+                let detail = match blocked.stage.as_str() {
+                    "Consent" => plan.consent_detail.clone(),
+                    "Lease" => plan.lease_detail.clone(),
+                    _ => None,
+                };
+                let mut refused = self.stamp(*blocked.refused, object);
+                refused.detail = detail.map(Box::new);
+                return Err(self.refuse(record, Some(blocked.stage), refused));
+            }
+        };
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
@@ -201,8 +200,7 @@ impl Session {
         let watch = admission
             .pid
             .and_then(|pid| MidSend::start(self.backend.as_ref(), pid, policy));
-        let outcome =
-            self.send_watched(mutation.events, route.clone(), tag, watch, target);
+        let outcome = self.send_watched(mutation.events, route.clone(), tag, watch, target);
         drop(lock);
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {

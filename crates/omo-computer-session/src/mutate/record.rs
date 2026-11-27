@@ -70,7 +70,11 @@ impl Record {
                 Ok(Route::Ax | Route::BackgroundWindow { .. } | Route::BackgroundPid { .. })
                 | Err(_) => DeliveryKind::Background,
             },
-            route: mutation.route.as_ref().ok().map(|route| route.wire().to_owned()),
+            route: mutation
+                .route
+                .as_ref()
+                .ok()
+                .map(|route| route.wire().to_owned()),
             tier: Tier::Exec,
             frame_id: mutation.frame_id.clone(),
             text: text.clone(),

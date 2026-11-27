@@ -143,7 +143,9 @@ impl Session {
                     );
                     guard.latch().is_some() || boundary_stop(backend, watch, window).is_some()
                 };
-                let delivery = self.backend.post_text(&text, route.clone(), tag, &mut interrupt);
+                let delivery = self
+                    .backend
+                    .post_text(&text, route.clone(), tag, &mut interrupt);
                 count = count.saturating_add(delivery.sent);
                 if let Some(refusal) = delivery.refusal {
                     return Outcome {
@@ -165,7 +167,10 @@ impl Session {
                 }
                 continue;
             }
-            match self.backend.post_input(&TaggedInput { event, tag }, route.clone()) {
+            match self
+                .backend
+                .post_input(&TaggedInput { event, tag }, route.clone())
+            {
                 Ok(_) => count = count.saturating_add(1),
                 Err(refusal) => {
                     return Outcome {

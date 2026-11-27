@@ -18,11 +18,16 @@ pub(crate) fn key_event(key: &str, down: bool) -> InputEvent {
 ///
 /// # Errors
 /// `BackgroundUnavailable{target_unknown}` (next call `computer.window(sel)`).
-pub(crate) fn route_for(target: Option<&str>, delivery: Option<Delivery>) -> Result<Route, Refusal> {
+pub(crate) fn route_for(
+    target: Option<&str>,
+    delivery: Option<Delivery>,
+) -> Result<Route, Refusal> {
     match (TargetRef::read(target), delivery) {
-        (TargetRef::Window(window), None | Some(Delivery::Background)) => Ok(Route::BackgroundWindow {
-            window: window.to_owned(),
-        }),
+        (TargetRef::Window(window), None | Some(Delivery::Background)) => {
+            Ok(Route::BackgroundWindow {
+                window: window.to_owned(),
+            })
+        }
         (TargetRef::Window(_) | TargetRef::Desktop, Some(Delivery::Foreground))
         | (TargetRef::Desktop, None) => Ok(Route::ForegroundHid),
         (TargetRef::Desktop, Some(Delivery::Background)) => Err(UNADDRESSED_BACKGROUND),

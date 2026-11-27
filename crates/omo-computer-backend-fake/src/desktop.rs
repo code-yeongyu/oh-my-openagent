@@ -86,9 +86,16 @@ impl Backend for FakeBackend {
 
     /// R70av: the fake arms any chord the consent view names (only the stop chord's source is
     /// under test here; a backend's own refusal is the core default's).
-    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+    fn set_stop_chord(
+        &mut self,
+        chord: Option<&str>,
+    ) -> omo_computer_core::backend::BackendResult<()> {
         let refused = chord.is_some_and(|chord| {
-            self.lock().scenario.unarmable_stop_chords.iter().any(|c| c.eq_ignore_ascii_case(chord))
+            self.lock()
+                .scenario
+                .unarmable_stop_chords
+                .iter()
+                .any(|c| c.eq_ignore_ascii_case(chord))
         });
         if refused {
             return Err(omo_computer_core::backend::Refusal::new(
@@ -126,8 +133,8 @@ impl Backend for FakeBackend {
 }
 
 #[cfg(test)]
-mod extent_tests;
-#[cfg(test)]
 mod addressed_tests;
+#[cfg(test)]
+mod extent_tests;
 #[cfg(test)]
 mod tests;

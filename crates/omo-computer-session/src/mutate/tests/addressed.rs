@@ -2,7 +2,9 @@
 //! refused before anything is sent (IS-2: no silent fallback to the foreground), with the
 //! table's typed pair and next call; a call that names its window is routed to that window.
 
-use serde_json::json;
+use std::fs;
+
+use serde_json::{json, Value};
 
 use super::{params, wire, Run};
 use crate::mutate::route_for;
@@ -16,9 +18,14 @@ fn ta5_background_delivery_without_a_target_is_refused_with_nothing_sent() {
     let run = Run::new();
     let mut session = run.session(Box::new(run.fake()));
     let refused = session
-        .click(params(json!({ "x": 10, "y": 10, "callId": "c-untargeted", "delivery": "background" })))
+        .click(params(
+            json!({ "x": 10, "y": 10, "callId": "c-untargeted", "delivery": "background" }),
+        ))
         .expect_err("a background call names its window");
-    assert_eq!(wire(&refused), ("BackgroundUnavailable", Some("target_unknown")));
+    assert_eq!(
+        wire(&refused),
+        ("BackgroundUnavailable", Some("target_unknown"))
+    );
     assert!(run.sink.is_empty(), "nothing sent");
     // Review M1 of #13788: the refusal runs through the funnel, so it writes its audit line at
     // stage Route, with background delivery and no route taken.
@@ -32,7 +39,56 @@ fn ta5_background_delivery_without_a_target_is_refused_with_nothing_sent() {
     assert_eq!(lines[0]["gate"]["stage"], json!("Route"));
     assert_eq!(lines[0]["gate"]["reason"], json!("target_unknown"));
     assert_eq!(lines[0]["delivery"], json!("background"));
-    assert!(lines[0].get("route").is_none_or(serde_json::Value::is_null), "no route taken");
+    assert!(
+        lines[0].get("route").is_none_or(serde_json::Value::is_null),
+        "no route taken"
+    );
+}
+
+#[test]
+fn ta5c_the_route_refusal_carries_the_object_stamp_and_its_trace_turn() {
+    let run = Run::new();
+    let mut session = Session::for_roots(Box::new(run.fake()), &run.roots());
+    session
+        .open(params(json!({ "reportMode": "object", "trace": true })))
+        .expect("open");
+    session.stop_path_start(params(json!({})));
+    let refused = session
+        .click(params(
+            json!({ "x": 10, "y": 10, "callId": "c-traced", "delivery": "background" }),
+        ))
+        .expect_err("a background call names its window");
+    assert_eq!(
+        wire(&refused),
+        ("BackgroundUnavailable", Some("target_unknown"))
+    );
+    assert!(
+        refused.stamps.session.is_some(),
+        "object mode stamps the session state"
+    );
+    session.close();
+    let artifacts = run.dir.path().join("artifacts");
+    let trace = fs::read_dir(&artifacts)
+        .expect("the artifacts dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
+        .expect("the JSONL trace");
+    let text = fs::read_to_string(trace).expect("trace text");
+    let turns: Vec<Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("a JSON line"))
+        .collect();
+    assert_eq!(turns.len(), 1, "one turn for the refused click: {text}");
+    assert_eq!(turns[0]["method"], json!("click"));
+    assert_eq!(
+        turns[0]["outcome"]["error"]["code"],
+        json!("BackgroundUnavailable")
+    );
+    assert_eq!(
+        turns[0]["outcome"]["error"]["reason"],
+        json!("target_unknown")
+    );
 }
 
 #[test]
@@ -40,7 +96,9 @@ fn ta5b_a_closed_session_answers_not_open_before_the_route_refusal() {
     let run = Run::new();
     let mut session = Session::for_roots(Box::new(run.fake()), &run.roots());
     let refused = session
-        .click(params(json!({ "x": 10, "y": 10, "callId": "c-closed", "delivery": "background" })))
+        .click(params(
+            json!({ "x": 10, "y": 10, "callId": "c-closed", "delivery": "background" }),
+        ))
         .expect_err("the session is not open");
     assert_eq!(refused.refusal, NOT_OPEN);
     assert!(run.sink.is_empty(), "nothing sent");
@@ -50,12 +108,32 @@ fn ta5b_a_closed_session_answers_not_open_before_the_route_refusal() {
 fn ta6_the_route_names_the_window_the_call_aims_at() {
     assert_eq!(
         route_for(Some("202"), Some(Delivery::Background)),
-        Ok(Route::BackgroundWindow { window: "202".to_owned() })
+        Ok(Route::BackgroundWindow {
+            window: "202".to_owned()
+        })
     );
-    assert_eq!(route_for(Some("202"), None), Ok(Route::BackgroundWindow { window: "202".to_owned() }));
-    assert_eq!(route_for(Some("202"), Some(Delivery::Foreground)), Ok(Route::ForegroundHid));
+    assert_eq!(
+        route_for(Some("202"), None),
+        Ok(Route::BackgroundWindow {
+            window: "202".to_owned()
+        })
+    );
+    assert_eq!(
+        route_for(Some("202"), Some(Delivery::Foreground)),
+        Ok(Route::ForegroundHid)
+    );
     assert_eq!(route_for(None, None), Ok(Route::ForegroundHid));
-    assert!(route_for(None, Some(Delivery::Background)).is_err(), "no window, no background route");
-    assert_eq!(route_for(Some("desktop"), None), Ok(Route::ForegroundHid), "the desktop is not a window");
-    assert!(route_for(Some("desktop"), Some(Delivery::Background)).is_err(), "nor a background target");
+    assert!(
+        route_for(None, Some(Delivery::Background)).is_err(),
+        "no window, no background route"
+    );
+    assert_eq!(
+        route_for(Some("desktop"), None),
+        Ok(Route::ForegroundHid),
+        "the desktop is not a window"
+    );
+    assert!(
+        route_for(Some("desktop"), Some(Delivery::Background)).is_err(),
+        "nor a background target"
+    );
 }
