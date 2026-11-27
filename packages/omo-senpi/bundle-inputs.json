@@ -782,6 +782,7 @@
     "packages/omo-native/bin/lib/jsonc.js",
     "packages/omo-native/bin/lib/package-paths.js",
     "packages/omo-native/bin/lib/provider-map.json",
+    "packages/omo-native/bin/lib/read-failure.js",
     "packages/omo-native/bin/lib/setup-assets-import.js",
     "packages/omo-native/bin/lib/setup-commandcode.js",
     "packages/omo-native/bin/lib/setup-credentials.js",
