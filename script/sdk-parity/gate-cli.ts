@@ -16,7 +16,7 @@ import { offenderGrowth } from "../remote-import-guard-adapter"
 import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
 import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
-import { SCENARIOS } from "./scenarios"
+import { type Scenario, SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
 import type { DiscoveredTool } from "./tool-check"
 
@@ -98,6 +98,11 @@ try {
   if (headVersions === undefined)
     throw new Error("the head has no packages/omo-native/package.json to read versions from")
   const baseSide = runSide(baseTree)
+  // The merge base's own scenario table: both trees run the head's, so only this shows a scenario the head dropped.
+  const baseScenarios = await import(join(baseTree, "script/sdk-parity/scenarios.ts")).then(
+    (module: { readonly SCENARIOS?: readonly Scenario[] }) => module.SCENARIOS,
+    () => undefined,
+  )
   const headSide = runSide(REPO_ROOT)
   const comparedMs = Date.now() - started
   const files = loadDomainFiles(ROWS_DIR)
@@ -135,6 +140,7 @@ try {
     body,
     headSha: git("rev-parse", "HEAD").trim(),
     versions: { base: baseVersions, head: headVersions },
+    baseScenarios,
     presentation: {
       base: baseRowsText === undefined ? undefined : parsePresentation(baseRowsText),
       head: loadPresentation(),
