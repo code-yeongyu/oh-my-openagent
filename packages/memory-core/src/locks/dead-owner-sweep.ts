@@ -1,7 +1,7 @@
 import { hostname } from "node:os"
 import path from "node:path"
 
-import { lstat, readdir, readFile } from "../fs/resilient"
+import { link, lstat, readdir, readFile, unlink } from "../fs/resilient"
 import { LockContentionError, acquireWithoutDirectorySweep } from "./acquire-core"
 import { releaseLock } from "./lock-owner"
 import { isLockOwnerProvenDead } from "./stale-owner"
@@ -9,6 +9,7 @@ import { createLockRecord, parseLockRecord, type LockRecord } from "./lock-recor
 import { getPidLiveness } from "./process-identity"
 
 const LOCK_FILE_SUFFIX = ".lock"
+const REAPING_NAME = /^(.+\.lock(?:\.recovery)?)\.reaping-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
@@ -71,11 +72,26 @@ export async function sweepDeadOwnerLocks(lockDirectory: string, options: DeadOw
   }
   let reclaimed = 0
   for (const name of names) {
-    if (!name.endsWith(LOCK_FILE_SUFFIX)) continue
+    const key = REAPING_NAME.exec(name)?.[1]
+    if (!key && !name.endsWith(LOCK_FILE_SUFFIX)) continue
     const lockPath = path.join(lockDirectory, name)
     try {
+      if (key) {
+        // Reaping names are unique, never reused. Never overwrite a successor or discard an
+        // unverified record. Only remove a live record's saved name after a successful put-back.
+        if (!(await lstat(lockPath)).isFile()) continue
+        const owner = parseLockRecord(await readFile(lockPath, "utf8"))
+        if (!owner) continue
+        if (!(await isLockOwnerProvenDead(owner))) {
+          if (owner.hostname !== hostname() || getPidLiveness(owner.pid) !== "alive") continue
+          await link(lockPath, path.join(lockDirectory, key))
+        }
+        await unlink(lockPath)
+        continue
+      }
       if (await reclaimIfDeadOwner(lockPath, options)) reclaimed += 1
     } catch (error) {
+      if (key && (errorCode(error) === "ENOENT" || errorCode(error) === "EEXIST")) continue
       options.onFailure?.(lockPath, error)
     }
   }

@@ -37,7 +37,7 @@ export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean>
 // rename-then-inspect instead of unlink: rename is atomic, so exactly one reaper obtains the
 // inode. If the bytes it obtained are not the dead record it saw, another contender already
 // reaped that record and published a fresh live holder in between, so the file is handed back
-// with link (EEXIST means yet another contender republished first, and nothing is lost).
+// with link. If another contender already republished, retain the displaced record for recovery.
 // The tombstone name must not match LEAKED_CANDIDATE_NAME in candidate-sweep.ts, otherwise a
 // concurrent stale-candidate sweep could delete it while it is still being inspected.
 async function isRecoverableOwner(owner: OwnerSnapshot, now: number, incompleteLockGraceMs: number): Promise<boolean> {
@@ -73,6 +73,7 @@ async function reclaimStaleRecoveryLock(
     await link(tombstonePath, recoveryPath)
   } catch (error) {
     if (errorCode(error) !== "EEXIST") throw error
+    return false
   }
   await unlink(tombstonePath)
   return false
