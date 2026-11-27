@@ -10,3 +10,9 @@ crate-type = ["rlib"]
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
 omo-computer-safety = { path = "../omo-computer-safety" }
+image = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = { workspace = true }
