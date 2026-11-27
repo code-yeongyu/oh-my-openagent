@@ -25,6 +25,8 @@ export type DagDiagnostic =
   | {
       readonly kind: "node_flag"
       readonly nodeId: DagNodeId
+      // A dependent flagged because the node it consumed lost its result (#12134).
+      readonly invalidatedBy?: DagNodeId
       readonly message: string
       readonly at: string
       readonly heldTrigger?: DagHeldTriggerFact

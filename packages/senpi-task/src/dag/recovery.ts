@@ -4,6 +4,7 @@ import { join } from "node:path"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagScheduler } from "./scheduler"
 import { installRecoveredDag } from "./recovery-install"
+import { reconcileCompletedNode } from "./recovery-completed-node"
 import { resolveRecoveredNodeTask } from "./recovery-attempt"
 import { startFailure, startSpec, taskOwner } from "./recovery-start"
 import { fenceStaleLiveChildren } from "./child-gate"
@@ -12,7 +13,7 @@ import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 import { defaultSignaller } from "../lifecycle/context"
 import type { TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
-import { dagNodeReusedEvent, dagNodeRetriedEvent, dagNodeTaskAttachedEvent, dagNodeTransitionedEvent } from "./events"
+import { dagNodeRetriedEvent, dagNodeTaskAttachedEvent, dagNodeTransitionedEvent } from "./events"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
 import type { OwnedStartResult } from "./owner"
@@ -263,19 +264,13 @@ async function reconcileNodes(
   const staleLive = fencing instanceof Promise ? await fencing : fencing
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
-      const result = readDagNodeResult({ store: context.store, runId: journal.snapshot().runId, nodeId: observed.id })
-      if (result !== null) {
-        reusedOutputs.set(observed.id, result.output)
-        if (observed.taskId !== undefined) {
-          journal.append(
-            dagNodeReusedEvent({
-              nodeId: observed.id,
-              taskId: observed.taskId,
-              sourceRunId: journal.snapshot().runId,
-            }),
-          )
-        }
-      }
+      const failCompleted = (nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void =>
+        failNode(journal, nodeId, code, message, context.now, pendingErrors)
+      const reopening = reconcileCompletedNode(
+        { ...context, journal, reusedOutputs, reattachedTasks, staleLive, failNode: failCompleted },
+        observed,
+      )
+      if (reopening instanceof Promise) await reopening
       continue
     }
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue

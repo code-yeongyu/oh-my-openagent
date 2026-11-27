@@ -8,9 +8,10 @@ import type { TeardownStepDeadline } from "../../lifecycle/teardown-budget"
 import type { DestructionPort } from "../../steering"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
 import { ImmediateRunner } from "./controlled-runner"
+import { parentSessionId, planner, rootSessionId } from "./controlled-dag-definitions"
 import { resultPersistingManager } from "./result-persisting-manager"
 import { ownedTaskState, ownedTaskStateDir } from "../../store/__fixtures__/owned-task-state"
-import type { DagDefinition, DagNodeInput } from "../graph"
+import type { DagDefinition } from "../graph"
 import { createDagWaitSurface, type DagRunResult } from "../handle"
 import type { RetrySchedule } from "../infrastructure-retry"
 import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartResult } from "../manager"
@@ -29,45 +30,7 @@ import { createDagFileStore, type DagFileStore } from "../store"
 import { noLiveHolder } from "./reattached-run"
 import type { DagNodeId, DagRunEvent, DagRunId } from "../types"
 
-export const parentSessionId = "session-e2e-failure-parent"
-export const rootSessionId = "session-e2e-failure-root"
-
-export function categoryNode(
-  id: string,
-  dependsOn: readonly string[] = [],
-  overrides: {
-    readonly prompt?: string
-    readonly label?: string
-    readonly task_summary?: string
-    readonly description?: string
-    readonly load_skills?: readonly string[]
-  } = {},
-): DagNodeInput {
-  return {
-    id,
-    prompt: `do ${id}`,
-    category: "quick",
-    ...(dependsOn.length === 0 ? {} : { dependsOn }),
-    ...overrides,
-  }
-}
-
-export function definition(key: string, nodes: readonly DagNodeInput[]): DagDefinition {
-  return { key, name: key.replaceAll("-", " "), nodes }
-}
-
-export function planner(spec: Parameters<ChildPlanner>[0]): ReturnType<ChildPlanner> {
-  const target = spec.category ?? spec.subagent_type ?? "default"
-  return {
-    kind: "resolved",
-    plan: {
-      model: spec.model ?? `scripted/${target}`,
-      ...(spec.category === undefined ? {} : { category: spec.category }),
-      ...(spec.subagent_type === undefined ? {} : { agentType: spec.subagent_type }),
-    },
-  }
-}
-
+export { categoryNode, definition, parentSessionId, planner, rootSessionId } from "./controlled-dag-definitions"
 export { resultPersistingManager } from "./result-persisting-manager"
 
 export type E2eFixtureOptions = {
@@ -84,6 +47,8 @@ export type E2eFixtureOptions = {
   readonly teardownStepDeadline?: TeardownStepDeadline
   /** The DAG self-resume fence is wired like the runtime wires it; false drives a manager without it. */
   readonly resumeFence?: boolean
+  /** The fence's view of a cancellation in flight, for a scheduler the test built outside the fixture. */
+  readonly cancelling?: (runId: DagRunId) => boolean
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
   // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
   readonly store?: DagFileStore
@@ -156,7 +121,7 @@ export function createE2eFixture(options: E2eFixtureOptions & { readonly project
             ownerResumeFence: (record: TaskRecord) =>
               createDagOwnerResumeFence({
                 store,
-                cancelling: (runId) => schedulers.get(runId)?.cancelling() ?? false,
+                cancelling: options.cancelling ?? ((runId) => schedulers.get(runId)?.cancelling() ?? false),
                 heldTriggers: {
                   reservations,
                   store,

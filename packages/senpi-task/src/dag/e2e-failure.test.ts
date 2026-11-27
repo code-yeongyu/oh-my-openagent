@@ -779,8 +779,10 @@ describe("DAG retry, amend, and revive end to end", () => {
 
   test("#11381 #given a completed node whose child resumed on its own #when the node is amended #then the stale child is cancelled before the amended attempt starts and is never adopted", async () => {
     // given
+    // A turn the fence allows while the run runs is followed by node A (#15133), so the live child of
+    // a settled run is one no fence re-checked: a host-session child outliving its process.
     const runner = new ControlledRunner()
-    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer })
+    const fixture = e2eFixture({ resumeFence: false, runner, materializeSkills: identityMaterializer })
     const started = await fixture.start(definition("amend-stale-child", [categoryNode("A"), categoryNode("B", ["A"])]))
     const runId = started.snapshot.runId
     await runner.whenStarted(1)
@@ -788,9 +790,9 @@ describe("DAG retry, amend, and revive end to end", () => {
     await runner.whenStarted(2)
     const staleTaskId = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
     if (staleTaskId === undefined) throw new Error("node A owns no task")
-    await runner.selfResume("A")
     runner.settle("B", completed("B"))
     await fixture.wait(runId)
+    await runner.selfResume("A")
     expect(fixture.taskStore.load(staleTaskId)?.status).toBe("running")
     const reattached = new Promise<{ readonly taskId: string; readonly staleStatus: string | undefined }>((resolve) => {
       const unsubscribe = subscribeDagJournal(fixture.store, runId, (event) => {

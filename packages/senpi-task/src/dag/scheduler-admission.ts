@@ -3,6 +3,7 @@ import type { OwnedStartResult } from "./owner"
 import { errorMessage, failNode, transition, type SchedulerContext } from "./scheduler-context"
 import { fenceStaleChildren, resolveAdmissionIdle, supersededChildren } from "./scheduler-cancellation"
 import { emitCompletedWaves, emitWaveAdmissions } from "./scheduler-frontier"
+import { stillAdmissible } from "./scheduler-self-resume"
 import { startSpec, owner, isRunnable } from "./scheduler-start"
 import { attachStarted, foldSettlement, nextOwnSettlement, settleOne } from "./scheduler-task-attachment"
 import { settleOwnerConflict, stopSupersededClaims, type SupersededStop } from "./scheduler-owner-conflict"
@@ -20,7 +21,8 @@ type SupersededStops = ReadonlyMap<string, SupersededStop>
 export async function admitFrontier(context: SchedulerContext): Promise<boolean> {
   for (;;) {
     if (context.suspended || context.cancellationStarted) return false
-    const denied = context.pendingAdmission.splice(0)
+    // A denial whose dependency re-opened meanwhile (its child resumed on its own) waits again (#12134).
+    const denied = stillAdmissible(context, context.pendingAdmission.splice(0))
     // No node is admitted in a pass after which a superseded or removed-node child is still live
     // (#11381). The fence stops such children under the admission latch, before this batch takes it.
     const stale = supersededChildren(context)
@@ -167,7 +169,10 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
             // The slot a fold may free goes to the oldest denial first, before the nodes it unblocks.
             // A node parked a microtask ago may still be in flight until its start settles; it stays
             // parked and is retried on the next fold or at the end of the pass.
-            const retry = admissionOrder.filter((nodeId) => parked.has(nodeId) && !inFlight.has(nodeId))
+            // A parked node whose dependency re-opened meanwhile returns to the frontier instead (#12134).
+            const waiting = admissionOrder.filter((nodeId) => parked.has(nodeId) && !inFlight.has(nodeId))
+            const retry = stillAdmissible(context, waiting)
+            for (const nodeId of waiting) if (!retry.includes(nodeId)) parked.delete(nodeId)
             if (retry.length > 0 && fenceClear()) {
               for (const nodeId of retry) parked.delete(nodeId)
               launch(retry)

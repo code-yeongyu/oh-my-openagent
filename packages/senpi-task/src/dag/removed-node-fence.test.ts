@@ -31,7 +31,12 @@ async function settledRunWithUnreachableChildOfA() {
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-removed-fence-"))
   roots.push(root)
   const runner = new ControlledRunner(undefined, { connectable: true })
-  const fixture = createE2eFixture({ project: root, runner, materializeSkills: identityMaterializer })
+  const fixture = createE2eFixture({
+    project: root,
+    resumeFence: false,
+    runner,
+    materializeSkills: identityMaterializer,
+  })
   const started = await fixture.start(definition("removed-fence", [categoryNode("A"), categoryNode("B")]))
   const runId = started.snapshot.runId
   await runner.whenStarted(2)
@@ -40,9 +45,11 @@ async function settledRunWithUnreachableChildOfA() {
     runId,
     (event) => event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
   )
-  await runner.selfResume("A")
   runner.settle("B", completed("B"))
   await fixture.wait(runId)
+  // Stacked on #15133 a turn the fence allows while the run runs is followed by its node, so a live
+  // child of a settled run is one no fence re-checked: a host-session child outliving its process.
+  await runner.selfResume("A")
   const orphan = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
   if (orphan === undefined) throw new Error("node A owns no task")
   runner.child("A").connection.lose()

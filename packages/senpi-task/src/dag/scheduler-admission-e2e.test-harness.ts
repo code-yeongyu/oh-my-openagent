@@ -30,7 +30,7 @@ export function cleanupAdmissionRoots(): void {
 
 type Gate = { readonly call: number; readonly reached: () => void; readonly released: Promise<void> }
 
-class GatedOwnedStarts {
+export class GatedOwnedStarts {
   readonly calls: string[] = []
   readonly stopRequests: { readonly taskId: string; readonly reason: string | undefined }[] = []
   /** Called as a start reaches the manager, after any hold: what the run looked like then. */
