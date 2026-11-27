@@ -69,13 +69,14 @@ function trackedChanges(root: string): string[] {
   return lines(gitOut(root, ["status", "--porcelain", "--untracked-files=no"])).map((line) => line.slice(3))
 }
 
-function failingTests(output: string): string[] {
+export function failingTests(output: string): string[] {
   const failures: string[] = []
   let file = ""
   for (const line of output.split("\n")) {
     if (/^\d+ tests? failed:$/.test(line.trim())) break
     const header = /^(\S+\.test\.ts):$/.exec(line.trim())
-    if (header?.[1]) file = header[1]
+    // bun test prints OS-native separators; the gate's output is machine-read, so name files as repo POSIX paths
+    if (header?.[1]) file = header[1].replaceAll("\\", "/")
     const failed = /^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/.exec(line.trim())
     if (failed?.[1]) failures.push(`${file} > ${failed[1]}`)
   }

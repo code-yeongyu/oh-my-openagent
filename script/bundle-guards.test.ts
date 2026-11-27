@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { deriveBundleGuards, withScratchHome } from "./bundle-guards"
+import { deriveBundleGuards, failingTests, withScratchHome } from "./bundle-guards"
 
 const cli = fileURLToPath(new URL("./bundle-guards.ts", import.meta.url))
 const bundlePath = "packages/omo-senpi/plugin/extensions/omo.js"
@@ -239,5 +239,21 @@ describe("bundle guard push gate (#15072)", () => {
       "script/new-runtime-guard.test.ts",
       "script/omo-bundle-fresh.test.ts",
     ])
+  })
+
+  test("#given bun test output with Windows path separators #when failures are named #then the file is the repo POSIX path", () => {
+    // given
+    const output = [
+      "script\\omo-bundle-fresh.test.ts:",
+      "(fail) the shipped bundle carries the source marker [12.30ms]",
+      "",
+      "1 test failed:",
+    ].join("\n")
+
+    // when
+    const failures = failingTests(output)
+
+    // then
+    expect(failures).toEqual(["script/omo-bundle-fresh.test.ts > the shipped bundle carries the source marker"])
   })
 })
