@@ -17,10 +17,10 @@ const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.
 const TRAILER_ARGUMENT_MARKER = `--trailer \\"${TRAILER}`
 const CO_AUTHOR_MARKER = "Co-authored-by:"
 const FOOTER_MARKER = "Ultraworked with"
-const SKILL_BODY_MARKER = "GIT MASTER LIVE QA BODY"
-const PREFIX_SECTION_MARKER = "GIT COMMAND PREFIX (MANDATORY)"
-// Only the rewrite of the seeded bash block can produce this line; the injected section has no `git add -A .`.
-const PREFIXED_COMMAND_MARKER = "GIT_MASTER=1 git add -A ."
+const SKILL_BODY_MARKER = "GIT SKILL LIVE QA BODY"
+const PREFIX_SECTION_MARKER = "<git_env_prefix>"
+// The seeded body has no git command, so only the injected block can produce the line form.
+const PREFIXED_COMMAND_MARKER = "GIT_MASTER=1 git"
 
 function findOnPath(bin) {
   if (bin.includes("/")) return existsSync(bin) ? bin : null
@@ -50,7 +50,7 @@ export function readToolEventsPayload(events) {
   return { count: readEvents.length, payload: JSON.stringify(readEvents) }
 }
 
-function seedScenario(sandbox, gitMasterConfig) {
+function seedScenario(sandbox, gitMasterConfig, readDirName) {
   seedSandbox(sandbox)
   const sessionDir = join(sandbox.root, "sessions")
   mkdirSync(sessionDir, { recursive: true })
@@ -58,20 +58,21 @@ function seedScenario(sandbox, gitMasterConfig) {
   mkdirSync(omoDir, { recursive: true })
   const omoConfig = gitMasterConfig === undefined ? {} : { git_master: gitMasterConfig }
   writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(omoConfig, null, 2)}\n`)
-  const skillDir = join(sandbox.agentDir, "skills", "git-master")
+  const skillDir = join(sandbox.agentDir, "skills", "git")
   mkdirSync(skillDir, { recursive: true })
-  const skillPath = join(skillDir, "SKILL.md")
   writeFileSync(
-    skillPath,
-    `---\nname: git-master\ndescription: Isolated live QA git-master skill\n---\n${SKILL_BODY_MARKER}\n\n\`\`\`bash\ngit add -A .\ngit commit -m "qa"\n\`\`\`\n`,
+    join(skillDir, "SKILL.md"),
+    `---\nname: git\ndescription: Isolated live QA git skill\n---\n${SKILL_BODY_MARKER}\n`,
   )
+  // The legacy scenario reads the retired `git-master` path, which does not exist on disk.
+  const skillPath = join(sandbox.agentDir, "skills", readDirName, "SKILL.md")
   writeFileSync(
     join(sandbox.cwd, "mock-script.json"),
     `${JSON.stringify(
       {
         steps: [
           { type: "tool_call", name: "read", arguments: { path: skillPath } },
-          { type: "text", text: "git-master attribution QA complete" },
+          { type: "text", text: "git skill attribution QA complete" },
         ],
       },
       null,
@@ -81,10 +82,10 @@ function seedScenario(sandbox, gitMasterConfig) {
   return sessionDir
 }
 
-function runScenario(senpiBin, gitMasterConfig) {
+function runScenario(senpiBin, gitMasterConfig, readDirName = "git") {
   const sandbox = createSandbox()
   try {
-    const sessionDir = seedScenario(sandbox, gitMasterConfig)
+    const sessionDir = seedScenario(sandbox, gitMasterConfig, readDirName)
     // An omo-hosted shell exports OMO_CODING_AGENT_DIR, which outranks SENPI_CODING_AGENT_DIR in
     // resolveAgentHome and would silently re-point the sandbox at the real agent dir.
     const cleanEnv = { ...process.env }
@@ -104,7 +105,7 @@ function runScenario(senpiBin, gitMasterConfig) {
         "mock-1",
         "--session-dir",
         sessionDir,
-        "read the git-master skill",
+        "read the git skill",
       ],
       {
         cwd: sandbox.cwd,
@@ -177,6 +178,7 @@ function main() {
   const optedIn = runScenario(senpiBin, { commit_footer: true })
   const prefixOff = runScenario(senpiBin, { git_env_prefix: "" })
   const coAuthorOff = runScenario(senpiBin, { include_co_authored_by: false })
+  const legacyPath = runScenario(senpiBin, undefined, "git-master")
   const changedRealDirs = snapshots.filter(({ dir, before }) => before !== credentialDigest(dir)).map(({ dir }) => dir)
   const checks = {
     default_process_exit: defaultOff.exitStatus === 0 ? "PASS" : "FAIL",
@@ -184,7 +186,7 @@ function main() {
     default_footer_absent: defaultOff.footerPresent ? "FAIL" : "PASS",
     default_trailer_once: defaultOff.trailerArgumentCount === 1 ? "PASS" : "FAIL",
     default_prefix_section: defaultOff.prefixSectionPresent ? "PASS" : "FAIL",
-    default_git_commands_prefixed: defaultOff.prefixedCommandPresent ? "PASS" : "FAIL",
+    default_prefix_line_form: defaultOff.prefixedCommandPresent ? "PASS" : "FAIL",
     opt_in_process_exit: optedIn.exitStatus === 0 ? "PASS" : "FAIL",
     opt_in_read_event: optedIn.readEventCount >= 1 && optedIn.bodyPresent ? "PASS" : "FAIL",
     opt_in_footer_injected: optedIn.footerPresent ? "PASS" : "FAIL",
@@ -192,12 +194,16 @@ function main() {
     prefix_off_process_exit: prefixOff.exitStatus === 0 ? "PASS" : "FAIL",
     prefix_off_read_event: prefixOff.readEventCount >= 1 && prefixOff.bodyPresent ? "PASS" : "FAIL",
     prefix_off_section_absent: prefixOff.prefixSectionPresent ? "FAIL" : "PASS",
-    prefix_off_commands_unprefixed: prefixOff.prefixedCommandPresent ? "FAIL" : "PASS",
+    prefix_off_line_form_absent: prefixOff.prefixedCommandPresent ? "FAIL" : "PASS",
     prefix_off_trailer_once: prefixOff.trailerArgumentCount === 1 ? "PASS" : "FAIL",
     co_author_off_process_exit: coAuthorOff.exitStatus === 0 ? "PASS" : "FAIL",
     co_author_off_read_event: coAuthorOff.readEventCount >= 1 && coAuthorOff.bodyPresent ? "PASS" : "FAIL",
     co_author_off_trailer_absent: coAuthorOff.trailerPresent ? "FAIL" : "PASS",
     co_author_off_prefix_kept: coAuthorOff.prefixedCommandPresent ? "PASS" : "FAIL",
+    legacy_path_process_exit: legacyPath.exitStatus === 0 ? "PASS" : "FAIL",
+    legacy_path_reads_git_skill: legacyPath.readEventCount >= 1 && legacyPath.bodyPresent ? "PASS" : "FAIL",
+    legacy_path_prefix_section: legacyPath.prefixSectionPresent ? "PASS" : "FAIL",
+    legacy_path_trailer_once: legacyPath.trailerArgumentCount === 1 ? "PASS" : "FAIL",
     real_agent_dirs_untouched: changedRealDirs.length === 0 ? "PASS" : "FAIL",
   }
   const result = Object.values(checks).every((value) => value === "PASS") ? "PASS" : "FAIL"
@@ -211,6 +217,7 @@ function main() {
       optIn: optedIn.sandboxAgentDir,
       prefixOff: prefixOff.sandboxAgentDir,
       coAuthorOff: coAuthorOff.sandboxAgentDir,
+      legacyPath: legacyPath.sandboxAgentDir,
     },
   }
   writeEvidence(outDir ? resolve(outDir) : undefined, payload, {
@@ -218,6 +225,7 @@ function main() {
     "opt-in": optedIn,
     "prefix-off": prefixOff,
     "co-author-off": coAuthorOff,
+    "legacy-path": legacyPath,
   })
   console.log(JSON.stringify(payload))
   process.exitCode = result === "PASS" ? 0 : 1

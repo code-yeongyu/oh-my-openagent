@@ -4,7 +4,7 @@
 
 ## Shipped skills
 
-The plugin ships 27 skills by default:
+The plugin ships 28 skills by default:
 
 - `ast-grep` — structural code search and rewrites
 - `browser` — drive a real browser from the js eval kernel: signed-in sites, forms, screenshots, web QA
@@ -13,7 +13,8 @@ The plugin ships 27 skills by default:
 - `debugging` — hypothesis-driven runtime debugging across languages
 - `eval-integrity` — check whether an eval, benchmark, or metric claim is trustworthy
 - `frontend` — UI/UX/visual design, styling, layout, and frontend implementation
-- `git-master` — advanced Git operations, history surgery, and workflow automation
+- `git` — local git from eval cells: commits, worktrees, base sync, push, history search (`git-master` still resolves as an alias)
+- `github` — GitHub work through a typed SDK, CLI and MCP: pull requests, CI waits, issues, Actions, releases, repositories
 - `give-me-tips` — explain any senpi tip, including the Tip: lines in the TUI
 - `hyperplan` — adversarial 5-member cross-critique planning
 - `init-deep` — deep project initialization and scaffold setup
