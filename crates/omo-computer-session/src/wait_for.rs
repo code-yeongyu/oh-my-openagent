@@ -6,9 +6,8 @@
 //! target itself went away.
 //! The call ends on an observation of its target, or of nothing when the target is gone.
 
-use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{NotificationFingerprint, Refusal, WindowFilter};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::observation::{Observation, SettleOutcome};
 use omo_computer_core::params::{
     ElementState, EventKind, SurfaceState, WaitForParams, WindowState,
