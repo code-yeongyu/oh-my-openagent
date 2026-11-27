@@ -93,6 +93,17 @@ describe.skipIf(process.platform !== "linux")("a launch refreshes only its own a
     expect(manager.calls()).toEqual([])
   })
 
+  test("an older launch for the unit's own agent directory never downgrades it", async () => {
+    const manager = serviceManagerStandIn()
+    const { home, unit, agentDir } = installedUnit("5.1.80")
+    const before = readFileSync(unit, "utf8")
+
+    expect(await launch(home, "5.1.77", agentDir)).toEqual([])
+
+    expect(readFileSync(unit, "utf8")).toBe(before)
+    expect(manager.calls()).toEqual([])
+  })
+
   test("a same-version launch for the unit's own agent directory leaves it byte-identical", async () => {
     const manager = serviceManagerStandIn()
     const { home, unit, agentDir } = installedUnit("5.1.77")
