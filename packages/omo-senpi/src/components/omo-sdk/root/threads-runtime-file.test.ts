@@ -35,7 +35,7 @@ function failingLoad() {
 
 // A core with every member the root calls, each answering an empty success; a case overrides the members it drives.
 function fullCore(overrides: Readonly<Record<string, unknown>> = {}): Record<string, unknown> {
-  const answer = async () => ({ kind: "ok", threads: [] })
+  const answer = async () => ({ kind: "ok", threads: [], thread: { thread_id: "t" } })
   return {
     ...Object.fromEntries(
       [
@@ -54,6 +54,7 @@ function fullCore(overrides: Readonly<Record<string, unknown>> = {}): Record<str
         "dispose",
       ].map((name) => [name, answer]),
     ),
+    release: async () => ({ kind: "ok", value: { success: true } }),
     extensions: { register: answer, call: answer },
     ...overrides,
   }
@@ -389,6 +390,103 @@ describe("a dispose that races the first thread call", () => {
         ran: [],
       })
     })
+
+  // Review 6081652829 and the LEAD's ruling, dispose wins by construction: a member reaches the core only through `use`,
+  // which checks the disposed mark and calls the core in the same tick. The sweep starts dispose after every number of
+  // microtask turns from 0 to N, where N is the turns that member takes to settle on a ready core with no dispose
+  // (measured first, so it covers the longest await chain the member has) plus one; no core method may run once
+  // dispose() began, and the core is disposed once.
+  const watchedCore = (h: Harness, onCall: (name: string) => void) => {
+    const watch = (target: Record<string, unknown>, prefix: string): Record<string, unknown> =>
+      Object.fromEntries(
+        Object.entries(target).map(([name, value]) => [
+          name,
+          name === "dispose"
+            ? value
+            : typeof value === "function"
+              ? (...args: unknown[]) => {
+                  onCall(`${prefix}${name}`)
+                  return (value as (...a: unknown[]) => unknown)(...args)
+                }
+              : typeof value === "object" && value !== null
+                ? watch(value as Record<string, unknown>, `${prefix}${name}.`)
+                : value,
+        ]),
+      )
+    return watch(h.makeCore() as Record<string, unknown>, "")
+  }
+  const readyNamespace = async (onCall: (name: string) => void) => {
+    const { served, counts, h } = harness()
+    h.loadGate.release(h.constructRuntime)
+    const warm = list(served)
+    await h.constructing
+    h.finish(watchedCore(h, onCall))
+    await warm
+    return { served, counts }
+  }
+  // A step is one microtask turn; a member that awaits I/O (a module import, for the input check) yields to the event
+  // loop, so a step that finds no microtask work waits one macrotask tick. The member's settling time counts these steps,
+  // so N covers every await it has, microtask or I/O, and the sweep starts dispose after each step from 0 to N + 1.
+  // One microtask turn per step (awaiting an already-settled promise takes exactly one), so no one-turn window is skipped.
+  const step = () => Promise.resolve()
+  const tick = () => new Promise<void>((resolve) => setImmediate(resolve))
+  const stepsToSettle = async (member: string): Promise<number> => {
+    const { served } = await readyNamespace(() => undefined)
+    let settled = false
+    const call = callMember(
+      served,
+      member,
+    )(MEMBER_INPUTS[member] ?? {}).then(() => {
+      settled = true
+    })
+    const bound = 10_000
+    let steps = 0
+    while (!settled && steps < bound) {
+      await (steps % 16 === 15 ? tick() : step())
+      steps += 1
+    }
+    expect({ member, settledWithinBound: settled }).toEqual({ member, settledWithinBound: true })
+    await call
+    return steps
+  }
+
+  for (const member of Object.keys(namespace(() => Promise.resolve(runtimeWith(() => undefined))).members))
+    test(`#given a ready core #when ${member} runs and dispose begins after every step up to the member's own settling time #then no core method runs once dispose began`, async () => {
+      const longest = await stepsToSettle(member)
+      const lateCalls: string[] = []
+      for (let steps = 0; steps <= longest + 1; steps += 1) {
+        let disposing = false
+        const { served, counts } = await readyNamespace((name) => {
+          if (disposing) lateCalls.push(`+${steps}: ${name}`)
+        })
+        const call = callMember(served, member)(MEMBER_INPUTS[member] ?? {})
+        for (let taken = 0; taken < steps; taken += 1) await (taken % 16 === 15 ? tick() : step())
+        disposing = true
+        await Promise.all([call, served.dispose?.()])
+        expect({ steps, created: counts.created, disposed: counts.disposed }).toEqual({
+          steps,
+          created: 1,
+          disposed: 1,
+        })
+      }
+      expect({ longest: longest > 0, lateCalls }).toEqual({ longest: true, lateCalls: [] })
+    })
+
+  // Architecture contract (the LEAD's ruling): the core is reachable only through `use`, whose callback reaches the core
+  // before its first await of anything else; no member holds the creation's result or the private acquire.
+  test("#given the threads namespace source #then every core use goes through use() and each callback reaches the core before any other await", async () => {
+    const source = await Bun.file(new URL("./threads.ts", import.meta.url)).text()
+    expect(source.match(/\bacquire\b|\.core\b|\bready\b/g) ?? []).toEqual([])
+    const callbacks = [...source.matchAll(/\buse\(\s*async \(core\) =>/g)].map((match) => {
+      const rest = source.slice((match.index ?? 0) + match[0].length)
+      return rest
+        .slice(0, rest.indexOf("core."))
+        .replace(/await\s*$/, "")
+        .replace(/await settledExtension\(async \(\) =>\s*$/, "")
+    })
+    expect(callbacks.length).toBeGreaterThan(10)
+    expect(callbacks.filter((prefix) => /\bawait\b|\.then\(/.test(prefix))).toEqual([])
+  })
 
   test("#given the dispose matrix #then it covers 16 cells: every outcome before and during the load, every construction outcome during construction, and a ready core", () => {
     const cells = Object.entries(OUTCOMES).flatMap(([outcome, { stage }]) =>

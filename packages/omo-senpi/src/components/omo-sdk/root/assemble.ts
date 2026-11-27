@@ -421,6 +421,7 @@ export function assembleRoot(
   // still pending before it releases the namespaces' cores and ports.
   const dispose = (): Promise<void> => {
     disposed = true
+    for (const serving of servings) serving.disposing?.()
     close()
     disposing ??= Promise.allSettled([...pending])
       .then(() => Promise.all(servings.map((serving) => serving.dispose?.())))

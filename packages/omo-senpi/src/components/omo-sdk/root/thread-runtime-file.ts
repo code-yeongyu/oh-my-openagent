@@ -173,17 +173,30 @@ export function threadCoreAccess(options: {
     pending = creating
     return creating
   }
-  // Dispose wins up to the moment a member runs: a call that awaited a core that was ready answers the disposed refusal
-  // when dispose() began meanwhile, so no member runs on a core dispose is releasing (design ruling on review 6081179233).
-  const acquire = async (): Promise<Ready | OmoFailure> => {
-    if (disposed) return DISPOSED
-    const made = await createCore()
-    return disposed ? DISPOSED : made
+  const acquire = (): Promise<Ready | OmoFailure> => (disposed ? Promise.resolve(DISPOSED) : createCore())
+  // dispose() began at the root: from this step on no member reaches the core (the root's own mark, the same tick).
+  const disposing = (): void => {
+    disposed = true
   }
   const dispose = async (): Promise<void> => {
     disposed = true
     const made = pending === undefined ? undefined : await pending
     return made === undefined || isFailure(made) ? options.disposePorts() : made.core.dispose()
   }
-  return { acquire, dispose }
+  // The ONLY way a member reaches the core (review 6081652829 and the LEAD's ruling: dispose wins by construction): it
+  // awaits the creation, then checks the disposed mark and calls `run` with the core in the same tick, with no await
+  // between the check and the call. A member awaits anything else it needs (its input checks) BEFORE it calls `use`, and
+  // `run` reaches the core before its own first await (a source check in threads-runtime-file.test.ts holds both).
+  const use = async <R>(run: (core: ThreadCore) => Promise<R>): Promise<R | OmoFailure> => {
+    const ready = await acquire()
+    if (isFailure(ready)) return ready
+    if (disposed) return DISPOSED
+    return run(ready.core)
+  }
+  // The checked runtime values (no core) for a member that reads them before it calls `use`.
+  const runtimeOf = async (): Promise<CheckedRuntime | OmoFailure> => {
+    const ready = await acquire()
+    return isFailure(ready) ? ready : ready.runtime
+  }
+  return { use, runtimeOf, disposing, dispose }
 }

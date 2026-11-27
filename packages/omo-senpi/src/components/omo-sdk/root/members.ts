@@ -21,6 +21,11 @@ export type NamespaceServing = {
   readonly legacy?: readonly RootCallKey[]
   /** Synchronous: aborts what is in flight, as `close()` does today. */
   readonly close?: () => void
+  /**
+   * Synchronous: dispose() began. The namespace refuses every core use from now on, though the root waits for the
+   * admissions still pending before it calls `dispose`.
+   */
+  readonly disposing?: () => void
   /** Releases what the core holds (the gateway store, the remote sessions). */
   readonly dispose?: () => Promise<void>
   /**
