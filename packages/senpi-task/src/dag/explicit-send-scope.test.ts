@@ -76,25 +76,30 @@ describe("a task outside the caller's scope with a refused stop pending reads as
     second.release()
   })
 
-  test("#given its own task whose refused turn's stop is not confirmed #when the owning session cancels it as a tool call does #then the cancel re-issues that stop and answers cancel_pending", async () => {
-    // given
-    const { fixture, runner, clock, taskA, first } = await heldTurnPastItsBudget(roots)
-    const second = runner.child("A").holdStops()
+  // The refused stop is recorded under the task's id, so a caller who names its own task must reach it too.
+  for (const address of ["id", "name"] as const) {
+    test(`#given its own task whose refused turn's stop is not confirmed #when the owning session cancels it by ${address} as a tool call does #then the cancel re-issues that stop and answers cancel_pending`, async () => {
+      // given
+      const { fixture, runner, clock, taskA, first } = await heldTurnPastItsBudget(roots)
+      const second = runner.child("A").holdStops()
 
-    // when
-    const answer = fixture.taskManager.cancelTask(taskA, "stop it", { caller: { sessionId: parentSessionId } })
-    const settledFirst = await Promise.race([
-      second.reached.then(() => "re-issued the stop"),
-      answer.then(() => "answered"),
-    ])
-    clock.expire()
+      // when
+      const answer = fixture.taskManager.cancelTask(address === "id" ? taskA : "A", "stop it", {
+        caller: { sessionId: parentSessionId },
+      })
+      const settledFirst = await Promise.race([
+        second.reached.then(() => "re-issued the stop"),
+        answer.then(() => "answered"),
+      ])
+      clock.expire()
 
-    // then
-    expect(settledFirst).toBe("re-issued the stop")
-    expect(await answer).toMatchObject({ kind: "cancel_pending", task_id: taskA })
-    first.release()
-    second.release()
-  })
+      // then
+      expect(settledFirst).toBe("re-issued the stop")
+      expect(await answer).toMatchObject({ kind: "cancel_pending", task_id: taskA })
+      first.release()
+      second.release()
+    })
+  }
 
   test("#given another session's task whose refused turn's stop is not confirmed #when a caller outside its session sends with all_scope #then the send waits for the stop as the owner's would", async () => {
     // given
