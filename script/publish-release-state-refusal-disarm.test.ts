@@ -131,6 +131,10 @@ describe("publish.yml release-state refusal (#15126)", () => {
     expect(result.output).toContain(
       "Timed out waiting for release-state PR #77 to merge; refusing to publish npm packages.",
     )
+    // One check read per poll: the timeout is reached only after every configured poll ran.
+    expect(
+      result.ghCalls.split("\n").filter((call) => call.startsWith("pr view 77 --json statusCheckRollup")),
+    ).toHaveLength(3)
     expect(result.armed).toBe(false)
   })
 
