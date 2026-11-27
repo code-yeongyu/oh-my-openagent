@@ -8,6 +8,9 @@
 
 mod host;
 mod lease_hook;
+mod preview;
+#[cfg(test)]
+mod preview_tests;
 mod state;
 mod wire;
 #[cfg(test)]

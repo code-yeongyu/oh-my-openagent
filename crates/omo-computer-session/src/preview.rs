@@ -56,16 +56,6 @@ impl Preview {
     ///
     /// # Errors
     /// Why the frame was dropped; nothing is emitted then.
-    pub fn offer(&mut self, now_ms: u64, lease_active: bool, frame: FrameBytes) -> Result<(), Dropped> {
-        if !self.subscribed {
-            return Err(Dropped::NotSubscribed);
-        }
-        if !lease_active {
-            return Err(Dropped::NoLease);
-        }
-        self.offer_eligible(now_ms, frame)
-    }
-
     pub(crate) fn offer_eligible(&mut self, now_ms: u64, frame: FrameBytes) -> Result<(), Dropped> {
         if frame.mime != omo_computer_core::observation::ImageMime::Jpeg {
             return Err(Dropped::NotJpeg);
