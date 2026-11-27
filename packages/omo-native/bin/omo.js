@@ -52,8 +52,16 @@ try {
     } else if (process.argv[2] === "remote") {
       const { runRemoteCommand } = await import("./lib/service-auth.generated.js")
       await runRemoteCommand(process.argv.slice(2))
-    } else if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
-    else await runLauncher()
+    } else if (process.argv[2] === "setup") {
+      // Setup reads other harnesses' credential files; its error text can quote them (#10983).
+      try {
+        await runSetup(process.argv.slice(3))
+      } catch (error) {
+        const { describeReadFailure } = await import("./lib/read-failure.js")
+        console.error(`omo setup: ${describeReadFailure(error)}`)
+        process.exitCode = 1
+      }
+    } else await runLauncher()
   }
 } catch (error) {
   console.error(`omo: ${error.message}`)

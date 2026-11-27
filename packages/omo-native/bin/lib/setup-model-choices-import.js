@@ -32,7 +32,7 @@ import { dirname, join } from "node:path"
 import { isDeepStrictEqual } from "node:util"
 import { timestamp } from "./auth-store.js"
 import { loadEngineModels } from "./engine-models.js"
-import { insertJsoncMember } from "./jsonc-edit.js"
+import { insertJsoncMember, JsoncEditRefusal } from "./jsonc-edit.js"
 import { parseJsonc } from "./jsonc.js"
 import { describeReadFailure } from "./read-failure.js"
 import { convertModelChoices, hasModelChoices, readModelChoices } from "./setup-opencode-models.js"
@@ -199,7 +199,7 @@ function writeTarget(target, items, report) {
     return items.map((item) => item.label)
   } catch (error) {
     report(
-      `WARN senpi: could not edit ${target.path} safely (${describeReadFailure(error)}); these model choices were not written: ${items.map((item) => item.label).join(", ")}`,
+      `WARN senpi: could not edit ${target.path} safely (${error instanceof JsoncEditRefusal ? error.message : describeReadFailure(error)}); these model choices were not written: ${items.map((item) => item.label).join(", ")}`,
     )
     return []
   }
