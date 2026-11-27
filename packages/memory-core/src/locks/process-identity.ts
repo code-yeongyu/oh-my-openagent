@@ -185,7 +185,8 @@ function legacyPsLstartConflict(recorded: string, actual: string): boolean {
 export function startIdentitiesConflict(recorded: string, actual: string): boolean {
   const recordedScheme = identityScheme(recorded)
   const actualScheme = identityScheme(actual)
-  if (recordedScheme === "ps-lstart" && actualScheme === "ps-lstart-utc") return legacyPsLstartConflict(recorded, actual)
+  if (recordedScheme === "ps-lstart" && actualScheme === "ps-lstart-utc")
+    return legacyPsLstartConflict(recorded, actual)
   if (recordedScheme === null || recordedScheme !== actualScheme) return false
   return recorded !== actual
 }
