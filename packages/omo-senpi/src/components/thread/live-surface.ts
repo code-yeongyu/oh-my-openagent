@@ -10,6 +10,7 @@ import {
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
 import { holderVersion } from "./tools/thread-state"
+import { engineEvidence } from "./tools/row-liveness"
 import { isIdentityRefusal } from "./tools/session-error"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -1072,4 +1073,3 @@ export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"
 export { answerWorktreeRequest } from "./worktree/worktree-rpc"
-import { engineEvidence } from "./tools/row-liveness"

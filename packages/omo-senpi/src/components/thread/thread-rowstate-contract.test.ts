@@ -67,7 +67,7 @@ test("one host missing the listing deadline cannot turn its claimed session inac
         let pending = ""
         socket.on("data", (chunk) => {
           pending += chunk
-          for (let end; (end = pending.indexOf("\n")) >= 0;) {
+          for (let end: number; (end = pending.indexOf("\n")) >= 0;) {
             const frame = JSON.parse(pending.slice(0, end))
             pending = pending.slice(end + 1)
             const data =

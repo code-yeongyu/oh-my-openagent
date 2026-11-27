@@ -23,12 +23,15 @@ export function hostCountsFor(
 }
 
 export function countHostAnswers(view: ThreadHostView): HostCounts {
-  const answered = view.hosts.filter(
-    (host) =>
+  const answered = view.hosts.filter((host) => {
+    const reply = host.list_sessions ?? host.result
+    return (
       host.error === undefined &&
       host.alive !== false &&
-      (host.list_sessions !== undefined || host.result !== undefined),
-  ).length
+      reply !== undefined &&
+      !("kind" in reply && reply.kind === "error")
+    )
+  }).length
   return { answered, unanswered: view.hosts.length - answered }
 }
 
