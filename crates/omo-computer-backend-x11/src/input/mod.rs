@@ -6,4 +6,12 @@ pub mod keys;
 pub mod xtest;
 
 #[cfg(test)]
+mod live_tests;
+#[cfg(test)]
+mod live_x;
+#[cfg(test)]
+mod route_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wiring_tests;

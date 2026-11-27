@@ -2022,6 +2022,8 @@ dependencies = [
  "omo-computer-backend-atspi",
  "omo-computer-core",
  "omo-computer-safety",
+ "serde_json",
+ "tempfile",
  "x11rb",
 ]
 

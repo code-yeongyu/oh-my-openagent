@@ -79,43 +79,5 @@ pub fn background_route(toolkit: Toolkit, qt_shim: bool) -> Result<(), Backgroun
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{background_route, classify, BackgroundRefusal, Evidence, Toolkit};
-
-    fn evidence(wm_class: &str, maps: &[&str], children: &[&str]) -> Evidence {
-        Evidence {
-            wm_class: wm_class.to_owned(),
-            maps: maps.iter().map(|path| (*path).to_owned()).collect(),
-            children: children.iter().map(|argv| (*argv).to_owned()).collect(),
-        }
-    }
-
-    #[test]
-    fn toolkit_classified_by_evidence_not_substring() {
-        let gtk = evidence("QtLookingBrowser", &["/usr/lib/x86_64-linux-gnu/libgtk-3.so.0"], &[]);
-        assert_eq!(classify(&gtk), Toolkit::Gtk3, "the mapped library wins over the class");
-        let qt = evidence(
-            "gtk-editor",
-            &["/usr/lib/x86_64-linux-gnu/libQt6Gui.so.6", "/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms/libqxcb.so"],
-            &[],
-        );
-        assert_eq!(classify(&qt), Toolkit::QtXcb);
-        let electron = evidence("Code", &["/usr/share/code/libffmpeg.so", "/usr/share/code/resources/app/node_modules.asar"], &["/usr/share/code/code --type=zygote"]);
-        assert_eq!(classify(&electron), Toolkit::Electron);
-        let bare = evidence("chromium-gtk-qt", &[], &[]);
-        assert_eq!(classify(&bare), Toolkit::Unknown, "a class alone is no evidence");
-    }
-
-    #[test]
-    fn qt_xcb_without_shim_is_background_unavailable() {
-        assert_eq!(
-            background_route(Toolkit::QtXcb, false),
-            Err(BackgroundRefusal {
-                toolkit: "qt_xcb",
-                reason: "toolkit",
-                next_call: "raise",
-            })
-        );
-        assert_eq!(background_route(Toolkit::QtXcb, true), Ok(()), "the shim accepts synthetic events");
-    }
-}
+#[path = "toolkit_tests.rs"]
+mod tests;

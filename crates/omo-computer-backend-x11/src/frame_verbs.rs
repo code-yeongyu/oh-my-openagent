@@ -32,17 +32,3 @@ pub fn read_back(requested: Frame, notified: Option<Frame>) -> FrameOutcome {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{read_back, Frame, FrameOutcome};
-
-    const ASKED: Frame = Frame { x: 10, y: 20, width: 640, height: 480 };
-
-    #[test]
-    fn frame_verb_reads_back_from_configure_notify() {
-        assert_eq!(read_back(ASKED, Some(ASKED)), FrameOutcome::Applied(ASKED));
-        let tiled = Frame { x: 0, y: 0, width: 960, height: 1080 };
-        assert_eq!(read_back(ASKED, Some(tiled)), FrameOutcome::Partial { kept: (960, 1080) });
-        assert_eq!(read_back(ASKED, None), FrameOutcome::Unconfirmed);
-    }
-}

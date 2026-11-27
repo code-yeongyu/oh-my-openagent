@@ -11,6 +11,9 @@ pub mod frame_verbs;
 pub mod input;
 mod monitors;
 pub mod overlay;
+#[cfg(test)]
+#[path = "release_helper_tests.rs"]
+mod release_helper_tests;
 pub mod self_set;
 pub mod session_state;
 pub mod stop_path;
