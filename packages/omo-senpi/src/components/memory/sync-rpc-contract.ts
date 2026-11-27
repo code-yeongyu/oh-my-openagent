@@ -3,7 +3,7 @@ import type { ApproveOutcome, PhraseVoidNotice } from "@oh-my-opencode/memory-co
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 import type { SyncRpcContext, SyncRpcRegistration } from "./sync-rpc-ports"
 
-export const SYNC_RPC_VERBS = [
+const SYNC_RPC_VERBS = [
   "enable",
   "pending",
   "approve",
