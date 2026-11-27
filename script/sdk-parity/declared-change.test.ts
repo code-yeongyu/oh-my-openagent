@@ -242,6 +242,13 @@ describe("the merge base's scenario table", () => {
     const source = await Bun.file(new URL("./gate-cli.ts", import.meta.url)).text()
     expect(source).toContain('show(mergeBase, "script/sdk-parity/scenarios.ts") === undefined')
     expect(source).toContain("...(baseTableProblem === undefined ? [] : [baseTableProblem])")
+    // A table that fails to load is bound as an empty one, so the report says '0 merge-base scenarios bound', never
+    // that the merge base has no table.
+    const handler = source.slice(
+      source.indexOf("loadBaseScenarioTable(join(baseTree"),
+      source.indexOf("})", source.indexOf("baseTableProblem = ")) + 2,
+    )
+    expect(handler).toMatch(/return \[\]\s*\}\)$/)
   })
 })
 
