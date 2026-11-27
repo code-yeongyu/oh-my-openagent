@@ -143,6 +143,18 @@ jobs:
           echo "ci_run_id=${run_id}" >> "$GITHUB_OUTPUT"
           echo "Dispatched ci.yml on ${ref}: run ${run_id}." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release CI pin
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Admits the pinned source, creates this attempt's release-ci/<sha>-<run>-<attempt> ref and dispatches ci.yml there, recording the run id the dispatch returned (#15094).
+            - Skipped when the pin's ci.yml has no workflow_dispatch trigger; gate-reuse then waits for the dev push run.
+          JOB_SUMMARY_NEXT: If this failed, read the admission or dispatch error above; unpin-ci removes the ref and any run it started.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   gate-reuse:
     needs: [pin-ci]
     # pin-ci is skipped for every release that is not a pinned parent run; that must not skip this gate.
@@ -645,6 +657,26 @@ jobs:
             echo "::error::Cleanup of the release's CI ref refs/${ref} and run ${CI_RUN_ID:-none} is unresolved:${unresolved}; finish it by hand."
             exit 1
           fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+          CI_REF: ${{ needs.pin-ci.outputs.ci_ref }}
+          CI_RUN_ID: ${{ needs.pin-ci.outputs.ci_run_id }}
+        run: |
+          {
+            echo "## Release CI ref cleanup"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`$JOB_STATUS\` |"
+            echo "| Ref | \`refs/heads/$CI_REF\` |"
+            echo "| CI run | \`${CI_RUN_ID:-none}\` |"
+            echo
+            echo "Cancels the release's own CI run if it is still running and deletes its ref while it names the source; anything unresolved fails this job and is named above."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   preflight-trust:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9933.
