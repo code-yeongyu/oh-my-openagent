@@ -10,6 +10,8 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // run by path as a bun preload: slice A1b's account fixture (PR 14996), which script/qa/sdk-proof preloads into the CLI
+        "test/account-goldens.fixture.ts",
         // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
         "bin/lib/engine-boot.js",
         // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
