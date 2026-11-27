@@ -40,6 +40,10 @@ on:
         description: "Internal: exact prepared source SHA for the provenance-bearing publish run."
         required: false
         type: string
+      source_ci_run:
+        description: "Internal: id of the ci.yml run the parent release dispatched for source_sha; revalidated here, used only with prepared_release_sha."
+        required: false
+        type: string
       ci_basis_receipt:
         description: "Maintainer-only: id of an exact-head CI basis receipt that waives the hosted ci.yml wait in gate-reuse. Requires prepared_release_sha and ci_basis_head. Leave empty to wait for hosted CI."
         required: false
@@ -69,7 +73,92 @@ permissions:
   actions: write
 
 jobs:
+  # A pinned release owns the CI run its gate waits on (#15094). ci.yml keeps only the newest pending dev push run, so
+  # a later merge could cancel the pin's push run while it waits; a run dispatched on its own ref is alone in its
+  # concurrency group. The source is admitted (read-only) before anything is written or dispatched. The ref name
+  # carries this release attempt (release-ci/<sha>-<run id>-<attempt>), so no other release shares or deletes it, and
+  # the dispatch API returns the run it created, so the run is known by id, never inferred. GITHUB_TOKEN creates the
+  # ref (which starts no push run) and dispatches. Skipped when the pin's ci.yml predates the dispatch trigger.
+  pin-ci:
+    if: inputs.source_sha != '' && inputs.prepared_release_sha == '' && inputs.lazycodex_only != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+    outputs:
+      ref_owned: ${{ steps.pin.outputs.ref_owned }}
+      ci_run_id: ${{ steps.pin.outputs.ci_run_id }}
+      ci_ref: ${{ steps.pin.outputs.ci_ref }}
+      dispatch_attempted: ${{ steps.pin.outputs.dispatch_attempted }}
+      source_sha: ${{ steps.pin.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Dispatch CI on the pinned source's own ref
+        id: pin
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+          CI_BASIS_RECEIPT: ${{ inputs.ci_basis_receipt }}
+          PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+        run: |
+          set -euo pipefail
+          source .github/scripts/release-source-admission.sh
+          admit_release_source
+          echo "source_sha=${SOURCE_SHA}" >> "$GITHUB_OUTPUT"
+          triggers="$(gh api -H "Accept: application/vnd.github.raw+json" "repos/${GH_REPO}/contents/.github/workflows/ci.yml?ref=${SOURCE_SHA}" \
+            | yq -o=json | jq -c '.on | keys')"
+          if ! jq -e 'index("workflow_dispatch")' <<< "$triggers" > /dev/null; then
+            echo "ci.yml at ${SOURCE_SHA} has no workflow_dispatch trigger (${triggers}); gate-reuse waits for its dev push run."
+            exit 0
+          fi
+          ref="release-ci/${SOURCE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "ci_ref=${ref}" >> "$GITHUB_OUTPUT"
+          # The name is this attempt's alone, so cleanup is registered before the create: whatever its answer, unpin-ci
+          # reconciles the ref (deletes it only while it names the source) and any run on it.
+          echo "ref_owned=true" >> "$GITHUB_OUTPUT"
+          if ! gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/heads/${ref}" -f sha="$SOURCE_SHA" > /dev/null; then
+            # The ref exists only if this POST created it before its answer was lost.
+            existing="$(gh api "repos/${GH_REPO}/git/ref/heads/${ref}" --jq .object.sha || true)"
+            if [ "$existing" != "$SOURCE_SHA" ]; then
+              echo "::error::Could not create refs/heads/${ref} at ${SOURCE_SHA} (it reads '${existing}')."
+              exit 1
+            fi
+          fi
+          # No retry: a repeated dispatch could start a second run nobody records. A lost answer fails the release, and
+          # unpin-ci then looks for the run it may have started.
+          echo "dispatch_attempted=true" >> "$GITHUB_OUTPUT"
+          run_id="$(gh api --method POST "repos/${GH_REPO}/actions/workflows/ci.yml/dispatches" -f ref="$ref" -F return_run_details=true --jq '.workflow_run_id // empty')"
+          if ! [[ "$run_id" =~ ^[0-9]+$ ]]; then
+            echo "::error::Dispatching ci.yml on ${ref} returned no run id ('${run_id}')."
+            exit 1
+          fi
+          echo "ci_run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "Dispatched ci.yml on ${ref}: run ${run_id}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release CI pin
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Admits the pinned source, creates this attempt's release-ci/<sha>-<run>-<attempt> ref and dispatches ci.yml there, recording the run id the dispatch returned (#15094).
+            - Skipped when the pin's ci.yml has no workflow_dispatch trigger; gate-reuse then waits for the dev push run.
+          JOB_SUMMARY_NEXT: If this failed, read the admission or dispatch error above; unpin-ci removes the ref and any run it started.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   gate-reuse:
+    needs: [pin-ci]
+    # pin-ci is skipped for every release that is not a pinned parent run; that must not skip this gate.
+    if: ${{ !failure() && !cancelled() }}
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9932.
     runs-on: ubuntu-24.04
     outputs:
@@ -172,32 +261,14 @@ jobs:
           ACTOR: ${{ github.actor }}
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
           REPOSITORY: ${{ github.repository }}
+          RELEASE_CI_RUN: ${{ needs.pin-ci.outputs.ci_run_id || (inputs.prepared_release_sha != '' && inputs.source_ci_run) || '' }}
+          RELEASE_CI_REF: ${{ needs.pin-ci.outputs.ci_ref }}
         run: |
           set -euo pipefail
 
           if [ -n "$SOURCE_SHA" ]; then
-            if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]] ||
-              [ "$LAZYCODEX_ONLY" = true ] || [ -n "$CI_BASIS_RECEIPT" ]; then
-              echo "::error::source_sha requires a full commit SHA, a version stamp, and hosted push CI."
-              exit 1
-            fi
-            SOURCE_SHA="$(git rev-parse --verify "$SOURCE_SHA")"
-            if [ "$(git cat-file -t "$SOURCE_SHA")" != commit ] || ! git merge-base --is-ancestor "$SOURCE_SHA" origin/dev; then
-              echo "::error::source_sha ${SOURCE_SHA} is not on dev."
-              exit 1
-            fi
-            if ! git merge-base --is-ancestor refs/remotes/origin/master "$SOURCE_SHA"; then
-              echo "::error::Pinned source ${SOURCE_SHA} does not contain origin/master; refusing a release that cannot fast-forward the mirror."
-              exit 1
-            fi
-            if [ -n "$PREPARED_RELEASE_SHA" ] && {
-              [ "$PREPARED_RELEASE_SHA" != "$GITHUB_SHA" ] ||
-              [ "$(git rev-parse HEAD^1)" != "$SOURCE_SHA" ] ||
-              ! git merge-base --is-ancestor "$PREPARED_RELEASE_SHA" origin/dev;
-            }; then
-              echo "::error::The prepared source must be a merged stamp whose first parent is ${SOURCE_SHA}."
-              exit 1
-            fi
+            source .github/scripts/release-source-admission.sh
+            admit_release_source
           fi
 
           # Explicit, logged waiver of the hosted CI wait. An empty receipt keeps the default path below.
@@ -289,12 +360,70 @@ jobs:
             return 1
           }
 
+          # The release's own run is a receipt only if it is this repository's ci.yml, dispatched by its workflow token on a
+          # release-ci ref for the source. The parent knows the exact ref (and got the id from its own dispatch). The tagged
+          # child gets the id as an input, so it also requires that it was itself dispatched by the workflow token and that
+          # the ref names a real publish.yml attempt of this repository, created before that run.
+          # Called in an || list, so errexit is off inside: every lookup refuses explicitly when it fails.
+          verify_owned_run() {
+            local sha="$1" ci_workflow publish_workflow run parent_id parent_attempt parent receipt receipts
+            if ! [[ "$owned" =~ ^[0-9]+$ ]]; then
+              echo "::error::The release's CI run id '${owned}' is not a run id."
+              return 1
+            fi
+            ci_workflow="$(retry_gh "Read the ci.yml workflow" gh api "repos/${REPOSITORY}/actions/workflows/ci.yml" --jq .id)" || return 1
+            run="$(retry_gh "Read the release's own CI run" gh api "repos/${REPOSITORY}/actions/runs/${owned}" \
+              --jq '[.id, .workflow_id, .head_sha, .event, .head_branch, .triggering_actor.login, .created_at] | @tsv')" || return 1
+            IFS=$'\t' read -r run_id run_workflow run_sha run_event run_branch run_actor run_created <<< "$run"
+            if ! [[ "$ci_workflow" =~ ^[0-9]+$ ]] || [ "$run_id" != "$owned" ] || [ "$run_workflow" != "$ci_workflow" ] || [ "$run_sha" != "$sha" ] ||
+              [ "$run_event" != workflow_dispatch ] || [ "$run_actor" != "github-actions[bot]" ]; then
+              echo "::error::CI run ${owned} is not a run this release dispatched for ${sha} (workflow ${run_workflow:-?}, event ${run_event:-?}, branch ${run_branch:-?}, by ${run_actor:-?})."
+              return 1
+            fi
+            if [ -n "$RELEASE_CI_REF" ]; then
+              if [ "$run_branch" != "$RELEASE_CI_REF" ]; then
+                echo "::error::CI run ${owned} is not a run this release dispatched for ${sha} (branch ${run_branch}, not ${RELEASE_CI_REF})."
+                return 1
+              fi
+              return 0
+            fi
+            if [ "$TRIGGERING_ACTOR" != "github-actions[bot]" ] || ! [[ "$run_branch" =~ ^release-ci/${sha}-([0-9]+)-([0-9]+)$ ]]; then
+              echo "::error::CI run ${owned} is not a run this release dispatched for ${sha} (branch ${run_branch:-?}; this run was started by ${TRIGGERING_ACTOR})."
+              return 1
+            fi
+            parent_id="${BASH_REMATCH[1]}"
+            parent_attempt="${BASH_REMATCH[2]}"
+            parent="$(retry_gh "Read the parent release run" gh api "repos/${REPOSITORY}/actions/runs/${parent_id}" \
+              --jq '[.workflow_id, .event, .run_attempt, .created_at] | @tsv')" || return 1
+            publish_workflow="$(retry_gh "Read the publish.yml workflow" gh api "repos/${REPOSITORY}/actions/workflows/publish.yml" --jq .id)" || return 1
+            IFS=$'\t' read -r parent_workflow parent_event parent_run_attempt parent_created <<< "$parent"
+            if ! [[ "$publish_workflow" =~ ^[0-9]+$ ]] || [ "$parent_workflow" != "$publish_workflow" ] ||
+              [ "$parent_event" != workflow_dispatch ] || ! [[ "$parent_run_attempt" =~ ^[0-9]+$ ]] || [ "$parent_run_attempt" -lt "$parent_attempt" ] || [[ "$parent_created" > "$run_created" ]]; then
+              echo "::error::CI run ${owned} names release attempt ${parent_id}-${parent_attempt}, which is not a publish.yml release of this repository that started it."
+              return 1
+            fi
+            receipt="release-ci-receipt-${sha}-${PREPARED_RELEASE_SHA}-${owned}"
+            receipts="$(retry_gh "Read the parent release's CI receipt" gh api --method GET "repos/${REPOSITORY}/actions/runs/${parent_id}/artifacts" \
+              -f name="$receipt" --jq "[.artifacts[] | select(.workflow_run.id == ${parent_id})] | length")" || return 1
+            if ! [[ "$receipts" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::Release attempt ${parent_id} recorded no receipt binding CI run ${owned} to ${sha} and ${PREPARED_RELEASE_SHA} (${receipt})."
+              return 1
+            fi
+          }
+
           # Unpinned releases can also use the release-state PR's CI at the prepared SHA.
           # Pinned releases require a push and proof that its heavy validation actually ran.
+          # The pinned source also counts the one run pin-ci dispatched for it (#15094), by run id, never any other dispatch:
+          # the parent release's own (exact ref), or in the tagged child the parent's, carried as source_ci_run and checked
+          # again here (dispatched by this repository's workflow token, at the source, on a release-ci ref for it).
           wait_for_ci() {
-            local sha="$1" event="${2:-}" push_run
+            local sha="$1" event="${2:-}" push_run owned="" owned_status="" owned_conclusion="" unproven_push="" owned_verified=""
             if [ "$event" = "push" ]; then set -- -f "event=push"; else set --; fi
-            for attempt in $(seq 1 120); do
+            if [ "$event" = "push" ] && [ "$sha" = "$SOURCE_SHA" ]; then owned="${RELEASE_CI_RUN:-}"; fi
+            # Its own run starts with the release, so it gets a full CI run's time (about 70 minutes) plus margin.
+            local attempts=120
+            if [ -n "$owned" ]; then attempts=400; fi
+            for attempt in $(seq 1 "$attempts"); do
               RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
                 "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
                 -f head_sha="$sha" "$@" -f per_page=100)"
@@ -302,6 +431,33 @@ jobs:
               if [ "$event" = "push" ]; then
                 push_run="$(select_green_push "$sha" <<< "$RUNS")"
                 SUCCESS_ID="${push_run%%$'\t'*}"
+                # With its own run, a green push counts only once proven; an unproven one never decides the release.
+                if [ -n "$SUCCESS_ID" ] && [ -n "$owned" ] && [ "$SUCCESS_ID" != "$unproven_push" ]; then
+                  if require_push_validation "$REPOSITORY" "$push_run"; then
+                    echo "CI workflow run ${SUCCESS_ID} ran and passed required validation for ${sha}."
+                    return 0
+                  fi
+                  echo "::warning::Green push run ${SUCCESS_ID} lacks the required validation proof; judging the release's own CI run ${owned}."
+                  unproven_push="$SUCCESS_ID"
+                fi
+                if [ -n "$owned" ] && [ "$SUCCESS_ID" = "$unproven_push" ]; then SUCCESS_ID=""; fi
+                if [ -z "$SUCCESS_ID" ] && [ -n "$owned" ]; then
+                  if [ -z "$owned_verified" ]; then
+                    verify_owned_run "$sha" || return 1
+                    owned_verified=true
+                  fi
+                  OWNED="$(retry_gh "Read the release's own CI run" gh api "repos/${REPOSITORY}/actions/runs/${owned}" \
+                    --jq '[.id, .run_attempt, .head_sha, .status, (.conclusion // "none")] | @tsv')"
+                  IFS=$'\t' read -r owned_id owned_attempt owned_sha owned_status owned_conclusion <<< "$OWNED"
+                  if [ "$owned_id" != "$owned" ] || [ "$owned_sha" != "$sha" ]; then
+                    echo "::error::CI run ${owned} changed identity while the release waited on it."
+                    return 1
+                  fi
+                  if [ "$owned_status" = completed ] && [ "$owned_conclusion" = success ]; then
+                    push_run="$(printf '%s\t%s\t%s' "$owned_id" "$owned_attempt" "$owned_sha")"
+                    SUCCESS_ID="$owned_id"
+                  fi
+                fi
               else
                 SUCCESS_ID="$(jq -r --arg sha "$sha" '
                   [.workflow_runs[] | select(.head_sha == $sha and .status == "completed" and .conclusion == "success")]
@@ -336,6 +492,25 @@ jobs:
                 return 0
               fi
 
+              # With its own run, the release judges only that run: another run's verdict (a superseded push, an older
+              # attempt) never decides it. It fails fast: a job that already concluded red decides the outcome now, not when
+              # the run ends (the 5.1.84 cut's run went red at minute 11 of 66). A cancelled job is not a verdict.
+              if [ -n "$owned" ]; then
+                if [ "$owned_status" = completed ]; then
+                  echo "::error::The release's own CI run ${owned} for ${sha} concluded ${owned_conclusion}."
+                  return 1
+                fi
+                RED="$(retry_gh "Read the release's own CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${owned}/jobs?filter=latest&per_page=100" \
+                  --jq '[.jobs[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure")) | "\(.name)=\(.conclusion)"] | join(", ")')"
+                if [ -n "$RED" ]; then
+                  echo "::error::The release's own CI run ${owned} for ${sha} is still running but already failed: ${RED}."
+                  return 1
+                fi
+                echo "Waiting for the release's own CI run ${owned} on ${sha} (attempt ${attempt}/${attempts})."
+                sleep 15
+                continue
+              fi
+
               ACTIVE_COUNT="$(jq -r --arg sha "$sha" '
                 [.workflow_runs[] | select(.head_sha == $sha and .status != "completed")] | length
               ' <<< "$RUNS")"
@@ -350,7 +525,7 @@ jobs:
                 echo "::error::CI completed without a successful run for ${sha}."
                 return 1
               fi
-              echo "Waiting for successful CI on ${sha} (attempt ${attempt}/120)."
+              echo "Waiting for successful CI on ${sha} (attempt ${attempt}/${attempts})."
               sleep 15
             done
 
@@ -395,6 +570,113 @@ jobs:
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The release-ci ref only names the run's commit; the run and its record stay after the ref is gone. Runs on every
+  # outcome once pin-ci owned the ref (including a failed or cancelled release), deletes the ref only while it still
+  # names the pinned source, and stops the release's own run if the gate no longer needs it.
+  unpin-ci:
+    needs: [pin-ci, gate-reuse]
+    if: always() && inputs.prepared_release_sha == '' && needs.pin-ci.outputs.ref_owned == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Delete the pinned source's CI ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ needs.pin-ci.outputs.source_sha }}
+          CI_RUN_ID: ${{ needs.pin-ci.outputs.ci_run_id }}
+          CI_REF: ${{ needs.pin-ci.outputs.ci_ref }}
+          DISPATCH_ATTEMPTED: ${{ needs.pin-ci.outputs.dispatch_attempted }}
+        run: |
+          set -uo pipefail
+          # Cancelling the run and removing the ref are independent; each retries, and anything unresolved fails this job.
+          unresolved=""
+          with_retry() {
+            local output
+            for api_retry in 1 2 3 4 5; do
+              if output="$("$@" 2>&1)"; then printf '%s' "$output"; return 0; fi
+              if grep -q 'HTTP 404' <<< "$output"; then return 4; fi
+              echo "$1 $2 $3: retry ${api_retry}/5: ${output}" >&2
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            return 1
+          }
+          if [ -z "$CI_RUN_ID" ] && [ "$DISPATCH_ATTEMPTED" = true ]; then
+            # The dispatch's answer was lost: a run on this attempt's own ref is the one it may have started. A new run can
+            # take a while to be listed, so an empty list is no answer until the window ends; then it stays indeterminate.
+            found=""
+            for visibility in $(seq 1 18); do
+              if ! listed="$(with_retry gh api --method GET "repos/${GH_REPO}/actions/workflows/ci.yml/runs" -f branch="$CI_REF" -f event=workflow_dispatch --jq '[.workflow_runs[] | "\(.id):\(.status)"] | join(" ")')"; then
+                found=error
+                unresolved+=" list-runs"
+                break
+              fi
+              for entry in $listed; do
+                found=yes
+                if [ "${entry#*:}" != completed ]; then
+                  with_retry gh run cancel "${entry%%:*}" > /dev/null || unresolved+=" cancel-run-${entry%%:*}"
+                fi
+              done
+              [ -z "$found" ] || break
+              sleep 10
+            done
+            [ -n "$found" ] || unresolved+=" dispatch-indeterminate"
+          fi
+          if [ -n "$CI_RUN_ID" ]; then
+            if run_status="$(with_retry gh api "repos/${GH_REPO}/actions/runs/${CI_RUN_ID}" --jq .status)"; then
+              if [ "$run_status" != completed ] && ! with_retry gh run cancel "$CI_RUN_ID" > /dev/null; then
+                unresolved+=" cancel-run-${CI_RUN_ID}"
+              fi
+            else
+              unresolved+=" read-run-${CI_RUN_ID}"
+            fi
+          fi
+          ref="heads/${CI_REF}"
+          # Actions runs bash with -e: capture the status instead of letting a failed read end the step.
+          existing="$(with_retry gh api "repos/${GH_REPO}/git/ref/${ref}" --jq .object.sha)" && ref_read=0 || ref_read=$?
+          case "$ref_read" in
+            4) echo "refs/${ref} is already gone." ;;
+            0)
+              if [ "$existing" != "$SOURCE_SHA" ]; then
+                echo "::error::refs/${ref} now names ${existing}, not ${SOURCE_SHA}; leaving it for a maintainer."
+                unresolved+=" ref-moved"
+              elif with_retry gh api --method DELETE "repos/${GH_REPO}/git/refs/${ref}" > /dev/null; then
+                echo "Deleted refs/${ref}."
+              else
+                unresolved+=" delete-ref"
+              fi
+              ;;
+            *) unresolved+=" read-ref" ;;
+          esac
+          if [ -n "$unresolved" ]; then
+            echo "::error::Cleanup of the release's CI ref refs/${ref} and run ${CI_RUN_ID:-none} is unresolved:${unresolved}; finish it by hand."
+            exit 1
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+          CI_REF: ${{ needs.pin-ci.outputs.ci_ref }}
+          CI_RUN_ID: ${{ needs.pin-ci.outputs.ci_run_id }}
+        run: |
+          {
+            echo "## Release CI ref cleanup"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`$JOB_STATUS\` |"
+            echo "| Ref | \`refs/heads/$CI_REF\` |"
+            echo "| CI run | \`${CI_RUN_ID:-none}\` |"
+            echo
+            echo "Cancels the release's own CI run if it is still running and deletes its ref while it names the source; anything unresolved fails this job and is named above."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   preflight-trust:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9933.
@@ -906,16 +1188,47 @@ jobs:
             return 1
           }
 
+          # Once its PR exists, every failed exit of this step disarms it: auto-merge waits only on the required checks, so an
+          # armed stamp would land a version on the base that nothing published (#15126, 5.1.84's #15124). Best-effort; it
+          # reports one snapshot of the PR (state and auto-merge read together) and never masks the original failure.
+          disarm_release_pr() {
+            local snapshot="" state="" armed=""
+            for api_retry in 1 2 3 4 5; do
+              gh pr merge "$PR_NUMBER" --disable-auto >/dev/null 2>&1 || true
+              snapshot="$(gh pr view "$PR_NUMBER" --json state,autoMergeRequest --jq '"\(.state) \(.autoMergeRequest != null)"' 2>/dev/null)" || snapshot=""
+              read -r state armed <<< "$snapshot" || true
+              if [ -n "$state" ] && { [ "$state" != OPEN ] || [ "$armed" = false ]; }; then break; fi
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            case "$state $armed" in
+              "OPEN false") echo "Disabled auto-merge on release-state PR #${PR_NUMBER}; it stays open and unmerged for a maintainer." ;;
+              "CLOSED "*) echo "Release-state PR #${PR_NUMBER} is closed; nothing was merged." ;;
+              "MERGED "*)
+                echo "::error::Release-state PR #${PR_NUMBER} merged into ${BASE_REF} before its auto-merge was disabled: ${BASE_REF} now declares v${VERSION}, which this run did not publish."
+                if [ -n "${SOURCE_SHA:-}" ]; then
+                  echo "::error::Recover by re-dispatching publish.yml with version=${VERSION} and source_sha=${SOURCE_SHA}: it reuses the merged stamp while that stamp is on ${BASE_REF} with ${SOURCE_SHA} as its first parent."
+                else
+                  echo "::error::Recover by re-dispatching publish.yml on ${BASE_REF} with version=${VERSION}: it reuses the merged stamp only while ${BASE_REF}'s tree still equals it; otherwise publish an unused version."
+                fi
+                ;;
+              *) echo "::error::Could not confirm that auto-merge is off on release-state PR #${PR_NUMBER} (last read: '${snapshot:-none}'); disable it by hand before it merges." ;;
+            esac
+          }
+
           PR_NUMBER="$(retry_gh "List release-state PR" gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
           if [ -z "$PR_NUMBER" ]; then
             PR_NUMBER="$(create_release_pr)"
           fi
+
+          release_pr_settled=false
+          trap 'status=$?; git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git" || true; if [ "$status" != 0 ] && [ "$release_pr_settled" != true ]; then disarm_release_pr; fi; exit "$status"' EXIT
 
           enable_release_auto_merge
 
           for attempt in $(seq 1 120); do
             PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
+              release_pr_settled=true
               MERGE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
               RELEASE_SHA="$(retry_gh "Read release-state PR source SHA" gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
               git fetch origin "$MERGE_SHA" "$RELEASE_SHA"
@@ -937,7 +1250,7 @@ jobs:
 
             FAILURES="$(retry_gh "Read release-state PR checks" gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
             if [ "$FAILURES" != "0" ]; then
-              echo "::error::Release-state PR #${PR_NUMBER} has failing required checks; refusing to publish npm packages."
+              echo "::error::Release-state PR #${PR_NUMBER} has failing checks; refusing to publish npm packages."
               retry_gh "Read failing release-state PR checks" gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}' || true
               exit 1
             fi
@@ -1022,7 +1335,7 @@ jobs:
   dispatch-provenance-safe-publish:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
     runs-on: ubuntu-24.04
-    needs: [release-metadata, prepare-release-state, verify-exact-pinned-stamp]
+    needs: [pin-ci, release-metadata, prepare-release-state, verify-exact-pinned-stamp]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -1041,10 +1354,27 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
 
+      # The parent's record that it accepted its own CI run for this source and handed it to the child of this prepared
+      # source. Only this run can attach an artifact to itself, so the child, which finds the parent from the run's ref,
+      # treats the artifact's name as the parent's binding of source, prepared SHA and CI run.
+      - name: Record the release's own CI receipt for the child
+        if: needs.pin-ci.outputs.ci_run_id != ''
+        run: printf 'Accepted by this release attempt for its tagged child.\n' > "$RUNNER_TEMP/release-ci-receipt.txt"
+
+      - name: Upload the release's own CI receipt
+        if: needs.pin-ci.outputs.ci_run_id != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-ci-receipt-${{ needs.pin-ci.outputs.source_sha }}-${{ needs.prepare-release-state.outputs.release_sha }}-${{ needs.pin-ci.outputs.ci_run_id }}
+          path: ${{ runner.temp }}/release-ci-receipt.txt
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Tag prepared source and dispatch provenance-safe publish
         env:
           INDEPENDENT_CI_REQUIRED: ${{ needs.verify-exact-pinned-stamp.outputs.independent_ci_required }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_CI_RUN: ${{ needs.pin-ci.outputs.ci_run_id }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
           RELEASE_SHA: ${{ needs.prepare-release-state.outputs.release_sha }}
           BUMP: ${{ inputs.bump }}
@@ -1096,6 +1426,12 @@ jobs:
               yq '.on.workflow_dispatch.inputs | has("source_sha")' -)"
             if [ "$accepts_pin" = true ]; then
               source_args+=(-f "source_sha=${SOURCE_SHA}")
+            fi
+            # The child revalidates the parent's own CI run for the pin; without it, it would need a green push.
+            accepts_run="$(git show "${RELEASE_SHA}:.github/workflows/publish.yml" |
+              yq '.on.workflow_dispatch.inputs | has("source_ci_run")' -)"
+            if [ -n "${SOURCE_CI_RUN:-}" ] && [ "$accepts_run" = true ]; then
+              source_args+=(-f "source_ci_run=${SOURCE_CI_RUN}")
             fi
           fi
 

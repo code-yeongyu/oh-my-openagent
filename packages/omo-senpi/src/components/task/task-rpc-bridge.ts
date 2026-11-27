@@ -264,7 +264,7 @@ function registerTaskHandlers(
     if ("error" in input) return invalidArguments(input.error)
     const record = engine.manager.get(input.value.task_id)
     if (record === undefined || record.parent_session_id !== sessionId) return notFound()
-    return (await runTaskCancel(engine.manager, input.value)).details
+    return (await runTaskCancel(engine.manager, input.value, sessionId)).details
   })
   handle("omo.task.output", async (data) => {
     const sessionId = currentSessionId()
