@@ -29,7 +29,7 @@ type Fixture = ReturnType<typeof liveParentFixture>
 
 // k-hang -> k-after: the observed run shape. Its host died mid-run, so the checkpoint still reads
 // `running` under a dead holder and recovery claims it like a paused run.
-export const hangThenAfter: DagDefinition = {
+const hangThenAfter: DagDefinition = {
   key: "pending-revival",
   name: "pending revival",
   nodes: [node("k-hang"), node("k-after", ["k-hang"])],
