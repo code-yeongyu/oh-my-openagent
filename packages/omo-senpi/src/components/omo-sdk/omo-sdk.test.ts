@@ -281,7 +281,7 @@ describe("config.status", () => {
 
   // Security contract (the security owner's ruling): the SDK reports the configuration by scope, kind and count. No key
   // name, key path, value, parse excerpt or file path from a config file reaches an SDK caller; the command a person
-  // runs (omo doctor) keeps the full text.
+  // runs (its configuration check) keeps the full text.
   test("#given user and project configs with unknown keys, a wrong-typed value and a parse error #when status runs #then the answer names none of them and no file path", async () => {
     const home = mkdtempSync(join(tmpdir(), "zz-canary-home-"))
     homes.push(home)
