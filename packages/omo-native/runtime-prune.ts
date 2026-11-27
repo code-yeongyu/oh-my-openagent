@@ -27,6 +27,8 @@ export function pruneProvisionedRuntimes(options: {
   readonly current: string
   readonly platform?: NodeJS.Platform
   readonly listRunning?: ListRunningCommands
+  /** Versions something still names, such as the installed session host unit (#15264 review M1); never removed. */
+  readonly keep?: readonly string[]
 }): RuntimePruneResult {
   const platform = options.platform ?? process.platform
   const result = { removed: [] as string[], kept: [] as string[], failed: [] as { version: string; reason: string }[] }
@@ -46,11 +48,15 @@ export function pruneProvisionedRuntimes(options: {
       // Still held (a Windows handle closes late); the next prune retries it.
     }
   }
+  const named = new Set(options.keep ?? [])
   const older = entries
     .filter((name) => RELEASE_VERSION.test(name) && Bun.semver.order(name, options.current) < 0)
     .sort((left, right) => Bun.semver.order(right, left))
-  result.kept.push(...older.slice(0, RETAINED_PREVIOUS_RUNTIMES))
-  const candidates = older.slice(RETAINED_PREVIOUS_RUNTIMES)
+  // A named runtime is kept on its own account, outside the one rollback runtime.
+  result.kept.push(...older.filter((name) => named.has(name)))
+  const unnamed = older.filter((name) => !named.has(name))
+  result.kept.push(...unnamed.slice(0, RETAINED_PREVIOUS_RUNTIMES))
+  const candidates = unnamed.slice(RETAINED_PREVIOUS_RUNTIMES)
   if (candidates.length === 0) return result
   // Windows refuses to rename a directory while a file inside it is open, which covers a running
   // runtime without a CIM query that costs seconds on every launch.
