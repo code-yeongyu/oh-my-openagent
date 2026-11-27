@@ -18,7 +18,6 @@ test("#given a cold sync RPC dispatcher #when the binding retires during loading
     pinDir: "",
     signal: new AbortController().signal,
     syncStatus: async () => undefined,
-    env: {},
     logger: { error() {} },
   })
   const status = handlers.get("omo.memory.sync.status")
