@@ -7,14 +7,14 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
-export type ExecFileText = (command: string, args: string[]) => Promise<string | null>
+export type ExecFileText = (command: string, args: string[], env?: NodeJS.ProcessEnv) => Promise<string | null>
 
-async function execFileText(command: string, args: string[]): Promise<string | null> {
+async function execFileText(command: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
   return await new Promise((resolve) => {
     // powershell.exe is a console-subsystem binary, and under a Node runtime (no bun:ffi, so the
     // kernel32 fast path below can never answer) this fallback runs on EVERY pid probe. Without
     // windowsHide each probe flashes a console Windows foregrounds, stealing focus (#8501).
-    execFile(command, args, { encoding: "utf8", timeout: 2_000, windowsHide: true }, (error, stdout) => {
+    execFile(command, args, { encoding: "utf8", timeout: 2_000, windowsHide: true, env }, (error, stdout) => {
       if (error !== null) {
         resolve(null)
         return
@@ -107,10 +107,16 @@ async function readProcessStartIdentity(pid: number): Promise<string | null> {
   return null
 }
 
-/** The darwin/freebsd fallback when `bun:ffi` cannot read the start time: what `ps -o lstart=` prints for `pid`. */
+/**
+ * The darwin/freebsd fallback when `bun:ffi` cannot read the start time. `ps -o lstart=` renders in the reader's
+ * timezone and locale, so it runs under UTC and the C locale, and every reader sees the same bytes for one process
+ * (#12108). The scheme is `ps-lstart-utc:`: a record an older reader wrote in local time (`ps-lstart:`) is then a
+ * different scheme, which `startIdentitiesConflict` never counts as proof that its owner died.
+ */
 export async function readPsLstartIdentity(pid: number, exec: ExecFileText = execFileText): Promise<string | null> {
-  const value = await exec("/bin/ps", ["-o", "lstart=", "-p", String(pid)])
-  return value === null ? null : `ps-lstart:${value.replace(/\s+/g, " ")}`
+  const env = { ...process.env, TZ: "UTC", LC_ALL: "C", LANG: "C" }
+  const value = await exec("/bin/ps", ["-o", "lstart=", "-p", String(pid)], env)
+  return value === null ? null : `ps-lstart-utc:${value.replace(/\s+/g, " ")}`
 }
 
 /**
@@ -140,8 +146,8 @@ function identityScheme(identity: string): string | null {
   return separator <= 0 ? null : identity.slice(0, separator)
 }
 
-// `ps -o lstart=` renders local time, so the same pid yields different bytes to two processes that
-// disagree about the timezone, and a mismatch is what proves an owner dead. Comparing across schemes
+// `ps -o lstart=` once rendered local time (`ps-lstart:`), so the same pid yielded different bytes to two processes
+// that disagreed about the timezone, and a mismatch is what proves an owner dead. Comparing across schemes
 // would therefore let a live owner's lock be stolen during an upgrade, so anything not directly
 // comparable is reported as no conflict and the owner keeps its lock.
 export function startIdentitiesConflict(recorded: string, actual: string): boolean {
