@@ -86,6 +86,40 @@ async function accountBook(remote: RemoteThreadSurface, text: string, read: Acco
   }
 }
 
+/**
+ * The refusal when one thread id is held on more than one device and nothing decides which holder is meant: one
+ * candidate per device, this device's entry under `here`.
+ */
+export function holdersRefusal(
+  thread: string,
+  holders: readonly ThreadAddressEntry[],
+  account: Account,
+  message: string,
+): ThreadRefusal {
+  const byDevice = new Map(holders.map((entry) => [entry.transport?.row.device ?? "here", entry] as const))
+  return withAddresses(
+    {
+      kind: "error",
+      ...threadToolFailure(
+        "ambiguous_target",
+        message,
+        "Address the session on one device with <device>/<session id>.",
+      ),
+      candidates: [...byDevice].map(([device, entry]) => ({
+        thread,
+        name: entry.name,
+        cwd: entry.cwd,
+        preview: entry.preview ?? "",
+        updatedAt: entry.updated_at,
+        state: entry.status,
+        device,
+      })),
+    },
+    account.here,
+    deviceNameOf(account),
+  )
+}
+
 const found = (hit: Extract<LadderResult, { readonly kind: "ok" }>, allScope: boolean | undefined): Found => ({
   ...hit,
   all_scope: hit.resolution === "alias" || hit.entry.transport !== undefined ? true : allScope,
@@ -117,11 +151,15 @@ export async function resolveBare(
   const here = ladder(ctx, ctx.local, text, opts)
   const exactHere =
     here.kind === "ok" && here.resolution !== "alias" && here.resolution !== "name" && here.resolution !== "id_prefix"
-  if (here.kind === "ok" && (ctx.remote === undefined || exactHere)) return { result: found(here, opts.all_scope) }
+  // Only a session an engine here runs answers an exact id without the account: a session file alone may be a stale copy
+  // of a session another device now holds (#15246).
+  if (here.kind === "ok" && (ctx.remote === undefined || (exactHere && here.entry.status === "live")))
+    return { result: found(here, opts.all_scope) }
   if (ctx.remote === undefined)
     return { result: here.kind === "ok" ? found(here, opts.all_scope) : withAddresses(here, null, () => undefined) }
   const book = await accountBook(ctx.remote, text, await read())
   const account = book.account
+  if (here.kind === "ok" && exactHere) return { result: fileHere(ctx, here, text, opts, book), account }
   if (book.entries.length === 0 && here.kind === "ok") return { result: found(here, opts.all_scope), account }
   // An ended session on another device is resumable: the exact ladder sees every row; fuzzy ranks only the ended rows
   // that can contend, so a large account's history cannot push a unique match over the 500-candidate cap.
@@ -158,6 +196,46 @@ export async function resolveBare(
       account,
     }
   return { result: withAddresses(across, account?.here ?? null, deviceNameOf(account)), account }
+}
+
+/**
+ * An exact id that this device holds only as a session file (#15246): the account decides. A session another device holds
+ * live is the target; held elsewhere with no single live holder, the id is ambiguous; known only here, the file answers.
+ * A listing that could not be read, or that a device missed, refuses: the copy here may be stale.
+ */
+function fileHere(
+  ctx: ResolveContext,
+  here: Extract<LadderResult, { readonly kind: "ok" }>,
+  text: string,
+  opts: ResolveOptions,
+  book: Book,
+): Found | ThreadRefusal {
+  if (book.unavailable !== undefined) return asRefusal(book.unavailable)
+  const account = book.account
+  if (account === undefined) return found(here, opts.all_scope)
+  const thread = here.entry.thread_id
+  const elsewhere = book.entries.filter((entry) => entry.thread_id === thread)
+  if (elsewhere.length === 0) {
+    const silent = silentDevices(account, text)
+    return silent.length === 0
+      ? found(here, opts.all_scope)
+      : toolRefusal(
+          devicesSilent(
+            "listing_incomplete",
+            silent.map((id) => ({ id, name: deviceNameOf(account)(id) ?? id })),
+          ),
+        )
+  }
+  const live = elsewhere.filter((entry) => entry.status === "live")
+  const holder = live.length === 1 ? ladder(ctx, live, text, opts) : undefined
+  if (holder?.kind === "ok") return found(holder, opts.all_scope)
+  const refusal = holdersRefusal(
+    thread,
+    [here.entry, ...elsewhere],
+    account,
+    `Session ${thread} is only a session file on this device and is held on another device, and no single running holder decides which one is meant; none was picked.`,
+  )
+  return { ...refusal, details: { ...refusal.details, reason: "session_file_without_engine" } }
 }
 
 /** The devices a miss cannot rule out: the one an earlier round listed `text` on, else every device this round missed. */
