@@ -139,7 +139,24 @@ describe("showAtRef", () => {
     expect(showAtRef(repo(), "HEAD", "dir/missing.txt")).toBeUndefined()
   })
 
-  test("#given a ref that does not resolve #then it throws rather than answer absent", () => {
-    expect(() => showAtRef(repo(), "no-such-ref", "dir/file.txt")).toThrow()
+  test("#given a ref that does not resolve #then a file read and a directory listing both throw rather than answer absent", () => {
+    const root = repo()
+    expect(() => showAtRef(root, "no-such-ref", "dir/file.txt")).toThrow()
+    expect(() => showAtRef(root, "no-such-ref", "dir/")).toThrow()
+  })
+
+  test("#given a directory the ref lacks #then undefined", () => {
+    expect(showAtRef(repo(), "HEAD", "missing-dir/")).toBeUndefined()
+  })
+
+  // Tripwire on the entry's wiring: every merge-base input the gate reads (the rows, the unresolved list, the goldens,
+  // the presentation rows, the offender record, the original and its pin, the scenario table) goes through show(),
+  // which is showAtRef, so a failing read is never read as "the merge base has none".
+  test("#given the gate's command-line entry #then it reads the merge base only through showAtRef", async () => {
+    const source = await Bun.file(new URL("./gate-cli.ts", import.meta.url)).text()
+    expect(source).toContain(
+      "const show = (ref: string, path: string): string | undefined => showAtRef(REPO_ROOT, ref, path)",
+    )
+    expect(source.match(/"show",|git show|\bcatch\s*\{\s*return undefined/g) ?? []).toEqual([])
   })
 })

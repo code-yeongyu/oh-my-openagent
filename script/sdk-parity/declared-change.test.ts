@@ -6,7 +6,14 @@ import { join } from "node:path"
 
 import { sha256 } from "./baseline"
 import { type ExemptionProvider, loadBaseScenarioTable } from "./declared-change"
-import { candidateDigest, EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
+import {
+  candidateDigest,
+  EXEMPTION_PROVIDERS,
+  type GateInput,
+  gateReport,
+  OUTCOME_PRODUCERS,
+  renderReport,
+} from "./gate"
 import { HEAD, input, rows, text, unresolved } from "./gate-fixture"
 import type { Outcome } from "./scenario-run"
 import { SCENARIOS, type Scenario } from "./scenarios"
@@ -446,5 +453,31 @@ describe("verify-review over the two classes", () => {
       decision: "accepted",
       reason: `the CLEAR at ${HEAD.slice(0, 10)} reviewed the 1 candidate(s) of digest ${output.match(/digest=([0-9a-f]{24})/)?.[1]}`,
     })
+  })
+})
+
+// Security contract (limit 1 of the gate-rule read): both trees run the head's runner and normalizer, so a change to them
+// is a gate change. It is flagged and signed, never passed silently because no outcome differs.
+describe("a change to how outcomes are produced or normalized", () => {
+  const verdictFor = (output: string) =>
+    `Verdict: CLEAR at ${HEAD}\nSDK-Parity-Reviewed: ${output.match(/digest=([0-9a-f]{24})/)?.[1] ?? ""}\n`
+
+  for (const file of OUTCOME_PRODUCERS)
+    test(`#given ${file} in the diff #then the report flags it, the digest binds it and a review is required`, () => {
+      const gate = input({ changedFiles: [file] })
+      const report = gateReport(gate)
+      expect(report.gateChanges).toEqual([`${file}#gate-change`])
+      const output = renderReport(report)
+      expect(output).toContain("GATE CHANGE:")
+      expect(report.digest).not.toBe(gateReport(input()).digest)
+      expect(verifyReview(output, "", "").decision).toBe("withheld")
+      expect(verifyReview(output, "", verdictFor(output)).decision).toBe("accepted")
+      expect(verifyReview(output, "", verdictFor(renderReport(gateReport(input())))).decision).toBe("withheld")
+    })
+
+  test("#given a diff touching no outcome producer #then there is no gate change and nothing to sign", () => {
+    const report = gateReport(input({ changedFiles: ["script/sdk-parity/gate.ts"] }))
+    expect(report.gateChanges).toEqual([])
+    expect(verifyReview(renderReport(report), "", "").decision).toBe("accepted")
   })
 })

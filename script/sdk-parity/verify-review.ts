@@ -38,7 +38,8 @@ export function verifyReview(checkOutput: string, body: string, verdict: string)
       return `${id.slice(0, at)} ${id.slice(at + DECLARED.length, id.lastIndexOf("@"))}`
     })
     .toSorted()
-  const others = ids.filter((id) => !id.includes("#exempt="))
+  // A gate-change file needs the signed review over the digest, not the author's Unchanged line.
+  const others = ids.filter((id) => !id.includes("#exempt=") && !id.endsWith("#gate-change"))
   const parsed = parseDeclarations(body)
   if (parsed.problems.length > 0) return withheld(`the body's declarations do not parse: ${parsed.problems[0]}`)
   const bodyChanged = parsed.declarations
@@ -51,7 +52,7 @@ export function verifyReview(checkOutput: string, body: string, verdict: string)
   if (others.length > 0 && !UNCHANGED_LINE.test(body))
     return withheld("the pull request body lacks the author's SDK-Parity-Unchanged: yes")
   if (others.length === 0 && UNCHANGED_LINE.test(body))
-    return withheld("the body carries SDK-Parity-Unchanged: yes, but every printed id is exempt")
+    return withheld("the body carries SDK-Parity-Unchanged: yes, but it covers no candidate")
   if (!CLEAR_VERDICT.test(verdict)) return withheld("the verdict is not a CLEAR")
   const reviewed = [...verdict.matchAll(REVIEWED_LINE)].map((match) => match[1])
   if (reviewed.length === 0)
