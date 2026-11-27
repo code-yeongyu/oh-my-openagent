@@ -153,9 +153,13 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
   // admission loop - a journaled-completion-but-starved-dependent stall. Foreign commits refresh
   // the cache; terminal node transitions additionally wake the settle loop. The subscription
   // retires once the run record is terminal.
-  const unsubscribeCommits = subscribeDagJournal(options.store, options.initialRecord.runId, (event) => {
+  const unsubscribeCommits = subscribeDagJournal(options.store, options.initialRecord.runId, async (event) => {
     if (event.seq > journal.snapshot().checkpointSeq) {
-      journal.refresh()
+      const refreshed = journal.transact(() => {
+        if (!context.suspended && event.seq > journal.snapshot().checkpointSeq) journal.refresh()
+      })
+      if (refreshed instanceof Promise) await refreshed
+      if (context.suspended) return
       if (event.type === "dag.node.transitioned" && TERMINAL_NODE_STATES.has(event.to)) {
         context.foreignSettlement = true
         context.resolveSettlementChanged()

@@ -215,7 +215,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     scheduler.subscribe(publishSchedulerEvent)
   })
 
-  const controller = (
+  const createController = (
     runId: DagRunId,
     parentSessionId: string,
   ): { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } => {
@@ -228,26 +228,30 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     return created
   }
 
-  const ensureScheduled = (runId: DagRunId, parentSessionId: string): void => {
-    const initialRecord = coreManager.record(runId, parentSessionId)
-    if (!SCHEDULABLE_RUN_STATUSES.has(initialRecord.status)) return
-    const owned = controller(runId, parentSessionId)
-    if (owned.running !== undefined) return
-    const running = owned.scheduler
-      .run()
-      .then(async (record) => {
-        await owned.scheduler.whenIdle()
-        return record
-      })
-      .finally(() => schedulers.delete(runId))
-    owned.running = running
-    void running.catch((error: unknown) => {
-      deps.logger.error("omo-senpi dag scheduler failed", {
-        runId,
-        error: error instanceof Error ? error.message : String(error),
+  const controller = (runId: DagRunId, parentSessionId: string) =>
+    schedulers.get(runId) ?? store.withAsyncJournalLock(runId, () => createController(runId, parentSessionId))
+
+  const ensureScheduled = (runId: DagRunId, parentSessionId: string): void | Promise<void> =>
+    store.withAsyncJournalLock(runId, () => {
+      const initialRecord = coreManager.record(runId, parentSessionId)
+      if (!SCHEDULABLE_RUN_STATUSES.has(initialRecord.status)) return
+      const owned = createController(runId, parentSessionId)
+      if (owned.running !== undefined) return
+      const running = owned.scheduler
+        .run()
+        .then(async (record) => {
+          await owned.scheduler.whenIdle()
+          return record
+        })
+        .finally(() => schedulers.delete(runId))
+      owned.running = running
+      void running.catch((error: unknown) => {
+        deps.logger.error("omo-senpi dag scheduler failed", {
+          runId,
+          error: error instanceof Error ? error.message : String(error),
+        })
       })
     })
-  }
 
   const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
@@ -258,7 +262,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     // journal the run cancelled, and only then let the parent's fence for the run go.
     const userStopped = record.status === "paused" && record.pause?.reason === "user_stop"
     if (userStopped) await endPausedRunChildren(deps.engine.manager, record, childClosure)
-    await controller(runId, sessionId).scheduler.cancel(runId, reason)
+    const owned = controller(runId, sessionId)
+    await (owned instanceof Promise ? await owned : owned).scheduler.cancel(runId, reason)
     if (!userStopped) return
     const runRef = { kind: "dag" as const, id: runId }
     await deps.engine.runPause?.forgetRun(record.parentSessionId, runRef)
@@ -337,7 +342,8 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ...coreManager,
     async start(params) {
       const result = await coreManager.start(params)
-      ensureScheduled(result.snapshot.runId, params.parentSessionId)
+      const scheduled = ensureScheduled(result.snapshot.runId, params.parentSessionId)
+      if (scheduled instanceof Promise) await scheduled
       return result
     },
     attach: waitSurface.attach,
@@ -578,7 +584,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
         watchLiveLease(scope, { ...outcome, holderPid: outcome.holderPid })
       }
     }
-    for (const run of manager.list(scope.sessionId)) ensureScheduled(run.runId, scope.sessionId)
+    for (const run of manager.list(scope.sessionId)) {
+      const scheduled = ensureScheduled(run.runId, scope.sessionId)
+      if (scheduled instanceof Promise) await scheduled
+    }
   }
 
   const unregisterPauseSource = deps.engine.runPause?.register(
@@ -614,7 +623,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       adopt: adoptInstalled,
       cancel: async (runId) => {
         const record = store.readCheckpoint<DagRunRecordV1>(runId)
-        if (record !== null) await controller(runId, record.parentSessionId).scheduler.cancel(runId, "run_cancelled")
+        if (record !== null) {
+          const owned = controller(runId, record.parentSessionId)
+          await (owned instanceof Promise ? await owned : owned).scheduler.cancel(runId, "run_cancelled")
+        }
       },
       deliverGuidance:
         deps.pausedGuidance ??
@@ -711,7 +723,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
         if (schedulers.get(runId) === owned) schedulers.delete(runId)
       }
       const sessionId = activeSessionId ?? deps.engine.runtime.sessionId()
-      if (sessionId !== undefined) recovery.pauseRunsForShutdown(sessionId)
+      if (sessionId !== undefined) await recovery.pauseRunsForShutdown(sessionId)
     },
     dispose() {
       unregisterPauseSource?.()

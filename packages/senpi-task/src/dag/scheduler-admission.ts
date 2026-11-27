@@ -8,35 +8,19 @@ import { attachStarted, settleOne } from "./scheduler-task-attachment"
 import type { DagNodeId, DagNodeErrorCode } from "./types"
 
 type ResidencyPark = "queued" | "lease" | "failed"
+type AdmissionResult = PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>
+
 export async function admitFrontier(context: SchedulerContext): Promise<boolean> {
   for (;;) {
-    if (context.suspended || context.cancellationStarted) return false
-    const denied = context.pendingAdmission.splice(0)
-    const deniedIds = new Set(denied)
-    const snapshot = context.journal.snapshot()
-    const runnable = snapshot.nodes
-      .filter(
-        (node) =>
-          (node.state === "pending" || node.state === "blocked") &&
-          !deniedIds.has(node.id) &&
-          !context.infrastructureRetries.pending(node.id) &&
-          isRunnable(snapshot, node.id),
-      )
-      .map((node) => node.id)
-    if (denied.length === 0 && runnable.length === 0) return true
-
-    for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
-    emitWaveAdmissions(context, runnable)
-
-    // Armed BEFORE the probe: the wake is edge-triggered, and a sibling child that settles while
-    // this batch is in flight must still be seen, or a run whose last chance passed in that gap
-    // parks until an unrelated resident settles.
-    const residencyReleased = context.taskManager.residencyChanged(snapshot.parentSessionId)
-    const awaitingAdmission = [...denied, ...runnable]
-    context.admissionInProgress = true
-    let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
+    const prepared = context.journal.transact(() => prepareAdmission(context))
+    const admission = prepared instanceof Promise ? await prepared : prepared
+    if (admission === undefined) return false
+    if (admission === null) return true
+    const { awaitingAdmission, residencyReleased } = admission
+    let folded
     try {
-      results = await Promise.allSettled(
+      if (context.suspended || context.cancellationStarted) return false
+      const results = await Promise.allSettled(
         awaitingAdmission.map(async (nodeId) => ({
           nodeId,
           result: await context.taskManager.startOwned(
@@ -48,46 +32,81 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
           ),
         })),
       )
+      const committed = context.journal.transact(() => foldAdmission(context, awaitingAdmission, results))
+      folded = committed instanceof Promise ? await committed : committed
     } finally {
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
     }
-    // The task owner record is durable even when admission finishes after suspension. Recovery
-    // resolves it by owner; this retired controller must not attach, fail, or promote the node.
-    if (context.suspended && !context.cancellationStarted) return false
-    const nextDenied: DagNodeId[] = []
-    let leaseDenied = false
-    for (let index = 0; index < results.length; index += 1) {
-      const settled = results[index]
-      const nodeId = awaitingAdmission[index]
-      if (settled === undefined || nodeId === undefined) throw new Error("DAG admission result lost its node")
-      if (settled.status === "rejected") {
-        if (!context.cancellationStarted) failNode(context, nodeId, "start_failed", errorMessage(settled.reason))
-        continue
-      }
-      const { result } = settled.value
-      if (context.cancellationStarted) {
-        if (result.kind === "started") attachStarted(context, nodeId, result)
-      } else if (result.kind === "residency_denied") {
-        const parked = parkResidencyDenied(context, nodeId, result)
-        if (parked === "queued") nextDenied.push(nodeId)
-        if (parked === "lease") {
-          nextDenied.push(nodeId)
-          leaseDenied = true
-        }
-      } else {
-        context.residencyQueued.delete(nodeId)
-        attachOrFail(context, nodeId, result)
-      }
-    }
-    if (context.cancellationStarted) return false
-    context.pendingAdmission.push(...nextDenied)
-    if (nextDenied.length === 0) return true
+    if (folded === undefined || context.suspended || context.cancellationStarted) return false
+    context.pendingAdmission.push(...folded.nextDenied)
+    if (folded.nextDenied.length === 0) return true
     // A contended or displaced admission lease is a bounded wait inside acquisition itself, so the
     // next probe is already paced; only a cap denial has to wait for a slot to free.
-    if (leaseDenied) continue
+    if (folded.leaseDenied) continue
     if (!(await settleOne(context, residencyReleased))) return false
   }
+}
+
+function prepareAdmission(context: SchedulerContext) {
+  if (context.suspended || context.cancellationStarted) return undefined
+  const denied = context.pendingAdmission.splice(0)
+  const deniedIds = new Set(denied)
+  const snapshot = context.journal.snapshot()
+  const runnable = snapshot.nodes
+    .filter(
+      (node) =>
+        (node.state === "pending" || node.state === "blocked") &&
+        !deniedIds.has(node.id) &&
+        !context.infrastructureRetries.pending(node.id) &&
+        isRunnable(snapshot, node.id),
+    )
+    .map((node) => node.id)
+  if (denied.length === 0 && runnable.length === 0) return null
+
+  for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
+  emitWaveAdmissions(context, runnable)
+
+  // Armed BEFORE the probe: a sibling's settlement while this batch is in flight must wake it.
+  const residencyReleased = context.taskManager.residencyChanged(snapshot.parentSessionId)
+  context.admissionInProgress = true
+  return { awaitingAdmission: [...denied, ...runnable], residencyReleased }
+}
+
+function foldAdmission(
+  context: SchedulerContext,
+  awaitingAdmission: readonly DagNodeId[],
+  results: readonly AdmissionResult[],
+) {
+  // Recovery resolves the durable task owner if admission finished after suspension. A retired
+  // scheduler must not attach, fail, or promote the node.
+  if (context.suspended && !context.cancellationStarted) return undefined
+  const nextDenied: DagNodeId[] = []
+  let leaseDenied = false
+  for (let index = 0; index < results.length; index += 1) {
+    const settled = results[index]
+    const nodeId = awaitingAdmission[index]
+    if (settled === undefined || nodeId === undefined) throw new Error("DAG admission result lost its node")
+    if (settled.status === "rejected") {
+      if (!context.cancellationStarted) failNode(context, nodeId, "start_failed", errorMessage(settled.reason))
+      continue
+    }
+    const { result } = settled.value
+    if (context.cancellationStarted) {
+      if (result.kind === "started") attachStarted(context, nodeId, result)
+    } else if (result.kind === "residency_denied") {
+      const parked = parkResidencyDenied(context, nodeId, result)
+      if (parked === "queued") nextDenied.push(nodeId)
+      if (parked === "lease") {
+        nextDenied.push(nodeId)
+        leaseDenied = true
+      }
+    } else {
+      context.residencyQueued.delete(nodeId)
+      attachOrFail(context, nodeId, result)
+    }
+  }
+  return { nextDenied, leaseDenied }
 }
 
 function parkResidencyDenied(context: SchedulerContext, nodeId: DagNodeId, denial: ResidencyDenied): ResidencyPark {

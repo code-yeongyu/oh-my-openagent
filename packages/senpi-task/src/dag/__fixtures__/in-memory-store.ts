@@ -14,10 +14,8 @@
 // - Seq must be strictly increasing, with the file store's error text; pages carry the same
 //   headSeq/hasMore/nextSinceSeq; events and checkpoints round-trip through JSON plus the paused
 //   encoding, so no caller can hold a live reference to stored state.
-// - Locks refuse a nested acquire of the same lock, as the file store does (there a second create of a
-//   live lock file ends in "Timed out acquiring DAG lock"); it is refused at once rather than after the
-//   file store's 30 s stall behind an unchanged holder. Beyond that a lock is a no-op: mutual exclusion between synchronous sections
-//   is what single-threaded JS already provides, and there is no second process to exclude.
+// - Raw sync locks refuse a nested acquire. Journal transactions can compose synchronous operations,
+//   and asynchronous waiters are notified when the current holder releases its lock.
 //
 // Deliberately NOT emulated, because no case here depends on it:
 // - `paths` still name real disk locations, and the few writers that bypass the store (results.ts's
@@ -61,18 +59,55 @@ export function createInMemoryDagStore(
   const checkpoints = new Map<DagRunId, object>()
   const keys = new Map<string, DagKeyRecord>()
   const results = new Map<string, string>()
-  const heldLocks = new Set<string>()
-  function withLock<T>(path: string, operation: () => T): T {
+  const heldLocks = new Map<string, Promise<void>>()
+  const heldJournalLocks = new Set<DagRunId>()
+  const heldSessionLocks = new Set<string>()
+
+  function acquire(path: string): () => void {
     assertSafeSegment(basename(path), "lock name")
     if (heldLocks.has(path)) throw new Error(`Timed out acquiring DAG lock: ${path}`)
-    heldLocks.add(path)
+    const released = Promise.withResolvers<void>()
+    heldLocks.set(path, released.promise)
+    return () => {
+      heldLocks.delete(path)
+      released.resolve()
+    }
+  }
+
+  function withLock<T>(path: string, operation: () => T): T {
+    const release = acquire(path)
     try {
       return operation()
     } finally {
-      heldLocks.delete(path)
+      release()
     }
   }
-  return {
+
+  async function withAsyncLock<T>(path: string, operation: () => T | Promise<T>): Promise<T> {
+    let holder = heldLocks.get(path)
+    while (holder !== undefined) {
+      await holder
+      holder = heldLocks.get(path)
+    }
+    const release = acquire(path)
+    try {
+      const result = operation()
+      return result instanceof Promise ? await result : result
+    } finally {
+      release()
+    }
+  }
+
+  function withJournalSection<T>(runId: DagRunId, operation: () => T): T {
+    heldJournalLocks.add(runId)
+    try {
+      return operation()
+    } finally {
+      heldJournalLocks.delete(runId)
+    }
+  }
+
+  const store: DagFileStore = {
     stateDir,
     paths,
     diagnostics: () => [],
@@ -143,19 +178,54 @@ export function createInMemoryDagStore(
       return results.get(`${runId}\u0000${nodeId}`) ?? null
     },
     withRunLock(runId, operation) {
+      if (heldJournalLocks.has(runId)) throw new Error(`Timed out acquiring DAG lock: ${paths.runLock(runId)}`)
+      return store.withJournalLock(runId, operation)
+    },
+    withRunCoordinationLock(runId, operation) {
       assertSafeSegment(runId, "run id")
-      return withLock(paths.runLock(runId), operation)
+      return withAsyncLock(paths.runCoordinationLock(runId), operation)
+    },
+    withJournalLock(runId, operation) {
+      assertSafeSegment(runId, "run id")
+      if (heldJournalLocks.has(runId)) return operation()
+      return withLock(paths.journalLock(runId), () => withJournalSection(runId, operation))
+    },
+    withAsyncJournalLock(runId, operation) {
+      assertSafeSegment(runId, "run id")
+      const path = paths.journalLock(runId)
+      if (!heldLocks.has(path) || heldJournalLocks.has(runId)) return store.withJournalLock(runId, operation)
+      return withAsyncLock(path, () => withJournalSection(runId, operation))
+    },
+    withAsyncJournalAndSessionLock(runId, parentSessionId, operation) {
+      assertSafeSegment(runId, "run id")
+      return withAsyncLock(paths.journalLock(runId), () =>
+        withAsyncLock(paths.sessionRunsLock(parentSessionId), () =>
+          withJournalSection(runId, () => {
+            heldSessionLocks.add(parentSessionId)
+            try {
+              return operation()
+            } finally {
+              heldSessionLocks.delete(parentSessionId)
+            }
+          }),
+        ),
+      )
     },
     withKeyLock: (parentSessionId, runKey, operation) => withLock(paths.keyLock(parentSessionId, runKey), operation),
+    withAsyncKeyLock: (parentSessionId, runKey, operation) =>
+      withAsyncLock(paths.keyLock(parentSessionId, runKey), operation),
     withTaskOwnerLock: (taskOwner, runId, operation) =>
       withLock(paths.taskOwnerLock(taskOwner), () => {
         assertSafeSegment(runId, "run id")
         return operation()
       }),
-    withSessionRunCapacity: (parentSessionId, _runId, operation) =>
-      withLock(paths.sessionRunsLock(parentSessionId), operation),
+    withSessionRunCapacity(parentSessionId, _runId, operation) {
+      if (heldSessionLocks.has(parentSessionId)) return operation()
+      return withLock(paths.sessionRunsLock(parentSessionId), operation)
+    },
     pruneExpired: () => [],
   }
+  return store
 }
 
 // The journal files a file-backed store WOULD have written under this store's paths. Cases that journal

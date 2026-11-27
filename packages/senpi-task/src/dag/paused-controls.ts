@@ -86,19 +86,23 @@ export async function cancelPausedDagNode(
   nodeId: DagNodeId,
   ports: { closeHold(taskId: string, cause: "node_cancelled"): Promise<void> },
 ): Promise<void> {
-  const record = ownedRecord(options, runId)
-  requireUserPaused(record)
-  const node = record.nodes.find((entry) => entry.id === nodeId)
-  if (node === undefined)
-    throw new DagNodeControlError({
-      code: "node_not_found",
-      message: `unknown dag node "${nodeId}"`,
-      runId,
-      nodeIds: [nodeId],
-    })
-  if (node.state === "completed" || node.state === "cancelled") return
-  const journal = controlJournal(options, record)
-  journal.append({ type: "dag.node.cancel_requested", nodeId })
+  const cancellation = await options.store.withAsyncJournalLock(runId, () => {
+    const record = ownedRecord(options, runId)
+    requireUserPaused(record)
+    const node = record.nodes.find((entry) => entry.id === nodeId)
+    if (node === undefined)
+      throw new DagNodeControlError({
+        code: "node_not_found",
+        message: `unknown dag node "${nodeId}"`,
+        runId,
+        nodeIds: [nodeId],
+      })
+    if (node.state === "completed" || node.state === "cancelled") return
+    controlJournal(options, record).append({ type: "dag.node.cancel_requested", nodeId })
+    return { record, node }
+  })
+  if (cancellation === undefined) return
+  const { record, node } = cancellation
   if (node.taskId !== undefined) {
     const task = options.taskManager.get(node.taskId)
     const result = await options.taskManager.cancelTask(
@@ -121,21 +125,23 @@ export async function cancelPausedDagNode(
     }
     await ports.closeHold(node.taskId, "node_cancelled")
   }
-  const fresh = ownedRecord(options, runId)
-  requireUserPaused(fresh)
-  const current = fresh.nodes.find((entry) => entry.id === nodeId)
-  if (fresh.pause?.pauseSeq !== record.pause?.pauseSeq || current === undefined) {
-    throw new DagNodeControlError({
-      code: "run_paused_by_user",
-      message: "the pause changed during cancellation",
-      runId,
+  return options.store.withAsyncJournalLock(runId, () => {
+    const fresh = ownedRecord(options, runId)
+    requireUserPaused(fresh)
+    const current = fresh.nodes.find((entry) => entry.id === nodeId)
+    if (fresh.pause?.pauseSeq !== record.pause?.pauseSeq || current === undefined) {
+      throw new DagNodeControlError({
+        code: "run_paused_by_user",
+        message: "the pause changed during cancellation",
+        runId,
+      })
+    }
+    controlJournal(options, fresh).append({
+      type: "dag.node.transitioned",
+      nodeId,
+      from: current.state,
+      to: "cancelled",
+      reason: { kind: "cancelled" },
     })
-  }
-  controlJournal(options, fresh).append({
-    type: "dag.node.transitioned",
-    nodeId,
-    from: current.state,
-    to: "cancelled",
-    reason: { kind: "cancelled" },
   })
 }

@@ -42,14 +42,19 @@ export function attachStarted(
 function watchQueuedPromotion(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
   disposePromotionWatch(context, nodeId)
   const foldPromotion = (): void => {
-    if (context.suspended || context.cancellationStarted) return
-    if (context.taskManager.get(taskId)?.status !== "running") return
-    disposePromotionWatch(context, nodeId)
-    // A task can terminalize straight from the queue (cancelled/errored before launch); by the
-    // time a stray event lands the node may already be folded, and a terminal node must never be
-    // dragged back to running (that path is reserved for explicit revives).
-    if (nodeById(context.journal.snapshot(), nodeId).state !== "scheduled") return
-    transition(context, nodeId, "running", { kind: "started" })
+    const committed = context.journal.transact(() => {
+      if (context.suspended || context.cancellationStarted) return
+      if (context.taskManager.get(taskId)?.status !== "running") return
+      disposePromotionWatch(context, nodeId)
+      // A task can terminalize straight from the queue (cancelled/errored before launch); by the
+      // time a stray event lands the node may already be folded, and a terminal node must never be
+      // dragged back to running (that path is reserved for explicit revives).
+      if (nodeById(context.journal.snapshot(), nodeId).state !== "scheduled") return
+      transition(context, nodeId, "running", { kind: "started" })
+    })
+    if (committed instanceof Promise) {
+      void committed.catch((error: unknown) => console.error("DAG queued promotion failed", error))
+    }
   }
   const unsubscribe = context.taskManager.subscribeChild(taskId, foldPromotion)
   context.promotionWatches.set(nodeId, unsubscribe)
@@ -107,21 +112,23 @@ export async function settleOne(context: SchedulerContext, residencyReleased?: P
     context.cancellationRequested.then(() => undefined),
   ])
   if (settled === null) return true
-  if (settled === undefined || context.suspended || context.cancellationStarted) return false
-  const task = context.attachedTasks.get(settled.nodeId)
-  context.attachedTasks.delete(settled.nodeId)
-  context.attachedTaskIds.delete(settled.nodeId)
-  disposePromotionWatch(context, settled.nodeId)
-  try {
-    if (settled.kind === "error") {
-      failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
-    } else {
-      foldTaskOutcome(context, settled.nodeId, settled.record)
+  return context.journal.transact(() => {
+    if (settled === undefined || context.suspended || context.cancellationStarted) return false
+    const task = context.attachedTasks.get(settled.nodeId)
+    context.attachedTasks.delete(settled.nodeId)
+    context.attachedTaskIds.delete(settled.nodeId)
+    disposePromotionWatch(context, settled.nodeId)
+    try {
+      if (settled.kind === "error") {
+        failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
+      } else {
+        foldTaskOutcome(context, settled.nodeId, settled.record)
+      }
+    } finally {
+      task?.resolveFolded()
     }
-  } finally {
-    task?.resolveFolded()
-  }
-  return true
+    return true
+  })
 }
 
 function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: TaskRecord): void {

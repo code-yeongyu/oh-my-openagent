@@ -80,6 +80,21 @@ for (const [name, create] of stores) {
       expect(store.withRunLock(RUN_ID, () => "acquired")).toBe("acquired")
     })
 
+    test("#given a journal and capacity transaction #when a journal acquires the same mutex #then it composes without changing legacy locking", async () => {
+      const store = create()
+      expect(store.paths.journalLock(RUN_ID)).toBe(store.paths.runLock(RUN_ID))
+      const seq = await store.withAsyncJournalAndSessionLock(RUN_ID, "parent", () =>
+        store.withSessionRunCapacity("parent", RUN_ID, () =>
+          store.withJournalLock(RUN_ID, () => {
+            expect(() => store.withRunLock(RUN_ID, () => undefined)).toThrow(/DAG lock/)
+            store.appendEvent(event(1))
+            return store.readEvents(RUN_ID, 0, { limit: 1 }).headSeq
+          }),
+        ),
+      )
+      expect(seq).toBe(1)
+    })
+
     test("#given a log of five events #when paged #then the cursor, headSeq and hasMore match", () => {
       const store = create()
       for (let seq = 1; seq <= 5; seq += 1) store.appendEvent(event(seq))

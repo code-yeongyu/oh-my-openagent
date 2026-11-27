@@ -20,20 +20,23 @@ export async function recoverPausedDagChildren(
     if (node.state !== "paused" || node.taskId === undefined) continue
     const fresh = ownedRecord(options, record.runId)
     if (fresh.pause?.pauseSeq !== pauseSeq || fresh.status !== "paused") return
-    const journal = controlJournal(options, fresh)
     switch (port.inspect(node.taskId)) {
       case "live":
         break
       case "lost":
-        journal.append({
-          type: "dag.node.pause-lost",
-          nodeId: node.id,
-          error: {
-            code: "lost_while_paused",
-            message: `task ${node.taskId} cannot be restored`,
+        await options.store.withAsyncJournalLock(record.runId, () => {
+          const current = ownedRecord(options, record.runId)
+          if (current.pause?.pauseSeq !== pauseSeq || current.status !== "paused") return
+          controlJournal(options, current).append({
+            type: "dag.node.pause-lost",
             nodeId: node.id,
-            at: new Date((options.now ?? Date.now)()).toISOString(),
-          },
+            error: {
+              code: "lost_while_paused",
+              message: `task ${node.taskId} cannot be restored`,
+              nodeId: node.id,
+              at: new Date((options.now ?? Date.now)()).toISOString(),
+            },
+          })
         })
         break
       case "restorable": {
@@ -42,12 +45,14 @@ export async function recoverPausedDagChildren(
           parentPauseSeq: pauseSeq,
           runRef: { kind: "dag", id: record.runId },
         })
-        const current = ownedRecord(options, record.runId)
-        if (current.pause?.pauseSeq !== pauseSeq || current.status !== "paused") return
-        controlJournal(options, current).append({
-          type: "dag.node.pause-recovered",
-          nodeId: node.id,
-          childSeq: receipt.childSeq,
+        await options.store.withAsyncJournalLock(record.runId, () => {
+          const current = ownedRecord(options, record.runId)
+          if (current.pause?.pauseSeq !== pauseSeq || current.status !== "paused") return
+          controlJournal(options, current).append({
+            type: "dag.node.pause-recovered",
+            nodeId: node.id,
+            childSeq: receipt.childSeq,
+          })
         })
         break
       }
