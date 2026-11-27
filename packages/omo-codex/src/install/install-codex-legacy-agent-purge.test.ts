@@ -6,6 +6,7 @@ import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
 
 const INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -56,12 +57,13 @@ describe("install-codex legacy agent purge", () => {
       )
       await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), LEGACY_MANAGED_ULTRAWORK_REVIEWER_TOML)
       await writeFile(join(agentsDir, "user-custom.toml"), 'name = "user-custom"\nmodel = "gpt-5.5"\n')
+      const repoRoot = await createRepoWithBuiltComponentBins()
 
       // when
       await runCodexInstaller({
         codexHome,
         binDir,
-        repoRoot: process.cwd(),
+        repoRoot,
         astGrepInstaller: skipAstGrepInstall,
         runCommand: async () => undefined,
       })
@@ -92,12 +94,13 @@ describe("install-codex legacy agent purge", () => {
         ["[agents.codex-ultrawork-reviewer]", 'config_file = "./agents/codex-ultrawork-reviewer.toml"', ""].join("\n"),
       )
       await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), customReviewer)
+      const repoRoot = await createRepoWithBuiltComponentBins()
 
       // when
       await runCodexInstaller({
         codexHome,
         binDir,
-        repoRoot: process.cwd(),
+        repoRoot,
         astGrepInstaller: skipAstGrepInstall,
         runCommand: async () => undefined,
       })

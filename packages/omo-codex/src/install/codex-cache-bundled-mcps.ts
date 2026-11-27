@@ -1,5 +1,5 @@
-import { isPlainRecord } from "./codex-cache-fs"
-import { cp, mkdir, readFile, stat } from "node:fs/promises"
+import { copyDirectoryTree, isPlainRecord } from "./codex-cache-fs"
+import { mkdir, readFile, stat } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 
 interface BundledMcpRuntime {
@@ -54,7 +54,7 @@ async function copyBundledMcpRuntimeDist(
   }
   const destinationPath = join(pluginRoot, runtime.destinationDistFromPlugin)
   await mkdir(dirname(destinationPath), { recursive: true })
-  await cp(sourcePath, destinationPath, { recursive: true })
+  copyDirectoryTree(sourcePath, destinationPath)
 }
 
 async function readSourceMcpArgs(path: string): Promise<ReadonlySet<string>> {
