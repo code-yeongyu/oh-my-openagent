@@ -11,6 +11,7 @@ import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/ty
 import type { DreamTriggerWiring } from "./dream-trigger"
 import type { MemoryFactsWiring } from "./facts-wiring"
 import { registerMemoryGuard } from "./guard"
+import { registerMemoryFilesystemPolicy } from "./policy-guard"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import type { MemoryJournalWiring } from "./journal-wiring"
 import { registerJournalSettleDelivery } from "./journal-settle-delivery"
@@ -223,6 +224,9 @@ export function registerMemoryStatic(input: {
         resolveSessionId: () => activeSession.current,
       },
     },
+  )
+  registerMemoryFilesystemPolicy(pi, () =>
+    activeSession.current === undefined ? undefined : resolveContext(activeSession.current),
   )
   registerMemoryGuard(pi, ctx, {
     getContext: (eventContext) => {

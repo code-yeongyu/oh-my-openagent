@@ -88,7 +88,7 @@ describe("memory filesystem policy guard", () => {
   test("#given a bound identity on a policy-capable host #when registration runs #then exactly one policy is registered with foreign-only denied roots", () => {
     const setup = policyFixture(roots)
 
-    const result = registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    const result = registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
 
     expect(result).toEqual({ status: "registered" })
     expect(setup.pi.filesystemPolicies).toHaveLength(1)
@@ -100,7 +100,7 @@ describe("memory filesystem policy guard", () => {
 
   test("#given the registered policy #when read and write target a foreign identity file #then both are denied with the stable reason", async () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
     const policy = registeredPolicy(setup)
     const foreign = canonical(setup.foreignFile)
 
@@ -116,7 +116,7 @@ describe("memory filesystem policy guard", () => {
 
   test("#given the registered policy #when enumeration targets the agents root or a foreign root #then both are denied", async () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
     const policy = registeredPolicy(setup)
     const agents = canonical(setup.agentsRoot)
     const foreign = canonical(setup.foreignRoot)
@@ -133,7 +133,7 @@ describe("memory filesystem policy guard", () => {
 
   test("#given the registered policy #when operations target the bound identity repo and worktrees #then they are allowed", async () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
     const policy = registeredPolicy(setup)
 
     expect(await check(policy, "read", canonical(setup.ownRepoFile))).toEqual({ allow: true })
@@ -143,7 +143,7 @@ describe("memory filesystem policy guard", () => {
 
   test("#given the registered policy #when an operation targets a path outside the agents root #then it is allowed", async () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
     const policy = registeredPolicy(setup)
 
     expect(await check(policy, "read", canonical(setup.outsideFile))).toEqual({ allow: true })
@@ -151,7 +151,7 @@ describe("memory filesystem policy guard", () => {
 
   test("#given the registered policy #when a sibling identity appears after registration #then its files are still denied", async () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
     const policy = registeredPolicy(setup)
 
     const intruderPaths = buildIdentityPaths(setup.memoryRoot, "intruder")
@@ -166,13 +166,38 @@ describe("memory filesystem policy guard", () => {
     })
   })
 
-  test("#given an unbound identity on a policy-capable host #when registration runs #then no policy is registered", () => {
+  test("#given no bound identity yet #when the registered policy is asked #then it allows everything, as a host with no policy does", async () => {
     const setup = policyFixture(roots)
 
-    const result = registerMemoryFilesystemPolicy(setup.pi, undefined)
+    const result = registerMemoryFilesystemPolicy(setup.pi, () => undefined)
 
-    expect(result).toEqual({ status: "unbound" })
-    expect(setup.pi.filesystemPolicies).toHaveLength(0)
+    expect(result).toEqual({ status: "registered" })
+    const policy = registeredPolicy(setup)
+    expect(policy.deniedRoots).toEqual([])
+    for (const [operation, path] of [
+      ["read", setup.foreignFile],
+      ["write", setup.foreignFile],
+      ["enumerate", setup.agentsRoot],
+      ["read", setup.ownRepoFile],
+    ] as const)
+      expect(await check(policy, operation, canonical(path))).toEqual({ allow: true })
+  })
+
+  test("#given one registered policy #when the session binds after registration #then the same policy denies foreign identities from then on (#15251)", async () => {
+    const setup = policyFixture(roots)
+    let bound: typeof setup.own | undefined
+    registerMemoryFilesystemPolicy(setup.pi, () => bound)
+    const policy = registeredPolicy(setup)
+    const foreign = canonical(setup.foreignFile)
+    expect(await check(policy, "read", foreign)).toEqual({ allow: true })
+
+    bound = setup.own
+
+    expect(setup.pi.filesystemPolicies).toHaveLength(1)
+    expect(await check(policy, "read", foreign)).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${foreign}`,
+    })
   })
 
   test("#given a host without the policy API #when registration runs #then nothing is registered and the soft guard stays the enforcement layer", async () => {
@@ -180,7 +205,7 @@ describe("memory filesystem policy guard", () => {
     const pi = new FakeExtensionAPI()
 
     expect(hasFilesystemPolicySupport(pi)).toBe(false)
-    const result = registerMemoryFilesystemPolicy(pi, setup.own)
+    const result = registerMemoryFilesystemPolicy(pi, () => setup.own)
 
     expect(result).toEqual({ status: "unsupported" })
 
@@ -211,7 +236,7 @@ describe("memory filesystem policy guard", () => {
     const strayPaths = buildIdentityPaths(setup.memoryRoot, "stray-run")
     mkdirSync(join(strayPaths.transcripts, "stream-1"), { recursive: true })
 
-    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
     const policy = registeredPolicy(setup)
 
     const deniedRoots = policy.deniedRoots ?? []
@@ -237,7 +262,7 @@ describe("memory filesystem policy guard", () => {
       binding: { identity: "own", repoPathHash: "hash", boundAt: 1 },
     })
 
-    registerMemoryFilesystemPolicy(setup.pi, transient)
+    registerMemoryFilesystemPolicy(setup.pi, () => transient)
     const policy = registeredPolicy(setup)
 
     expect(await check(policy, "write", canonical(runPaths.transcripts), "write")).toEqual({ allow: true })
