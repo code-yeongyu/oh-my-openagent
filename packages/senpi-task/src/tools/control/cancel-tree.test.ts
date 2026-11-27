@@ -121,6 +121,5 @@ describe("a root's cancel of a grandchild is the terminal state its middle child
     expect(readEvents(store, grandchild.task_id)).toContain("cancelled")
     expect(manager.getResidentHandle(grandchild.task_id)).toBeUndefined()
     expect(manager.residentTaskIds()).not.toContain(grandchild.task_id)
-    lifecycle.dispose?.()
   })
 })
