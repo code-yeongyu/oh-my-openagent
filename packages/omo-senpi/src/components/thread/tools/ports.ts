@@ -105,6 +105,8 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
+  /** The host's own `get_protocol_info` capabilities (an observing read); absent on a host port that cannot read them. */
+  readonly capabilities?: () => Promise<readonly string[]>
   /** `permissionPreset` is the approval mode the new session starts in (its creator's, #12884); absent, the host's default applies. */
   readonly openSession: (params: {
     readonly cwd?: string
@@ -222,7 +224,7 @@ export type ThreadToolSurfaceOptions = {
   /** A same-device send to a session that is not running becomes a wake (#13037 5.3); absent, it is queued offline. */
   readonly sameDeviceWake?: SameDeviceWake
   /**
-   * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
+   * The gateway store: the tools' idempotency receipts. The component passes
    * the one store it shares with the session's control endpoint; the SDK passes the one it opened
    * under the agent dir. There is no fallback: a second store opened elsewhere would be a separate
    * database.
@@ -240,8 +242,6 @@ export type ThreadToolSurfaceOptions = {
   readonly callerCause?: () => string | undefined
   /** The highest chain hop an input of the caller's current run arrived with from another device; a send continues it (K8). */
   readonly callerChainHop?: () => number
-  /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
-  readonly callerRunDeliveries?: () => readonly string[]
   /** The agent sessions whose deliveries the caller's current run took in: a `thread_send` back to one asks for no permission (#12886). */
   readonly callerReplyTargets?: () => readonly string[]
   /** The senders of the deliveries the current run consumed, as each delivery stated them (decision 0027 section 6): a reply
@@ -252,10 +252,6 @@ export type ThreadToolSurfaceOptions = {
     readonly name?: string
     readonly device?: string
   }[]
-  /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
-  readonly callerRunHasLocalInput?: () => boolean
-  /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
-  readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
   /**
    * How long a create waits for its first prompt to start on this device (`control/prompt-start.ts`); absent,

@@ -1,7 +1,15 @@
 import { type ConnectOptions, connectLocalApi, type LocalApiClient } from "./local-api/client.ts"
-import type { DeliveryHolds, DeliveryInbound, DrainedData, JsonObject, PendingPair } from "./local-api/protocol.ts"
+import type {
+  CommandRpc,
+  DeliveryHolds,
+  DeliveryInbound,
+  DrainedData,
+  JsonObject,
+  PendingPair,
+} from "./local-api/protocol.ts"
 import { connectLocalBackground } from "./background-transport.ts"
-import { deviceServiceStateDir } from "./device-service.ts"
+import { connectDeviceService, deviceServiceStateDir } from "./device-service.ts"
+import type { CommandResult } from "./remote-attach.ts"
 
 /**
  * omo#13037: an engine process's delivery-consumer connection to this device's service, on the local API v1 the
@@ -18,6 +26,16 @@ export type DeliveryConsumerClient = {
   ) => Promise<void>
   readonly held: (askId: string, holds: boolean) => Promise<void>
   readonly peerAdmitted: (device: string) => Promise<boolean>
+  /**
+   * One record to a session on another device (omo#14560's delivery-outcome notice), on its own background connection
+   * opened for this call and closed after it, so the consumer's declaration connection never carries a command.
+   */
+  readonly wakeCommand: (
+    device: string,
+    durableId: string,
+    rpc: CommandRpc,
+    options?: { readonly waitMs?: number },
+  ) => Promise<CommandResult>
   readonly pending: (pairs: readonly PendingPair[]) => Promise<void>
   readonly drained: (pair: PendingPair) => Promise<DrainedData>
   readonly onInbound: (listener: (event: DeliveryInbound) => void) => () => void
@@ -55,6 +73,14 @@ export async function connectDeliveryConsumer(
       await client.request("delivery.held", { ask_id: askId, holds })
     },
     peerAdmitted: async (device) => (await client.request("peer.admitted", { device })).admitted,
+    wakeCommand: async (device, durableId, rpc, commandOptions) => {
+      const sender = await connectDeviceService({ version: options.version, stateDir, background: true })
+      try {
+        return await sender.wakeCommand(device, durableId, rpc, commandOptions)
+      } finally {
+        sender.close()
+      }
+    },
     pending: async (pairs) => {
       await client.request("delivery.pending", { pairs })
     },

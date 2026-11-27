@@ -1,4 +1,6 @@
+import type { AdapterRules } from "./remote-import-guard-adapter"
 import type { GuardRules } from "./remote-import-guard-check"
+import adapterOffenders from "./remote-import-guard-adapter-offenders.json"
 
 // Design "one remote module" v6, sections 1 and 12 (guard G1). L0 is the vendored relay-daemon local-API client, L1 the
 // device service (device-service-core), L1m the vendored bunshin relay transport, L2 `omo-senpi/src/components/remote`.
@@ -12,6 +14,15 @@ const REMOTE = "packages/omo-senpi/src/components/remote/"
 // surface importing another surface file (the TUI's own files) is not reaching the layer. Scope: S3 sees direct static
 // imports, require() and literal import() only; a route through another module, or bin/lib/thread.js loading built
 // bundles by a non-literal import() (frozen by NON_LITERAL_IMPORT_OFFENDERS), is outside it.
+// The `omo-ai/remote` SDK (#13413) shares the CLI files' remote- prefix. Its entry, remote-sdk.ts, is a caller like any
+// surface (the barrel only). remote-sdk-api.ts is its published declaration surface: it names components/remote's leaf
+// types directly, type-only, so the shipped declarations stay that small closure (#13782); S3 allows that and nothing else.
+const REMOTE_SDK_DECLARATIONS = "packages/omo-native/remote-sdk-api.ts"
+export const REMOTE_SDK_ENTRY: ReadonlySet<string> = new Set([
+  "packages/omo-native/remote-sdk.ts",
+  REMOTE_SDK_DECLARATIONS,
+])
+
 const isRemoteSurface = (file: string): boolean =>
   file.startsWith("packages/omo-senpi/src/components/thread/") ||
   file.startsWith(`${REMOTE}tui/`) ||
@@ -49,100 +60,85 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     "packages/omo-native/device-service-handoff.ts",
     "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
-  s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
+  s3: {
+    surface: isRemoteSurface,
+    layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY],
+    entries: [`${REMOTE}index.ts`, `${REMOTE}lazy.ts`, `${REMOTE}admin.ts`],
+    declarations: { files: new Set([REMOTE_SDK_DECLARATIONS]), reaches: REMOTE },
+  },
 }
 
 type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
 
-// Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
-// removes a use also removes its row.
-export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
-    uses: [BUNSHIN_TS_RELAY],
-    removedBy: "omo PR 4c-3",
-  },
-  "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: [BUNSHIN_TS_RELAY], removedBy: "omo PR 4c-3" },
+// Family A (#14943 design 7.5): the adapters of both editions' CLIs and the thread tools, and the layers an adapter may
+// not reach. The SDK entries end the walk: the thread SDK, the omo SDK and the remote module's index.
+const THREAD = "packages/omo-senpi/src/components/thread/"
+const NATIVE = "packages/omo-native/"
+const OPENCODE_CLI = "packages/omo-opencode/src/cli/"
+const NATIVE_ADAPTER =
+  /^packages\/omo-native\/(?:(?:remote|account|sync)-[^/]+\.ts|service-auth-command\.ts|launcher-commands\.ts|compile-entry\.ts|compile-args\.ts)$/
+const LAUNCHER_ADAPTER =
+  /^packages\/omo-native\/bin\/lib\/(?:launcher|thread|thread-args|daemon[a-z-]*|update-args|engine-commands|host-status|retired-command|setup-import|doctor)\.js$/
+const OPENCODE_ADAPTER = new Set([
+  `${OPENCODE_CLI}cli-program.ts`,
+  `${OPENCODE_CLI}runtime-commands.ts`,
+  `${OPENCODE_CLI}cleanup-command.ts`,
+  `${OPENCODE_CLI}mcp-oauth/index.ts`,
+  `${OPENCODE_CLI}service-auth/commands.ts`,
+  `${OPENCODE_CLI}account-keys/commands.ts`,
+])
+const LOOP_ADAPTER = /^packages\/omo-codex\/plugin\/components\/ulw-loop\/src\/cli[a-z-]*\.ts$/
+// The tool definitions; the `tools/*-ops.ts` bodies and helpers they reach are the threads core (design 3.1).
+const TOOL_ADAPTER = /^packages\/omo-senpi\/src\/components\/thread\/tools(?:\.ts|\/extension-tools\.ts)$/
+
+export const ADAPTER_RULES: AdapterRules = {
+  adapter: (file) =>
+    NATIVE_ADAPTER.test(file) ||
+    LAUNCHER_ADAPTER.test(file) ||
+    OPENCODE_ADAPTER.has(file) ||
+    LOOP_ADAPTER.test(file) ||
+    TOOL_ADAPTER.test(file),
+  testFile: isTestFile,
+  sdkEntries: [`${THREAD}sdk.ts`, "packages/omo-senpi/src/components/omo-sdk/index.ts", `${REMOTE}index.ts`],
+  forbidden: [
+    `${THREAD}address/`,
+    "packages/thread-address-core/",
+    `${THREAD}gateway/`,
+    `${THREAD}control/`,
+    `${THREAD}remote/`,
+    REMOTE,
+    DEVICE_SERVICE_CORE,
+    BUNSHIN_TS_RELAY,
+    `${OPENCODE_CLI}service-auth/`,
+    `${OPENCODE_CLI}account-keys/`,
+    `${NATIVE}device-service-handoff.ts`,
+  ],
+  forbiddenBuiltins: ["net", "tls", "http", "https", "http2", "dgram", "ws"],
 }
 
-export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
-  "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
-    uses: ["createRelayTransport"],
-    removedBy: "omo PR 4c-3",
-  },
-  "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: ["createRelayTransport"], removedBy: "omo PR 4c-3" },
-}
+// Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
+// removes a use also removes its row.
+export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {}
+
+export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
 // S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.
 export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-attach-dialogs.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-attach-presentation.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-attach.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
+  // The device-service administration adapters stay on device-service-core until they call the omo SDK's deviceService.*
+  // capabilities (routing them through remote/admin.ts would only hide the same dependency).
   "packages/omo-native/remote-bootstrap.ts": {
     uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-cli.ts": {
-    uses: [DEVICE_SERVICE_CORE, REMOTE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+    removedBy: "omo#15032 (deviceService.* through the omo SDK, #14943)",
   },
   "packages/omo-native/remote-cold-wake.ts": {
     uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-entry.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-local.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-render.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-session-verbs.ts": {
-    uses: [DEVICE_SERVICE_CORE, REMOTE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
+    removedBy: "omo#15032 (deviceService.* through the omo SDK, #14943)",
   },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
-  "packages/omo-senpi/src/components/thread/remote/attach-pool.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
-  "packages/omo-senpi/src/components/thread/live-surface.ts": {
-    uses: [REMOTE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/default-remote.ts": {
-    uses: [REMOTE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/outcome.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
   "packages/omo-senpi/src/components/thread/remote/ports.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/remote-ops.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
@@ -152,13 +148,15 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
   },
 }
 
+// Family A offenders (a JSON record so the gate and the test can read the merge base's copy): today's adapters reach these
+// layers; the slice named moves each onto the SDK and removes its row, and the record may only shrink against the base.
+export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = adapterOffenders
+
 // Non-literal `import()` sites outside tests, frozen at their count per file (v6 section 12): any new one fails.
 export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/lsp-daemon/scripts/qa/cancellation-smoke.mjs": 6,
   "packages/lsp-daemon/scripts/qa/commit-barrier-smoke.mjs": 1,
   "packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs": 2,
-  "packages/omo-codex/plugin/skills/browser/scripts/omowright.mjs": 1,
-  "packages/omo-codex/plugin/skills/lsp-setup/scripts/verify-lsp.ts": 1,
   "packages/omo-codex/scripts/install-generated-bundle.test.mjs": 1,
   "packages/omo-codex/scripts/install-local.mjs": 1,
   "packages/omo-native/bin/lib/category-coverage.js": 2,
@@ -177,8 +175,6 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/plugin/scripts/build-extension-runtimes.test.mjs": 1,
   "packages/omo-senpi/plugin/scripts/build-extension.test.mjs": 1,
   "packages/omo-senpi/plugin/scripts/bundle-inputs.test.mjs": 1,
-  "packages/omo-senpi/plugin/skills/browser/scripts/omowright.mjs": 1,
-  "packages/omo-senpi/plugin/skills/lsp-setup/scripts/verify-lsp.ts": 1,
   "packages/omo-senpi/scripts/qa/agent-toolkit-catalog-qa.mjs": 1,
   "packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs": 2,
   "packages/omo-senpi/scripts/qa/gateway-acceptance-trace.mjs": 1,

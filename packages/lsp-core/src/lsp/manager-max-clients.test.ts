@@ -62,21 +62,21 @@ describe("LspManager resident client cap", () => {
     const { manager, clients, clock } = managerWithFakes(2)
     try {
       await manager.getClient("/root-a", SERVER)
-      manager.releaseClient("/root-a", SERVER.id)
+      manager.releaseClient("/root-a", SERVER)
       clock.value += 10
       await manager.getClient("/root-b", SERVER)
-      manager.releaseClient("/root-b", SERVER.id)
+      manager.releaseClient("/root-b", SERVER)
       clock.value += 10
 
       // when
       await manager.getClient("/root-c", SERVER)
-      manager.releaseClient("/root-c", SERVER.id)
+      manager.releaseClient("/root-c", SERVER)
 
       // then
       expect(manager.clientCount()).toBe(2)
-      expect(manager.hasClient("/root-a", SERVER.id)).toBe(false)
-      expect(manager.hasClient("/root-b", SERVER.id)).toBe(true)
-      expect(manager.hasClient("/root-c", SERVER.id)).toBe(true)
+      expect(manager.hasClient("/root-a", SERVER)).toBe(false)
+      expect(manager.hasClient("/root-b", SERVER)).toBe(true)
+      expect(manager.hasClient("/root-c", SERVER)).toBe(true)
       expect(clients.get("/root-a")?.stopCallCount).toBe(1)
     } finally {
       await manager.stopAll()
@@ -90,20 +90,20 @@ describe("LspManager resident client cap", () => {
       await manager.getClient("/root-busy", SERVER)
       clock.value += 10
       await manager.getClient("/root-idle", SERVER)
-      manager.releaseClient("/root-idle", SERVER.id)
+      manager.releaseClient("/root-idle", SERVER)
       clock.value += 10
 
       // when
       await manager.getClient("/root-new", SERVER)
-      manager.releaseClient("/root-new", SERVER.id)
+      manager.releaseClient("/root-new", SERVER)
 
       // then
-      expect(manager.hasClient("/root-busy", SERVER.id)).toBe(true)
-      expect(manager.hasClient("/root-idle", SERVER.id)).toBe(false)
+      expect(manager.hasClient("/root-busy", SERVER)).toBe(true)
+      expect(manager.hasClient("/root-idle", SERVER)).toBe(false)
       expect(clients.get("/root-busy")?.stopCallCount).toBe(0)
       expect(clients.get("/root-idle")?.stopCallCount).toBe(1)
     } finally {
-      manager.releaseClient("/root-busy", SERVER.id)
+      manager.releaseClient("/root-busy", SERVER)
       await manager.stopAll()
     }
   })
@@ -121,8 +121,8 @@ describe("LspManager resident client cap", () => {
       expect(manager.clientCount()).toBe(2)
       expect(clients.get("/root-busy")?.stopCallCount).toBe(0)
     } finally {
-      manager.releaseClient("/root-busy", SERVER.id)
-      manager.releaseClient("/root-second", SERVER.id)
+      manager.releaseClient("/root-busy", SERVER)
+      manager.releaseClient("/root-second", SERVER)
       await manager.stopAll()
     }
   })
@@ -132,7 +132,7 @@ describe("LspManager resident client cap", () => {
     const { manager, clients, clock } = managerWithFakes(1)
     try {
       await manager.getClient("/root-first", SERVER)
-      manager.releaseClient("/root-first", SERVER.id)
+      manager.releaseClient("/root-first", SERVER)
       clock.value += 10
 
       // when
@@ -141,9 +141,34 @@ describe("LspManager resident client cap", () => {
       await Promise.resolve()
 
       // then
-      expect(manager.hasClient("/root-first", SERVER.id)).toBe(false)
+      expect(manager.hasClient("/root-first", SERVER)).toBe(false)
       expect(clients.get("/root-first")?.stopCallCount).toBe(1)
-      expect(manager.hasClient("/root-warm", SERVER.id)).toBe(true)
+      expect(manager.hasClient("/root-warm", SERVER)).toBe(true)
+    } finally {
+      await manager.stopAll()
+    }
+  })
+})
+
+describe("LspManager client identity", () => {
+  const NATIVE_TSC: ResolvedServer = {
+    ...SERVER,
+    command: ["/repo/packages/x/node_modules/.bin/tsc", "--lsp", "--stdio"],
+  }
+
+  it("#given one root #when files resolve to different typescript commands #then each command gets its own client and the same command shares one", async () => {
+    // given: packages/x resolves to its own tsc --lsp, packages/y and packages/z to typescript-language-server
+    const { manager } = managerWithFakes(10)
+    try {
+      // when
+      const forX = await manager.getClient("/repo", NATIVE_TSC)
+      const forY = await manager.getClient("/repo", SERVER)
+      const forZ = await manager.getClient("/repo", SERVER)
+
+      // then
+      expect(manager.clientCount()).toBe(2)
+      expect(forX).not.toBe(forY)
+      expect(forZ).toBe(forY)
     } finally {
       await manager.stopAll()
     }

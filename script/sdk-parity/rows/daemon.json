@@ -1,0 +1,836 @@
+{
+  "domain": "daemon",
+  "rows": [
+    {
+      "id": "daemon.ensure",
+      "kind": "capability",
+      "sdk": "daemon.ensure",
+      "today": "partial",
+      "slices": [
+        "C1a",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "upgrade"
+              },
+              {
+                "type": "string",
+                "const": "fallback"
+              },
+              {
+                "type": "string",
+                "const": "never"
+              }
+            ]
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "launch_spec": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mcp_presenter_enforcement": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "ensure"
+          ],
+          "flags": {
+            "--launch-spec": "launch_spec",
+            "--policy": "policy",
+            "--socket": "root.endpoint.socket",
+            "--rpc-key-root": "root.endpoint.key_root",
+            "--mcp-presenter-enforcement": "mcp_presenter_enforcement=true"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call (as for daemon.run)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.gc",
+      "kind": "capability",
+      "sdk": "daemon.gc",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "prune_store_index": {
+            "type": "boolean"
+          },
+          "agent_dir": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "gc"
+          ],
+          "flags": {
+            "--prune-store-index": "prune_store_index=true",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "gc"
+          ],
+          "flags": {
+            "--agent-dir": "agent_dir"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.handoff",
+      "kind": "capability",
+      "sdk": "daemon.handoff",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "upgrade"
+              },
+              {
+                "type": "string",
+                "const": "fallback"
+              },
+              {
+                "type": "string",
+                "const": "never"
+              }
+            ]
+          },
+          "launch_spec": {
+            "type": "string",
+            "minLength": 1
+          },
+          "allow_downgrade": {
+            "type": "boolean"
+          },
+          "when": {
+            "type": "object",
+            "required": [
+              "idle"
+            ],
+            "properties": {
+              "idle": {
+                "type": "object",
+                "required": [
+                  "operation",
+                  "if_instance",
+                  "if_generation",
+                  "target_build"
+                ],
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "if_instance": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "if_generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "target_build": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "handoff"
+          ],
+          "flags": {
+            "--no-upgrade": "policy=never"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "handoff"
+          ],
+          "flags": {
+            "--launch-spec": "launch_spec",
+            "--policy": "policy",
+            "--socket": "root.endpoint.socket",
+            "--allow-downgrade": "allow_downgrade=true",
+            "--when": "when.idle",
+            "--operation": "when.idle.operation",
+            "--if-instance": "when.idle.if_instance",
+            "--if-generation": "when.idle.if_generation",
+            "--target-build": "when.idle.target_build"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.rollbackPrepare",
+      "kind": "capability",
+      "sdk": "daemon.rollbackPrepare",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "allow_missing_index": {
+            "type": "boolean"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "rollback-prepare"
+          ],
+          "flags": {
+            "--store": "stores",
+            "--allow-missing-index": "allow_missing_index=true",
+            "--dry-run": "dry_run=true",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.run",
+      "kind": "capability",
+      "sdk": "daemon.run",
+      "today": "partial",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "upgrade"
+              },
+              {
+                "type": "string",
+                "const": "fallback"
+              },
+              {
+                "type": "string",
+                "const": "never"
+              }
+            ]
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "run"
+          ],
+          "flags": {
+            "--no-upgrade": "policy=never",
+            "--pinned": "pinned=true",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.shardPath",
+      "kind": "capability",
+      "sdk": "daemon.shardPath",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "p"
+              },
+              {
+                "type": "string",
+                "const": "i"
+              }
+            ]
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1
+          },
+          "root": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "owner"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "shard-path"
+          ],
+          "flags": {
+            "--kind": "kind",
+            "--owner": "owner",
+            "--root": "root"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: an endpoint internal"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.status",
+      "kind": "capability",
+      "sdk": "daemon.status",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "all": {
+            "type": "boolean"
+          },
+          "include_workers": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "status"
+          ],
+          "flags": {
+            "--include-workers": "include_workers=true",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "status"
+          ],
+          "flags": {
+            "--all": "all=true",
+            "--include-workers": "include_workers=true",
+            "--socket": "root.endpoint.socket"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.stop",
+      "kind": "capability",
+      "sdk": "daemon.stop",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "drain": {
+            "type": "boolean"
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1
+          },
+          "wait_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "expected_generation": {
+            "type": "object",
+            "required": [
+              "instance_id",
+              "generation",
+              "pid",
+              "process_start_time"
+            ],
+            "properties": {
+              "instance_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pid": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "process_start_time": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "stop"
+          ],
+          "flags": {
+            "--drain": "drain=true"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [
+            "host",
+            "stop"
+          ],
+          "flags": {
+            "--drain": "drain=true",
+            "--instance": "instance",
+            "--wait-ms": "wait_ms",
+            "--force": "force=true",
+            "--expected-generation": "expected_generation",
+            "--socket": "root.endpoint.socket"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.stopAll",
+      "kind": "capability",
+      "sdk": "daemon.stopAll",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "drain": {
+            "type": "boolean"
+          },
+          "wait": {
+            "type": "boolean"
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "stop"
+          ],
+          "flags": {
+            "--all": "when",
+            "--drain": "drain=true",
+            "--wait": "wait=true",
+            "--timeout": "deadline_ms"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "daemon.warm",
+      "kind": "capability",
+      "sdk": "daemon.warm",
+      "today": "partial",
+      "slices": [
+        "C1a",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object",
+            "patternProperties": {
+              "^.*$": {}
+            }
+          }
+        },
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call (as for daemon.run)",
+        "cli": "CLI omitted: reached through omo daemon run, which ensures the daemon and then warms it (daemon.run)"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.7",
+      "position": 3,
+      "ids": [
+        "daemon.run"
+      ],
+      "cells": [
+        "`daemon.run({ policy?, pinned? })`: one operation that ensures the operator daemon and then warms it; a refused or failed warm is reported in the value and the run still succeeds, as today",
+        "`omo daemon run [--no-upgrade] [--pinned] [--json]`",
+        "none",
+        "partial: `warmDaemon` only",
+        "Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 4,
+      "ids": [
+        "daemon.ensure",
+        "daemon.warm"
+      ],
+      "cells": [
+        "`daemon.ensure({ policy?, pinned?, launch_spec?, mcp_presenter_enforcement? })`, the endpoint from the root's `endpoint`; `daemon.warm({ cwd?, kind?, context? })`",
+        "`omo host ensure [--launch-spec] [--policy upgrade\\|fallback\\|never] [--socket] [--rpc-key-root] [--mcp-presenter-enforcement]`",
+        "none",
+        "partial: `warmDaemon`",
+        "Same reason",
+        "C1a, after S0"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 6,
+      "ids": [
+        "daemon.status"
+      ],
+      "cells": [
+        "`daemon.status({ all?, include_workers? })`, each terminal row with its last activity",
+        "`omo daemon status [--include-workers]`; `omo host status [--all] [--include-workers] [--socket]`",
+        "none",
+        "**no**",
+        "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044)",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 7,
+      "ids": [
+        "daemon.stop"
+      ],
+      "cells": [
+        "`daemon.stop({ drain?, instance?, wait_ms?, force?, expected_generation? })`",
+        "`omo daemon stop [--drain]`; `omo host stop [--drain [--instance] [--wait-ms]] [--force] [--expected-generation] [--socket]`",
+        "none",
+        "**no**",
+        "Same reason as run",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 8,
+      "ids": [
+        "daemon.stopAll"
+      ],
+      "cells": [
+        "`daemon.stopAll({ drain?, wait?, deadline_ms? })`",
+        "`omo daemon stop --all [--drain] [--wait [--timeout]]`",
+        "none",
+        "**no**",
+        "Same reason",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 9,
+      "ids": [
+        "daemon.handoff"
+      ],
+      "cells": [
+        "`daemon.handoff({ policy?, launch_spec?, allow_downgrade?, when?: { idle: { operation, if_instance, if_generation, target_build } } })`. `policy` is `upgrade`, `fallback` or `never`; omo's verb takes it from the config's `task.host_engine_policy`, and `--no-upgrade` is `never` (`N/bin/lib/daemon.js:61-66, 236-246`)",
+        "`omo daemon handoff [--no-upgrade]`; `omo host handoff [--launch-spec] [--policy] [--socket] [--allow-downgrade] [--when idle --operation --if-instance --if-generation --target-build]`",
+        "none",
+        "**no**",
+        "Same reason",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 10,
+      "ids": [
+        "daemon.gc"
+      ],
+      "cells": [
+        "`daemon.gc({ prune_store_index?, agent_dir? })`",
+        "`omo daemon gc [--prune-store-index]`; `omo host gc [--agent-dir]`",
+        "none",
+        "**no**",
+        "Same reason",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 11,
+      "ids": [
+        "daemon.rollbackPrepare"
+      ],
+      "cells": [
+        "`daemon.rollbackPrepare({ stores?, allow_missing_index?, dry_run? })`",
+        "`omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index] [--dry-run]`",
+        "none",
+        "**no**",
+        "Same reason",
+        "C1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 12,
+      "ids": [
+        "daemon.shardPath"
+      ],
+      "cells": [
+        "`daemon.shardPath({ kind, owner, root? })`",
+        "`omo host shard-path --kind p\\|i --owner <id> [--root]`",
+        "none",
+        "**no**",
+        "Tool omitted: an endpoint internal",
+        "C1a"
+      ]
+    }
+  ]
+}
