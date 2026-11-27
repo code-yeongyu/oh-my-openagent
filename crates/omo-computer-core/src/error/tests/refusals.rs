@@ -50,7 +50,8 @@ fn backend_refusals_map_through_the_table() {
         bare.displays().err(),
         bare.capture(&Target::Window("101".to_owned()), &capture)
             .err(),
-        bare.post_input(&input, Route::BackgroundPid).err(),
+        bare.post_input(&input, Route::BackgroundPid { pid: 4242 })
+            .err(),
         bare.stop_listener().err(),
         bare.epoch_source().next_change().err(),
         bare.snapshot(&request).err(),

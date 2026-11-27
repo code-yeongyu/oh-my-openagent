@@ -1,0 +1,136 @@
+import { log } from "@oh-my-opencode/utils"
+
+import type { ManagedChildEvent, ManagedChildHandle, RunnerOutcome } from "./child-handle"
+import { isModelTurnFailure } from "./model-refusals"
+import type { UsageLimitMemory, UsageLimitProbe } from "./usage-limit-memory"
+import { PROBE_REQUEST_EVENT } from "../runners/probe-request"
+import type { ResolvedModelRecord, TaskRunStats } from "../state"
+
+/**
+ * Remembers what a failed run proved about its route's usage limit (#11383), whoever walks the chain and whether or not
+ * the run may walk it: a turn that already ran a tool is not replayed, yet later tasks still route around the limit. A
+ * silent probe rung ends child-unresponsive, which counts only for the run that is probing; the result says whether
+ * this outcome was that probe timeout.
+ */
+export function recordRunLimit(
+  limits: UsageLimitMemory,
+  run: {
+    readonly taskId: string
+    readonly epoch: number
+    readonly outcome: Extract<RunnerOutcome, { readonly status: "error" }>
+    readonly runStats: TaskRunStats | undefined
+  },
+  route: ResolvedModelRecord | undefined,
+): boolean {
+  const probeTimedOut =
+    run.outcome.failure.kind === "child-unresponsive" &&
+    limits.probeOf(run.taskId, run.epoch) !== undefined &&
+    (run.runStats?.tool_calls ?? 0) === 0
+  if (route !== undefined && (isModelTurnFailure(run.outcome) || probeTimedOut))
+    limits.settle(run.taskId, route.provider, route.model_id, run.outcome.failure.message, probeTimedOut, run.epoch)
+  return probeTimedOut
+}
+
+/**
+ * A probe rung that could not even start confirms its provider's limit, recorded with the sanitized start-failure text.
+ * The caller passes only a start of the run that still owns its task.
+ */
+export function recordProbeStartFailure(
+  limits: UsageLimitMemory,
+  run: { readonly taskId: string; readonly epoch: number },
+  route: ResolvedModelRecord | undefined,
+  failure: { readonly errorMessage: string },
+): void {
+  if (route !== undefined && limits.probeOf(run.taskId, run.epoch) !== undefined)
+    limits.settle(run.taskId, route.provider, route.model_id, failure.errorMessage, true, run.epoch)
+}
+
+function answered(event: ManagedChildEvent): boolean {
+  if (event.type === "message_update") return true
+  if (event.type !== "message_end" || typeof event.message !== "object" || event.message === null) return false
+  const message = event.message as { readonly role?: unknown; readonly stopReason?: unknown }
+  return message.role === "assistant" && message.stopReason !== "error"
+}
+
+/**
+ * The outcome of the one same-provider rung an ambiguous usage limit hopped onto (#11383), bounded: a rung that has
+ * not started answering within `timeoutMs` fails with the original limit plus the timeout, so a silent probe confirms
+ * the provider's account limit instead of holding the task until the reset. `onAnswered` fires once the rung starts
+ * answering, so its later failures are its own. A rung that times out is aborted before the outcome resolves, so a
+ * provider answer that arrives after the deadline cannot run tools for a task already reported as failed.
+ */
+export function boundedProbeOutcome(input: {
+  readonly handle: ManagedChildHandle
+  readonly probe: UsageLimitProbe
+  readonly model: string
+  readonly timeoutMs: number
+  readonly onAnswered: () => void
+  readonly scheduleTimeout?: (run: () => void, delayMs: number) => { cancel(): void }
+  readonly subscribeRequest?: (listener: (at: number) => void) => () => void
+  readonly now?: () => number
+}): Promise<RunnerOutcome> {
+  return new Promise((resolve, reject) => {
+    let timer: { cancel(): void } | undefined
+    let unsubscribe = (): void => {}
+    let unsubscribeRequest = (): void => {}
+    let stopped = false
+    const stop = (): void => {
+      stopped = true
+      unsubscribe()
+      unsubscribeRequest()
+    }
+    const schedule =
+      input.scheduleTimeout ??
+      ((run, delayMs) => {
+        const timeout = setTimeout(run, delayMs)
+        timeout.unref?.()
+        return { cancel: () => clearTimeout(timeout) }
+      })
+    const start = (at?: number): void => {
+      if (!stopped && timer === undefined) {
+        timer = schedule(
+          () => {
+            stop()
+            void input.handle.abort().catch((error: unknown) => {
+              log("senpi-task usage-limit probe abort failed", { taskId: input.handle.task_id, error: String(error) })
+            })
+            resolve({
+              status: "error",
+              failure: {
+                kind: "child-unresponsive",
+                message: `${input.probe.message}\n${input.model} gave no answer within ${Math.ceil(input.timeoutMs / 1000)} s after that limit, so the ${input.probe.provider} limit counts as account-wide.`,
+              },
+            })
+          },
+          Math.max(0, input.timeoutMs - (at === undefined ? 0 : (input.now ?? Date.now)() - at)),
+        )
+      }
+    }
+    unsubscribe = input.handle.subscribe((event) => {
+      if (event.type === "extension_event" && Reflect.get(event, "name") === PROBE_REQUEST_EVENT) {
+        const data: unknown = Reflect.get(event, "data")
+        const at: unknown = typeof data === "object" && data !== null ? Reflect.get(data, "at") : undefined
+        start(typeof at === "number" ? at : undefined)
+      }
+      if (!answered(event)) return
+      timer?.cancel()
+      stop()
+      input.onAnswered()
+    })
+    if (stopped) unsubscribe()
+    unsubscribeRequest = input.subscribeRequest?.(start) ?? (() => {})
+    if (stopped) unsubscribeRequest()
+    void input.handle.waitForOutcome().then(
+      (outcome) => {
+        timer?.cancel()
+        stop()
+        resolve(outcome)
+      },
+      (error: unknown) => {
+        timer?.cancel()
+        stop()
+        reject(error)
+      },
+    )
+  })
+}

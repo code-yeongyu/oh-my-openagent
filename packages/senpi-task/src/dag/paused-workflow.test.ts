@@ -1,10 +1,12 @@
 import { afterEach, expect, test } from "bun:test"
 import { cleanupProjects } from "../manager/__fixtures__/manager-fakes"
 import { pausedRun } from "./__fixtures__/paused-run"
-import { reenterDagRun, retryDagNodes } from "./node-retry"
+import { retryDagNodes } from "./node-retry"
+import { reenterDagRun } from "./run-reentry"
 import { sendToDagNode } from "./node-send"
 import { createDagRecovery } from "./recovery"
 import { createDagManager } from "./manager"
+import { noLiveHolder } from "./__fixtures__/reattached-run"
 
 afterEach(cleanupProjects)
 
@@ -130,7 +132,7 @@ test("design 26: amending queued C while paused never reenters or changes paused
       ...h.definition,
       nodes: h.definition.nodes.map((node) => (node.id === "c" ? { ...node, prompt: "updated-c" } : node)),
     }
-    await manager.amend({ runId: h.runId, definition: changed, parentSessionId: "parent-1" })
+    await manager.amend({ holder: noLiveHolder, runId: h.runId, definition: changed, parentSessionId: "parent-1" })
     expect(h.read().pause).toEqual({ reason: "user_stop", pauseSeq: 7 })
     expect(h.read().nodes.find((node) => node.id === h.b)?.state).toBe("paused")
     expect(h.inProcess.startedSpecs).toHaveLength(1)
@@ -139,7 +141,7 @@ test("design 26: amending queued C while paused never reenters or changes paused
       nodes: h.definition.nodes.map((node) => (node.id === "b" ? { ...node, prompt: "unsafe-b" } : node)),
     }
     await expect(
-      manager.amend({ runId: h.runId, definition: unsafe, parentSessionId: "parent-1" }),
+      manager.amend({ holder: noLiveHolder, runId: h.runId, definition: unsafe, parentSessionId: "parent-1" }),
     ).rejects.toMatchObject({ code: "amend_running_node" })
   } finally {
     await h.manager.cancelTask(h.taskId)
