@@ -119,12 +119,6 @@ export type SendOutcome =
   // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is
   // the registry's sendDenialReminder, surfaced to the caller verbatim.
   | { readonly kind: "one_shot_agent"; readonly task_id: string; readonly agent: string; readonly message: string }
-  | {
-      readonly kind: "scope_denied"
-      readonly task_id: string
-      readonly owning_session_id: string
-      readonly reason: string
-    }
   | { readonly kind: "not_found"; readonly reason: string; readonly suggestion: string }
 
 export type InterruptOutcome =
@@ -187,12 +181,6 @@ export type RedispatchOutcome =
   | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
-  | {
-      readonly kind: "scope_denied"
-      readonly task_id: string
-      readonly owning_session_id: string
-      readonly reason: string
-    }
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {

@@ -17,10 +17,10 @@ import {
   uncertainDeliveryDenial,
   notContinuableReason,
   oneShotPolicyDenial,
-  scopeDenied,
+  sendNotFound,
 } from "./engine-policy"
 import { reviveDetachedTerminalOnSend, reviveTerminal } from "./revive"
-import { resolveTask, resolveTaskCallerFirst, type TaskLookup } from "./scope-resolver"
+import { resolveSendTarget, resolveTask, type TaskLookup } from "./scope-resolver"
 import { reviveRunningOnSend } from "./revive-running"
 import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
@@ -33,7 +33,6 @@ import {
 import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
-const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 
 export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   const pendingSends = new Map<string, number>()
@@ -60,18 +59,14 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   async function sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome> {
-    const record = resolveTaskCallerFirst(lookup, input.idOrName, input.callerSessionId)
-    if (record === undefined) {
-      return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
-    }
-    const denied = scopeDenied(record, input)
-    if (denied !== undefined) return denied
+    const record = resolveSendTarget(lookup, input.idOrName, input)
+    if (record === undefined) return sendNotFound(input.idOrName)
     // A fenced send acts on exactly this record's run: every revive below re-checks that run_epoch
     // inside its own record mutation, so a run that moves after this check is never revived twice.
     if (runMoved(record, input.expectedRunEpoch)) return staleSend(record)
     // One-shot policy runs after ownership is established but BEFORE the pending enqueue and
     // messageability: a one-shot agent refuses task_send in every state (running, pending,
-    // terminal, cross-session alike), and an unauthorized caller learns only the scope denial.
+    // terminal, cross-session alike), and a caller outside the task's scope learns only not found.
     const oneShot = oneShotPolicyDenial(record)
     if (oneShot !== undefined) return oneShot
     if (record.failure_kind === "suspended_unresumable" && record.status === "error") {

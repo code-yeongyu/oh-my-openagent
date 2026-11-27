@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TSchema } from "typebox"
 
 import { settledWithin } from "../../manager/settled-within"
+import { redispatchNotFound, sendNotFound } from "../../steering"
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
@@ -118,28 +119,34 @@ async function sendNow(
 ): Promise<SendToolResult> {
   const validation = validateParams(params)
   if (validation !== undefined) return validation
+  const scope = { callerSessionId, allScope: params.all_scope === true }
+  // A call without a caller session reaches a task only with all_scope.
+  const resolvable = callerSessionId !== undefined || scope.allScope
 
   if (params.redispatch === true) {
     if (manager.redispatchTask === undefined) return invalidArguments("this manager does not support redispatch")
-    const scopedCaller = params.all_scope === true ? undefined : callerSessionId
-    const outcome = await manager.redispatchTask(params.to, scopedCaller)
-    return mapRedispatchOutcome(manager, outcome, callerSessionId)
+    const outcome = resolvable
+      ? await manager.redispatchTask(params.to, callerSessionId, scope.allScope)
+      : redispatchNotFound(params.to)
+    return mapRedispatchOutcome(manager, outcome, scope)
   }
 
   if (typeof params.message === "string") {
-    const outcome = await manager.sendToTask({
-      idOrName: params.to,
-      message: params.message,
-      deliverAs: "steer",
-      ...(callerSessionId !== undefined ? { callerSessionId } : {}),
-      ...(params.all_scope === true ? { allScope: true } : {}),
-    })
+    const outcome = resolvable
+      ? await manager.sendToTask({
+          idOrName: params.to,
+          message: params.message,
+          deliverAs: "steer",
+          ...(callerSessionId !== undefined ? { callerSessionId } : {}),
+          ...(scope.allScope ? { allScope: true } : {}),
+        })
+      : sendNotFound(params.to)
 
     if (outcome.kind !== "not_found") return mapSendOutcome(outcome)
-    if (teamRouting === undefined) return notFound(manager, outcome.reason, callerSessionId)
+    if (teamRouting === undefined) return notFound(manager, outcome.reason, scope)
 
     const resolution = await resolveSendTeamRunId(params, teamRouting)
-    if (resolution.kind === "none") return notFound(manager, outcome.reason, callerSessionId)
+    if (resolution.kind === "none") return notFound(manager, outcome.reason, scope)
     if (resolution.kind === "error") return invalidArguments(resolution.reason)
 
     const teamResult = await runTeamSend(teamRouting.service, resolution.teamRunId, teamRouting.from, {
