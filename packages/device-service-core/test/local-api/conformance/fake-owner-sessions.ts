@@ -173,11 +173,50 @@ const answerCommand = (
     return state.withheld("final_state")
   }
   if (delegated !== undefined) {
-    for (const frame of delegated.frames) sendCommandEvent(conn, state.mint, device, { frame })
-    const accepted = state.mode !== "terminal" || terminalTakes(state.terminalCommands, rpc)
-    sendCommandEvent(conn, state.mint, device, { command_id, response: engineReply(rpc, delegated.data, accepted) })
+    const admitted = admittedPrompt(state, device, rpc)
+    if (admitted !== undefined) {
+      sendCommandEvent(conn, state.mint, device, { command_id, response: { ...admitted, id: rpc["id"] ?? null } })
+    } else {
+      for (const frame of delegated.frames) sendCommandEvent(conn, state.mint, device, { frame })
+      const accepted = state.mode !== "terminal" || terminalTakes(state.terminalCommands, rpc)
+      const response = engineReply(rpc, delegated.data, accepted)
+      admitPrompt(state, device, rpc, response)
+      sendCommandEvent(conn, state.mint, device, { command_id, response })
+    }
   }
   for (const sent of outcome) conn.send(eventOf("session.command_state", { command_id, ...sent }))
+}
+
+// The engine admits one prompt per client message id on a session (senpi ClientAdmissions): a repeat of the same message
+// answers the first reply, the same id with a different message is client_message_id_conflict. Tests that repeat a
+// keyed send therefore see what a real holder does, not one prompt per call.
+const promptKey = (device: string, rpc: CommandRpc): string | undefined => {
+  const id = rpc["clientMessageId"]
+  return rpc["type"] === "prompt" && typeof id === "string"
+    ? `${device}\u0000${String(rpc["sessionId"])}\u0000${id}`
+    : undefined
+}
+
+const admittedPrompt = (state: OwnerState, device: string, rpc: CommandRpc): JsonObject | undefined => {
+  const key = promptKey(device, rpc)
+  const prior = key === undefined ? undefined : state.admittedPrompts.get(key)
+  if (prior === undefined) return undefined
+  if (prior.message === JSON.stringify(rpc["message"])) return prior.response
+  const reason = `clientMessageId ${String(rpc["clientMessageId"])} was already used for different input`
+  return {
+    type: "response",
+    command: "prompt",
+    success: false,
+    error: `client_message_id_conflict: ${reason}`,
+    errorCode: "client_message_id_conflict",
+    errorData: { reason, action: "send new input with a new clientMessageId" },
+  }
+}
+
+const admitPrompt = (state: OwnerState, device: string, rpc: CommandRpc, response: JsonObject): void => {
+  const key = promptKey(device, rpc)
+  if (key !== undefined && response["success"] === true)
+    state.admittedPrompts.set(key, { message: JSON.stringify(rpc["message"]), response })
 }
 
 // #393 part B: `session: "<device>.<key>"` names a session its device lists, delegated with no attach on this connection.

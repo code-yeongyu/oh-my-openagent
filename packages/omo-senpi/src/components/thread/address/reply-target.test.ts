@@ -1,19 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import type { ThreadAddressEntry } from "../addressing"
-import type { ThreadToolSurfaceOptions } from "./ports"
-import { replyTargetMismatch } from "./reply-target"
+import { replyTargetMismatch, type ReplySender } from "./reply"
 
 // Amendment A4.3.1 of #13037: a reply approved for a consumed sender is delivered only to an entry with that sender's
 // session id AND that sender's device. The resolvers already narrow to the sender's device, so this check is the second
 // layer; it is pinned here directly.
 
-type Sender = { readonly session_id: string; readonly name?: string; readonly device?: string }
-
-const repliesTo = (senders: readonly Sender[]) =>
-  ({
-    callerReplySenders: () => senders,
-    callerReplyTargets: () => senders.map((sender) => sender.session_id),
-  }) as unknown as ThreadToolSurfaceOptions
+const repliesTo = (senders: readonly ReplySender[]) => senders
 
 const entry = (device?: string): ThreadAddressEntry => ({
   thread_id: "dur-sender",

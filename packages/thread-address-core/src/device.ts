@@ -75,3 +75,28 @@ export function resolveDevice(
   if (prefix.length > 1) return refused(devicesShare("devices_share_prefix", text, prefix))
   return refused(noDevice(text, roster.devices))
 }
+
+/** A row of any device list: its id and name, whether it is this device, and whether it is reachable now. */
+export type DeviceRowLike = {
+  readonly id: string
+  readonly name: string
+  readonly self?: boolean
+  readonly online?: boolean
+}
+
+/**
+ * The same resolver over any device rows (a roster, or an account listing that still holds dead devices): `here` is
+ * the row marked `self`, a row without `online` is reachable, and the answer is the caller's own row, so a caller that
+ * acts on the device (a rename, a revoke) holds exactly the row its listing returned.
+ */
+export function resolveDeviceRow<T extends DeviceRowLike>(
+  rows: readonly T[],
+  text: string,
+): { readonly kind: "ok"; readonly row: T } | { readonly kind: "refusal"; readonly refusal: AddressRefusal } {
+  const here = rows.find((row) => row.self === true)?.id ?? null
+  const devices = rows.map((row) => ({ id: row.id, name: row.name, online: row.online ?? true }))
+  const resolved = resolveDevice({ here, devices }, text, { online: false })
+  if (resolved.kind === "refusal") return resolved
+  const row = rows.find((candidate) => candidate.id === resolved.device.id)
+  return row === undefined ? { kind: "refusal", refusal: noDevice(text, devices) } : { kind: "ok", row }
+}

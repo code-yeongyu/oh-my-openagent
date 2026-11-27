@@ -2,7 +2,16 @@ import { mock } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
+import { resolveDeviceRow } from "@oh-my-opencode/thread-address-core"
+import {
+  deviceRefusal,
+  type DeviceRow,
+  type RemoteClient,
+  type RemoteFailure,
+  type ServiceStatus,
+  type SessionRow,
+  type ThreadHandle,
+} from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { RuntimePhase } from "./gateway/adapter"
 import { createInboxDrain } from "./gateway/drain"
@@ -100,6 +109,8 @@ export function fakeRemoteClient(account: {
   readonly devicesFail?: RemoteFailure
   /** Each account read, by member name, in call order. */
   readonly reads?: string[]
+  /** The account listing's rows (sessions.list); absent, sessions.list is unsupported. */
+  readonly sessions?: () => readonly RemoteSessionRow[]
 }): RemoteClient {
   const row = (device: RemoteDevice): DeviceRow => ({
     id: device.device,
@@ -140,10 +151,44 @@ export function fakeRemoteClient(account: {
         account.reads?.push("devices.list")
         return account.fail ?? account.devicesFail ?? { kind: "ok", value: account.devices().map(row) }
       },
-      resolve: none("devices.resolve"),
+      // The client's own resolver over the same roster, as the real client answers it.
+      resolve: async (idOrName) => {
+        account.reads?.push("devices.resolve")
+        const failed = account.fail ?? account.devicesFail
+        if (failed !== undefined) return failed
+        const resolved = resolveDeviceRow(account.devices().map(row), idOrName)
+        return resolved.kind === "ok" ? { kind: "ok", value: resolved.row } : deviceRefusal(resolved.refusal)
+      },
     },
     sessions: {
-      list: none("sessions.list"),
+      list:
+        account.sessions === undefined
+          ? none("sessions.list")
+          : async (filter) => {
+              account.reads?.push("sessions.list")
+              if (account.fail !== undefined) return account.fail
+              const roster = account.devices()
+              const rows = (account.sessions?.() ?? []).flatMap((listed): SessionRow[] => {
+                const device = roster.find((known) => known.device === listed.device)
+                if (device === undefined || (filter?.device !== undefined && filter.device !== listed.device)) return []
+                return [
+                  {
+                    thread: `${listed.device}/${listed.session_id}` as ThreadHandle,
+                    ...(listed.durable_id === undefined ? {} : { durable_id: listed.durable_id }),
+                    name: listed.title,
+                    title: listed.title,
+                    device: row(device),
+                    project: listed.project,
+                    path: listed.path,
+                    state: listed.state === "running" || listed.state === "ended" ? listed.state : "idle",
+                    archived: false,
+                    updated_ms: listed.updated_ms,
+                    source: listed.source ?? "live",
+                  },
+                ]
+              })
+              return { kind: "ok", value: { revision: 1, rows, unanswered: [] } }
+            },
       resolve: none("sessions.resolve"),
       get: none("sessions.get"),
       open: none("sessions.open"),
@@ -633,7 +678,11 @@ export function createRemoteThreadFixture() {
           return ok({ kind: "steered", turnId: epoch })
         }
         admitted.add(id)
-        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: epoch })
+        // The contract: a started admission names the turn the admitted message starts, the one after the idle epoch.
+        // The engine answers the idle epoch today (code-yeongyu/senpi#7478, omo#15013); the fake models the contract,
+        // and the cross-device proof harness against the real engine is what shows the defect.
+        const started = /^\d+$/.test(epoch) ? String(Number(epoch) + 1) : epoch
+        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: started })
       }
       if (rpc["type"] === "get_available_models")
         return ok({
@@ -750,6 +799,7 @@ export function createRemoteThreadFixture() {
         // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
         here: options.selfDevice === "unknown" ? null : "here",
         devices: () => devices,
+        sessions: () => options.rows ?? [],
         reads: accountReads,
         ...(options.selfDevice === "throws"
           ? { fail: { kind: "error", code: "host_unavailable", message: "device.info failed", next_action: "Retry." } }

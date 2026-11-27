@@ -139,6 +139,45 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "devices.resolve/resolve-refuses-connector",
+      "row": "devices.resolve",
+      "input": {
+        "device": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.resolve/resolve-refuses-service",
+      "row": "devices.resolve",
+      "input": {
+        "device": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
     }
   ]
 }

@@ -36,6 +36,8 @@ export type OwnerState = {
   readonly attaches: Map<string, WorldSession>
   readonly bindings: Map<string, { readonly target: string; readonly sha256: string }>
   readonly commands: CommandRpc[]
+  /** The prompts the engine admitted, by device, session and client message id, with the first reply. */
+  readonly admittedPrompts: Map<string, { readonly message: string; readonly response: JsonObject }>
   readonly uploads: UploadAssembler
   readonly endpoints: Set<string>
   readonly reports: Omit<EnforcementReport, "id" | "type">[]

@@ -217,7 +217,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     locate: async (request) => {
       const located = await threads.locate(request)
       return located.kind === "ok"
-        ? { kind: "ok", thread: located.located }
+        ? // The facade is a script principal's root: its located thread carries the endpoint and the session file path.
+          { kind: "ok", thread: located.located as LocatedThread }
         : { kind: "error", error: threadToolFailureOf(located) }
     },
     create: async (request) => {

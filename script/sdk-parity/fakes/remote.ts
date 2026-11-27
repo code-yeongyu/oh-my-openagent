@@ -47,14 +47,41 @@ export function remotePort(recorder: Recorder): {
     device: STUDIO.id,
     session_id: STUDIO_THREAD,
     durable_id: STUDIO_THREAD,
-    title: `lane ${STUDIO_THREAD}`,
+    // `title` renames b's thread, e.g. to share a name with a thread on this device.
+    title: typeof given["title"] === "string" ? given["title"] : `lane ${STUDIO_THREAD}`,
     project: "/work/studio",
     path: "/work/studio",
     state: "idle",
     updated_ms: 1_700_000_000_000,
   }
+  // `given: {port: "remote", state: {here: [threads]}}` lists those threads of this device in the account listing too, as
+  // the service lists every device's rows; without it the listing holds b's thread only.
+  const here = Array.isArray(given["here"]) ? (given["here"] as readonly string[]) : []
+  const hereRows = here.map((thread): RemoteSessionRow => ({
+    ...row,
+    device: "here",
+    session_id: thread,
+    durable_id: thread,
+    title: `lane ${thread}`,
+  }))
+  // `devices: [{device, label, online?}]` adds devices to the roster; `devicesFail: true` makes the device reads fail as
+  // a device service that is not installed answers.
+  const devices = Array.isArray(given["devices"])
+    ? (given["devices"] as readonly { device: string; label: string; online?: boolean }[]).map((device) => ({
+        online: true,
+        ...device,
+      }))
+    : []
   const fixture = createRemoteThreadFixture()
-  const { remote } = fixture.account({ rows: [row], online, live: [STUDIO_THREAD] })
+  const { remote } = fixture.account({
+    rows: [row, ...hereRows],
+    online,
+    live: [STUDIO_THREAD],
+    devices,
+    ...(given["devicesFail"] === true ? { devicesFail: true } : {}),
+    // `listingFails: true`: the account listing (sessions.list) fails, as a device service that cannot read it does.
+    ...(given["listingFails"] === true ? { failSessionsList: true } : {}),
+  })
   const label = (device: unknown): string => (device === STUDIO.id ? STUDIO.label : String(device))
   const address = (device: unknown, session: unknown): string => `${label(device)}/${String(session)}`
   const refusalOf = (result: unknown): string | undefined => {

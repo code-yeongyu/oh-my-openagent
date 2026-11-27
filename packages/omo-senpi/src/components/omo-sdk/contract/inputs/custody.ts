@@ -2,6 +2,7 @@ import type { Readable } from "node:stream"
 
 import { Type } from "typebox"
 
+import { callback, Nothing } from "../callback"
 import type { UserCode } from "../results/custody"
 
 // The credential-bearing calls of the security design (#14945, sections 4.2, 4.3, 5.0 to 5.7). No input carries a secret
@@ -16,8 +17,13 @@ const Optional = Type.Optional
 export type ReadableHandle = Readable | ReadableStream<Uint8Array>
 const Handle = Type.Unsafe<ReadableHandle>({ type: "object" })
 
-const callback = <Fn>() => Type.Unsafe<Fn>({})
 const Signal = Optional(Type.Unsafe<AbortSignal>({}))
+const UserCodeShape = Type.Object({
+  verification_uri: Type.String(),
+  user_code: Type.String(),
+  matching_code: Type.String(),
+  expires_at: Type.String(),
+})
 
 /**
  * Where a credential goes (5.2): an admitted terminal, or a peer process the core opens its channel to and verifies by
@@ -31,8 +37,8 @@ const Destination = Type.Union([
 export const AccountSignIn = Type.Object({
   method: Type.Union([Type.Literal("device_code"), Type.Literal("browser")]),
   open_browser: Optional(Type.Boolean()),
-  onUserCode: callback<(code: UserCode) => void | Promise<void>>(),
-  onOpenUrl: Optional(callback<(url: string) => void | Promise<void>>()),
+  onUserCode: callback<(code: UserCode) => void | Promise<void>>({ args: [UserCodeShape], answer: Nothing }),
+  onOpenUrl: Optional(callback<(url: string) => void | Promise<void>>({ args: [Type.String()], answer: Nothing })),
   deviceName: Optional(Name),
   replace: Optional(Type.Boolean()),
   signal: Signal,
@@ -47,11 +53,14 @@ export const AccountKeysStatus = Type.Object({})
 
 /** The ceremony's own callbacks; the phrase itself only ever reaches the terminal port (5.1). */
 export const SyncEnable = Type.Object({
-  onCode: callback<(code: string) => void | Promise<void>>(),
-  confirm: callback<() => boolean | Promise<boolean>>(),
+  onCode: callback<(code: string) => void | Promise<void>>({ args: [Type.String()], answer: Nothing }),
+  confirm: callback<() => boolean | Promise<boolean>>({ args: [], answer: Type.Boolean() }),
   signal: Signal,
 })
-export const SyncRecover = Type.Object({ confirm: callback<() => boolean | Promise<boolean>>(), signal: Signal })
+export const SyncRecover = Type.Object({
+  confirm: callback<() => boolean | Promise<boolean>>({ args: [], answer: Type.Boolean() }),
+  signal: Signal,
+})
 
 const Provider = Optional(Name)
 const Model = Optional(Name)

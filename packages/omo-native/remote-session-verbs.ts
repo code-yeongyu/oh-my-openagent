@@ -8,7 +8,7 @@ import {
   interruptThread,
   setModelOn,
 } from "../omo-senpi/src/components/thread/control/operations"
-import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
+import { createRelayControl, endedRowAnswer } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
 import {
   handleOf,
@@ -215,6 +215,10 @@ async function runSessionOn(
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer, named }, dependencies)
+  // #13016 CTL-26 / CLI-09: a session its device lists as ended is not live, as the thread tools answer it; nothing is
+  // sent to its device.
+  const ended = endedRowAnswer(row, args.verb === "close" ? "close" : "control")
+  if (ended !== undefined) return answer(ended, label)
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":

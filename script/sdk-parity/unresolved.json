@@ -176,12 +176,6 @@
       "issue": "#14523"
     },
     {
-      "id": "devices.resolve",
-      "gap": "partial: remote module",
-      "slice": "T1a",
-      "issue": "#13016"
-    },
-    {
       "id": "devices.revoke",
       "gap": "no SDK call",
       "slice": "A1c",
@@ -651,9 +645,9 @@
     },
     {
       "id": "threads.locate",
-      "gap": "no conformance scenario of its inputs yet",
-      "slice": "P1b",
-      "issue": "new"
+      "gap": "partial: its core ignores signal and deadline_ms (cancellation gap, ruling H4), and on-other-device names the route before it passes",
+      "slice": "T1b",
+      "issue": "#14951"
     },
     {
       "id": "threads.messages",

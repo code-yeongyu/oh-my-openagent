@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { resolveDevice } from "."
+import { resolveDevice, resolveDeviceRow } from "."
 import type { DeviceRow } from "./refusals"
 
 const devices: readonly DeviceRow[] = [
@@ -135,6 +135,47 @@ describe("#given a caller that holds a listing row's exact device id (exactId) #
     expect(resolveDevice(account, "c0ffee5a1d2b3c4d", { online: true, exactId: true })).toMatchObject({
       kind: "refusal",
       refusal: { code: "device_offline", details: { device: "c0ffee5a1d2b3c4d" } },
+    })
+  })
+})
+
+describe("resolveDeviceRow: the same resolver over any device rows, the caller's own row back", () => {
+  // An account listing: this device marked self, a dead device (no online flag: it still resolves), and two rows that
+  // share a name and an id prefix.
+  type Listed = { readonly id: string; readonly name: string; readonly self?: boolean; readonly lastSeenAt?: string }
+  const self: Listed = { id: "a1b2c3d4e5f60001", name: "this mac", self: true }
+  const dead: Listed = { id: "deadbeef00000001", name: "old laptop", lastSeenAt: "2025-01-01T00:00:00Z" }
+  const listed: readonly Listed[] = [
+    self,
+    dead,
+    { id: "f00dcafe00000001", name: "twin" },
+    { id: "f00dcafe00000002", name: "twin" },
+  ]
+  const answer = (text: string): Listed | string => {
+    const resolved = resolveDeviceRow(listed, text)
+    return resolved.kind === "ok" ? resolved.row : resolved.refusal.reason
+  }
+
+  test("#given a dead device's id, name and prefix #when resolved #then each answers that listing row itself", () => {
+    expect([answer("deadbeef00000001"), answer("OLD LAPTOP"), answer("deadbe")]).toEqual([dead, dead, dead])
+  })
+
+  test("#given here #when resolved #then the row marked self answers", () => {
+    expect(answer("here")).toBe(self)
+  })
+
+  test("#given a shared name, a shared prefix and nothing #when resolved #then the core's refusals", () => {
+    expect([answer("twin"), answer("f00dcafe"), answer("nowhere")]).toEqual([
+      "devices_share_name",
+      "devices_share_prefix",
+      "no_device",
+    ])
+  })
+
+  test("#given rows with an online flag #when one is offline #then it still resolves (no online requirement)", () => {
+    expect(resolveDeviceRow([{ id: "b0b0b0b0b0b0", name: "box", online: false }], "box")).toMatchObject({
+      kind: "ok",
+      row: { id: "b0b0b0b0b0b0" },
     })
   })
 })

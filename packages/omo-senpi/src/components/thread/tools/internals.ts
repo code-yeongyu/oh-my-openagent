@@ -9,7 +9,7 @@ import {
   type DiskSession,
   type ThreadSurface,
 } from "../address-book"
-import { resolveTarget, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
+import { namesAnEntry, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
 import type {
   ThreadActivity,
   ThreadModel,
@@ -257,11 +257,7 @@ export function sendAddressBook(
   const known = new Set(book.map((entry) => entry.durable_id))
   if (known.has(address)) return book
   const root = options.callerWorkspaceRoot()
-  const resolved = resolveTarget(toThreadAddressEntries(book), address, {
-    all_scope: allScope,
-    callerWorkspaceRoot: root,
-  })
-  const idOnly = resolved.kind !== "error" || resolved.code !== "not_found"
+  const idOnly = namesAnEntry(toThreadAddressEntries(book), address, { all_scope: allScope, callerWorkspaceRoot: root })
   const found = findDiskSessions(sessionsDirectory, address, {
     all_scope: allScope,
     workspaceRoots: workspaceDirectories(root),

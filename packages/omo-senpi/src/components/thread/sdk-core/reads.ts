@@ -1,4 +1,4 @@
-import { resolveAddress } from "../address"
+import { resolve, type ResolvePrincipal } from "../address"
 import { toThreadAddressEntries, type AddressEntry } from "../address-book"
 import type { ThreadState, ThreadToolResult } from "../contracts"
 import { listAcross } from "../remote/cross-device"
@@ -28,13 +28,18 @@ export type CoreReadRequest = Scoped & {
   readonly cursor?: string
 }
 export type CoreLocateResult = { readonly kind: "ok"; readonly thread: LocatedThread } | Failure
+export type CoreResolveRequest = Scoped & { readonly address: string; readonly workspace?: string }
+/** What the one resolver decided: the canonical address, the thread id and its device (null: this device, no account). */
+export type CoreResolveResult =
+  { readonly kind: "ok"; readonly thread: string; readonly id: string; readonly device: string | null } | Failure
 
 const LIST_KEYS = ["all_scope", "state"] as const
 const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
 const LOCATE_KEYS = ["thread", "all_scope"] as const
+const RESOLVE_KEYS = ["address", "all_scope", "workspace"] as const
 
 export function createReads(context: ThreadCoreContext) {
-  const { options, surface, view, resolveContext } = context
+  const { options, surface, view } = context
   const list = (request: CoreListRequest = {}): Promise<ThreadToolResult> =>
     guarded(
       async () =>
@@ -62,19 +67,23 @@ export function createReads(context: ThreadCoreContext) {
           UNKNOWN_CALLER,
         ),
     )
-  const locate = (request: Scoped & { readonly thread: string }): Promise<CoreLocateResult> =>
+  const locate = (
+    request: Scoped & { readonly thread: string },
+    principal: ResolvePrincipal = { kind: "script" },
+  ): Promise<CoreLocateResult> =>
     guarded(async () => {
       const refused = unknownKeys(request, LOCATE_KEYS)
       if (refused !== undefined) return refused
       const current = await view()
-      const resolved = await resolveAddress(
-        resolveContext(toThreadAddressEntries(addressBook(surface, current))),
+      const book = toThreadAddressEntries(addressBook(surface, current))
+      const resolved = await resolve(
+        { remote: options.remote, workspace: surface.callerWorkspaceRoot(), book: () => book },
         request.thread,
-        { all_scope: request.all_scope, probe: true },
+        { operation: "locate", principal, scope: { all_scope: request.all_scope }, probe: true },
       )
       if (resolved.kind === "error") return { kind: "error", error: resolved } as const
       // A thread on another device: the same located shape, carrying its device and the address every tool takes.
-      if (resolved.where.kind === "device") {
+      if (resolved.holder.kind === "device") {
         const { thread_id, name, cwd, status } = resolved.entry
         return {
           kind: "ok",
@@ -87,17 +96,17 @@ export function createReads(context: ThreadCoreContext) {
             endpoint: null,
             surface: null,
             alive: status === "live",
-            device: resolved.where.row.device,
-            address: resolved.address,
+            device: resolved.holder.row.device,
+            address: resolved.thread,
           },
         } as const
       }
-      const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.thread)
+      const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.id)
       const entry = entries.find((candidate) => candidate.alive) ?? entries[0]
       if (entry === undefined)
         return fail(
           "not_found",
-          `Thread ${resolved.thread} is not in the address book.`,
+          `Thread ${resolved.id} is not in the address book.`,
           "Run omo thread list --all-scope.",
         )
       const { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive } = entry
@@ -106,5 +115,26 @@ export function createReads(context: ThreadCoreContext) {
         thread: { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive },
       } as const
     })
-  return { list, read, locate }
+  /** threads.resolve's decision (design section 5, ruling A): the one resolver, the caller's scope and workspace. */
+  const resolveThread = (
+    request: CoreResolveRequest,
+    principal: ResolvePrincipal = { kind: "script" },
+  ): Promise<CoreResolveResult> =>
+    guarded(async () => {
+      const refused = unknownKeys(request, RESOLVE_KEYS)
+      if (refused !== undefined) return refused
+      const book = toThreadAddressEntries(addressBook(surface, await view()))
+      const resolved = await resolve(
+        {
+          remote: options.remote,
+          workspace: request.workspace ?? surface.callerWorkspaceRoot(),
+          book: () => book,
+        },
+        request.address,
+        { operation: "resolve", principal, scope: { all_scope: request.all_scope }, probe: true },
+      )
+      if (resolved.kind === "error") return { kind: "error", error: resolved } as const
+      return { kind: "ok", thread: resolved.thread, id: resolved.id, device: resolved.device?.id ?? null } as const
+    })
+  return { list, read, locate, resolveThread }
 }

@@ -17,6 +17,21 @@ const UNSUPPORTED_CONNECTOR = refuse("unsupported", { note: "connector_send: a c
 
 export const THREAD_LINES: readonly MatrixLine[] = [
   {
+    section: "4.6",
+    capability:
+      "`threads.resolve`, `threads.locate`, `devices.resolve`, `threads.aliases.resolve`: turning an address, an alias or a device name into the row it names",
+    slug: "resolve",
+    rows: ["threads.resolve", "threads.locate", "devices.resolve", "threads.aliases.resolve"],
+    cells: columns({
+      people: allow(),
+      session: allow(
+        "the owner's decision on revision 22: under the scope rules of the reads of 4.1, resolve, devices.resolve and aliases.resolve answer identifiers only (the thread id, the device id, the alias's target id and display name; never an endpoint, a path or another principal's identity), and locate answers the thread tools' result shape with no endpoint and no session file path",
+      ),
+      connector: refuse("sender_not_allowed", { note: "new in revision 22, as for the reads of 4.1 and devices.list" }),
+      service: refuse("sender_not_allowed", { note: "new in revision 22" }),
+    }),
+  },
+  {
     section: "4.1",
     capability: "List, read, entries, get, wait, follow",
     slug: "read",
@@ -37,6 +52,20 @@ export const THREAD_LINES: readonly MatrixLine[] = [
       people: allow("own deliveries only"),
       session: allow("own deliveries only"),
       connector: allow("own deliveries only"),
+      service: NA,
+    }),
+  },
+  {
+    section: "4.1",
+    capability:
+      "A steer's turn guard (`expected_turn_id`): the id is a concurrency guard, not a permission, and who must supply it is decided once in the core, before any transport, the same on every leg",
+    slug: "steer-turn-guard",
+    rows: ["threads.send"],
+    input: { delivery: "steer" },
+    cells: columns({
+      people: allow("may omit it: the core steers the running turn"),
+      session: allow("must name the turn: a session that omits it is refused as the steer tool refuses today"),
+      connector: NA,
       service: NA,
     }),
   },

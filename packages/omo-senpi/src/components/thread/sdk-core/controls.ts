@@ -14,7 +14,7 @@ import {
 import { createThread } from "../control/create"
 import { locateControl } from "../control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "../control/operations"
-import { controlIdentity } from "../control/port"
+import { notLiveAnswer } from "../control/not-live"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "../control/prompt-start"
 import { renameThread } from "../control/rename"
 import { UNKNOWN_CALLER } from "../tools/ports"
@@ -93,8 +93,7 @@ export function createControls(context: ThreadCoreContext) {
         const found = await located(value.thread ?? "self", value.all_scope)
         if (found.kind === "error") return found.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (found.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
+        if (found.kind === "not_live") return notLiveAnswer("close", found)
         return await closeThread(found.control, closeOptions(value))
       }),
     rename: (request: ThreadRenameInput) =>

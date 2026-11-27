@@ -90,6 +90,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     attaches: new Map(),
     bindings: new Map(),
     commands: [],
+    admittedPrompts: new Map(),
     uploads: new UploadAssembler(),
     endpoints: new Set(),
     reports: [],

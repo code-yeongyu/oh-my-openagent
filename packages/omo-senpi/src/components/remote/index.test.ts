@@ -5,7 +5,8 @@ import * as remote from "./index"
 // are its only runtime values. createRemoteClient stays internal: a caller always builds its client through its sender's
 // factory. resolveTypedDevice is seam 3 (#13432): the `omo remote` CLI may import only this barrel (G2,
 // omo-native/test/remote-cli-imports.test.ts), so the one device resolver its session verbs use is public here.
-// resolveTypedAddress is seam 4 (#14305): the same rule for the one thread-address resolver.
+// resolveTypedAddress is seam 4 (#14305): the same rule for the one thread-address resolver. deviceRefusal (T1a) words a
+// core device refusal as the client's devices.resolve answers it, so a fake client answers exactly as the real one.
 
 describe("remote module barrel", () => {
   test("#given the barrel #when its runtime exports are listed #then they are exactly the public values", () => {
@@ -13,6 +14,7 @@ describe("remote module barrel", () => {
       "REMOTE_CODES",
       "canonicalizeThreadHandle",
       "describeThread",
+      "deviceRefusal",
       "exitCodeOf",
       "handleOf",
       "remoteClientForCli",

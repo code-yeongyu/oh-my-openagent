@@ -90,7 +90,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "expect": [
         {
@@ -106,7 +106,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "expect": [
         {
@@ -125,7 +125,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "expect": [
         {
@@ -1754,7 +1754,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "connector",
@@ -1776,7 +1776,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "session",
@@ -1798,7 +1798,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "service"
@@ -1890,7 +1890,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "person",
@@ -1912,7 +1912,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "script",
@@ -1934,7 +1934,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "connector",
@@ -1956,7 +1956,7 @@
       "input": {
         "name": "x-name",
         "op": "x-op",
-        "args": "$callback"
+        "args": {}
       },
       "principal": {
         "kind": "service"
@@ -2094,6 +2094,123 @@
         {
           "port": "opencodeServer",
           "op": "prompt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.resolve/resolve-refuses-connector",
+      "row": "threads.resolve",
+      "input": {
+        "address": "t-1"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.locate/resolve-refuses-connector",
+      "row": "threads.locate",
+      "input": {
+        "thread": "t-1"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.aliases.resolve/resolve-refuses-connector",
+      "row": "threads.aliases.resolve",
+      "input": {
+        "alias": "rev"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.resolve/resolve-refuses-service",
+      "row": "threads.resolve",
+      "input": {
+        "address": "t-1"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.locate/resolve-refuses-service",
+      "row": "threads.locate",
+      "input": {
+        "thread": "t-1"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.aliases.resolve/resolve-refuses-service",
+      "row": "threads.aliases.resolve",
+      "input": {
+        "alias": "rev"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
           "count": 0
         }
       ]

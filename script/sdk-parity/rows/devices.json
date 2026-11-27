@@ -102,7 +102,7 @@
       "id": "devices.resolve",
       "kind": "capability",
       "sdk": "devices.resolve",
-      "today": "partial",
+      "today": "yes",
       "slices": [
         "T1a"
       ],
@@ -126,8 +126,22 @@
       },
       "projection": {},
       "scenarios": {
-        "effect": [],
-        "refusal": []
+        "effect": [
+          "devices.resolve/by-id",
+          "devices.resolve/by-name",
+          "devices.resolve/here",
+          "devices.resolve/name-case-folded",
+          "devices.resolve/unique-prefix"
+        ],
+        "refusal": [
+          "devices.resolve/unknown-device",
+          "devices.resolve/name-shared",
+          "devices.resolve/prefix-shared",
+          "devices.resolve/service-not-installed",
+          "devices.resolve/empty-device",
+          "devices.resolve/resolve-refuses-connector",
+          "devices.resolve/resolve-refuses-service"
+        ]
       },
       "modules": []
     },
@@ -210,7 +224,7 @@
         "`devices.resolve({ device })`",
         "implicit in every `<device>/...`",
         "none",
-        "partial: remote module",
+        "yes",
         "Tool and CLI omitted: resolution is part of each verb",
         "T1a"
       ]

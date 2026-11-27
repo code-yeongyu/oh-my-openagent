@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 
-import { resolveAddress } from "../address"
+import { resolve } from "../address"
 import type { ThreadSendResult } from "../contracts"
 import type { GatewayDeliveryMode, GatewayDeliverySuccess } from "../gateway/types"
 import { sendThread, viewForSend } from "../sdk-send"
@@ -58,7 +58,7 @@ export function createSend(context: ThreadCoreContext) {
       const routed = await sendThread(
         controls,
         pipeline,
-        resolveAddress,
+        resolve,
         current,
         {
           thread: request.thread,

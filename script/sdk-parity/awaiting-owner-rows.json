@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "rows": [
+    {
+      "section": "4.1",
+      "row": "A send repeated under one idempotency key",
+      "slice": "T1b"
+    },
+    {
+      "section": "4.2",
+      "row": "`account.show`, `account.signInCheck` (reads)",
+      "slice": "A1b"
+    },
+    {
+      "section": "4.3",
+      "row": "The conditions on `install.setup.apply`",
+      "slice": "C1c"
+    },
+    {
+      "section": "4.6",
+      "row": "threads.readAfterWait",
+      "slice": "T1b"
+    },
+    {
+      "section": "4.6",
+      "row": "threads.messages",
+      "slice": "T1b"
+    },
+    {
+      "section": "4.6",
+      "row": "threads.aliases.set",
+      "slice": "T1c"
+    },
+    {
+      "section": "4.6",
+      "row": "threads.aliases.clear",
+      "slice": "T1c"
+    },
+    {
+      "section": "4.6",
+      "row": "threads.release",
+      "slice": "T1c"
+    },
+    {
+      "section": "4.6",
+      "row": "daemon.run",
+      "slice": "C1a"
+    },
+    {
+      "section": "4.6",
+      "row": "daemon.warm",
+      "slice": "C1a"
+    },
+    {
+      "section": "4.6",
+      "row": "diagnostics.models",
+      "slice": "C1b"
+    },
+    {
+      "section": "4.6",
+      "row": "install.sdkRoot",
+      "slice": "P1b; X1b for the session's root"
+    },
+    {
+      "section": "4.6",
+      "row": "engine.config.agentDir",
+      "slice": "E1c"
+    },
+    {
+      "section": "4.6",
+      "row": "engine.config.resources",
+      "slice": "A later slice, with a cell of its own"
+    },
+    {
+      "section": "4.6",
+      "row": "engine.models.update",
+      "slice": "E1c"
+    },
+    {
+      "section": "4.6",
+      "row": "toolkit.help",
+      "slice": "OC2"
+    }
+  ]
+}

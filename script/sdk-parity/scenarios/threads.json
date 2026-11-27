@@ -240,165 +240,6 @@
       ]
     },
     {
-      "id": "threads.resolve/by-name",
-      "row": "threads.resolve",
-      "kind": "effect",
-      "input": {
-        "address": "review"
-      },
-      "expect": [
-        {
-          "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "workspace"
-          }
-        },
-        {
-          "port": "remote",
-          "op": "sessions.resolve",
-          "args": {
-            "address": "review"
-          }
-        }
-      ]
-    },
-    {
-      "id": "threads.resolve/all-scope",
-      "row": "threads.resolve",
-      "kind": "effect",
-      "input": {
-        "address": "review",
-        "all_scope": true
-      },
-      "expect": [
-        {
-          "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "all"
-          }
-        },
-        {
-          "port": "remote",
-          "op": "sessions.resolve",
-          "args": {
-            "address": "review"
-          }
-        }
-      ]
-    },
-    {
-      "id": "threads.resolve/workspace",
-      "row": "threads.resolve",
-      "kind": "effect",
-      "input": {
-        "address": "review",
-        "workspace": "/w/app"
-      },
-      "expect": [
-        {
-          "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "workspace",
-            "workspace": "/w/app"
-          }
-        },
-        {
-          "port": "remote",
-          "op": "sessions.resolve",
-          "args": {
-            "address": "review"
-          }
-        }
-      ]
-    },
-    {
-      "id": "threads.resolve/missing",
-      "row": "threads.resolve",
-      "kind": "refusal",
-      "refusal": "not_found",
-      "input": {
-        "address": "nobody"
-      },
-      "expect": [
-        {
-          "port": "host",
-          "op": "list_sessions"
-        },
-        {
-          "port": "remote",
-          "op": "sessions.resolve",
-          "result": {
-            "code": "not_found"
-          }
-        }
-      ]
-    },
-    {
-      "id": "threads.resolve/two-holders",
-      "row": "threads.resolve",
-      "kind": "refusal",
-      "refusal": "ambiguous_target",
-      "input": {
-        "address": "review"
-      },
-      "expect": [
-        {
-          "port": "host",
-          "op": "list_sessions",
-          "result": {
-            "names": [
-              "review",
-              "review"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "threads.resolve/other-workspace",
-      "row": "threads.resolve",
-      "kind": "refusal",
-      "refusal": "scope_denied",
-      "input": {
-        "address": "elsewhere"
-      },
-      "expect": [
-        {
-          "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "workspace"
-          },
-          "result": {
-            "out_of_scope": [
-              "elsewhere"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": "threads.resolve/device-silent",
-      "row": "threads.resolve",
-      "kind": "refusal",
-      "refusal": "host_unavailable",
-      "input": {
-        "address": "studio/review"
-      },
-      "expect": [
-        {
-          "port": "remote",
-          "op": "sessions.resolve",
-          "result": {
-            "listing": "incomplete"
-          }
-        }
-      ]
-    },
-    {
       "id": "threads.read/newest",
       "row": "threads.read",
       "kind": "effect",
@@ -1366,6 +1207,31 @@
       "answer": {
         "thread": "t-1"
       },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.locate/out-of-scope",
+      "row": "threads.locate",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        }
+      ],
       "target": "this_device"
     },
     {
@@ -3797,6 +3663,36 @@
         "name": "review"
       },
       "target": "this_device"
+    },
+    {
+      "id": "threads.rename/out-of-scope",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        }
+      ]
     },
     {
       "id": "threads.rename/idempotent-repeat",
@@ -7058,6 +6954,384 @@
           }
         }
       ]
+    },
+    {
+      "id": "threads.resolve/on-other-device",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "devices.list"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "args": {
+            "device": "studio"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "count": 2
+        }
+      ],
+      "answer": {
+        "thread": "b/t-2"
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.resolve/all-scope",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "t-2",
+        "all_scope": true
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "count": 2
+        },
+        {
+          "port": "remote",
+          "op": "devices.list"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "t-2"
+          }
+        }
+      ],
+      "answer": {
+        "thread": "b/t-2"
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.resolve/workspace",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "lane t-2",
+        "workspace": "/work/studio"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "count": 2
+        },
+        {
+          "port": "remote",
+          "op": "devices.list"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "lane t-2"
+          }
+        }
+      ],
+      "answer": {
+        "thread": "b/t-2"
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.resolve/this-device",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "t-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "thread": "t-1"
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/other-workspace",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "address": "t-1",
+        "workspace": "/w/app"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/out-of-workspace",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "address": "t-3"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "t-3"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/out-of-workspace-all-scope",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "t-3",
+        "all_scope": true
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "thread": "t-3"
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/by-name",
+      "row": "threads.resolve",
+      "kind": "effect",
+      "input": {
+        "address": "lane t-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "count": 2
+        }
+      ],
+      "answer": {
+        "thread": "here/t-1"
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/missing",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "address": "nobody"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "aliases.resolve",
+          "args": {
+            "alias": "nobody"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/two-holders",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "ambiguous_target",
+      "input": {
+        "address": "lane t-1",
+        "all_scope": true
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "title": "lane t-1",
+            "here": [
+              "t-1",
+              "t-3"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "remote",
+          "op": "sessions.list"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.resolve/device-silent",
+      "row": "threads.resolve",
+      "kind": "refusal",
+      "refusal": "host_unavailable",
+      "input": {
+        "address": "studio/nothere"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "listingFails": true
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.list",
+          "result": {
+            "error": "host_unavailable"
+          }
+        }
+      ],
+      "target": "other_device"
     }
   ]
 }

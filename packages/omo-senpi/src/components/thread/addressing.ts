@@ -628,3 +628,20 @@ export function checkNameConflict(entries: readonly ThreadSummary[], name: strin
     [toCandidate(conflict)],
   )
 }
+
+/**
+ * Whether `address` names one of `entries` by more than its exact durable id (a name, an alias or a prefix match, or an
+ * ambiguity among them): the send book asks this before it reads session files from disk, so a name nothing lists is
+ * looked up by name there and anything else by id only. The ladder answers it here; the send book does not run it.
+ */
+export function namesAnEntry(
+  entries: readonly ThreadAddressEntry[],
+  address: string,
+  opts: { readonly all_scope?: boolean; readonly callerWorkspaceRoot: string | null | undefined },
+): boolean {
+  const resolved = resolveTarget([...entries], address, {
+    all_scope: opts.all_scope,
+    callerWorkspaceRoot: opts.callerWorkspaceRoot ?? undefined,
+  })
+  return resolved.kind !== "error" || resolved.code !== "not_found"
+}

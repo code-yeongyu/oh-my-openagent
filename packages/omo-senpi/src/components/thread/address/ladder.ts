@@ -8,6 +8,7 @@ import {
 import { threadToolFailure } from "../errors"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { Resolution, ResolveContext, ResolveOptions } from "./types"
+import { held } from "../remote/held-answers"
 
 /** The ladder's answer with the resolution named the way Resolved names it (`self`, `session_id`). */
 export type LadderResult =
@@ -71,6 +72,8 @@ export function ladder(
   const exact = exactLadder(ctx, entries, text, opts)
   if (opts.match !== "fuzzy") return exact
   if (exact.kind === "ok" && exact.entry.thread_id !== ctx.callerId) return exact
+  // An exact refusal that names its candidates answers as is: fuzzy ranks only after an exact miss (T1a finding 8).
+  if (!held("handoff-exact-ambiguity") && exact.kind === "error" && exact.code === "ambiguous_target") return exact
   const visible =
     opts.all_scope === true
       ? ranked

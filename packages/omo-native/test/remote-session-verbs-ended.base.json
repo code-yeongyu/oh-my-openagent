@@ -1,0 +1,132 @@
+{
+  "captured_from": "08c03295c9cdc4b85306d355c4e120051a43b00c",
+  "by": "the base tree's omo remote CLI over createRemoteThreadFixture().account({ rowState: 'ended' })",
+  "answers": [
+    {
+      "args": [
+        "model",
+        "b/dur-on-b",
+        "anthropic/claude-opus"
+      ],
+      "code": 0,
+      "out": [
+        "b/dur-on-b now uses anthropic/claude-opus."
+      ],
+      "err": [],
+      "sent": [
+        "session:get_available_models",
+        "session:set_model"
+      ]
+    },
+    {
+      "args": [
+        "model",
+        "b/dur-on-b",
+        "anthropic/claude-opus",
+        "--json"
+      ],
+      "code": 0,
+      "out": [
+        "{\"kind\":\"ok\",\"thread\":\"dur-on-b\",\"device\":\"b\",\"model\":{\"provider\":\"anthropic\",\"id\":\"claude-opus\"}}"
+      ],
+      "err": [],
+      "sent": [
+        "session:get_available_models",
+        "session:set_model"
+      ]
+    },
+    {
+      "args": [
+        "interrupt",
+        "b/dur-on-b"
+      ],
+      "code": 0,
+      "out": [
+        "Nothing was running on b/dur-on-b."
+      ],
+      "err": [],
+      "sent": [
+        "session:interrupt"
+      ]
+    },
+    {
+      "args": [
+        "interrupt",
+        "b/dur-on-b",
+        "--json"
+      ],
+      "code": 0,
+      "out": [
+        "{\"kind\":\"ok\",\"thread\":\"dur-on-b\",\"device\":\"b\",\"interrupted\":false,\"background\":{\"status\":\"not_supported\"}}"
+      ],
+      "err": [],
+      "sent": [
+        "session:interrupt"
+      ]
+    },
+    {
+      "args": [
+        "close",
+        "b/dur-on-b"
+      ],
+      "code": 0,
+      "out": [
+        "Closed b/dur-on-b."
+      ],
+      "err": [],
+      "sent": [
+        "session:unload_session"
+      ]
+    },
+    {
+      "args": [
+        "close",
+        "b/dur-on-b",
+        "--json"
+      ],
+      "code": 0,
+      "out": [
+        "{\"kind\":\"ok\",\"thread\":\"dur-on-b\",\"device\":\"b\",\"closed\":true,\"reason\":\"closed\",\"dropped_deliveries\":[]}"
+      ],
+      "err": [],
+      "sent": [
+        "session:unload_session"
+      ]
+    },
+    {
+      "args": [
+        "send",
+        "b/dur-on-b",
+        "hi",
+        "--no-wait"
+      ],
+      "code": 0,
+      "out": [
+        "Sent to b/dur-on-b: turn turn-b started."
+      ],
+      "err": [],
+      "sent": [
+        "endpoint:find_session",
+        "session:prompt"
+      ]
+    },
+    {
+      "args": [
+        "send",
+        "b/dur-on-b",
+        "hi",
+        "--no-wait",
+        "--json"
+      ],
+      "code": 0,
+      "out": [
+        "{\"kind\":\"ok\",\"thread\":\"dur-on-b\",\"link\":\"[on b](omo-thread://v1/dur-on-b)\",\"delivery\":{\"kind\":\"started\",\"turn_id\":\"turn-b\"},\"deduplicated\":false,\"device\":\"b\"}"
+      ],
+      "err": [],
+      "sent": [
+        "endpoint:find_session",
+        "session:prompt"
+      ]
+    }
+  ]
+}

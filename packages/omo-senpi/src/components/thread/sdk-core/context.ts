@@ -1,6 +1,5 @@
 import { join } from "node:path"
 
-import type { ThreadAddressEntry } from "../addressing"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { ProvenanceWorkspaces } from "../gateway/provenance-resolver"
 import { createLiveThreadSurface, parseHostStatusAll } from "../live-surface"
@@ -79,13 +78,5 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     ...surface,
     ...(options.remote === undefined ? {} : { remote: options.remote }),
   }
-  // The shared resolver's context, as far as it is fixed for this SDK instance (the local book each call builds
-  // is spread in per call). `self` never resolves for the CLI (UNKNOWN_CALLER), exactly as before.
-  const resolveContext = (local: readonly ThreadAddressEntry[]) => ({
-    remote: options.remote,
-    callerWorkspaceRoot: surface.callerWorkspaceRoot(),
-    local,
-    callerId: UNKNOWN_CALLER,
-  })
-  return { options, principal, env, host, store, surface, view, pipeline, controls, resolveContext }
+  return { options, principal, env, host, store, surface, view, pipeline, controls }
 }

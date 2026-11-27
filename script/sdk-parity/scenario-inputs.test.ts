@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { ROOT_CALLS, type RootCallKey } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import { inputAccepts } from "../../packages/omo-senpi/src/components/omo-sdk/contract/validate"
 import { FORMAT_CHECKED } from "../../packages/omo-senpi/test-support/omo-sdk-sample-input"
-import { decodeFixtures } from "./bytes-fixtures"
+import { boundaryInput } from "./bytes-fixtures"
 
 // Every scenario input the table states must be an input the root's boundary accepts (its call's schema and the fields
 // the root checks beyond it), unless the scenario is about an invalid input. A placeholder the boundary refuses never
@@ -20,7 +20,7 @@ const scenarios: readonly Scenario[] = readdirSync(DIR)
 function refusedAtBoundary(scenario: Scenario): string | undefined {
   const key = scenario.row as RootCallKey
   const problems: string[] = []
-  const input = decodeFixtures(scenario.input ?? {}, problems, scenario.id)
+  const input = boundaryInput(scenario.input ?? {}, problems, scenario.id)
   if (problems.length > 0) return problems.join("; ")
   if (!inputAccepts(key, input)) return "outside the call's schema"
   const fields = typeof input === "object" && input !== null ? Object.entries(input) : []
@@ -42,6 +42,17 @@ describe("the scenario table's inputs", () => {
         return reason === undefined ? [] : [`${scenario.id}: ${reason}`]
       }),
     ).toEqual([])
+  })
+
+  test("#given the table's markers #then the shared boundary input turns each into the value it stands for (control)", () => {
+    const input = boundaryInput(
+      { cb: "$callback", credential: { $handle: "fake-readable" }, plain: "x" },
+      [],
+      "control",
+    ) as Record<string, unknown>
+    expect(typeof input["cb"]).toBe("function")
+    expect(input["credential"]).toBeInstanceOf(ReadableStream)
+    expect(input["plain"]).toBe("x")
   })
 
   test("#given a placeholder module URL #then the check names it (control)", () => {

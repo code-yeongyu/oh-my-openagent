@@ -14,7 +14,7 @@ export const ACCOUNT_CALLS = {
   "account.store.disable": valueCall<result.AccountStore>()(input.AccountStoreDisable),
   "devices.list": valueCall<readonly result.LiveDevice[]>()(input.DevicesList),
   "devices.rename": valueCall<result.LiveDevice>()(input.DevicesRename),
-  "devices.resolve": valueCall<result.DeviceRow>()(input.DevicesResolve),
+  "devices.resolve": valueCall<result.DeviceRow | result.DeviceIdentifiers>()(input.DevicesResolve),
   "devices.revoke": valueCall<result.Revoked>()(input.DevicesRevoke),
   "deviceService.status": valueCall<result.DeviceServiceStatus>()(input.DeviceServiceStatus),
   "deviceService.info": valueCall<result.ServiceInfo>()(input.DeviceServiceInfo),

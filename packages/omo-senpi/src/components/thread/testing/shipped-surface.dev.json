@@ -1,0 +1,4535 @@
+{
+  "tool thread_list | -": {
+    "kind": "ok",
+    "threads": [
+      {
+        "thread": "0aa00001-0000-4000-8000-000000000001",
+        "name": "alpha",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+        "surface": "daemon",
+        "machine": "this mac",
+        "alias": "lane-here"
+      },
+      {
+        "thread": "0aa00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[shared](omo-thread://v1/0aa00003-0000-4000-8000-000000000003)",
+        "surface": "daemon",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0aa00004-0000-4000-8000-000000000004",
+        "name": "fix/login",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+        "surface": "daemon",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0bb00001-0000-4000-8000-000000000001",
+        "name": "beta",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e",
+        "alias": "lane-b"
+      },
+      {
+        "thread": "0bb00002-0000-4000-8000-000000000002",
+        "name": "beta old",
+        "status": "resumable",
+        "state": "inactive",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0bb00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[shared](omo-thread://v1/0bb00003-0000-4000-8000-000000000003)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0dd00001-0000-4000-8000-000000000001",
+        "name": "stale live",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[stale live](omo-thread://v1/0dd00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e"
+      }
+    ],
+    "scope": "workspace",
+    "devices": [
+      {
+        "device": "a11ce0de5e1f0123",
+        "name": "this mac",
+        "online": true,
+        "last_seen": null,
+        "this_device": true,
+        "listing": "listed",
+        "threads": 3
+      },
+      {
+        "device": "b",
+        "name": "studio",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 0
+      },
+      {
+        "device": "b7c41e09d2a64f1e",
+        "name": "Studio Laptop",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 4
+      },
+      {
+        "device": "c0ffee5a1d2b3c4d",
+        "name": "attic",
+        "online": false,
+        "last_seen": "<time>",
+        "this_device": false,
+        "listing": "offline",
+        "threads": 0
+      }
+    ]
+  },
+  "tool thread_list all_scope | -": {
+    "kind": "ok",
+    "threads": [
+      {
+        "thread": "0aa00001-0000-4000-8000-000000000001",
+        "name": "alpha",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+        "surface": "daemon",
+        "machine": "this mac",
+        "alias": "lane-here"
+      },
+      {
+        "thread": "0aa00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[shared](omo-thread://v1/0aa00003-0000-4000-8000-000000000003)",
+        "surface": "daemon",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0aa00004-0000-4000-8000-000000000004",
+        "name": "fix/login",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+        "surface": "daemon",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0bb00001-0000-4000-8000-000000000001",
+        "name": "beta",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e",
+        "alias": "lane-b"
+      },
+      {
+        "thread": "0bb00002-0000-4000-8000-000000000002",
+        "name": "beta old",
+        "status": "resumable",
+        "state": "inactive",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0bb00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[shared](omo-thread://v1/0bb00003-0000-4000-8000-000000000003)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0dd00001-0000-4000-8000-000000000001",
+        "name": "stale live",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[stale live](omo-thread://v1/0dd00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e"
+      }
+    ],
+    "scope": "all",
+    "devices": [
+      {
+        "device": "a11ce0de5e1f0123",
+        "name": "this mac",
+        "online": true,
+        "last_seen": null,
+        "this_device": true,
+        "listing": "listed",
+        "threads": 3
+      },
+      {
+        "device": "b",
+        "name": "studio",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 0
+      },
+      {
+        "device": "b7c41e09d2a64f1e",
+        "name": "Studio Laptop",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 4
+      },
+      {
+        "device": "c0ffee5a1d2b3c4d",
+        "name": "attic",
+        "online": false,
+        "last_seen": "<time>",
+        "this_device": false,
+        "listing": "offline",
+        "threads": 0
+      }
+    ]
+  },
+  "sdk list | -": {
+    "kind": "ok",
+    "threads": [
+      {
+        "thread": "0aa00001-0000-4000-8000-000000000001",
+        "name": "alpha",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+        "surface": "desktop",
+        "machine": "this mac",
+        "alias": "lane-here"
+      },
+      {
+        "thread": "0aa00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[shared](omo-thread://v1/0aa00003-0000-4000-8000-000000000003)",
+        "surface": "desktop",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0aa00004-0000-4000-8000-000000000004",
+        "name": "fix/login",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": null,
+        "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+        "surface": "desktop",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0bb00001-0000-4000-8000-000000000001",
+        "name": "beta",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e",
+        "alias": "lane-b"
+      },
+      {
+        "thread": "0bb00002-0000-4000-8000-000000000002",
+        "name": "beta old",
+        "status": "resumable",
+        "state": "inactive",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0bb00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[shared](omo-thread://v1/0bb00003-0000-4000-8000-000000000003)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0dd00001-0000-4000-8000-000000000001",
+        "name": "stale live",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[stale live](omo-thread://v1/0dd00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e"
+      }
+    ],
+    "scope": "workspace",
+    "devices": [
+      {
+        "device": "a11ce0de5e1f0123",
+        "name": "this mac",
+        "online": true,
+        "last_seen": null,
+        "this_device": true,
+        "listing": "listed",
+        "threads": 3
+      },
+      {
+        "device": "b",
+        "name": "studio",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 0
+      },
+      {
+        "device": "b7c41e09d2a64f1e",
+        "name": "Studio Laptop",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 4
+      },
+      {
+        "device": "c0ffee5a1d2b3c4d",
+        "name": "attic",
+        "online": false,
+        "last_seen": "<time>",
+        "this_device": false,
+        "listing": "offline",
+        "threads": 0
+      }
+    ]
+  },
+  "sdk list all_scope | -": {
+    "kind": "ok",
+    "threads": [
+      {
+        "thread": "0aa00001-0000-4000-8000-000000000001",
+        "name": "alpha",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+        "surface": "desktop",
+        "machine": "this mac",
+        "alias": "lane-here"
+      },
+      {
+        "thread": "0aa00002-0000-4000-8000-000000000002",
+        "name": "<cwd-name>",
+        "unnamed": true,
+        "status": "resumable",
+        "state": "inactive",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[<cwd-name>](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0aa00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[shared](omo-thread://v1/0aa00003-0000-4000-8000-000000000003)",
+        "surface": "desktop",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0aa00004-0000-4000-8000-000000000004",
+        "name": "fix/login",
+        "status": "live",
+        "state": "idle",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+        "surface": "desktop",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0dd00001-0000-4000-8000-000000000001",
+        "name": "<cwd-name>",
+        "unnamed": true,
+        "status": "resumable",
+        "state": "inactive",
+        "cwd": "<cwd>",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[<cwd-name>](omo-thread://v1/0dd00001-0000-4000-8000-000000000001)",
+        "machine": "this mac"
+      },
+      {
+        "thread": "0bb00001-0000-4000-8000-000000000001",
+        "name": "beta",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+        "device": "b7c41e09d2a64f1e",
+        "alias": "lane-b"
+      },
+      {
+        "thread": "0bb00002-0000-4000-8000-000000000002",
+        "name": "beta old",
+        "status": "resumable",
+        "state": "inactive",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+        "device": "b7c41e09d2a64f1e"
+      },
+      {
+        "thread": "0bb00003-0000-4000-8000-000000000003",
+        "name": "shared",
+        "status": "live",
+        "state": "idle",
+        "machine": "Studio Laptop",
+        "cwd": "/work/b",
+        "created_at": "<time>",
+        "updated_at": "<time>",
+        "link": "[shared](omo-thread://v1/0bb00003-0000-4000-8000-000000000003)",
+        "device": "b7c41e09d2a64f1e"
+      }
+    ],
+    "scope": "all",
+    "devices": [
+      {
+        "device": "a11ce0de5e1f0123",
+        "name": "this mac",
+        "online": true,
+        "last_seen": null,
+        "this_device": true,
+        "listing": "listed",
+        "threads": 5
+      },
+      {
+        "device": "b",
+        "name": "studio",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 0
+      },
+      {
+        "device": "b7c41e09d2a64f1e",
+        "name": "Studio Laptop",
+        "online": true,
+        "last_seen": null,
+        "this_device": false,
+        "listing": "listed",
+        "threads": 3
+      },
+      {
+        "device": "c0ffee5a1d2b3c4d",
+        "name": "attic",
+        "online": false,
+        "last_seen": "<time>",
+        "this_device": false,
+        "listing": "offline",
+        "threads": 0
+      }
+    ]
+  },
+  "tool thread_read | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+    "items": [
+      {
+        "seq": 1,
+        "role": "user",
+        "content": "\"message 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 2,
+        "role": "assistant",
+        "content": "\"message 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 3,
+        "role": "user",
+        "content": "\"message 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 4,
+        "role": "assistant",
+        "content": "\"message 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 5,
+        "role": "user",
+        "content": "\"message 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 6,
+        "role": "assistant",
+        "content": "\"message 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 7,
+        "role": "user",
+        "content": "\"message 6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 8,
+        "role": "assistant",
+        "content": "\"message 7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 9,
+        "role": "user",
+        "content": "\"message 8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 10,
+        "role": "assistant",
+        "content": "\"message 9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 11,
+        "role": "user",
+        "content": "\"message 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 12,
+        "role": "assistant",
+        "content": "\"message 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 13,
+        "role": "user",
+        "content": "\"message 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 14,
+        "role": "assistant",
+        "content": "\"message 13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 15,
+        "role": "user",
+        "content": "\"message 14 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 16,
+        "role": "assistant",
+        "content": "\"message 15 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 17,
+        "role": "user",
+        "content": "\"message 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 18,
+        "role": "assistant",
+        "content": "\"message 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 19,
+        "role": "user",
+        "content": "\"message 18 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 20,
+        "role": "assistant",
+        "content": "\"message 19 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 21,
+        "role": "user",
+        "content": "\"message 20 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 22,
+        "role": "assistant",
+        "content": "\"message 21 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 23,
+        "role": "user",
+        "content": "\"message 22 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 24,
+        "role": "assistant",
+        "content": "\"message 23 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 25,
+        "role": "user",
+        "content": "\"message 24 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 26,
+        "role": "assistant",
+        "content": "\"message 25 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 27,
+        "role": "user",
+        "content": "\"message 26 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 28,
+        "role": "assistant",
+        "content": "\"message 27 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 29,
+        "role": "user",
+        "content": "\"message 28 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 30,
+        "role": "assistant",
+        "content": "\"message 29 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      }
+    ],
+    "truncated": false,
+    "source": "live_host"
+  },
+  "tool thread_read | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "items": [
+      {
+        "seq": 1,
+        "role": "user",
+        "content": "\"message 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 2,
+        "role": "assistant",
+        "content": "\"message 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 3,
+        "role": "user",
+        "content": "\"message 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 4,
+        "role": "assistant",
+        "content": "\"message 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 5,
+        "role": "user",
+        "content": "\"message 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 6,
+        "role": "assistant",
+        "content": "\"message 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 7,
+        "role": "user",
+        "content": "\"message 6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 8,
+        "role": "assistant",
+        "content": "\"message 7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 9,
+        "role": "user",
+        "content": "\"message 8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 10,
+        "role": "assistant",
+        "content": "\"message 9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 11,
+        "role": "user",
+        "content": "\"message 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 12,
+        "role": "assistant",
+        "content": "\"message 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 13,
+        "role": "user",
+        "content": "\"message 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 14,
+        "role": "assistant",
+        "content": "\"message 13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 15,
+        "role": "user",
+        "content": "\"message 14 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 16,
+        "role": "assistant",
+        "content": "\"message 15 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 17,
+        "role": "user",
+        "content": "\"message 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 18,
+        "role": "assistant",
+        "content": "\"message 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 19,
+        "role": "user",
+        "content": "\"message 18 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 20,
+        "role": "assistant",
+        "content": "\"message 19 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 21,
+        "role": "user",
+        "content": "\"message 20 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 22,
+        "role": "assistant",
+        "content": "\"message 21 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 23,
+        "role": "user",
+        "content": "\"message 22 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 24,
+        "role": "assistant",
+        "content": "\"message 23 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 25,
+        "role": "user",
+        "content": "\"message 24 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 26,
+        "role": "assistant",
+        "content": "\"message 25 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 27,
+        "role": "user",
+        "content": "\"message 26 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 28,
+        "role": "assistant",
+        "content": "\"message 27 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 29,
+        "role": "user",
+        "content": "\"message 28 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 30,
+        "role": "assistant",
+        "content": "\"message 29 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      }
+    ],
+    "truncated": false,
+    "source": "live_host"
+  },
+  "tool thread_read | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+    "items": [
+      {
+        "seq": 1,
+        "role": "user",
+        "content": "\"message 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 2,
+        "role": "assistant",
+        "content": "\"message 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 3,
+        "role": "user",
+        "content": "\"message 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 4,
+        "role": "assistant",
+        "content": "\"message 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 5,
+        "role": "user",
+        "content": "\"message 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 6,
+        "role": "assistant",
+        "content": "\"message 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 7,
+        "role": "user",
+        "content": "\"message 6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 8,
+        "role": "assistant",
+        "content": "\"message 7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 9,
+        "role": "user",
+        "content": "\"message 8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 10,
+        "role": "assistant",
+        "content": "\"message 9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 11,
+        "role": "user",
+        "content": "\"message 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 12,
+        "role": "assistant",
+        "content": "\"message 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 13,
+        "role": "user",
+        "content": "\"message 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 14,
+        "role": "assistant",
+        "content": "\"message 13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 15,
+        "role": "user",
+        "content": "\"message 14 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 16,
+        "role": "assistant",
+        "content": "\"message 15 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 17,
+        "role": "user",
+        "content": "\"message 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 18,
+        "role": "assistant",
+        "content": "\"message 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 19,
+        "role": "user",
+        "content": "\"message 18 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 20,
+        "role": "assistant",
+        "content": "\"message 19 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 21,
+        "role": "user",
+        "content": "\"message 20 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 22,
+        "role": "assistant",
+        "content": "\"message 21 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 23,
+        "role": "user",
+        "content": "\"message 22 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 24,
+        "role": "assistant",
+        "content": "\"message 23 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 25,
+        "role": "user",
+        "content": "\"message 24 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 26,
+        "role": "assistant",
+        "content": "\"message 25 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 27,
+        "role": "user",
+        "content": "\"message 26 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 28,
+        "role": "assistant",
+        "content": "\"message 27 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 29,
+        "role": "user",
+        "content": "\"message 28 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 30,
+        "role": "assistant",
+        "content": "\"message 29 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      }
+    ],
+    "truncated": false,
+    "source": "live_host",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "tool thread_read | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_read | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_read | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+    "items": [],
+    "truncated": false,
+    "source": "session_jsonl",
+    "source_incomplete": true
+  },
+  "tool thread_read | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+    "items": [
+      {
+        "seq": 1,
+        "role": "user",
+        "content": "\"message 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 2,
+        "role": "assistant",
+        "content": "\"message 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 3,
+        "role": "user",
+        "content": "\"message 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 4,
+        "role": "assistant",
+        "content": "\"message 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 5,
+        "role": "user",
+        "content": "\"message 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 6,
+        "role": "assistant",
+        "content": "\"message 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 7,
+        "role": "user",
+        "content": "\"message 6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 8,
+        "role": "assistant",
+        "content": "\"message 7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 9,
+        "role": "user",
+        "content": "\"message 8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 10,
+        "role": "assistant",
+        "content": "\"message 9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 11,
+        "role": "user",
+        "content": "\"message 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 12,
+        "role": "assistant",
+        "content": "\"message 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 13,
+        "role": "user",
+        "content": "\"message 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 14,
+        "role": "assistant",
+        "content": "\"message 13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 15,
+        "role": "user",
+        "content": "\"message 14 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 16,
+        "role": "assistant",
+        "content": "\"message 15 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 17,
+        "role": "user",
+        "content": "\"message 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 18,
+        "role": "assistant",
+        "content": "\"message 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 19,
+        "role": "user",
+        "content": "\"message 18 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 20,
+        "role": "assistant",
+        "content": "\"message 19 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 21,
+        "role": "user",
+        "content": "\"message 20 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 22,
+        "role": "assistant",
+        "content": "\"message 21 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 23,
+        "role": "user",
+        "content": "\"message 22 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 24,
+        "role": "assistant",
+        "content": "\"message 23 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 25,
+        "role": "user",
+        "content": "\"message 24 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 26,
+        "role": "assistant",
+        "content": "\"message 25 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 27,
+        "role": "user",
+        "content": "\"message 26 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 28,
+        "role": "assistant",
+        "content": "\"message 27 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 29,
+        "role": "user",
+        "content": "\"message 28 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 30,
+        "role": "assistant",
+        "content": "\"message 29 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      }
+    ],
+    "truncated": false,
+    "source": "live_host",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "tool thread_send | here live": {
+    "kind": "error",
+    "error": {
+      "code": "loop_detected",
+      "message": "A session cannot deliver to itself through the gateway.",
+      "next_action": "A session cannot message itself through the gateway; address another thread.",
+      "details": {
+        "guard": "self_send"
+      }
+    }
+  },
+  "tool thread_send | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1
+    },
+    "message_seq": 1,
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "auto"
+  },
+  "tool thread_send | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+    "delivery": {
+      "kind": "started",
+      "turn_id": "turn-b"
+    },
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "start",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "tool thread_send | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_send | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_send | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1
+    },
+    "message_seq": 1,
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "auto"
+  },
+  "tool thread_send | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+    "delivery": {
+      "kind": "started",
+      "turn_id": "turn-b"
+    },
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "start",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "tool thread_send keyed twice | here live": [
+    {
+      "kind": "error",
+      "error": {
+        "code": "loop_detected",
+        "message": "A session cannot deliver to itself through the gateway.",
+        "next_action": "A session cannot message itself through the gateway; address another thread.",
+        "details": {
+          "guard": "self_send"
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "code": "loop_detected",
+        "message": "A session cannot deliver to itself through the gateway.",
+        "next_action": "A session cannot message itself through the gateway; address another thread.",
+        "details": {
+          "guard": "self_send"
+        }
+      }
+    }
+  ],
+  "tool thread_send keyed twice | another live here": [
+    {
+      "kind": "ok",
+      "thread": "0aa00004-0000-4000-8000-000000000004",
+      "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 1,
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    },
+    {
+      "kind": "ok",
+      "thread": "0aa00004-0000-4000-8000-000000000004",
+      "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 1,
+      "deduplicated": true,
+      "outcome": {
+        "kind": "pending"
+      },
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    }
+  ],
+  "tool thread_send keyed twice | b live": [
+    {
+      "kind": "ok",
+      "thread": "0bb00001-0000-4000-8000-000000000001",
+      "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    },
+    {
+      "kind": "ok",
+      "thread": "0bb00001-0000-4000-8000-000000000001",
+      "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": true,
+      "outcome": {
+        "kind": "outcome_unavailable"
+      },
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    }
+  ],
+  "tool thread_send keyed twice | missing": [
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  ],
+  "tool thread_send keyed twice | name two threads share": [
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    }
+  ],
+  "tool thread_send keyed twice | ended here": [
+    {
+      "kind": "ok",
+      "thread": "0aa00002-0000-4000-8000-000000000002",
+      "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 1,
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    },
+    {
+      "kind": "ok",
+      "thread": "0aa00002-0000-4000-8000-000000000002",
+      "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 1,
+      "deduplicated": true,
+      "outcome": {
+        "kind": "pending"
+      },
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    }
+  ],
+  "tool thread_send keyed twice | ended on b": [
+    {
+      "kind": "ok",
+      "thread": "0bb00002-0000-4000-8000-000000000002",
+      "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    },
+    {
+      "kind": "ok",
+      "thread": "0bb00002-0000-4000-8000-000000000002",
+      "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": true,
+      "outcome": {
+        "kind": "outcome_unavailable"
+      },
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    }
+  ],
+  "tool thread_send keyed past the horizon | here live": [
+    {
+      "kind": "error",
+      "error": {
+        "code": "loop_detected",
+        "message": "A session cannot deliver to itself through the gateway.",
+        "next_action": "A session cannot message itself through the gateway; address another thread.",
+        "details": {
+          "guard": "self_send"
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "code": "loop_detected",
+        "message": "A session cannot deliver to itself through the gateway.",
+        "next_action": "A session cannot message itself through the gateway; address another thread.",
+        "details": {
+          "guard": "self_send"
+        }
+      }
+    }
+  ],
+  "tool thread_send keyed past the horizon | another live here": [
+    {
+      "kind": "ok",
+      "thread": "0aa00004-0000-4000-8000-000000000004",
+      "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 1,
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    },
+    {
+      "kind": "ok",
+      "thread": "0aa00004-0000-4000-8000-000000000004",
+      "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 2,
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    }
+  ],
+  "tool thread_send keyed past the horizon | b live": [
+    {
+      "kind": "ok",
+      "thread": "0bb00001-0000-4000-8000-000000000001",
+      "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    },
+    {
+      "kind": "ok",
+      "thread": "0bb00001-0000-4000-8000-000000000001",
+      "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    }
+  ],
+  "tool thread_send keyed past the horizon | missing": [
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  ],
+  "tool thread_send keyed past the horizon | name two threads share": [
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "kind": "error",
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        },
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    }
+  ],
+  "tool thread_send keyed past the horizon | ended here": [
+    {
+      "kind": "ok",
+      "thread": "0aa00002-0000-4000-8000-000000000002",
+      "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 1,
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    },
+    {
+      "kind": "ok",
+      "thread": "0aa00002-0000-4000-8000-000000000002",
+      "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1
+      },
+      "message_seq": 2,
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "auto"
+    }
+  ],
+  "tool thread_send keyed past the horizon | ended on b": [
+    {
+      "kind": "ok",
+      "thread": "0bb00002-0000-4000-8000-000000000002",
+      "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    },
+    {
+      "kind": "ok",
+      "thread": "0bb00002-0000-4000-8000-000000000002",
+      "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "delivery_id": "<id>",
+      "effective_mode": "start",
+      "device": "b7c41e09d2a64f1e"
+    }
+  ],
+  "tool thread_handoff | here live": {
+    "kind": "error",
+    "error": {
+      "code": "loop_detected",
+      "message": "A session cannot deliver to itself through the gateway.",
+      "next_action": "A session cannot message itself through the gateway; address another thread.",
+      "details": {
+        "guard": "self_send"
+      }
+    }
+  },
+  "tool thread_handoff | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "name": "fix/login",
+    "status": "live",
+    "state": "idle",
+    "cwd": "<cwd>",
+    "created_at": "<time>",
+    "updated_at": null,
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "surface": "daemon",
+    "resolved_by": "exact_name",
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1
+    },
+    "message_seq": 1,
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "auto"
+  },
+  "tool thread_handoff | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "name": "beta",
+    "status": "live",
+    "state": "idle",
+    "cwd": "/work/b",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+    "device": "b7c41e09d2a64f1e",
+    "resolved_by": "exact_name",
+    "delivery": {
+      "kind": "started",
+      "turn_id": "turn-b"
+    },
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "start"
+  },
+  "tool thread_handoff | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_handoff | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_handoff | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "name": "",
+    "status": "resumable",
+    "state": "inactive",
+    "cwd": "<cwd>",
+    "created_at": "<time>",
+    "updated_at": null,
+    "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+    "resolved_by": "exact_name",
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1
+    },
+    "message_seq": 1,
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "auto"
+  },
+  "tool thread_handoff | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "name": "beta old",
+    "status": "live",
+    "state": "inactive",
+    "cwd": "/work/b",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+    "device": "b7c41e09d2a64f1e",
+    "resolved_by": "exact_name",
+    "delivery": {
+      "kind": "started",
+      "turn_id": "turn-b"
+    },
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "start"
+  },
+  "tool thread_interrupt | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "interrupted": false,
+    "background": {
+      "status": "not_supported"
+    }
+  },
+  "tool thread_interrupt | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "interrupted": false,
+    "background": {
+      "status": "not_supported"
+    }
+  },
+  "tool thread_interrupt | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "interrupted": false,
+    "background": {
+      "status": "not_supported"
+    }
+  },
+  "tool thread_interrupt | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_interrupt | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_interrupt | ended here": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_interrupt | ended on b": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_close | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "closed": true,
+    "reason": "closed",
+    "dropped_deliveries": []
+  },
+  "tool thread_close | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "closed": true,
+    "reason": "closed",
+    "dropped_deliveries": []
+  },
+  "tool thread_close | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "closed": true,
+    "reason": "closed",
+    "dropped_deliveries": []
+  },
+  "tool thread_close | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_close | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_close | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "closed": false,
+    "reason": "not_live",
+    "dropped_deliveries": []
+  },
+  "tool thread_close | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "device": "b7c41e09d2a64f1e",
+    "closed": false,
+    "reason": "not_live",
+    "dropped_deliveries": []
+  },
+  "tool thread_rename | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "name": "renamed"
+  },
+  "tool thread_rename | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "name": "renamed"
+  },
+  "tool thread_rename | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "name": "renamed"
+  },
+  "tool thread_rename | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_rename | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_rename | ended here": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_rename | ended on b": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_set_model | here live": {
+    "kind": "error",
+    "error": {
+      "code": "model_not_found",
+      "message": "Provider \"anthropic\" has no available models in the target's catalog.",
+      "next_action": "Choose a provider from the target's available list or enable the requested provider on the target.",
+      "details": {
+        "reason": "provider_not_configured",
+        "provider": "anthropic",
+        "available_providers": [],
+        "available": []
+      }
+    }
+  },
+  "tool thread_set_model | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "model_not_found",
+      "message": "Provider \"anthropic\" has no available models in the target's catalog.",
+      "next_action": "Choose a provider from the target's available list or enable the requested provider on the target.",
+      "details": {
+        "reason": "provider_not_configured",
+        "provider": "anthropic",
+        "available_providers": [],
+        "available": []
+      }
+    }
+  },
+  "tool thread_set_model | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "model": {
+      "provider": "anthropic",
+      "id": "claude-opus"
+    }
+  },
+  "tool thread_set_model | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_set_model | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_set_model | ended here": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_set_model | ended on b": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_set_reasoning | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "level": "high",
+    "scope": "session"
+  },
+  "tool thread_set_reasoning | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "level": "high",
+    "scope": "session"
+  },
+  "tool thread_set_reasoning | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "level": "high",
+    "scope": "session"
+  },
+  "tool thread_set_reasoning | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_set_reasoning | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_set_reasoning | ended here": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_set_reasoning | ended on b": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "tool thread_create existing | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "name": "alpha",
+    "status": "live",
+    "state": "idle",
+    "cwd": "<cwd>",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+    "deduplicated": true,
+    "prompt": null
+  },
+  "tool thread_create existing | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "name": "fix/login",
+    "status": "live",
+    "state": "idle",
+    "cwd": "<cwd>",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "deduplicated": true,
+    "prompt": null
+  },
+  "tool thread_create existing | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "name": "beta",
+    "status": "live",
+    "state": "idle",
+    "cwd": "/work/b",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+    "device": "b7c41e09d2a64f1e",
+    "deduplicated": true,
+    "prompt": null
+  },
+  "tool thread_create existing | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in the daemon-wide scope. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "tool thread_create existing | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "tool thread_create existing | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "name": "",
+    "status": "live",
+    "state": "idle",
+    "cwd": "<cwd>",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+    "deduplicated": false,
+    "prompt": null
+  },
+  "tool thread_create existing | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "name": "beta old",
+    "status": "live",
+    "state": "idle",
+    "cwd": "/work/b",
+    "created_at": "<time>",
+    "updated_at": "<time>",
+    "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+    "device": "b7c41e09d2a64f1e",
+    "deduplicated": false,
+    "prompt": null
+  },
+  "sdk read | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "link": "[alpha](omo-thread://v1/0aa00001-0000-4000-8000-000000000001)",
+    "items": [],
+    "truncated": false,
+    "source": "live_host"
+  },
+  "sdk read | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "items": [],
+    "truncated": false,
+    "source": "live_host"
+  },
+  "sdk read | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+    "items": [
+      {
+        "seq": 1,
+        "role": "user",
+        "content": "\"message 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 2,
+        "role": "assistant",
+        "content": "\"message 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 3,
+        "role": "user",
+        "content": "\"message 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 4,
+        "role": "assistant",
+        "content": "\"message 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 5,
+        "role": "user",
+        "content": "\"message 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 6,
+        "role": "assistant",
+        "content": "\"message 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 7,
+        "role": "user",
+        "content": "\"message 6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 8,
+        "role": "assistant",
+        "content": "\"message 7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 9,
+        "role": "user",
+        "content": "\"message 8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 10,
+        "role": "assistant",
+        "content": "\"message 9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 11,
+        "role": "user",
+        "content": "\"message 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 12,
+        "role": "assistant",
+        "content": "\"message 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 13,
+        "role": "user",
+        "content": "\"message 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 14,
+        "role": "assistant",
+        "content": "\"message 13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 15,
+        "role": "user",
+        "content": "\"message 14 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 16,
+        "role": "assistant",
+        "content": "\"message 15 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 17,
+        "role": "user",
+        "content": "\"message 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 18,
+        "role": "assistant",
+        "content": "\"message 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 19,
+        "role": "user",
+        "content": "\"message 18 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 20,
+        "role": "assistant",
+        "content": "\"message 19 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 21,
+        "role": "user",
+        "content": "\"message 20 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 22,
+        "role": "assistant",
+        "content": "\"message 21 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 23,
+        "role": "user",
+        "content": "\"message 22 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 24,
+        "role": "assistant",
+        "content": "\"message 23 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 25,
+        "role": "user",
+        "content": "\"message 24 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 26,
+        "role": "assistant",
+        "content": "\"message 25 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 27,
+        "role": "user",
+        "content": "\"message 26 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 28,
+        "role": "assistant",
+        "content": "\"message 27 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 29,
+        "role": "user",
+        "content": "\"message 28 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 30,
+        "role": "assistant",
+        "content": "\"message 29 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      }
+    ],
+    "truncated": false,
+    "source": "live_host",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "sdk read | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk read | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "sdk read | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "link": "[thread](omo-thread://v1/0aa00002-0000-4000-8000-000000000002)",
+    "items": [],
+    "truncated": false,
+    "source": "session_jsonl",
+    "source_incomplete": true
+  },
+  "sdk read | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "link": "[beta old](omo-thread://v1/0bb00002-0000-4000-8000-000000000002)",
+    "items": [
+      {
+        "seq": 1,
+        "role": "user",
+        "content": "\"message 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 2,
+        "role": "assistant",
+        "content": "\"message 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 3,
+        "role": "user",
+        "content": "\"message 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 4,
+        "role": "assistant",
+        "content": "\"message 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 5,
+        "role": "user",
+        "content": "\"message 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 6,
+        "role": "assistant",
+        "content": "\"message 5 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 7,
+        "role": "user",
+        "content": "\"message 6 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 8,
+        "role": "assistant",
+        "content": "\"message 7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 9,
+        "role": "user",
+        "content": "\"message 8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 10,
+        "role": "assistant",
+        "content": "\"message 9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 11,
+        "role": "user",
+        "content": "\"message 10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 12,
+        "role": "assistant",
+        "content": "\"message 11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 13,
+        "role": "user",
+        "content": "\"message 12 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 14,
+        "role": "assistant",
+        "content": "\"message 13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 15,
+        "role": "user",
+        "content": "\"message 14 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 16,
+        "role": "assistant",
+        "content": "\"message 15 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 17,
+        "role": "user",
+        "content": "\"message 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 18,
+        "role": "assistant",
+        "content": "\"message 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 19,
+        "role": "user",
+        "content": "\"message 18 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 20,
+        "role": "assistant",
+        "content": "\"message 19 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 21,
+        "role": "user",
+        "content": "\"message 20 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 22,
+        "role": "assistant",
+        "content": "\"message 21 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 23,
+        "role": "user",
+        "content": "\"message 22 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 24,
+        "role": "assistant",
+        "content": "\"message 23 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 25,
+        "role": "user",
+        "content": "\"message 24 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 26,
+        "role": "assistant",
+        "content": "\"message 25 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 27,
+        "role": "user",
+        "content": "\"message 26 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 28,
+        "role": "assistant",
+        "content": "\"message 27 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 29,
+        "role": "user",
+        "content": "\"message 28 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      },
+      {
+        "seq": 30,
+        "role": "assistant",
+        "content": "\"message 29 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+      }
+    ],
+    "truncated": false,
+    "source": "live_host",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "sdk send | here live": {
+    "kind": "ok",
+    "delivery_id": "<id>",
+    "message_seq": 1,
+    "effective_mode": "auto",
+    "endpoint_kind": "rpc_host",
+    "deduplicated": false,
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1,
+      "reason": "wake_unavailable"
+    },
+    "thread": "0aa00001-0000-4000-8000-000000000001"
+  },
+  "sdk send | another live here": {
+    "kind": "ok",
+    "delivery_id": "<id>",
+    "message_seq": 1,
+    "effective_mode": "auto",
+    "endpoint_kind": "rpc_host",
+    "deduplicated": false,
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1,
+      "reason": "wake_unavailable"
+    },
+    "thread": "0aa00004-0000-4000-8000-000000000004"
+  },
+  "sdk send | b live": {
+    "kind": "ok",
+    "delivery": {
+      "kind": "started",
+      "turn_id": "turn-b"
+    },
+    "deduplicated": false,
+    "device": "b7c41e09d2a64f1e",
+    "effective_mode": "start",
+    "thread": "0bb00001-0000-4000-8000-000000000001"
+  },
+  "sdk send | missing": {
+    "kind": "error",
+    "error": {
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk send | name two threads share": {
+    "kind": "error",
+    "error": {
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      }
+    }
+  },
+  "sdk send | ended here": {
+    "kind": "ok",
+    "delivery_id": "<id>",
+    "message_seq": 1,
+    "effective_mode": "auto",
+    "endpoint_kind": null,
+    "deduplicated": false,
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1,
+      "reason": "wake_unavailable"
+    },
+    "thread": "0aa00002-0000-4000-8000-000000000002"
+  },
+  "sdk send | ended on b": {
+    "kind": "ok",
+    "delivery": {
+      "kind": "started",
+      "turn_id": "turn-b"
+    },
+    "deduplicated": false,
+    "device": "b7c41e09d2a64f1e",
+    "effective_mode": "start",
+    "thread": "0bb00002-0000-4000-8000-000000000002"
+  },
+  "sdk send keyed twice | here live": [
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00001-0000-4000-8000-000000000001"
+    },
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00001-0000-4000-8000-000000000001"
+    }
+  ],
+  "sdk send keyed twice | another live here": [
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00004-0000-4000-8000-000000000004"
+    },
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00004-0000-4000-8000-000000000004"
+    }
+  ],
+  "sdk send keyed twice | b live": [
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00001-0000-4000-8000-000000000001"
+    },
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00001-0000-4000-8000-000000000001"
+    }
+  ],
+  "sdk send keyed twice | missing": [
+    {
+      "kind": "error",
+      "error": {
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  ],
+  "sdk send keyed twice | name two threads share": [
+    {
+      "kind": "error",
+      "error": {
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "sdk send keyed twice | ended here": [
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": null,
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00002-0000-4000-8000-000000000002"
+    },
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": null,
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00002-0000-4000-8000-000000000002"
+    }
+  ],
+  "sdk send keyed twice | ended on b": [
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00002-0000-4000-8000-000000000002"
+    },
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00002-0000-4000-8000-000000000002"
+    }
+  ],
+  "sdk send keyed past the horizon | here live": [
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00001-0000-4000-8000-000000000001"
+    },
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00001-0000-4000-8000-000000000001"
+    }
+  ],
+  "sdk send keyed past the horizon | another live here": [
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00004-0000-4000-8000-000000000004"
+    },
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": "rpc_host",
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00004-0000-4000-8000-000000000004"
+    }
+  ],
+  "sdk send keyed past the horizon | b live": [
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00001-0000-4000-8000-000000000001"
+    },
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00001-0000-4000-8000-000000000001"
+    }
+  ],
+  "sdk send keyed past the horizon | missing": [
+    {
+      "kind": "error",
+      "error": {
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "code": "not_found",
+        "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+        "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+        "details": {
+          "kind": "thread"
+        }
+      }
+    }
+  ],
+  "sdk send keyed past the horizon | name two threads share": [
+    {
+      "kind": "error",
+      "error": {
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "error",
+      "error": {
+        "code": "ambiguous_target",
+        "message": "2 visible threads share the name \"shared\".",
+        "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+        "details": {
+          "kind": "thread",
+          "candidates": [
+            {
+              "thread": "0aa00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "<cwd>",
+              "preview": "",
+              "updatedAt": null,
+              "state": "live",
+              "device": "a11ce0de5e1f0123",
+              "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+              "device_name": "this mac"
+            },
+            {
+              "thread": "0bb00003-0000-4000-8000-000000000003",
+              "name": "shared",
+              "cwd": "/work/b",
+              "preview": "",
+              "updatedAt": "<time>",
+              "state": "live",
+              "device": "b7c41e09d2a64f1e",
+              "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+              "device_name": "Studio Laptop"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "sdk send keyed past the horizon | ended here": [
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": null,
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00002-0000-4000-8000-000000000002"
+    },
+    {
+      "kind": "ok",
+      "delivery_id": "<id>",
+      "message_seq": 1,
+      "effective_mode": "auto",
+      "endpoint_kind": null,
+      "deduplicated": false,
+      "delivery": {
+        "kind": "queued_offline",
+        "queue_position": 1,
+        "reason": "wake_unavailable"
+      },
+      "thread": "0aa00002-0000-4000-8000-000000000002"
+    }
+  ],
+  "sdk send keyed past the horizon | ended on b": [
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00002-0000-4000-8000-000000000002"
+    },
+    {
+      "kind": "ok",
+      "delivery": {
+        "kind": "started",
+        "turn_id": "turn-b"
+      },
+      "deduplicated": false,
+      "device": "b7c41e09d2a64f1e",
+      "effective_mode": "start",
+      "thread": "0bb00002-0000-4000-8000-000000000002"
+    }
+  ],
+  "sdk locate | here live": {
+    "kind": "ok",
+    "thread": {
+      "thread_id": "0aa00001-0000-4000-8000-000000000001",
+      "title": "alpha",
+      "cwd": "<cwd>",
+      "status": "live",
+      "session_path": null,
+      "endpoint": {
+        "kind": "rpc_host",
+        "socket": "<tmp>",
+        "routing_id": "route-here-live",
+        "durable_session_id": "0aa00001-0000-4000-8000-000000000001"
+      },
+      "surface": "desktop",
+      "alive": true
+    }
+  },
+  "sdk locate | another live here": {
+    "kind": "ok",
+    "thread": {
+      "thread_id": "0aa00004-0000-4000-8000-000000000004",
+      "title": "fix/login",
+      "cwd": "<cwd>",
+      "status": "live",
+      "session_path": null,
+      "endpoint": {
+        "kind": "rpc_host",
+        "socket": "<tmp>",
+        "routing_id": "route-here-slash",
+        "durable_session_id": "0aa00004-0000-4000-8000-000000000004"
+      },
+      "surface": "desktop",
+      "alive": true
+    }
+  },
+  "sdk locate | b live": {
+    "kind": "ok",
+    "thread": {
+      "thread_id": "0bb00001-0000-4000-8000-000000000001",
+      "title": "beta",
+      "cwd": "/work/b",
+      "status": "live",
+      "session_path": null,
+      "endpoint": null,
+      "surface": null,
+      "alive": true,
+      "device": "b7c41e09d2a64f1e",
+      "address": "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001"
+    }
+  },
+  "sdk locate | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk locate | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "sdk locate | ended here": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0aa00002-0000-4000-8000-000000000002\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk locate | ended on b": {
+    "kind": "ok",
+    "thread": {
+      "thread_id": "0bb00002-0000-4000-8000-000000000002",
+      "title": "beta old",
+      "cwd": "/work/b",
+      "status": "resumable",
+      "session_path": null,
+      "endpoint": null,
+      "surface": null,
+      "alive": false,
+      "device": "b7c41e09d2a64f1e",
+      "address": "b7c41e09d2a64f1e/0bb00002-0000-4000-8000-000000000002"
+    }
+  },
+  "sdk interrupt | here live": {
+    "kind": "ok",
+    "thread": "0aa00001-0000-4000-8000-000000000001",
+    "turn_id": "turn-here",
+    "interrupted": false,
+    "background": {
+      "status": "not_supported"
+    }
+  },
+  "sdk interrupt | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "turn_id": "turn-here",
+    "interrupted": false,
+    "background": {
+      "status": "not_supported"
+    }
+  },
+  "sdk interrupt | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "interrupted": false,
+    "background": {
+      "status": "not_supported"
+    }
+  },
+  "sdk interrupt | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk interrupt | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "sdk interrupt | ended here": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "sdk interrupt | ended on b": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "sdk close | here live": {
+    "kind": "error",
+    "error": {
+      "code": "unsupported",
+      "message": "The host holding thread 0aa00001-0000-4000-8000-000000000001 does not accept close requests.",
+      "next_action": "Update omo on this device and restart its host.",
+      "details": {
+        "command": "close_session"
+      }
+    }
+  },
+  "sdk close | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "unsupported",
+      "message": "The host holding thread 0aa00004-0000-4000-8000-000000000004 does not accept close requests.",
+      "next_action": "Update omo on this device and restart its host.",
+      "details": {
+        "command": "close_session"
+      }
+    }
+  },
+  "sdk close | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "closed": true,
+    "reason": "closed",
+    "dropped_deliveries": []
+  },
+  "sdk close | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk close | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "sdk close | ended here": {
+    "kind": "ok",
+    "thread": "0aa00002-0000-4000-8000-000000000002",
+    "closed": false,
+    "reason": "not_live",
+    "dropped_deliveries": []
+  },
+  "sdk close | ended on b": {
+    "kind": "ok",
+    "thread": "0bb00002-0000-4000-8000-000000000002",
+    "device": "b7c41e09d2a64f1e",
+    "closed": false,
+    "reason": "not_live",
+    "dropped_deliveries": []
+  },
+  "sdk rename | here live": {
+    "kind": "error",
+    "error": {
+      "code": "internal_error",
+      "message": "Thread operation failed: not used by locate",
+      "next_action": "Run omo thread list and retry after checking the target."
+    }
+  },
+  "sdk rename | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "internal_error",
+      "message": "Thread operation failed: not used by locate",
+      "next_action": "Run omo thread list and retry after checking the target."
+    }
+  },
+  "sdk rename | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "device": "b7c41e09d2a64f1e",
+    "name": "renamed"
+  },
+  "sdk rename | missing": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "not_found",
+      "message": "No visible thread matches \"0ee00001-0000-4000-8000-000000000001\" in this workspace. No reachable endpoint lists a thread with that thread_id.",
+      "next_action": "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to check the id; a thread on a device that is offline is found once it is online.",
+      "details": {
+        "kind": "thread"
+      }
+    }
+  },
+  "sdk rename | name two threads share": {
+    "kind": "error",
+    "error": {
+      "kind": "error",
+      "code": "ambiguous_target",
+      "message": "2 visible threads share the name \"shared\".",
+      "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
+      "details": {
+        "kind": "thread",
+        "candidates": [
+          {
+            "thread": "0aa00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "<cwd>",
+            "preview": "",
+            "updatedAt": null,
+            "state": "live",
+            "device": "a11ce0de5e1f0123",
+            "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+            "device_name": "this mac"
+          },
+          {
+            "thread": "0bb00003-0000-4000-8000-000000000003",
+            "name": "shared",
+            "cwd": "/work/b",
+            "preview": "",
+            "updatedAt": "<time>",
+            "state": "live",
+            "device": "b7c41e09d2a64f1e",
+            "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+            "device_name": "Studio Laptop"
+          }
+        ]
+      },
+      "candidates": [
+        {
+          "thread": "0aa00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "<cwd>",
+          "preview": "",
+          "updatedAt": null,
+          "state": "live",
+          "device": "a11ce0de5e1f0123",
+          "address": "a11ce0de5e1f0123/0aa00003-0000-4000-8000-000000000003",
+          "device_name": "this mac"
+        },
+        {
+          "thread": "0bb00003-0000-4000-8000-000000000003",
+          "name": "shared",
+          "cwd": "/work/b",
+          "preview": "",
+          "updatedAt": "<time>",
+          "state": "live",
+          "device": "b7c41e09d2a64f1e",
+          "address": "b7c41e09d2a64f1e/0bb00003-0000-4000-8000-000000000003",
+          "device_name": "Studio Laptop"
+        }
+      ]
+    }
+  },
+  "sdk rename | ended here": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "sdk rename | ended on b": {
+    "kind": "error",
+    "error": {
+      "code": "not_resumable",
+      "message": "The thread has no live owner.",
+      "next_action": "Retry when the target is live."
+    }
+  },
+  "sdk release | here live": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "sdk release | another live here": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "sdk release | b live": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "sdk release | missing": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "sdk release | name two threads share": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "sdk release | ended here": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "sdk release | ended on b": {
+    "success": false,
+    "error": "internal_error",
+    "errorData": {
+      "hint": "Thread operation failed: not used by locate"
+    }
+  },
+  "tool thread_send steer with turn 7, target running turn 7 | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1
+    },
+    "message_seq": 1,
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "steer"
+  },
+  "sdk send steer with turn 7, target running turn 7 | another live here": {
+    "kind": "ok",
+    "delivery_id": "<id>",
+    "message_seq": 1,
+    "effective_mode": "steer",
+    "endpoint_kind": "rpc_host",
+    "deduplicated": false,
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1,
+      "reason": "wake_unavailable"
+    },
+    "thread": "0aa00004-0000-4000-8000-000000000004"
+  },
+  "tool thread_send steer without a turn id, target running turn 7 | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "invalid_arguments",
+      "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+      "next_action": "Fix the arguments and send again."
+    }
+  },
+  "sdk send steer without a turn id, target running turn 7 | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "invalid_arguments",
+      "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+      "next_action": "Fix the arguments and send again."
+    }
+  },
+  "tool thread_send steer with turn 7, target idle | another live here": {
+    "kind": "ok",
+    "thread": "0aa00004-0000-4000-8000-000000000004",
+    "link": "[fix/login](omo-thread://v1/0aa00004-0000-4000-8000-000000000004)",
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1
+    },
+    "message_seq": 1,
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "steer"
+  },
+  "sdk send steer with turn 7, target idle | another live here": {
+    "kind": "ok",
+    "delivery_id": "<id>",
+    "message_seq": 1,
+    "effective_mode": "steer",
+    "endpoint_kind": "rpc_host",
+    "deduplicated": false,
+    "delivery": {
+      "kind": "queued_offline",
+      "queue_position": 1,
+      "reason": "wake_unavailable"
+    },
+    "thread": "0aa00004-0000-4000-8000-000000000004"
+  },
+  "tool thread_send steer without a turn id, target idle | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "invalid_arguments",
+      "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+      "next_action": "Fix the arguments and send again."
+    }
+  },
+  "sdk send steer without a turn id, target idle | another live here": {
+    "kind": "error",
+    "error": {
+      "code": "invalid_arguments",
+      "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+      "next_action": "Fix the arguments and send again."
+    }
+  },
+  "tool thread_send steer with turn 7, target running turn 7 | b live": {
+    "kind": "ok",
+    "thread": "0bb00001-0000-4000-8000-000000000001",
+    "link": "[beta](omo-thread://v1/0bb00001-0000-4000-8000-000000000001)",
+    "delivery": {
+      "kind": "steered",
+      "turn_id": "7"
+    },
+    "deduplicated": false,
+    "delivery_id": "<id>",
+    "effective_mode": "steer",
+    "device": "b7c41e09d2a64f1e"
+  },
+  "sdk send steer with turn 7, target running turn 7 | b live": {
+    "kind": "ok",
+    "delivery": {
+      "kind": "steered",
+      "turn_id": "7"
+    },
+    "deduplicated": false,
+    "device": "b7c41e09d2a64f1e",
+    "effective_mode": "steer",
+    "thread": "0bb00001-0000-4000-8000-000000000001"
+  },
+  "tool thread_send steer without a turn id, target running turn 7 | b live": {
+    "kind": "error",
+    "error": {
+      "code": "invalid_arguments",
+      "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+      "next_action": "Fix the arguments and send again."
+    }
+  },
+  "sdk send steer without a turn id, target running turn 7 | b live": {
+    "kind": "ok",
+    "delivery": {
+      "kind": "steered",
+      "turn_id": "7"
+    },
+    "deduplicated": false,
+    "device": "b7c41e09d2a64f1e",
+    "effective_mode": "steer",
+    "thread": "0bb00001-0000-4000-8000-000000000001"
+  },
+  "tool thread_send steer with turn 7, target idle | b live": {
+    "kind": "error",
+    "error": {
+      "code": "not_steerable",
+      "message": "A steer to rk-b-live on device b7c41e09d2a64f1e was refused: not_steerable.",
+      "next_action": "Send with delivery auto or follow_up; a steer needs a running turn.",
+      "details": {
+        "device": "b7c41e09d2a64f1e"
+      }
+    }
+  },
+  "sdk send steer with turn 7, target idle | b live": {
+    "kind": "error",
+    "error": {
+      "code": "not_steerable",
+      "message": "A steer to rk-b-live was refused: not_steerable.",
+      "next_action": "Send with delivery auto or follow_up; a steer needs a running turn.",
+      "details": {
+        "device": "b7c41e09d2a64f1e"
+      }
+    }
+  },
+  "tool thread_send steer without a turn id, target idle | b live": {
+    "kind": "error",
+    "error": {
+      "code": "invalid_arguments",
+      "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+      "next_action": "Fix the arguments and send again."
+    }
+  },
+  "sdk send steer without a turn id, target idle | b live": {
+    "kind": "error",
+    "error": {
+      "code": "not_steerable",
+      "message": "A steer to rk-b-live was refused: not_steerable.",
+      "next_action": "Send with delivery auto or follow_up; a steer needs a running turn.",
+      "details": {
+        "device": "b7c41e09d2a64f1e"
+      }
+    }
+  }
+}

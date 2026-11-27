@@ -272,6 +272,8 @@ test("application evidence wins after the deadline; admission alone is not appli
   }
 })
 
+// Held (held-answers.ts send-derived-id-remote): dev's answer past the sender's receipt horizon, a new delivery,
+// until slice T1b makes the delivery id the thread's, key's and class's on both legs (ruling B9).
 test("query by old ID never sends anew after sender receipt retention", async () => {
   const x = await setup()
   try {

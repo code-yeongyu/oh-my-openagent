@@ -25,6 +25,8 @@ const ALLOWED = new Set([
   // The address grammar seams.ts parses with (#14305): a leaf that imports nothing, held by thread-address-core's own
   // self-contained.test.ts.
   "packages/thread-address-core/src/parse.ts",
+  // The held-answers list (T1a, design lane ruling): a leaf that imports nothing; seams.ts reads whether `self` is held.
+  "packages/omo-senpi/src/components/thread/remote/held-answers.ts",
   `${DSC}/src/account-state.ts`,
   // The local API wire vocabulary outside local-api/ (guard G1 S1): re-exports of the leaf files below, nothing else.
   `${DSC}/src/wire.ts`,

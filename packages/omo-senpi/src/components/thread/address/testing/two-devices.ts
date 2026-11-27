@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import type { ThreadAddressEntry } from "../../addressing"
 import type {
   AliasHolder,
@@ -6,7 +8,7 @@ import type {
   RemoteSessionRow,
   RemoteThreadSurface,
 } from "../../remote/ports"
-import { createRemoteThreadFixture } from "../../thread-remote-fixture"
+import { createRemoteThreadFixture, ENGINE } from "../../thread-remote-fixture"
 import type { ThreadHostSession } from "../../tools"
 
 // Two devices of one account for the address module (#14305): this device (a hex id of its own, so the `here` keyword and
@@ -59,6 +61,8 @@ export const T = {
   /** Live on B; a closed copy of the same id sits on this device (a stale copy). */
   stale: "0dd00001-0000-4000-8000-000000000001",
   fixLogin: "0ff00001-0000-4000-8000-000000000001",
+  /** With `prefixTwin`: live on B, sharing its first 8 hex characters with bLive (an ambiguous id prefix). */
+  bPrefixTwin: "0bb00001-ffff-4000-8000-00000000000f",
 } as const
 
 /** B's listing keys: each differs from its durable id. */
@@ -69,6 +73,7 @@ export const KEY = {
   bProbe: "rk-b-probe",
   stale: "rk-stale-on-b",
   fixLogin: "rk-fix-login",
+  bPrefixTwin: "rk-b-prefix-twin",
 } as const
 
 /** This device's routing ids: each differs from its durable id. */
@@ -160,6 +165,16 @@ export type TwoDeviceOptions = {
   readonly silent?: readonly string[]
   /** The device service state (default connected). */
   readonly plan?: string
+  /** A second live thread on B whose id shares bLive's first 8 hex characters. */
+  readonly prefixTwin?: boolean
+  /** The senders of the deliveries the caller consumed this run (an approved reply goes only to one of them). */
+  readonly replySenders?: readonly { readonly session_id: string; readonly name?: string; readonly device?: string }[]
+  /** The caller's workspace root (default this process's cwd). */
+  readonly callerWorkspaceRoot?: string
+  /** Device b's engine is running a turn (a steer to b has a turn to steer). */
+  readonly bRunning?: boolean
+  /** Write this device's session files to disk, as a device has them (default: listed only, no transcript on disk). */
+  readonly sessionFiles?: boolean
 }
 
 /**
@@ -175,7 +190,11 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.fix === true ? [{ device: FIX.id, label: FIX.name, online: true }] : []),
     ...(options.quietThird === true ? [{ device: QUIET.id, label: QUIET.name, online: true }] : []),
   ]
-  const rows = [...B_ROWS, ...(options.fix === true ? [FIX_ROW] : [])]
+  const rows = [
+    ...B_ROWS,
+    ...(options.fix === true ? [FIX_ROW] : []),
+    ...(options.prefixTwin === true ? [row(T.bPrefixTwin, KEY.bPrefixTwin, "beta twin")] : []),
+  ]
   const aliases = new Map<string, AliasHolder>([
     [ALIAS.onB, { session_id: T.bLive, device: B.id }],
     [ALIAS.here, { session_id: T.hereLive, device: HERE.id }],
@@ -189,6 +208,7 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.plan === undefined ? {} : { plan: options.plan }),
     ...(options.probe === true ? { wakeFeature: true, ended: { [B.id]: { [T.bProbe]: KEY.bProbe } } } : {}),
     ...(options.silent === undefined ? {} : { silent: options.silent }),
+    ...(options.bRunning === true ? { engine: { ...ENGINE, streaming: true, currentTurnId: "7" } } : {}),
   })
   const base: RemoteThreadSurface = {
     ...account.remote,
@@ -246,6 +266,16 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     sessions: [...HERE_SESSIONS],
     diskSessions: HERE_DISK,
     caller: T.hereLive,
+    ...(options.replySenders === undefined ? {} : { callerReplySenders: () => options.replySenders ?? [] }),
+    ...(options.callerWorkspaceRoot === undefined ? {} : { callerWorkspaceRoot: options.callerWorkspaceRoot }),
   })
+  // The base fixture lists this device's disk sessions at <agentDir>/<id>.jsonl without writing them; with sessionFiles a
+  // session file here is a real file, so a read or an open of it reaches its header as it would on a device.
+  if (options.sessionFiles === true)
+    for (const id of HERE_DISK)
+      writeFileSync(
+        join(tools.agentDir, `${id}.jsonl`),
+        `${JSON.stringify({ type: "session", id, cwd: process.cwd(), timestamp: "2026-11-01T00:00:00Z" })}\n`,
+      )
   return { account, remote, run: tools.run, tools, entries: HERE_ENTRIES, cleanup: fixture.cleanup }
 }

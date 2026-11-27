@@ -17,6 +17,7 @@ import { createLiveThreadSurface } from "../thread/live-surface"
 import { DEADLINES } from "./deadlines"
 import { createLocalSessions } from "./local-sessions"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { clientMessageIdOf } from "../thread/remote/client-message-id"
 import { personIdentity } from "./sessions"
 import {
   clientOn,
@@ -611,6 +612,82 @@ describe("#13756 review", () => {
     expect(sent("open_session")).toHaveLength(258)
   })
 
+  // #15011, measured before any fix: the client's receipt map is a cache. These pin what reaches the holder when the
+  // cache no longer holds the key: the prompt goes again, under the SAME client message id, which the holder's engine
+  // admits once (senpi ClientAdmissions: a repeated id with the same message answers replayed).
+  test("#15011 (a) #given one client and 257 keyed sends #when the first key is sent again #then the cache miss is safe: the repeat reaches the holder under the first send's client message id and answers its delivery", async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    const first = await valueOf(client.sessions.send(LIVE, { text: "m-0", idempotency_key: "k-0" }))
+    for (let index = 1; index <= 256; index++)
+      await valueOf(client.sessions.send(LIVE, { text: `m-${index}`, idempotency_key: `k-${index}` }))
+    const again = await valueOf(client.sessions.send(LIVE, { text: "m-0", idempotency_key: "k-0" }))
+    const ids = sent("prompt")
+      .filter((record) => record["message"] === "m-0")
+      .map((record) => record["clientMessageId"])
+    expect({
+      prompts: ids.length,
+      sameId: ids[0] === ids[1],
+      delivery: again.delivery_id === first.delivery_id,
+    }).toEqual({
+      prompts: 2,
+      sameId: true,
+      delivery: true,
+    })
+  })
+
+  // Held (thread/remote/held-answers.ts send-derived-id-remote, owner T1b): a keyed send through the relay names its
+  // prompt by the caller and the key, as dev does, until T1b derives the id from the thread on both legs.
+  test("#given a person's keyed send to another device #then its prompt and answer carry the caller-and-key id dev names it by", async () => {
+    const { owner, sent } = await onWorld()
+    const answer = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k-held" }),
+    )
+    const dev = clientMessageIdOf(personIdentity("user-1").caller, "k-held")
+    expect({ prompt: sent("prompt").map((record) => record["clientMessageId"]), answer: answer.delivery_id }).toEqual({
+      prompt: [dev],
+      answer: dev,
+    })
+  })
+
+  test("#15011 (b) #given a keyed send #when a fresh client sends the same key #then the repeat reaches the holder under the same client message id", async () => {
+    const { owner, sent } = await onWorld()
+    const first = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k" }),
+    )
+    const again = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k" }),
+    )
+    const ids = sent("prompt").map((record) => record["clientMessageId"])
+    expect({
+      prompts: ids.length,
+      sameId: ids[0] === ids[1],
+      delivery: again.delivery_id === first.delivery_id,
+    }).toEqual({
+      prompts: 2,
+      sameId: true,
+      delivery: true,
+    })
+  })
+
+  test("#15011 #given a keyed send #when a fresh client sends other text under the same key #then the holder refuses it client_message_id_conflict", async () => {
+    const { owner } = await onWorld()
+    // The security owner's ruling (#15021): the conflict carries no text from either message, in any field.
+    await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "CANARY-FIRST-7c1", idempotency_key: "k" }),
+    )
+    const other = await clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, {
+      text: "CANARY-SECOND-9d4",
+      idempotency_key: "k",
+    })
+    const answer = JSON.stringify(other)
+    expect(answer).toContain("client_message_id_conflict")
+    expect({ first: answer.includes("CANARY-FIRST"), second: answer.includes("CANARY-SECOND") }).toEqual({
+      first: false,
+      second: false,
+    })
+  })
+
   test("#given a keyed send then a long run of unkeyed sends #when the key is retried #then it replays within the last 256 receipts and reaches the device again past them (L37)", async () => {
     // Every unkeyed send keeps a receipt under a fresh key nobody can retry: the store keeps the newest 256 settled ones.
     const { owner, sent } = await onWorld()
@@ -969,6 +1046,20 @@ describe("an open on this device", () => {
         failureOf(await session.sessions.open({ device: SELF, workspace: host.root, first: { text: "go" } })).code,
       ).toBe("local_only")
       expect(opensOn(host)).toEqual([])
+    })
+  })
+
+  // Held (thread/remote/held-answers.ts send-derived-id-remote, owner T1b): this device's leg names the prompt by the
+  // caller and the key too, as dev does.
+  test("#given a person's keyed send on this device #then its prompt and answer carry the caller-and-key id dev names it by", async () => {
+    await withContractHost({}, async (host) => {
+      const { client } = await localClient(host)
+      const answer = await valueOf(client.sessions.send(SELF_SESSION, { text: "once", idempotency_key: "lk-held" }))
+      const dev = clientMessageIdOf(personIdentity("user-1").caller, "lk-held")
+      const prompts = host.mutations
+        .filter((frame) => frame["type"] === "prompt")
+        .map((frame) => frame["clientMessageId"])
+      expect({ prompts, answer: answer.delivery_id }).toEqual({ prompts: [dev], answer: dev })
     })
   })
 

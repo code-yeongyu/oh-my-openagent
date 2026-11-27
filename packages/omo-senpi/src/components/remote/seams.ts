@@ -1,6 +1,7 @@
 import { formatAddress, parseAddress } from "../../../../thread-address-core/src/parse"
 import { nextActionFor, remoteFailure } from "./codes"
 import type { RemoteFailure, Scope, SessionRow, ThreadHandle } from "./types"
+import { held } from "../thread/remote/held-answers"
 
 /** What a thread address names before any lookup: a session on a named device, or an address on this device's view. */
 export type CanonicalThread = {
@@ -24,6 +25,13 @@ export function canonicalizeThreadHandle(
   if (text === "")
     return remoteFailure("invalid_arguments", "A thread address is empty.", nextActionFor("invalid_arguments"))
   const parsed = parseAddress(text)
+  // Design section 5, the caller row: `self` names the calling session, and a client of the remote module has none.
+  if (parsed.kind === "self" && !held("remote-resolve-self"))
+    return remoteFailure(
+      "caller_context_missing",
+      "self names the calling session, and this caller has none.",
+      nextActionFor("caller_context_missing"),
+    )
   if (parsed.kind === "device")
     return {
       kind: "ok",

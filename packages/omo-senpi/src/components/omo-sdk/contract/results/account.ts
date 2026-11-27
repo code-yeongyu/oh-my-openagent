@@ -25,6 +25,9 @@ export type {
 export type { DeviceServiceStatus }
 export type { ControlSessionWakeState as WakeState } from "../../../../../../device-service-core/src/wire"
 
+/** A session's devices.resolve answer (security design 4.6, revision 22): the device id only, never a row. */
+export type DeviceIdentifiers = { readonly id: string }
+
 export type SignInCheck = { readonly ready: true }
 
 /** `omo logout`: the stored credential and device keys are gone; `revoked` is whether the service confirmed the revoke. */

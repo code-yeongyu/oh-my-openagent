@@ -15,6 +15,9 @@ import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 import { displayedThread } from "./relay-session-host"
+import { notLiveAnswer, notLiveRow } from "./not-live"
+import { held } from "../remote/held-answers"
+import type { ThreadToolResult } from "../contracts"
 import { threadRow } from "../tools/thread-row"
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -39,6 +42,17 @@ const THINKING_LEVEL_UNSUPPORTED =
  * (`sessionCommand`): the same records this device's endpoint takes, so each answer maps to the same result. The
  * caller has already found the device online (`locateControl`); a device that goes away in between refuses typed.
  */
+/**
+ * What `omo remote model|interrupt|close` answers for a row its device lists as ended (#13016 CTL-26, CLI-09): not live,
+ * nothing sent. Held at the base branch's answer (held-answers.ts "remote-verbs-ended-row": the verb reaches the device)
+ * until T1b and T1b-m clear the rows; undefined means the verb runs on the row.
+ */
+export function endedRowAnswer(row: RemoteSessionRow, verb: "close" | "control"): ThreadToolResult | undefined {
+  if (held("remote-verbs-ended-row")) return undefined
+  const notLive = notLiveRow(row)
+  return notLive === undefined ? undefined : notLiveAnswer(verb, notLive)
+}
+
 export function createRelayControl(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,

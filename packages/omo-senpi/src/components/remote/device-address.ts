@@ -1,8 +1,7 @@
-import { accountState, asFailure, resolveAddress, type Resolved } from "../thread/address"
+import { accountState, asFailure, resolve, type ResolveOk } from "../thread/address"
 import { threadToolFailure, type ThreadToolFailure } from "../thread/errors"
 import type { RemoteThreadSurface } from "../thread/remote/ports"
 import { parseAddress } from "@oh-my-opencode/thread-address-core"
-import { UNKNOWN_CALLER } from "../thread/tools/ports"
 
 /**
  * Seam 4 (#14305, design section 2): the only resolver for a typed thread address, the one a person typed at this
@@ -22,13 +21,16 @@ export async function resolveTypedAddress(
   opts: { readonly need: "address" | "online" },
 ): Promise<RemoteResolved | { readonly kind: "error"; readonly error: ThreadToolFailure }> {
   const read = readOnce(remote)
-  const resolved = await resolveAddress(
-    { remote: read, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
-    typed,
-    { all_scope: true, probe: true, unique_holder: true, need: opts.need },
-  )
+  const resolved = await resolve({ remote: read, workspace: "", book: () => [] }, typed, {
+    operation: opts.need === "online" ? "control" : "deliver",
+    principal: { kind: "person" },
+    scope: { all_scope: true },
+    probe: true,
+    unique_holder: true,
+    need: opts.need === "online" ? "online" : "any",
+  })
   if (resolved.kind !== "ok") return { kind: "error", error: asFailure(resolved) }
-  const { where, thread } = resolved
+  const { holder: where, id: thread } = resolved
   if (where.kind !== "device")
     return {
       kind: "error",
@@ -40,7 +42,17 @@ export async function resolveTypedAddress(
       ),
     }
   const here = parseAddress(typed).kind === "bare" && thread !== "" ? await copyHere(read, thread) : undefined
-  if (here === undefined) return { ...resolved, where }
+  if (here === undefined)
+    return {
+      kind: "ok",
+      thread,
+      address: resolved.thread,
+      device: resolved.device,
+      where,
+      entry: resolved.entry,
+      resolution: resolved.resolution,
+      all_scope: resolved.all_scope,
+    }
   return {
     kind: "error",
     error: threadToolFailure(
@@ -50,7 +62,7 @@ export async function resolveTypedAddress(
       {
         kind: "thread",
         candidates: [
-          { thread, device: where.row.device, address: resolved.address },
+          { thread, device: where.row.device, address: resolved.thread },
           { thread, device: here, address: `${here}/${thread}` },
         ],
       },
@@ -97,4 +109,15 @@ async function copyHere(read: RemoteThreadSurface, thread: string): Promise<stri
 }
 
 /** A resolved address on another device: the only kind an `omo remote` verb acts on. */
-type RemoteResolved = Resolved & { readonly where: Extract<Resolved["where"], { readonly kind: "device" }> }
+type RemoteResolved = {
+  readonly kind: "ok"
+  /** The thread id. */
+  readonly thread: string
+  /** The canonical `<device id>/<thread>` every surface takes back. */
+  readonly address: string
+  readonly device: ResolveOk["device"]
+  readonly where: Extract<ResolveOk["holder"], { readonly kind: "device" }>
+  readonly entry: ResolveOk["entry"]
+  readonly resolution: ResolveOk["resolution"]
+  readonly all_scope: boolean | undefined
+}
