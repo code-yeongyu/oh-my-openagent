@@ -47,6 +47,7 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
+import { BACKLOG_KEYS, transferBacklog, type BacklogRequest, type BacklogResult } from "./tools/backlog-ops"
 import { listAcross } from "./remote/cross-device"
 import { lazySameDeviceWake } from "./wake/lazy-same-device-wake"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
@@ -150,6 +151,11 @@ export type ThreadSdk = StoreExtensionApi & {
   readonly close: (request: ThreadCloseInput) => Promise<ThreadToolResult>
   readonly rename: (request: ThreadRenameInput) => Promise<ThreadToolResult>
   readonly set_model: (request: ThreadSetModelInput) => Promise<ThreadToolResult>
+  /**
+   * Cancels or moves (in order, sender and idempotency key kept) the pending deliveries of a session on this device that is
+   * not mid-turn, without loading it (#15187); only the session holding its registered name, or its creator, may ask.
+   */
+  readonly backlog: (request: BacklogRequest) => Promise<BacklogResult>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
   readonly release: (
     thread: LocatedThread,
@@ -514,6 +520,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         if (found.kind === "not_live") return NOT_LIVE
         return await setModelOn(found.control, value.model, value.provider)
       }),
+    backlog: (request) =>
+      guarded(
+        async () => unknownKeys(request, BACKLOG_KEYS) ?? transferBacklog(surface, await view(), principal, request),
+      ),
     release: async (thread, request) => {
       const releaseSession = host.gateway?.releaseSession
       if (releaseSession === undefined || thread.endpoint === null)

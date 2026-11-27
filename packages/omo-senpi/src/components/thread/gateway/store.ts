@@ -355,6 +355,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
     backlogs: (durableIds) => call("backlogs", { targets: durableIds, now: now() }),
+    transferBacklog: (request) => call("backlog_transfer", request),
     journalMode: () => call("journal_mode"),
     stats: () => call("stats"),
     legacyMigrated: () => track(async () => (await start()).legacy_migrated),

@@ -35,6 +35,9 @@ export type RefusalReason =
   | "target_closed"
   /** A newer delivery from the same sender under the same collapse key replaced it before the target took it (#14428). */
   | "superseded"
+  /** Dropped or re-queued on another session by the SDK's backlog call before the target took it (#15187). */
+  | "cancelled"
+  | "moved"
 
 export type ProcessIdentity = {
   readonly pid: number
