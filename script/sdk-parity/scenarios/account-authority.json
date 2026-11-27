@@ -368,6 +368,11 @@
           "port": "session",
           "op": "me",
           "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
         }
       ]
     },
@@ -384,6 +389,11 @@
         {
           "port": "session",
           "op": "me",
+          "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
           "count": 0
         }
       ]
@@ -403,6 +413,11 @@
           "port": "session",
           "op": "devices.list",
           "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
         }
       ]
     },
@@ -419,6 +434,11 @@
         {
           "port": "session",
           "op": "devices.list",
+          "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
           "count": 0
         }
       ]
@@ -617,6 +637,11 @@
           "port": "session",
           "op": "me",
           "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
         }
       ]
     },
@@ -638,6 +663,11 @@
           "port": "session",
           "op": "me",
           "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
         }
       ]
     },
@@ -657,6 +687,11 @@
         {
           "port": "session",
           "op": "me",
+          "count": 0
+        },
+        {
+          "port": "credentialStore",
+          "op": "read",
           "count": 0
         }
       ]
