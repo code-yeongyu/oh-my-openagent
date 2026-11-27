@@ -29,6 +29,7 @@ import {
   OPEN_STATES,
 } from "./constants"
 import { pairLoopGuardMessage } from "../errors"
+import { engineTurnCapOf, type EngineTurnCap } from "./adapter"
 import { backlogRefusal } from "./backlog"
 import { findDiskSessions } from "../address-book"
 import { readLegacyMailbox } from "./legacy-mailbox"
@@ -153,6 +154,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     attempt: Number(record.attempt),
     admission_kind: record.admission_kind === null ? null : String(record.admission_kind),
     wait_kind: record.wait_kind === "approval" ? "approval" : null,
+    engine_turn_cap: storedEngineTurnCap(record),
     turn_epoch: nullableNumber(record.turn_epoch),
     root_id: String(record.root_id),
     hop: Number(record.hop),
@@ -164,6 +166,25 @@ function rowFrom(record: SqlRow): DeliveryRow {
     verbatim_display_text: nullableString(record.verbatim_display_text),
     collapse_key: nullableString(record.collapse_key),
   }
+}
+
+/**
+ * An admitted `held` row keeps the engine-turn cap it waits behind in `reason` (senpi#7138), a column only a refused row
+ * otherwise uses: no schema step, and an older binary, which reads `reason` on refused rows only, still reads the row as
+ * a held one.
+ */
+function storedEngineTurnCap(record: Record<string, unknown>): EngineTurnCap | null {
+  if ((record.state !== "admitted" && record.state !== "applied") || record.admission_kind !== "held") return null
+  if (typeof record.reason !== "string") return null
+  try {
+    return engineTurnCapOf((JSON.parse(record.reason) as { engine_turn_cap?: unknown }).engine_turn_cap) ?? null
+  } catch {
+    return null
+  }
+}
+
+function storedReasonOf(cap: EngineTurnCap | undefined): string | null {
+  return cap === undefined ? null : JSON.stringify({ engine_turn_cap: cap })
 }
 
 function nullableString(value: unknown): string | null {
@@ -1066,8 +1087,10 @@ export function claimFingerprint(row: DeliveryRow): string {
   return `${JSON.stringify(row.admitted_by)}#${row.attempt}`
 }
 
+// A requeued row drops the cap its last admission stored in `reason` (see storedEngineTurnCap); SQLite reads the old
+// admission_kind on the right-hand side, so the CASE sees the row as it was.
 const CLEARED_CLAIM =
-  "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, wait_kind = NULL, turn_epoch = NULL"
+  "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, wait_kind = NULL, turn_epoch = NULL, reason = CASE WHEN admission_kind = 'held' THEN NULL ELSE reason END"
 
 function transition(
   ctx: StoreContext,
@@ -1409,10 +1432,11 @@ export async function recordOutcome(ctx: StoreContext, request: RecordOutcomeReq
     else {
       write(
         ctx,
-        "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, turn_epoch = ?, mode_effective = COALESCE(?, mode_effective), updated_at = ? WHERE delivery_id = ?",
+        "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, reason = ?, turn_epoch = ?, mode_effective = COALESCE(?, mode_effective), updated_at = ? WHERE delivery_id = ?",
         [
           outcome.admission_kind,
           outcome.wait_kind ?? null,
+          storedReasonOf(outcome.admission_kind === "held" ? outcome.engine_turn_cap : undefined),
           outcome.turn_epoch,
           outcome.mode_effective ?? null,
           request.now,

@@ -310,14 +310,14 @@ async function promptThatRan(
       ...prompt,
       next_action: `The prompt is stored${local ? "" : ` on device ${thread.device}`} and runs when ${thread.thread_id} wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).`,
     }
-  if (!local && delivery.kind === "queued") return prompt
+  if (!local && delivery.kind === "queued") return behindCap(prompt, thread)
   const waited =
     local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
   if (waited?.kind === "started") return { ...prompt, delivery: waited.delivery }
   if (waited?.kind === "queued") {
     const position = delivery.kind === "queued" ? delivery.queue_position : 1
     const waiting = waited.waiting_on === undefined ? {} : { waiting_on: waited.waiting_on }
-    return { ...prompt, delivery: { kind: "queued", queue_position: position, ...waiting } }
+    return behindCap({ ...prompt, delivery: { kind: "queued", queue_position: position, ...waiting } }, thread)
   }
   const state = waited?.kind === "not_started" ? waited.state : delivery.kind
   const waitingOn = delivery.kind === "queued" ? delivery.waiting_on : undefined
@@ -335,6 +335,20 @@ async function promptThatRan(
         ...(waitingOn === undefined ? {} : { waiting_on: waitingOn }),
       },
     ),
+  }
+}
+
+/**
+ * A first prompt the engine-turn cap holds (senpi#7138) runs only when a person sends a message or resumes the thread,
+ * and a resend would deliver it twice: the answer says so.
+ */
+function behindCap(prompt: ThreadCreatePrompt, thread: HostedThread): ThreadCreatePrompt {
+  if ("error" in prompt || prompt.delivery.kind !== "queued") return prompt
+  const wait = prompt.delivery.waiting_on
+  if (wait?.kind !== "engine_turn_cap") return prompt
+  return {
+    ...prompt,
+    next_action: `The prompt is recorded but ${thread.thread_id} paused its automatic turns (${wait.reason} at ${wait.count}): it runs when a person sends it a message or resumes it. Do not send it again; check it with thread_read (tool.thread_read({ thread }) in an eval cell).`,
   }
 }
 

@@ -1,0 +1,3 @@
+### Fixed
+
+- A thread message the receiving engine keeps behind its engine-turn cap (senpi#7138: it answers `held` with the cap instead of starting a turn) is now answered `queued` with `waiting_on: { kind: "engine_turn_cap", reason, count }` by `thread_send`, `thread_handoff`, `thread_create`'s first prompt, the thread SDK and `omo thread send --json`, on this device and from another device, and a same-key resend answers the same. The tool line says automatic turns are paused and that a person's message or a Resume runs it, where it used to say the thread was paused or stopped. A `held` under a person's Stop or another hold still waits on `hold`.

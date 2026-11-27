@@ -15,6 +15,7 @@ const standInWorld = (judged: string[]): StepWorld => {
     adopt: async () => undefined,
     keys: async () => new Set(),
     read: async () => idleState,
+    engineState: async () => ({}),
     judge: async (_key, expectation) => {
       judged.push(expectation.kind)
       return { ok: true, why: "B shows the expected state", state: idleState }

@@ -125,6 +125,21 @@ export type AdmitExternalMessageInput = {
  */
 export type EngineTurnCap = { readonly reason: string; readonly count: number }
 
+const CAP_REASON = /^[a-z0-9][a-z0-9-]{0,63}$/
+
+/**
+ * The one reading of an engine-turn cap from outside this process (the extension API's `engine_turn_cap`, the RPC's
+ * `engineTurnCap`, a stored row): a reason token and a non-negative integer count, else none. The reason is shown to
+ * people and models, so anything but a short lowercase token is refused rather than displayed.
+ */
+export function engineTurnCapOf(value: unknown): EngineTurnCap | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const { reason, count } = value as { readonly reason?: unknown; readonly count?: unknown }
+  if (typeof reason !== "string" || !CAP_REASON.test(reason)) return undefined
+  if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return undefined
+  return { reason, count }
+}
+
 /** `engine_turn_cap` is present only on `held` from an engine with senpi#7138, and then `holds` is not. */
 export type AdmitExternalMessageResult = {
   readonly kind: ExternalAdmissionKind

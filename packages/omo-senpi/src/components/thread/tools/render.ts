@@ -192,7 +192,12 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
 
 function queuedLine(delivery: {
   readonly queue_position?: number
-  readonly waiting_on?: { readonly kind?: string; readonly device?: string }
+  readonly waiting_on?: {
+    readonly kind?: string
+    readonly device?: string
+    readonly reason?: string
+    readonly count?: number
+  }
 }): string {
   const position = delivery.queue_position
   const waiting = delivery.waiting_on
@@ -204,6 +209,8 @@ function queuedLine(delivery: {
       return `queued #${position}: thread is paused or stopped${where}; delivers when it resumes`
     case "wake":
       return `queued #${position}: no engine is running the thread${where}; it starts to take the message`
+    case "engine_turn_cap":
+      return `queued #${position}: automatic turns paused (${excerptRendererText(String(waiting.reason), LABEL_WIDTH)} at ${Number(waiting.count)})${where}; runs when a person sends a message or resumes the thread`
     default:
       return `queued #${position}: waits for the running turn`
   }

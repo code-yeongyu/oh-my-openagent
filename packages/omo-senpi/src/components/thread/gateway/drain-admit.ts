@@ -1,4 +1,4 @@
-import type { GatewayAdmissionKind, SessionRuntimePort } from "./adapter"
+import { engineTurnCapOf, type GatewayAdmissionKind, type SessionRuntimePort } from "./adapter"
 import { decideDelivery, effectiveLaneOf } from "./decision"
 import { deliverySender, renderDeliveryDisplayText, renderDeliveryText } from "./provenance"
 import type { GatewayStore } from "./store"
@@ -97,11 +97,14 @@ export function createClaimedAdmitter(deps: AdmitterDeps): ClaimedAdmitter {
     const kind = joins && result.kind === "queued" ? "steered" : result.kind
     if (kind === "queued") deps.noticeQueued(claimedRow)
     const written = result.kind === "already_admitted" && runtime.listAdmittedDeliveries().emitted.includes(engineId)
+    // senpi#7138: a `held` answer that names the engine-turn cap waits behind that cap, not behind a hold.
+    const cap = kind === "held" ? engineTurnCapOf(result.engine_turn_cap) : undefined
     await record(row, {
       kind: written ? "applied" : "admitted",
       admission_kind: kind,
       turn_epoch: result.turn_epoch,
       mode_effective: lane,
+      ...(cap === undefined ? {} : { engine_turn_cap: cap }),
       // A delivery queued while the session waits on a question waits on that approval (#13014), as the relay leg reports it.
       ...(kind === "queued" && runtime.phase() === "waiting_question" ? { wait_kind: "approval" as const } : {}),
     })
