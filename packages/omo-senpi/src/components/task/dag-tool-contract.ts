@@ -38,6 +38,7 @@ export type DagToolErrorCode =
   | "run_still_active"
   | "run_paused_by_user"
   | "run_not_user_paused"
+  | "run_busy"
   | "guidance_frozen"
   | "guidance_not_found"
 

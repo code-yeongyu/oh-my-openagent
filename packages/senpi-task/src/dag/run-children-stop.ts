@@ -3,7 +3,7 @@ import type { TaskRecord } from "../state"
 import type { CancelOptions, CancelOutcome } from "../steering/types"
 import type { DagRunRecordV1 } from "./manager"
 import { isLiveOwnedTask } from "./scheduler-context"
-import type { DagRunId } from "./types"
+import type { DagNode, DagRunId } from "./types"
 
 export class DagRunChildrenLiveError extends Error {
   readonly taskIds: readonly string[]
@@ -19,14 +19,22 @@ export class DagRunChildrenLiveError extends Error {
   }
 }
 
-/** Keyed by run, not by today's nodes: an amendment can remove a node whose child still runs. */
+/**
+ * The run's children: every task whose owner record names the run - keyed by run, not by today's
+ * nodes, since an amendment can remove a node whose child still runs - plus a child a node of the run
+ * names that carries no owner record at all (started outside `startOwned`), which only the node's
+ * `taskId` ties to the run. Read without nodes (a cached list summary), the owned records alone.
+ */
 export function liveRunChildren(
-  taskManager: Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending">,
-  record: Pick<DagRunRecordV1, "runId">,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "selfResumeStopPending"> & Partial<Pick<TaskManager, "get">>,
+  record: Pick<DagRunRecordV1, "runId"> & { readonly nodes?: readonly Pick<DagNode, "taskId">[] },
 ): readonly TaskRecord[] {
-  return taskManager
-    .findOwnedTasks({ kind: "dag", runId: record.runId })
-    .filter((task) => isLiveOwnedTask(taskManager, task))
+  const owned = taskManager.findOwnedTasks({ kind: "dag", runId: record.runId })
+  const unowned = (record.nodes ?? []).flatMap((node) => {
+    const task = node.taskId === undefined ? undefined : taskManager.get?.(node.taskId)
+    return task === undefined || task.owner !== undefined ? [] : [task]
+  })
+  return [...owned, ...unowned].filter((task) => isLiveOwnedTask(taskManager, task))
 }
 
 type StopAnswer = { readonly result: PromiseSettledResult<CancelOutcome>; readonly askAgainIfLive: boolean }
@@ -53,8 +61,11 @@ export async function stopRunChildren(
   // asked again only if it is live after an answer that found it stopped or on another run (#12134): a
   // finished child can start a turn on its own while the cancel is still under way.
   for (;;) {
-    const owned = taskManager.findOwnedTasks({ kind: "dag", runId: record.runId })
-    const live = new Set(owned.filter((task) => isLiveOwnedTask(taskManager, task)).map((task) => task.task_id))
+    // The live set is the run's one definition (owner-less children a node names included); the owned
+    // records also cover an attached child that already settled.
+    const liveTasks = liveRunChildren(taskManager, record)
+    const owned = [...taskManager.findOwnedTasks({ kind: "dag", runId: record.runId }), ...liveTasks]
+    const live = new Set(liveTasks.map((task) => task.task_id))
     const pass = [...new Set([...attached, ...live])].filter((taskId) => {
       const answer = answers.get(taskId)
       return answer === undefined || (answer.askAgainIfLive && live.has(taskId))
@@ -116,7 +127,7 @@ function foundStopped(outcome: CancelOutcome): boolean {
 }
 
 export async function stopSettledRunChildren(
-  taskManager: TaskManager,
+  taskManager: Pick<TaskManager, "findOwnedTasks" | "cancelTask" | "selfResumeStopPending">,
   record: DagRunRecordV1,
   reason?: string,
 ): Promise<void> {

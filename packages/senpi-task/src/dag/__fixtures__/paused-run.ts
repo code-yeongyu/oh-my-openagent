@@ -4,6 +4,7 @@ import type { DagRunRecordV1 } from "../manager"
 import { createDagFileStore } from "../store"
 import type { DagNodeId, DagRunId } from "../types"
 import type { DagSchedulerOptions } from "../scheduler"
+import { createDagRunReservations } from "../run-reservations"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export async function pausedRun() {
@@ -54,7 +55,13 @@ export async function pausedRun() {
     diagnostics: compiled.diagnostics,
   }
   store.writeCheckpoint(runId, record)
-  const options: DagSchedulerOptions = { store, taskManager: h.manager, initialRecord: record, now: () => 0 }
+  const options: DagSchedulerOptions = {
+    reservations: createDagRunReservations(),
+    store,
+    taskManager: h.manager,
+    initialRecord: record,
+    now: () => 0,
+  }
   const read = () => {
     const current = store.readCheckpoint<DagRunRecordV1>(runId)
     if (current === null) throw new Error("fixture checkpoint disappeared")

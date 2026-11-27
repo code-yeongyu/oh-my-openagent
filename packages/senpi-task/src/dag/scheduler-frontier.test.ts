@@ -12,6 +12,7 @@ import type { DagRunRecordV1 } from "./manager"
 import { controlJournal } from "./node-control-context"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { persistDagNodeResult } from "./results"
+import { createDagRunReservations } from "./run-reservations"
 import type { DagSchedulerOptions } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
@@ -246,7 +247,12 @@ describe("DAG scheduler foreign-commit wake (#7412)", () => {
     })
     expect(persisted.kind).not.toBe("failed")
     const foreign = controlJournal(
-      { store, taskManager: manager, initialRecord: durable() } as DagSchedulerOptions,
+      {
+        reservations: createDagRunReservations(),
+        store,
+        taskManager: manager,
+        initialRecord: durable(),
+      } as DagSchedulerOptions,
       durable(),
     )
     foreign.append(

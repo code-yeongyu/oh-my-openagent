@@ -4,12 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
-import type { ManagedChildHandle, ManagedRunner, ManagedStartSpec, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
   createDagManager,
-  type DagLeaseWatchTimerHandle,
-  type DagLeaseWatchTimers,
   type DagRunEvent,
   type DagRunId,
   type DagRunRecordV1,
@@ -17,97 +14,21 @@ import {
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
+import {
+  FOREIGN_HOST_PID,
+  ManualTimers,
+  ScriptedRunner,
+  within,
+  type WarnRecord,
+} from "./dag-runtime-recovery.test-support"
 import { composeTaskEngine } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
-import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
-// Above every reachable pid, so it can only ever be "alive" through the injected probe.
-const FOREIGN_HOST_PID = 2_147_483_647
 
 afterEach(() => {
   for (const root of cleanupRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
 })
-
-function deferred<T>() {
-  let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
-function within<T>(promise: Promise<T>, step: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const bound = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`the test budget ran out while awaiting ${step}`)), remainingTestTime())
-  })
-  return Promise.race([promise, bound]).finally(() => {
-    if (timer !== undefined) clearTimeout(timer)
-  })
-}
-
-class ScriptedRunner implements ManagedRunner {
-  readonly handles: Array<{ readonly spec: ManagedStartSpec; readonly settle: (output: string) => void }> = []
-  readonly #started = new Map<number, ReturnType<typeof deferred<void>>>()
-
-  start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
-    const outcome = deferred<RunnerOutcome>()
-    const handle: ManagedChildHandle = {
-      task_id: spec.taskId,
-      sessionId: `child-${spec.taskId}`,
-      pid: undefined,
-      steer: () => Promise.resolve(),
-      followUp: () => Promise.resolve(),
-      abort: () => {
-        outcome.resolve({ status: "cancelled" })
-        return Promise.resolve()
-      },
-      subscribe: () => () => undefined,
-      waitForOutcome: () => outcome.promise,
-      lastAssistantText: () => undefined,
-      dispose: () => Promise.resolve(),
-    }
-    this.handles.push({ spec, settle: (output) => outcome.resolve({ status: "completed", finalResponse: output }) })
-    this.#started.get(this.handles.length)?.resolve()
-    return Promise.resolve(handle)
-  }
-
-  whenStarted(count: number): Promise<void> {
-    if (this.handles.length >= count) return Promise.resolve()
-    const signal = this.#started.get(count) ?? deferred<void>()
-    this.#started.set(count, signal)
-    return signal.promise
-  }
-}
-
-class ManualTimers implements DagLeaseWatchTimers {
-  readonly #timers = new Map<number, () => void>()
-  #next = 0
-
-  set(callback: () => void): number {
-    this.#next += 1
-    this.#timers.set(this.#next, callback)
-    return this.#next
-  }
-
-  clear(handle: DagLeaseWatchTimerHandle): void {
-    if (typeof handle === "number") this.#timers.delete(handle)
-  }
-
-  pending(): number {
-    return this.#timers.size
-  }
-
-  tick(): void {
-    const due = [...this.#timers.values()]
-    this.#timers.clear()
-    for (const callback of due) callback()
-  }
-}
-
-type WarnRecord = { readonly message: string; readonly fields: Record<string, unknown> | undefined }
-
 /**
  * Who paused the run the successor runtime finds. The first runtime always pauses it under THIS
  * process's pid; a cross-host handoff (what the lease watch exists for) is made honest by re-stamping

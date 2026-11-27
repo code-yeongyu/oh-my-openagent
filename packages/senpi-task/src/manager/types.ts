@@ -26,6 +26,7 @@ import type { ChildCreationPort, ChildPausePort, ResumedChildTurn, RunPauseOwner
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import type { HeldStart, StartAdmission } from "./start-admission"
 import type { HostLivenessStatus } from "../runners/rpc-host/handle-heartbeat"
+import type { OwnerResumeFence } from "./owner-resume"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
@@ -279,13 +280,7 @@ export type TrustedRespawnLaunch = {
 
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
-/** An owner's answer on whether its settled child may reopen for a run the child started on its own. */
-export type OwnerResumeVerdict =
-  | { readonly kind: "allow" }
-  // `retire` tears the child down (its claim is over); `hold` only stops the unsolicited turn and
-  // leaves the settled child as resident and send-revivable as it was before it started that turn.
-  | { readonly kind: "refuse"; readonly reason: string; readonly disposition: "retire" | "hold" }
-export type OwnerResumeFence = (record: TaskRecord) => OwnerResumeVerdict
+export type { OwnerResumeFence, OwnerResumeVerdict } from "./owner-resume"
 
 export type TaskManagerOptions = {
   readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void

@@ -93,6 +93,9 @@ export type ManagedChildHandle = {
   // settled (a monitor or background job woke it), so the manager can reopen the record.
   onSelfResumed?(listener: () => void): () => void
   onReconciled?(listener: (notice: ReconciledTurnNotice) => void): () => void
+  // Host-session children: reconciliation sent this handle the continuation of an interrupted turn,
+  // whose run will reopen the record its notice marked interrupted (#15125).
+  continuationDelivered?(): boolean
   // RPC handles expose a settled process signal; in-process handles omit it because their session
   // lifecycle has no separate child process to observe.
   hasExited?(): boolean
@@ -156,6 +159,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
           publishTaskStatus: (status: TaskStatus) => handle.publishTaskStatus(status),
           stopWhenReachable: () => handle.stopWhenReachable(),
           onReconciled: (listener: (notice: ReconciledTurnNotice) => void) => handle.onReconciled(listener),
+          continuationDelivered: () => handle.continuationDelivered(),
         }
       : {}),
     steer: (text, identity) => handle.steer(text, identity),
