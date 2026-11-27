@@ -14,7 +14,6 @@ type Inspection = {
   shell?: boolean
   spawn?: "success" | "throw"
   captureStderr?: boolean
-  stdoutCapture?: boolean
   capture?: boolean
   windowsNodeStats?: boolean
 }
@@ -48,7 +47,6 @@ childProcess.spawn = (_command, _args, options) => {
   if (input.spawn === "throw") throw new Error("spawn refused")
   const child = new EventEmitter()
   child.stderr = Object.assign(new EventEmitter(), { readableEnded: true })
-  child.stdout = Object.assign(new EventEmitter(), { readableEnded: true, setEncoding() {} })
   queueMicrotask(() => child.emit("exit", 0, null))
   return child
 }
@@ -56,7 +54,7 @@ syncBuiltinESMExports()
 Object.defineProperty(process, "channel", {
   value: input.ipc === "unknown" ? {} : input.ipc == null ? undefined : { fd: input.ipc },
 })
-const { capturedStdoutHandoffFor, inspectPrivateFdTable, privateFdHandoffFor } = await import(${JSON.stringify(TABLE_MODULE)})
+const { inspectPrivateFdTable, privateFdHandoffFor } = await import(${JSON.stringify(TABLE_MODULE)})
 closed.length = 0
 const table = JSON.stringify(input.table)
 const platform = input.platform ?? "win32"
@@ -70,19 +68,13 @@ if (input.capture) {
   handoff = privateFdHandoff({ KEEP: "yes" })
   helperTable = process.env.SENPI_PRIVATE_FDS ?? null
   closed.length = 0
-} else if (input.stdoutCapture) handoff = capturedStdoutHandoffFor({ KEEP: "yes" }, table, platform)
-else handoff = privateFdHandoffFor({ KEEP: "yes" }, table, platform, { shell: input.shell })
+} else handoff = privateFdHandoffFor({ KEEP: "yes" }, table, platform, { shell: input.shell })
 let failure
 if (input.spawn) {
   const { runChild } = await import(${JSON.stringify(new URL("./child-process.js", TABLE_MODULE).href)})
   closed.length = 0
   try {
-    await runChild("engine", [], {
-      ...handoff,
-      shell: input.shell,
-      captureStderr: input.captureStderr,
-      captureStdout: input.stdoutCapture,
-    })
+    await runChild("engine", [], { ...handoff, shell: input.shell, captureStderr: input.captureStderr })
   } catch (error) { failure = error.message }
 } else handoff?.onSpawn?.()
 console.log(JSON.stringify({ inspected, handoff, closed, spawned, failure, helperTable }))
@@ -185,20 +177,6 @@ describe("Windows private descriptor pair contract (#11955)", () => {
       expect(result.failure).toBe(mode === "throw" ? "spawn refused" : undefined)
     })
   }
-
-  test("a host launch whose stdout the launcher reads keeps every forwarded slot and pipes only stdout (#15263)", () => {
-    const result = inspect({
-      table: { a: 5 },
-      platform: "linux",
-      sockets: [5],
-      pipes: [],
-      ipc: null,
-      spawn: "success",
-      stdoutCapture: true,
-    })
-    expect(result.spawned.env.SENPI_PRIVATE_FDS).toBe('{"a":5}')
-    expect(result.spawned.stdio).toEqual(["inherit", "pipe", "inherit", "ignore", "ignore", 5])
-  })
 
   test("stderr capture preserves both private stdio slots", () => {
     const result = inspect({ table: { a: [5, 6] }, spawn: "success", captureStderr: true })

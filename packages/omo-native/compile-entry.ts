@@ -30,15 +30,6 @@ import { remapSenpiEnvironment } from "./compiled-environment"
 import { SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
 import { runServiceAuthCommand } from "./service-auth-command"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
-import {
-  observedLaunch,
-  operatorHostLaunch,
-  RAW_HOST_LAUNCH_ENV,
-  takeRawHostLaunch,
-  withProductLaunchSpec,
-} from "./bin/lib/host-launch.js"
-import { runChild, propagateResult } from "./bin/lib/child-process.js"
-import { capturedStdoutHandoffFor, PRIVATE_FDS_ENV } from "./bin/lib/private-fd-table.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
 import { runDoctor } from "./bin/lib/doctor.js"
@@ -72,7 +63,6 @@ import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/s
 import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
 import { claimMemorySyncAtBoot } from "./memory-sync-boot"
-import { hostHelp } from "./bin/lib/host-help.js"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -175,14 +165,6 @@ type CompiledLauncherSeams = {
   readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }>
 }
 
-/** #15263: the launch profile of the primary a host ensure, handoff or `omo daemon run|handoff` left serving. */
-const observeCompiledHost = async (socket: string, timeout: number, options: { keyRoot: string }) =>
-  (await import("../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/host-probe.js")).observeProtocolInfo(
-    socket,
-    timeout,
-    options,
-  )
-
 /** RULING-74: the runtime's keychain helper sits directly beside the binary (the desktop layout); every command uses it first. */
 export function compiledKeychainHelper(execDir: string): string {
   return join(execDir, "omo-keychain")
@@ -243,46 +225,16 @@ export async function runCompiledLauncher(
     return true
   }
   if (refuseRetiredCommand(args)) return true
-  if (operatorHostLaunch(args, canonicalAgentDir())) {
-    if (takeRawHostLaunch(process.env, process.ppid)) return false
-    const pluginRoot = join(execDir, "plugin")
-    const launchEnv = { ...process.env, [RAW_HOST_LAUNCH_ENV]: String(process.pid) }
-    const launchArgs = withProductLaunchSpec(args, pluginRoot)
-    const child = await runChild(
-      process.execPath,
-      import.meta.url.startsWith("file:") && process.argv[1]?.endsWith("/compile-entry.ts")
-        ? [process.argv[1], ...launchArgs]
-        : launchArgs,
-      { ...capturedStdoutHandoffFor(launchEnv, process.env[PRIVATE_FDS_ENV]), captureStdout: true },
-    )
-    propagateResult(child)
-    const answer = await observedLaunch(
-      { exitCode: child.status ?? 1, stdout: child.stdout },
-      {
-        args,
-        pluginRoot,
-        agentDir: canonicalAgentDir(),
-        observe: observeCompiledHost,
-      },
-    )
-    process.stdout.write(answer.stdout)
-    process.exitCode = answer.exitCode
-    return true
-  }
   // The compiled binary IS the engine's process, so the host CLI is reached by re-running this
   // executable with `host ...` - an early command that goes to the engine untouched. Spawning a
   // node path here would re-enter omo itself and leave a phantom session behind.
   const engine = {
     run(engineArgs: string[], options: { env: Record<string, string | undefined> }) {
       const marker = adoptedEngineTrust()
-      const trusted =
+      const env =
         marker === undefined
           ? options.env
           : buildTrustLaunchEnvironment(options.env, { marker, hop: false, platform: process.platform })
-      // The caller (omo daemon) observes the host itself, as on npm, so its engine call goes straight to the engine.
-      const env = operatorHostLaunch(engineArgs, canonicalAgentDir(), trusted)
-        ? { ...trusted, [RAW_HOST_LAUNCH_ENV]: String(process.pid) }
-        : trusted
       const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env, windowsHide: true })
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
@@ -318,7 +270,6 @@ export async function runCompiledLauncher(
       migration: compiledRollbackMigration(),
       pluginRoot: join(execDir, "plugin"),
       agentDir: canonicalAgentDir(),
-      observe: observeCompiledHost,
       env: process.env,
       stdout: process.stdout,
       stderr: process.stderr,
@@ -448,11 +399,6 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  const help = hostHelp(process.argv.slice(2))
-  if (help !== undefined) {
-    console.log(help)
-    return
-  }
   // #13449: in a compiled binary the kill guard's shims ask THIS executable `__kill-guard check ...` before every kill,
   // so this branch hands it to the engine's judge before any boot step: on this route there is no handoff, no
   // migration and no agent-dir write. It is the one exception to the #10697 line below; every other start still runs

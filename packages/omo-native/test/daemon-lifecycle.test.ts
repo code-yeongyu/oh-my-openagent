@@ -37,7 +37,7 @@ function fixture() {
 }
 
 describe("omo daemon endpoint lifecycle", () => {
-  test("#given daemon shard thread extra and dead endpoints #when handoff runs #then every live endpoint uses the correct engine path", async () => {
+  test("#given daemon shard thread extra and dead endpoints #when handoff runs #then every live endpoint uses the correct engine path", () => {
     const { pluginRoot, agentDir, endpoints } = fixture()
     const engine = scriptedEngine((args) => {
       if (args.includes("--all")) return { exitCode: 0, stdout: JSON.stringify({ endpoints }) }
@@ -48,7 +48,7 @@ describe("omo daemon endpoint lifecycle", () => {
     })
     const stdout = capture()
 
-    const exitCode = await runDaemonCommand(["handoff"], {
+    const exitCode = runDaemonCommand(["handoff"], {
       engine,
       pluginRoot,
       agentDir,
@@ -67,7 +67,7 @@ describe("omo daemon endpoint lifecycle", () => {
     expect(stdout.text()).toContain(`${endpoints[2]?.socket}: refuse`)
   })
 
-  test("#given task.host_idle_exit_ms #when handoff fans out #then every host action receives the supported env override", async () => {
+  test("#given task.host_idle_exit_ms #when handoff fans out #then every host action receives the supported env override", () => {
     const { pluginRoot, agentDir, endpoints } = fixture()
     writeJson(join(agentDir, "omo.json"), { task: { host_idle_exit_ms: 12_345 } })
     const engine = scriptedEngine((args) =>
@@ -76,7 +76,7 @@ describe("omo daemon endpoint lifecycle", () => {
         : { exitCode: 0, stdout: JSON.stringify({ action: "reuse" }) },
     )
 
-    const exitCode = await runDaemonCommand(["handoff"], {
+    const exitCode = runDaemonCommand(["handoff"], {
       engine,
       pluginRoot,
       agentDir,
@@ -91,37 +91,6 @@ describe("omo daemon endpoint lifecycle", () => {
       expect(call.args).not.toContain("--idle-exit-ms")
       expect(call.env.SENPI_RPC_HOST_IDLE_EXIT_MS).toBe("12345")
     }
-  })
-
-  // #15263 review L1: the primary a handoff leaves on the operator socket is observed, as daemon run's is.
-  test("#given a handoff whose new primary lacks the product plugin #when it runs #then it is refused and named", async () => {
-    const { pluginRoot, agentDir, endpoints } = fixture()
-    const daemonSocket = join(agentDir, "rpc", "rpc.sock")
-    const engine = scriptedEngine((args) =>
-      args.includes("--all")
-        ? { exitCode: 0, stdout: JSON.stringify({ endpoints: endpoints.slice(0, 1) }) }
-        : { exitCode: 0, stdout: JSON.stringify({ action: "handoff", socket: daemonSocket, pid: 9 }) },
-    )
-    const stdout = capture()
-    const observed: string[] = []
-
-    const exitCode = await runDaemonCommand(["handoff"], {
-      engine,
-      pluginRoot,
-      agentDir,
-      env: {},
-      stdout,
-      stderr: capture(),
-      platform: "darwin",
-      observe: async (socket: string) => {
-        observed.push(socket)
-        return { launch_profile: { core: { extensions: [] } } }
-      },
-    })
-
-    expect(observed).toEqual([daemonSocket])
-    expect(exitCode).toBe(3)
-    expect(stdout.text()).toContain(`${daemonSocket}: refuse; product plugin: absent`)
   })
 
   test("#given four owned endpoints #when stop --all runs without wait #then each endpoint gets one stop request", () => {

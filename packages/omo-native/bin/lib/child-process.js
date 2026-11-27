@@ -53,7 +53,7 @@ export function propagateResult(result) {
  * would terminate the child abruptly, so nothing is forwarded and the wait is the whole behavior.
  */
 export function runChild(command, args, options = {}) {
-  const { captureStderr = false, captureStdout = false, onSpawn, ...spawnOptions } = options
+  const { captureStderr = false, onSpawn, ...spawnOptions } = options
   const env = spawnOptions.env ?? process.env
   const shellHandoff = spawnOptions.shell
     ? privateFdHandoffFor(env, env[PRIVATE_FDS_ENV], process.platform, { shell: true })
@@ -138,13 +138,6 @@ export function runChild(command, args, options = {}) {
       closeOwned?.()
     }
     let stderr = ""
-    let stdout = ""
-    if (captureStdout) {
-      child.stdout.setEncoding("utf8")
-      child.stdout.on("data", (chunk) => {
-        stdout += chunk
-      })
-    }
     if (captureStderr) {
       // The decoder keeps a multi-byte character split across chunks whole; the echo stays raw bytes.
       const decoder = new StringDecoder("utf8")
@@ -158,20 +151,8 @@ export function runChild(command, args, options = {}) {
     // A child that died of the forwarded signal needs no special case: `propagateResult` turns a
     // signaled result into this process dying by the same signal, which is exactly right.
     const finish = (status, signal) =>
-      settle(() => resolve({ status, signal, ...(captureStderr && { stderr }), ...(captureStdout && { stdout }) }))
+      settle(() => resolve(captureStderr ? { status, signal, stderr } : { status, signal }))
     child.on("exit", (status, signal) => {
-      if (captureStdout && !child.stdout.readableEnded) {
-        const done = () => {
-          clearTimeout(timer)
-          finish(status, signal)
-        }
-        const timer = setTimeout(() => {
-          child.stdout.destroy()
-          done()
-        }, STDERR_DRAIN_MS)
-        child.stdout.once("end", done)
-        return
-      }
       if (!captureStderr || child.stderr.readableEnded) {
         finish(status, signal)
         return

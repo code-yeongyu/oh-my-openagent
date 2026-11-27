@@ -100,7 +100,7 @@ describe("omo daemon lifecycle over a mixed fixture", () => {
     expect(json.aggregate).toMatchObject({ live: 1, terminals: 1, sessions: 2 })
   })
 
-  test("#given a host and two terminals #when handoff runs #then the engine is called for the host only and the terminals are reported skipped", async () => {
+  test("#given a host and two terminals #when handoff runs #then the engine is called for the host only and the terminals are reported skipped", () => {
     const f = fixture()
     const engine = scriptedEngine((args) =>
       statusAll(args)
@@ -108,7 +108,7 @@ describe("omo daemon lifecycle over a mixed fixture", () => {
         : { exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 11 }) },
     )
     const result = run(f, ["handoff"], engine)
-    expect(await result.exitCode).toBe(0)
+    expect(result.exitCode).toBe(0)
     expect(engine.calls.filter((call) => !statusAll(call.args)).map((call) => call.args.slice(0, 5))).toEqual([
       ["host", "ensure", "--json", "--socket", f.host.socket],
     ])
