@@ -83,7 +83,8 @@ describe("attestationOps", () => {
     expect(out).toMatchObject({
       repo: "acme/widgets",
       digest,
-      path: join(dir, `${digest}.jsonl`),
+      // ':' is not allowed in a Windows file name, so there the file is named with '-' (src/attestations.ts).
+      path: join(dir, `${process.platform === "win32" ? digest.replace(":", "-") : digest}.jsonl`),
     });
     expect(out.items).toEqual([
       { repositoryId: 1, bundle: BUNDLE },
