@@ -42,7 +42,8 @@ Same-named skill at higher priority replaces the lower; disabled names never loa
 | `config-source-discovery.ts` | Discover scope directories from config |
 | `skill-template-resolver.ts` | Variable substitution in skill templates (incl. disabled watermark options) |
 | `skill-mcp-config.ts` | Extract MCP configs from skill YAML |
-| `git-master-template-injection.ts` | Git-master prompt template injection |
+| `git-master-template-injection.ts` | `git_master` settings applied to the git skill: env-prefix block and commit-attribution directive |
+| `skill-name-aliases.ts` | The one table of retired skill names (`git-master` -> `git`) every name surface consults |
 | `skill-deduplication.ts` | Name-dedup rules across sources |
 | `types.ts` | `LoadedSkill`, `SkillScope`, `SkillDiscoveryResult` |
 

@@ -1,6 +1,4 @@
-import { homedir } from "node:os"
 import { LocalApiError, readDeviceServiceStatus } from "@oh-my-opencode/device-service-core"
-import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { ok, type OmoResult, refused } from "../result"
 
@@ -34,18 +32,15 @@ const readStatus: DeviceServiceStatusPort = ({ stateDir, signal }) =>
   })
 
 export function createDeviceServiceApi(options: {
-  readonly env: Readonly<Record<string, string | undefined>>
-  readonly home?: string
+  readonly stateDir: () => string
   readonly status?: DeviceServiceStatusPort
 }): DeviceServiceApi {
   const status = options.status ?? readStatus
   return {
     async status(callOptions = {}) {
-      // The state dir rule the fleet SDK's transport picker uses (#13597), so both read the same service.
-      const stateDir = deviceServiceStateDir(process.platform, options.env, options.home ?? homedir())
       try {
         const answer = await status({
-          stateDir,
+          stateDir: options.stateDir(),
           ...(callOptions.signal === undefined ? {} : { signal: callOptions.signal }),
         })
         if (answer === "not_running" || answer === "no_answer")
