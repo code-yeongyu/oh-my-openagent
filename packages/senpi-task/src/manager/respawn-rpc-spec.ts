@@ -3,7 +3,7 @@ import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { PersonaTooLargeError } from "../runners/rpc/persona-args"
 import type { RpcPersona, RpcRunnerSpec } from "../runners/types"
 import type { TaskRecord } from "../state"
-import type { BuildRespawnManagedSpecResult } from "./manager-helpers"
+import { launchToolAllowlist, type BuildRespawnManagedSpecResult } from "./manager-helpers"
 import { failure } from "./respawn-failure"
 import { rpcPersona } from "./runner"
 import type { TrustedRespawnLaunch } from "./types"
@@ -43,7 +43,7 @@ export function personaRefusal(error: unknown, cleanupFailure?: string): Respawn
 // lives on the record itself, so the resumed child keeps the lists it was granted.
 function recordToolPolicy(record: TaskRecord): RpcPersona {
   return {
-    ...(record.tool_allow === undefined ? {} : { toolAllowlist: record.tool_allow }),
+    ...(record.tool_allow === undefined ? {} : { toolAllowlist: launchToolAllowlist(record) }),
     ...(record.tool_deny === undefined ? {} : { toolDenylist: record.tool_deny }),
   }
 }

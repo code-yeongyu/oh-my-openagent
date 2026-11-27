@@ -86,15 +86,23 @@ export function buildRecordInput(input: {
     ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
-    ...(plan.toolAllowlist !== undefined ? { tool_allow: childToolAllowlist(spec, plan.toolAllowlist) } : {}),
+    ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
     ...(plan.toolDenylist !== undefined ? { tool_deny: plan.toolDenylist } : {}),
   }
 }
 
-// A team member reports and coordinates through the tools its member extension registers (its bootstrap prompt
-// says so), so an agent allow list narrows everything else but never those. A deny list still removes them.
-function childToolAllowlist(spec: ManagerStartSpec, allow: readonly string[]): readonly string[] {
-  return spec.team_role === "member" ? [...new Set([...allow, ...MEMBER_EXTENSION_TOOL_NAMES])] : allow
+/**
+ * The allow list a child is launched with, on start and on every respawn. The record keeps the agent's own list; a
+ * team member reports and coordinates through the tools its member extension registers (its bootstrap prompt says
+ * so), so for a member those are added here, which also covers a member recorded before this rule. A deny list
+ * still removes them.
+ */
+export function launchToolAllowlist(
+  record: Pick<TaskRecord, "tool_allow" | "team_role">,
+): readonly string[] | undefined {
+  const allow = record.tool_allow
+  if (allow === undefined || record.team_role !== "member") return allow
+  return [...new Set([...allow, ...MEMBER_EXTENSION_TOOL_NAMES])]
 }
 
 // Background mode after promoteToBackground runs. A task already running in the background keeps
@@ -135,7 +143,7 @@ export function buildManagedSpec(input: {
     ...(plan.variant !== undefined ? { variant: plan.variant } : {}),
     ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
     ...(instructions !== undefined ? { instructions } : {}),
-    ...(record.tool_allow !== undefined ? { toolAllowlist: record.tool_allow } : {}),
+    ...(record.tool_allow !== undefined ? { toolAllowlist: launchToolAllowlist(record) } : {}),
     ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
     includeTaskTools: record.owner?.kind !== "dag",
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
@@ -198,7 +206,7 @@ export function buildRespawnManagedSpec(record: TaskRecord, stateDir: string): B
       ...(record.resolved_model?.variant === undefined ? {} : { variant: record.resolved_model.variant }),
       ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
       ...(spawnSpec.instructions !== undefined ? { instructions: spawnSpec.instructions } : {}),
-      ...(record.tool_allow !== undefined ? { toolAllowlist: record.tool_allow } : {}),
+      ...(record.tool_allow !== undefined ? { toolAllowlist: launchToolAllowlist(record) } : {}),
       ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
       includeTaskTools: record.owner?.kind !== "dag",
       ...(spawnSpec.member_scoped_tool_names !== undefined
