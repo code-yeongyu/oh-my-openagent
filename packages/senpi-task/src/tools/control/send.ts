@@ -28,7 +28,7 @@ const DESCRIPTION = [
   "message is required (except with redispatch:true) and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Messages to team members and '*' are capped by the team payload limit (default 32 KB; split larger payloads or send a file path); messages to a child task have no such cap.",
-  "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
+  "Cross-session: a child owned by another session is not found unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
   "One-shot agents (plan-reviewer) always refuse task_send in every state; spawn a new plan-reviewer instead.",
 ].join(" ")
