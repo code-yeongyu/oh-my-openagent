@@ -6,8 +6,9 @@ import { compareVersions } from "./release/version.ts"
 const ENDPOINT_PRIMARY_MIN_SERVICE_VERSION = "0.1.11"
 
 /**
- * omo#14195: the device names no engine endpoint as its own. Every create fails the same way until
- * omo runs on that device again, or its device service (or this one) is updated to name a primary, so it is its own
+ * omo#14195: the device names no engine endpoint as its own. Every create fails the same way until that device's
+ * primary host answers again (`omo host ensure` replaces a host whose process lives while its socket is dead, omo#15003;
+ * a restart of omo there is the fallback), or a device service too old to name a primary is updated, so it is its own
  * refusal, never a transient code a caller would simply retry.
  */
 export class NoPrimaryEndpointError extends NotSentError {
@@ -16,7 +17,7 @@ export class NoPrimaryEndpointError extends NotSentError {
       "unsupported",
       `${device} lists ${listed} engine endpoint(s) and names none as its own engine; nothing was opened`,
       {
-        action: `Start or restart omo on ${device}; if that does not help, update the device service on both devices.`,
+        action: `Run \`omo host ensure\` on ${device}, else restart omo there; if it still names no engine, update the device service on both devices.`,
       },
     )
   }
