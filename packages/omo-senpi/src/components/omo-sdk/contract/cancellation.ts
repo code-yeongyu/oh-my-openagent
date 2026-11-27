@@ -9,8 +9,14 @@ type WaitingCallKey = {
   [Key in RootCallKey]: (typeof ROOT_CALLS)[Key]["waits"] extends true ? Key : never
 }[RootCallKey]
 
+/**
+ * Calls whose core takes neither option, honoured by the root racing the answer (design lane ruling (A) on account.devices):
+ * root/call-conventions.test.ts generates its cancel, deadline and dispose cases over this list.
+ */
+export const ROOT_RACED_CALLS = ["account.devices"] as const
+
 const HONOURED = new Set<string>([
-  "account.devices",
+  ...ROOT_RACED_CALLS,
   "threads.resolve",
   "threads.entries",
   "threads.get",

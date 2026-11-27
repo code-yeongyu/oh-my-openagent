@@ -182,7 +182,8 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // the remote client statically (train 14's tip alone builds this runtime's entry at 674,306 B; per-input table in the merge
 // commit's PR body); P1b's own code on the new base is 218,319 B over train 14's runtime. Ruling (a): base bytes move the pin
 // in the merge commit only.
-const OMO_SDK_RUNTIME_BYTES = 892_625
+// 892,630 with the thread client's refusal text reading 'omo installation' (thread/sdk-core/failures.ts +5 B; ruling (a)).
+const OMO_SDK_RUNTIME_BYTES = 892_630
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,
@@ -406,7 +407,7 @@ describe("thread SDK runtime", () => {
       ...extra,
       "await sdk.dispose()",
     ].join("\n")
-  const threadClientRefusal = "The thread client of this omo install could not be loaded."
+  const threadClientRefusal = "The thread client of this omo installation could not be loaded."
   const expectTyped = (answers) => {
     expect(Object.entries(answers).filter(([, outcome]) => "threw" in outcome)).toEqual([])
     expect(
@@ -679,7 +680,9 @@ describe("omo SDK runtime", () => {
     ).toEqual([])
     const refused = Object.entries(absent).filter(([, outcome]) => outcome.code === "internal_error")
     expect(
-      refused.every(([, outcome]) => outcome.message === "The thread client of this omo install could not be loaded."),
+      refused.every(
+        ([, outcome]) => outcome.message === "The thread client of this omo installation could not be loaded.",
+      ),
     ).toBe(true)
     expect(refused.map(([key]) => key)).toEqual(
       expect.arrayContaining(["threads.list", "threads.read", "threads.send"]),

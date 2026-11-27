@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { tmpdir } from "node:os"
 
-import { createOmoSdk, type DeviceServiceStatusPort } from ".."
+import { createOmoSdk, type DeviceServiceStatusPort, type OmoSdk } from ".."
+import type { CallOptions } from "../contract"
+import { ROOT_RACED_CALLS } from "../contract/cancellation"
 import { ROOT_DISPOSED } from "./assemble"
 
 const env = { OMO_SERVICE_API_URL: "https://accounts.example.test" }
@@ -49,87 +51,94 @@ describe("deviceService.status keeps both call conventions", () => {
   })
 })
 
-// account.devices answers the caller's signal and deadline on the answer (design lane ruling (A)); the account read is not
-// handed the signal at this head, so its late result and late rejection must never surface.
-describe("account.devices honours signal and deadline_ms on its answer", () => {
-  const signedIn = { device: { id: "dev-1", name: "laptop" }, accessToken: "t" }
-  const heldRead = () => {
-    let settle: ((outcome: { ok: unknown } | { fail: unknown }) => void) | undefined
-    let entered: (() => void) | undefined
-    const inRead = new Promise<void>((resolve) => {
-      entered = resolve
-    })
-    const uses: string[] = []
-    const sdk = createOmoSdk({
-      env,
-      cwd: tmpdir(),
-      ports: {
-        desktopLaunch: () => false,
-        credentialStore: { read: async () => signedIn as never },
-        session: {
-          accessToken: async () => "t",
-          request: (async (path: string) => {
-            uses.push(path)
-            entered?.()
-            return new Promise((resolve, reject) => {
-              settle = (outcome) => ("ok" in outcome ? resolve(outcome.ok) : reject(outcome.fail))
-            })
-          }) as never,
-        },
+// The calls the root honours by racing the answer (contract/cancellation.ts ROOT_RACED_CALLS, design lane ruling (A)):
+// their core is not handed the signal, so a late result and a late rejection must never surface. The harness map is keyed
+// by that list, so a call added to it without its cases does not compile.
+type RacedCall = (typeof ROOT_RACED_CALLS)[number]
+const signedIn = { device: { id: "dev-1", name: "laptop" }, accessToken: "t" }
+const RACED: Readonly<
+  Record<RacedCall, { readonly call: (sdk: OmoSdk, options?: CallOptions) => Promise<unknown>; readonly late: unknown }>
+> = {
+  "account.devices": { call: (sdk, options) => sdk.account.devices({}, options), late: { devices: [] } },
+}
+const heldRead = () => {
+  let settle: ((outcome: { ok: unknown } | { fail: unknown }) => void) | undefined
+  let entered: (() => void) | undefined
+  const inRead = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const uses: string[] = []
+  const sdk = createOmoSdk({
+    env,
+    cwd: tmpdir(),
+    ports: {
+      desktopLaunch: () => false,
+      credentialStore: { read: async () => signedIn as never },
+      session: {
+        accessToken: async () => "t",
+        request: (async (path: string) => {
+          uses.push(path)
+          entered?.()
+          return new Promise((resolve, reject) => {
+            settle = (outcome) => ("ok" in outcome ? resolve(outcome.ok) : reject(outcome.fail))
+          })
+        }) as never,
       },
+    },
+  })
+  return { sdk, inRead, uses, settle: (outcome: { ok: unknown } | { fail: unknown }) => settle?.(outcome) }
+}
+const unhandled: unknown[] = []
+const onUnhandled = (reason: unknown) => unhandled.push(reason)
+
+for (const key of ROOT_RACED_CALLS) {
+  const { call, late } = RACED[key]
+  describe(`${key} honours signal and deadline_ms on its answer`, () => {
+    test("#given a read in flight #when the caller's signal aborts #then the answer is cancelled and a late answer of the read is dropped", async () => {
+      process.on("unhandledRejection", onUnhandled)
+      try {
+        const { sdk, inRead, settle } = heldRead()
+        const stop = new AbortController()
+        const answer = call(sdk, { signal: stop.signal })
+        await inRead
+        stop.abort()
+        expect(await answer).toMatchObject({ kind: "error", error: { code: "cancelled" } })
+        settle({ ok: late })
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(unhandled).toEqual([])
+      } finally {
+        process.off("unhandledRejection", onUnhandled)
+      }
     })
-    return { sdk, inRead, uses, settle: (outcome: { ok: unknown } | { fail: unknown }) => settle?.(outcome) }
-  }
-  const unhandled: unknown[] = []
-  const onUnhandled = (reason: unknown) => unhandled.push(reason)
 
-  test("#given an account read in flight #when the caller's signal aborts #then the answer is cancelled and a late answer of the read is dropped", async () => {
-    process.on("unhandledRejection", onUnhandled)
-    try {
-      const { sdk, inRead, settle } = heldRead()
-      const stop = new AbortController()
-      const answer = sdk.account.devices({}, { signal: stop.signal })
+    test("#given a read in flight #when the deadline passes and the read then fails #then the answer is timeout and the failure surfaces nowhere", async () => {
+      process.on("unhandledRejection", onUnhandled)
+      try {
+        const { sdk, inRead, settle } = heldRead()
+        const answer = call(sdk, { deadline_ms: 1 })
+        await inRead
+        expect(await answer).toMatchObject({ kind: "error", error: { code: "timeout" } })
+        settle({ fail: new Error("late failure") })
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(unhandled).toEqual([])
+      } finally {
+        process.off("unhandledRejection", onUnhandled)
+      }
+    })
+
+    test("#given a read in flight #when the root is disposed and the port then answers #then the call answers what the port did and the next call is refused with no port use", async () => {
+      const { sdk, inRead, uses, settle } = heldRead()
+      const answer = call(sdk)
       await inRead
-      stop.abort()
-      expect(await answer).toMatchObject({ kind: "error", error: { code: "cancelled" } })
-      settle({ ok: { devices: [] } })
-      await new Promise((resolve) => setImmediate(resolve))
-      expect(unhandled).toEqual([])
-    } finally {
-      process.off("unhandledRejection", onUnhandled)
-    }
+
+      const disposed = sdk.dispose()
+      settle({ ok: late })
+
+      expect(await answer).toMatchObject({ kind: "ok" })
+      await disposed
+      const after = uses.length
+      expect(await call(sdk)).toEqual({ kind: "error", error: ROOT_DISPOSED })
+      expect(uses.length).toBe(after)
+    })
   })
-
-  test("#given an account read in flight #when the deadline passes and the read then fails #then the answer is timeout and the failure surfaces nowhere", async () => {
-    process.on("unhandledRejection", onUnhandled)
-    try {
-      const { sdk, inRead, settle } = heldRead()
-      const answer = sdk.account.devices({}, { deadline_ms: 1 })
-      await inRead
-      expect(await answer).toMatchObject({ kind: "error", error: { code: "timeout" } })
-      settle({ fail: new Error("late failure") })
-      await new Promise((resolve) => setImmediate(resolve))
-      expect(unhandled).toEqual([])
-    } finally {
-      process.off("unhandledRejection", onUnhandled)
-    }
-  })
-
-  test("#given an account read in flight #when the root is disposed and the port then answers #then the call answers what the port did and the next call is refused with no port use", async () => {
-    // given: an injected session port, which close() cannot reach; the real session is built with the close signal
-    const { sdk, inRead, uses, settle } = heldRead()
-    const answer = sdk.account.devices({})
-    await inRead
-
-    // when
-    const disposed = sdk.dispose()
-    settle({ ok: { devices: [] } })
-
-    // then
-    expect(await answer).toEqual({ kind: "ok", value: [] })
-    await disposed
-    const after = uses.length
-    expect(await sdk.account.devices({})).toEqual({ kind: "error", error: ROOT_DISPOSED })
-    expect(uses.length).toBe(after)
-  })
-})
+}
