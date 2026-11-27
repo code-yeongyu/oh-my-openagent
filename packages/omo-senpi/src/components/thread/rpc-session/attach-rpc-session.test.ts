@@ -7,8 +7,13 @@ import {
   type ContractHostOptions,
   withContractHost,
 } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
-import { attachRpcSession } from "./attach-rpc-session"
-import type { RpcRecord, RpcSessionStream, RpcSessionTarget } from "./types"
+// Through the shipped entry (runtime/thread-sdk/sdk.js is built from it): the export an integration imports is the one tested.
+import {
+  attachRpcSession,
+  type RpcRecord,
+  type RpcSessionStream,
+  type RpcSessionTarget,
+} from "../../../extension/thread-sdk"
 
 // The SDK's raw pi-RPC stream to one session on a running shared host (#15238), against senpi-task's contract host over a
 // real socket: the stream an integration relays to a single-session pi-RPC client.
