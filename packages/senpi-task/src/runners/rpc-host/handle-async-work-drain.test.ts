@@ -25,7 +25,7 @@ const ADAPTERS = [
  */
 for (const [runner, harness] of ADAPTERS) {
   describe(`a drained async-work hold on ${runner} (omo#10487)`, () => {
-    test("#given a held turn #when its work drains and the idle record repeats with no new turn #then nothing settles until the confirmation, which reports async_work_pending", async () => {
+    test("#given a held turn #when its work drains and the idle record repeats with no new turn #then nothing settles until the confirmations past the wake-delivery grace, which report async_work_pending", async () => {
       // given
       const h = harness()
       await h.endTurnWithDetachedCell()
@@ -39,11 +39,34 @@ for (const [runner, harness] of ADAPTERS) {
       // then - the repeated idle record is not an answer
       expect(h.settled()).toBeUndefined()
 
-      // when - the confirmation reads the drained, idle session
+      // when - the confirmations read the drained, idle session for the whole wake-delivery grace
+      await h.confirm()
+      expect(h.settled()).toBeUndefined()
       await h.confirm()
 
       // then
       expectDrainedWithoutAnswer(h.settled())
+      await h.handle.dispose()
+    })
+
+    test("#given a held turn whose monitor ended #when a confirmation reads the drained idle session before the monitor's wake arrives #then that wake turn's answer is the outcome, never async_work_pending", async () => {
+      // given - the turn ended with the monitor live, and the monitor left the engine's lifecycle
+      const h = harness()
+      await h.endTurnWithDetachedCell()
+      h.setWaits(undefined)
+      h.emit(lifecycleRecord())
+      await flushSettlement()
+
+      // when - a confirmation lands inside the engine's coalescing window: drained and idle, no wake yet
+      await h.confirm()
+      expect(h.settled()).toBeUndefined()
+
+      // when - the coalesced monitor event wakes the child and it answers
+      for (const record of wokenTurn(FINAL_RESULT)) h.emit(record)
+      await flushSettlement()
+
+      // then
+      expect(h.settled()).toEqual({ status: "completed", finalResponse: FINAL_RESULT })
       await h.handle.dispose()
     })
 
@@ -52,6 +75,7 @@ for (const [runner, harness] of ADAPTERS) {
       const h = harness()
       await h.endTurnWithDetachedCell()
       h.setWaits(undefined)
+      await h.confirm()
       await h.confirm()
       expectDrainedWithoutAnswer(h.settled())
       let resumed = 0

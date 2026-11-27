@@ -111,6 +111,30 @@ describe("cancel of an in-process child whose turn is held on its own work (#104
     h.dispose()
   })
 
+  test("#given a held turn whose work drained inside the wake-delivery grace #when cancelled with the abort skipped #then it ends cancelled at once and the session is destroyed now", async () => {
+    // given - the work left the lifecycle and a confirmation read the session drained and idle
+    const h = heldChild()
+    h.session.endTurnWithDetachedCell()
+    await flushSettlement()
+    h.session.setWaits(undefined)
+    h.scheduler.runNext()
+    await flushSettlement()
+    expect(h.settled()).toBeUndefined()
+
+    // when
+    const outcome = await h.engine.cancelTask(TASK, "stop the run", { abort: "skip" })
+    await flushSettlement()
+
+    // then
+    expect(outcome).toMatchObject({ kind: "cancelled", task_id: TASK })
+    expect(h.settled()).toEqual({ status: "cancelled" })
+    await bounded(h.whenDestroyed)
+    expect(h.destroyed).toEqual([`${TASK}:cancel_without_abort`])
+    expect(h.session.disposed()).toBe(true)
+    expect(h.scheduler.pending()).toBe(0)
+    h.dispose()
+  })
+
   test("#given a held turn whose wake turn is running #when cancelled with the abort skipped #then that turn reaches its end, no second hold is taken and the session is destroyed after it", async () => {
     // given
     const h = heldChild()

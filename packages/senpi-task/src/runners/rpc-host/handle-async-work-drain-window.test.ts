@@ -55,7 +55,9 @@ for (const [runner, harness] of ADAPTERS) {
       h.emit({ type: "agent_idle" })
       await flushSettlement()
 
-      // then - not the note; the hold's confirmation reads the drained, idle session
+      // then - not the note; the hold's confirmations read the drained, idle session past the wake-delivery grace
+      expect(h.settled()).toBeUndefined()
+      await h.confirm()
       expect(h.settled()).toBeUndefined()
       await h.confirm()
       expectAbandonedCell(h.settled())
