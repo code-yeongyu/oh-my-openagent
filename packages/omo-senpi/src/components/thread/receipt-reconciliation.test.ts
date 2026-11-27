@@ -8,12 +8,17 @@ import { createDeliveryConsumer } from "./consumer/consumer"
 import { createFakeDeliveryService } from "./consumer/testing/fake-delivery-service"
 import { writeSessionFile } from "./wake/testing/fake-wake-host"
 import type { JsonObject, RemoteThreadSurface } from "./remote/ports"
+import type { GatewayStore } from "./gateway/store"
 
 type Timer = { readonly run: () => void; readonly ms: number; cancelled: boolean }
 
 async function setup(
   noticeMode: "deliver" | "drop" | "duplicate" = "deliver",
-  options: { readonly timers?: Timer[] } = {},
+  options: {
+    readonly timers?: Timer[]
+    /** Wraps the store the holder's consumer reads, to hold or count its reads. */
+    readonly holderStore?: (store: GatewayStore) => GatewayStore
+  } = {},
 ) {
   const h = createGatewayHarness()
   const f = createRemoteThreadFixture()
@@ -39,7 +44,7 @@ async function setup(
   // that reads what a notice did waits for every notice it started, then for the sender's consumer to apply them.
   const notices: Promise<void>[] = []
   const consumer = createDeliveryConsumer({
-    store,
+    store: options.holderStore?.(store) ?? store,
     port: {
       ...service.port,
       notice: (n) => {
@@ -507,6 +512,79 @@ test("the holder's own timer reports a never-woken delivery at its deadline, wit
     // Nothing is left queued, so nothing is armed again.
     expect(timers.filter((timer) => !timer.cancelled && timer !== armed[0])).toEqual([])
     expect(x.counts).toEqual({ forward: 1, reverse: 1, wakes: 1, queries: 0 })
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a settlement pass that read the rows before a send was committed never cancels the timer the newer pass armed", async () => {
+  const timers: Timer[] = []
+  // The startup pass reads the open sessions before the send exists, and is held until the send's own pass has armed.
+  let release: (() => void) | undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let reads = 0
+  const x = await setup("deliver", {
+    timers: new Proxy(timers, {
+      get: (target, key) =>
+        key === "push"
+          ? (timer: Timer) => {
+              const length = target.push(timer)
+              release?.()
+              return length
+            }
+          : Reflect.get(target, key),
+    }),
+    holderStore: (store) => ({
+      ...store,
+      intakeMarks: {
+        ...store.intakeMarks,
+        openSessions: async () => {
+          const sessions = await store.intakeMarks.openSessions()
+          if (reads++ === 0) await held
+          return sessions
+        },
+      },
+    }),
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+    await x.consumer.idle()
+    expect(timers.filter((timer) => !timer.cancelled).map((timer) => timer.ms)).toEqual([86_400_000])
+  } finally {
+    await x.cleanup()
+  }
+})
+
+test("a send while the holder's timer is armed reads no rows to re-arm it", async () => {
+  const timers: Timer[] = []
+  let reads = 0
+  const x = await setup("deliver", {
+    timers,
+    holderStore: (store) => ({
+      ...store,
+      intakeMarks: {
+        ...store.intakeMarks,
+        openSessions: async () => {
+          reads++
+          return await store.intakeMarks.openSessions()
+        },
+      },
+    }),
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k1" })
+    await x.consumer.idle()
+    const after = reads
+    x.h.clock.now += 1_000
+    setSystemTime(x.h.clock.now)
+    await x.sender.run("thread_send", { thread: "dur-on-b", message: "two", idempotency_key: "k2" })
+    await x.consumer.idle()
+    expect(reads).toBe(after)
+    expect(timers.filter((timer) => !timer.cancelled).map((timer) => timer.ms)).toEqual([86_400_000])
   } finally {
     await x.cleanup()
   }
