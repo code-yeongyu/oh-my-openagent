@@ -42,8 +42,8 @@ function startFailed(taskId: string, name: string, message: string): StartResult
 describe("buildTaskExecute background batch fanout", () => {
   test("#given background capacity one #when three items start #then all ids and queue positions return as running", async () => {
     const starts = [
-      started(IDS[0], "one"),
-      started(IDS[1], "two", "pending", 1),
+      { ...started(IDS[0], "one"), nickname: "Selene" },
+      { ...started(IDS[1], "two", "pending", 1), nickname: "Helios" },
       started(IDS[2], "three", "pending", 2),
     ]
     let startIndex = 0
@@ -70,11 +70,17 @@ describe("buildTaskExecute background batch fanout", () => {
 
     expect(output.details).toMatchObject({ task_id: IDS[0], status: "running", run_in_background: true })
     expect(output.details.items).toEqual([
-      { task_id: IDS[0], name: "one", category: "quick", status: "running" },
-      { task_id: IDS[1], name: "two", category: "quick", status: "pending", queue_position: 1 },
+      { task_id: IDS[0], name: "one", nickname: "Selene", category: "quick", status: "running" },
+      { task_id: IDS[1], name: "two", nickname: "Helios", category: "quick", status: "pending", queue_position: 1 },
       { task_id: IDS[2], name: "three", category: "quick", status: "pending", queue_position: 2 },
     ])
-    for (const taskId of IDS) expect(textOf(output)).toContain(`task_send(to="${taskId}"`)
+    const text = textOf(output)
+    for (const taskId of IDS) expect(text).toContain(`task_send(to="${taskId}"`)
+    expect(text).toContain("one (Selene) st_batch_1 (running)")
+    expect(text).toContain("[task_id: st_batch_1 - continue with task_send")
+    expect(text).toContain("two (Helios) st_batch_2 (pending)")
+    expect(text.match(/Selene/gu)).toHaveLength(1)
+    expect(text.match(/Helios/gu)).toHaveLength(1)
   })
 
   test("#given inherited and item load_skills #when background items start #then each result reports its own resolution", async () => {

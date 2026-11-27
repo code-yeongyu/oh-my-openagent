@@ -19,10 +19,12 @@ export type CallerSessionResolver = (ctx: SessionIdCarrier) => string | undefine
 
 // The engine surface each tool drives. Tools NEVER touch the store directly (W1-V seam obligation 2):
 // every mutation goes through these public manager APIs.
-export type SendManager = Pick<TaskManager, "sendToTask" | "list" | "redispatchTask">
+export type SendManager = Pick<TaskManager, "sendToTask" | "list" | "redispatchTask"> & Partial<Pick<TaskManager, "get">>
 export type CancelManager = Pick<TaskManager, "cancelTask" | "get">
 
-export type SendResultDetails =
+export type ControlWorkerLabel = { readonly nickname?: string; readonly name?: string }
+
+export type SendResultDetails = ControlWorkerLabel & (
   | { readonly kind: "unresponsive"; readonly task_id: string; readonly retryable: true; readonly reason: string }
   | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
   | {
@@ -77,9 +79,9 @@ export type SendResultDetails =
       readonly member: string
       readonly code: SenpiShutdownErrorCode | "team_state_missing"
       readonly reason: string
-    }
+    })
 
-export type CancelResultDetails =
+export type CancelResultDetails = ControlWorkerLabel & (
   | {
       readonly kind: "cancelled"
       readonly task_id: string
@@ -102,7 +104,7 @@ export type CancelResultDetails =
       readonly undelivered_messages?: number
     }
   | { readonly kind: "not_found"; readonly reason: string }
-  | { readonly kind: "invalid_arguments"; readonly reason: string }
+  | { readonly kind: "invalid_arguments"; readonly reason: string })
 
 export type SendToolResult = ToolExecutionResult<SendResultDetails>
 export type CancelToolResult = AgentToolResult<CancelResultDetails>

@@ -1,6 +1,7 @@
 import {
   awaitingInputDetails,
   createChildProgress,
+  resolveTaskTarget,
   runTaskCancel,
   runTaskOutput,
   runTaskSend,
@@ -13,6 +14,7 @@ import type { TaskEngine } from "./engine"
 import {
   boundedTaskOutput,
   invalidArguments,
+  isTaskId,
   liveProgressSnapshot,
   parseTaskCancel,
   parseTaskList,
@@ -239,6 +241,12 @@ function registerTaskHandlers(
     }
   }
   if (handle === undefined) return forgetSession
+  const ownedTarget = (target: string, sessionId: string): TaskRecord | undefined => {
+    const canonical = isTaskId(target) ? engine.manager.get(target) : undefined
+    if (canonical !== undefined) return canonical.parent_session_id === sessionId ? canonical : undefined
+    const records = engine.manager.list({ scope: "parent-session", session_id: sessionId })
+    return resolveTaskTarget(records.map(({ record }) => record), target, sessionId)
+  }
   handle("omo.task.list", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
@@ -253,18 +261,18 @@ function registerTaskHandlers(
     if (sessionId === undefined) return unavailable()
     const input = parseTaskSend(data)
     if ("error" in input) return invalidArguments(input.error)
-    const record = engine.manager.get(input.value.to)
-    if (record === undefined || record.parent_session_id !== sessionId) return notFound()
-    return (await runTaskSend(engine.manager, input.value, sessionId)).details
+    const record = ownedTarget(input.value.to, sessionId)
+    if (record === undefined) return notFound()
+    return (await runTaskSend(engine.manager, { ...input.value, to: record.task_id }, sessionId)).details
   })
   handle("omo.task.cancel", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
     const input = parseTaskCancel(data)
     if ("error" in input) return invalidArguments(input.error)
-    const record = engine.manager.get(input.value.task_id)
-    if (record === undefined || record.parent_session_id !== sessionId) return notFound()
-    return (await runTaskCancel(engine.manager, input.value, sessionId)).details
+    const record = ownedTarget(input.value.task_id, sessionId)
+    if (record === undefined) return notFound()
+    return (await runTaskCancel(engine.manager, { ...input.value, task_id: record.task_id }, sessionId)).details
   })
   handle("omo.task.output", async (data) => {
     const sessionId = currentSessionId()

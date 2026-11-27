@@ -242,6 +242,82 @@ describe("createTaskTool", () => {
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
   })
 
+  test("#given a populated batch result #when the stock task component renders #then it shows only named worker rows with identity and failures", () => {
+    // given
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderResult = tool.renderResult
+    if (renderResult === undefined) throw new Error("task renderResult is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderResult, undefined, [
+      {
+        content: [{ type: "text", text: "batch started" }],
+        details: {
+          task_id: "st_batch",
+          status: "error",
+          mode: "spawn",
+          items: [
+            {
+              task_id: "st_01a2172b",
+              name: "st_01a2172b",
+              nickname: "Rhea",
+              subagent_type: "explore",
+              status: "running",
+            },
+            { task_id: "", name: "denied", status: "error", error_message: "depth limit" },
+          ],
+        },
+      },
+      { expanded: false, isPartial: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const rows = renderedLines(component, 120).map(Bun.stripANSI)
+
+    // then
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toContain("Rhea id:st_01a2172b agent:explore running")
+    expect(rows[0]).not.toContain("item")
+    expect(rows[0]).not.toContain("name:st_01a2172b")
+    expect(rows[1]).toContain("name:denied")
+    expect(rows[1]).toContain("error:depth limit")
+  })
+
+  test("#given a nicknamed single result #when the stock task component renders #then nickname and full ID stay visible before target details", () => {
+    // given
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderResult = tool.renderResult
+    if (renderResult === undefined) throw new Error("task renderResult is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderResult, undefined, [
+      {
+        content: [{ type: "text", text: "started" }],
+        details: {
+          task_id: "st_01a2172b",
+          nickname: "Rhea",
+          status: "running",
+          mode: "spawn",
+          subagent_type: "explore",
+          run_in_background: true,
+        },
+      },
+      { expanded: false, isPartial: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [rendered = ""] = renderedLines(component, 72)
+    const row = Bun.stripANSI(rendered)
+
+    // then
+    expect(row).toContain("Rhea")
+    expect(row).toContain("id:st_01a2172b")
+    expect(row.indexOf("Rhea")).toBeLessThan(row.indexOf("id:st_01a2172b"))
+    expect(row).toContain("agent:explore")
+    expect(row).toContain("running")
+    expect(rendererVisibleWidth(rendered)).toBeLessThanOrEqual(72)
+  })
+
   test("#given an ultrabrain background result #when rendered at 72 columns #then every required context token remains complete", () => {
     // given
     const tool = createTaskTool(deps(fakeManager({})))

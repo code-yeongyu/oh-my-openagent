@@ -44,6 +44,13 @@ function completedRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
 }
 
 describe("buildCompletionDetails", () => {
+  test("a nicknamed completion still includes its actual task address", () => {
+    const details = buildCompletionDetails(completedRecord({ nickname: "Selene" }))
+    expect(buildCompletionMessage([details]).content).toContain("nickname:Selene")
+    expect(buildCompletionMessage([details]).content).toContain("name:summarize-logs")
+    expect(buildCompletionMessage([details]).content).toContain("st_deadbeef")
+  })
+
   test("#given completed record #when details built #then core facts, full result, and duration are populated", () => {
     // given
     const record = completedRecord()

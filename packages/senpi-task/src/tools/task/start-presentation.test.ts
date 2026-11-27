@@ -28,6 +28,23 @@ describe("backgroundStartText", () => {
     )
   })
 
+  test("#given a nickname #when the start text is built #then it appears beside the canonical id and keeps the description", () => {
+    // given / when
+    const text = backgroundStartText({ ...STARTED, nickname: "Selene" }, { description: "auditing" })
+
+    // then
+    expect(text).toContain("Started task auditing (Selene, st_00000001, running)")
+  })
+
+  test("#given a nickname already used as the task label #when the start text is built #then the label is not repeated", () => {
+    // given / when
+    const text = backgroundStartText({ ...STARTED, nickname: "auditor" }, {})
+
+    // then
+    expect(text).toContain("Started task auditor (st_00000001, running)")
+    expect(text.match(/auditor/gu)).toHaveLength(1)
+  })
+
   test("#given no labels #when the start text is built #then the name is used and the id form stays stable", () => {
     // given / when / then
     expect(backgroundStartText(STARTED, {})).toContain("Started task auditor (st_00000001, running)")

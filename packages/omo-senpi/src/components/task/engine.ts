@@ -37,6 +37,7 @@ import {
   type CategoryConfigGenerations,
 } from "./category-config-generation"
 import { createCategoryUnavailableWarningPlanner } from "./category-unavailable-warning"
+import { configuredNicknameModelIds } from "./nickname-model-ids"
 import { createTaskStoreChain } from "./engine-store-chain"
 import type { StoreMutation } from "./store-mutation-observer"
 import { createEngineKernelTools } from "./engine-kernel-tools"
@@ -290,6 +291,19 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     resolveChildToolNames: kernelTools.childToolNames,
     planner,
     config: settings,
+    nicknameAgentHome: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }),
+    nicknameModelIds: () => configuredNicknameModelIds(getOmoConfig()),
+    onNicknameConflict: (conflict) => {
+      const rules = conflict.rules.map(({ key, set }) => `"${key}" -> "${set}"`).join(", ")
+      runtime
+        .ui()
+        ?.notify(
+          `Nickname wildcard rules conflict for "${conflict.modelId}": ${rules}. Using alphabetical winner "${conflict.chosenKey}" -> "${conflict.chosenSet}".`,
+          "warning",
+        )
+    },
+    onNicknameAllocationError: (error) =>
+      log("omo-senpi task nickname reservation failed", { error: error instanceof Error ? error.message : String(error) }),
     resolveInheritedExtensions,
     rpcRespawnRunner: buildRespawnRunner(runnerContext),
     executionModeGate: host.executionModeGate,

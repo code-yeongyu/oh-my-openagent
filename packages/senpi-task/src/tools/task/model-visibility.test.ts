@@ -41,7 +41,7 @@ describe("batch task model visibility", () => {
       runInBackground: true,
       startItem: async () => started,
     })
-    const itemLine = taskResultLines(output.details)[1]
+    const itemLine = taskResultLines(output.details)[0]
 
     // then
     expect(itemLine).toContain("category:quick(chatgpt-subscription/gpt-5.6-luna-fast)")

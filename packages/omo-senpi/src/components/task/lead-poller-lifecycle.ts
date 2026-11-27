@@ -26,6 +26,8 @@ export type LeadPollerLifecycleDeps = {
   readonly runtimeDir: (teamRunId: string) => string
   readonly deliveryJournal?: LeadDeliveryJournal
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
+  readonly readTask?: (id: string) => TaskRecord | undefined
+  readonly notify?: (label: string) => void
   readonly pi: Pick<SenpiExtensionAPI, "sendMessage">
   readonly logger: ComponentLogger
   readonly coordinator?: Pick<IdleInjectionCoordinator, "enqueue" | "scheduleFlush" | "flushSoon">
@@ -95,7 +97,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
         coordinator: createInjectionSink(deps, team.teamRunId),
         ...(deps.deliveryJournal !== undefined ? { deliveryJournal: deps.deliveryJournal } : {}),
         appendEvent: deps.appendTaskEvent,
-        eventTaskId: (message) => memberTaskMap[message.from],
+        eventTaskId: (message) => Object.hasOwn(memberTaskMap, message.from) ? memberTaskMap[message.from] : undefined,
         leadSessionFile: () => deps.runtime.sessionFile(),
       })
       pollers.set(team.teamRunId, { ownerSessionId: sessionId, poller })
@@ -224,6 +226,27 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   function createInjectionSink(input: LeadPollerLifecycleDeps, teamRunId: string): LeadInjectionSink {
     return {
       enqueue(injection) {
+        const { sender, onFlushed: markFlushed, ...delivery } = injection
+        let worker: TaskRecord | undefined
+        try {
+          worker = sender === undefined ? undefined : input.readTask?.(sender.taskId)
+        } catch (error) {
+          input.logger.warn("omo-senpi team message worker lookup failed", { error: String(error) })
+        }
+        const nickname = worker?.team_run_id === teamRunId && worker.team_member_name === sender?.name
+          ? worker.nickname
+          : undefined
+        const owner = input.runtime.sessionId()
+        const onFlushed = sender === undefined || nickname === undefined ? markFlushed : () => {
+          markFlushed?.()
+          if (owner !== undefined && owner === input.runtime.sessionId()) {
+            try {
+              input.notify?.(normalizeRendererText(`Message from ${nickname} (${sender.name})`))
+            } catch (error) {
+              input.logger.warn("omo-senpi team message label unavailable", { error: String(error) })
+            }
+          }
+        }
         if (input.coordinator === undefined) {
           input.pi.sendMessage(
             {
@@ -234,14 +257,15 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
             },
             { triggerTurn: true, deliverAs: "steer" },
           )
-          injection.onFlushed?.()
+          onFlushed?.()
           return
         }
         // Refused (coordinator retired with the session): throw so the lead poller releases its
         // durable delivery reservation and redelivers the message after the reload, instead of
         // leaving it reserved-but-never-flushed.
         const accepted = input.coordinator.enqueue({
-          ...injection,
+          ...delivery,
+          ...(onFlushed === undefined ? {} : { onFlushed }),
           runRef: { kind: "team", id: teamRunId },
           customType: "senpi-task:team-message",
           display: false,
@@ -299,3 +323,4 @@ function isRuntimeAccessError(error: unknown): error is NodeJS.ErrnoException {
 function assertNever(value: never): never {
   throw new TypeError(`Unexpected parent state: ${String(value)}`)
 }
+import { normalizeRendererText, type TaskRecord } from "@oh-my-opencode/senpi-task"

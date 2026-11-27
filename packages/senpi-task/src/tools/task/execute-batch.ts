@@ -47,8 +47,9 @@ function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToo
   return { content: [{ type: "text", text }], details }
 }
 
-function continuationFooter(taskId: string): string {
-  return `\n\n[task_id: ${taskId} - continue with task_send(to="${taskId}", message="...")]`
+function continuationFooter(taskId: string, nickname?: string): string {
+  const label = nickname === undefined ? "" : `, nickname: ${nickname}`
+  return `\n\n[task_id: ${taskId}${label} - continue with task_send(to="${taskId}", message="...")]`
 }
 
 async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]> {
@@ -81,7 +82,12 @@ function backgroundText(starts: readonly BatchStart[], status: "running" | "erro
       return `${index + 1}. ${start.detail.name ?? "task"} (error): ${start.detail.error_message ?? "start failed"}`
     }
     const queue = start.result.queue_position === undefined ? "" : ` queue:${start.result.queue_position}`
-    return `${index + 1}. ${start.result.name} ${start.result.task_id} (${start.result.status})${queue}${continuationFooter(start.result.task_id)}`
+    const nickname =
+      start.result.nickname === undefined || start.result.nickname === start.result.name
+        ? ""
+        : ` (${start.result.nickname})`
+    const identity = `${start.result.name}${nickname} ${start.result.task_id} (${start.result.status})`
+    return `${index + 1}. ${identity}${queue}${continuationFooter(start.result.task_id)}`
   })
   return [`Batch ${status}.`, ...lines].join("\n")
 }
@@ -111,11 +117,17 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
 }
 
 function recordOutput(record: TaskRecord, start: StartedResult, skills?: TaskSkillSummary): BatchItemOutput {
+  const nickname = record.nickname ?? start.nickname
   return {
     detail: {
       task_id: record.task_id,
       run_epoch: record.notification.run_epoch,
       name: record.name ?? start.name,
+      ...(nickname === undefined ? {} : { nickname }),
+      ...(record.category === undefined ? {} : { category: record.category }),
+      ...(record.agent_type === undefined ? {} : { subagent_type: record.agent_type }),
+      model: record.model,
+      ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
       status: record.status,
       ...(record.error_message !== undefined && { error_message: record.error_message }),
       ...(skills === undefined ? {} : { skills }),
@@ -150,6 +162,7 @@ function rejectedOutput(start: LiveStart, aborted: boolean, reason: unknown): Ba
     detail: {
       task_id: start.result.task_id,
       name: start.result.name,
+      ...(start.result.nickname === undefined ? {} : { nickname: start.result.nickname }),
       status: aborted ? "cancelled" : "error",
       error_message: message,
       ...(start.skills === undefined ? {} : { skills: start.skills }),
@@ -175,7 +188,7 @@ function syncText(
 ): string {
   const lines = outputs.map((output, index) => {
     const label = output.detail.name ?? (output.detail.task_id || "task")
-    const footer = output.continuation ? continuationFooter(output.detail.task_id) : ""
+    const footer = output.continuation ? continuationFooter(output.detail.task_id, output.detail.nickname) : ""
     return `${index + 1}. ${label} (${output.detail.status}): ${output.body}${footer}`
   })
   return [`Batch ${status}.`, ...lines].join("\n")

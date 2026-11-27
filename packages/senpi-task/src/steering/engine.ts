@@ -60,7 +60,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   async function sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome> {
-    const record = resolveTaskCallerFirst(lookup, input.idOrName, input.callerSessionId)
+    const record = resolveTaskCallerFirst(lookup, input.idOrName, input.callerSessionId, input.canonicalOnly === true || input.expectedRunEpoch !== undefined)
     if (record === undefined) {
       return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
     }

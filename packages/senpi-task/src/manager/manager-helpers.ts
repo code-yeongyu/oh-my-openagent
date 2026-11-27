@@ -1,11 +1,20 @@
 import { join } from "node:path"
+import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
 import type { ResolvedModelRecord } from "../state"
 import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
-import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
+import type {
+  ManagedStartSpec,
+  ManagerStartSpec,
+  NicknameWildcardConflict,
+  ResolvedChildPlan,
+  StartResult,
+} from "./types"
 import type { ExecutionMode } from "./execution-mode"
+import type { createNicknameAllocator } from "./nickname-allocation"
+import { wildcardNicknameSet } from "./nickname-model-patterns"
 
 // The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
 // and the post-start pin check read (#9722 H1) - a stale resolvedModel from the failed rung would
@@ -51,19 +60,63 @@ export function memberKernelToolRefusal(
   }
 }
 
+export function reserveTaskNickname(
+  spec: ManagerStartSpec,
+  plan: ResolvedChildPlan,
+  nicknames: OmoTaskSettings["nicknames"],
+  allocate: ReturnType<typeof createNicknameAllocator>,
+  options: {
+    readonly configuredModelIds?: ReadonlySet<string>
+    readonly onConflict?: (conflict: NicknameWildcardConflict) => void
+  } = {},
+): Promise<string | undefined> | undefined {
+  if (nicknames === undefined) return undefined
+  const agentType = spec.subagent_type ?? plan.agentType
+  const category = spec.category ?? plan.category
+  const model = plan.resolved_model
+  const modelId = model === undefined ? undefined : `${model.provider}/${model.model_id}`
+  const exactSet = ownValue(nicknames.models, modelId)
+  const preferredSet =
+    spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
+      ? ownValue(nicknames.agents, agentType)
+      : ownValue(nicknames.categories, category)
+  const wildcardSet =
+    exactSet !== undefined || modelId === undefined || nicknames.models === undefined
+      ? undefined
+      : wildcardNicknameSet(nicknames.models, modelId, {
+          ...(options.configuredModelIds === undefined ? {} : { configuredModelIds: options.configuredModelIds }),
+          ...(preferredSet === undefined ? {} : { preferredSet }),
+          defaultSet: nicknames.default,
+          ...(options.onConflict === undefined ? {} : { onConflict: options.onConflict }),
+        })
+  const set = exactSet ?? wildcardSet ?? preferredSet ?? nicknames.default
+  if (set === undefined) return undefined
+  const pool = ownValue(nicknames.sets, set)
+  if (pool === undefined) return undefined
+  return allocate({
+    set,
+    pool,
+    parentSessionId: spec.parent_session_id,
+    conversationId: spec.root_session_id ?? spec.parent_session_id,
+    style: nicknames.occurrence_style,
+  })
+}
+
 export function buildRecordInput(input: {
   readonly spec: ManagerStartSpec
   readonly plan: ResolvedChildPlan
   readonly name: string
   readonly executionMode: ExecutionMode
   readonly taskSeq: number
+  readonly nickname?: string
 }): TaskRecordInput {
-  const { spec, plan, name, executionMode, taskSeq } = input
+  const { spec, plan, name, executionMode, taskSeq, nickname } = input
   const agentType = spec.subagent_type ?? plan.agentType
   const category = spec.category ?? plan.category
   const runInBackground = spec.run_in_background === true
   return {
     name,
+    ...(nickname === undefined ? {} : { nickname }),
     task_seq: taskSeq,
     // The spawn-time mode. A foreground task later handed off with promoteToBackground becomes
     // "promoted", which notify_on_terminal alone cannot distinguish from a background spawn.
@@ -88,6 +141,10 @@ export function buildRecordInput(input: {
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
     ...(plan.toolDenylist !== undefined ? { tool_deny: plan.toolDenylist } : {}),
   }
+}
+
+function ownValue<T>(record: Readonly<Record<string, T>> | undefined, key: string | undefined): T | undefined {
+  return record !== undefined && key !== undefined && Object.hasOwn(record, key) ? record[key] : undefined
 }
 
 // Background mode after promoteToBackground runs. A task already running in the background keeps

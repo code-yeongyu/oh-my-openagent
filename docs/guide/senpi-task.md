@@ -99,6 +99,91 @@ There is no `team_wait` tool. When the next step depends on a reply, send with `
 
 ## Configuration
 
+### Worker nicknames
+
+`task.nicknames` is optional. To give workers nicknames from one pool:
+
+```jsonc
+{
+  "task": {
+    "nicknames": {
+      "sets": { "moon": ["Selene", "Io", "Callisto"] },
+      "default": "moon"
+    }
+  }
+}
+```
+
+You can also map model IDs or wildcard patterns with `models`, exact agent
+names with `agents`, or exact category names with `categories`. Each entry
+names a pool in `sets`.
+
+The initial model selected for launch takes priority, including when the
+primary model is at capacity and another model starts instead. An exact
+`provider/model` key wins before any wildcards. In a wildcard, `*` matches zero or more characters,
+including `/`, and matching ignores case. A pattern with `/` matches the full
+`provider/model` ID; a pattern without `/` can match model IDs across providers,
+including the part after a gateway's nested vendor prefix. Other characters
+are literal.
+
+Among matching wildcard rules, a narrower rule (one that matches a strict
+subset of another rule's IDs) wins over the broader rule, regardless of
+declaration order. For remaining rules, compare only the model IDs named in the
+effective config, not the provider's live catalog: a rule that matches a strict
+subset of another rule's configured IDs wins. If that still doesn't decide,
+prefer the rule with more fixed characters as written.
+
+If the tied rules name the same pool, OmO uses it without warning. If they name
+different pools, OmO tries the requested agent or category's nickname mapping,
+then uses `default` only if it names one of the tied pools for this model.
+Otherwise OmO picks the alphabetically first tied rule and warns once for that
+model and conflict. Use an exact model key to settle the choice explicitly.
+
+If no model rule matches, OmO tries the requested agent or category, then
+`default` as usual. No match means no nickname. Use nonempty sets with printable labels
+of at most 32 UTF-16 code units after trimming. Nickname occurrences use
+`task.nicknames.occurrence_style`, one of `#`, `roman`, `full`, or `arabic`;
+the default is `roman`. The first occurrence has no suffix. For the twenty-second
+occurrence of `Phobos`, the styles render `Phobos #22`, `Phobos XXII`,
+`Phobos the Twenty-Second`, and `Phobos the 22nd`, respectively.
+
+Occurrence counts are per root conversation and base nickname, regardless of
+which set or style selected it. If the full label exceeds 32 UTF-16 code units,
+OmO tries `#` style first. If it still does not fit, OmO shortens the base at a
+grapheme boundary and keeps the whole suffix.
+
+The task engine stores a persistent cursor in the shared agent home. Its key
+uses the set name and the exact effective ordered list after duplicate names
+are removed. The first allocation is seeded; later allocations advance that
+cursor. Projects using the same agent home share it. A different ordered list
+has its own cursor. Upgrading starts counting from the first new reservation;
+OmO does not count past tasks or rename them. A crash can skip reserved
+occurrences. If storage fails, the task runs without a nickname. Assigned
+nicknames stay fixed across model fallback and resume.
+
+Refer to workers by nickname in chat, for example, “Ask Io III to check
+the logs.” The coordinator can use the nickname directly with `task_output`,
+`task_send`, or `task_cancel` for its own child tasks. `Io III`, `Io #3`,
+`Io the Third`, and `Io the 3rd` all address the same third occurrence.
+Use the task ID if a nickname is ambiguous. Existing task IDs and canonical
+names take precedence; nicknames do not address workers in other sessions or
+replace team mailbox names.
+
+Passive consumers can read the optional top-level `nickname` string from the
+linked native task record or an `omo.task.updated` task snapshot. Older or
+unconfigured tasks omit it.
+
+Stock Senpi displays nicknames in task spawn, send, cancel, and output
+results. Spawn cards show nicknames beside the real `id:` label. Batch results
+show one row per worker without repeating the first worker's ID in a separate
+summary row. On narrow terminals, spawn cards trim other details before the
+nickname and preserve the full ID when it fits. Tool clients can read the
+optional `nickname` alongside `name` and
+`task_id` on a resolved result or batch item, or in `task_output`'s
+`details.snapshot`. Structured results still return the real `name` and `task_id`.
+Team mail from a known nicknamed worker can show a `Message from` notification;
+the hidden mailbox delivery and its acknowledgment are unchanged.
+
 ### Checkout isolation
 
 The task tool accepts `isolated`, `apply`, and `merge` on a single request or

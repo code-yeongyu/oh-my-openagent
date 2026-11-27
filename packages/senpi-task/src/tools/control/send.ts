@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TSchema } from "typebox"
 
 import { settledWithin } from "../../manager/settled-within"
+import { taskReferenceLabel } from "../../manager/task-target"
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
@@ -20,7 +21,7 @@ export type { MemberScopedTaskSendInput, TaskSendInput } from "./send-schema"
 export type { TaskSendTeamRouting } from "./send-shutdown"
 
 const DESCRIPTION = [
-  "Send a message to a child task or team member, keyed by to.",
+  "Send a message to a child task ID, name, or session-local nickname, or to a team member.",
   "Plain-text messages steer a running child immediately when nothing is ahead of them; while earlier messages are queued or draining, or the child is still launching, suspended or unresponsive, the message is queued and delivered in order.",
   "A plain-text message to a parked in-process or detached RPC child with a transcript and recorded launch spec resumes that session after eligible finished runs. Killed, cancelled, and lost children never revive; unfinished parked children automatically resume or end within the recovery budget.",
   "redispatch:true (no message) re-dispatches a task flagged 'resumed, waiting for input' onto a fresh live session, replaying its persisted prompt; the old dead session is abandoned.",
@@ -121,25 +122,30 @@ async function sendNow(
 
   if (params.redispatch === true) {
     if (manager.redispatchTask === undefined) return invalidArguments("this manager does not support redispatch")
-    const scopedCaller = params.all_scope === true ? undefined : callerSessionId
-    const outcome = await manager.redispatchTask(params.to, scopedCaller)
-    return mapRedispatchOutcome(manager, outcome, callerSessionId)
+    const outcome = await manager.redispatchTask(params.to, callerSessionId, params.all_scope)
+    return withResolvedWorker(manager, mapRedispatchOutcome(manager, outcome, callerSessionId))
   }
 
   if (typeof params.message === "string") {
-    const outcome = await manager.sendToTask({
+    const input = {
       idOrName: params.to,
       message: params.message,
-      deliverAs: "steer",
+      deliverAs: "steer" as const,
       ...(callerSessionId !== undefined ? { callerSessionId } : {}),
       ...(params.all_scope === true ? { allScope: true } : {}),
-    })
+    }
+    const outcome = await manager.sendToTask(teamRouting === undefined ? input : { ...input, canonicalOnly: true })
 
-    if (outcome.kind !== "not_found") return mapSendOutcome(outcome)
+    if (outcome.kind !== "not_found") return withResolvedWorker(manager, mapSendOutcome(outcome))
     if (teamRouting === undefined) return notFound(manager, outcome.reason, callerSessionId)
 
     const resolution = await resolveSendTeamRunId(params, teamRouting)
-    if (resolution.kind === "none") return notFound(manager, outcome.reason, callerSessionId)
+    const sendAlias = async (): Promise<SendToolResult | undefined> => {
+      const alias = await manager.sendToTask(input)
+      return alias.kind === "not_found" ? undefined : withResolvedWorker(manager, mapSendOutcome(alias))
+    }
+    if (resolution.kind === "none")
+      return (await sendAlias()) ?? notFound(manager, outcome.reason, callerSessionId)
     if (resolution.kind === "error") return invalidArguments(resolution.reason)
 
     const teamResult = await runTeamSend(teamRouting.service, resolution.teamRunId, teamRouting.from, {
@@ -147,6 +153,11 @@ async function sendNow(
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),
     })
+    // This refusal happens before enqueue. A selected team or any other outcome is final.
+    if (teamResult.details.kind === "invalid_recipient" && params.team_run_id === undefined && teamRouting.teamRunId === undefined) {
+      const alias = await sendAlias()
+      if (alias !== undefined) return alias
+    }
     const wrapped: SendToolResult = toolResult(firstText(teamResult), {
       kind: "team_message",
       team: teamResult.details,
@@ -157,6 +168,24 @@ async function sendNow(
   if (params.message !== undefined) return routeStructuredMessage(params.to, params.message, params, teamRouting)
 
   return invalidArguments("message is required")
+}
+
+function withResolvedWorker(manager: SendManager, result: SendToolResult): SendToolResult {
+  const details = result.details
+  if (!("task_id" in details) || details.kind === "scope_denied") return result
+  const worker = manager.get?.(details.task_id)
+  if (worker?.nickname === undefined) return result
+  const label = taskReferenceLabel(details.task_id, worker.nickname)
+  return {
+    ...result,
+    content: result.content.map((part) => part.type !== "text" ? part : {
+      ...part,
+      text: part.text.includes(details.task_id)
+        ? part.text.replace(details.task_id, () => label)
+        : `${label}: ${part.text}`,
+    }),
+    details: { ...details, nickname: worker.nickname, ...(worker.name === undefined ? {} : { name: worker.name }) },
+  }
 }
 
 function validateParams(params: TaskSendInput): SendToolResult | undefined {

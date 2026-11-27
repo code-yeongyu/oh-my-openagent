@@ -56,6 +56,7 @@ export function startedDetail(
     task_id: start.task_id,
     ...(start.run_epoch === undefined ? {} : { run_epoch: start.run_epoch }),
     name: start.name,
+    ...(start.nickname === undefined ? {} : { nickname: start.nickname }),
     ...(item.task_summary === undefined ? {} : { task_summary: item.task_summary }),
     ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
     ...(item.model === undefined ? {} : { model: item.model }),

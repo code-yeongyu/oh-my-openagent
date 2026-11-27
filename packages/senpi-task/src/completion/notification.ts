@@ -39,6 +39,7 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
           : { kind: "task", id: record.task_id },
     task_id: record.task_id,
     name: record.name ?? record.task_id,
+    ...(record.nickname === undefined ? {} : { nickname: record.nickname }),
     status: record.status,
     ...(record.category === undefined ? {} : { category: record.category }),
     ...(record.agent_type === undefined ? {} : { agent_type: record.agent_type }),
@@ -129,6 +130,7 @@ function continuationHint(record: TaskRecord): string {
 function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {
   const identity = joinRendererTokens([
     detail.resumed_turn === true ? "task completion (resumed turn)" : "task completion",
+    ...(detail.nickname === undefined ? [] : [`nickname:${normalizeRendererText(detail.nickname)}`]),
     `name:${normalizeRendererText(detail.name)}`,
     `id:${normalizeRendererText(detail.task_id)}`,
     formatTargetWithModel({

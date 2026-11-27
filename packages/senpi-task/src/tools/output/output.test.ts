@@ -88,6 +88,38 @@ describe("runTaskOutput", () => {
     }
   })
 
+  test("#given a nicknamed task #when read #then the nickname is preserved in structured status details", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_nicknamed", name: "canonical-name", nickname: "Selene" })
+
+    // when
+    const result = await runTaskOutput(depsFrom([record]), { task_id: record.task_id }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot).toMatchObject({
+        task_id: "st_nicknamed",
+        name: "canonical-name",
+        nickname: "Selene",
+      })
+    }
+  })
+
+  test("#given an unchanged nicknamed task #when status is read again #then no_progress retains the nickname", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_nicknamed", nickname: "Selene" })
+    const deps = depsFrom([record])
+    const statusReads = new Map<string, string>()
+
+    // when
+    await runTaskOutput(deps, { task_id: record.task_id }, "session-parent", statusReads)
+    const result = await runTaskOutput(deps, { task_id: record.task_id }, "session-parent", statusReads)
+
+    // then
+    expect(result.details).toMatchObject({ kind: "no_progress", nickname: "Selene" })
+  })
+
   test("#given a task with a resolved model #when read #then status uses display plus reasoning details", async () => {
     // given
     const resolvedModel = {

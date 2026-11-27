@@ -33,8 +33,9 @@ function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToo
   return { content: [{ type: "text", text }], details }
 }
 
-function continuationFooter(taskId: string): string {
-  return `\n\n[task_id: ${taskId} - continue with task_send(to="${taskId}", message="...")]`
+function continuationFooter(taskId: string, nickname?: string): string {
+  const label = nickname === undefined ? "" : `, nickname: ${nickname}`
+  return `\n\n[task_id: ${taskId}${label} - continue with task_send(to="${taskId}", message="...")]`
 }
 
 function syncResult(
@@ -43,7 +44,7 @@ function syncResult(
   skills: ReturnType<typeof buildStartSpec>["skills"],
 ): AgentToolResult<TaskToolDetails> {
   const body = record.final_response ?? record.error_message ?? `Task ${record.status}`
-  return result(appendMissingSkills(body + continuationFooter(record.task_id), skills), {
+  return result(appendMissingSkills(body + continuationFooter(record.task_id, record.nickname), skills), {
     ...recordDetails(record, mode),
     ...(skills === undefined ? {} : { skills }),
   })

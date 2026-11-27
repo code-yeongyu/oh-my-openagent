@@ -131,6 +131,7 @@ describe("task-family custom message renderers", () => {
       {
         task_id: "st_done",
         name: "worker",
+        nickname: "Selene",
         status: "completed" as const,
         category: "quick",
         model: "requested/model",
@@ -157,7 +158,7 @@ describe("task-family custom message renderers", () => {
     const text = lines.join("\n")
 
     // then
-    expect(text).toContain("Task complete · worker")
+    expect(text).toContain("Task complete · Selene · worker")
     expect(text).toContain("id st_done")
     expect(text).toContain("category:quick(chatgpt-subscription/gpt-5.6-luna-fast)")
     expect(text).toContain("duration 1.25s")

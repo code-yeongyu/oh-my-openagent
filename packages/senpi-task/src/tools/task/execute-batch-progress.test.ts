@@ -58,7 +58,7 @@ describe("foreground batch progress", () => {
         const taskId = IDS[startIndex]
         if (taskId === undefined) throw new Error("unexpected extra start")
         startIndex += 1
-        return { kind: "started", task_id: taskId, status: "running", name: `child-${startIndex}` }
+        return { kind: "started", task_id: taskId, status: "running", name: `child-${startIndex}`, nickname: "Selene" }
       },
       subscribeChild: (taskId, next) => {
         listeners.set(taskId, next)
@@ -91,8 +91,11 @@ describe("foreground batch progress", () => {
     if (initial === undefined) throw new Error("no initial partial update")
     expect(text(initial)).toContain("child-1")
     expect(text(initial)).toContain("child-2")
+    expect(text(initial)).toContain("Selene, st_progress_1")
+    expect(text(initial)).toContain("Selene, st_progress_2")
     expect(initial.details).toMatchObject({ task_id: IDS[0], status: "running", run_in_background: false })
     expect(initial.details.items?.map((item) => item.task_id)).toEqual([...IDS])
+    expect(initial.details.items?.map((item) => item.nickname)).toEqual(["Selene", "Selene"])
     expect(progress(initial.details)).toMatchObject({ startedAt: expect.any(Number) })
     expect(progress(initial.details).activity).toContain("child-1")
 
@@ -120,6 +123,8 @@ describe("foreground batch progress", () => {
     const lastPartial = updates[updates.length - 1]
     if (lastPartial === undefined) throw new Error("no partial update before the final result")
     expect(text(lastPartial).match(/completed/g)?.length).toBe(2)
+    expect(text(lastPartial)).toContain("Selene, st_progress_1")
+    expect(text(lastPartial)).toContain("Selene, st_progress_2")
     expect(lastPartial.details.items?.map((item) => item.status)).toEqual(["completed", "completed"])
     expect(progress(lastPartial.details).activity.match(/completed/g)?.length).toBe(2)
   })

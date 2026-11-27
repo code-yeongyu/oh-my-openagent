@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { ManagedChildHandle } from "./child-handle"
-import { FakeRunner, baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, makeManager, settings } from "./__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "./types"
 
 afterEach(cleanupProjects)
@@ -61,15 +61,26 @@ describe("TaskManager configured runtime fallback", () => {
     const { manager, store } = makeManager({
       planner: fallbackPlanner(),
       inProcess: runner,
+      config: settings({
+        nicknames: {
+          sets: { moon: ["Selene"], sun: ["Helios"], general: ["Atlas"] },
+          models: { "vendor-a/primary-model": "moon", "vendor-b/fallback-model": "sun" },
+          categories: { quick: "general" },
+          default: "general",
+        },
+      }),
     })
     const initialStart = runner.nextStart()
-    const result = await manager.start(baseSpec({ execution_mode: "in-process" }))
+    const result = await manager.start(baseSpec({ execution_mode: "in-process", name: "worker" }))
     if (result.kind !== "started") throw new Error("expected started task")
+    expect(result.nickname).toBe("Selene")
     await initialStart
     const firstHandle = runner.handles.get(result.task_id)
     if (firstHandle === undefined) throw new Error("expected initial handle")
     expect(store.load(result.task_id)).toMatchObject({
       model: "vendor-a/primary-model",
+      nickname: "Selene",
+      name: "worker",
       requested_model: { display: "vendor-a/primary-model" },
       resolved_model: { display: "vendor-a/primary-model" },
       fallback_models: [{ display: "vendor-b/fallback-model" }],
@@ -97,6 +108,8 @@ describe("TaskManager configured runtime fallback", () => {
     expect(store.load(result.task_id)).toMatchObject({
       status: "running",
       model: "vendor-b/fallback-model",
+      nickname: "Selene",
+      name: "worker",
       requested_model: { display: "vendor-a/primary-model" },
       resolved_model: { display: "vendor-b/fallback-model" },
       fallback_models: [],

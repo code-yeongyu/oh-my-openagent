@@ -3,6 +3,7 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
+import { taskReferenceLabel } from "../../manager/task-target"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
 import { defaultResolveCallerSessionId } from "./caller-session"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
@@ -13,10 +14,10 @@ export const TaskCancelParams = Type.Object({
   task_id: Type.Optional(
     Type.String({
       description:
-        "Task id (st_...) of the child to cancel. Pass task_id or name; when both are given, task_id wins and name is ignored.",
+        "Task ID (st_...) or session-local nickname. If both task_id and name are given, task_id wins.",
     }),
   ),
-  name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
+  name: Type.Optional(Type.String({ description: "Canonical task name or session-local nickname." })),
   reason: Type.Optional(Type.String({ description: "Optional human-readable reason recorded on the cancelled task." })),
 })
 
@@ -47,16 +48,23 @@ export async function runTaskCancel(
   }
 
   const outcome = await manager.cancelTask(idOrName, params.reason, { caller: { sessionId: callerSessionId } })
+  const worker = "task_id" in outcome && outcome.kind !== "stale" ? manager.get(outcome.task_id) : undefined
+  const reference = "task_id" in outcome ? taskReferenceLabel(outcome.task_id, worker?.nickname) : idOrName
+  const label =
+    worker?.nickname === undefined
+      ? {}
+      : { nickname: worker.nickname, ...(worker.name === undefined ? {} : { name: worker.name }) }
   switch (outcome.kind) {
     case "cancelled": {
-      const status = manager.get(outcome.task_id)?.status ?? ("cancelled" satisfies TaskStatus)
+      const status = worker?.status ?? ("cancelled" satisfies TaskStatus)
       return toolResult(
         withDroppedSteeringNotice(
-          `Cancelled ${outcome.task_id} (was ${outcome.previous_status}, now ${status}).`,
+          `Cancelled ${reference} (was ${outcome.previous_status}, now ${status}).`,
           outcome.undelivered_messages ?? 0,
         ),
         {
           kind: "cancelled",
+          ...label,
           task_id: outcome.task_id,
           previous_status: outcome.previous_status,
           status,
@@ -67,11 +75,12 @@ export async function runTaskCancel(
     case "cancel_pending":
       return toolResult(
         withDroppedSteeringNotice(
-          `Cancel requested for ${outcome.task_id}, but the child is unreachable: its connection to the task host dropped. It is stopped on its host before it runs anything else once reachable, or ends when the connection does not come back; its lane is released then. task_output shows the pending cancel.`,
+          `Cancel requested for ${reference}, but the child is unreachable: its connection to the task host dropped. It is stopped on its host before it runs anything else once reachable, or ends when the connection does not come back; its lane is released then. task_output shows the pending cancel.`,
           outcome.undelivered_messages ?? 0,
         ),
         {
           kind: "cancel_pending",
+          ...label,
           task_id: outcome.task_id,
           previous_status: outcome.previous_status,
           reason: outcome.reason,
@@ -79,8 +88,9 @@ export async function runTaskCancel(
         },
       )
     case "noop":
-      return toolResult(`${outcome.reason} No change.`, {
+      return toolResult(`${outcome.reason.replace(outcome.task_id, () => reference)} No change.`, {
         kind: "noop",
+        ...label,
         task_id: outcome.task_id,
         status: outcome.status,
         reason: outcome.reason,
@@ -88,11 +98,12 @@ export async function runTaskCancel(
     case "released":
       return toolResult(
         withDroppedSteeringNotice(
-          `Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`,
+          `Task ${reference} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`,
           outcome.undelivered_messages ?? 0,
         ),
         {
           kind: "released",
+          ...label,
           task_id: outcome.task_id,
           status: outcome.status,
           ...(outcome.undelivered_messages === undefined ? {} : { undelivered_messages: outcome.undelivered_messages }),

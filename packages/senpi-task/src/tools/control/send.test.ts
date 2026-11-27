@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { AGENT_INTERACTION_POLICIES } from "../../agents"
 import type { SendInput, SendOutcome } from "../../steering"
-import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "../../manager/__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager, settings } from "../../manager/__fixtures__/manager-fakes"
+import { runTaskCancel } from "./cancel"
 import { createMemberScopedTaskSendTool, createTaskSendTool, runTaskSend } from "./send"
 import type { TeamToolsService } from "../team/types"
 import type { SendManager } from "./types"
@@ -69,6 +70,25 @@ describe("runTaskSend", () => {
     if (result.details.kind !== "steered") throw new Error("expected steered")
     expect(result.details.delivered).toBe("steer")
     expect(result.details.task_id).toBe(started.task_id)
+  })
+
+  test("resolved send and cancel results carry the session-local nickname without replacing the canonical ID", async () => {
+    const { manager } = makeManager({
+      config: settings({ nicknames: { sets: { moon: ["Selene"] }, default: "moon" } }),
+    })
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", name: "worker" }))
+    if (started.kind !== "started") throw new Error("expected started")
+    const foreign = await runTaskSend(manager, { to: started.task_id, message: "not authorized" }, "other")
+    expect(foreign.details.kind).toBe("scope_denied")
+    expect(foreign.details).not.toHaveProperty("nickname")
+    const alias = await runTaskSend(manager, { to: "Selene", message: "follow-up by nickname" }, "p1")
+    expect(alias.details).toMatchObject({ kind: "steered", task_id: started.task_id, nickname: "Selene" })
+    const sent = await runTaskSend(manager, { to: "worker", message: "keep going" }, "p1")
+    expect(sent.details).toMatchObject({ kind: "steered", task_id: started.task_id, name: "worker", nickname: "Selene" })
+    const cancelled = await runTaskCancel(manager, { task_id: started.task_id }, "p1")
+    expect(cancelled.details).toMatchObject({
+      kind: "cancelled", task_id: started.task_id, name: "worker", nickname: "Selene",
+    })
   })
 
   test("#given a caller session id #when sending #then callerSessionId is injected into the steering call", async () => {
@@ -151,6 +171,28 @@ describe("runTaskSend", () => {
     expect(denied.isError).toBe(true)
     expect(crossed.details.kind).toBe("redispatched")
     expect(inProcess.startedSpecs).toHaveLength(2)
+  })
+
+  test("a foreign canonical name wins over a local nickname for send and redispatch", async () => {
+    const { manager, store, inProcess } = makeManager()
+    const local = await manager.start(baseSpec({ parent_session_id: "local", name: "worker" }))
+    const foreign = await manager.start(baseSpec({ parent_session_id: "foreign", name: "beta" }))
+    if (local.kind !== "started" || foreign.kind !== "started") throw new Error("expected both children")
+    store.mutate(local.task_id, (record) => ({ ...record, nickname: "beta" }))
+    const denied = await runTaskSend(manager, { to: "beta", message: "without scope" }, "local")
+    expect(denied.details).toMatchObject({ kind: "scope_denied", task_id: foreign.task_id })
+    const sent = await runTaskSend(manager, { to: "beta", message: "with scope", all_scope: true }, "local")
+    expect(sent.details).toMatchObject({ kind: "steered", task_id: foreign.task_id })
+    expect(inProcess.handles.get(local.task_id)?.steerCalls).toEqual([])
+    for (const { task_id } of [local, foreign]) {
+      store.mutate(task_id, (record) => ({
+        ...record,
+        awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() },
+      }))
+    }
+    const restarted = await runTaskSend(manager, { to: "beta", redispatch: true, all_scope: true }, "local")
+    expect(restarted.details).toMatchObject({ kind: "redispatched", task_id: foreign.task_id })
+    expect(manager.get(local.task_id)?.awaiting_input?.reason).toBe("resumed_turn_aborted")
   })
 
   test("#given an unknown redispatch target #when sent #then not_found lists this session's task names", async () => {

@@ -31,7 +31,18 @@ function child(taskId: string, summary: string, createdAt: string): TaskRecord {
 type Payload = {
   readonly source: string
   readonly activeCount: number
-  readonly items?: readonly { readonly id: string; readonly description?: string; readonly startedAtMs?: number }[]
+  readonly items?: readonly {
+    readonly id: string
+    readonly description?: string
+    readonly startedAtMs?: number
+    readonly nickname?: string
+  }[]
+  readonly channels?: readonly {
+    readonly id: string
+    readonly description?: string
+    readonly startedAtMs?: number
+    readonly nickname?: string
+  }[]
 }
 
 function createHarness(
@@ -75,7 +86,7 @@ function createHarness(
 describe("resumption-channel emitter wake-source items (#10026)", () => {
   it("#given two live background children #when the session snapshot is emitted #then each child is a senpi wake-source item", async () => {
     // given
-    const first = child("st_00000011", "Index the repo", "2026-10-14T01:00:00.000Z")
+    const first = { ...child("st_00000011", "Index the repo", "2026-10-14T01:00:00.000Z"), nickname: "Selene" }
     const second = child("st_00000012", "Draft the notes", "2026-10-14T01:05:00.000Z")
     const harness = createHarness([first, second])
 
@@ -86,9 +97,15 @@ describe("resumption-channel emitter wake-source items (#10026)", () => {
     const payload = harness.emitted.at(-1)
     expect(payload?.activeCount).toBe(2)
     expect(payload?.items).toEqual([
-      { id: first.task_id, description: "Index the repo", startedAtMs: Date.parse(first.created_at) },
+      {
+        id: first.task_id,
+        description: "Index the repo",
+        startedAtMs: Date.parse(first.created_at),
+        nickname: "Selene",
+      },
       { id: second.task_id, description: "Draft the notes", startedAtMs: Date.parse(second.created_at) },
     ])
+    expect(payload?.channels).toEqual(payload?.items)
   })
 
   it("#given one live child #when it completes while another starts in the same mutation #then a new snapshot names the new child", async () => {

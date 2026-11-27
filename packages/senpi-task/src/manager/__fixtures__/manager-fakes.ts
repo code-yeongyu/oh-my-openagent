@@ -14,7 +14,7 @@ import type { TaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
 import type { ExecutionModeGate } from "../execution-mode"
 import { createTaskManager } from "../manager"
-import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
+import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec, TaskManagerOptions } from "../types"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 import type { DestructionPort } from "../../steering"
 
@@ -186,6 +186,7 @@ export function makeManager(
     process?: ManagedRunner
     admit?: AdmitResident
     executionModeGate?: ExecutionModeGate
+    onNicknameConflict?: NonNullable<TaskManagerOptions["onNicknameConflict"]>
     destruction?: DestructionPort
   } = {},
 ) {
@@ -198,7 +199,9 @@ export function makeManager(
     runners: { "in-process": inProcess, process: processRunner },
     planner: options.planner ?? categoryPlanner(),
     config: options.config ?? settings({ default_concurrency: 5, max_depth: 1 }),
+    nicknameAgentHome: project,
     cwd: project,
+    ...(options.onNicknameConflict !== undefined && { onNicknameConflict: options.onNicknameConflict }),
     ...(options.admit !== undefined && { admit: options.admit }),
     ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),
     ...(options.destruction !== undefined && { destruction: options.destruction }),

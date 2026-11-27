@@ -17,6 +17,7 @@ type ResumptionChannel = {
   readonly id: string
   readonly description: string
   readonly startedAtMs: number
+  readonly nickname?: string
 }
 
 type ResumptionChannelEmitterManager = {
@@ -100,6 +101,7 @@ export function createResumptionChannelEmitter(deps: ResumptionChannelEmitterDep
         id: record.task_id,
         description: taskStatusDescription(record),
         startedAtMs: Date.parse(record.created_at),
+        ...(record.nickname === undefined ? {} : { nickname: record.nickname }),
       })
     }
     return channels

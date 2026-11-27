@@ -163,6 +163,7 @@ export type StartResult =
       readonly run_epoch?: number
       readonly status: "running" | "pending"
       readonly name: string
+      readonly nickname?: string
       readonly resolved_model?: ResolvedModelRecord
       // The model the child ACTUALLY started on, read from the child itself (never the plan) -
       // absent for a queued start that has not launched yet (#9722).
@@ -276,6 +277,13 @@ export type TrustedRespawnLaunch = {
 
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
+export type NicknameWildcardConflict = {
+  readonly modelId: string
+  readonly rules: readonly { readonly key: string; readonly set: string }[]
+  readonly chosenKey: string
+  readonly chosenSet: string
+}
+
 export type TaskManagerOptions = {
   readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
   readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
@@ -292,6 +300,12 @@ export type TaskManagerOptions = {
   readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
   readonly planner: ChildPlanner
   readonly config: OmoTaskSettings
+  readonly nicknameAgentHome?: string
+  readonly onNicknameAllocationError?: (error: unknown) => void
+  // Effective model ids from omo.json, used only to rank overlapping nickname wildcard rules.
+  readonly nicknameModelIds?: () => ReadonlySet<string>
+  // Called for unresolved wildcard pool conflicts; the manager deduplicates per model/conflict.
+  readonly onNicknameConflict?: (conflict: NicknameWildcardConflict) => void
   readonly cwd: string
   readonly now?: () => number
   readonly scheduleExitConfirmation?: ExitConfirmationSchedule

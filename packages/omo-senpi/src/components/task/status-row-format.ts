@@ -81,8 +81,13 @@ export function formatTaskRow(record: TaskRecord): string {
     description: record.description,
     taskSummary: record.task_summary,
   })
-  const parts = [identity]
+  const nickname = optionalRendererText(record.nickname)
+  const parts = [nickname === undefined ? identity : `${nickname} · ${identity}`]
   if (identity !== normalizeRendererText(record.task_id)) parts.push(`(${normalizeRendererText(record.task_id)})`)
+  const handle = optionalRendererText(record.name)
+  if (nickname !== undefined && handle !== undefined && handle !== identity && handle !== record.task_id) {
+    parts.push(`name:${handle}`)
+  }
   parts.push(recordStatusTarget(record))
   parts.push(`mode:${normalizeRendererText(record.execution_mode)}`, `status:${statusLabel(record)}`)
   if (record.pid !== undefined) parts.push(`pid:${record.pid}`)
@@ -196,7 +201,12 @@ export function taskStatusDescription(record: TaskRecord): string {
 }
 
 function liveTaskIdentity(record: TaskRecord): string {
-  return taskStatusDescription(record)
+  return withNickname(record, taskStatusDescription(record))
+}
+
+function withNickname(record: TaskRecord, identity: string): string {
+  const nickname = optionalRendererText(record.nickname)
+  return nickname === undefined ? identity : `${nickname} · ${identity}`
 }
 
 function formatElapsed(createdAt: string, now: number): string {
@@ -241,12 +251,15 @@ function formatCompactTaskRow(record: TaskRecord, maxWidth: number, includeName:
 function compactTaskIdentity(record: TaskRecord, maxWidth: number, includeName: boolean): string {
   if (!includeName) return excerptRendererText(record.task_id, maxWidth)
   return excerptRendererText(
-    taskIdentityLabel({
-      taskId: record.task_id,
-      name: record.name,
-      description: record.description,
-      taskSummary: record.task_summary,
-    }),
+    withNickname(
+      record,
+      taskIdentityLabel({
+        taskId: record.task_id,
+        name: record.name,
+        description: record.description,
+        taskSummary: record.task_summary,
+      }),
+    ),
     maxWidth,
   )
 }

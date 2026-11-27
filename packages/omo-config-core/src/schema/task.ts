@@ -9,6 +9,32 @@ import * as z from "zod"
 // queue starts - they never refuse one.
 const DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited" as const
 
+const NicknameSetId = z.string().min(1)
+const NicknameSetMap = z.record(z.string(), NicknameSetId)
+const Nickname = z.string().trim().min(1).max(32).regex(/^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+$/u)
+const TaskNicknamesLayerSchema = z
+  .object({
+    sets: z.record(NicknameSetId, z.array(Nickname).min(1)).optional(),
+    models: NicknameSetMap.optional(),
+    agents: NicknameSetMap.optional(),
+    categories: NicknameSetMap.optional(),
+    default: NicknameSetId.optional(),
+    occurrence_style: z.enum(["#", "roman", "full", "arabic"]).optional(),
+  })
+  .strict()
+
+// References can cross files or harness/profile overlays, so only check them on the merged view.
+const TaskNicknamesSchema = TaskNicknamesLayerSchema.superRefine((config, ctx) => {
+  const check = (key: string, path: string[]) => {
+    if (config.sets !== undefined && Object.hasOwn(config.sets, key)) return
+    ctx.addIssue({ code: "custom", path, message: `Unknown task nickname set "${key}"` })
+  }
+  for (const group of ["models", "agents", "categories"] as const) {
+    for (const [key, set] of Object.entries(config[group] ?? {})) check(set, [group, key])
+  }
+  if (config.default !== undefined) check(config.default, ["default"])
+})
+
 // 0 is the numeric spelling of "unlimited" for every cap below: the senpi-task engine maps a 0
 // concurrency limit to Infinity and treats a 0 residency cap exactly like the "unlimited" literal.
 const ResidencyMaxChildrenInputSchema = z.union([z.number().int().nonnegative(), z.literal("unlimited")])
@@ -110,6 +136,7 @@ export const OmoTaskSettingsSchema = z
     global_concurrency: z.number().int().nonnegative().default(8),
     provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
     model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
+    nicknames: TaskNicknamesSchema.optional(),
     max_depth: z.number().int().nonnegative().default(1),
     residency_max_children: ResidencyMaxChildrenInputSchema.default(DEFAULT_RESIDENCY_MAX_CHILDREN),
     resident_idle_timeout_ms: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).default(900000),
@@ -175,6 +202,7 @@ export const OmoTaskSettingsLayerSchema = z
     global_concurrency: z.number().int().nonnegative().optional(),
     provider_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
     model_concurrency: z.record(z.string(), z.number().int().nonnegative()).optional(),
+    nicknames: TaskNicknamesLayerSchema.optional(),
     max_depth: z.number().int().nonnegative().optional(),
     residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
     resident_idle_timeout_ms: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
