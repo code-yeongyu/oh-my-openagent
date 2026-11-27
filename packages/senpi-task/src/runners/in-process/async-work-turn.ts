@@ -6,6 +6,7 @@ export type InProcessAsyncWorkOptions = {
   readonly schedule?: AsyncWorkScheduler
   readonly intervalMs?: number
   readonly staleLimitMs?: number
+  readonly wakeDeliveryGraceMs?: number
 }
 
 export type AsyncWorkSession = {
@@ -88,6 +89,7 @@ export function createInProcessAsyncWork(input: {
         schedule: input.options?.schedule ?? defaultSchedule,
         intervalMs: input.options?.intervalMs ?? DEFAULT_INTERVAL_MS,
         staleLimitMs: input.options?.staleLimitMs,
+        wakeDeliveryGraceMs: input.options?.wakeDeliveryGraceMs,
       })
       // While this release is installed the hold still holds (begin runs first; a wake turn only
       // disarms it), so an abandon always answers the abandoned work, never the held note.

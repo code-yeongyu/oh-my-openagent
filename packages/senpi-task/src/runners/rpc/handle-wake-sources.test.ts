@@ -256,6 +256,11 @@ describe("createRpcChildHandle pending async work (senpi#3492, omo#10487)", () =
     harness.emit(cellSnapshot(0))
     expect(scheduler.pending()).toBe(1)
     scheduler.runNext()
+    await flushSettlement()
+    expect(settled).toBeUndefined()
+
+    // when - the next confirmation still reads it drained and idle, past the wake-delivery grace
+    scheduler.runNext()
 
     // then - the cell drained and no turn answered it: the held note is never the result (review
     // finding 1 on #15137); a turn the cell's notification starts later supersedes this

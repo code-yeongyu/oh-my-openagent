@@ -55,7 +55,7 @@ function harness(initialWaits: unknown) {
     taskId: "st_10487_window",
     session,
     promptText: "run the delayed eval, then answer FINAL-RESULT",
-    asyncWork: { schedule: scheduler.scheduler, intervalMs: 1_000, staleLimitMs: 5_000 },
+    asyncWork: { schedule: scheduler.scheduler, intervalMs: 1_000, staleLimitMs: 5_000, wakeDeliveryGraceMs: 1_000 },
   })
   let settled: RunnerOutcome | undefined
   void handle.waitForIdle().then((outcome) => {
@@ -92,7 +92,10 @@ describe("the in-process pending-work window (omo#10487)", () => {
     h.drain()
     await h.resolvePrompt()
 
-    // then - not the note; the hold's confirmation reads the drained, idle session
+    // then - not the note; the hold's confirmations read the drained, idle session past the wake-delivery grace
+    expect(h.settled()).toBeUndefined()
+    h.scheduler.runNext()
+    await flushSettlement()
     expect(h.settled()).toBeUndefined()
     h.scheduler.runNext()
     await flushSettlement()

@@ -418,16 +418,21 @@ describe("createTurnSettlement completed with pending async work (senpi#3492, om
     expect(fixture.scheduler.pending()).toBe(1)
     expect(fixture.settled()).toBeUndefined()
 
-    // when - the work releases; the armed confirmation re-reads it
+    // when - the work releases; the armed confirmation re-reads it and opens the wake-delivery grace
     workLive = false
     expect(fixture.scheduler.pending()).toBe(1)
+    fixture.scheduler.runNext()
+    await flushSettlement()
+    expect(fixture.settled()).toBeUndefined()
+
+    // when - the next confirmation still reads it drained and idle, past the grace
     const settled = fixture.nextSettled()
     fixture.scheduler.runNext()
 
     // then - the work drained and no turn answered it: the held progress note is never the result
     // (review finding 1 on #15137); a turn the work's notification starts later supersedes this
     const outcome = await settled
-    expect(probe.calls()).toBe(2)
+    expect(probe.calls()).toBe(3)
     expect(outcome.status).toBe("error")
     if (outcome.status !== "error") throw new Error("expected the typed failure")
     expect(outcome.failure.kind).toBe("async_work_pending")
