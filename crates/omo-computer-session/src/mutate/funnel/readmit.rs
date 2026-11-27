@@ -9,10 +9,11 @@ use crate::Session;
 /// A gate refusal with the plan's wire members (review L3): the Consent stage carries the plan's
 /// consent detail (`{app, identity}`), the Lease stage its lease detail (`{window, holder,
 /// retryAfterMs}`); the first pass and every re-admit answer the same shape.
-pub(super) fn gate_refused(refused: GateRefusal, plan: &Plan) -> (String, Refused) {
+pub(super) fn gate_refused(refused: GateRefusal, plan: &Plan, url_detail: Option<serde_json::Value>) -> (String, Refused) {
     let detail = match refused.gate {
         Gate::Consent => plan.consent_detail.clone(),
         Gate::Lease => plan.lease_detail.clone(),
+        Gate::Consequential => url_detail,
         _ => None,
     };
     let out = Refused {
@@ -33,13 +34,14 @@ impl Session {
         self.reconcile_stop();
         let epoch = self.guard.supervisor().stop_epoch();
         let call = (mutation.method, &mutation.call.target, mutation.route);
-        let plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
+        let url_detail = self.url_stages(&mut plan, mutation);
         match self
             .guard
-            .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages)
+            .admit_on_with(self.backend.as_mut(), &mutation.call, plan.stages.clone())
         {
             Ok(_) => Ok((plan, epoch)),
-            Err(refused) => Err(Box::new(gate_refused(refused, &plan))),
+            Err(refused) => Err(Box::new(gate_refused(refused, &plan, url_detail))),
         }
     }
 }

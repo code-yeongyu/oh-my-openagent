@@ -8,10 +8,13 @@ mod admit;
 mod display_awake;
 mod lease_hook;
 mod send;
+#[cfg(test)]
+mod integration_tests;
 mod settings;
 
 pub use admit::{Admission, Blocked};
 pub use display_awake::{DisplayAwakeHold, HoldLimits, SharedHold};
+pub(crate) use send::post_one;
 pub use send::{units, Ended, Outcome, Stop};
 pub use settings::OpenSettings;
 
