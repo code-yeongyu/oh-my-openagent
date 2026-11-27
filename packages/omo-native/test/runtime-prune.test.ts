@@ -197,6 +197,17 @@ describe("pruneProvisionedRuntimes", () => {
     expect(result.kept).toEqual(["5.1.61"])
   })
 
+  // #15264 review M1: a session host unit that serves another agent dir is not refreshed, so its runtime must survive.
+  test("#given the installed session host unit names an idle runtime two releases back #when a fresh runtime prunes #then that runtime is kept on its own account", () => {
+    provision("5.1.60", "5.1.61", "5.1.62")
+    const result = pruneProvisionedRuntimes({ root, current: "5.1.63", listRunning: () => [], keep: ["5.1.60"] })
+    expect(present("5.1.60")).toBe(true)
+    expect(present("5.1.62")).toBe(true)
+    expect(present("5.1.61")).toBe(false)
+    expect(result.kept.toSorted()).toEqual(["5.1.60", "5.1.62"])
+    expect(result.removed).toEqual(["5.1.61"])
+  })
+
   test("#given no runtime root #when a fresh runtime prunes #then it reports nothing", () => {
     expect(pruneProvisionedRuntimes({ root: join(root, "missing"), current: "5.1.62", platform: "linux" })).toEqual({
       removed: [],
