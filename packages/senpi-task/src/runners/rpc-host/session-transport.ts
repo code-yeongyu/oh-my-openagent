@@ -89,7 +89,7 @@ export interface HostOpenSessionWire {
  * HOST capability: the host applies `open_session.persona` (`appendSystemPrompt`, `tools`, `excludeTools`) to
  * that one session, as `--append-system-prompt` / `--tools` / `--exclude-tools` apply to a process (#13057).
  */
-export const SESSION_PERSONA_CAPABILITY = "session_persona"
+const SESSION_PERSONA_CAPABILITY = "session_persona"
 
 /** The immutable launch profile of one child session, in omo's names. */
 export interface HostSessionOpenInput {
