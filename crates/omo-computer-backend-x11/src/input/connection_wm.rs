@@ -22,6 +22,9 @@ use super::server::{Window, WmRequest, XError};
 use crate::toolkit::{read_evidence, Evidence};
 
 const ICONIC_STATE: u32 = 3;
+/// StaticGravity: the request's x and y place the client window itself, the rectangle
+/// `windows()` lists, not the outer corner of the manager's decorations.
+const STATIC_GRAVITY: u32 = 10;
 /// Source indication 2: a tool acting for the user (EWMH).
 const SOURCE_TOOL: u32 = 2;
 /// After the first `ConfigureNotify`, the move and the resize may arrive as separate notifies.
@@ -69,7 +72,7 @@ impl InputConnection {
                     .map_err(x)?
                     .check()
                     .map_err(x)?;
-                let flags = (0b1111 << 8) | (SOURCE_TOOL << 12);
+                let flags = STATIC_GRAVITY | (0b1111 << 8) | (SOURCE_TOOL << 12);
                 (
                     self.atoms.moveresize,
                     [

@@ -2,7 +2,7 @@
 //! --locked --lib -- --ignored`). Each leg starts its own `Xvfb` (so its key presses never reach
 //! another test's server) and reads it through a second, independent connection.
 
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 use omo_computer_core::backend::{InputEvent, Route};
@@ -142,8 +142,8 @@ fn frame_request_reads_back_the_frame_the_manager_applied() {
     let oracle = x.oracle();
     let root = oracle.setup().roots[0].root;
     let mut wm = Command::new("xfwm4")
+        .arg("--compositor=off")
         .env("DISPLAY", &x.display)
-        .stderr(Stdio::null())
         .spawn()
         .expect("xfwm4 is installed");
     let check = oracle
@@ -152,7 +152,7 @@ fn frame_request_reads_back_the_frame_the_manager_applied() {
         .reply()
         .expect("atom")
         .atom;
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(20);
     let managed = || {
         let reply = oracle
             .get_property(false, root, check, AtomEnum::WINDOW, 0, 1)
