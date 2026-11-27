@@ -33,10 +33,12 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 |------|---------|------|
 | `task` | `createTaskTool` | `tools/task/tool.ts:10` (`TASK_TOOL_NAME`) |
 | `task_send` | `createTaskSendTool` | `tools/control/send.ts` |
-| `task_cancel` | `createTaskCancelTool` | `tools/control/cancel.ts:60` |
+| `task_cancel` | `createTaskCancelTool` | `tools/control/cancel.ts:114` |
 | `task_output` | `createTaskOutputTool` | `tools/output/output.ts` |
 
 `task` is spawn-only. It accepts either one `prompt` or a non-empty `tasks:[...]` batch (module map: [`src/tools/task/AGENTS.md`](src/tools/task/AGENTS.md)); synchronous batches aggregate every child result, while background batches return item ids and queue positions. Steer, resident-session revival, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child status/transcript peeks go through `task_output`.
+
+`task_cancel` acts for the calling session (`ctx.sessionManager.getSessionId()`, the same resolver `task_send` and `task_output` use; an in-process child's call carries the child's own session). It resolves an id or name only among the caller's tasks (those whose parent or root session is the caller) through `steering/scope-resolver.ts`, before any branch reads the record: a task outside that scope, and any call without a caller session, answers exactly as a missing id does, and nothing is cancelled. It has no `all_scope`. The engine's own cancel roads (DAG, workpools, teams, eval handles, `/tasks kill`, run pause, a spawn's own abort) pass no caller and resolve as before; `interruptTask` takes the same optional caller. `task_send` looks a name up among the caller's tasks first and otherwise keeps its store-wide lookup and `scope_denied` answer.
 
 ### Team tools (6, lead-only)
 
