@@ -1,3 +1,5 @@
+import { homedir } from "node:os"
+
 import { deviceServiceStateDirIn } from "@oh-my-opencode/device-service-core/state-dir"
 
 import type { MachineHubTransport } from "../../../../vendor/bunshin-ts/index.js"
@@ -73,6 +75,14 @@ const parseChoice = (raw: string | undefined): TransportChoice => {
  * service when its status answers `connected`, else the hub when this build bundles it and a hub config
  * resolves. A service that is installed but insecure or unproven still throws from the status probe.
  */
+/**
+ * The transport for this process's own environment: the process's home is its own to use, so an environment without
+ * `HOME` (a service unit, `env -i`) still reaches the OS home's device service. A given env never falls back to it.
+ */
+export function pickProcessTransport(deps: PickTransportDeps = BUNDLED): Promise<MachineHubTransport> {
+  return pickTransport(process.env, { ...deps, home: deps.home ?? homedir() })
+}
+
 export async function pickTransport(env: Env, deps: PickTransportDeps = BUNDLED): Promise<MachineHubTransport> {
   const choice = parseChoice(env[TRANSPORT_CHOICE_ENV])
   const stateDir = stateDirOf(env, deps)

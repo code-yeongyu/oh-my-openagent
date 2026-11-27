@@ -24,7 +24,9 @@ const nonEmpty = (value: string | undefined): string | undefined =>
 
 /** The home an environment names: `HOME`, or `USERPROFILE` on Windows (what the OS's own home lookup reads there). */
 function envHome(platform: NodeJS.Platform, env: Env): string | undefined {
-  return nonEmpty(platform === "win32" ? env.USERPROFILE : env.HOME)
+  const home = nonEmpty(platform === "win32" ? env.USERPROFILE : env.HOME)
+  // Held to the state-dir variable's rule: a relative home would resolve against the process's cwd.
+  return home !== undefined && isAbsoluteOn(platform, home) ? home : undefined
 }
 
 // The contract is a silent fall-through: an unreadable, unparsable or dangling discovery file means the default.

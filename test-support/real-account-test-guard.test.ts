@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -41,6 +41,26 @@ describe("credential store test guard", () => {
   test("#given this process's preload #when the test reads Bun.secrets #then no violation is recorded (the store is a fake)", async () => {
     await Bun.secrets.get({ service: "omo-guard-probe", name: "probe" })
     expect(credentialStoreGuard.takeViolations()).toEqual([])
+  })
+})
+
+describe("device-service test guard routes", () => {
+  test("#given a symlink to the guarded dir #when a test dials the socket through it #then it is refused", () => {
+    const dir = realDir()
+    const link = join(realDir(), "link")
+    symlinkSync(dir, link)
+    const guard = createDeviceServiceGuard(dir)
+
+    expect(() => guard.check([{ path: join(link, "service.sock") }])).toThrow(/real device service/)
+    expect(guard.takeViolations()).toHaveLength(1)
+  })
+
+  test("#given this process's preload #when Bun.connect or fetch's unix option names the machine's own socket #then each is refused before connecting", () => {
+    const socket = join(guardedStateDir, "service.sock")
+
+    expect(() => Bun.connect({ unix: socket, socket: { data() {} } })).toThrow(/real device service/)
+    expect(() => fetch("http://localhost/", { unix: socket })).toThrow(/real device service/)
+    expect(deviceServiceGuard.takeViolations()).toHaveLength(2)
   })
 })
 

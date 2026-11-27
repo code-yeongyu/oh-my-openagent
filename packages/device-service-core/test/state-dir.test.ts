@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { deviceServiceStateDir } from "../src/index.ts"
+import { deviceServiceStateDirIn } from "../src/state-dir.ts"
 
 const dirs: string[] = []
 
@@ -106,4 +107,31 @@ describe("deviceServiceStateDir", () => {
       expect(deviceServiceStateDir("linux", {}, home)).toBe(join(home, ".omo", "device-service"))
     }
   })
+})
+
+// A caller handed an environment resolves its home from that environment alone (#15214): HOME on POSIX, USERPROFILE on
+// Windows, absolute only, never the process's home.
+describe("deviceServiceStateDirIn", () => {
+  test.each([
+    ["posix, HOME", "linux", { HOME: "/home/a" }, "/home/a/.omo/device-service"],
+    ["posix, USERPROFILE only", "linux", { USERPROFILE: "/home/a" }, undefined],
+    ["posix, a relative HOME", "linux", { HOME: "rel-home" }, undefined],
+    ["posix, an empty HOME", "linux", { HOME: "" }, undefined],
+    ["posix, nothing", "linux", {}, undefined],
+    [
+      "win32, USERPROFILE",
+      "win32",
+      { USERPROFILE: "C:\\Users\\a" },
+      "C:\\Users\\a\\AppData\\Local\\OmO\\device-service",
+    ],
+    ["win32, HOME only", "win32", { HOME: "C:\\Users\\a" }, undefined],
+    ["win32, a relative USERPROFILE", "win32", { USERPROFILE: "a" }, undefined],
+  ] as const)(
+    "#given %s #when resolved without a home argument #then the dir follows the env alone",
+    (_, platform, env, expected) => {
+      const dir = deviceServiceStateDirIn(platform, env)
+      if (expected === undefined) expect(dir).toBeUndefined()
+      else expect(dir?.replaceAll("/", platform === "win32" ? "\\" : "/")).toBe(expected)
+    },
+  )
 })

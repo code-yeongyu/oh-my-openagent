@@ -1,13 +1,18 @@
 import { afterAll, describe, expect, it } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
 
 import type { MachineHubTransport } from "../../../../vendor/bunshin-ts/index.js"
 
-import { BunshinSessionError, pickTransport, type PickTransportDeps } from "./bunshin-ts-pick-transport"
+import {
+  BunshinSessionError,
+  pickProcessTransport,
+  pickTransport,
+  type PickTransportDeps,
+} from "./bunshin-ts-pick-transport"
 
 const hubTransport = { kind: "hub" } as const satisfies Partial<MachineHubTransport>
 
@@ -128,6 +133,23 @@ describe("bunshin-ts pickTransport", () => {
     )
     expect(await errorCode(picked)).toBe("no_transport")
     expect(probes).toEqual([])
+  })
+
+  it("#given this process's environment without HOME #when the shipped process picker runs #then it probes the OS home's service", async () => {
+    const probes: string[] = []
+    const before = process.env["HOME"]
+    delete process.env["HOME"]
+    try {
+      await pickProcessTransport({
+        relayStatus: async (status) => {
+          probes.push(status?.stateDir ?? "<default>")
+          return { connected: true }
+        },
+      })
+    } finally {
+      if (before !== undefined) process.env["HOME"] = before
+    }
+    expect(probes).toEqual([deviceServiceStateDir(process.platform, process.env, homedir())])
   })
 
   it("#given an unknown choice #when picked #then bad_choice is thrown", async () => {

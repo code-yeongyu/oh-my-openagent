@@ -7,7 +7,7 @@ import {
 } from "../../../../vendor/bunshin-ts/index.js"
 
 import { deviceOperationError } from "./bunshin-ts-errors"
-import { pickTransport } from "./bunshin-ts-pick-transport"
+import { pickProcessTransport } from "./bunshin-ts-pick-transport"
 import { typedClient } from "./bunshin-ts-typed-machine"
 
 type LazyBunshinClientOptions = {
@@ -98,5 +98,5 @@ export function createLazyBunshinClient(
 }
 
 export const bunshin: BunshinClient = createLazyBunshinClient(async () =>
-  connect({ transport: await pickTransport(process.env) }),
+  connect({ transport: await pickProcessTransport() }),
 )
