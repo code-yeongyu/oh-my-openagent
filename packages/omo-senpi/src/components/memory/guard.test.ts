@@ -821,3 +821,23 @@ describe("memory guard combined tool_result handler (#12594)", () => {
     ])
   })
 })
+
+describe("memory guard on the Cursor exec event order (#12466)", () => {
+  test("#given an allowed ancestor enumeration run through the Cursor exec bridge #when a foreign identity appears before its result #then the result is replaced by the deny", async () => {
+    const setup = ancestorFixture()
+    const session = { sessionManager: { getSessionId: () => "session-1" } }
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-cursor")).toBeUndefined()
+    // A synthetic second identity, created while the walk runs.
+    mkdirSync(join(setup.agentsRoot, "late-id", "runtime"), { recursive: true })
+    // The Cursor exec bridge reports the end of the execution before the tool_result hook runs.
+    await setup.pi.dispatch(
+      "tool_execution_end",
+      { type: "tool_execution_end", toolCallId: "call-cursor", toolName: "grep", result: {}, isError: false },
+      session,
+    )
+    const replaced = await finish(setup, "grep", setup.memoryRoot, "call-cursor")
+
+    expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: {} }])
+  })
+})
