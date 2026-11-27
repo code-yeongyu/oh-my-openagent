@@ -17,6 +17,8 @@ pub enum LeaseEnd {
     Lock,
     PresenceLost,
     Stop,
+    /// The user pressed the lease-end key (a bare physical Escape on X11, row 50).
+    UserEsc,
 }
 
 /// The surface shown for the live lease, and the end the next report must state.

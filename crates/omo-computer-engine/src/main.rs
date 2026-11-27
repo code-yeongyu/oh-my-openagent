@@ -28,5 +28,24 @@ fn main() -> ExitCode {
         Mode::Schema => schema::run(),
         Mode::Selftest { json } => selftest::run(json),
         Mode::Stdio => stdio::run(),
+        Mode::X11ReleaseHelper => x11_release_helper(),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn x11_release_helper() -> ExitCode {
+    let display = std::env::var("DISPLAY").unwrap_or_default();
+    match omo_computer_backend_x11::release_helper::run(&display) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("omo-computer-engine: x11 release helper: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn x11_release_helper() -> ExitCode {
+    eprintln!("omo-computer-engine: the x11 release helper runs on Linux only");
+    ExitCode::from(2)
 }

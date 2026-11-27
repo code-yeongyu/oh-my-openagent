@@ -22,6 +22,15 @@ pub(super) const fn granted_permissions() -> PermissionProbe {
 }
 
 impl FakeBackend {
+    /// Row 27 (R51): the scenario's scripted `permissions` block; absent leaves every permission granted.
+    pub(super) fn scripted_permissions(&self) -> PermissionProbe {
+        self.lock().scenario.permissions.map_or(granted_permissions(), |p| PermissionProbe {
+            capture: p.capture,
+            input: p.input,
+            accessibility: p.accessibility,
+        })
+    }
+
     pub(super) fn scripted_capabilities(&self) -> Capabilities {
         let displays = self.lock().displays.len();
         let mut capabilities =
@@ -50,6 +59,16 @@ impl FakeBackend {
             )),
             script => Ok(Box::new(FakeStopListener::new(self.shared.clone(), script))),
         }
+    }
+
+    /// Row 50: the scripted lease-end key, taken once.
+    pub(super) fn scripted_take_lease_end(&self) -> bool {
+        let mut state = self.lock();
+        let heard = state.lease_end_heard_at.is_some_and(|at| state.stop_polls > at);
+        if heard {
+            state.lease_end_heard_at = None;
+        }
+        std::mem::take(&mut state.lease_end_pressed) || heard
     }
 
     pub(super) fn scripted_epoch_source(&self) -> Box<dyn EpochSource> {

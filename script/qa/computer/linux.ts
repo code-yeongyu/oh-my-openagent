@@ -24,6 +24,8 @@ import { Engine } from "./linux/lib/engine.ts"
 import { Processes } from "./linux/lib/procs.ts"
 import { failed, isAdmit, verdict, type Scenario, type SessionName, type Stage } from "./linux/lib/scenario.ts"
 import { admission, setExitCode, setLine, type Outcome } from "./linux/lib/set.ts"
+import { consentCarriedDefault } from "./linux/scenarios/consent-carried-default.ts"
+import { consentNoFile } from "./linux/scenarios/consent-no-file.ts"
 import { noDisplay } from "./linux/scenarios/no-display.ts"
 import { occluderOracle } from "./linux/scenarios/occluder-oracle.ts"
 import { xftDpiScale } from "./linux/scenarios/xft-dpi-scale.ts"
@@ -46,6 +48,8 @@ const SCENARIOS: Record<string, Scenario> = {
   "xft-dpi-scale": xftDpiScale,
   "occluder-oracle": occluderOracle,
   "no-display": noDisplay,
+  "consent-no-file": consentNoFile,
+  "consent-carried-default": consentCarriedDefault,
 }
 
 const { values } = parseArgs({

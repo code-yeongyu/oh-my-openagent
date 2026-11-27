@@ -13,6 +13,8 @@ pub enum Mode {
     /// Drives a fake-backend session through the RPC layer and reports the checks.
     Selftest { json: bool },
     Version,
+    /// The X11 backend's release helper (row 49): releases a dead engine's XTEST holds.
+    X11ReleaseHelper,
 }
 
 /// # Errors
@@ -25,6 +27,7 @@ pub fn parse(args: &[String]) -> Result<Mode, String> {
         ["--selftest"] => Ok(Mode::Selftest { json: false }),
         ["--selftest", "--json"] | ["--json", "--selftest"] => Ok(Mode::Selftest { json: true }),
         ["--version"] => Ok(Mode::Version),
+        ["--x11-release-helper"] => Ok(Mode::X11ReleaseHelper),
         other => Err(format!("unsupported arguments: {}", other.join(" "))),
     }
 }
@@ -43,6 +46,7 @@ mod tests {
         assert_eq!(parse(&args(&["--stdio"])), Ok(Mode::Stdio));
         assert_eq!(parse(&args(&["--schema"])), Ok(Mode::Schema));
         assert_eq!(parse(&args(&["--selftest", "--json"])), Ok(Mode::Selftest { json: true }));
+        assert_eq!(parse(&args(&["--x11-release-helper"])), Ok(Mode::X11ReleaseHelper));
         assert!(parse(&args(&["--serve"])).is_err());
         assert!(parse(&args(&["--stdio", "--schema"])).is_err());
     }
