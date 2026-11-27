@@ -17,6 +17,13 @@ describe("classifyRetryableModelMiss", () => {
     expect(classifyRetryableModelMiss(child)).toEqual({ kind: "auth_missing", provider: "anthropic" })
   })
 
+  test("#given a revoked OAuth refresh token child failure #when classified #then it is a dead credential on that provider, so the chain moves on (#15227)", () => {
+    const child = result(
+      "OAuth refresh failed for google: body={\"error\":\"invalid_grant\"} (Token has been expired or revoked)",
+    )
+    expect(classifyRetryableModelMiss(child)).toEqual({ kind: "auth_missing", provider: "google" })
+  })
+
   test("#given an OpenAI context overflow #when classified #then it returns context_overflow", () => {
     expect(classifyRetryableModelMiss(result("Your input exceeds the context window of this model"))).toEqual({
       kind: "context_overflow",

@@ -64,7 +64,7 @@ export function reflectionRemediation(
       return "the reflection prompt outgrew the context window of every candidate model; run /dream to trim system memory, or point memory.reflection at a larger-context model"
     }
     if (combined.includes("auth_missing") || combined.includes("api key")) {
-      return "run /login <provider>"
+      return "the provider login for the failing model is broken or missing; run /login <provider> (named in the failure detail), or point the memory category at another model with categories.<category>.model"
     }
     return "no model for the memory reflection category could be admitted; the models that were tried are named in the failure detail"
   }

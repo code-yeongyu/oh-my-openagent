@@ -15,6 +15,9 @@ export type RetryableModelMiss =
 
 const MODEL_NOT_FOUND_PATTERN = /^Error: Model "([^"]+)" not found\. Use --list-models to see available models\.$/m
 const API_KEY_NOT_FOUND_PATTERN = /^(?:Error:\s*)?No API key found for\s+([^\s.]+)/m
+// A revoked or expired OAuth login: the credential exists but is dead, so this provider's models
+// cannot serve anything until the user logs in again (#15227). Same consequence as a missing key.
+const OAUTH_REFRESH_FAILED_PATTERN = /^OAuth refresh failed for\s+([^\s:]+)/m
 const HTTP_STATUS_PATTERN = /(?:^|\s)(\d{3})\s*:/
 const PROVIDER_DETAIL_MAX_CHARS = 200
 
@@ -23,7 +26,7 @@ export function classifyRetryableModelMiss(result: ModelMissResult): RetryableMo
   const output = `${result.stderr}\n${result.stdout}`
   const model = MODEL_NOT_FOUND_PATTERN.exec(output)?.[1]
   if (model !== undefined) return { kind: "model_not_visible", id: model }
-  const provider = API_KEY_NOT_FOUND_PATTERN.exec(output)?.[1]
+  const provider = API_KEY_NOT_FOUND_PATTERN.exec(output)?.[1] ?? OAUTH_REFRESH_FAILED_PATTERN.exec(output)?.[1]
   if (provider !== undefined) return { kind: "auth_missing", provider }
   const detail = providerFailureDetail(result)
   if (detail === undefined) return undefined
