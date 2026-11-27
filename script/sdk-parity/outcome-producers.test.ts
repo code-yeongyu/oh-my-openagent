@@ -46,6 +46,23 @@ describe("the files that produce or normalize an outcome", () => {
     expect(producersOnly(tree(moved))).toEqual([at("normalize.ts"), OUTCOME_RUNNER])
   })
 
+  // Review of #15217 at 6dda266fad (MEDIUM 1): gate-cli.ts statically imports `offenderGrowth` from script/, outside
+  // the folder, and that function decides a gate failure. Harness modules anywhere under script/ are producers; product
+  // code under packages/ is not, since both trees run it and the gate compares what it does.
+  test("#given a judging entry that imports a harness module outside the folder #then that module is a member and product code is not", () => {
+    const root = tree({
+      "scenario-run.ts": "export {}\n",
+      "gate-cli.ts": 'import { guard } from "../guard"\nimport { p } from "../../packages/product/p"\n',
+    })
+    writeFileSync(join(root, "script/guard.ts"), 'import { rule } from "./guard-rules"\nexport const guard = rule\n')
+    writeFileSync(join(root, "script/guard-rules.ts"), "export const rule = 1\n")
+    mkdirSync(join(root, "packages/product"), { recursive: true })
+    writeFileSync(join(root, "packages/product/p.ts"), "export const p = 1\n")
+    const set = outcomeProducers(root)
+    expect(set).toEqual(expect.arrayContaining(["script/guard.ts", "script/guard-rules.ts"]))
+    expect(set).not.toContain("packages/product/p.ts")
+  })
+
   test("#given a type-only import #then it is not a producer: a type cannot change an outcome", () => {
     const root = tree({
       "scenario-run.ts": 'import type { T } from "./types"\nimport { type U } from "./more-types"\n',
@@ -75,7 +92,8 @@ describe("the files that produce or normalize an outcome", () => {
       "verify-review.ts",
       "version-mask.ts",
     ].map(at)
-    expect(outcomeProducers(REPO_ROOT)).toEqual(expect.arrayContaining(members))
+    const harness = ["script/remote-import-guard-adapter.ts", "script/remote-import-guard-rules.ts"]
+    expect(outcomeProducers(REPO_ROOT)).toEqual(expect.arrayContaining([...members, ...harness]))
   })
 
   test("#given re-exports, a bare side-effect import, a .js specifier, require() and a JSON module #then each is followed", () => {

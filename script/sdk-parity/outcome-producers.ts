@@ -55,11 +55,15 @@ function resolveModule(root: string, from: string, specifier: string): string {
   return relative(root, file).split("\\").join("/")
 }
 
+// The harness: every module under script/ is the gate's own code, so a static import of one decides outcomes from the
+// head's checkout (gate-cli.ts imports `offenderGrowth` from script/, review of #15217 at 6dda266fad). Product code
+// under packages/ is not followed: both trees run it and the gate compares what it does.
+const HARNESS_ROOT = "script/"
+
 /**
- * The files under script/sdk-parity that produce, normalize or judge an outcome: the gate's entries and every module they
- * reach there, transitively. Computed from the source, so a module the runner newly
- * imports is in the set without a list to edit. Imports outside the folder are not followed: the runner and the tool
- * registry load them from the tree under test (`import(join(tree, ...))`), which both sides run and compare.
+ * The harness files that produce, normalize or judge an outcome: the gate's entries and every module they reach under
+ * script/, transitively. Computed from the source, so a module the runner newly imports is in the set without a list to
+ * edit.
  */
 export function outcomeProducers(root: string): string[] {
   const seen = new Set(GATE_ENTRIES)
@@ -68,7 +72,7 @@ export function outcomeProducers(root: string): string[] {
     if (!/\.[cm]?[jt]s$/.test(file)) continue
     for (const specifier of specifiersOf(file, readFileSync(join(root, file), "utf8"))) {
       const target = resolveModule(root, file, specifier)
-      if (!target.startsWith("script/sdk-parity/") || seen.has(target)) continue
+      if (!target.startsWith(HARNESS_ROOT) || seen.has(target)) continue
       seen.add(target)
       queue.push(target)
     }
