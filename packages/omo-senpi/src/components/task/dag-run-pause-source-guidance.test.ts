@@ -51,14 +51,14 @@ describe("DAG guidance dispatch holds the run's reservation", () => {
     const taskManager = new LongRunningTaskManager()
     taskManager.add(taskRecord(owner("only"), "paused", "task-only"))
     const isProcessAlive = (pid: number): boolean => pid === process.pid
-    const schedulerOptions = { store, taskManager, isProcessAlive }
+    const reservations = createDagRunReservations()
+    const schedulerOptions = { store, taskManager, isProcessAlive, reservations }
     guidePausedDag({ ...schedulerOptions, initialRecord: stopped }, runId, "look again")
     const second = guidePausedDag(
       { ...schedulerOptions, initialRecord: store.readCheckpoint<DagRunRecordV1>(runId) ?? stopped },
       runId,
       "and then this",
     )
-    const reservations = createDagRunReservations()
     let openDelivery = (): void => undefined
     const delivery = new Promise<void>((resolve) => (openDelivery = resolve))
     let markDelivering = (): void => undefined

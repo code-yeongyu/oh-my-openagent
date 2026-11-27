@@ -20,6 +20,7 @@ import { persistDagNodeResult } from "./results"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // See scheduler.test.ts: Bun honours a preload's setDefaultTimeout only for the first test file
@@ -292,6 +293,7 @@ function frontierFixture(
   store.writeCheckpoint(id, initialRecord)
   let eventTime = Date.parse("2026-08-25T00:00:02.000Z")
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store,
     taskManager: manager,
     initialRecord,
@@ -540,7 +542,12 @@ describe("DAG scheduler foreign-commit wake (#7412)", () => {
     })
     expect(persisted.kind).not.toBe("failed")
     const foreign = controlJournal(
-      { store, taskManager: manager, initialRecord: durable() } as DagSchedulerOptions,
+      {
+        reservations: createDagRunReservations(),
+        store,
+        taskManager: manager,
+        initialRecord: durable(),
+      } as DagSchedulerOptions,
       durable(),
     )
     foreign.append(

@@ -58,8 +58,9 @@ export type DagSchedulerOptions = {
   readonly scheduleRetry?: RetrySchedule
   // The in-process reservation a control verb already holds for this run (`run-acquisition.ts`).
   readonly reservation?: DagRunReservation
-  // This process's reservations: a revive watcher's fold waits on them (`node-send-revive.ts`).
-  readonly reservations?: DagRunReservations
+  // This process's per-run reservations, required: a revive watcher's fold always waits on them
+  // (`node-send-revive.ts`). A scheduler built by hand without a runtime passes a registry of its own.
+  readonly reservations: DagRunReservations
 }
 
 // Harness-injected gate for agent-routed nodes, evaluated once per admission before startOwned:

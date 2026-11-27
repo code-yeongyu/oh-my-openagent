@@ -9,6 +9,7 @@ import { join } from "node:path"
 import { LongRunningTaskManager, node, pausedRecord, runId } from "./__fixtures__/reattached-run"
 import type { DagRunRecordV1 } from "./manager"
 import { cancelPausedDagNode, guidePausedDag } from "./paused-controls"
+import { createDagRunReservations } from "./run-reservations"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId } from "./types"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
@@ -41,7 +42,12 @@ function stoppedRunResumedAtTheLock() {
       return base.withRunLock(lockedRunId, operation)
     },
   }
-  const options = { store, taskManager: new LongRunningTaskManager(), initialRecord: stopped }
+  const options = {
+    store,
+    taskManager: new LongRunningTaskManager(),
+    initialRecord: stopped,
+    reservations: createDagRunReservations(),
+  }
   const events = () => base.readEvents(runId, 0, { limit: 500 }).events
   return { options, events, raced: () => raced }
 }

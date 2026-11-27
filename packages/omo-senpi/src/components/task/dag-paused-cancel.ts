@@ -30,17 +30,26 @@ export function endedChildClosure(manager: ChildLookup): PausedNodeHoldPort {
   }
 }
 
-/** Every node's current child of a run no scheduler holds is ended before the run is journaled cancelled. */
+/**
+ * Every node's current child of a run no scheduler holds is ended before the run is journaled cancelled.
+ * With `onUnclosed`, a child that cannot be stopped or closed is reported and the others still are.
+ */
 export async function endPausedRunChildren(
   manager: NodeChildLookup,
   record: DagRunRecordV1,
   closure: PausedNodeHoldPort,
+  onUnclosed?: (nodeId: DagNodeId, taskId: string, error: unknown) => void,
 ): Promise<void> {
   for (const node of record.nodes) {
     const task = currentNodeTask(manager, record, node)
     if (task === undefined || isTerminalRecord(task)) continue
-    await manager.cancelTask(task.task_id, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
-    await closure.closeHold(task.task_id, "run_cancelled")
+    try {
+      await manager.cancelTask(task.task_id, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
+      await closure.closeHold(task.task_id, "run_cancelled")
+    } catch (error) {
+      if (onUnclosed === undefined) throw error
+      onUnclosed(node.id, task.task_id, error)
+    }
   }
 }
 

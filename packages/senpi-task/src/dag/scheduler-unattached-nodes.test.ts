@@ -20,6 +20,7 @@ import { subscribeDagJournal } from "./journal"
 import { createDagRecovery } from "./recovery"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
@@ -49,7 +50,12 @@ describe("DAG scheduler over active nodes it does not hold", () => {
     manager.add(taskRecord(owner("gone"), "running", "task-gone"))
 
     // when
-    const parked = await createDagScheduler({ store, taskManager: manager, initialRecord }).run()
+    const parked = await createDagScheduler({
+      reservations: createDagRunReservations(),
+      store,
+      taskManager: manager,
+      initialRecord,
+    }).run()
 
     // then - the run stops claiming to run, and the node's work is not judged here
     expect(parked.status).toBe("paused")
@@ -66,7 +72,7 @@ describe("DAG scheduler over active nodes it does not hold", () => {
       "gone:completed",
       "after:completed",
     ])
-  }, 30_000)
+  })
 
   test("#given a parked scheduler #when the run is re-entered and parks again twice #then no parked scheduler keeps refreshing on the later commits", async () => {
     // given
@@ -81,7 +87,9 @@ describe("DAG scheduler over active nodes it does not hold", () => {
     const initialRecord = { ...paused, status: "running" as const }
     store.writeCheckpoint(runId, initialRecord)
     manager.add(taskRecord(owner("gone"), "running", "task-gone"))
-    const parked = [createDagScheduler({ store, taskManager: manager, initialRecord })]
+    const parked = [
+      createDagScheduler({ reservations: createDagRunReservations(), store, taskManager: manager, initialRecord }),
+    ]
     await parked[0]?.run()
 
     for (let round = 0; round < 2; round += 1) {
@@ -98,7 +106,12 @@ describe("DAG scheduler over active nodes it does not hold", () => {
       if (current === null) throw new Error("expected a checkpoint")
       const taken = { ...current, status: "running" as const }
       store.writeCheckpoint(runId, taken)
-      const next = createDagScheduler({ store, taskManager: manager, initialRecord: taken })
+      const next = createDagScheduler({
+        reservations: createDagRunReservations(),
+        store,
+        taskManager: manager,
+        initialRecord: taken,
+      })
       await next.run()
       await committed
       unsubscribe()

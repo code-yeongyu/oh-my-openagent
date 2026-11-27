@@ -37,6 +37,7 @@ export async function installRecoveredDag(
           taskManager: context.taskManager,
           initialRecord: claimed,
           hostPid: context.hostPid,
+          reservations: context.reservations,
           now: context.now,
         },
         context.pausedChildren,
@@ -63,6 +64,7 @@ export async function installRecoveredDag(
     const scheduler = createDagScheduler({
       store: context.store,
       taskManager: context.taskManager,
+      reservations: context.reservations,
       initialRecord: journal.snapshot(),
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
       ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),

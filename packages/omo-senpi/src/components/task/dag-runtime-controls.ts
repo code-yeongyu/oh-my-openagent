@@ -78,9 +78,12 @@ export function createDagRuntimeControls(ports: {
 
   const send = (runId: DagRunId, nodeId: string, message: string): Promise<DagNodeSendResult> =>
     reserved(runId, "send", (reservation) => {
-      const held = ports.holdsRun(runId) ? schedulers.get(runId) : undefined
-      if (held !== undefined) return held.scheduler.sendToNode(runId, nodeId as DagNodeId, message)
+      // One path per run state: a run this host's scheduler is running goes through that scheduler; a
+      // settled run goes through the one decision and fold below, even while its scheduler is still
+      // registered (the registry drops the entry only after the scheduler idles) (#15125).
       const record = coreManager.record(runId, ports.sessionId())
+      const held = ports.holdsRun(runId) && record.status === "running" ? schedulers.get(runId) : undefined
+      if (held !== undefined) return held.scheduler.sendToNode(runId, nodeId as DagNodeId, message)
       return sendToDagNode(
         { ...schedulerOptions, initialRecord: record, reservation, reservations: ports.reservations },
         runId,

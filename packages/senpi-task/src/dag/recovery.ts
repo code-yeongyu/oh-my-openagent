@@ -40,7 +40,7 @@ export type DagRecoveryOutcome = {
   readonly kind: "resumed" | "adopted" | "skipped"
   readonly record?: DagRunRecordV1
   readonly reusedOutputs?: ReadonlyMap<DagNodeId, string>
-  readonly reason?: "foreign_session" | "live_lease" | "not_paused"
+  readonly reason?: "foreign_session" | "live_lease" | "not_paused" | "busy"
   // The pid a `live_lease` skip observed alive. A host that paused the run for its own shutdown is
   // often still exiting when its successor resumes the session, so the caller watches this pid and
   // retries the claim once it is gone instead of leaving the run paused for good.
@@ -208,8 +208,8 @@ async function visitPausedRuns(
       ? claimOrphanedRun(context, observed.runId, observed.parentSessionId, parentSessionId)
       : claimPausedRun(context, observed.runId, parentSessionId, { kind: "automatic" })
     if (claim.kind === "skipped") {
-      if (!foreign && claim.reason === "live_lease") {
-        outcomes.push({ runId: observed.runId, kind: "skipped", reason: claim.reason, holderPid: claim.holderPid })
+      if (!foreign && (claim.reason === "live_lease" || claim.reason === "busy")) {
+        outcomes.push({ ...claim, runId: observed.runId })
       }
       continue
     }
