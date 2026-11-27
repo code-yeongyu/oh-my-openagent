@@ -1,4 +1,4 @@
-import { toGatewayAddressEntries } from "../address-book"
+import { toGatewayAddressEntries, type AddressEntry } from "../address-book"
 import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter"
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
 import { createLocalTransport } from "../gateway/local-transport"
@@ -32,6 +32,22 @@ export type GatewayServices = {
 }
 
 /**
+ * A published owner is listed on its own socket only (`sendView`), so its session file is found on disk with no endpoint. When
+ * that one socket was refused for its host's identity, the refusal belongs to the owner's thread: it is not offline.
+ */
+function withOwnerRefusal(book: readonly AddressEntry[], current: ThreadHostView, address: string): readonly AddressEntry[] {
+  const [owner, ...others] = current.hosts
+  if (owner === undefined || others.length > 0 || owner.reason !== "identity_unproven" || !(owner.error instanceof Error))
+    return book
+  const refusal = owner.error
+  return book.map((entry) =>
+    entry.thread_id === address && !entry.alive && entry.identity_refusal === undefined
+      ? { ...entry, identity_refusal: refusal }
+      : entry,
+  )
+}
+
+/**
  * The one composition of the gateway over a thread surface: the caller's store and the engine resolving addresses through
  * the address book of `view`. The agent tools and the `omo thread` SDK both build on it, so neither duplicates the
  * engine; they differ only in the principal they pass. `view` is the send path's view (callers pass
@@ -46,8 +62,9 @@ export function createGatewayServices(
   // single-lookup rule); the extension path shares the plain live-and-disk resolver (no store).
   const resolve: GatewayResolve = async (address, request) => {
     const current = await sendView(options, address, view)
+    const book = sendAddressBook(options, current, address, request.all_scope)
     return await resolveFromEntries(
-      () => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)),
+      () => toGatewayAddressEntries(withOwnerRefusal(book, current, address)),
       options.callerWorkspaceRoot,
     )(address, request)
   }
