@@ -78,7 +78,7 @@ const scenarios: ReadonlyArray<readonly [string, Scenario]> = [
     async () => {
       const child = stdioChild()
       const late = await child.disposed()
-      void child.handle.adoptFinishedTurn?.("done")
+      void child.handle.adoptFinishedTurn?.("done", "unrecorded")
       await clock.advance(0)
       return late()
     },

@@ -126,11 +126,13 @@ export function parseOptionalOwner(record: Record<string, unknown>): DagTaskOwne
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("owner is not an object")
   if (readString(value, "kind") !== "dag") throw new Error("owner.kind is not dag")
+  const execAttempt = readOptionalNumber(value, "execAttempt")
   return {
     kind: "dag",
     runId: readString(value, "runId") as DagTaskOwner["runId"],
     nodeId: readString(value, "nodeId") as DagTaskOwner["nodeId"],
     fingerprint: readString(value, "fingerprint"),
+    ...(execAttempt === undefined ? {} : { execAttempt }),
   }
 }
 

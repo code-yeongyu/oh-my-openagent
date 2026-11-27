@@ -165,7 +165,7 @@ describe("in-process child teardown shuts down its extensions (#9413)", () => {
       disposed = true
       dispose()
     }
-    const handle = createRestoredChildHandle({ taskId: "hung-child", session })
+    const handle = createRestoredChildHandle({ workEvidence: "none-pending", taskId: "hung-child", session })
     const shutdownErrors: ExtensionError[] = []
     const stopWatchingErrors = session.extensionRunner.onError((error) => {
       if (error.event === "session_shutdown") shutdownErrors.push(error)

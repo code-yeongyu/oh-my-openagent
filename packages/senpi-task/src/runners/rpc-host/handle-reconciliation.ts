@@ -1,5 +1,5 @@
 import type { TaskRecord } from "../../state"
-import type { RunnerOutcome } from "../in-process/child-handle"
+import type { PendingWorkEvidence, UnfinishedOutcome } from "../pending-async-work"
 import type { HostSessionPort } from "./handle-port"
 import { readInputReceipt } from "./input-receipt"
 import { reconcileHostTurn, type ReconciledTurnNotice } from "./reconcile-turn"
@@ -8,7 +8,10 @@ import { reconcileHostTurn, type ReconciledTurnNotice } from "./reconcile-turn"
 export function createHandleReconciliation(input: {
   readonly lastInputId: () => string | undefined
   readonly port: () => HostSessionPort
-  readonly settle: (outcome: RunnerOutcome) => void
+  // Every state the reconciliation reads also reports the engine's lifecycle (omo#10487).
+  readonly observeState: (state: unknown) => void
+  readonly settle: (outcome: UnfinishedOutcome) => void
+  readonly adopt: (finalResponse: string, evidence: PendingWorkEvidence) => void
   readonly continuing: () => void
 }) {
   let record: Pick<TaskRecord, "host_session" | "final_response"> = {}
@@ -36,7 +39,11 @@ export function createHandleReconciliation(input: {
       const lastInputEffect = effectId === undefined ? undefined : await readInputReceipt(sessionPath, effectId)
       const result = await reconcileHostTurn(
         {
-          getState: () => client.getState(),
+          getState: async () => {
+            const state = await client.getState()
+            input.observeState(state)
+            return state
+          },
           ...(lastInputEffect === undefined ? {} : { lastInputEffect }),
           reopened,
           get adoptedEntryId() {
@@ -44,6 +51,7 @@ export function createHandleReconciliation(input: {
           },
           notify,
           settle: input.settle,
+          adopt: input.adopt,
           interruptedWithoutTranscript,
         },
         record,

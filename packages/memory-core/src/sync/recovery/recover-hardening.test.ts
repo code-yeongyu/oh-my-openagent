@@ -136,7 +136,7 @@ describe("recovery after begin always disposes the held keys (#10412 review H1)"
 })
 
 describe("the trust pin is checked before any join (#10412 review M1)", () => {
-  test("a device pinned to one root refuses a second, different identity under the same account name, before begin's keys are used", async () => {
+  test("a device pinned to one root refuses a second, different identity under the same account name, before begin runs (D12 membership guard)", async () => {
     const first = await createWorld()
     const second = await createWorld()
     expect(first.account).toBe(second.account)
@@ -153,8 +153,7 @@ describe("the trust pin is checked before any join (#10412 review M1)", () => {
       next: "re-pair or recover",
     })
     expect(second.server.chain(second.account).length).toBe(before)
-    expect(derived.length).toBe(1)
-    expect(derived.every(zero)).toBe(true)
+    expect(derived.length).toBe(0)
     expect(await loadTrustAnchor(stateDir, first.account)).toEqual(pinnedBefore)
   })
 })
