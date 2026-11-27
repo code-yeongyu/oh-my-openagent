@@ -60,16 +60,20 @@ export async function listLiveDevices(session: Pick<Session, "accessToken" | "re
     .map(live)
 }
 
-/** Renames a device of this account; the service answers 404 `not_found` for an id the account does not have. */
+/**
+ * Renames a device of this account and answers it as the account lists it afterwards (undefined once the account no
+ * longer lists it); the service answers 404 `not_found` for an id the account does not have.
+ */
 export async function renameDevice(
   session: Pick<Session, "accessToken" | "request">,
   id: string,
   name: string,
-): Promise<void> {
+): Promise<LiveDevice | undefined> {
   const access = await session.accessToken()
   await session.request(`/v1/devices/${encodeURIComponent(id)}`, {
     ...jsonRequest({ name }),
     method: "PATCH",
     headers: { ...syncRequestHeaders(access), "content-type": "application/json" },
   })
+  return (await listLiveDevices(session)).find((device) => device.id === id)
 }

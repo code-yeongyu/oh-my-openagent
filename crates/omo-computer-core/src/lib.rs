@@ -6,7 +6,9 @@ pub mod capabilities;
 pub mod doc;
 pub mod env;
 pub mod error;
+pub mod frame;
 pub mod hello;
+pub mod intervention;
 pub mod listing;
 pub mod methods;
 mod nullable;
@@ -19,6 +21,7 @@ pub mod results;
 pub mod schema;
 pub mod session_state;
 pub mod settings;
+pub mod settle_profile;
 pub mod untrusted;
 
 #[cfg(test)]
