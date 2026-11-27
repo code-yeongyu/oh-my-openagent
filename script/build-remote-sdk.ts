@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, relative, resolve } from "node:path"
+import path, { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 // `omo-ai/remote` (omo#13413): the remote module bundled for node plus its declaration tree. TypeScript 7 has no
@@ -149,14 +149,20 @@ async function declarations(): Promise<Artifacts> {
 /**
  * Every path where what a commit ships differs from the build: an artifact git's index does not hold (missing, or written
  * but never added), one whose indexed bytes differ, or an indexed file in the types tree the build no longer emits. The
- * working tree is never read: an install's prepare build rewrites it, so it would always look current.
+ * working tree is never read: an install's prepare build rewrites it, so it would always look current. Every key and
+ * `typesRoot` come from `paths` (the platform's path module), so the types tree is judged with it too.
  */
 export function staleArtifacts(
   artifacts: ReadonlyMap<string, string>,
   typesRoot: string,
   indexed: ReadonlyMap<string, string>,
+  paths: typeof path = path,
 ): string[] {
-  const extra = new Set([...indexed.keys()].filter((path) => path.startsWith(`${typesRoot}/`)))
+  const inTypes = (file: string): boolean => {
+    const below = paths.relative(typesRoot, file)
+    return below !== "" && below !== ".." && !below.startsWith(`..${paths.sep}`) && !paths.isAbsolute(below)
+  }
+  const extra = new Set([...indexed.keys()].filter(inTypes))
   const differing = [...artifacts]
     .filter(([path, text]) => {
       extra.delete(path)

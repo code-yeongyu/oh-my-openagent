@@ -91,16 +91,15 @@ describe("omo-ai/remote build", () => {
     ["posix", posix, "/repo"],
     ["win32", win32, "C:\\repo"],
   ] as const
-  test.each(PLATFORMS.flatMap(([platform, paths, base]) => ROWS.map((row) => [platform, ...row, paths, base] as const)))(
-    "#given %s paths and %s #when compared #then the stale paths are listed",
-    (_, __, index, expected, paths, base) => {
-      const at = (path: string) => paths.join(base, path)
-      const artifacts = new Map(Object.entries(BUILT).map(([path, text]) => [at(path), text]))
-      const indexed = new Map(Object.entries(index).map(([path, text]) => [at(path), text]))
-      const stale = staleArtifacts(artifacts, at("types"), indexed, paths)
-      expect(stale.map((path) => paths.relative(base, path).split(paths.sep).join("/"))).toEqual([...expected])
-    },
-  )
+  test.each(
+    PLATFORMS.flatMap(([platform, paths, base]) => ROWS.map((row) => [platform, ...row, paths, base] as const)),
+  )("#given %s paths and %s #when compared #then the stale paths are listed", (_, __, index, expected, paths, base) => {
+    const at = (path: string) => paths.join(base, path)
+    const artifacts = new Map(Object.entries(BUILT).map(([path, text]) => [at(path), text]))
+    const indexed = new Map(Object.entries(index).map(([path, text]) => [at(path), text]))
+    const stale = staleArtifacts(artifacts, at("types"), indexed, paths)
+    expect(stale.map((path) => paths.relative(base, path).split(paths.sep).join("/"))).toEqual([...expected])
+  })
 
   test("#given stale bytes committed and fresh bytes rebuilt but not committed #when the index is read #then the output is stale", async () => {
     const repo = mkdtempSync(join(tmpdir(), "omo-remote-sdk-index-"))
