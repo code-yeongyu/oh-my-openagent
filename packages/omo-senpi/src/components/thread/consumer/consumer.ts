@@ -121,18 +121,26 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   }
 
   /**
-   * The reply is the engine's RPC response envelope, as the live path answers the same record (A5 addendum 2).
-   * `unknown_delivery`: the service no longer waits on this pair; the row stays and the wake goes on (A5.1).
-   */
-  /**
    * #14266: an intake row is left to its session's own reconcile, which first checks whether the delivery reached the
    * transcript live (gateway retention skips intake rows, #14466). A session this device never woke never reconciles,
    * so past its deadline the row is settled here exactly as a receipt query settles it: applied when the transcript
    * holds it, else refused `expired`, which the refusal notices then tell its sender. The timer is then armed for the
-   * earliest deadline of the intake rows still queued.
+   * earliest deadline of the intake rows still queued. Passes run unawaited from several places, so only the latest
+   * one started may cancel or arm the timer: an older one may have read the rows before a newer row was committed.
    */
   let cancelDeadline: (() => void) | undefined
+  let generation = 0
+  let passes = 0
   const settleExpiredIntake = async (): Promise<void> => {
+    const pass = ++generation
+    passes++
+    try {
+      await settlePass(pass)
+    } finally {
+      passes--
+    }
+  }
+  const settlePass = async (pass: number): Promise<void> => {
     const now = store.now()
     let next = Number.POSITIVE_INFINITY
     for (const session of await store.intakeMarks.openSessions()) {
@@ -158,6 +166,7 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
         })
       }
     }
+    if (pass !== generation) return
     cancelDeadline?.()
     cancelDeadline = undefined
     if (options.schedule === undefined || !serving || next === Number.POSITIVE_INFINITY) return
@@ -212,6 +221,10 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
     }
   }
 
+  /**
+   * The reply is the engine's RPC response envelope, as the live path answers the same record (A5 addendum 2).
+   * `unknown_delivery`: the service no longer waits on this pair; the row stays and the wake goes on (A5.1).
+   */
   const answer = async (
     pair: { readonly sender_device: string; readonly command_id: string },
     reply: Record<string, unknown>,
@@ -339,7 +352,9 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       waiting_on: (await store.sessionWait.waitingOn({ durable_id: event.durable_id })) ?? { kind: "wake" },
     })
     track(settleAfterAnswer(event, outcome.row_id))
-    if (!outcome.deduplicated) track(settleExpiredIntake())
+    // Every intake row has the same lifetime, so a timer already armed is due no later than this row: only an unarmed
+    // consumer, or one whose pass in flight may have read the rows before this commit, needs a new pass.
+    if (!outcome.deduplicated && (cancelDeadline === undefined || passes > 0)) track(settleExpiredIntake())
   }
 
   const reportPending = async (): Promise<void> => {
