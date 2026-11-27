@@ -19,6 +19,7 @@ import type {
   ThreadToolResult,
   ThreadTranscriptItem,
 } from "../contracts"
+import { inSendResultOrder } from "../contracts/send-result-order"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
@@ -90,7 +91,8 @@ export function uncertainFailure(note: string | null): ThreadToolResult {
   )
 }
 
-export function output(result: ThreadToolResult): ToolOutput {
+export function output(answer: ThreadToolResult): ToolOutput {
+  const result = "delivery" in answer ? inSendResultOrder(answer) : answer
   return {
     content: [{ type: "text", text: JSON.stringify(result) }],
     details: { result },
