@@ -431,6 +431,41 @@ test("expiry and a deadline claim cannot both win", async () => {
   }
 })
 
+// #14266: the holder answered queued and asked for the wake, but the session never ran (this fixture's wake only counts).
+// The intake row is left to the target's own reconcile, which never comes, so at its deadline the holder settles it and
+// tells the sender; the sender never has to ask.
+test.each([86_399_999, 86_400_000])(
+  "a delivery whose holder never woke the session is reported to the sender at its deadline, unasked (%i ms)",
+  async (elapsed) => {
+    const x = await setup()
+    try {
+      setSystemTime(x.h.clock.now)
+      const first = await x.sender.run("thread_send", { thread: "dur-on-b", message: "one", idempotency_key: "k" })
+      if (first.kind !== "ok" || !("delivery_id" in first) || typeof first.delivery_id !== "string")
+        throw new Error("send did not return a delivery id")
+      expect(first).toMatchObject({ delivery: { kind: "queued", waiting_on: { kind: "wake" } } })
+      x.h.clock.now += elapsed
+      setSystemTime(x.h.clock.now)
+      await x.consumer.reportDrained()
+      await x.noticesSettled()
+      const due = elapsed >= 86_400_000
+      expect(await x.store.list({ target_durable_id: "dur-on-b" })).toMatchObject([
+        due ? { state: "refused", reason: "expired" } : { state: "queued" },
+      ])
+      const held = await x.sender.store.remoteReceipt({
+        now: x.sender.store.now(),
+        principal: "session:dur-caller",
+        delivery_id: first.delivery_id,
+      })
+      expect(held?.result.outcome).toEqual(due ? { kind: "refused", reason: "expired" } : undefined)
+      expect(x.runtime.enqueueCalls).toHaveLength(0)
+      expect(x.counts).toEqual({ forward: 1, reverse: due ? 1 : 0, wakes: 1, queries: 0 })
+    } finally {
+      await x.cleanup()
+    }
+  },
+)
+
 test("a partition across the deadline returns unavailable until authorized recovery", async () => {
   const x = await setup()
   try {
