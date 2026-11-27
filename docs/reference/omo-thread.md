@@ -281,6 +281,28 @@ per table, so it never adds a write when nothing else writes.
 | A sender's rate bucket | until it is idle for a full refill (40 s), which is exactly a fresh bucket |
 | A session's sequence counter and incarnation | while any delivery names the session; rebuilt on its next use |
 
+## Hosts that do not authenticate
+
+When a launch of an rpc host starts, it publishes a key record under `<agent dir>/rpc/keys/<launch id>`. `omo thread` and the thread tools use that record to check which host answers a socket before they send it anything.
+
+- `host_identity_unproven: the thread host's launch has no key record under the key root`: the host answered with a challenge for a launch whose key record cannot be found under the key root. It is sent no commands.
+  - In `omo thread list` its threads show as `inactive`, with that sentence as the note.
+  - `read`, `close` and the control tools answer the same refusal.
+  - A `send` is stored and shows `queued`, waiting on `host_identity_unproven`. The host that holds the thread takes the message from the local store itself, so nothing is lost.
+- A host that does not authenticate at all: engines older than 2026.10.24-3 publish no key record. This release still serves them and announces the change. The next release refuses them with `host_unauthenticated`.
+
+### What to do
+
+1. Update omo: `omo update`.
+2. Stop the old host: `omo daemon stop`. The next thread call starts one from the updated engine.
+3. If the host runs under another agent directory (another profile), point the key root at it: `SENPI_RPC_KEY_ROOT=<that agent dir> omo thread ...`.
+
+Do not delete or edit files under `rpc/keys`. A host removes its own record when it exits, and `senpi host gc` removes the records of processes that died.
+
+### Windows
+
+Windows named pipes use the older `<socket>.secret` handshake. It proves the client to the host, but nothing proves the host to the client. This is an accepted gap until the launch-key challenge is extended to pipes (code-yeongyu/senpi#7571).
+
 ## JSON
 
 With `--json`, stdout is exactly one JSON value, also on failure. `list` prints the thread array;
