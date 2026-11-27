@@ -41,7 +41,8 @@ export function createDagRecoverySweeps(ports: {
     leaseWatch.dispose()
   }
 
-  const watchLiveLease = (scope: RecoveryScope, runId: DagRunId, holderPid: number): void => {
+  const watchLiveLease = (scope: RecoveryScope, outcome: DagRecoveryOutcome, holderPid: number): void => {
+    const { runId } = outcome
     if (!open || leaseWatches.has(runId)) return
     // A live_lease naming our own pid means a scheduler in this runtime still holds the run: a watch on
     // our own pid could only fire once this process is gone.
@@ -53,18 +54,23 @@ export function createDagRecoverySweeps(ports: {
     })
     leaseWatches.set(
       runId,
-      leaseWatch.watch(holderPid, () => {
-        leaseWatches.delete(runId)
-        if (ports.activeSessionId() !== scope.sessionId) return
-        void recover(scope)
-          .then(ports.onRecovered)
-          .catch((error: unknown) => {
-            ports.logger.error("omo-senpi DAG deferred recovery failed", {
-              runId,
-              error: error instanceof Error ? error.message : String(error),
+      leaseWatch.watch(
+        holderPid,
+        () => {
+          leaseWatches.delete(runId)
+          if (ports.activeSessionId() !== scope.sessionId) return
+          void recover(scope)
+            .then(ports.onRecovered)
+            .catch((error: unknown) => {
+              ports.logger.error("omo-senpi DAG deferred recovery failed", {
+                runId,
+                error: error instanceof Error ? error.message : String(error),
+              })
             })
-          })
-      }),
+        },
+        // A node child's owner is watched as the holder rule named it: gone once its pid is reused.
+        outcome.holderClaim,
+      ),
     )
   }
 
@@ -72,7 +78,7 @@ export function createDagRecoverySweeps(ports: {
     const outcomes = await ports.install(scope)
     for (const outcome of outcomes) {
       if (outcome.kind !== "skipped" || outcome.reason !== "live_lease" || outcome.holderPid === undefined) continue
-      watchLiveLease(scope, outcome.runId, outcome.holderPid)
+      watchLiveLease(scope, outcome, outcome.holderPid)
     }
     ports.afterSweep(scope.sessionId)
     return outcomes

@@ -65,8 +65,6 @@ describe("DAG committed shutdown holds the runs it pauses", () => {
       schedulers,
       reservations,
       holders: { taskManager, hostPid: process.pid, isProcessAlive },
-      children: taskManager,
-      closure: { closeHold: async () => undefined },
       holdsRun: (id) => schedulers.get(id)?.running !== undefined,
     })
     const shutdown = createShutdownPause({

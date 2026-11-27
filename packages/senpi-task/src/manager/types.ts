@@ -14,6 +14,8 @@ import type {
   TaskStatus,
 } from "../state"
 import type { DestructionPort, SendOutcome } from "../steering"
+import type { OwnerProcessView } from "../lifecycle/owner-process"
+import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
@@ -25,12 +27,15 @@ import type { ChildCreationPort, ChildPausePort, ResumedChildTurn, RunPauseOwner
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import type { HeldStart, StartAdmission } from "./start-admission"
 import type { HostLivenessStatus } from "../runners/rpc-host/handle-heartbeat"
+import type { OwnerResumeFence } from "./owner-resume"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
 // The unified spec both runner adapters accept. A superset: the rpc adapter uses the subset it
 // needs (task_id, cwd, state_dir, prompt); the in-process adapter also consumes model/tools/agent.
 export type ManagedStartSpec = {
+  readonly onProviderRequest?: () => void
+  readonly probeProviderRequest?: boolean
   readonly admission?: StartAdmission
   readonly taskId: string
   readonly cwd: string
@@ -276,6 +281,8 @@ export type TrustedRespawnLaunch = {
 
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
+export type { OwnerResumeFence, OwnerResumeVerdict } from "./owner-resume"
+
 export type TaskManagerOptions = {
   readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
   readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
@@ -294,10 +301,17 @@ export type TaskManagerOptions = {
   readonly config: OmoTaskSettings
   readonly cwd: string
   readonly now?: () => number
+  // How long the one same-provider rung an ambiguous usage limit hops onto may stay silent (#11383); default 60 s.
+  readonly limitProbeTimeoutMs?: number
   readonly scheduleExitConfirmation?: ExitConfirmationSchedule
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.
   readonly destruction?: DestructionPort
+  // Asked about a DAG-owned record inside the same record mutation that would reopen its settled child
+  // for a run the child started on its own (#11381); absent -> every such reopen proceeds.
+  readonly ownerResumeFence?: OwnerResumeFence
+  // Budget for each step of stopping a refused self-started turn; injectable so a test owns the clock.
+  readonly teardownStepDeadline?: TeardownStepDeadline
   // Injected by the todo-17 wiring. Consulted at spawn so the residency cap (LRU eviction) gates a
   // new child; absent -> admission is skipped (pre-wiring/unit behaviour, no cap enforcement).
   readonly admit?: AdmitResident
@@ -313,6 +327,8 @@ export type TaskManagerOptions = {
   readonly hostPid?: number
   // Whether a recorded owner host still runs; defaults to the lifecycle's signal-0 probe.
   readonly isProcessAlive?: (pid: number) => boolean
+  // When the recorded owner pid started; a process born after the record was written never owns it.
+  readonly ownerProcesses?: OwnerProcessView
   // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so
   // a same-host parked child revives onto the same live parent closures; absent = no kernel tools.
   readonly kernelToolBindings?: KernelToolBindingRegistry

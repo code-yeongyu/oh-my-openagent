@@ -14,7 +14,7 @@ import {
   dagRunEligibility,
   type DagRunReservations,
 } from "../../../../senpi-task/src/dag/run-acquisition"
-import { releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
+import { holderProbeOf, releaseDagRunLease } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler, type DagRunReentry } from "../../../../senpi-task/src/dag/scheduler"
 import type { PausedNodeHoldPort } from "./dag-paused-cancel"
 import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
@@ -37,15 +37,11 @@ export function createDagSchedulerRegistry(ports: {
   readonly reservations: DagRunReservations
   // Re-runs this session's recovery: a run whose scheduler here failed is handed to it.
   recover(sessionId: string): Promise<readonly DagRecoveryOutcome[]>
-  // Ends a parked run's live children (the unheld road cancel takes).
+  // Confirms a parked run's stopped children closed their holds (bookkeeping on the one drain's result).
   readonly closure: PausedNodeHoldPort
 }) {
   const { schedulers, store, schedulerOptions, logger } = ports
-  const lease = {
-    taskManager: schedulerOptions.taskManager,
-    hostPid: process.pid,
-    isProcessAlive: ports.isProcessAlive,
-  }
+  const lease = holderProbeOf({ ...schedulerOptions, hostPid: process.pid, isProcessAlive: ports.isProcessAlive })
 
   /** "This host holds the run": a scheduler of this runtime is running it (started or installed here). */
   const holdsRun = (runId: DagRunId): boolean => schedulers.get(runId)?.running !== undefined

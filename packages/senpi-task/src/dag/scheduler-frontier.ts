@@ -15,7 +15,7 @@ import {
   TERMINAL_NODE_STATES,
   type SchedulerContext,
 } from "./scheduler-context"
-import { cancelledSnapshot } from "./scheduler-cancellation"
+import { cancelledSnapshot, disposeSupersededChildren, supersededChildren } from "./scheduler-cancellation"
 import { admitFrontier } from "./scheduler-admission"
 import { settleOne } from "./scheduler-task-attachment"
 import type { DagNode, DagNodeId } from "./types"
@@ -26,6 +26,8 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
   if (context.journal.snapshot().status === "pending") {
     context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
   }
+  const superseded = supersededChildren(context)
+  if (superseded.length > 0) await disposeSupersededChildren(context, superseded)
 
   for (;;) {
     if (context.suspended || context.cancellationStarted) return cancelledSnapshot(context)
@@ -120,7 +122,7 @@ export function emitWaveAdmissions(context: SchedulerContext, scheduled: readonl
   }
 }
 
-function emitCompletedWaves(context: SchedulerContext): void {
+export function emitCompletedWaves(context: SchedulerContext): void {
   if (context.emittedWaveAdmissions.size === 0) return
   const snapshot = context.journal.snapshot()
   const states = new Map(snapshot.nodes.map((node) => [node.id, node.state]))

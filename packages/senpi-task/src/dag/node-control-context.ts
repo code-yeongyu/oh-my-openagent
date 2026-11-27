@@ -1,11 +1,10 @@
 // The shared boundary of the per-node control verbs: one refusal vocabulary, one ownership/lease
 // check, and one journal factory, so retry and send can never disagree about who owns a run.
-import { defaultSignaller } from "../lifecycle/context"
 import { createDagJournal, type DagJournal } from "./journal"
 import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
 import { acquireDagRun, dagRunEligibility } from "./run-acquisition"
 import { reentryRefusal } from "./reentry-refusal"
-import { liveForeignHolder, releaseDagRunLease } from "./run-lease"
+import { holderProbeOf, liveForeignHolder, observeChildOwners, releaseDagRunLease } from "./run-lease"
 import { applyDagSchedulerEvent, type DagSchedulerOptions } from "./scheduler"
 import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeId, DagRunId } from "./types"
@@ -68,14 +67,7 @@ export function ownedRecord(options: DagSchedulerOptions, runId: DagRunId): DagR
   }
   // The one holder rule (#15125): the lease, a still-draining previous holder, or for a record naming
   // neither the live foreign owner of an active child.
-  const holder = liveForeignHolder(
-    {
-      taskManager: options.taskManager,
-      hostPid: options.hostPid ?? process.pid,
-      isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-    },
-    record,
-  )
+  const holder = liveForeignHolder(holderProbeOf(options), record)
   if (holder !== undefined) {
     throw new DagNodeControlError({
       code: "run_not_owned",
@@ -115,11 +107,7 @@ export function acquireReentryLease(
   options: DagSchedulerOptions,
   runId: DagRunId,
 ): { readonly record: DagRunRecordV1; readonly abandon: () => void } {
-  const probe = {
-    taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-  }
+  const probe = holderProbeOf(options)
   const parentSessionId = options.initialRecord.parentSessionId
   const acquired = acquireDagRun(options.store, runId, {
     operation: "re-entry",
@@ -147,12 +135,19 @@ export function runBusy(runId: DagRunId, operation: string): DagNodeControlError
 
 /** The one holder rule (`liveForeignHolder`) with this verb's probe, for a write decided elsewhere. */
 export function foreignHolderOf(options: DagSchedulerOptions): (fresh: DagRunRecordV1) => number | undefined {
-  const probe = {
-    taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
-  }
+  const probe = holderProbeOf(options)
   return (fresh) => liveForeignHolder(probe, fresh)
+}
+
+/**
+ * Reads the starts the holder rule judges this run's node children by, on its current record. A verb
+ * awaits it before its first holder decision; one that did not would judge a child's owner by pid.
+ */
+export function observeRunOwners(
+  options: Omit<DagSchedulerOptions, "initialRecord" | "reservations">,
+  runId: DagRunId,
+): Promise<void> | undefined {
+  return observeChildOwners(holderProbeOf(options), readRecord(options.store, runId))
 }
 
 export function readRecord(store: DagFileStore, runId: DagRunId): DagRunRecordV1 | null {

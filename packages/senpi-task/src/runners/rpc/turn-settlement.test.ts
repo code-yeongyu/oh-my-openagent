@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
+import type { PendingAsyncWork } from "../pending-async-work"
 import { createTurnSettlement, type TurnSettlementProbe } from "./turn-settlement"
 import { createManualSettlementScheduler, flushSettlement } from "./turn-settlement.test-support"
 
@@ -46,8 +47,10 @@ function deferred<T>(): {
 function createFixture(options?: {
   readonly probe?: () => Promise<TurnSettlementProbe | undefined>
   readonly wakeSourcesLive?: () => boolean
+  readonly pendingAsyncWork?: () => PendingAsyncWork | undefined
   readonly disposed?: () => boolean
   readonly maxUnreadableProbes?: number
+  readonly asyncWorkStaleLimitMs?: number
 }) {
   const scheduler = createManualSettlementScheduler()
   let settled: RunnerOutcome | undefined
@@ -63,7 +66,9 @@ function createFixture(options?: {
     probe: options?.probe,
     settleConfirmMs: 60_000,
     maxUnreadableProbes: options?.maxUnreadableProbes,
+    asyncWorkStaleLimitMs: options?.asyncWorkStaleLimitMs,
     wakeSourcesLive: options?.wakeSourcesLive,
+    pendingAsyncWork: options?.pendingAsyncWork,
     disposed: options?.disposed,
     scheduleConfirmation: scheduler.scheduler,
   })
@@ -119,7 +124,7 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
     })
   })
 
-  test("#given a terminal provider error while a goal continuation timer is armed #when the confirmation fires #then the held outcome never settles and a later agent_start clears it", async () => {
+  test("#given a terminal provider error while a goal continuation timer is armed #when the confirmation fires #then the held outcome stays held, re-armed, and a later agent_start clears it", async () => {
     // given
     const probe = countingProbe(idleState)
     let wakeLive = true
@@ -128,21 +133,22 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
     // when - the turn ends terminally; its wake tracker says a goal owns the recovery
     fixture.settlement.observe(agentEnd(PROVIDER_TIMEOUT) as never)
 
-    // then - the armed confirmation sees the live wake and holds: no probe, no re-arm, no settle
+    // then - the armed confirmation sees the live wake and holds: no probe, no settle, re-armed (omo#9711)
     expect(fixture.scheduler.pending()).toBe(1)
     fixture.scheduler.runNext()
     await flushSettlement()
     expect(probe.calls()).toBe(0)
-    expect(fixture.scheduler.pending()).toBe(0)
+    expect(fixture.scheduler.pending()).toBe(1)
     expect(fixture.settled()).toBeUndefined()
 
     // when - the goal continuation actually starts a new turn
     wakeLive = false
     fixture.settlement.observe({ type: "agent_start" } as never)
 
-    // then - the held outcome is dropped for the new turn
+    // then - the held outcome is dropped for the new turn and its confirmation disarmed
     await flushSettlement()
     expect(fixture.settled()).toBeUndefined()
+    expect(fixture.scheduler.pending()).toBe(0)
   })
 
   test("#given a terminal provider error whose probe reports an active turn #when it later reports true idleness #then only the idle answer settles the held outcome", async () => {
@@ -368,5 +374,138 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
 
     // then - the wake source owns the turn: nothing settles
     expect(fixture.settled()).toBeUndefined()
+  })
+})
+
+const DETACHED_CELL: PendingAsyncWork = {
+  sources: [{ source: "senpi-codemode", activeCount: 1, labels: ["eval cell"] }],
+  children: 0,
+}
+
+function completedEnd(): unknown {
+  const assistant = { role: "assistant", content: [{ type: "text", text: "wrote the report" }], stopReason: "stop" }
+  return { type: "agent_end", willRetry: false, messages: [assistant] }
+}
+
+describe("createTurnSettlement completed with pending async work (senpi#3492, omo#10487)", () => {
+  test("#given a completed turn whose own async work is still pending #when agent_idle arrives #then the outcome stays pending until the work releases and the idle probe confirms no turn answered it", async () => {
+    // given - a detached eval cell is live while the child ends its turn
+    const probe = countingProbe(idleState)
+    let workLive = true
+    const fixture = createFixture({
+      probe: probe.probe,
+      wakeSourcesLive: () => false,
+      pendingAsyncWork: () => (workLive ? DETACHED_CELL : undefined),
+    })
+    fixture.settlement.observe(completedEnd() as never)
+
+    // when - the session goes idle with the work still in flight
+    fixture.settlement.observe({ type: "agent_idle" } as never)
+
+    // then - the outcome is held, not reported: the work's wake starts the real final turn
+    await flushSettlement()
+    expect(fixture.settled()).toBeUndefined()
+    // a turn that ended right now (exit, park) would have abandoned the cell: typed, never completed
+    expect(fixture.settlement.pending()?.status).toBe("error")
+    expect(fixture.scheduler.pending()).toBe(1)
+
+    // when - the confirmation fires while the work is still live
+    fixture.scheduler.runNext()
+    await flushSettlement()
+
+    // then - it holds again and re-arms the confirmation while the work is still in flight
+    expect(probe.calls()).toBe(1)
+    expect(fixture.scheduler.pending()).toBe(1)
+    expect(fixture.settled()).toBeUndefined()
+
+    // when - the work releases; the armed confirmation re-reads it
+    workLive = false
+    expect(fixture.scheduler.pending()).toBe(1)
+    const settled = fixture.nextSettled()
+    fixture.scheduler.runNext()
+
+    // then - the work drained and no turn answered it: the held progress note is never the result
+    // (review finding 1 on #15137); a turn the work's notification starts later supersedes this
+    const outcome = await settled
+    expect(probe.calls()).toBe(2)
+    expect(outcome.status).toBe("error")
+    if (outcome.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+    expect(outcome.failure.message).toContain("nothing woke the child")
+  })
+
+  test("#given a completed turn held on pending async work #when the work makes no progress past the bound #then it settles as the typed async_work_pending failure, never completed", async () => {
+    // given - the work stays exactly as it was; the bound is 3 confirmations (180 s / 60 s)
+    const probe = countingProbe(idleState)
+    const fixture = createFixture({
+      probe: probe.probe,
+      wakeSourcesLive: () => false,
+      pendingAsyncWork: () => DETACHED_CELL,
+      asyncWorkStaleLimitMs: 180_000,
+    })
+    fixture.settlement.observe(completedEnd() as never)
+    fixture.settlement.observe({ type: "agent_idle" } as never)
+    await flushSettlement()
+
+    // when - probes 1 and 2 run while work is still live
+    fixture.scheduler.runNext()
+    await flushSettlement()
+    expect(fixture.scheduler.pending()).toBe(1)
+    expect(fixture.settled()).toBeUndefined()
+
+    fixture.scheduler.runNext()
+    await flushSettlement()
+    expect(fixture.scheduler.pending()).toBe(1)
+    expect(fixture.settled()).toBeUndefined()
+
+    // when - third probe runs and reaches the bound
+    const settled = fixture.nextSettled()
+    fixture.scheduler.runNext()
+    const outcome = await settled
+
+    // then - a visible typed failure naming the abandoned work
+    expect(outcome.status).toBe("error")
+    if (outcome.status !== "error") throw new Error("unreachable")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+    expect(outcome.failure.message).toContain("senpi-codemode: 1 [eval cell]")
+  })
+
+  test("#given a completed turn held on pending async work #when the work's wake starts a new turn #then the held outcome is dropped for that turn", async () => {
+    // given
+    const fixture = createFixture({
+      probe: countingProbe(idleState).probe,
+      wakeSourcesLive: () => false,
+      pendingAsyncWork: () => DETACHED_CELL,
+    })
+    fixture.settlement.observe(completedEnd() as never)
+    fixture.settlement.observe({ type: "agent_idle" } as never)
+    await flushSettlement()
+    expect(fixture.settlement.pending()?.status).toBe("error")
+
+    // when - the pending cell's completion notification wakes the session (senpi#3492's resumed turn)
+    fixture.settlement.observe({ type: "agent_start" } as never)
+    await flushSettlement()
+
+    // then - nothing settled: whatever that turn produces is the child's outcome
+    expect(fixture.settled()).toBeUndefined()
+    expect(fixture.settlement.pending()).toBeUndefined()
+    expect(fixture.scheduler.pending()).toBe(0)
+  })
+
+  test("#given a completed turn with no pending async work #when agent_idle arrives #then the outcome settles immediately (a goal wake alone does not hold a completed turn)", () => {
+    // given - a goal timer rides hasLiveWakeSources, and the engine reports no pending work
+    const fixture = createFixture({
+      probe: countingProbe(idleState).probe,
+      wakeSourcesLive: () => true,
+      pendingAsyncWork: () => undefined,
+    })
+    fixture.settlement.observe(completedEnd() as never)
+
+    // when
+    fixture.settlement.observe({ type: "agent_idle" } as never)
+
+    // then
+    expect(fixture.settled()).toEqual({ status: "completed", finalResponse: "wrote the report" })
+    expect(fixture.scheduler.pending()).toBe(0)
   })
 })

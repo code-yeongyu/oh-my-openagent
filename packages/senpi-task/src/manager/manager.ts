@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { log } from "@oh-my-opencode/utils"
 
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
+import type { DagTaskOwner, DagTaskOwnerKey, DagTaskOwnerScope, OwnedStartResult } from "../dag/owner"
 import {
   endFallbackHandoff,
   forgetClosedChild,
@@ -24,15 +24,9 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
-import type {
-  AwaitingInputReason,
-  EffectiveModelRecord,
-  LiveRunStats,
-  ResolvedModelRecord,
-  TaskRecord,
-  TaskRunStats,
-} from "../state"
-import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
+import type { AwaitingInputReason, LiveRunStats, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
+import { createSelfResumedListeners, reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
+import { ownedClaims, ownedStartResult } from "./owned-claims"
 import { ContinuedRuns } from "./continued-run"
 import { createSteeringEngine } from "../steering"
 import type {
@@ -56,6 +50,15 @@ import {
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
 import { runtimeFallbackCandidates } from "./credential-failure"
+import {
+  createUsageLimitMemory,
+  LIMIT_PROBE_TIMEOUT_MS,
+  routeAroundSpentLimits,
+  type UsageLimitMemory,
+} from "./usage-limit-memory"
+import { boundedProbeOutcome, recordProbeStartFailure, recordRunLimit } from "./usage-limit-probe"
+import { prepareLimitRevival } from "./usage-limit-revival"
+import { createProbeRequestSignal } from "../runners/probe-request"
 import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
 import { createWorkpoolAdmission } from "./workpool-admission"
 import { withResidentStart } from "./resident-start"
@@ -103,7 +106,12 @@ import {
 import { createHeldSend } from "./held-send"
 import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
+import { ownerProcessViewFor } from "../lifecycle/owner-process"
 import { defaultSignaller } from "../lifecycle/context"
+import { defaultTeardownStepDeadline } from "../lifecycle/teardown-budget"
+import { cancelBehindRefusedStop, RefusedStops } from "./refused-stops"
+import { explicitSendChecks } from "./explicit-send"
+import { REDISPATCH_HOLDER_WAIT_MS, redispatchLockPath, redispatchRefusal } from "./redispatch-guard"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
 import { AdmissionBarrier, type ResumeCredential } from "../pause/admission-barrier"
@@ -159,6 +167,7 @@ type RpcRespawnRunner = {
 
 type TaskManagerImplOptions = TaskManagerOptions & {
   readonly rpcRespawnRunner?: RpcRespawnRunner
+  readonly usageLimits?: UsageLimitMemory
 }
 
 type ReattachingTaskManager = TaskManager &
@@ -187,30 +196,6 @@ type ReattachingTaskManager = TaskManager &
 export const START_REPORT_WINDOW_MS = 250
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
-// A re-dispatch holds its lock across a child launch, which can take far longer than a record write.
-const REDISPATCH_HOLDER_WAIT_MS = 120_000
-
-function redispatchLockPath(stateDir: string, taskId: string): string {
-  return join(stateDir, "redispatch-locks", taskId)
-}
-
-function redispatchRefusal(record: TaskRecord): RedispatchOutcome | undefined {
-  if (isTerminalRecord(record)) {
-    return {
-      kind: "invalid_state",
-      task_id: record.task_id,
-      reason: `Task ${record.task_id} is ${record.status}; only a task waiting for input can be re-dispatched.`,
-    }
-  }
-  if (record.awaiting_input === undefined) {
-    return {
-      kind: "invalid_state",
-      task_id: record.task_id,
-      reason: `Task ${record.task_id} is not waiting for input; only a flagged "resumed, waiting for input" task can be re-dispatched.`,
-    }
-  }
-  return undefined
-}
 function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
   const ownerKey = `${owner.kind}\0${owner.runId}\0${owner.nodeId}`
   const digest = createHash("sha256").update(ownerKey).digest("hex")
@@ -238,9 +223,11 @@ class TaskManagerImpl implements TaskManager {
   // succeeds releases them.
   readonly #cleanupOwners = new Map<string, ManagedChildHandle>()
   readonly #nativeFallbackExhaustions = new WeakSet<ManagedChildHandle>()
+  readonly #limits: UsageLimitMemory
   // Callers can subscribe before a queued task owns a handle. Each entry is attached exactly once
   // when #launch promotes it, and its returned cleanup owns both pending and live subscriptions.
   readonly #childSubscribers = new Map<string, Map<ManagedChildListener, () => void>>()
+  readonly #selfResumed = createSelfResumedListeners()
   // Release guard: latest released run_epoch per task_id. A revived task (higher epoch) can still
   // release its LATER occupancy, while a stale re-release of an already-released epoch is a no-op.
   // Keyed by task_id (not `${taskId}:${epoch}`) so growth is bounded by live tasks and forget()
@@ -259,6 +246,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #sendCounts = new Map<string, number>()
   readonly #stopsPending = new PendingStops()
   readonly #steering: SteeringEngine
+  readonly #refusedStops: RefusedStops
   readonly #isolation: IsolationWiring
   readonly #outcome: OutcomeTracker
   readonly #runPause: ReturnType<typeof createTaskRunPause>
@@ -271,6 +259,7 @@ class TaskManagerImpl implements TaskManager {
   constructor(inputOptions: TaskManagerImplOptions) {
     const options = { ...inputOptions, admissionBarrier: inputOptions.admissionBarrier ?? new AdmissionBarrier() }
     this.#options = options
+    this.#limits = options.usageLimits ?? createUsageLimitMemory(() => this.#now())
     this.#barrier = options.admissionBarrier
     this.#startAdmissions = createStartAdmissions(
       options.admissionBarrier,
@@ -347,6 +336,16 @@ class TaskManagerImpl implements TaskManager {
         return removed
       },
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
+      prepareRevival: (record, handle) =>
+        prepareLimitRevival(record, handle, {
+          limits: this.#limits,
+          store: options.store,
+          close: () =>
+            (options.destruction ?? NOOP_DESTRUCTION).destroyResidentTask(record.task_id, "fallback_handoff"),
+          forget: () => this.forget(record.task_id, { path: "evict" }),
+          respawn: (fresh, path) => this.respawn(fresh, path),
+          reattach: (fresh, child) => this.reattach(fresh, child),
+        }),
       reserveForDetachedRevive: (record) => this.#reserveForDetachedRevive(record),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
       runStatsSnapshot: (taskId) => this.#runStats.get(taskId)?.snapshot(this.#now()),
@@ -360,6 +359,15 @@ class TaskManagerImpl implements TaskManager {
       now: this.#now,
     }
     this.#steering = createSteeringEngine(port)
+    this.#refusedStops = new RefusedStops({
+      store: options.store,
+      deadline: options.teardownStepDeadline ?? defaultTeardownStepDeadline,
+      load: (taskId) => this.#tryLoad(taskId) ?? undefined,
+      liveHandle: (taskId) => this.#live.get(taskId)?.handle,
+      ...(options.ownerResumeFence === undefined ? {} : { fence: options.ownerResumeFence }),
+      ...(options.destruction === undefined ? {} : { destruction: options.destruction }),
+      forget: (taskId) => this.forget(taskId, { path: "end" }),
+    })
     this.#isolation = createIsolationWiring({
       runtime: options.isolation,
       store: options.store,
@@ -383,6 +391,7 @@ class TaskManagerImpl implements TaskManager {
             store: options.store,
             hostPid: this.#hostPid,
             isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+            ownerProcesses: ownerProcessViewFor(options.isProcessAlive, options.ownerProcesses),
             respawn: (paused, sessionPath) => this.respawn(paused, sessionPath, undefined, { paused: true }),
             reattach: (paused, handle) => this.reattach(paused, handle),
             liveHandle: (taskId) => this.#live.get(taskId)?.handle,
@@ -403,6 +412,7 @@ class TaskManagerImpl implements TaskManager {
       forget: (taskId, options) => this.forget(taskId, options),
       settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
+      usageLimits: this.#limits,
       stopSettlement: (taskId) => this.#stopsPending.settlement(taskId),
       pauseSettlement: (taskId, epoch) => this.#runPause.settlement(taskId, epoch),
       parkSlot: (taskId, epoch) => this.#runPause.park(taskId, epoch),
@@ -526,7 +536,7 @@ class TaskManagerImpl implements TaskManager {
 
     return withTaskRecordLockAsync(lockPath, async () => {
       spec.admission?.assertOpen()
-      const raced = this.#ownedResult(owner)
+      const raced = ownedStartResult(this.findOwnedTasks(owner), owner, (claim) => this.#refusedStops.isLive(claim))
       if (raced !== undefined) return raced
       const result = await withResidentStart(
         this.#options,
@@ -542,39 +552,11 @@ class TaskManagerImpl implements TaskManager {
   // execAttempt-scoped fingerprint, and task ids sort by creation, so the newest claim is the live
   // one. The superseded record keeps its dag owner marker (spawn-time launcher stripping reads it).
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined {
-    return this.#options.store
-      .list()
-      .records.findLast(
-        (record) =>
-          record.owner?.kind === owner.kind &&
-          record.owner.runId === owner.runId &&
-          record.owner.nodeId === owner.nodeId,
-      )
+    return this.findOwnedTasks(owner).at(-1)
   }
 
-  #ownedResult(owner: DagTaskOwner): OwnedStartResult | undefined {
-    const record = this.findOwnedTask(owner)
-    if (record === undefined) return undefined
-    if (record.owner?.fingerprint !== owner.fingerprint) {
-      // A settled record cannot be re-run in place, so a differing fingerprint on it is a retry:
-      // ownership moves to the fresh task. Only a LIVE task with a different fingerprint is a
-      // genuine conflict between two callers over one running child.
-      if (isTerminalRecord(record)) return undefined
-      return {
-        kind: "owner_conflict",
-        task_id: record.task_id,
-        existing_fingerprint: record.owner?.fingerprint ?? "",
-        requested_fingerprint: owner.fingerprint,
-      }
-    }
-    return {
-      kind: "started",
-      reused: true,
-      task_id: record.task_id,
-      status: record.status,
-      name: record.name ?? record.task_id,
-      ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
-    }
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
+    return ownedClaims(this.#options.store.list().records, owner)
   }
 
   async #startResolved(
@@ -665,9 +647,23 @@ class TaskManagerImpl implements TaskManager {
     const registration =
       requestedRegistration ?? this.#names.register(spec.parent_session_id, undefined, claimed.task_id)
     spec.admission?.bind(claimed.task_id)
-    const admission = admitSpill(plan, this.#concurrency, claimed.task_id, claimed.notification.run_epoch)
-    const effectivePlan = admission.plan
+    // An earlier child already found these rungs spent: only the rungs the memory clears compete for capacity, so the
+    // lane a lease holds is always the lane of the model that launches (#11383).
+    const avoided = routeAroundSpentLimits(plan, this.#limits)
+    if ("spent" in avoided) {
+      return this.#failSpawn({
+        claimed,
+        registration,
+        spec,
+        executionMode,
+        lease: undefined,
+        failure_kind: "usage_limit",
+        error_message: `${avoided.spent}\nEvery model in this task's fallback chain is behind a usage limit an earlier task already hit, so it was not started. Retry once the limit resets, or point this category at another provider or model in omo.json.`,
+      })
+    }
+    const admission = admitSpill(avoided.plan, this.#concurrency, claimed.task_id, claimed.notification.run_epoch)
     const lease = admission.lease
+    const effectivePlan = admission.plan
     let finalRecord: TaskRecord
     let managedSpec: ManagedStartSpec
     let isolation: PreparedIsolation | undefined
@@ -810,7 +806,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async sendToTask(input: SendInput): Promise<SendOutcome> {
-    const outcome = await this.#steering.sendToTask(input)
+    const checks = explicitSendChecks(this.#steering, this.#options.ownerResumeFence, this.#refusedStops, input)
+    const answer = checks.answer === undefined ? undefined : await checks.answer
+    if (answer !== undefined) return answer
+    const outcome = await this.#steering.sendToTask({ ...input, idOrName: checks.taskId })
     if (outcome.kind === "steered") this.#clearAwaitingInput(outcome.task_id)
     return outcome
   }
@@ -825,7 +824,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const outcome = await this.#steering.cancelTask(idOrName, reason, options)
+    const taskId = this.#steering.resolve(idOrName)?.task_id ?? idOrName
+    const refused = cancelBehindRefusedStop(this.#refusedStops, taskId, () => this.#tryLoad(taskId)?.status)
+    if (refused !== undefined) return refused
+    const outcome = await this.#steering.cancelTask(taskId, reason, options)
     if (outcome.kind === "cancelled") {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)
@@ -1116,6 +1118,10 @@ class TaskManagerImpl implements TaskManager {
     return () => subscribers.get(listener)?.()
   }
 
+  subscribeSelfResumed(taskId: string, listener: () => void): () => void {
+    return this.#selfResumed.subscribe(taskId, listener)
+  }
+
   runStatsSnapshot(taskId: string): TaskRunStats | undefined {
     return this.#runStats.get(taskId)?.snapshot(this.#now())
   }
@@ -1164,6 +1170,29 @@ class TaskManagerImpl implements TaskManager {
     credential?: ResumeCredential,
     options?: { readonly paused?: boolean },
   ): Promise<RespawnResult> {
+    const routed = routeAroundSpentLimits(record, this.#limits)
+    if ("spent" in routed)
+      return Promise.resolve({ ok: false, disposition: "retryable", code: "usage_limit", reason: routed.spent })
+    if (routed.plan !== record) {
+      const updated = this.#options.store.mutate(record.task_id, (fresh) =>
+        fresh.host_pid === record.host_pid && fresh.notification.run_epoch === record.notification.run_epoch
+          ? {
+              ...fresh,
+              model: routed.plan.model,
+              resolved_model: routed.plan.resolved_model,
+              fallback_models: routed.plan.fallback_models,
+            }
+          : fresh,
+      )
+      if (updated === null || updated.model !== routed.plan.model)
+        return Promise.resolve({
+          ok: false,
+          disposition: "retryable",
+          code: "respawn_failed",
+          reason: "task changed before limit routing",
+        })
+      record = updated
+    }
     return admitRespawn(
       this.#barrier,
       record,
@@ -1493,7 +1522,8 @@ class TaskManagerImpl implements TaskManager {
     if (!this.#ownsLaunch(context, record)) return { kind: "stale" }
     const chain =
       credentials === undefined ? (record.fallback_models ?? []) : chainWithoutRefusingProvider(record, credentials)
-    const nextModel = chain[0]
+    const remainingModels = chain.filter((model) => !this.#limits.familySpent(model.provider, model.model_id))
+    const nextModel = remainingModels[0]
     if (nextModel === undefined) return undefined
 
     this.#releaseSlot(record.task_id, context.model, record.notification.run_epoch)
@@ -1503,7 +1533,7 @@ class TaskManagerImpl implements TaskManager {
       ...withRefusal(record, refusalOf(record, error.failure.message, nowIso(this.#now))),
       model: nextModel.display,
       resolved_model: nextModel,
-      fallback_models: chain.slice(1),
+      fallback_models: remainingModels.slice(1),
       fallback_attempts: [
         ...(record.fallback_attempts ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
         nextModel,
@@ -1611,6 +1641,7 @@ class TaskManagerImpl implements TaskManager {
       type: "fail",
       timestamp,
       error_message: input.error_message,
+      ...(input.failure_kind === "usage_limit" ? { failure_kind: input.failure_kind } : {}),
     })
     if (!started.applied || !failed.applied) throw new Error("spawn bookkeeping failure transitions were not applied")
     return {
@@ -1687,7 +1718,15 @@ class TaskManagerImpl implements TaskManager {
       waitForTerminal: (taskId) => this.waitFor(taskId),
       reserveForRevive: (taskId) => this.#reserveForRevive(taskId),
       trackOutcome: (taskId, handle, model, epoch) => this.#outcome.trackOutcome(taskId, handle, model, epoch),
+      announce: (taskId) => this.#selfResumed.announce(taskId),
+      ...(this.#options.ownerResumeFence === undefined ? {} : { ownerResumeFence: this.#options.ownerResumeFence }),
+      markRefusedStop: (taskId, handle, disposition) => this.#refusedStops.mark(taskId, handle, disposition),
+      stopRefusedRun: (taskId) => this.#refusedStops.attempt(taskId),
     }
+  }
+
+  selfResumeStopPending(taskId: string): boolean {
+    return this.#refusedStops.pending(taskId)
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
@@ -1705,6 +1744,9 @@ class TaskManagerImpl implements TaskManager {
         if (status.state === "running") void this.#steering.notifyStarted(taskId)
       },
       onLivenessNotice: (record, status) => this.#options.onChildLiveness?.(record, status),
+      // The engine hopped past a spent designated rung in-session: remember it like a failed turn (#11383).
+      onUsageLimitHop: (provider, modelId, message) =>
+        this.#limits.settle(taskId, provider, modelId, message, false, this.#tryLoad(taskId)?.notification.run_epoch),
       onExtensionEvent: (event) => {
         const record = this.#tryLoad(taskId)
         if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)
@@ -1725,13 +1767,16 @@ class TaskManagerImpl implements TaskManager {
     readonly runStats: TaskRunStats | undefined
     readonly timestamp: string
   }): Promise<boolean> {
-    if (this.workpools.ownsTask(input.taskId)) return false
-    if (input.outcome.status !== "error" || !isChainWalkable(input.outcome, input.runStats)) {
-      return false
-    }
-
+    if (input.outcome.status !== "error") return false
     const record = this.#tryLoad(input.taskId)
-    const candidates = record == null ? undefined : runtimeFallbackCandidates(record, input.outcome.failure.message)
+    const route = record?.resolved_model
+    const run = { taskId: input.taskId, epoch: input.epoch, outcome: input.outcome, runStats: input.runStats }
+    const probeTimedOut = recordRunLimit(this.#limits, run, route)
+    if (this.workpools.ownsTask(input.taskId)) return false
+    if (!(isChainWalkable(input.outcome, input.runStats) || probeTimedOut)) return false
+
+    const candidates =
+      record == null ? undefined : runtimeFallbackCandidates(record, input.outcome.failure.message, this.#limits)
     const nextModel = candidates?.remaining[0]
     const live = this.#live.get(input.taskId)
     const fallbackExhausted =
@@ -1868,6 +1913,9 @@ class TaskManagerImpl implements TaskManager {
       fallbackModels: remainingModels,
     })
     const launch = (): void => {
+      if (candidates.limit === "ambiguous" && nextModel.provider === route?.provider) {
+        this.#limits.beginProbe(input.taskId, nextModel.provider, failureMessage, nextEpoch)
+      }
       void this.#launchRuntimeFallback({
         record: nextRecord,
         managedSpec: nextSpec,
@@ -2011,7 +2059,9 @@ class TaskManagerImpl implements TaskManager {
     })
     // Checked before anything starts: a cancel, an interrupt or another owner that moved the task while
     // this launch waited (for the old rung's close, or for capacity) must not get a child started.
+    const epoch = context.record.notification.run_epoch
     if (!this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))) {
+      this.#limits.endProbe(context.record.task_id, epoch)
       this.#releaseSlot(context.record.task_id, context.model, context.record.notification.run_epoch)
       failOwnedRun(this.#options.store, launchRunOf(context.record), nowIso(this.#now), {
         errorMessage: "Runtime fallback launch aborted before the child could start.",
@@ -2020,10 +2070,29 @@ class TaskManagerImpl implements TaskManager {
       return
     }
 
-    let handle: ManagedChildHandle
+    const request = createProbeRequestSignal(this.#now)
+    const probing = this.#limits.probeOf(context.record.task_id, epoch) !== undefined
+    let started: { readonly handle: ManagedChildHandle } | { readonly error: unknown }
     try {
-      handle = await context.runner.start(context.managedSpec)
+      started = {
+        handle: await context.runner.start(
+          probing
+            ? { ...context.managedSpec, onProviderRequest: request.started, probeProviderRequest: true }
+            : context.managedSpec,
+        ),
+      }
     } catch (error) {
+      started = { error }
+    }
+    // The start awaited: a cancel, interrupt or another owner may have moved the task meanwhile. Whichever way the start
+    // settled, a run that is no longer this one's only ends its own probe: it records no limit evidence and a late child
+    // of it is discarded, never attached.
+    const owned = this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))
+    if (!owned) this.#limits.endProbe(context.record.task_id, epoch)
+    if ("error" in started) {
+      const { error } = started
+      const run = { taskId: context.record.task_id, epoch }
+      if (owned) recordProbeStartFailure(this.#limits, run, context.record.resolved_model, describeStartFailure(error))
       const advanced = this.#advanceStartFallback(context, error)
       if (advanced !== undefined) {
         if (advanced.kind === "retry") void this.#launchRuntimeFallback(advanced.context)
@@ -2039,9 +2108,8 @@ class TaskManagerImpl implements TaskManager {
       return
     }
 
-    // The start awaited: a cancel, interrupt or another owner may have moved the task meanwhile. A
-    // late child of a run that is no longer this one's is discarded, never attached.
-    if (!this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))) {
+    const { handle } = started
+    if (!owned) {
       await this.#discardStaleLaunch(context, handle)
       return
     }
@@ -2057,7 +2125,28 @@ class TaskManagerImpl implements TaskManager {
     this.#attachChildSubscribers(context.record.task_id, handle)
     this.#recordSpawnFacts(context.record.task_id, handle)
     void this.#isolation.stamp(context.record.task_id, handle)
-    this.#outcome.trackOutcome(context.record.task_id, handle, context.model, context.record.notification.run_epoch)
+    const taskId = context.record.task_id
+    const probe = this.#limits.probeOf(taskId, epoch)
+    this.#outcome.trackOutcome(
+      taskId,
+      handle,
+      context.model,
+      epoch,
+      probe === undefined
+        ? undefined
+        : {
+            turnId: `usage-limit-probe-${epoch}`,
+            outcome: boundedProbeOutcome({
+              handle,
+              probe,
+              model: context.model,
+              subscribeRequest: request.subscribe,
+              now: this.#now,
+              timeoutMs: this.#options.limitProbeTimeoutMs ?? LIMIT_PROBE_TIMEOUT_MS,
+              onAnswered: () => this.#limits.endProbe(taskId, epoch),
+            }),
+          },
+    )
   }
 
   // A revived child is running again and SHOULD occupy a slot; re-acquire it and re-arm outcome

@@ -4,20 +4,28 @@ import { join } from "node:path"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagScheduler } from "./scheduler"
 import { installRecoveredDag } from "./recovery-install"
+import { reconcileCompletedNode } from "./recovery-completed-node"
+import { resolveRecoveredNodeTask } from "./recovery-attempt"
+import { startFailure, startSpec, taskOwner } from "./recovery-start"
+import { fenceStaleLiveChildren } from "./child-gate"
 import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 
-import { defaultSignaller } from "../lifecycle/context"
 import type { PendingRevivals } from "../lifecycle/revival-pending"
 import { childBacking } from "./child-backing"
-import type { ManagerStartSpec, TaskManager } from "../manager/types"
+import type { TaskManager } from "../manager/types"
 import type { TaskRecord, TaskStatus } from "../state"
-import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
-import { dagNodeReusedEvent, dagNodeRetriedEvent, dagNodeTaskAttachedEvent, dagNodeTransitionedEvent } from "./events"
+import { dagNodeRetriedEvent, dagNodeTaskAttachedEvent, dagNodeTransitionedEvent } from "./events"
 import { createDagJournal, type DagJournal } from "./journal"
-import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import { skipDuplicateTerminalTransition, type DagRunRecordV1 } from "./manager"
+import type { OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
-import { currentNodeTask, leaseAfterEvent, releaseDagRunLease } from "./run-lease"
+import {
+  holderProbeOf,
+  leaseAfterEvent,
+  releaseDagRunLease,
+  type DagRunHolder,
+  type DagRunHolderProbe,
+} from "./run-lease"
 import { pauseRunsForShutdown } from "./recovery-shutdown"
 import { claimOrphanedRun, claimPausedRun } from "./recovery-claim"
 import { createDagRunReservations, type DagRunHeldReservations, type DagRunReservations } from "./run-acquisition"
@@ -45,6 +53,8 @@ export type DagRecoveryOutcome = {
   // often still exiting when its successor resumes the session, so the caller watches this pid and
   // retries the claim once it is gone instead of leaving the run paused for good.
   readonly holderPid?: number
+  // The stamped claim when that holder is a node child's owner: the watch waits for THAT owner.
+  readonly holderClaim?: DagRunHolder["claim"]
 }
 
 export type DagRecoveryOptions = {
@@ -57,6 +67,8 @@ export type DagRecoveryOptions = {
   // Liveness probe for a paused run's previous lease holder. Defaults to the lifecycle port's
   // signaller so the signal-0 existence check has exactly one implementation in the package.
   readonly isProcessAlive?: (pid: number) => boolean
+  // The start view a node child's owner is judged by (`holderProbeOf`); see lifecycle/owner-process.ts.
+  readonly ownerProcesses?: DagRunHolderProbe["ownerProcesses"]
   // Whether THIS process still runs a scheduler for the run. Consulted when the recorded holder pid
   // is our own: a signal-0 probe on ourselves is always true, so without this a same-process
   // session reopen (multi-session host) would wait for its own host to exit. (#8006)
@@ -105,23 +117,22 @@ export type InstalledDagRun = {
   readonly settled: Promise<DagRecoveryOutcome>
 }
 
-export type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager">> & {
-  readonly pausedChildren?: PausedChildRecoveryPort
-  readonly pendingRevivals?: PendingRevivals
-  readonly resumeCredential?: ResumeCredential
-  readonly hostPid: number
-  readonly isProcessAlive: (pid: number) => boolean
-  readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
-  // A claim writes our pid as the lease before the scheduler exists, so until the caller holds that
-  // scheduler every other entry of this process must see the run as taken.
-  readonly reservations: DagRunReservations
-  readonly now: () => number
-  readonly subscriberRing?: number
-  readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
-  readonly stopAdmission?: (runId: DagRunId) => void
-  readonly reattach?: (runId: DagRunId, taskId: string) => void
-  readonly ancestry?: { readonly depth: number }
-}
+export type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager">> &
+  DagRunHolderProbe & {
+    readonly pausedChildren?: PausedChildRecoveryPort
+    readonly pendingRevivals?: PendingRevivals
+    readonly resumeCredential?: ResumeCredential
+    readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
+    // A claim writes our pid as the lease before the scheduler exists, so until the caller holds that
+    // scheduler every other entry of this process must see the run as taken.
+    readonly reservations: DagRunReservations
+    readonly now: () => number
+    readonly subscriberRing?: number
+    readonly nodeSpawnPolicy?: DagNodeSpawnPolicy
+    readonly stopAdmission?: (runId: DagRunId) => void
+    readonly reattach?: (runId: DagRunId, taskId: string) => void
+    readonly ancestry?: { readonly depth: number }
+  }
 
 export type RecoveryPendingTerminalResult = {
   readonly record: TaskRecord
@@ -130,9 +141,8 @@ export type RecoveryPendingTerminalResult = {
 export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
   const context: RecoveryContext = {
     store: options.store,
+    ...holderProbeOf(options),
     taskManager: options.taskManager,
-    hostPid: options.hostPid ?? process.pid,
-    isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
     ...(options.isRunHeldInProcess === undefined ? {} : { isRunHeldInProcess: options.isRunHeldInProcess }),
     reservations: options.reservations ?? createDagRunReservations(),
     now: options.now ?? Date.now,
@@ -149,7 +159,8 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     installResumedRun: async (runId, parentSessionId, pauseSeq, credential) => {
       const record = context.store.readCheckpoint<RecoverableRecord>(runId)
       if (record?.pause?.pauseSeq !== pauseSeq) return { kind: "skipped", runId, reason: "not_paused" }
-      const claim = claimPausedRun(context, runId, parentSessionId, { kind: "resume", pauseSeq })
+      const pendingClaim = claimPausedRun(context, runId, parentSessionId, { kind: "resume", pauseSeq })
+      const claim = pendingClaim instanceof Promise ? await pendingClaim : pendingClaim
       if (claim.kind === "skipped") return { ...claim, runId }
       try {
         const context_ = { ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) }
@@ -204,9 +215,10 @@ async function visitPausedRuns(
     if (observed.pause?.reason === "user_stop") continue
     const foreign = observed.parentSessionId !== parentSessionId
     if (foreign && (forkSource === undefined || normalizeSessionId(observed.parentSessionId) !== forkSource)) continue
-    const claim = foreign
+    const pendingClaim = foreign
       ? claimOrphanedRun(context, observed.runId, observed.parentSessionId, parentSessionId)
       : claimPausedRun(context, observed.runId, parentSessionId, { kind: "automatic" })
+    const claim = pendingClaim instanceof Promise ? await pendingClaim : pendingClaim
     if (claim.kind === "skipped") {
       if (!foreign && (claim.reason === "live_lease" || claim.reason === "busy")) {
         outcomes.push({ ...claim, runId: observed.runId })
@@ -263,30 +275,32 @@ async function reconcileNodes(
       .filter((entry) => entry.record.status === "pending" && entry.queue_position !== undefined)
       .map((entry) => entry.record.task_id),
   )
+  // No scheduler or admission fence exists yet: the child gate's rule 1 runs before any start (#11381).
+  const fencing = fenceStaleLiveChildren(context.taskManager, journal.snapshot())
+  const staleLive = fencing instanceof Promise ? await fencing : fencing
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
-      const result = readDagNodeResult({ store: context.store, runId: journal.snapshot().runId, nodeId: observed.id })
-      if (result !== null) {
-        reusedOutputs.set(observed.id, result.output)
-        if (observed.taskId !== undefined) {
-          journal.append(
-            dagNodeReusedEvent({
-              nodeId: observed.id,
-              taskId: observed.taskId,
-              sourceRunId: journal.snapshot().runId,
-            }),
-          )
-        }
-      }
+      const failCompleted = (nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void =>
+        failNode(journal, nodeId, code, message, context.now, pendingErrors)
+      const reopening = reconcileCompletedNode(
+        { ...context, journal, reusedOutputs, reattachedTasks, staleLive, failNode: failCompleted },
+        observed,
+      )
+      if (reopening instanceof Promise) await reopening
       continue
     }
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue
     if (observed.state !== "scheduled" && observed.state !== "running" && observed.state !== "paused") continue
 
-    let task = currentNodeTask(context.taskManager, journal.snapshot(), observed)
+    const resolving = resolveRecoveredNodeTask(context.taskManager, journal.snapshot(), observed, staleLive)
+    const resolved = resolving instanceof Promise ? await resolving : resolving
+    if (resolved.kind === "fail") {
+      failNode(journal, observed.id, resolved.code, resolved.message, context.now, pendingErrors)
+      continue
+    }
+    let task = resolved.kind === "task" ? resolved.task : undefined
     if (task !== undefined && observed.taskId !== task.task_id) attachTask(journal, observed.id, task.task_id)
-
-    if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {
+    if (resolved.kind === "start") {
       const result = await context.taskManager.startOwned(
         {
           ...startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
@@ -542,69 +556,10 @@ export function listRunRecords(store: DagFileStore): readonly RecoverableRecord[
     .filter((record): record is RecoverableRecord => record !== null)
 }
 
-function startSpec(record: DagRunRecordV1, nodeId: DagNodeId, sessionDepth: number): ManagerStartSpec {
-  const node = nodeById(record, nodeId)
-  const persisted = persistedNode(record, nodeId)
-  return {
-    prompt: persisted.effectivePrompt,
-    ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
-    parent_session_id: record.parentSessionId,
-    root_session_id: record.rootSessionId,
-    depth: sessionDepth + 1,
-    ...(node.route.kind === "category"
-      ? { category: node.route.category }
-      : { subagent_type: node.route.agent, ...(node.route.model === undefined ? {} : { model: node.route.model }) }),
-    name: node.id,
-    ...(persisted.description === undefined ? {} : { description: persisted.description }),
-    run_in_background: true,
-  }
-}
-
-function taskOwner(record: DagRunRecordV1, nodeId: DagNodeId): DagTaskOwner {
-  // Keyed on the persisted execAttempt, NEVER the display attempt: reattach bumps the display
-  // attempt with no new execution, and an attempt-keyed fingerprint would then compute a value the
-  // persisted owner record does not hold - a spurious owner_conflict on an untouched resume.
-  const execAttempt = nodeById(record, nodeId).execAttempt
-  return {
-    kind: "dag",
-    runId: record.runId,
-    nodeId,
-    fingerprint: dagFingerprint(
-      ownerFingerprintInput({
-        definitionFingerprint: record.definitionFingerprint,
-        nodeId,
-        ...(execAttempt === undefined ? {} : { execAttempt }),
-      }),
-    ),
-  }
-}
-
 function nodeById(record: DagRunRecordV1, nodeId: DagNodeId) {
   const node = record.nodes.find((entry) => entry.id === nodeId)
   if (node === undefined) throw new Error(`unknown DAG node "${nodeId}"`)
   return node
-}
-
-function persistedNode(record: DagRunRecordV1, nodeId: DagNodeId): DagPersistedNode {
-  const node = record.definition.nodes.find((entry) => entry.id === nodeId)
-  if (node === undefined) throw new Error(`missing persisted definition for DAG node "${nodeId}"`)
-  return node
-}
-
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "held" }>): {
-  readonly code: DagNodeErrorCode
-  readonly message: string
-} {
-  switch (result.kind) {
-    case "depth_denied":
-      return { code: "depth_denied", message: result.reason }
-    case "plan_unresolved":
-      return { code: "plan_unresolved", message: result.error.message }
-    case "start_failed":
-      return { code: "start_failed", message: result.error_message }
-    case "owner_conflict":
-      return { code: "start_failed", message: `DAG task owner conflicts with existing task ${result.task_id}` }
-  }
 }
 
 function taskFailure(

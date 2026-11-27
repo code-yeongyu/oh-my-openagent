@@ -1,7 +1,8 @@
 import { log } from "@oh-my-opencode/utils"
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
-import { retriesStopped } from "./deferred-revival"
+import { claimantAlive, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
+import { retriesStopped, stopAwareRetryContext } from "./deferred-revival"
 import { PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { isHostSessionRecord } from "./host-session"
 import type { IdleReclaimerTimer, LifecycleDeps } from "./port"
@@ -50,9 +51,9 @@ export function startLiveParentRecovery(
   }
 
   async function attempt(record: TaskRecord, episode: Episode): Promise<void> {
+    const attemptable = () => eligible(record) && context.registry.get(record.task_id) === undefined
     try {
-      if (!eligible(record)) return
-      if (context.registry.get(record.task_id) !== undefined) return
+      if (!attemptable()) return
       const expired = context.now() >= episode.deadline
       if (
         isSuspensionExpiry(record) ||
@@ -66,11 +67,13 @@ export function startLiveParentRecovery(
       if (expired) episode.deadlineAttempted = true
       // A live foreign owner may release its claim within the budget. Do not start a second run
       // beside it; at expiry the normal stop/close path must end it (or disclose unconfirmed close).
-      if (
-        record.host_pid !== undefined &&
-        record.host_pid !== context.hostPid &&
-        context.signaller.isAlive(record.host_pid)
-      ) {
+      const observing = observeRecordOwners(context.ownerProcesses, [record], context.hostPid)
+      if (observing !== undefined) {
+        await observing
+        // Reading the owner's start identity is a wait: a shutdown or handle that landed meanwhile ends this attempt.
+        if (!attemptable()) return
+      }
+      if (record.host_pid !== undefined && record.host_pid !== context.hostPid && claimantAlive(context, record)) {
         if (expired) await expireSuspendedChild(context, record, () => owned(record))
         return
       }
@@ -91,7 +94,7 @@ export function startLiveParentRecovery(
         if (other.task_id !== record.task_id) excludeTaskIds.add(other.task_id)
       const revival = reconcileScopedRevival(
         {
-          ...context,
+          ...stopAwareRetryContext(context, record.parent_session_id),
           deferUnresumable: true,
           reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds },
         },

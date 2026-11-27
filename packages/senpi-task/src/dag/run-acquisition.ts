@@ -4,7 +4,8 @@
 // the one holder rule, (3) takes this process's per-run reservation and (4) writes the lease. The
 // caller then builds its scheduler or journal from the returned record, never from an earlier read.
 import type { DagRunRecordV1 } from "./manager"
-import { liveForeignHolder, type DagRunHolderProbe } from "./run-lease"
+import type { HostClaim } from "../state/record-types"
+import { liveForeignHolderOf, type DagRunHolderProbe } from "./run-lease"
 import type { DagFileStore } from "./store"
 import { TERMINAL_DAG_RUN_STATUSES, type DagRunId } from "./types"
 
@@ -74,11 +75,14 @@ export const dagRunEligibility = {
       stoppedByUser(fresh) &&
       fresh.pause?.pauseSeq === pauseSeq &&
       heldHere() !== true,
-  /** Cancel of a run no scheduler here holds: of this session, not yet settled. */
+  /**
+   * Cancel of a run no scheduler here holds: of this session. A settled one is eligible too, because a
+   * child it owns can still be live (#11381); the cancel then only drains it and writes no lease.
+   */
   unheldCancel:
     (parentSessionId: string): Eligibility =>
     (fresh) =>
-      fresh.parentSessionId === parentSessionId && !TERMINAL_DAG_RUN_STATUSES.has(fresh.status),
+      fresh.parentSessionId === parentSessionId,
   /** Parking a run whose scheduler here failed: of this session, still `running`, no scheduler here holds it. */
   parkFailed:
     (parentSessionId: string, heldHere: () => boolean): Eligibility =>
@@ -117,9 +121,12 @@ export type DagRunAcquisition<T extends LeasedRecord> =
       readonly leaseTaken: boolean
     }
   | { readonly kind: "not_eligible"; readonly record: T }
-  | { readonly kind: "held"; readonly holderPid: number }
+  | DagRunHeld
   | { readonly kind: "busy"; readonly operation: string }
   | { readonly kind: "missing" }
+
+// A child's owner carries its stamped claim, so a lease watch can tell that owner from a reused pid.
+export type DagRunHeld = { readonly kind: "held"; readonly holderPid: number; readonly holderClaim?: HostClaim }
 
 export type DagRunAcquisitionRequest<T extends LeasedRecord> = {
   readonly operation: string
@@ -164,13 +171,13 @@ export function classifySend(fresh: LeasedRecord, parentSessionId: string, nodeI
 export function decideDagRun<T extends LeasedRecord>(
   fresh: T,
   request: Pick<DagRunAcquisitionRequest<T>, "eligible" | "probe" | "holder">,
-):
-  | { readonly kind: "not_eligible" }
-  | { readonly kind: "held"; readonly holderPid: number }
-  | { readonly kind: "free" } {
+): { readonly kind: "not_eligible" } | DagRunHeld | { readonly kind: "free" } {
   if (!request.eligible(fresh)) return { kind: "not_eligible" }
-  const holderPid = request.holder === undefined ? liveForeignHolder(request.probe, fresh) : request.holder(fresh)
-  return holderPid === undefined ? { kind: "free" } : { kind: "held", holderPid }
+  const holderPid = request.holder?.(fresh)
+  if (holderPid !== undefined) return { kind: "held", holderPid }
+  const holder = request.holder === undefined ? liveForeignHolderOf(request.probe, fresh) : undefined
+  if (holder === undefined) return { kind: "free" }
+  return { kind: "held", holderPid: holder.pid, ...(holder.claim === undefined ? {} : { holderClaim: holder.claim }) }
 }
 
 export function acquireDagRun<T extends LeasedRecord>(

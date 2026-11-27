@@ -3,13 +3,14 @@
 // rule, this process's per-run reservation (held until the caller adopts or abandons the run), then
 // the lease (#15125).
 import type { RecoverableRecord, RecoveryContext } from "./recovery"
-import { acquireDagRun, dagRunEligibility, type DagRunAcquisition } from "./run-acquisition"
+import { acquireDagRun, dagRunEligibility, type DagRunAcquisition, type DagRunHeld } from "./run-acquisition"
+import { observeChildOwners } from "./run-lease"
 import type { DagRunId } from "./types"
 
 export type ClaimedRun =
   | { readonly kind: "claimed"; readonly record: RecoverableRecord; readonly release: () => void }
   | { readonly kind: "skipped"; readonly reason: "foreign_session" | "not_paused" | "busy" }
-  | { readonly kind: "skipped"; readonly reason: "live_lease"; readonly holderPid: number }
+  | ({ readonly kind: "skipped"; readonly reason: "live_lease" } & Omit<DagRunHeld, "kind">)
 
 // Only an immediate fork source can be adopted, and its recorded holder must still prove
 // abandonment. Missing holders and live foreign processes remain protected.
@@ -40,7 +41,23 @@ export function claimOrphanedRun(
 /** Automatic recovery never takes a run the user stopped; the user's Resume takes exactly its Stop. */
 export type ClaimMode = { readonly kind: "automatic" } | { readonly kind: "resume"; readonly pauseSeq: number }
 
+/**
+ * The holder rule judges a node child's owner by its start too, read here so the decision is fresh.
+ * Asynchronous only while there is a stamped foreign owner to read, as in the lifecycle: the common
+ * path adds no scheduling turn before the claim.
+ */
 export function claimPausedRun(
+  context: RecoveryContext,
+  runId: DagRunId,
+  parentSessionId: string,
+  mode: ClaimMode,
+): ClaimedRun | Promise<ClaimedRun> {
+  const observing = observeChildOwners(context, context.store.readCheckpoint<RecoverableRecord>(runId))
+  if (observing === undefined) return claimObserved(context, runId, parentSessionId, mode)
+  return observing.then(() => claimObserved(context, runId, parentSessionId, mode))
+}
+
+function claimObserved(
   context: RecoveryContext,
   runId: DagRunId,
   parentSessionId: string,
@@ -77,8 +94,10 @@ function claimOutcome(
   switch (acquired.kind) {
     case "acquired":
       return { kind: "claimed", record: acquired.record, release: () => acquired.reservation?.release() }
-    case "held":
-      return { kind: "skipped", reason: "live_lease", holderPid: acquired.holderPid }
+    case "held": {
+      const { kind: _held, ...holder } = acquired
+      return { kind: "skipped", reason: "live_lease", ...holder }
+    }
     case "busy":
       // Another operation of this process is installing or mutating the run: ask again once it releases it.
       return { kind: "skipped", reason: "busy" }

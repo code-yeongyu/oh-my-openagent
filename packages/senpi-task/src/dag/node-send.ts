@@ -1,6 +1,7 @@
 // Send: delivering a message to one node's child through the task manager's steering engine, and
 // folding the outcome of a child that was revived outside any wave.
 import type { SendOutcome } from "../steering"
+import { childStartRefusal } from "./child-gate"
 import { dagNodeSteeredEvent, dagNodeTransitionedEvent } from "./events"
 import { guidePausedDag } from "./paused-controls"
 import type { DagRunRecordV1 } from "./manager"
@@ -64,6 +65,15 @@ export async function sendToDagNode(
         runId,
         nodeIds: [nodeId],
       })
+    }
+    // The child gate on the decided record, after the ownership decision (#11381): a run that owes a
+    // stop or has a stale child live admits no work, and only the node's CURRENT attempt is revived -
+    // never a superseded task the node still names. A refusal gives back the lease this send took.
+    const refusal = childStartRefusal(options.taskManager, record, options.taskManager.get(taskId))
+    if (refusal !== undefined) {
+      const remedy = refusal.rule === "not_current" ? " Retry the node to run its current definition." : ""
+      const code = refusal.rule === "not_current" ? "node_not_continuable" : "run_still_active"
+      throw new DagNodeControlError({ code, message: `${refusal.message}.${remedy}`, runId, nodeIds: [nodeId] })
     }
     const outcome = await options.taskManager.sendToTask({
       idOrName: taskId,

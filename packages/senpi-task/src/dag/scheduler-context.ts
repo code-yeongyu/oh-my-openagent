@@ -31,6 +31,7 @@ export type AttachedTaskSettlement =
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId
+  selfResumed: boolean
   readonly settled: Promise<AttachedTaskSettlement>
   readonly folded: Promise<void>
   readonly resolveFolded: () => void
@@ -88,6 +89,9 @@ export type SchedulerContext = {
   // waitFor resolves only at terminal, so this watch is the only signal that folds the task
   // engine's later queue promotion into a scheduled -> running node transition.
   readonly promotionWatches: Map<DagNodeId, () => void>
+  // omo#10487: armed before waitFor, kept through completion so an early self-resume supersedes
+  // the attached settlement and a later one reopens the node; disposed at run end.
+  readonly selfResumeWatches: Map<DagNodeId, () => void>
 }
 
 export function nodeById(record: DagRunRecordV1, nodeId: DagNodeId): DagNode {
@@ -104,6 +108,33 @@ export function transition(
 ): void {
   const from = nodeById(context.journal.snapshot(), nodeId).state
   context.journal.append(dagNodeTransitionedEvent({ nodeId, from, to, reason }))
+}
+
+/**
+ * Every owned task of the node that can still do work, whether or not this controller attached it.
+ * Not only the newest: an earlier attempt's finished child can resume on its own after the next
+ * attempt's task exists (#11381).
+ */
+export function liveOwnedTasks(context: SchedulerContext, nodeId: DagNodeId): readonly TaskRecord[] {
+  return context.taskManager
+    .findOwnedTasks({ kind: "dag", runId: context.journal.snapshot().runId, nodeId })
+    .filter((task) => isLiveOwnedTask(context.taskManager, task))
+}
+
+/**
+ * The one liveness predicate for a run's owned children (#11381): a record that can still do work, or
+ * one whose refused self-started turn the manager has not confirmed stopped. Every reader of a run's
+ * live children - cancel drain, outstanding stop, admission fence, sweep, recovery - asks here.
+ */
+export function isLiveOwnedTask(
+  tasks: Pick<TaskManager, "selfResumeStopPending">,
+  task: TaskRecord | null | undefined,
+): boolean {
+  return isLiveTask(task) || (task != null && tasks.selfResumeStopPending?.(task.task_id) === true)
+}
+
+export function isLiveTask(task: TaskRecord | null | undefined): boolean {
+  return task?.status === "pending" || task?.status === "running" || task?.status === "paused"
 }
 
 export function failNode(context: SchedulerContext, nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void {

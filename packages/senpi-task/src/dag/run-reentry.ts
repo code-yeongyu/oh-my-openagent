@@ -3,6 +3,7 @@
 import { dagRunResumedEvent } from "./events"
 import type { DagRunRecordV1 } from "./manager"
 import { acquireReentryLease, controlJournal, DagNodeControlError, readRecord } from "./node-control-context"
+import { outstandingStopRefusal } from "./outstanding-stop"
 import { createDagScheduler, type DagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { TERMINAL_DAG_RUN_STATUSES } from "./types"
 
@@ -39,6 +40,7 @@ export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
   }
   const { record, abandon } = acquireReentryLease(options, observed.runId)
   try {
+    assertNoOutstandingStop(options, record)
     return startReentry(
       options,
       withRevivalCapacity(options, record, () => resumeIfSettled(options, record)),
@@ -47,6 +49,15 @@ export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
     abandon()
     throw error
   }
+}
+
+// Re-entry of a settled run that still owns a live child would admit work beside it (#11381): every
+// re-entry verb refuses until a repeated cancel has drained the run, on the record it acquired and
+// before it journals anything.
+export function assertNoOutstandingStop(options: DagSchedulerOptions, record: DagRunRecordV1): void {
+  const owed = outstandingStopRefusal(options.taskManager, record)
+  if (owed !== undefined)
+    throw new DagNodeControlError({ code: "run_still_active", message: owed, runId: record.runId })
 }
 
 // A settled run counts against the cap again the moment it resumes, so the journal writes that revive

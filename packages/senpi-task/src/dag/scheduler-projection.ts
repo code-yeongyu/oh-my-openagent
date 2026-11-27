@@ -5,6 +5,7 @@ import { applyDagRunMutation } from "./manager"
 import { applyRunPause } from "./run-pause"
 import { leaseAfterEvent } from "./run-lease"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
+import { applyDiagnostic, clearHeldTrigger } from "./held-trigger-record"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
 import type { TaskRecord } from "../state"
@@ -81,7 +82,7 @@ function projectSchedulerEvent(
         nodes: record.nodes.map((node) => {
           if (node.id !== event.nodeId) return node
           const transitioned: DagNodeWithResult = transitionedNode(
-            node,
+            event.to === "running" ? clearHeldTrigger(node) : node,
             event.to,
             event.at,
             pendingErrors.get(event.nodeId),
@@ -134,10 +135,13 @@ function projectSchedulerEvent(
     // A revived child runs again on its own session: no new task, no attempt bump, just the node
     // leaving its terminal state so the revive watcher can fold the new outcome.
     case "dag.node.steered":
-      if (event.delivery !== "revive") return { ...record, updatedAt: event.at }
       return {
         ...record,
-        nodes: record.nodes.map((node) => (node.id === event.nodeId ? { ...node, taskId: event.taskId } : node)),
+        nodes: record.nodes.map((node) =>
+          node.id !== event.nodeId
+            ? node
+            : { ...clearHeldTrigger(node), ...(event.delivery === "revive" ? { taskId: event.taskId } : {}) },
+        ),
         updatedAt: event.at,
       }
     // The retry and amend record mutations live in ONE shared reducer with the manager so a journal
@@ -146,7 +150,7 @@ function projectSchedulerEvent(
     case "dag.definition.amended":
       return { ...applyDagRunMutation(record, event), updatedAt: event.at }
     case "dag.diagnostic.added":
-      return { ...record, diagnostics: [...record.diagnostics, event.diagnostic], updatedAt: event.at }
+      return applyDiagnostic(record, event)
     case "dag.run.created":
     case "dag.run.paused":
     case "dag.wave.started":

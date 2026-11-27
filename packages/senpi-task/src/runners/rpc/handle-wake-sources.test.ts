@@ -215,3 +215,54 @@ describe("createRpcChildHandle goal wake-source tracking (senpi#3262)", () => {
     expect(settled).toBeUndefined()
   })
 })
+
+describe("createRpcChildHandle pending async work (senpi#3492, omo#10487)", () => {
+  test("#given a detached eval cell still in flight #when the child ends its turn clean #then the task stays running until the cell drains and the idle probe confirms no turn answered it", async () => {
+    // given - the child detached a cell during its turn; the cell has not settled yet
+    const scheduler = createManualSettlementScheduler()
+    const harness = createHarness(60_000, scheduler.scheduler)
+    const cellSnapshot = (activeCount: number): unknown => ({
+      type: "extension_event",
+      name: "wake_source_state",
+      data: {
+        source: "senpi-codemode",
+        activeCount,
+        items: activeCount > 0 ? [{ id: "cell_1", description: "eval cell", startedAtMs: 1 }] : [],
+      },
+    })
+    harness.emit(cellSnapshot(1))
+    let settled: RunnerOutcome | undefined
+    void harness.handle.waitForOutcome().then((outcome) => {
+      settled = outcome
+    })
+
+    // when - the turn ends with a final answer and the session reports idle while the cell runs
+    for (const record of successfulTurn()) harness.emit(record)
+
+    // then - the completed outcome is held: the cell's wake is still coming (omo#10487)
+    await flushSettlement()
+    expect(scheduler.pending()).toBe(1)
+    expect(settled).toBeUndefined()
+
+    // when - the confirmation fires while the cell is still live
+    scheduler.runNext()
+    await flushSettlement()
+
+    // then - still held, re-armed for next heartbeat
+    expect(settled).toBeUndefined()
+    expect(scheduler.pending()).toBe(1)
+
+    // when - the cell settles and the source publishes its empty snapshot
+    harness.emit(cellSnapshot(0))
+    expect(scheduler.pending()).toBe(1)
+    scheduler.runNext()
+
+    // then - the cell drained and no turn answered it: the held note is never the result (review
+    // finding 1 on #15137); a turn the cell's notification starts later supersedes this
+    const outcome = await harness.handle.waitForOutcome()
+    expect(outcome.status).toBe("error")
+    if (outcome.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+    await harness.handle.dispose()
+  })
+})
