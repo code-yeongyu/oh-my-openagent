@@ -103,111 +103,101 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).not.toContain("PACKAGED BODY")
   })
 
-  test("#given default attribution settings #when the git-master skill is loaded #then the env-prefix section and one co-author directive ride the skill block", () => {
-    const cwd = tempDir()
-    const pluginSkillsDir = tempDir()
-    writeSkill(pluginSkillsDir, 'GIT MASTER BODY\n\n```bash\ngit add -A .\ngit commit -m "x"\n```', "git-master")
-
-    const loader = createTaskSkillLoader({
+  function gitLoader(pluginSkillsDir: string, settings: Record<string, unknown> = {}) {
+    return createTaskSkillLoader({
       agentDir: tempDir(),
       homeDir: tempDir(),
       pluginSkillsDirs: [pluginSkillsDir],
-      loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+      loadSettings: () => OmoGitMasterSettingsSchema.parse(settings),
     })
-    const resolution = loader(["git-master"], cwd)
+  }
 
-    expect(resolution.resolved).toEqual(["git-master"])
-    expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).toContain("GIT COMMAND PREFIX (MANDATORY)")
-    expect(resolution.prepend).toContain("GIT_MASTER=1 git add -A .")
-    expect(resolution.prepend).toContain('GIT_MASTER=1 git commit -m "x"')
-    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
-    expect(resolution.prepend).toContain("GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit")
-    expect(resolution.prepend).not.toContain("Ultraworked with")
+  test("#given default settings #when load_skills names git and then the legacy git-master alias #then both resolve to git with one settings block and one attribution directive", () => {
+    const cwd = tempDir()
+    const pluginSkillsDir = tempDir()
+    writeSkill(pluginSkillsDir, "GIT BODY", "git")
+    const loader = gitLoader(pluginSkillsDir)
+
+    const byName = loader(["git"], cwd)
+    const byAlias = loader(["git-master"], cwd)
+
+    expect(byName.resolved).toEqual(["git"])
+    expect(byAlias.resolved).toEqual(["git"])
+    expect(byAlias.missing).toEqual([])
+    expect(byAlias.prepend).toBe(byName.prepend)
+    expect(occurrences(byName.prepend, "<git_env_prefix>")).toBe(1)
+    expect(occurrences(byName.prepend, "<commit_attribution>")).toBe(1)
+    expect(occurrences(byName.prepend, `--trailer "${TRAILER}"`)).toBe(1)
   })
 
-  test("#given a git-master skill file that already carries the attribution directive #when it is loaded #then the directive is not appended again", () => {
+  test("#given a custom git_env_prefix #when the git skill is loaded #then the configured assignments reach both the Bun.$ env form and the bash line form", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
-    const loadSettings = () => OmoGitMasterSettingsSchema.parse({ git_env_prefix: "" })
-    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
-    const firstLoad = createTaskSkillLoader({
-      agentDir: tempDir(),
-      homeDir: tempDir(),
-      pluginSkillsDirs: [pluginSkillsDir],
-      loadSettings,
-    })
-    const firstSkill = firstLoad(["git-master"], cwd).skills?.find((skill) => skill.name === "git-master")
+    writeSkill(pluginSkillsDir, "GIT BODY", "git")
+
+    const resolution = gitLoader(pluginSkillsDir, { git_env_prefix: "OMO_GIT=7 TRACE_GIT=on" })(["git-master"], cwd)
+
+    expect(resolution.prepend).toContain('OMO_GIT: "7"')
+    expect(resolution.prepend).toContain('TRACE_GIT: "on"')
+    expect(resolution.prepend).toContain("OMO_GIT=7 TRACE_GIT=on git")
+    expect(resolution.prepend).not.toContain("GIT_MASTER")
+  })
+
+  test("#given a git skill file that already carries the attribution directive #when it is loaded #then the directive is not appended again", () => {
+    const cwd = tempDir()
+    const pluginSkillsDir = tempDir()
+    writeSkill(pluginSkillsDir, "GIT BODY", "git")
+    const firstSkill = gitLoader(pluginSkillsDir, { git_env_prefix: "" })(["git"], cwd).skills?.find(
+      (skill) => skill.name === "git",
+    )
     const savedDir = tempDir()
-    writeSkill(savedDir, firstSkill?.content ?? "", "git-master")
+    writeSkill(savedDir, firstSkill?.content ?? "", "git")
 
-    const resolution = createTaskSkillLoader({
-      agentDir: tempDir(),
-      homeDir: tempDir(),
-      pluginSkillsDirs: [savedDir],
-      loadSettings,
-    })(["git-master"], cwd)
+    const resolution = gitLoader(savedDir, { git_env_prefix: "" })(["git"], cwd)
 
-    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
+    expect(occurrences(resolution.prepend, "<commit_attribution>")).toBe(1)
   })
 
-  test("#given the footer opted in #when the git-master skill is loaded #then the footer and the co-author ride the skill block", () => {
+  test("#given the footer opted in #when the git skill is loaded #then the footer and the co-author ride the skill block", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
-    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+    writeSkill(pluginSkillsDir, "GIT BODY", "git")
 
-    const loader = createTaskSkillLoader({
-      agentDir: tempDir(),
-      homeDir: tempDir(),
-      pluginSkillsDirs: [pluginSkillsDir],
-      loadSettings: () => OmoGitMasterSettingsSchema.parse({ commit_footer: true, include_co_authored_by: true }),
-    })
-    const resolution = loader(["git-master"], cwd)
+    const resolution = gitLoader(pluginSkillsDir, { commit_footer: true, include_co_authored_by: true })(["git"], cwd)
 
-    expect(resolution.prepend).toContain("GIT MASTER BODY")
     expect(resolution.prepend).toContain("Ultraworked with")
-    expect(resolution.prepend).toContain("GIT COMMAND PREFIX (MANDATORY)")
     expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
   })
 
-  test("#given attribution disabled and the env prefix disabled #when the git-master skill is loaded #then the skill block stays untouched", () => {
+  test("#given attribution and the env prefix disabled #when the git skill is loaded #then the skill block stays untouched", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
-    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+    writeSkill(pluginSkillsDir, "GIT BODY", "git")
 
-    const loader = createTaskSkillLoader({
-      agentDir: tempDir(),
-      homeDir: tempDir(),
-      pluginSkillsDirs: [pluginSkillsDir],
-      loadSettings: () =>
-        OmoGitMasterSettingsSchema.parse({ commit_footer: false, include_co_authored_by: false, git_env_prefix: "" }),
-    })
-    const resolution = loader(["git-master"], cwd)
+    const resolution = gitLoader(pluginSkillsDir, {
+      commit_footer: false,
+      include_co_authored_by: false,
+      git_env_prefix: "",
+    })(["git"], cwd)
 
-    expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).not.toContain("GIT COMMAND PREFIX (MANDATORY)")
+    expect(resolution.prepend).toContain("GIT BODY")
+    expect(resolution.prepend).not.toContain("<git_env_prefix>")
+    expect(resolution.prepend).not.toContain("<commit_attribution>")
     expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
-    expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 
-  test("#given senpi started from a non-bash login shell #when the git-master skill is loaded #then the prefix uses the bash form senpi's bash tool runs", () => {
+  test("#given senpi started from a non-bash login shell #when the git skill is loaded #then the line form is the bash form senpi's bash tool runs", () => {
     const saved = { SHELL: process.env["SHELL"], PSModulePath: process.env["PSModulePath"] }
     try {
       process.env["SHELL"] = "/bin/tcsh"
       process.env["PSModulePath"] = "C:\\Program Files\\PowerShell\\Modules"
       const cwd = tempDir()
       const pluginSkillsDir = tempDir()
-      writeSkill(pluginSkillsDir, "GIT MASTER BODY\n\n```bash\ngit status\n```", "git-master")
+      writeSkill(pluginSkillsDir, "GIT BODY", "git")
 
-      const loader = createTaskSkillLoader({
-        agentDir: tempDir(),
-        homeDir: tempDir(),
-        pluginSkillsDirs: [pluginSkillsDir],
-        loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
-      })
-      const resolution = loader(["git-master"], cwd)
+      const resolution = gitLoader(pluginSkillsDir)(["git"], cwd)
 
-      expect(resolution.prepend).toContain("\nGIT_MASTER=1 git status\n```")
+      expect(resolution.prepend).toContain("GIT_MASTER=1 git")
       expect(resolution.prepend).not.toContain("setenv")
       expect(resolution.prepend).not.toContain("$env:")
     } finally {
@@ -218,7 +208,7 @@ describe("createTaskSkillLoader", () => {
     }
   })
 
-  test("#given the footer opted in #when a non-git-master skill is loaded #then no directive is injected", () => {
+  test("#given the footer opted in #when a non-git skill is loaded #then no directive is injected", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "SHARED BODY")
