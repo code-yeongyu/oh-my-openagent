@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "0124586099bf514a056fb484417f7f2fef572f440741141afaca9dbcaaab2050",
+  "workflowSha256": "e1cace1dbe8d4ba4e696b6d09ad20528b7cec76ddbf88340828a7e71e81a50b6",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
@@ -20,7 +20,7 @@
       "Check PR target branch",
       "Write job summary"
     ],
-    "test (windows-latest, 1/2)": [
+    "test (windows-latest, 1/3)": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
       "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
@@ -31,13 +31,14 @@
       "Run vendored lsp-daemon tests",
       "Run tests with Windows telemetry",
       "Run tests",
+      "Run tests",
       "Upload Windows post-test telemetry",
       "Collect timed-out git evidence",
       "Upload timed-out git evidence",
       "Check that this leg ran its tests",
       "Write job summary"
     ],
-    "test (windows-latest, 2/2)": [
+    "test (windows-latest, 2/3)": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
       "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
@@ -47,6 +48,25 @@
       "Create the second local user for the DACL tests",
       "Run vendored lsp-daemon tests",
       "Run tests with Windows telemetry",
+      "Run tests",
+      "Run tests",
+      "Upload Windows post-test telemetry",
+      "Collect timed-out git evidence",
+      "Upload timed-out git evidence",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test (windows-latest, 3/3)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Create the second local user for the DACL tests",
+      "Run vendored lsp-daemon tests",
+      "Run tests with Windows telemetry",
+      "Run tests",
       "Run tests",
       "Upload Windows post-test telemetry",
       "Collect timed-out git evidence",
@@ -425,7 +445,7 @@
       "reason": "The Windows leg runs the platform smoke; the full suite runs on the Linux leg."
     },
     {
-      "job": "test (windows-latest, 1/2)",
+      "job": "test (windows-latest, 1/3)",
       "steps": [
         "Run actions/cache@v6",
         "Run tests"
@@ -433,12 +453,24 @@
       "reason": "Windows does not use the POSIX cache; shard 1 runs its tests through the telemetry step."
     },
     {
-      "job": "test (windows-latest, 2/2)",
+      "job": "test (windows-latest, 2/3)",
       "steps": [
         "Run actions/cache@v6",
         "Run tests with Windows telemetry",
         "Collect timed-out git evidence",
-        "Upload timed-out git evidence"
+        "Upload timed-out git evidence",
+        "Run tests"
+      ],
+      "reason": "Windows does not use the POSIX cache; telemetry and git diagnostics belong to shard 1."
+    },
+    {
+      "job": "test (windows-latest, 3/3)",
+      "steps": [
+        "Run actions/cache@v6",
+        "Run tests with Windows telemetry",
+        "Collect timed-out git evidence",
+        "Upload timed-out git evidence",
+        "Run tests"
       ],
       "reason": "Windows does not use the POSIX cache; telemetry and git diagnostics belong to shard 1."
     },
