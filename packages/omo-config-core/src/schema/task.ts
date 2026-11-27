@@ -57,7 +57,9 @@ export const OmoTaskIsolationSchema = z
   })
   .strict()
 
-const isolationDefaults = OmoTaskIsolationSchema.parse({})
+// One source for the isolation defaults (#11643): the task tool's own fallback reads these, so a
+// changed default cannot diverge between the config schema and the tool path.
+export const isolationDefaults = OmoTaskIsolationSchema.parse({})
 
 export const OmoTaskIsolationLayerSchema = z
   .object({

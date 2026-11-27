@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
+import { OmoTaskSettingsSchema, isolationDefaults } from "@oh-my-opencode/omo-config-core"
 import { Value } from "typebox/value"
 import { normalizeTaskToolArguments } from "./argument-normalization"
 import { taskCallLines } from "./call-renderer"
@@ -96,5 +96,16 @@ describe("isolation task parameters", () => {
   test("call row displays isolation beside foreground or background", () => {
     expect(taskCallLines({ isolated: true, run_in_background: true })[0]).toBe("task background isolated")
     expect(taskCallLines({ isolated: false })[0]).toBe("task foreground")
+  })
+
+  test("#given no task config at all #when the start spec resolves isolation #then the tool's fallback is the config schema's own default (#11643)", () => {
+    // The one-source pin: with no isolation config the tool falls back to the schema's parsed
+    // defaults, so changing the default in omo-config-core changes the tool path with it.
+    const deps = makeDeps(createFakeManager({}), { omoConfig: { categories: {}, agents: {} } })
+    expect(buildStartSpec({ prompt: "Inspect", isolated: true }, { category: "quick" }, "parent", deps, "/project")).toMatchObject({
+      isolated: true,
+      apply: isolationDefaults.apply,
+      merge: isolationDefaults.merge,
+    })
   })
 })

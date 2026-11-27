@@ -1,5 +1,6 @@
 import { resolveExecutionMode } from "../../manager"
 import type { ExecutionMode, ManagerStartSpec } from "../../manager"
+import { isolationDefaults } from "@oh-my-opencode/omo-config-core"
 import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
@@ -35,8 +36,8 @@ export function buildStartSpec(
     ...(isolated
       ? {
           isolated,
-          apply: params.apply ?? isolation?.apply ?? true,
-          merge: params.merge ?? isolation?.merge ?? "patch",
+          apply: params.apply ?? isolation?.apply ?? isolationDefaults.apply,
+          merge: params.merge ?? isolation?.merge ?? isolationDefaults.merge,
         }
       : params.isolated === undefined
         ? {}
