@@ -55,3 +55,40 @@ describe("a root built for a value that is not one of the five principals", () =
       expect(() => assembleThreadFacade({ env: {}, cwd: tmpdir(), principal } as never)).toThrow(TypeError)
     })
 })
+
+// Review of #14983 at 699c480398 (LOW 1): the account service origin is the caller's to change only for a person or a
+// script (security design 4.2). A session root that names one through `accounts` is refused, as it is through `api`. The
+// environment the root is built with is the configured origin, which a session's call uses, so it is not refused.
+describe("a session root that names an account service origin", () => {
+  const session = { kind: "session", session_id: "session-1" } as const
+  const whoami = async (options: Record<string, unknown>) => {
+    const root = createOmoSdk({
+      cwd: tmpdir(),
+      principal: session,
+      ports: {
+        session: {
+          accessToken: async () => null,
+          request: async () => {
+            throw new Error("no network in this test")
+          },
+        },
+      },
+      ...options,
+    } as never)
+    const answer = (await root.account.whoami({})) as { kind: string; error?: { code?: string; message?: string } }
+    await root.dispose()
+    return answer
+  }
+  const originRefused = (answer: { error?: { code?: string; message?: string } }) =>
+    answer.error?.code === "sender_not_allowed" && (answer.error.message ?? "").includes("security design 4.2")
+  for (const [label, options] of [
+    ["the api option", { env: {}, api: "https://api.example.test" }],
+    ["the accounts option", { env: {}, accounts: "https://accounts.example.test" }],
+  ] as const)
+    test(`#given ${label} #when it asks account.whoami #then the origin refusal answers`, async () => {
+      expect(originRefused(await whoami(options))).toBe(true)
+    })
+  test("#given the configured origin in the environment the root is built with #when it asks account.whoami #then the origin refusal does not answer", async () => {
+    expect(originRefused(await whoami({ env: { OMO_SERVICE_API_URL: "https://api.example.test" } }))).toBe(false)
+  })
+})

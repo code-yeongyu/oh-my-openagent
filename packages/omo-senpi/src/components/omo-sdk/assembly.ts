@@ -26,6 +26,14 @@ function assertLauncherCores(cores: CoreLoaders): void {
     )
 }
 
+// The facts the matrix's "origin" line (security design 4.2) is conditioned on: the caller changes the account service
+// origin through `api` or through `accounts` (review of #14983 at 699c480398, LOW 1). The environment the root is built
+// with is the configured origin, which a session's call uses (the line's own note).
+const originFacts = (options: OmoSdkOptions): OmoSdkOptions & { readonly api?: string } => {
+  const api = options.api ?? options.accounts
+  return api === undefined ? options : { ...options, api }
+}
+
 /** The root over this package's cores and the launcher-side cores the shipping entry supplies. Building it opens nothing. */
 export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly): OmoSdk {
   const given = options.env ?? process.env
@@ -55,7 +63,7 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
       ...(options.home === undefined ? {} : { home: options.home }),
       principal,
     },
-    boundaryRefusals(principal, options),
+    boundaryRefusals(principal, originFacts(options)),
   )
   // The shipped serving placed the shipped API objects' own functions at these keys, so the tree is that surface too.
   return root as OmoSdk
