@@ -38,19 +38,19 @@ Generator/checker note: update this file with the audited component list, then r
 - Upstream URL: https://www.npmjs.com/package/@opencode-ai/sdk
 - Where-bundled: root production dependency for OpenCode API access.
 
-### @opentui/core@0.5.8
+### @opentui/core@0.9.9
 - License: MIT, from `node_modules/@opentui/core/LICENSE`.
 - Copyright: Copyright (c) 2025 opentui.
 - Upstream URL: https://www.npmjs.com/package/@opentui/core
 - Where-bundled: root production dependency.
 
-### @opentui/keymap@0.5.8
+### @opentui/keymap@0.9.9
 - License: MIT, from `node_modules/@opentui/keymap/LICENSE`.
 - Copyright: Copyright (c) 2025 opentui.
 - Upstream URL: https://www.npmjs.com/package/@opentui/keymap
 - Where-bundled: root production dependency.
 
-### @opentui/solid@0.5.8
+### @opentui/solid@0.9.9
 - License: MIT, from `node_modules/@opentui/solid/LICENSE`.
 - Copyright: Copyright (c) 2025 opentui.
 - Upstream URL: https://www.npmjs.com/package/@opentui/solid
@@ -121,6 +121,12 @@ Generator/checker note: update this file with the audited component list, then r
 - Copyright: Copyright 2020 Posthog / Hiberly, Inc.; Copyright 2015 Mixpanel, Inc.
 - Upstream URL: https://github.com/PostHog/posthog-js
 - Where-bundled: root production dependency for anonymous telemetry.
+
+### solid-js@1.9.20
+- License: MIT, from `node_modules/solid-js/LICENSE`.
+- Copyright: Copyright (c) 2016-2025 Ryan Carniato.
+- Upstream URL: https://www.npmjs.com/package/solid-js
+- Where-bundled: root production dependency (the peer `@opentui/solid` renders with; pinned so installs resolve a patched `seroval`).
 
 ### vscode-jsonrpc@8.2.1
 - License: MIT, from `node_modules/vscode-jsonrpc/License.txt`.
