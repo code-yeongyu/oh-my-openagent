@@ -10,7 +10,6 @@ import { resolveAgentReflectionSettings } from "./reflection-settings"
 import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
-import { registerMemoryFilesystemPolicy } from "./policy-guard"
 import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } from "./shutdown-drain"
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
@@ -341,7 +340,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       pressureDreamAdmission.reset(sessionId)
       lastEventCtx.current = eventCtx
       reflectionLive.attach(sessionId)
-      registerMemoryFilesystemPolicy(pi, identity)
       maintenance.schedule(identity)
       if (branchEntryCount(eventCtx) > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)
