@@ -785,7 +785,10 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const taskId = this.#steering.resolve(idOrName)?.task_id ?? idOrName
+    const record = this.#steering.resolveCancelTarget(idOrName, options?.caller)
+    if (record === undefined && options?.caller !== undefined)
+      return this.#steering.cancelTask(idOrName, reason, options)
+    const taskId = record?.task_id ?? idOrName
     const refused = cancelBehindRefusedStop(this.#refusedStops, taskId, () => this.#tryLoad(taskId)?.status)
     if (refused !== undefined) return refused
     const outcome = await this.#steering.cancelTask(taskId, reason, options)
