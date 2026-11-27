@@ -7,7 +7,7 @@ import {
   reserveWhenFree,
   type DagRunReservations,
 } from "../../../../senpi-task/src/dag/run-acquisition"
-import type { DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
+import { observeChildOwners, type DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
 import { createDagScheduler } from "../../../../senpi-task/src/dag/scheduler"
 import { TERMINAL_DAG_RUN_STATUSES } from "../../../../senpi-task/src/dag/types"
 import type { OwnedScheduler } from "./dag-scheduler-registry"
@@ -41,6 +41,8 @@ export function createDagRunCancel(ports: {
         await held.scheduler.cancel(runId, reason)
         return record
       }
+      const observing = observeChildOwners(ports.holders, ports.store.readCheckpoint<DagRunRecordV1>(runId))
+      if (observing !== undefined) await observing
       const acquired = acquireDagRun<DagRunRecordV1>(ports.store, runId, {
         operation: "cancel",
         probe: ports.holders,

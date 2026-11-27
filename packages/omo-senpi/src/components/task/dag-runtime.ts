@@ -47,7 +47,7 @@ import { registerDagPauseSource } from "./dag-runtime-pause-wiring"
 import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { PausedChildRecoveryPort } from "../../../../senpi-task/src/dag/paused-child-recovery"
 import type { DagGuidanceDelivery } from "./dag-run-pause-source"
-import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
+import { ownerLiveness } from "../../../../senpi-task/src/dag/run-lease"
 
 const EVENT_PAGE_SIZE = 1000
 const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled"])
@@ -116,7 +116,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const reservations = createDagRunReservations()
   const recoveryTaskSubscriptions = new Map<string, () => void>()
   const activityTaskSubscriptions = new Map<string, () => void>()
-  const isProcessAlive = deps.leaseWatch?.isProcessAlive ?? defaultSignaller.isAlive
+  const liveness = ownerLiveness(deps.leaseWatch ?? {})
   let mutationListener = (): void => undefined
   let durableEventListener = (_event: DagRunEvent): void => undefined
   let activeSessionId: string | undefined
@@ -158,7 +158,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
     // The same probe and (required) reservations as recovery and the registry, revive watchers included.
-    isProcessAlive,
+    ...liveness,
     reservations,
   }
 
@@ -220,7 +220,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     schedulerOptions,
     logger: deps.logger,
-    isProcessAlive,
+    isProcessAlive: liveness.isProcessAlive,
     reservations,
     recover: (sessionId) => sweeps.recover({ sessionId }),
     closure: childClosure,
@@ -231,7 +231,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     schedulerOptions,
     schedulers,
     reservations,
-    holders: { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive },
+    holders: { taskManager: deps.engine.manager, hostPid: process.pid, ...liveness },
     holdsRun,
   })
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
@@ -451,7 +451,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     taskManager,
     ...(deps.pausedChildren === undefined ? {} : { pausedChildren: deps.pausedChildren }),
-    isProcessAlive,
+    ...liveness,
     // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
     // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
     // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.

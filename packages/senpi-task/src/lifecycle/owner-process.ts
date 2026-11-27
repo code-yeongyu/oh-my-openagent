@@ -2,6 +2,9 @@ import { getProcessStartIdentity, startIdentitiesConflict } from "@oh-my-opencod
 
 import type { TaskRecord } from "../state"
 
+/** What a record says about its owner: the pid that claimed it and that claimant's stamp. */
+export type RecordOwner = Pick<TaskRecord, "host_pid" | "host_claim">
+
 /** The OS's own record of when the process now holding `pid` started, or null when it cannot say. */
 export type ProcessStartReader = (pid: number) => Promise<string | null>
 
@@ -67,7 +70,7 @@ export function ownerProcessViewFor(
 export function recordOwnerAlive(
   isAlive: (pid: number) => boolean,
   view: OwnerProcessView,
-  record: TaskRecord,
+  record: RecordOwner,
 ): boolean {
   const pid = record.host_pid
   if (pid === undefined || !isAlive(pid)) return false
@@ -80,7 +83,7 @@ export function recordOwnerAlive(
 // Undefined when nothing needs probing, so callers add no scheduling turn on the common path.
 export function observeRecordOwners(
   view: OwnerProcessView,
-  records: readonly TaskRecord[],
+  records: readonly RecordOwner[],
   ownPid: number,
 ): Promise<void> | undefined {
   const pids = new Set<number>()

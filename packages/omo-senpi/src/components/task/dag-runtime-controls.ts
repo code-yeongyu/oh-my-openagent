@@ -14,6 +14,7 @@ import { applyPausedDagGuidance, type PausedDagGuideCommand } from "../../../../
 import {
   acquireReentryLease,
   foreignHolderOf,
+  observeRunOwners,
   refuseUnheldActiveNodes,
   runBusy,
 } from "../../../../senpi-task/src/dag/node-control-context"
@@ -50,6 +51,10 @@ export function createDagRuntimeControls(ports: {
     const reservation = ports.reservations.reserve(runId, operation)
     if (reservation === undefined) throw runBusy(runId, ports.reservations.inFlight(runId) ?? operation)
     try {
+      // The holder rule judges a node child's owner by its start too: read it before the verb decides
+      // (only when there is one to read, so the common path adds no scheduling turn).
+      const observing = observeRunOwners(schedulerOptions, runId)
+      if (observing !== undefined) await observing
       return await verb(reservation)
     } finally {
       reservation.release()

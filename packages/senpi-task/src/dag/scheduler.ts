@@ -1,3 +1,4 @@
+import type { OwnerProcessView } from "../lifecycle/owner-process"
 import type { TaskManager } from "../manager/types"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagRunReservation, DagRunReservations } from "./run-reservations"
@@ -52,6 +53,8 @@ export type DagSchedulerOptions = {
   // retry. Defaults to this process and the lifecycle port's signal-0 probe.
   readonly hostPid?: number
   readonly isProcessAlive?: (pid: number) => boolean
+  // The start view a node child's owner is judged by (`holderProbeOf`); see lifecycle/owner-process.ts.
+  readonly ownerProcesses?: OwnerProcessView
   readonly now?: () => number
   readonly scheduleRetry?: RetrySchedule
   // The in-process reservation a control verb already holds for this run (`run-acquisition.ts`).
