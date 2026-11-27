@@ -20,8 +20,8 @@ export type RoutingEntry = {
 /**
  * The configuration as the SDK reports it: each file by its scope, with whether it exists and loaded, and the load's
  * diagnostics by kind and count; the routing of every category and agent the SDK may name; and the typed engine
- * settings. A file's path and a diagnostic's text stay with the command a person runs (`omo doctor`), which renders
- * the same core's result in full.
+ * settings. A file's path and a diagnostic's text stay with the doctor report a person reads, which renders the
+ * same core's result in full.
  */
 export type ConfigStatus = {
   readonly files: readonly {
