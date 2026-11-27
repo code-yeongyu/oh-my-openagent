@@ -29,16 +29,13 @@ import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
 import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal } from "./journal"
 import { prepareLanding, readWorking } from "./landing"
 import { adoptLegacyRenders } from "./legacy-cycle"
-import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
+import { type ItemPaths, itemPathsOnDisk, landingPath } from "./working-tree"
 
 export interface Applied {
   readonly batches: number
   /** Distinct memories the cycle rendered. */
   readonly memories: number
 }
-
-const itemPathsOnDisk = async (root: string): Promise<ItemPaths> =>
-  itemPaths((await scanWorkingTree(diskLister(root))).files)
 
 const textHash = (text: string | null): string =>
   createHash("sha256")

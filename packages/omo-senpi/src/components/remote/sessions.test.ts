@@ -40,7 +40,7 @@ afterEach(async () => {
   for (const dir of emptyDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const NEW_KEY = "bmV3LXNlc3Npb24ta2V5MQ"
+const NEW_KEY = "FAKE_session_key_test1"
 const ENGINE_ID = "dur-new"
 
 // One engine reply for every record a session takes on the delegated channel (the owner answers each with the same data):
@@ -77,8 +77,8 @@ const world = (): World => {
   const replying = { ...live, delegated: { data: SESSION_REPLY, frames: [] } }
   return {
     ...base,
-    endpoints: { [PEER]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
-    primary: { [PEER]: "ZW5kcG9pbnQta2V5LTAwMD" },
+    endpoints: { [PEER]: ["FAKE_endpoint_key_tst1"] },
+    primary: { [PEER]: "FAKE_endpoint_key_tst1" },
     endpointCommand: {
       data: { sessionId: "engine-routing-1", state: { sessionId: ENGINE_ID, cwd: "/work" } },
       outcome: [{ state: "engine_applied", retryable: false }],

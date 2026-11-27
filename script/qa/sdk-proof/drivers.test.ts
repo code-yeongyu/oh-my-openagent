@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { enumerateProcesses } from "@oh-my-opencode/utils/process-sweep"
+
 import { cellOf } from "./cell.ts"
 import { createCliDriver } from "./drivers/cli.ts"
 import { threadOf } from "./drivers/driver.ts"
@@ -47,8 +49,10 @@ describe("the CLI driver", () => {
   })
 })
 
-// A process whose command line carries `marker` and is still alive; the read-back of a driver's teardown.
-const alive = (marker: string): boolean => Bun.spawnSync(["pgrep", "-f", marker]).stdout.toString().trim().length > 0
+// A process whose command line carries `marker` and is still alive; the read-back of a driver's teardown. The process
+// table comes from `ps` on POSIX and from Win32_Process on Windows, where there is no pgrep.
+const alive = async (marker: string): Promise<boolean> =>
+  (await enumerateProcesses()).some(({ command, pid }) => pid !== process.pid && command.includes(marker))
 
 const abortSoon = (): AbortSignal => AbortSignal.timeout(100)
 
@@ -67,7 +71,7 @@ describe("the CLI driver, stalled or answering nonsense", () => {
 
     // then
     expect(cellOf(answer, undefined).cell).toBe("fail")
-    expect(alive(marker)).toBe(false)
+    expect(await alive(marker)).toBe(false)
   })
 
   test("#given omo printing text that is not a thread result #when the open runs #then the cell is red", async () => {
@@ -175,7 +179,7 @@ describe("the SDK driver", () => {
 
     // then
     expect(cellOf(answer, undefined).cell).toBe("fail")
-    expect(alive(path)).toBe(false)
+    expect(await alive(path)).toBe(false)
   })
 
   test("#given an SDK entry answering the thread #when the open runs #then the cell is green", async () => {

@@ -38,7 +38,9 @@ test("PATH wins over a libexec copy, and a non-executable file is not a tool", (
   layout((root) => {
     const libexec = join(root, "usr/libexec")
     place(join(libexec, "xfwm4"), 0o644)
-    expect(resolveTool("xfwm4", { which: () => null, libexecDirs: [libexec] })).toBeNull()
+    // Windows has no execute bit, so a 0o644 file is still runnable there; only POSIX can tell it is not a tool.
+    if (process.platform !== "win32")
+      expect(resolveTool("xfwm4", { which: () => null, libexecDirs: [libexec] })).toBeNull()
     expect(resolveTool("xfwm4", { which: () => "/opt/bin/xfwm4", libexecDirs: [libexec] })).toBe("/opt/bin/xfwm4")
   })
 })
