@@ -22,6 +22,10 @@ describe("createHostSessionHandle pending async work from the engine lifecycle (
     // given
     const h = harness()
     await h.endTurnWithDetachedCell()
+    let resumed = 0
+    h.handle.onSelfResumed?.(() => {
+      resumed += 1
+    })
 
     // when - the cell finishes and its notification starts the real final turn
     h.setWaits(undefined)
@@ -29,8 +33,10 @@ describe("createHostSessionHandle pending async work from the engine lifecycle (
     for (const record of wokenTurn(FINAL_RESULT)) h.emit(record)
     await flushSettlement()
 
-    // then - the outcome the parent was already waiting on is the real answer
+    // then - the outcome the parent was already waiting on is the real answer, and the held turn's wake
+    // is that turn's continuation, never announced as a run the child started on its own
     expect(h.settled()).toEqual({ status: "completed", finalResponse: FINAL_RESULT })
+    expect(resumed).toBe(0)
     await h.handle.detach()
   })
 
