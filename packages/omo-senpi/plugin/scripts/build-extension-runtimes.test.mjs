@@ -15,7 +15,10 @@ import {
   normalizeModulePath,
   STATIC_SET_DEFINITION,
   STATIC_SET_PATH,
+  STATIC_SINCE_TRAIN_14,
+  STATIC_SINCE_TRAIN_14_CHAIN,
   staticModuleSet,
+  TRAIN_14_LISTING,
 } from "./omo-sdk-static-set.mjs"
 import { createBuildFixture, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 
@@ -175,10 +178,15 @@ describe("shipped SDK runtimes inline a pinned set of packages", () => {
 // 751,149 with the after-dispose sentinel rethrown by the threads namespace's two catches (code review
 // 7202772023; root/threads.ts +47 B; LEAD ruling (a)).
 // 751,758 with free data under any-value fields copied at the boundary (LEAD ruling (1), 20:36Z; root/assemble.ts +609 B; ruling (a)).
-// 755,500 with revision 22's matrix lines and the held cells (#15033 restacked on P1b; per input, unminified:
-// principal-matrix/threads.ts +1,596, account.ts +1,452, host.ts +639, root/pending-cells.ts -481, root/held-allows.ts
-// +659, root/authority.ts +108; ruling (a)).
-const OMO_SDK_RUNTIME_BYTES = 755_500
+// 892,625 at the merge of dev after train 14 (04d7c82657): +140,867 B base-brought, measured: train 14's devices.list imports
+// the remote client statically (train 14's tip alone builds this runtime's entry at 674,306 B; per-input table in the merge
+// commit's PR body); P1b's own code on the new base is 218,319 B over train 14's runtime. Ruling (a): base bytes move the pin
+// in the merge commit only.
+// 892,630 with the thread client's refusal text reading 'omo installation' (thread/sdk-core/failures.ts +5 B; ruling (a)).
+// 896,370 with #15033 merged onto P1b's 699c480398: revision 22's matrix lines and the held cells, +3,740 B over P1b's head
+// (on a8ac23291f they were +3,742, 751,758 -> 755,500; per input, unminified: principal-matrix/threads.ts +1,596, account.ts
+// +1,452, host.ts +639, root/pending-cells.ts -481, root/held-allows.ts +659, root/authority.ts +108; ruling (a)).
+const OMO_SDK_RUNTIME_BYTES = 896_370
 const DEFERRED = ["omo-sdk/contract/calls.ts", "components/thread/contracts/", "components/thread/sdk-core/index.ts"]
 
 // What ships and runs at import (design lane ruling of record): the built runtime's inputs that keep bytes in its output,
@@ -225,7 +233,47 @@ describe("the provisioned SDK root runtime's cold import (P1b decision)", () => 
 
   test("#given the runtime entry #then the deferred modules are on no static import path", async () => {
     const { reached } = await staticModuleSet()
-    expect(reached.filter((path) => DEFERRED.some((part) => path.includes(part)))).toEqual([])
+    expect(
+      reached.filter((path) => DEFERRED.some((part) => path.includes(part)) && !STATIC_SINCE_TRAIN_14.includes(path)),
+    ).toEqual([])
+  })
+
+  // Two-way pin (design lane ruling): deferred by P1b's design, static on dev since train 14. Red when the remote-client
+  // runtime-file slice (omo#15190) defers them again, so this list is emptied and deleted, and red when any of them
+  // reaches the entry by another path than train 14's devices.list.
+  test("#given the runtime entry #then the eight thread-contract modules are static by train 14's devices.list and by no other path", async () => {
+    const { reached, entry, staticEdges } = await staticModuleSet()
+    expect(STATIC_SINCE_TRAIN_14.filter((path) => !reached.includes(path))).toEqual([])
+    // Every module the entry reaches by static edges when one module is taken out of the walk.
+    const reachedWithout = (skip) => {
+      const seen = new Set([entry])
+      const queue = [entry]
+      while (queue.length > 0)
+        for (const next of staticEdges[queue.shift()] ?? [])
+          if (next !== skip && !seen.has(next)) {
+            seen.add(next)
+            queue.push(next)
+          }
+      return seen
+    }
+    const chainTo = (target) => {
+      const parent = new Map([[entry, undefined]])
+      const queue = [entry]
+      while (queue.length > 0) {
+        const from = queue.shift()
+        for (const next of staticEdges[from] ?? [])
+          if (!parent.has(next)) {
+            parent.set(next, from)
+            queue.push(next)
+          }
+      }
+      const chain = []
+      for (let at = target; at !== undefined; at = parent.get(at)) chain.unshift(at)
+      return chain
+    }
+    expect(chainTo(STATIC_SINCE_TRAIN_14_CHAIN.at(-1))).toEqual(STATIC_SINCE_TRAIN_14_CHAIN)
+    const withoutListing = reachedWithout(TRAIN_14_LISTING)
+    expect(STATIC_SINCE_TRAIN_14.filter((path) => withoutListing.has(path))).toEqual([])
   })
 })
 
@@ -362,7 +410,7 @@ describe("thread SDK runtime", () => {
       ...extra,
       "await sdk.dispose()",
     ].join("\n")
-  const threadClientRefusal = "The thread client of this omo install could not be loaded."
+  const threadClientRefusal = "The thread client of this omo installation could not be loaded."
   const expectTyped = (answers) => {
     expect(Object.entries(answers).filter(([, outcome]) => "threw" in outcome)).toEqual([])
     expect(
@@ -635,7 +683,9 @@ describe("omo SDK runtime", () => {
     ).toEqual([])
     const refused = Object.entries(absent).filter(([, outcome]) => outcome.code === "internal_error")
     expect(
-      refused.every(([, outcome]) => outcome.message === "The thread client of this omo install could not be loaded."),
+      refused.every(
+        ([, outcome]) => outcome.message === "The thread client of this omo installation could not be loaded.",
+      ),
     ).toBe(true)
     expect(refused.map(([key]) => key)).toEqual(
       expect.arrayContaining(["threads.list", "threads.read", "threads.send"]),

@@ -26,6 +26,29 @@
       ]
     },
     {
+      "id": "account.devices/lists-the-accounts-devices",
+      "row": "account.devices",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 1,
+          "result": {
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
+          }
+        },
+        {
+          "port": "session",
+          "op": "devices.list"
+        }
+      ]
+    },
+    {
       "id": "account.whoami/signed-out",
       "row": "account.whoami",
       "kind": "refusal",

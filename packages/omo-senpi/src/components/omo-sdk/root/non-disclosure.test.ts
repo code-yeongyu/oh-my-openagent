@@ -16,6 +16,8 @@ import { createRecorder } from "../../../../../../script/sdk-parity/fakes/record
 import { remotePort } from "../../../../../../script/sdk-parity/fakes/remote"
 import type { ThreadHost } from "../../thread/tools"
 import { createThreadSdk } from "../../thread/sdk"
+import { startFakeOwner } from "../../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import { defaultWorld } from "../../../../../device-service-core/test/local-api/conformance/world.ts"
 import { invalidInput } from "./assemble"
 import { boundaryRefusals } from "./authority"
 
@@ -25,10 +27,44 @@ import { boundaryRefusals } from "./authority"
 // to the console and every file the call wrote under the run's home and agent dir are scanned. Nothing of a canary may
 // appear outside its row's destination; the scan of the root's result objects alone is not the I1 evidence, which is
 // why the store, the console and the files are scanned too. The negative control proves the scanner finds a canary.
+// The rule, in its order (LEAD ruling on design 4.5): FIRST, no answer for any principal carries secret contents (keys,
+// tokens, dial secrets, credentials); SECOND, the script answer is what any caller can get, since an agent session that
+// builds its own root in an eval cell is a script (4.5), so its paths are the caller's own files at declared locations;
+// THIRD, a root built with a session or a service principal gets less, per the matrix. A 'refused to a session' cell
+// holds for a root built with that principal, never for a session's own eval-cell root.
+// devices.list reads this machine's device service (omo#14881): the conformance owner serves a roster whose rows carry a
+// field the listing must drop, holding a canary, so the scan proves the mapping and not an empty answer.
+const ROSTER_CANARY_FIELD = "token"
+async function rosterService(
+  canary: string,
+): Promise<{ readonly stateDir: string; readonly stop: () => Promise<void> }> {
+  const stateDir = mkdtempSync(join(tmpdir(), "la-"))
+  const world = defaultWorld()
+  const owner = await startFakeOwner({
+    stateDir,
+    world: {
+      ...world,
+      devices: world.devices.map((device) => ({ ...device, [ROSTER_CANARY_FIELD]: canary })),
+    } as never,
+    // The device service is reached through its state dir, not a port object: its roster request is the call's touch.
+    onRequest: (type) => {
+      if (type === "devices.list" && running !== undefined)
+        touches.push({ key: running, port: "deviceService.devices.list" })
+    },
+  })
+  return {
+    stateDir,
+    stop: async () => {
+      await owner.stop()
+      rmSync(stateDir, { recursive: true, force: true })
+    },
+  }
+}
+
 const CANARIES = {
   accessToken: "CANARY-access-6f1e",
   refreshToken: "CANARY-refresh-91ad",
-  privateKey: "CANARY-privkey-3c07",
+  privateKey: "CANARY-privkey",
   recoveryPhrase: "CANARY-phrase-b2d4",
   providerKey: "CANARY-provider-58e0",
   oauthToken: "CANARY-oauth-a7c9",
@@ -150,6 +186,7 @@ const PORT_NAMES = {
   now: true,
   deviceServiceStatus: true,
   signInProcess: true,
+  remoteTimers: true,
 } as const satisfies Record<keyof OmoSdkPorts, true>
 
 function notFake(ports: OmoSdkPorts): string[] {
@@ -176,6 +213,51 @@ function listingRemote(): RemoteThreadSurface {
   return remotePort(createRecorder(scenario)).remote
 }
 
+// The id a rename just sent: only its own read-back lists it, so no later call sees another caller's input.
+let renamedId: string | undefined
+async function healthyAccountService(path: string, init?: { readonly method?: string }): Promise<unknown> {
+  if (path === "/v1/me")
+    return { user: { email: "owner@example.test", token: CANARIES.oauthToken }, account: { id: "acct-1" } }
+  if (path === "/v1/devices") {
+    const id = renamedId ?? "dev-2"
+    renamedId = undefined
+    return {
+      devices: [
+        { id: "dev-1", name: "laptop", current: true, revokedAt: null, token: CANARIES.oauthToken },
+        { id, name: "studio", revokedAt: null, secret: CANARIES.refreshToken },
+      ],
+    }
+  }
+  if (init?.method === "PATCH") {
+    const id = decodeURIComponent(path.slice("/v1/devices/".length))
+    renamedId = id
+    return { id, name: "studio", revokedAt: null, token: CANARIES.oauthToken }
+  }
+  return { token: CANARIES.oauthToken }
+}
+
+// Healthy: the code event shows the user code (by design only to onUserCode), then the device is signed in.
+const healthySignIn: NonNullable<OmoSdkPorts["signInProcess"]> = async ({ onLine }) => {
+  onLine(
+    JSON.stringify({
+      event: "code",
+      verificationUri: "https://accounts.example.test/device",
+      userCode: CANARIES.userCode,
+      matchingCode: "MATCH-1",
+      expiresAt: "2099-01-01T00:00:00Z",
+    }),
+  )
+  onLine(
+    JSON.stringify({
+      event: "signed_in",
+      device: { id: "dev-9", name: "new" },
+      deviceService: "on",
+      token: CANARIES.oauthToken,
+    }),
+  )
+  return { code: 0 }
+}
+
 function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
   return withFakes(fault, home, {
     desktopLaunch: () => false,
@@ -184,6 +266,7 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
         ? failing(CANARIES.refreshToken)
         : async () =>
             ({
+              device: { id: "dev-1", name: "laptop" },
               accessToken: CANARIES.accessToken,
               refreshToken: CANARIES.refreshToken,
               privateKey: CANARIES.privateKey,
@@ -191,18 +274,25 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     },
     session: {
       accessToken: async () => CANARIES.accessToken,
-      request: fault
-        ? failing(CANARIES.oauthToken)
-        : async () => ({ user: { email: "owner@example.test" }, token: CANARIES.oauthToken }),
+      // Healthy: each path gives the answer its call carries data from, with a canary in a field the answer must drop.
+      request: fault ? failing(CANARIES.oauthToken) : healthyAccountService,
     },
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
-    signInProcess: failing(CANARIES.userCode) as never,
+    signInProcess: fault ? (failing(CANARIES.userCode) as never) : healthySignIn,
     host: canaryHost(fault),
     // With ports faulting the gateway store faults too; healthy, it is a store the scan builds in its own scratch agent
     // dir, so its file is read column by column.
     store: fault ? faultingStore() : createGatewayStore({ agentDir: home }),
     remote: fault ? (fakeRemote(true) as RemoteThreadSurface) : listingRemote(),
     now: () => 1_764_000_000_000,
+    // devices.list's clock: real deadlines, so a device service that never answers still settles.
+    remoteTimers: {
+      after: (ms: number, fn: () => void) => {
+        const timer = setTimeout(fn, ms)
+        return () => clearTimeout(timer)
+      },
+      now: () => Date.now(),
+    },
   })
 }
 
@@ -347,6 +437,123 @@ const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = Obj
   ]),
 )
 
+// The healthy pass, per built call admitted for a principal (design lane ruling, t72y's form): the answer KIND for each of
+// the two driver inputs, the call's OWN port family where it has one (reading the credential store first is the account
+// precondition, never the call's port), and whether its answer's CONTENT was scanned: `scanned: false` means the healthy
+// answer is a typed refusal only because the fixture holds nothing to answer with, or the call has no member yet, so no
+// data-carrying answer of it passed the scan. Each such row names the slice that clears it and is self-retiring: a
+// `scanned: false` row whose call answers ok is stale and fails. A boundary refusal or an unbuilt call is judged above.
+const NO_THREAD = "the scan's fake host holds no thread (and no extension) with the sample ids"
+type HealthyRow = {
+  readonly kinds: Readonly<Partial<Record<string, readonly string[]>>>
+  readonly port?: string
+  readonly scanned: boolean
+  readonly owner?: string
+  readonly reason?: string
+}
+const HEALTHY: Readonly<Record<string, HealthyRow>> = {
+  "account.devices": {
+    kinds: { script: ["ok"], person: ["ok"], session: ["ok"] },
+    port: "ports.session",
+    scanned: true,
+  },
+  "account.signIn": {
+    kinds: { script: ["not_implemented", "ok"], person: ["not_implemented", "ok"], session: ["not_implemented", "ok"] },
+    port: "ports.signInProcess",
+    scanned: true,
+  },
+  "account.whoami": {
+    kinds: { script: ["ok"], person: ["ok"], session: ["ok"] },
+    port: "ports.session",
+    scanned: true,
+  },
+  "config.status": {
+    kinds: { script: ["ok"], person: ["ok"], session: ["ok"], service: ["ok"] },
+    scanned: true,
+    owner: "C1b",
+    reason: "answers with no port (PORT_GAPS)",
+  },
+  "daemon.warm": { kinds: { script: ["not_implemented", "ok"], person: ["not_implemented", "ok"] }, scanned: true },
+  "deviceService.status": {
+    kinds: { script: ["ok"], person: ["ok"], session: ["ok"], connector: ["ok"], service: ["ok"] },
+    port: "ports.deviceServiceStatus",
+    scanned: true,
+  },
+  "devices.list": { kinds: { script: ["ok"], person: ["ok"], session: ["ok"] }, port: "deviceService", scanned: true },
+  "devices.rename": {
+    kinds: { script: ["ok"], person: ["ok"], session: ["ok"] },
+    port: "ports.session",
+    scanned: true,
+  },
+  "threads.close": {
+    kinds: { script: ["caller_context_missing", "not_found"], person: ["caller_context_missing", "not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.create": {
+    kinds: { script: ["invalid_arguments", "not_implemented"], person: ["invalid_arguments", "not_implemented"] },
+    scanned: false,
+    owner: "T1b",
+    reason: NO_THREAD,
+  },
+  "threads.extensions.call": {
+    kinds: { script: ["not_found"], person: ["not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.extensions.register": {
+    kinds: { script: ["invalid_arguments"], person: ["invalid_arguments"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.interrupt": {
+    kinds: { script: ["not_found"], person: ["not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.list": { kinds: { script: ["not_implemented", "ok"], person: ["not_implemented", "ok"] }, scanned: true },
+  "threads.locate": {
+    kinds: { script: ["not_found"], person: ["not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.read": {
+    kinds: { script: ["not_found", "not_implemented"], person: ["not_found", "not_implemented"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.release": {
+    kinds: { script: ["not_found", "not_implemented"], person: ["not_found", "not_implemented"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.rename": {
+    kinds: { script: ["invalid_arguments", "not_found"], person: ["invalid_arguments", "not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.send": {
+    kinds: { script: ["invalid_arguments", "not_found"], person: ["invalid_arguments", "not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+  "threads.setModel": {
+    kinds: { script: ["not_found"], person: ["not_found"] },
+    scanned: false,
+    owner: "T1a",
+    reason: NO_THREAD,
+  },
+}
+
 // Where a caller's own input comes back in the answer to that caller, as observed (reported to the design lane).
 const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, readonly string[]>>>> = {
   ok: {
@@ -360,6 +567,7 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.setModel",
       "threads.rename",
       "threads.extensions.call",
+      "devices.rename",
     ],
     person: [
       "threads.read",
@@ -371,7 +579,10 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.setModel",
       "threads.rename",
       "threads.extensions.call",
+      "devices.rename",
     ],
+    // The rename answers the device it renamed, whose id is the caller's own input.
+    session: ["devices.rename"],
   },
   fault: {},
 }
@@ -456,8 +667,14 @@ describe("the non-disclosure scan over the whole root", () => {
         })
         const captured: Captured[] = []
         touches.length = 0
+        const roster = fault ? undefined : await rosterService(CANARIES.socketSecret)
         const options = {
-          env: { OMO_SERVICE_API_URL: "https://accounts.example.test", HOME: home, OMO_CODING_AGENT_DIR: home },
+          env: {
+            OMO_SERVICE_API_URL: "https://accounts.example.test",
+            HOME: home,
+            OMO_CODING_AGENT_DIR: home,
+            ...(roster === undefined ? {} : { OMO_DEVICE_SERVICE_STATE_DIR: roster.stateDir }),
+          },
           cwd: home,
           home,
           agentDir: home,
@@ -475,6 +692,7 @@ describe("the non-disclosure scan over the whole root", () => {
           await root.dispose()
         } finally {
           for (const undo of restore) undo()
+          await roster?.stop()
         }
         const paths = filesUnder(home)
         const written = paths
@@ -524,6 +742,45 @@ describe("the non-disclosure scan over the whole root", () => {
             .map((entry): string => entry.key)
             .filter((key, index, keys) => keys.indexOf(key) === index),
         ).toEqual([...(EXPECTED_INPUT_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? [])])
+        // The healthy pass's own coverage (design lane ruling): no internal_error anywhere (a broken fixture, never a
+        // result), the kind of every built admitted call exactly as the table says, each call's own port reached, and the
+        // rows whose content was not scanned printed with their owner, so the residual stays on the record.
+        if (!fault) {
+          const who = principal?.kind ?? "script"
+          const kindOf = (entry: Captured): string => {
+            const code = (errorOf(entry) as { readonly code?: unknown } | undefined)?.code
+            if (typeof code === "string") return code
+            const kind = (entry.answer as { readonly kind?: unknown } | undefined)?.kind
+            return typeof kind === "string" ? kind : "ok"
+          }
+          expect(captured.filter((entry) => kindOf(entry) === "internal_error").map((entry) => entry.key)).toEqual([])
+          const observed = Object.fromEntries(
+            [...new Set(captured.map((entry) => entry.key))]
+              .filter((key) => !refused.has(key))
+              .map((key) => [key, [...new Set(captured.filter((entry) => entry.key === key).map(kindOf))].toSorted()])
+              .filter(([, found]) => !Bun.deepEquals(found, ["not_implemented"])),
+          )
+          const rows = Object.entries(HEALTHY).flatMap(([key, row]) =>
+            row.kinds[who] === undefined ? [] : [[key, row] as const],
+          )
+          expect(observed).toEqual(Object.fromEntries(rows.map(([key, row]) => [key, row.kinds[who]])))
+          expect(
+            rows
+              .filter(
+                ([key, row]) =>
+                  row.port !== undefined &&
+                  !touches.some((touch) => touch.key === key && touch.port.startsWith(row.port ?? "")),
+              )
+              .map(([key]) => key),
+          ).toEqual([])
+          expect(rows.filter(([, row]) => !row.scanned && row.kinds[who]?.includes("ok")).map(([key]) => key)).toEqual(
+            [],
+          )
+          const notScanned = rows.filter(([, row]) => !row.scanned)
+          console.info(
+            `non-disclosure healthy pass, ${who}: ${rows.length - notScanned.length} calls scanned through their answer, ${notScanned.length} not: ${notScanned.map(([key, row]) => `${key} (${row.owner}: ${row.reason})`).join("; ")}`,
+          )
+        }
         // Reach by case, with every port faulting: a refused cell and a pure call stop before any port; a call that is
         // permitted and built reaches a port, unless it is named below with the reason it answers without one.
         if (fault) {
@@ -543,4 +800,54 @@ describe("the non-disclosure scan over the whole root", () => {
           ...(EXPECTED_B8_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? []),
         ])
       })
+})
+
+// Positive controls (LEAD ruling on t72y's note): a canary in a field the answer DOES carry is found, one per port family,
+// so the scan's zero above is evidence and not a blind matcher. The roster's label is what devices.list returns as name.
+describe("the scan finds a canary that rides a field the answer carries", () => {
+  const CARRIED = "CANARY-carried-9e21"
+  const signedIn = { device: { id: "dev-1", name: "laptop" }, accessToken: "t" }
+  const sessionRoot = (stateDir: string) =>
+    assembleOmoSdk(
+      {
+        env: { OMO_SERVICE_API_URL: "https://accounts.example.test", OMO_DEVICE_SERVICE_STATE_DIR: stateDir },
+        cwd: tmpdir(),
+        principal: { kind: "session", session_id: "s-1" },
+        ports: {
+          desktopLaunch: () => false,
+          credentialStore: { read: async () => signedIn as never },
+          session: {
+            accessToken: async () => "t",
+            request: (async (path: string, init?: { method?: string }) => {
+              if (path === "/v1/me") return { user: { email: CARRIED }, account: { id: "acct-1" } }
+              if (path === "/v1/devices") return { devices: [{ id: "dev-2", name: CARRIED, revokedAt: null }] }
+              if (init?.method === "PATCH") return { id: "dev-2", name: CARRIED, revokedAt: null }
+              throw new Error(`unexpected ${path}`)
+            }) as never,
+          },
+        },
+      },
+      {},
+    )
+  const found = (answer: unknown) => canariesIn(answer, "$", new Set(), [CARRIED])
+
+  test("#given the carried field of each port family holds a canary #when a session calls it #then the scan finds it in the answer", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "la-"))
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir,
+      world: { ...world, devices: world.devices.map((device) => ({ ...device, label: CARRIED })) },
+    })
+    try {
+      const root = sessionRoot(stateDir)
+      expect(found(await root.devices.list({}))).not.toEqual([])
+      expect(found(await root.account.devices({}))).not.toEqual([])
+      expect(found(await root.devices.rename({ id: "dev-2", name: "studio" }))).not.toEqual([])
+      expect(found(await root.account.whoami({}))).not.toEqual([])
+      root.close()
+    } finally {
+      await owner.stop()
+      rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
 })

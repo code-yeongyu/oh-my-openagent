@@ -8,7 +8,7 @@ import type {
 } from "../../../remote/types"
 import type { WhoAmI } from "../../account"
 import type { DeviceServiceStatus } from "../../device-service"
-import type { LiveDevice } from "../../devices"
+import type { ListedDevice, LiveDevice } from "../../devices"
 
 // What the account, devices, device service and sync calls answer as their `value`: the shipped omo SDK's and the remote
 // module's own types where one exists, otherwise the record the matching `omo` verb prints today with `--json`.
@@ -22,7 +22,7 @@ export type {
   ServiceStatus,
   WhoAmI,
 }
-export type { DeviceServiceStatus }
+export type { DeviceServiceStatus, ListedDevice }
 export type { ControlSessionWakeState as WakeState } from "../../../../../../device-service-core/src/wire"
 
 export type SignInCheck = { readonly ready: true }

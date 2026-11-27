@@ -1,3 +1,4 @@
+import { headRefusal } from "./head-check"
 import { execFileSync } from "node:child_process"
 import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -70,13 +71,9 @@ function runSide(tree: string): { outcomes: Record<string, Outcome>; tools: Disc
 }
 
 const started = Date.now()
-// In CI the check runs at the pull request's own head (review 6061267823 H4), never at a synthetic merge commit: the
-// digest a reviewer copies is bound to the head this compares, so a checkout of any other commit stops here.
-const expectedHead = arg("--expect-head")
-if (expectedHead !== undefined && git("rev-parse", "HEAD").trim() !== expectedHead) {
-  process.stderr.write(
-    `sdk-parity gate: checked out ${git("rev-parse", "HEAD").trim()}, not the pull request head ${expectedHead}; check out the head itself\n`,
-  )
+const refusal = headRefusal(git("rev-parse", "HEAD").trim(), arg("--expect-head"))
+if (refusal !== undefined) {
+  process.stderr.write(refusal)
   process.exit(1)
 }
 const mergeBase = git("merge-base", arg("--base") ?? "origin/dev", "HEAD").trim()

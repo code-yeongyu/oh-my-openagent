@@ -9,6 +9,7 @@ import {
   RequestFailure,
 } from "@oh-my-opencode/omo-opencode/service-auth"
 import { LocalApiError } from "@oh-my-opencode/device-service-core"
+import { closeClients, fakeClock, startOwner } from "../remote/testing/fake-service"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 
 const ORIGIN = "https://accounts.example.test"
@@ -83,8 +84,9 @@ function secretKeys(value: unknown, path = "$"): string[] {
 }
 
 const homes: string[] = []
-afterEach(() => {
+afterEach(async () => {
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
+  await closeClients()
 })
 
 describe("createOmoSdk reads", () => {
@@ -106,9 +108,9 @@ describe("createOmoSdk reads", () => {
     })
   })
 
-  test("#given the account lists a revoked device #when devices.list runs #then only live devices return, this one current", async () => {
+  test("#given the account lists a revoked device #when account.devices runs #then only live devices return with the account's own fields, this one current", async () => {
     const { ports } = fakes()
-    expect(valueOf(await sdkWith(ports).devices.list())).toEqual([
+    expect(valueOf(await sdkWith(ports).account.devices())).toEqual([
       { id: "dev_this", name: "device-a", kind: "cli", platform: "linux", current: true },
       { id: "dev_other", name: "device-b", platform: "macos", machineBound: true, current: false },
     ])
@@ -118,7 +120,9 @@ describe("createOmoSdk reads", () => {
     const { ports } = fakes()
     const home = mkdtempSync(join(tmpdir(), "omo-sdk-home-"))
     homes.push(home)
-    const sdk = createOmoSdk({ env: { OMO_SERVICE_API_URL: ORIGIN, HOME: home }, cwd: home, home, ports })
+    const owner = await startOwner()
+    const env = { OMO_SERVICE_API_URL: ORIGIN, HOME: home, OMO_DEVICE_SERVICE_STATE_DIR: owner.stateDir }
+    const sdk = createOmoSdk({ env, cwd: home, home, ports: { ...ports, remoteTimers: fakeClock() } })
     const values = [
       await sdk.account.whoami(),
       await sdk.devices.list(),
@@ -133,7 +137,7 @@ describe("createOmoSdk reads", () => {
 describe("createOmoSdk refusals", () => {
   test("#given no stored sign-in #when a read runs #then it answers signed_out and makes no request", async () => {
     const { ports, calls } = fakes({ store: null })
-    const error = errorOf(await sdkWith(ports).devices.list())
+    const error = errorOf(await sdkWith(ports).account.whoami())
     expect(error.code).toBe("signed_out")
     expect(error.next_action).not.toBe("")
     expect(calls).toEqual([])
@@ -153,7 +157,7 @@ describe("createOmoSdk refusals", () => {
         throw new ApiRefusal("unauthorized", 401)
       },
     })
-    const result = await sdkWith(ports).devices.list()
+    const result = await sdkWith(ports).account.whoami()
     expect(errorOf(result)).toMatchObject({ code: "session_ended", details: { code: "unauthorized" } })
     expect(secretKeys(result)).toEqual([])
   })
@@ -164,7 +168,7 @@ describe("createOmoSdk refusals", () => {
         throw new ApiRefusal("forbidden", 403)
       },
     })
-    expect(errorOf(await sdkWith(ports).devices.list())).toMatchObject({
+    expect(errorOf(await sdkWith(ports).account.whoami())).toMatchObject({
       code: "service_refused",
       details: { status: 403, code: "forbidden" },
     })

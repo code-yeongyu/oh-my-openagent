@@ -7,6 +7,23 @@
       // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
       // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
       "entry": [
+        // run by path from scripts/qa/thread-tools/run-all.mjs; they use the gateway kit lib/gateway.mjs, which script/qa/sdk-proof imports too
+        "scripts/qa/thread-tools/adopt.mjs",
+        "scripts/qa/thread-tools/busy-backlog.mjs",
+        "scripts/qa/thread-tools/default-delivery.mjs",
+        "scripts/qa/thread-tools/draft-preservation.mjs",
+        "scripts/qa/thread-tools/graceful-close.mjs",
+        "scripts/qa/thread-tools/held-then-exit.mjs",
+        "scripts/qa/thread-tools/host-to-tui.mjs",
+        "scripts/qa/thread-tools/loop-guard.mjs",
+        "scripts/qa/thread-tools/lost-ack.mjs",
+        "scripts/qa/thread-tools/offline-queue.mjs",
+        "scripts/qa/thread-tools/receiver-crash.mjs",
+        "scripts/qa/thread-tools/repeated-wake.mjs",
+        "scripts/qa/thread-tools/run-all.mjs",
+        "scripts/qa/thread-tools/sender-death.mjs",
+        "scripts/qa/thread-tools/stopped-target.mjs",
+        "scripts/qa/thread-tools/tui-to-tui.mjs",
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
@@ -56,6 +73,8 @@
         "src/extension/omo-task.ts",
       ],
       "ignoreFiles": [
+        // type declarations for scripts/qa/thread-tools/lib/gateway.mjs, which script/qa/sdk-proof imports from TypeScript
+        "scripts/qa/thread-tools/lib/gateway.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/expect-exit.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -347,25 +366,13 @@
         // run by path from scripts/qa/thread-tools/run-all.mjs (#14079: local thread calls in an approved eval cell ask nothing)
         "scripts/qa/thread-tools/local-approvals.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/adopt.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/cli-surface.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/desktop-client.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/desktop-to-cli.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/draft-preservation.mjs",
-        // run by path from scripts/qa/thread-tools/run-all.mjs (#14333: no mode starts an idle TUI and steers a busy one)
-        "scripts/qa/thread-tools/default-delivery.mjs",
-        // run by path from scripts/qa/thread-tools/run-all.mjs (#14313: a graceful close of a busy daemon session and terminal)
-        "scripts/qa/thread-tools/graceful-close.mjs",
         // run by path as the free-plan cross-workspace thread-tools QA driver (#14201)
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/held-then-exit.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/host-to-tui.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/desktop-shell.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -374,22 +381,8 @@
         "scripts/qa/thread-tools/lib/gateway.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/harness.mjs",
-        // run by name from run-all.mjs, which knip does not trace
-        "scripts/qa/thread-tools/default-delivery.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/loop-guard.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/lost-ack.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/offline-queue.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/plugin-surface.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/receiver-crash.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/repeated-wake.mjs",
-        // a QA scenario that run-all.mjs runs by name (#14428), like its siblings
-        "scripts/qa/thread-tools/busy-backlog.mjs",
         // a QA scenario that run-all.mjs runs by name (#14058), like its siblings
         "scripts/qa/thread-tools/create-prompt-authority.mjs",
         // a QA scenario that run-all.mjs runs by name (#14063), like its siblings
@@ -399,17 +392,9 @@
         // run by run-all.mjs as a child process (legacy suite), never imported
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/run-all.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/sender-death.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/session-control-qa.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/stopped-target.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/terminal-to-ui.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/tui-to-tui.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/todo-fanout-reminder-e2e.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

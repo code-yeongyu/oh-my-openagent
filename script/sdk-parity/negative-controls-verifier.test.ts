@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
-import { join } from "node:path"
+import { headRefusal } from "./head-check"
 
 import { candidateDigest, gateReport, renderReport } from "./gate"
 import { EARLIER, HEAD, input } from "./gate-fixture"
-import { REPO_ROOT } from "./registry"
 import { verifyReview } from "./verify-review"
 
 // Negative controls of design 7.4 and 7.6 for the candidate tier's verifier (amendment 3, review 6061267823 H4): the
@@ -60,12 +58,10 @@ describe("negative controls: the candidate verifier (7.4, 7.6, review 6061267823
   })
 
   test("#given a checkout that is not the pull request head #then the gate stops before comparing", () => {
-    const run = spawnSync(
-      process.execPath,
-      [join(REPO_ROOT, "script/sdk-parity/gate-cli.ts"), "--expect-head", "0".repeat(40)],
-      { cwd: REPO_ROOT, encoding: "utf8" },
+    expect(headRefusal("a".repeat(40), "0".repeat(40))).toContain(
+      `not the pull request head ${"0".repeat(40)}; check out the head itself`,
     )
-    expect(run.status).toBe(1)
-    expect(run.stderr).toContain(`not the pull request head ${"0".repeat(40)}; check out the head itself`)
+    expect(headRefusal("a".repeat(40), "a".repeat(40))).toBeUndefined()
+    expect(headRefusal("a".repeat(40), undefined)).toBeUndefined()
   })
 })

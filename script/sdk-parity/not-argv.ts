@@ -45,10 +45,6 @@ export const NOT_ARGV: Readonly<Record<string, NotArgv>> = {
     ],
     reason: "engine RPC record types",
   },
-  "packages/omo-senpi/src/components/thread/gateway/store.ts": {
-    tokens: ["--input-type"],
-    reason: "filters the runtime's execArgv for a worker",
-  },
   "packages/omo-senpi/src/components/thread/remote/alias-registry.ts": {
     tokens: ["claim", "of", "release", "rename", "resolve"],
     reason: "the alias service's HTTP routes",

@@ -4,9 +4,9 @@ import { baselineProblems, PIN_PATH } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
 import { runEffectScenarios, type ScenarioRun } from "./conformance-run"
 import { expectationProblems, type ObservedCall, portProblems, type TableScenario } from "./expectation"
-import { built, builtRows, CONTEXT, open, pair, run, scenario } from "./conformance-fixture"
+import { built, builtRows, CONTEXT, open, pair, run, scenario, headEvidence } from "./conformance-fixture"
 import { gateReport, goldenProblems } from "./gate"
-import { input, original, rows, text, unresolved } from "./gate-fixture"
+import { filledRows, input, original, rows, text, unresolved } from "./gate-fixture"
 
 // Negative controls of design 7.2, 7.3 and 7.6 for what builds a row (reviews 6061267823 H1/H3, 6061624223 H1, amendment
 // 5): typed run evidence whose observed port calls match the scenario's expected effect, every optional input covered by
@@ -30,7 +30,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       run(scenario("by-id", undefined), { kind: "error", error: { code: "not_implemented" } }),
       pair[1] as ScenarioRun,
     ])
-    expect(conformanceProblems(builtRows, open, evidence, CONTEXT)).toContainEqual(
+    expect(conformanceProblems(builtRows, open, [...(await headEvidence()), ...evidence], CONTEXT)).toContainEqual(
       "row threads.locate: scenario threads.locate/by-id answered not_implemented; threads.locate is a stub, build it",
     )
   })
@@ -48,7 +48,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const [first] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
     if (first === undefined) throw new Error("no record")
     const wrong: EffectEvidence = { ...first, member: "threads.list" }
-    expect(conformanceProblems(builtRows, open, [wrong], CONTEXT)).toContainEqual(
+    expect(conformanceProblems(builtRows, open, [...(await headEvidence()), ...[wrong]], CONTEXT)).toContainEqual(
       "row threads.locate: scenario threads.locate/by-id ran threads.list for threads.locate, not threads.locate",
     )
   })
@@ -56,7 +56,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
   test("#given a run whose port calls do not match the expected effect #then it does not build the row (review 6061624223 H1)", async () => {
     const silent = run(scenario("by-id", undefined), { kind: "ok" }, () => ({ kind: "ok" }))
     const evidence = await runEffectScenarios(builtRows, [silent, ...pair.slice(1)])
-    expect(conformanceProblems(builtRows, open, evidence, CONTEXT)).toContainEqual(
+    expect(conformanceProblems(builtRows, open, [...(await headEvidence()), ...evidence], CONTEXT)).toContainEqual(
       'row threads.locate: scenario threads.locate/by-id: host.listSessions {"allScope":false} expected 1 call(s), observed 0',
     )
   })
@@ -66,7 +66,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       row.id === "threads.locate" ? { ...built, scenarios: { effect: ["threads.locate/by-id"], refusal: [] } } : row,
     )
     const evidence = await runEffectScenarios(onlyOne, [pair[0] as ScenarioRun])
-    expect(conformanceProblems(onlyOne, open, evidence, CONTEXT)).toEqual([
+    expect(conformanceProblems(onlyOne, open, [...(await headEvidence()), ...evidence], CONTEXT)).toEqual([
       "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one",
       "row threads.locate: no passing effect scenario addresses a thread on other_device; add one",
     ])
@@ -85,7 +85,8 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     ]
     const uncovered =
       "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one"
-    const problems = (records: EffectEvidence[]) => conformanceProblems(builtRows, open, records, CONTEXT)
+    const head = await headEvidence()
+    const problems = (records: EffectEvidence[]) => conformanceProblems(builtRows, open, [...head, ...records], CONTEXT)
     expect(problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }))).not.toContain(uncovered)
     expect(problems(sameTrace({ thread: "t-1" }, { thread: "t-1" }))).toContain(uncovered)
     expect(
@@ -179,7 +180,14 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const [stable] = await runEffectScenarios(builtRows, [steady])
     expect(shaky?.unstableAnswer).toBe(true)
     expect(stable?.unstableAnswer).toBeUndefined()
-    expect(conformanceProblems(builtRows, open, shaky === undefined ? [] : [shaky], CONTEXT)).toContainEqual(
+    expect(
+      conformanceProblems(
+        builtRows,
+        open,
+        [...(await headEvidence()), ...(shaky === undefined ? [] : [shaky])],
+        CONTEXT,
+      ),
+    ).toContainEqual(
       "row threads.locate: scenario threads.locate/by-id: its answer differs between two runs of the same input; an unstable answer proves no effect",
     )
   })
@@ -260,24 +268,44 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       originalText: original,
       pinText: text(PIN_PATH),
       unresolved: cleared,
-      evidence,
+      evidence: [...(await headEvidence()), ...evidence],
       context: CONTEXT,
       atBase: { originalText: original, pinText: text(PIN_PATH), unresolved },
     }
     expect(baselineProblems(state)).toEqual([])
-    expect(conformanceProblems(builtRows, open, evidence, CONTEXT)).toEqual([])
+    expect(conformanceProblems(builtRows, open, [...(await headEvidence()), ...evidence], CONTEXT)).toEqual([])
   })
 
-  test("#given the initializing pull request (the base has no record) #then the original, its pin and the manifest are admitted together", () => {
+  test("#given the initializing pull request (the base has no record) #then the original, its pin and the manifest are admitted together", async () => {
     const state = {
       rows,
       originalText: original,
       pinText: text(PIN_PATH),
       unresolved,
-      evidence: [],
+      evidence: await headEvidence(),
       context: CONTEXT,
       atBase: { originalText: undefined, pinText: undefined, unresolved: undefined },
     }
     expect(baselineProblems(state)).toEqual([])
+  })
+})
+
+// The rows the tree really builds (scenario-fill-owners.json) are judged on their real run evidence; without it, or with a
+// failing effect, the gate must name them (design lane ruling (1) on the first built row, condition (d)).
+describe("a row the tree builds is judged on its own run evidence", () => {
+  test("#given the built rows with no run record at the head #then each of their scenarios is named", () => {
+    const problems = conformanceProblems(filledRows, open, [], CONTEXT)
+    for (const row of filledRows)
+      for (const id of row.scenarios.effect)
+        expect(problems).toContain(`row ${row.id}: scenario ${id} has no run record at the head`)
+    expect(filledRows.length).toBeGreaterThan(0)
+  })
+
+  test("#given a built row whose effect scenario observed nothing #then the row has no passing effect scenario", async () => {
+    const head = await headEvidence()
+    const broken = head.map((record) => (record.kind === "effect" ? { ...record, observed: [] } : record))
+    const problems = conformanceProblems(filledRows, open, broken, CONTEXT)
+    for (const row of filledRows) expect(problems).toContain(`row ${row.id} has no passing effect scenario`)
+    expect(conformanceProblems(filledRows, open, head, CONTEXT)).toEqual([])
   })
 })

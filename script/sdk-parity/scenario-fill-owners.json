@@ -1,4 +1,6 @@
 {
   "version": 1,
-  "rows": {}
+  "rows": {
+    "account.devices": "P1b"
+  }
 }
