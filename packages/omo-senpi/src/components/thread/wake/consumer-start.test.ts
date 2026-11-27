@@ -60,6 +60,56 @@ function input(h: GatewayHarness, deliveries: () => Promise<DeliveryServicePort 
 }
 
 describe("startDeliveryConsumer", () => {
+  // #15241 review L1: a settlement pass that fails on the deadline timer's path is reported, never retried in silence.
+  test("#given a serving consumer whose deadline settlement fails #when its timer fires #then the failure reaches the log", async () => {
+    const h = (harness = createGatewayHarness())
+    const service = createFakeDeliveryService({ admitted: true })
+    const timers: (() => void)[] = []
+    let failNow = false
+    let reported: (line: string) => void = () => undefined
+    const logged = new Promise<string>((resolve) => {
+      reported = resolve
+    })
+    const base = input(h, async () => service.port)
+    const failing: GatewayStore = {
+      ...base.store,
+      intakeMarks: {
+        ...base.store.intakeMarks,
+        openSessions: async () => {
+          if (failNow) throw new Error("store worker gone")
+          return await base.store.intakeMarks.openSessions()
+        },
+      },
+    }
+    const serving = await startDeliveryConsumer({
+      ...base,
+      store: failing,
+      schedule: (run) => {
+        timers.push(run)
+        return () => undefined
+      },
+      log: (line) => {
+        if (line.includes("store worker gone")) reported(line)
+      },
+    })
+    expect(serving).toBeDefined()
+    await failing.intake(request(h, "d-expiring"))
+    await serving?.consumer.reportDrained()
+    expect(timers.length).toBeGreaterThan(0)
+
+    failNow = true
+    timers.at(-1)?.()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const line = await Promise.race([
+      logged,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("waited 5s for the settlement failure in the log")), 5_000)
+      }),
+    ]).finally(() => clearTimeout(timer))
+    expect(line).toContain("store worker gone")
+    serving?.close()
+  })
+
   test("#given a declaration the service refuses with an error #when the consumer starts #then the port is closed, the death is reported, and nothing serves", async () => {
     const h = (harness = createGatewayHarness())
     const died: string[] = []

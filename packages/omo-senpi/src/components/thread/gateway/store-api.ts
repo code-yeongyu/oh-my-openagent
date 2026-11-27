@@ -72,6 +72,8 @@ export type GatewayStore = ExtensionFacade & {
   }) => Promise<boolean>
   readonly deliveryView: (deliveryId: string) => Promise<DeliveryView | null>
   readonly receiptOutcome: (request: ReceiptOutcomeRequest) => Promise<ReceiptOutcome>
+  /** `receiptOutcome` for several deliveries of one session, its transcript read once. */
+  readonly receiptOutcomes: (requests: readonly ReceiptOutcomeRequest[]) => Promise<readonly ReceiptOutcome[]>
   readonly refusalNotices: (now: number) => Promise<readonly RefusalNotice[]>
   readonly claimRefusalNotice: (request: {
     readonly now: number

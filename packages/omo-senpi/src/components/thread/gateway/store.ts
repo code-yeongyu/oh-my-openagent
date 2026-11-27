@@ -348,6 +348,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
     receiptOutcome: (request) => call("receipt_outcome", request),
+    receiptOutcomes: (requests) => call("receipt_outcomes", requests),
     refusalNotices: (now) => call("refusal_notices", now),
     claimRefusalNotice: (request) => call("claim_refusal_notice", request),
     remoteReceipt: (request) => call("remote_receipt", request),

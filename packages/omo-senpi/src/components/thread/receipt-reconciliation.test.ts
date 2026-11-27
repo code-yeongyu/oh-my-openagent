@@ -713,3 +713,39 @@ test("a partition across the deadline returns unavailable until authorized recov
     await x.cleanup()
   }
 })
+
+// #15241 review L2: every expired intake row of one session is settled in ONE store call, so the store worker reads that
+// session's transcript once per pass (the drain's reconcile shares one transcript read the same way), not once per row.
+test("a deadline pass settles all of one session's expired rows in one store call", async () => {
+  const calls = { single: 0, batched: 0 }
+  const x = await setup("deliver", {
+    holderStore: (store) => ({
+      ...store,
+      receiptOutcome: async (request) => {
+        calls.single++
+        return await store.receiptOutcome(request)
+      },
+      receiptOutcomes: async (requests) => {
+        calls.batched++
+        return await store.receiptOutcomes(requests)
+      },
+    }),
+  })
+  try {
+    setSystemTime(x.h.clock.now)
+    for (const key of ["k1", "k2", "k3"])
+      await x.sender.run("thread_send", { thread: "dur-on-b", message: key, idempotency_key: key })
+    x.h.clock.now += 86_400_000
+    setSystemTime(x.h.clock.now)
+    await x.consumer.reportDrained()
+    await x.noticesSettled()
+    expect((await x.store.list({ target_durable_id: "dur-on-b" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "expired"],
+      ["refused", "expired"],
+      ["refused", "expired"],
+    ])
+    expect(calls).toEqual({ single: 0, batched: 1 })
+  } finally {
+    await x.cleanup()
+  }
+})

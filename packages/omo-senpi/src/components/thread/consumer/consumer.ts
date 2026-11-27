@@ -161,27 +161,25 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
     const now = store.now()
     let next = Number.POSITIVE_INFINITY
     for (const session of await store.intakeMarks.openSessions()) {
-      let sessionPath: string | undefined
-      let resolved = false
+      const expired: { readonly sender: string; readonly delivery_id: string }[] = []
       for (const row of await store.list({ target_durable_id: session.durable_id })) {
         if (row.state !== "queued" || row.ledger_id?.startsWith(`${row.sender}/`) !== true) continue
-        if (row.expires_at > now) {
-          next = Math.min(next, row.expires_at)
-          continue
-        }
-        if (!resolved) {
-          const target = resolveWakeTarget(options.sessionsDirectory, session.durable_id)
-          sessionPath = target.kind === "found" ? target.session_path : undefined
-          resolved = true
-        }
-        await store.receiptOutcome({
+        if (row.expires_at > now) next = Math.min(next, row.expires_at)
+        else expired.push({ sender: row.sender, delivery_id: row.ledger_id.slice(row.sender.length + 1) })
+      }
+      if (expired.length === 0) continue
+      // One call per session, so its transcript is read once however many rows expired (#15241 review L2).
+      const target = resolveWakeTarget(options.sessionsDirectory, session.durable_id)
+      const sessionPath = target.kind === "found" ? target.session_path : undefined
+      await store.receiptOutcomes(
+        expired.map((row) => ({
           now,
           principal: row.sender,
-          delivery_id: row.ledger_id.slice(row.sender.length + 1),
+          delivery_id: row.delivery_id,
           target_durable_id: session.durable_id,
           ...(sessionPath === undefined ? {} : { session_path: sessionPath }),
-        })
-      }
+        })),
+      )
     }
     if (pass !== generation) return
     cancelDeadline?.()
