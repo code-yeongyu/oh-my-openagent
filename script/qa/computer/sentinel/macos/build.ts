@@ -8,7 +8,7 @@ import type { HelperPaths } from "./session.ts"
 // they are built as minimal app bundles: activation through LaunchServices needs a bundle identity.
 
 const SOURCES = {
-  recorder: ["wire.swift", "recorder.swift", "recorder-samples.swift"],
+  recorder: ["wire.swift", "recorder.swift", "recorder-observers.swift", "recorder-samples.swift"],
   typist: ["wire.swift", "typist.swift"],
   planter: ["wire.swift", "planter.swift"],
 } as const

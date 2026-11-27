@@ -31,6 +31,11 @@ final class Recorder: NSObject {
   var knownWindows: Set<UInt32> = []
   var windowsListed = false
   var pendingReads = 0
+  // pids whose window observer is registered, and pids whose registration is still being retried
+  var registered: Set<pid_t> = []
+  var registering: Set<pid_t> = []
+  // when an app failed registration while it was not regular: its gap is carried into the activation re-registration
+  var failedSince: [pid_t: Double] = [:]
   var stopping = false
   let pasteboard = PasteboardPoller()
 
@@ -114,32 +119,13 @@ final class Recorder: NSObject {
 
     center.addObserver(self, selector: #selector(launched(_:)), name: NSWorkspace.didLaunchApplicationNotification, object: nil)
     for app in NSWorkspace.shared.runningApplications where app.processIdentifier != getpid() {
-      watchWindows(of: app.processIdentifier)
+      watchWindows(of: app.processIdentifier, origin: "arm")
     }
     if windowsListed { armed("dialog", "notification+sample") } else { fault("dialog", "window list unreadable") }
   }
 
-  // An app with a user interface whose window observer cannot register is AX-blind for dialogs: that is a fault,
-  // never a silent gap. Background agents without a UI routinely refuse and are not judged.
-  func watchWindows(of pid: pid_t) {
-    let error = observe(pid, AXUIElementCreateApplication(pid), [kAXWindowCreatedNotification, kAXSheetCreatedNotification])
-    guard error != .success, NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular else { return }
-    fault("dialog", "window observer for pid \(pid) did not register (AX \(axErrorName(error)))")
-  }
-
   @objc func spaceChanged() {
     send("space", ["kind": "space", "via": "notification", "value": activeSpaceId().map { String($0) } ?? "unknown"])
-  }
-
-  @objc func activated(_ note: Notification) {
-    let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-    send("activation", ["kind": "activation", "via": "notification", "pid": Int(app?.processIdentifier ?? -1)])
-  }
-
-  @objc func launched(_ note: Notification) {
-    if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
-      watchWindows(of: app.processIdentifier)
-    }
   }
 
   func onAccessibility(_ element: AXUIElement, _ notification: String) {
@@ -156,8 +142,8 @@ final class Recorder: NSObject {
   }
 
   // A window-created notification arrives while its owner is still building the window, so its reads can time out.
-  // They run off the main thread with a bounded retry of a timed-out read; the raw AXError name goes into the event and
-  // the reducer judges it. `pendingReads` lets `stop` wait for reads still running instead of closing the window on
+  // They run off the main thread with a bounded retry of a timed-out read; the raw AXError name, the number of read
+  // attempts and which notification fired go into the event, and the reducer judges them. `pendingReads` lets `stop` wait for reads still running instead of closing the window on
   // them (the retry can take ~3 s: 20 x (2 x 50 ms timeouts + 50 ms)).
   func windowAdded(_ element: AXUIElement, sheet: Bool) {
     let at = uptimeMs()
@@ -166,8 +152,9 @@ final class Recorder: NSObject {
       AXUIElementSetMessagingTimeout(element, 0.05)
       var pid: pid_t = 0
       AXUIElementGetPid(element, &pid)
-      var role = "", subrole = "", lastError = AXError.success
+      var role = "", subrole = "", lastError = AXError.success, reads = 0
       for _ in 0..<20 {
+        reads += 1
         let (roleError, roleValue) = axValue(element, kAXRoleAttribute)
         let (subroleError, subroleValue) = axValue(element, kAXSubroleAttribute)
         role = roleValue as? String ?? ""
@@ -176,7 +163,6 @@ final class Recorder: NSObject {
         if roleError != .cannotComplete && subroleError != .cannotComplete { break }
         usleep(50_000)
       }
-      if sheet && role.isEmpty { role = "AXSheet" }
       var number: CGWindowID = 0
       if let windowOfElement { _ = windowOfElement(element, &number) }
       let layer = listWindows()?.first { $0.number == number }?.layer ?? 0
@@ -184,26 +170,28 @@ final class Recorder: NSObject {
         self.pendingReads -= 1
         if number != 0 { self.knownWindows.insert(number) }
         self.send("dialog", [
-          "t": at, "kind": "window_added", "id": "ax:\(pid)#\(number)", "ownerPid": Int(pid), "layer": layer,
-          "role": role, "subrole": subrole, "axError": axErrorName(lastError),
+          "t": at, "kind": "window_added", "source": "ax", "notification": sheet ? "sheet" : "window",
+          "id": "ax:\(pid)#\(number)", "ownerPid": Int(pid), "layer": layer,
+          "role": role, "subrole": subrole, "axError": axErrorName(lastError), "axReads": reads,
         ])
       }
     }
   }
 
-  // `stop` waits up to 4 s for new-window reads still running, then reports how many were left; `final` waits for it.
+  // `stop <ms>` waits up to that long for new-window reads and observer registrations still running, then reports how
+  // many of each were left; `final` waits for it. The harness sends both budgets and waits at least that long for each
+  // marker. A registration left running would report its gap after the final read, where the harness cuts it off.
   func drainThenStop(deadline: Double) {
-    if pendingReads > 0 && uptimeMs() < deadline { return after(0.05) { self.drainThenStop(deadline: deadline) } }
+    if (pendingReads > 0 || !registering.isEmpty) && uptimeMs() < deadline {
+      return after(0.05) { self.drainThenStop(deadline: deadline) }
+    }
     recording = false
-    let stop: [String: Any] = ["kind": "stop", "pendingReads": pendingReads]
+    let stop: [String: Any] = ["kind": "stop", "pendingReads": pendingReads, "pendingRegistrations": registering.count]
     pasteboard.drain {
       emit(stop)
       DispatchQueue.main.async { self.stopping = false }
     }
   }
-
-
-
 
   func onTap(_ type: CGEventType, _ event: CGEvent) {
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
@@ -215,13 +203,15 @@ final class Recorder: NSObject {
   }
 
   // The final field read is the typing verdict, so a read that only timed out (the app was busy) is retried for up to
-  // a second; a read that failed outright, or still times out at the deadline, is a fault.
+  // the harness's budget; a read that failed outright, or still times out at the deadline, is a fault.
   func finalRead(deadline: Double) {
     let text = fieldText()
     if let text, text != Recorder.busy { return emit(["kind": "field", "text": text, "final": true]) }
     if text == Recorder.busy, uptimeMs() < deadline { return after(0.05) { self.finalRead(deadline: deadline) } }
-    fault("typing", text == nil ? "final field read failed" : "final field read timed out for 1 s")
+    fault("typing", text == nil ? "final field read failed" : "final field read timed out")
   }
+
+  func budget(_ words: [String], _ fallback: Double) -> Double { words.dropFirst().first.flatMap { Double($0) } ?? fallback }
 
   func command(_ words: [String]) {
     switch words.first {
@@ -230,10 +220,10 @@ final class Recorder: NSObject {
       recording = true
     case "stop":
       stopping = true
-      drainThenStop(deadline: uptimeMs() + 4_000)
+      drainThenStop(deadline: uptimeMs() + budget(words, 4_000))
     case "final":
       if stopping { return after(0.05) { self.command(words) } }
-      finalRead(deadline: uptimeMs() + 1_000)
+      finalRead(deadline: uptimeMs() + budget(words, 1_000))
     case "snapshot":
       emitSnapshot()
     case "quit":

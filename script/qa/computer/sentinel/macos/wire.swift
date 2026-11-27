@@ -79,6 +79,15 @@ func axFind(_ root: AXUIElement, identifier: String, depth: Int = 10) -> AXUIEle
   return nil
 }
 
+func policyName(_ policy: NSApplication.ActivationPolicy) -> String {
+  switch policy {
+  case .regular: return "regular"
+  case .accessory: return "accessory"
+  case .prohibited: return "prohibited"
+  @unknown default: return "unknown"
+  }
+}
+
 func axErrorName(_ error: AXError) -> String {
   switch error {
   case .success: return "success"

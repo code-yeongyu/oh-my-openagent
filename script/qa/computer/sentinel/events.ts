@@ -23,7 +23,7 @@ export type SentinelEvent = { readonly t: number } & (
   | { readonly kind: "tick" | "start" }
   // A sampler tick that took long: its total time and its slowest read, so a stalled sampler names what held it.
   | { readonly kind: "slow_tick"; readonly ms: number; readonly read: string; readonly readMs: number }
-  | { readonly kind: "stop"; readonly pendingReads?: number }
+  | { readonly kind: "stop"; readonly pendingReads?: number; readonly pendingRegistrations?: number }
   | { readonly kind: "focus" | "space"; readonly via: Via; readonly value: string }
   | { readonly kind: "order"; readonly windows: readonly string[] }
   | { readonly kind: "typed"; readonly index: number; readonly char: string }
@@ -33,12 +33,40 @@ export type SentinelEvent = { readonly t: number } & (
   | { readonly kind: "activation"; readonly via: Via; readonly pid: number }
   | {
       readonly kind: "window_added"
+      // "ax": a window/sheet-created notification and the recorder's own attribute reads of it, which must carry
+      // their facts (which notification, how many read attempts, the last AXError). "sample": the window list.
+      readonly source: "ax" | "sample"
       readonly id: string
       readonly ownerPid: number
       readonly role: string
       readonly subrole: string
       readonly layer: number
+      readonly notification?: "window" | "sheet"
       readonly axError?: string
+      readonly axReads?: number
+    }
+  | {
+      // A window observer that was not registered from `since` (the app's launch or the first attempt) until `t`
+      // (observer_late) or ever (observer_failed): a sheet in that gap is invisible to every branch.
+      readonly kind: "observer_failed"
+      // where the registration started: an app running when the recorder armed, a launch, or an activation
+      readonly origin: "arm" | "launch" | "activation"
+      readonly pid: number
+      // bundle id, else the process name; and the activation policy at the last attempt
+      readonly app: string
+      readonly policy: "regular" | "accessory" | "prohibited" | "unknown"
+      readonly axError: string
+      readonly attempts: number
+      readonly regular: boolean
+      readonly since: number
+    }
+  | {
+      readonly kind: "observer_late"
+      readonly origin: "arm" | "launch" | "activation"
+      readonly pid: number
+      readonly attempts: number
+      readonly regular: boolean
+      readonly since: number
     }
   | { readonly kind: "leak"; readonly what: "key" | "mouse" }
 )
@@ -69,7 +97,7 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
   tick: {},
   slow_tick: { ms: num, read: str, readMs: num },
   start: {},
-  stop: { pendingReads: optional(num) },
+  stop: { pendingReads: optional(num), pendingRegistrations: optional(num) },
   focus: { via, value: str },
   space: { via, value: str },
   order: { windows: listOf(str) },
@@ -79,13 +107,27 @@ const SHAPES: Readonly<Record<SentinelEvent["kind"], Readonly<Record<string, Che
   clipboard: { changeCount: num },
   activation: { via, pid: num },
   window_added: {
+    source: oneOf("ax", "sample"),
     id: str,
     ownerPid: num,
     role: str,
     subrole: str,
     layer: num,
+    notification: optional(oneOf("window", "sheet")),
     axError: optional(str),
+    axReads: optional(num),
   },
+  observer_failed: {
+    origin: oneOf("arm", "launch", "activation"),
+    pid: num,
+    app: str,
+    policy: oneOf("regular", "accessory", "prohibited", "unknown"),
+    axError: str,
+    attempts: num,
+    regular: bool,
+    since: num,
+  },
+  observer_late: { origin: oneOf("arm", "launch", "activation"), pid: num, attempts: num, regular: bool, since: num },
   leak: { what: oneOf("key", "mouse") },
 }
 

@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import { admitWindow, p99 } from "./latency.ts"
-import { judgeSelfTest, type Trial } from "./selftest-judge.ts"
-import { SIGNALS, type SentinelSummary, type Signal } from "./summary.ts"
+import {
+  judgeAxSheetTrial,
+  judgeSelfTest,
+  observerFailureLines,
+  observerRetryProblems,
+  type Trial,
+} from "./selftest-judge.ts"
+import { parseEvents, SIGNALS, type SentinelSummary, type Signal } from "./summary.ts"
 
 function summaryWith(happened: readonly Signal[], faults: readonly string[] = []): SentinelSummary {
   const signals = Object.fromEntries(
@@ -121,5 +127,114 @@ describe("latency-pinned negative windows", () => {
       ok: false,
       reason: "no recorded latency on qa: calibrate before judging negatives",
     })
+  })
+})
+
+// The AX-only sheet trial proves the AX attribute read and its retry: exactly one hit, through the role branch, after at
+// least one retried read. Anything else names why the AX path is unproven.
+describe("judging the AX-only sheet trial", () => {
+  const table = [
+    ["a role read that needed a retry", [{ branch: "role", axReads: 2 }], true],
+    ["a role read on the first attempt", [{ branch: "role", axReads: 1 }], false],
+    ["only the sheet notification", [{ branch: "notification", axReads: 20 }], false],
+    ["only the window layer", [{ branch: "layer", axReads: null }], false],
+    [
+      "the role branch and the layer branch",
+      [
+        { branch: "role", axReads: 2 },
+        { branch: "layer", axReads: null },
+      ],
+      false,
+    ],
+    ["nothing", [], false],
+  ] as const
+  for (const [what, hits, proven] of table)
+    test(`${what}: ${proven ? "proven" : "not proven"}`, () => {
+      expect(judgeAxSheetTrial(hits) === undefined).toBe(proven)
+    })
+})
+
+// The self-test prints one line per app whose window observer never registered, so the claim that such apps are all
+// background agents is read from the run, not deduced from its verdict.
+describe("observer registration failures are listed per app", () => {
+  const failed = (pid: number, app: string, policy: "regular" | "accessory" | "prohibited" | "unknown") =>
+    ({
+      t: 10,
+      kind: "observer_failed",
+      origin: "launch",
+      pid,
+      app,
+      policy,
+      axError: "cannotComplete",
+      attempts: 1,
+      regular: policy === "regular",
+      since: 5,
+    }) as const
+
+  test("each failure is one line naming the pid, the app, its activation policy, attempts and AX error", () => {
+    expect(
+      observerFailureLines([failed(41, "com.apple.WindowServer", "accessory"), failed(57, "Finder", "regular")]),
+    ).toEqual([
+      "SENTINEL_OBSERVER_FAILED pid=41 app=com.apple.WindowServer policy=accessory origin=launch attempts=1 ax=cannotComplete",
+      "SENTINEL_OBSERVER_FAILED pid=57 app=Finder policy=regular origin=launch attempts=1 ax=cannotComplete",
+    ])
+    expect(observerFailureLines([])).toEqual([])
+  })
+
+  test("a failure that does not say which app or which policy is not an event", () => {
+    const line = JSON.stringify({
+      t: 1,
+      kind: "observer_failed",
+      pid: 9,
+      axError: "failure",
+      attempts: 1,
+      regular: false,
+      since: 0,
+    })
+    expect(parseEvents(line).events).toEqual([])
+    expect(parseEvents(line).faults).toHaveLength(1)
+  })
+})
+
+// Apps already running when the recorder arms are past their launch: a background app gets one registration attempt,
+// so a crowd of background agents that refuse registration cannot run retry chains on the main thread into the 20 Hz
+// sampler's tick gap. A regular app found at arm time, and launched or activated apps, may still retry; the self-test
+// fails when an arm-time background app was retried.
+describe("arm-time registration of a background app is tried once", () => {
+  const failedAt = (pid: number, origin: "arm" | "launch" | "activation", attempts: number, regular = false) =>
+    ({
+      t: 10,
+      kind: "observer_failed",
+      origin,
+      pid,
+      app: `com.example.agent${pid}`,
+      policy: regular ? "regular" : "prohibited",
+      axError: "cannotComplete",
+      attempts,
+      regular,
+      since: 5,
+    }) as const
+
+  test("six background agents found at arm time, each tried once, pass", () => {
+    expect(observerRetryProblems([41, 42, 43, 44, 45, 46].map((pid) => failedAt(pid, "arm", 1)))).toEqual([])
+  })
+
+  test("an arm-time app that was retried is named", () => {
+    expect(observerRetryProblems([failedAt(41, "arm", 1), failedAt(42, "arm", 10)])).toEqual([
+      "window observer for pid 42 was retried 10 times although it was found at arm time",
+    ])
+  })
+
+  test("a regular app found at arm time may retry a transient refusal", () => {
+    expect(observerRetryProblems([failedAt(43, "arm", 10, true)])).toEqual([])
+    expect(
+      observerRetryProblems([
+        { t: 400, kind: "observer_late", origin: "arm", pid: 44, attempts: 3, regular: true, since: 5 },
+      ]),
+    ).toEqual([])
+  })
+
+  test("a launched or activated app may retry", () => {
+    expect(observerRetryProblems([failedAt(51, "launch", 10), failedAt(52, "activation", 10)])).toEqual([])
   })
 })
