@@ -1702,6 +1702,7 @@
     "packages/omo-senpi/src/components/thread/contracts/parse.ts",
     "packages/omo-senpi/src/components/thread/contracts/permission-presets.ts",
     "packages/omo-senpi/src/components/thread/contracts/results.ts",
+    "packages/omo-senpi/src/components/thread/contracts/send-result-order.ts",
     "packages/omo-senpi/src/components/thread/contracts/state.ts",
     "packages/omo-senpi/src/components/thread/control/close-ladder.ts",
     "packages/omo-senpi/src/components/thread/control/create-launch.ts",
