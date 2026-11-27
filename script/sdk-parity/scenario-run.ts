@@ -3,7 +3,14 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { REPO_ROOT } from "./registry"
-import { type CliScenario, type LoopParseScenario, type Scenario, SCENARIOS, type ToolScenario } from "./scenarios"
+import {
+  type CliScenario,
+  type LoopParseScenario,
+  type Scenario,
+  SCENARIOS,
+  type SdkScenario,
+  type ToolScenario,
+} from "./scenarios"
 import { discoverOmoTools, openToolSession } from "./tool-registry"
 
 // Runs the scenario table against one tree and records each outcome, normalized so that the merge base and the head
@@ -61,6 +68,50 @@ async function runCli(tree: string, scenario: CliScenario): Promise<Outcome> {
   }
 }
 
+const SDK_ENTRY = "packages/omo-senpi/src/components/omo-sdk/index.ts"
+
+// The child imports the tree's own SDK entry, so the merge base answers with the merge base's code.
+const SDK_DRIVER = `
+const [entry, member, home, cwd] = process.argv.slice(1)
+const sdk = (await import(entry)).createOmoSdk({ env: { HOME: home }, cwd })
+const call = member.split(".").reduce((node, key) => node[key], sdk)
+process.stdout.write(JSON.stringify(await call()))
+`
+
+async function runSdk(tree: string, scenario: SdkScenario): Promise<Outcome> {
+  const sandbox = mkdtempSync(join(tmpdir(), "sdk-parity-sdk-"))
+  const home = join(sandbox, "home")
+  const cwd = join(home, "project")
+  mkdirSync(cwd, { recursive: true })
+  try {
+    for (const [path, content] of Object.entries(scenario.files)) {
+      mkdirSync(dirname(join(home, path)), { recursive: true })
+      writeFileSync(join(home, path), content)
+    }
+    const child = Bun.spawn([process.execPath, "-e", SDK_DRIVER, join(tree, SDK_ENTRY), scenario.member, home, cwd], {
+      cwd,
+      env: { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, TMPDIR: sandbox, NO_COLOR: "1" },
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: CLI_BUDGET_MS,
+      killSignal: "SIGKILL",
+    })
+    const [stdout, stderr, exit] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    const clean = normalizer([
+      [sandbox, "<sandbox>"],
+      [tree, "<tree>"],
+    ])
+    return exit === 0 ? { answer: JSON.parse(clean(stdout)) } : { exit, stderr: clean(stderr) }
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
+  }
+}
+
 async function runTools(tree: string, scenarios: readonly ToolScenario[]): Promise<Map<string, Outcome>> {
   const outcomes = new Map<string, Outcome>()
   if (scenarios.length === 0) return outcomes
@@ -107,7 +158,9 @@ async function runScenarios(
         ? (tools.get(scenario.id) ?? {})
         : scenario.surface === "loop-parse"
           ? await runLoopParse(tree, scenario)
-          : await runCli(tree, scenario)
+          : scenario.surface === "sdk"
+            ? await runSdk(tree, scenario)
+            : await runCli(tree, scenario)
   return out
 }
 
