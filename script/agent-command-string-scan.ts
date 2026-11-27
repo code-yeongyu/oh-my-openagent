@@ -25,7 +25,11 @@ export function isExcluded(filePath: string): boolean {
     filePath.startsWith("changes/unreleased/") ||
     filePath === ".omo" ||
     filePath.startsWith(".omo/") ||
-    filePath.split("/").some((part) => part === "node_modules" || part === "install-dist" || part === "dist")
+    filePath
+      .split("/")
+      .some(
+        (part) => part === "node_modules" || part === "install-dist" || part === "dist" || part === "remote-sdk-types",
+      )
   )
 }
 

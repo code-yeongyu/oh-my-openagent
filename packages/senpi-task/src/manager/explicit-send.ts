@@ -5,19 +5,19 @@ import { sendBehindRefusedStop, type RefusedStops } from "./refused-stops"
 
 /**
  * The manager's checks before an explicit send (#11381), in the one order that discloses nothing: the
- * address is resolved once (steering's resolver); steering's scope decision comes FIRST, so a caller
- * outside the task's session sees only that denial, synchronously, whatever the record's owner or a
- * refused turn's stop would say; then the owner's decision; then the wait behind a refused turn's stop.
- * `answer` is undefined, synchronously, when nothing applies, so such a send starts in the caller's tick;
- * every later step uses `taskId`.
+ * address is resolved once (steering's resolver, the caller's own task first); steering's scope decision
+ * comes FIRST, so a caller outside the task's session sees only that refusal, synchronously, whatever the
+ * record's owner or a refused turn's stop would say; then the owner's decision; then the wait behind a
+ * refused turn's stop. `answer` is undefined, synchronously, when nothing applies, so such a send starts in
+ * the caller's tick; every later step uses `taskId`.
  */
 export function explicitSendChecks(
-  steering: Pick<SteeringEngine, "resolve" | "scopeDenial">,
+  steering: Pick<SteeringEngine, "resolveSendTarget" | "scopeDenial">,
   fence: OwnerResumeFence | undefined,
   stops: RefusedStops,
   input: SendInput,
 ): { readonly taskId: string; readonly answer?: SendOutcome | Promise<SendOutcome | undefined> } {
-  const record = steering.resolve(input.idOrName)
+  const record = steering.resolveSendTarget(input.idOrName, input.callerSessionId)
   if (record === undefined) return { taskId: input.idOrName }
   const denied = steering.scopeDenial(record, input) ?? ownerSendRefusal(fence, record)
   if (denied !== undefined) return { taskId: record.task_id, answer: denied }

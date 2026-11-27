@@ -6,6 +6,7 @@
 // (#13635), and the ones the engine can name honestly get their own kind.
 
 import { StrandedGitLockError } from "../../git/repo-lock-sweep"
+import { OwnershipUndecidedError, OwnershipUnprovenError } from "./account-journal"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 import { causeOf, type SyncFailureCause, type SyncStage } from "./failure-cause"
 
@@ -18,9 +19,10 @@ export type SyncFailure =
     }
   | { readonly kind: "auth_expired"; readonly reason: string; readonly action: string }
   | { readonly kind: "offline"; readonly reason: string; readonly action: string }
+  | { readonly kind: "ownership_undecided"; readonly reason: string; readonly action: string }
   | {
       /** A full disk, a refused write, a service refusal, else unknown: each says what failed in `cause`. */
-      readonly kind: "disk_full" | "no_write_access" | "service_refused" | "unknown"
+      readonly kind: "disk_full" | "no_write_access" | "service_refused" | "client_update_required" | "unknown"
       readonly reason: string
       readonly action: string
       readonly cause: SyncFailureCause
@@ -41,6 +43,22 @@ const AUTH_EXPIRED: SyncFailure = {
   kind: "auth_expired",
   reason: "This device's OmO sign-in has expired or was refused, so memory sync cannot reach your account.",
   action: "Sign in to OmO again from the OmO desktop app on this computer.",
+}
+
+/** An older journal waits for its owner to be proven (#14491): nothing is uploaded or set aside meanwhile. */
+const OWNERSHIP_UNPROVEN: SyncFailure = {
+  kind: "offline",
+  reason: "Memory sync is checking which account this device's memory belongs to.",
+  action: "Nothing is uploaded until the OmO sync service answers; sync resumes on its own once it is reachable.",
+}
+
+/** No record the service keeps shows whose memory an older journal holds (#14491): only the person can decide. */
+const OWNERSHIP_UNDECIDED: SyncFailure = {
+  kind: "ownership_undecided",
+  reason:
+    "This device has memory from before its account's oldest kept sync history, so OmO cannot tell which account it belongs to.",
+  action:
+    "Nothing is uploaded and this memory stays on this device. This version of OmO has no command to choose what happens to it yet; a later version adds one.",
 }
 
 const OFFLINE: SyncFailure = {
@@ -85,6 +103,16 @@ const READ_ONLY = {
     "Make the memory folder writable again; with OMO_DEBUG=1 the memory log names the file. Sync retries on its own.",
 } as const
 
+/** The service's client floor refuses this build (HTTP 426 `client_update_required`): it never passes until OmO is updated (#14483). */
+const CLIENT_UPDATE_REQUIRED = {
+  kind: "client_update_required",
+  reason: "This version of OmO is too old for the OmO sync service, so memory sync is paused on this device.",
+  action: "Update OmO on this device to keep syncing; sync is paused until then.",
+} as const
+
+const isClientUpdateRequired = (error: SyncHttpError): boolean =>
+  error.status === 426 || error.code === "client_update_required"
+
 const FULL_CODES: ReadonlySet<string> = new Set(["ENOSPC", "EDQUOT"])
 const DENIED_CODES: ReadonlySet<string> = new Set(["EACCES", "EPERM"])
 
@@ -95,6 +123,7 @@ function describeCausedFailure(error: unknown, stage: SyncStage): SyncFailure {
   if (FULL_CODES.has(code)) return { ...DISK_FULL, cause }
   if (DENIED_CODES.has(code)) return { ...PERMISSION_DENIED, cause }
   if (code === "EROFS") return { ...READ_ONLY, cause }
+  if (error instanceof SyncHttpError && isClientUpdateRequired(error)) return { ...CLIENT_UPDATE_REQUIRED, cause }
   if (error instanceof SyncHttpError)
     return {
       kind: "service_refused",
@@ -160,5 +189,11 @@ export function describeSyncFailure(error: unknown, stage: SyncStage): SyncFailu
   }
   if (error instanceof SyncAuthError || (error instanceof SyncHttpError && error.status === 401)) return AUTH_EXPIRED
   if (error instanceof SyncNetworkError || (error instanceof SyncHttpError && error.transient)) return OFFLINE
+  if (error instanceof OwnershipUndecidedError) return OWNERSHIP_UNDECIDED
+  if (error instanceof OwnershipUnprovenError) {
+    const cause = error.cause
+    if (cause instanceof SyncAuthError || (cause instanceof SyncHttpError && cause.status === 401)) return AUTH_EXPIRED
+    return OWNERSHIP_UNPROVEN
+  }
   return describeCausedFailure(error, stage)
 }

@@ -1,4 +1,4 @@
-import type { JsonObject } from "../device-service-core/src/index.ts"
+import type { JsonObject } from "../omo-senpi/src/components/remote/index"
 import { raiserOnly } from "../omo-senpi/src/components/thread/remote/dialog-mirror"
 
 // relayd sends a dialog in its local shape (`extension_ui_request`) only on the delegated connection that raised it; every

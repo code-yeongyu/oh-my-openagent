@@ -38,6 +38,8 @@ export type AccountAccess = {
   /** Why no account call may run here at all (a closed SDK, a desktop launch); undefined when one may. */
   readonly blockedReason: () => OmoResult<never> | undefined
   readonly signedIn: <T>(read: (signedIn: SignedIn) => Promise<T>) => Promise<OmoResult<T>>
+  /** Aborted by `close`: every call checks it before it starts and passes it to what it waits on. */
+  readonly signal: AbortSignal
   readonly close: () => void
 }
 
@@ -139,6 +141,7 @@ export function createAccountAccess(options: {
         return failure(error)
       }
     },
+    signal: lifetime.signal,
     close: () => lifetime.abort(),
   }
 }
