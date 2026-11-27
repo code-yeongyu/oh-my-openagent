@@ -1,12 +1,8 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
-import { memoryHookChecker } from "./spawn-supervisor-support"
 
 import {
-  GitMemoryRepo,
-  buildDefaultSeedFiles,
   cleanupReflectionWorktree,
-  installHooks,
   maybeKillAt,
   type ReflectionFinalizeResult,
   type ReflectionWorktree,
@@ -16,6 +12,7 @@ import {
 import type { SenpiOmoConfigResult } from "../../config-resolution"
 import { resolveAgentReflectionSettings } from "../reflection-settings"
 import { createRunWorktree } from "./create-run-worktree"
+import { ensureCommittedMemoryRepo } from "./ensure-committed-repo"
 import { resolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import { MemoryModelExhaustedError, type MemoryModelChain } from "./memory-model-attempts"
 import type { MemoryLaunchRoute } from "./fork-cost"
@@ -42,15 +39,7 @@ export async function executeReflectionRun(input: {
   readonly appendLaunched: () => Promise<void>
 }): Promise<ExecutionResult | ReflectionRunResult> {
   const { run, resolution, loaded, options } = input
-  const repo = new GitMemoryRepo({ dir: options.identity.paths.repo, agentId: options.identity.id })
-  if (!existsSync(join(options.identity.paths.repo, ".git"))) {
-    await repo.init({
-      seedFiles: buildDefaultSeedFiles(),
-      installHooks: (dir) => {
-        installHooks(dir, { checker: memoryHookChecker() })
-      },
-    })
-  }
+  const repo = await ensureCommittedMemoryRepo(options.identity.paths, options.identity.id)
   let worktree: ReflectionWorktree | undefined
   try {
     maybeKillAt("after-reserve")

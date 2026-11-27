@@ -16,6 +16,7 @@ import type {
   FactsRunLedger,
 } from "./facts-runner-types"
 import type { FactsTerminalWrites } from "./facts-terminal-writes"
+import { ensureCommittedMemoryRepo } from "./worker/ensure-committed-repo"
 import { readRunJson } from "./worker/run-artifacts"
 
 /** Artifact recovery, terminal finalization, and retention never create a model child. */
@@ -78,7 +79,7 @@ export function createFactsRunMaintenance(
       factsDir: options.identity.paths.facts,
       now,
       finalize: async (runDir) => {
-        const repo = new GitMemoryRepo({ dir: options.identity.paths.repo, agentId: options.identity.id })
+        const repo = await ensureCommittedMemoryRepo(options.identity.paths, options.identity.id)
         await finalize(runDir, repo)
       },
       fail: (runDir, ledger, detail) =>
