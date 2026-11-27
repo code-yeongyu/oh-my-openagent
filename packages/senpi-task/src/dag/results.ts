@@ -38,6 +38,14 @@ export type DagNodeResultPersistInput = {
   readonly now?: () => number
 }
 
+// The exact bytes a fold persists for a terminal node: the response artifact and, when the run has
+// run_stats, the serialized stats sidecar. One derivation serves the write and any comparison with
+// what is already on disk, so the two can never drift (#12134).
+export type DagNodeResultContents = {
+  readonly output: string
+  readonly stats?: string
+}
+
 export type DagNodeResultReadInput = {
   readonly store: DagFileStore
   readonly runId: DagRunId
@@ -68,15 +76,18 @@ export function persistDagNodeResult(input: DagNodeResultPersistInput): DagNodeR
     // journal_corrupt diagnostic the caller already journals, instead of throwing out of a
     // terminal-transition mutation.
     outputPath = input.store.paths.result(input.runId, input.nodeId)
-    const output = input.record.final_response ?? ""
+    const contents = dagNodeResultContents(input)
     fs.mkdirSync(dirname(outputPath), { recursive: true })
-    writeArtifact(outputPath, output)
-    const stats = writeStatsSidecar(input, statsPath(outputPath))
+    writeArtifact(outputPath, contents.output)
+    const sidecarPath = statsPath(outputPath)
+    // A run without run_stats must not leave an earlier fold's sidecar describing it.
+    if (contents.stats === undefined) fs.rmSync(sidecarPath, { force: true })
+    else writeArtifact(sidecarPath, contents.stats)
     return {
       kind: "persisted",
       artifact: {
-        ...artifactRef(input.store, outputPath, output),
-        ...(stats === undefined ? {} : { stats }),
+        ...artifactRef(input.store, outputPath, contents.output),
+        ...(contents.stats === undefined ? {} : { stats: artifactRef(input.store, sidecarPath, contents.stats) }),
       },
     }
   } catch (error) {
@@ -117,18 +128,34 @@ export function readDagNodeResult(input: DagNodeResultReadInput): DagNodeResultR
   return runStats === undefined ? { output } : { output, runStats }
 }
 
-function writeStatsSidecar(input: DagNodeResultPersistInput, path: string): DagResultArtifactRef | undefined {
+export function dagNodeResultContents(
+  input: Pick<DagNodeResultPersistInput, "runId" | "nodeId" | "record">,
+): DagNodeResultContents {
+  const output = input.record.final_response ?? ""
   const runStats = input.record.run_stats
-  if (runStats === undefined) return undefined
+  if (runStats === undefined) return { output }
   const sidecar: StatsSidecar = {
     schemaVersion: STATS_SCHEMA_VERSION,
     runId: input.runId,
     nodeId: input.nodeId,
     runStats,
   }
-  const serialized = JSON.stringify(sidecar)
-  writeArtifact(path, serialized)
-  return artifactRef(input.store, path, serialized)
+  return { output, stats: JSON.stringify(sidecar) }
+}
+
+/** The bytes a fold left on disk for a node, in the shape `dagNodeResultContents` derives; null when nothing was persisted. */
+export function readDagNodeResultContents(input: DagNodeResultReadInput): DagNodeResultContents | null {
+  let outputPath: string
+  try {
+    outputPath = input.store.paths.result(input.runId, input.nodeId)
+  } catch (error) {
+    if (error instanceof Error) return null
+    throw error
+  }
+  const output = readTextFile(outputPath)
+  if (output === null) return null
+  const stats = readTextFile(statsPath(outputPath))
+  return stats === null ? { output } : { output, stats }
 }
 
 function writeArtifact(path: string, contents: string): void {

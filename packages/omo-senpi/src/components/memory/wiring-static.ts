@@ -1,7 +1,12 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
+import {
+  resolveMemoryRoot,
+  type MemoryBlockCache,
+  type ReservedRun,
+  type TranscriptProjection,
+} from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
@@ -11,6 +16,7 @@ import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/ty
 import type { DreamTriggerWiring } from "./dream-trigger"
 import type { MemoryFactsWiring } from "./facts-wiring"
 import { registerMemoryGuard } from "./guard"
+import { registerMemoryFilesystemPolicy } from "./policy-guard"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import type { MemoryJournalWiring } from "./journal-wiring"
 import { registerJournalSettleDelivery } from "./journal-settle-delivery"
@@ -223,6 +229,11 @@ export function registerMemoryStatic(input: {
         resolveSessionId: () => activeSession.current,
       },
     },
+  )
+  registerMemoryFilesystemPolicy(
+    pi,
+    () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),
+    resolveMemoryRoot(options.env, options.cwd()),
   )
   registerMemoryGuard(pi, ctx, {
     getContext: (eventContext) => {

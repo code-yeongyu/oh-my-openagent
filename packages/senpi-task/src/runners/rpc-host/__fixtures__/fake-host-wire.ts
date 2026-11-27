@@ -122,10 +122,12 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
       return ok({})
     case "get_state": {
       const model = routingId === undefined ? undefined : openedModels.get(ports)?.get(routingId)
+      const lifecycle = routingId === undefined ? undefined : ports.table.lifecycle(routingId)
       return ok({
         sessionId: `durable-${payload.sessionId}`,
         isStreaming: routingId !== undefined && ports.table.isStreaming(routingId),
         ...(model === undefined ? {} : { model }),
+        ...(lifecycle === undefined ? {} : { lifecycle }),
       })
     }
     case "set_session_context": {
