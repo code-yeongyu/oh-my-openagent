@@ -163,9 +163,11 @@ export type FollowOutcome = {
 /**
  * The options of sessions.follow and sessions.wait. `from` anchors them on one send (#13753): with a receipt that carries
  * a `delivery_id`, they follow only the turn that answers that send and end on its end, whatever the attach replays;
- * without one they follow the session from now on.
+ * without one they follow the session from now on. `from` may also be the send's receipt still pending (#13414 4c-2):
+ * a caller follows before it sends, so no record of a fast turn arrives unseen; the attach opens at once, its records are
+ * held until the receipt resolves and judged by it then, and a rejected promise ends follow (and wait) with a failure.
  */
-export type FollowOpts = Opts & { readonly from?: SendReceipt }
+export type FollowOpts = Opts & { readonly from?: SendReceipt | Promise<SendReceipt> }
 export type FollowEvent =
   | { readonly kind: "receipt"; readonly receipt: SendReceipt }
   | { readonly kind: "text"; readonly delta: string }

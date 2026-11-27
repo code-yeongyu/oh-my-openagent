@@ -177,7 +177,7 @@ Everything else is parallel. Fire one `task()` per independent checkbox in the s
 ```typescript
 task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
 task(category="deep-low", load_skills=["programming"], run_in_background=false, prompt="...task B...")
-task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
+task(category="quick", load_skills=["git"], run_in_background=false, prompt="...task C...")
 ```
 
 Exploration agents may use `run_in_background=true`; implementation tasks use `run_in_background=false`. Collect background results with `background_output(task_id="bg_...")`. Store every continuation id `ses_...`. Never use `background_cancel(all=true)`.

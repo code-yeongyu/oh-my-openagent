@@ -88,6 +88,40 @@ describe("skill-commands input rewrite", () => {
     }
   })
 
+  test("#given the git skill is loaded #when the user submits the retired git-master name bare or as /skill: #then both become /skill:git with the args intact", async () => {
+    const fixture = skillsFixture(["git"])
+    try {
+      const pi = hostWith([{ name: "skill:git", source: "skill" }])
+      await registerSkillCommands(pi, fixture.dir)
+
+      expect((await submit(pi, "/git-master commit the fix")).text).toBe("/skill:git commit the fix")
+      expect((await submit(pi, "/skill:git-master commit the fix")).text).toBe("/skill:git commit the fix")
+      expect((await submit(pi, "/git")).text).toBe("/skill:git")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("#given a user skill still installed under the retired git-master name #when either slash form names it #then the exact legacy skill keeps it, and with no git command the retired form is not redirected", async () => {
+    const fixture = skillsFixture(["git"])
+    try {
+      const both = hostWith([
+        { name: "skill:git", source: "skill" },
+        { name: "skill:git-master", source: "skill" },
+      ])
+      await registerSkillCommands(both, fixture.dir)
+      expect((await submit(both, "/git-master commit")).text).toBe("/skill:git-master commit")
+      expect((await submit(both, "/skill:git-master commit")).text).toBe("/skill:git-master commit")
+
+      const targetUnavailable = hostWith([{ name: "tasks", source: "extension" }])
+      await registerSkillCommands(targetUnavailable, fixture.dir)
+      expect(await submit(targetUnavailable, "/skill:git-master commit")).toMatchObject({ handled: true })
+      expect(await submit(targetUnavailable, "/git-master commit")).toMatchObject({ handled: true })
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
   test("#given an attached image #when a bare skill command is rewritten #then the image rides along", async () => {
     const fixture = skillsFixture(["ulw-plan"])
     try {

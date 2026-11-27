@@ -89,7 +89,10 @@ describe("task_cancel stops the child", () => {
     await reopenAsked
 
     // when - cancelled while unreachable
-    const cancelled = await bounded(runTaskCancel(parent.manager, { task_id: child.task_id }), "task_cancel")
+    const cancelled = await bounded(
+      runTaskCancel(parent.manager, { task_id: child.task_id }, parent.sessionId),
+      "task_cancel",
+    )
 
     // then - never a false cancelled, and the lane is still held by a child that may still run
     expect(cancelled.details).toMatchObject({ kind: "cancel_pending", task_id: child.task_id })
@@ -143,7 +146,10 @@ describe("task_cancel stops the child", () => {
     const mark = world.host.commands.length
 
     // when
-    const cancelled = await bounded(runTaskCancel(parent.manager, { task_id: child.task_id }), "task_cancel")
+    const cancelled = await bounded(
+      runTaskCancel(parent.manager, { task_id: child.task_id }, parent.sessionId),
+      "task_cancel",
+    )
 
     // then
     expect(cancelled.details).toMatchObject({ kind: "cancelled" })

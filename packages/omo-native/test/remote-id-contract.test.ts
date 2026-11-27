@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, watch } from "node:fs"
 import { dirname } from "node:path"
 import { awaitWithinTestBudget } from "../../../test-support/test-deadline"
-import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
+import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import {
   defaultWorld,
@@ -78,28 +78,6 @@ async function owner(duplicate: false | "other" | "self" = false) {
   return fake
 }
 
-// The CLI closes the attach endpoint in a continuation it chains on the service's `closed` and keeps no handle to
-// (remote-cli.ts). The service the test hands it gives `closed` a Promise subclass, so every promise chained on it
-// (its continuations, built through the subclass's species) is recorded: the test awaits the endpoint's own
-// server.close and removal instead of watching the filesystem against a clock (#14528).
-function observeClosed(service: DeviceService) {
-  const chained: Promise<unknown>[] = []
-  class Recorded<T> extends Promise<T> {
-    constructor(executor: ConstructorParameters<typeof Promise<T>>[0]) {
-      super(executor)
-      chained.push(this)
-    }
-  }
-  const closed = new Recorded<void>((resolve) => {
-    void service.closed.then(resolve)
-  })
-  return {
-    service: { ...service, closed },
-    // A snapshot: awaiting a recorded promise chains another one on it.
-    settled: () => Promise.all([...chained]),
-  }
-}
-
 describe("#13010 remote CLI session identity", () => {
   // #13409: the model rides on the one open_session (the engine's launch profile), so no later model step can miss the
   // session whose durable id differs from its attach key.
@@ -108,7 +86,8 @@ describe("#13010 remote CLI session identity", () => {
     const result = await run(["open", PEER, "--model", "test/model", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")) }).toMatchObject({
       code: REMOTE_EXIT.ok,
-      json: { kind: "ok", thread: DURABLE, model: MODEL },
+      // --json prints the client's OpenResult: the thread as <device>/<listing key> and the model it opened on.
+      json: { thread: `${PEER}/${SESSION_ID}`, model: MODEL },
     })
     expect(JSON.stringify(fake.state.commands)).not.toContain("set_model")
   })
@@ -118,7 +97,7 @@ describe("#13010 remote CLI session identity", () => {
     const result = await run(["interrupt", "missing-session", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject({
       code: REMOTE_EXIT.failed,
-      json: { kind: "error", error: { code: "not_found" } },
+      json: { kind: "error", code: "not_found" },
       commands: [],
     })
   })
@@ -139,7 +118,7 @@ describe("#13010 remote CLI session identity", () => {
       expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject(
         {
           code: REMOTE_EXIT.failed,
-          json: { kind: "error", error: { code: "ambiguous_target" } },
+          json: { kind: "error", code: "ambiguous_target" },
           commands: [],
         },
       )
@@ -158,8 +137,9 @@ describe("#13010 remote CLI session identity", () => {
       expect({ target, code: result.code, json: result.out.map((line) => JSON.parse(line)) }).toMatchObject({
         target,
         code: REMOTE_EXIT.ok,
-        // A listing key typed behind its device answers with that key, as before the address module (#14305 review L2).
-        json: [{ kind: "ok", thread: target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE }],
+        // A listing key typed behind its device names the session by that key, as before the address module (#14305
+        // review L2); any other form names it by its durable id.
+        json: [{ thread: `${PEER}/${target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE}` }],
       })
     }
   })
@@ -168,12 +148,11 @@ describe("#13010 remote CLI session identity", () => {
     const fake = await owner()
     for (const target of [DURABLE, `${PEER}/${DURABLE}`, `${PEER}/${SESSION_ID}`]) {
       const service = await connectDeviceService({ version: "5.1.72", stateDir: fake.stateDir })
-      const observed = observeClosed(service)
       const prepared = await prepareRemoteAttach(
         {
           accountShow: async () => SIGNED_IN,
           stateDir: fake.stateDir,
-          connect: async () => observed.service,
+          connect: async () => service,
           now: () => 0,
           output: () => {},
           write: () => {},
@@ -190,9 +169,17 @@ describe("#13010 remote CLI session identity", () => {
         if (socket === undefined) throw new Error("attach did not name its endpoint")
         const endpoint = dirname(socket)
         expect(existsSync(endpoint)).toBe(true)
-        // Closing the service closes the endpoint: its server.close settles, then its directory is gone.
+        // Closing the service ends the attach (#13414 4c-2: the client's attach owns the endpoint), and the attach's end
+        // removes the endpoint's directory: watched from its parent before the close, so the removal is not missed.
+        const removed = new Promise<void>((resolve) => {
+          const watcher = watch(dirname(endpoint), () => {
+            if (existsSync(endpoint)) return
+            watcher.close()
+            resolve()
+          })
+        })
         service.close()
-        await awaitWithinTestBudget(observed.settled(), "the attach endpoint's close")
+        await awaitWithinTestBudget(removed, "the attach endpoint's removal")
         expect(existsSync(endpoint)).toBe(false)
       } finally {
         service.close()
