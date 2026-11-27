@@ -8,6 +8,7 @@ import { log } from "../../shared/logger"
 import { mergeNativeSkills } from "../skill/native-skills"
 import type { NativeSkillEntry } from "../skill/native-skills"
 import { matchSkillByName } from "../skill/skill-matcher"
+import { isGitSkillName } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/git-skill-metadata"
 import type { DelegateTaskToolOptions } from "./types"
 
 type ResolveSkillContentOptions = {
@@ -119,7 +120,7 @@ export async function resolveSkillContent(
       continue
     }
     const template = extractSkillTemplate(skill)
-    if (name === "git-master") {
+    if (isGitSkillName(skill.name)) {
       resolved.set(name, injectGitMasterConfig(template, options.gitMasterConfig))
     } else {
       resolved.set(name, template)

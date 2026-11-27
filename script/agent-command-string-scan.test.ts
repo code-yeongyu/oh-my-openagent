@@ -61,6 +61,26 @@ describe("agent command string scan", () => {
       }
     })
 
+    test("#when a generated declaration tree mirrors a source comment naming a legacy command #then only the source counts (#13413)", () => {
+      const root = mkdtempSync(join(tmpdir(), "agent-command-scan-"))
+      try {
+        const mirror = "packages/omo-native/bin/lib/remote-sdk-types/omo-senpi/src/remote"
+        mkdirSync(join(root, mirror), { recursive: true })
+        mkdirSync(join(root, "packages/omo-senpi/src/remote"), { recursive: true })
+        writeFileSync(join(root, "packages/omo-senpi/src/remote/factories.ts"), "// like `omo version`\n")
+        writeFileSync(join(root, mirror, "factories.d.ts"), "// like `omo version`\n")
+        for (const args of [
+          ["init", "-q"],
+          ["add", "."],
+        ]) {
+          expect(Bun.spawnSync(["git", ...args], { cwd: root }).exitCode).toBe(0)
+        }
+        expect(collectHits(root)).toEqual(["packages/omo-senpi/src/remote/factories.ts: omo version"])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
     test("#when the fold moves a fragment naming a legacy command into a root or package changes.md #then the hits are unchanged (#12609)", () => {
       const root = mkdtempSync(join(tmpdir(), "agent-command-scan-"))
       const git = (...args: string[]) => expect(Bun.spawnSync(["git", ...args], { cwd: root }).exitCode).toBe(0)

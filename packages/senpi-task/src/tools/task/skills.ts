@@ -9,6 +9,7 @@ import { senpiBarrel } from "../../lazy/senpi-barrel"
 import type { LoadedSkill, SkillLoader, SkillResolution } from "./types"
 import { readProjectSkills, type CheckedProjectSkills } from "./checked-project-skills"
 import { readSkillFileChecked } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/checked-skill-read"
+import { resolveSkillAlias } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-name-aliases"
 import {
   checkSkillPath,
   skillProvenance,
@@ -185,8 +186,11 @@ export function createFsSkillLoader(options: FsSkillLoaderOptions = {}): SkillLo
     const rejected: { name: string; reason: string }[] = []
     const userDirs = uniqueDirs([join(agentDir, "skills"), join(home, ".agents", "skills"), ...extraDirs])
     const projectRoot = detectWorktreePath(cwd)
+    const read = (name: string): LoadedSkill | undefined =>
+      readSkill(name, dirs, discover, discoveryCache, userDirs, rejected, projectCache, projectRoot)
     for (const name of names) {
-      const skill = readSkill(name, dirs, discover, discoveryCache, userDirs, rejected, projectCache, projectRoot)
+      const canonicalName = resolveSkillAlias(name)
+      const skill = read(name) ?? (canonicalName === name ? undefined : read(canonicalName))
       if (skill === undefined && !rejected.some((entry) => entry.name === name)) missing.push(name)
       else if (skill !== undefined) skills.push(skill)
     }

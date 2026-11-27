@@ -30,6 +30,16 @@ export type SyncDevicesRequest = Readonly<Record<string, never>>
 export type PendingId = string
 export type PairingCode = string
 
+/** Service refusals a client can act on; `refused` carries one only for these (#12123). */
+export type SyncServiceCode =
+  | "not_available"
+  | "entitlement_required"
+  | "access_not_open"
+  | "device_revoked"
+  | "reauth_required"
+  | "account_deleted"
+  | "client_update_required"
+
 /** Why sync authority is unavailable: machine-readable, so a field report names its cause (#13153). */
 export type SyncUnavailableCode =
   | "no_account"
@@ -43,7 +53,7 @@ export type SyncUnavailableCode =
   | "retired"
 
 export type SyncRpcProblem =
-  | { readonly kind: "refused"; readonly reason: string }
+  | { readonly kind: "refused"; readonly reason: string; readonly code?: SyncServiceCode }
   | { readonly kind: "unavailable"; readonly reason: string; readonly code?: SyncUnavailableCode }
 
 export interface JoinProgress {
@@ -78,6 +88,13 @@ export type SyncEnableResponse =
   | {
       readonly kind: "phrase_unavailable"
       readonly reason: "no-surface" | "disabled" | "service-floor-off"
+      /** Devices to update OmO on first, by label only (per-account phrase gate). */
+      readonly devices?: ReadonlyArray<{
+        readonly label: string
+        readonly kind: string
+        readonly platform: string
+        readonly lastSyncAt: string
+      }>
       readonly deviceSyncLeftOn?: true
     }
   | { readonly kind: "cancelled" }
