@@ -20,7 +20,8 @@ export function handleSyncVerbs(
   rpc: SyncRpcRegistration,
   dispatch: (verb: SyncRpcVerb, data: unknown, context?: SyncRpcContext) => unknown,
 ): void {
-  for (const verb of SYNC_RPC_VERBS) rpc.handle(`omo.memory.sync.${verb}`, (data, context) => dispatch(verb, data, context))
+  for (const verb of SYNC_RPC_VERBS)
+    rpc.handle(`omo.memory.sync.${verb}`, (data, context) => dispatch(verb, data, context))
 }
 
 export const syncRpcUntrusted = () =>
