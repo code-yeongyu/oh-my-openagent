@@ -53,7 +53,7 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
 
     if (ULW_REVIEWER_AGENT_NAMES.has(canonicalSubagentType)) {
       throw new SenpiTeamSpecError(
-        `ulw reviewer agent "${subagentType}" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead`,
+        `ulw reviewer agent "${subagentType}" cannot be a team member; delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )

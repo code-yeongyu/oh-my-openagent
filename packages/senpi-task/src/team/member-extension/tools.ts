@@ -8,6 +8,7 @@ import type { Static, TSchema } from "typebox"
 import type { PersistedTaskEvent } from "../../store"
 import { toolResult } from "../../tools/control/tool-result"
 import { buildTeamMessage } from "../messaging/message"
+import { MEMBER_TASK_SEND_TOOL_NAME } from "../member-tool-names"
 import { TEAM_LEAD_SENTINEL } from "../normalize"
 
 // Static JSON Schema keeps a second schema-builder runtime off every cold RPC member boot.
@@ -94,7 +95,7 @@ export function createMemberTaskSendTool(
   // (pinned by the senpi API tripwire), so wrapping here would only statically bind this module
   // to the engine barrel.
   return {
-    name: "task_send",
+    name: MEMBER_TASK_SEND_TOOL_NAME,
     label: "Task Send",
     description: "Send a durable message to another team member or the team lead.",
     parameters: MemberTaskSendParams,

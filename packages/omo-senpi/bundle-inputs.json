@@ -2420,6 +2420,7 @@
     "packages/senpi-task/src/team/member-map.ts",
     "packages/senpi-task/src/team/member-projection.ts",
     "packages/senpi-task/src/team/member-respawn.ts",
+    "packages/senpi-task/src/team/member-tool-names.ts",
     "packages/senpi-task/src/team/member-validator.ts",
     "packages/senpi-task/src/team/messaging/delivery-events.ts",
     "packages/senpi-task/src/team/messaging/delivery-journal.ts",

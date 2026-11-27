@@ -6,6 +6,7 @@ import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
+import { MEMBER_EXTENSION_TOOL_NAMES } from "../team/member-tool-names"
 
 // The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
 // and the post-start pin check read (#9722 H1) - a stale resolvedModel from the failed rung would
@@ -85,9 +86,15 @@ export function buildRecordInput(input: {
     ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
-    ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
+    ...(plan.toolAllowlist !== undefined ? { tool_allow: childToolAllowlist(spec, plan.toolAllowlist) } : {}),
     ...(plan.toolDenylist !== undefined ? { tool_deny: plan.toolDenylist } : {}),
   }
+}
+
+// A team member reports and coordinates through the tools its member extension registers (its bootstrap prompt
+// says so), so an agent allow list narrows everything else but never those. A deny list still removes them.
+function childToolAllowlist(spec: ManagerStartSpec, allow: readonly string[]): readonly string[] {
+  return spec.team_role === "member" ? [...new Set([...allow, ...MEMBER_EXTENSION_TOOL_NAMES])] : allow
 }
 
 // Background mode after promoteToBackground runs. A task already running in the background keeps
@@ -128,7 +135,7 @@ export function buildManagedSpec(input: {
     ...(plan.variant !== undefined ? { variant: plan.variant } : {}),
     ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
     ...(instructions !== undefined ? { instructions } : {}),
-    ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
+    ...(record.tool_allow !== undefined ? { toolAllowlist: record.tool_allow } : {}),
     ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
     includeTaskTools: record.owner?.kind !== "dag",
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
