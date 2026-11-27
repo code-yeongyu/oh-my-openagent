@@ -175,6 +175,22 @@ describe("the declared form: controls that must fail", () => {
   })
 })
 
+describe("where a declaration is read in the body", () => {
+  test("#given a marker line inside a code fence #then it is parsed and judged like any other line", () => {
+    const fenced = withOutcomes(ok(1), ok(2), "Example:\n\n```\nSDK-Parity-Changed: s1 answer\n```\n")
+    expect(gateReport(fenced).exempted).toEqual([expect.stringMatching(/^s1#exempt=declared:answer@/)])
+    const broken = withOutcomes(ok(1), ok(2), "```\nSDK-Parity-Changed: <scenario-id> <kind>[ <arg> ...]\n```\n")
+    expect(failuresOf(broken).join("\n")).toMatch(/is not one of/)
+  })
+
+  test("#given a marker that does not start its line, inline or indented #then it is not a declaration", () => {
+    const body = "Written as `SDK-Parity-Changed: s1 answer` in a sentence.\n    SDK-Parity-Changed: s1 answer\n"
+    expect(failuresOf(withOutcomes(ok(1), ok(2), body)).join("\n")).toMatch(
+      /answers differently on the merge base and the head/,
+    )
+  })
+})
+
 describe("the one place where exemptions are consulted", () => {
   test("#given control 19: the providers the gate consults #then they are exactly the closed, named list", () => {
     expect(RESOLVED).not.toBe("")
