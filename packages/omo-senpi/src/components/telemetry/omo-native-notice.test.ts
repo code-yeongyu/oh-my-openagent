@@ -31,6 +31,8 @@ type Question = { readonly title: string; readonly message: string }
 
 function askOnceUi(answer: boolean | Promise<boolean>, questions: Question[]) {
   return {
+    mode: "tui",
+    hasUI: true,
     ui: {
       confirm: async (title: string, message: string) => {
         questions.push({ title, message })
@@ -130,6 +132,56 @@ describe("OmO Native telemetry consent question", () => {
     })
   })
 
+  it("#given an RPC session whose UI forwards confirm #when it starts #then nothing is asked and nothing is recorded (#15213, #15196)", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
+    try {
+      const env = {
+        POSTHOG_API_KEY: "test-api-key",
+        SENPI_CODING_AGENT_DIR: stateDir,
+        HOME: stateDir,
+        OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+      }
+      const pi = new FakeExtensionAPI()
+      createOmoNativeNoticeRegistration({ env, stateDir }).register(pi, {
+        config: pi,
+        logger: createSilentLogger(),
+      })
+      const questions: Question[] = []
+
+      await pi.dispatch("session_start", {}, { ...askOnceUi(true, questions), mode: "rpc", hasUI: true })
+
+      expect(questions).toEqual([])
+      expect(existsSync(consentMarkerPath(stateDir))).toBe(false)
+    } finally {
+      rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
+  it("#given a print session whose no-op UI declines every confirm #when it starts #then no decline is recorded", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
+    try {
+      const env = {
+        POSTHOG_API_KEY: "test-api-key",
+        SENPI_CODING_AGENT_DIR: stateDir,
+        HOME: stateDir,
+        OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+      }
+      const pi = new FakeExtensionAPI()
+      createOmoNativeNoticeRegistration({ env, stateDir }).register(pi, {
+        config: pi,
+        logger: createSilentLogger(),
+      })
+      const questions: Question[] = []
+
+      await pi.dispatch("session_start", {}, { ...askOnceUi(false, questions), mode: "print", hasUI: false })
+
+      expect(questions).toEqual([])
+      expect(existsSync(consentMarkerPath(stateDir))).toBe(false)
+    } finally {
+      rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
   it("#given DO_NOT_TRACK=1 #when a session starts #then no question is asked", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
     try {
@@ -202,6 +254,8 @@ describe("OmO Native telemetry consent question", () => {
         "session_start",
         {},
         {
+          mode: "tui",
+          hasUI: true,
           ui: {
             confirm: async () => {
               throw new Error("dialog crashed")
