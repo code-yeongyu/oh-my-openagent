@@ -26,9 +26,20 @@ import { fileURLToPath } from "node:url"
 const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
-export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-export const DESKTOP_ROOT =
-  process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
+// The legacy checkouts have no portable default location (a machine-specific path here made every
+// direct scenario run die on another machine with "Cannot find module" before any check, #15085):
+// without the variable the harness fails with one line naming it, and run-all.mjs's summary counts
+// the legacy suite as not run.
+const requiredRoot = (name) => {
+  const value = process.env[name]
+  if (value === undefined || value === "")
+    throw new Error(
+      `thread-tools QA: set ${name} to the checkout path this scenario needs (run-all.mjs skips the legacy suite without it)`,
+    )
+  return value
+}
+export const SENPI_ROOT = requiredRoot("THREAD_QA_SENPI_ROOT")
+export const DESKTOP_ROOT = requiredRoot("THREAD_QA_DESKTOP_ROOT")
 
 const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-shared", "lib")
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")
