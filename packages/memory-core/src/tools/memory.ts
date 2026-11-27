@@ -16,7 +16,7 @@ import type { ClaimReceipt } from "../provenance"
 import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatter"
 import { commitMemoryWrite, type MemoryWriteLock, type MemoryWriteStage } from "./commit-write"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
-import { MemoryToolError } from "./tool-errors"
+import { MemoryNoChangesError, MemoryToolError } from "./tool-errors"
 
 export type MemoryCommand =
   "create" | "str_replace" | "insert" | "delete" | "rename" | "update_description" | "apply_patch"
@@ -92,6 +92,8 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
     if (error instanceof MemoryPatchParseError || error instanceof MemoryPatchHunkError) {
       throw toolError(error.message)
     }
+    // A write whose result already equals the stored state is a terminal ok the model does not retry (#14814).
+    if (error instanceof MemoryNoChangesError) return { message: error.message }
     if (error instanceof MemoryToolError) throw error
     throw toolError(errorMessage(error), error)
   }
