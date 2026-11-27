@@ -11,6 +11,7 @@ import { applyDagRunMutation, DagManagerError, createDagManager, type DagRunReco
 import { createDagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+import { noLiveHolder } from "./__fixtures__/reattached-run"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "ses_parent"
@@ -147,7 +148,7 @@ async function raceStarts(projectDir: string, prompts: readonly string[]): Promi
   const outcomes = await Promise.all(readers.map(async (read) => JSON.parse(await read()) as RaceOutcome))
   const exits = await Promise.all(children.map((child) => child.exited))
   const stderr = await Promise.all(errors)
-  exits.forEach((code, index) => expect(code, stderr[index]).toBe(0))
+  for (const [index, code] of exits.entries()) expect(code, stderr[index]).toBe(0)
   return outcomes
 }
 
@@ -516,6 +517,7 @@ describe("createDagManager amend", () => {
     completeDiamond(store, started.snapshot.runId)
 
     const amended = await dag.amend({
+      holder: noLiveHolder,
       runId: started.snapshot.runId,
       definition: diamond("build b differently"),
       parentSessionId,
@@ -569,12 +571,18 @@ describe("createDagManager amend", () => {
     })
 
     await expect(
-      dag.amend({ runId: started.snapshot.runId, definition: diamond("changed"), parentSessionId }),
+      dag.amend({
+        holder: noLiveHolder,
+        runId: started.snapshot.runId,
+        definition: diamond("changed"),
+        parentSessionId,
+      }),
     ).rejects.toMatchObject({ code: "amend_running_node", nodeIds: ["B"] })
 
     store.writeCheckpoint(started.snapshot.runId, completed)
     await expect(
       dag.amend({
+        holder: noLiveHolder,
         runId: started.snapshot.runId,
         definition: {
           ...diamond(),
@@ -585,7 +593,7 @@ describe("createDagManager amend", () => {
     ).rejects.toMatchObject({ code: "invalid_amendment" })
 
     const withoutD = { ...diamond(), nodes: diamond().nodes.filter((node) => node.id !== "D") }
-    const amended = await dag.amend({ key: "diamond", definition: withoutD, parentSessionId })
+    const amended = await dag.amend({ holder: noLiveHolder, key: "diamond", definition: withoutD, parentSessionId })
     expect(amended.nodes.map((node) => node.id as string)).toEqual(["A", "B", "C"])
   })
 
@@ -595,6 +603,7 @@ describe("createDagManager amend", () => {
     completeDiamond(store, started.snapshot.runId)
 
     const amended = await dag.amend({
+      holder: noLiveHolder,
       runId: started.snapshot.runId,
       definition: diamond("build b", [{ id: "E", prompt: "build e", category: "quick", dependsOn: ["D"] }]),
       parentSessionId,
@@ -628,6 +637,7 @@ describe("createDagManager amend", () => {
     completeDiamond(store, started.snapshot.runId)
 
     const amended = await dag.amend({
+      holder: noLiveHolder,
       runId: started.snapshot.runId,
       definition: diamond("changed", [{ id: "E", prompt: "build e", category: "quick", dependsOn: ["D"] }]),
       parentSessionId,
@@ -645,10 +655,16 @@ describe("createDagManager amend", () => {
   test("#given invalid selectors or a missing run #when amended #then invalid_arguments and run_not_found are returned", async () => {
     const { dag } = manager(tempProject())
     await expect(
-      dag.amend({ runId: "run-missing" as DagRunId, key: "missing", definition: diamond(), parentSessionId }),
+      dag.amend({
+        holder: noLiveHolder,
+        runId: "run-missing" as DagRunId,
+        key: "missing",
+        definition: diamond(),
+        parentSessionId,
+      }),
     ).rejects.toMatchObject({ code: "invalid_arguments" })
     await expect(
-      dag.amend({ runId: "run-missing" as DagRunId, definition: diamond(), parentSessionId }),
+      dag.amend({ holder: noLiveHolder, runId: "run-missing" as DagRunId, definition: diamond(), parentSessionId }),
     ).rejects.toMatchObject({ code: "run_not_found" })
   })
 
@@ -656,7 +672,12 @@ describe("createDagManager amend", () => {
     const { store, dag } = manager(tempProject())
     const started = await dag.start({ definition: diamond(), parentSessionId, rootSessionId })
     const old = completeDiamond(store, started.snapshot.runId)
-    const amended = await dag.amend({ runId: started.snapshot.runId, definition: diamond("changed"), parentSessionId })
+    const amended = await dag.amend({
+      holder: noLiveHolder,
+      runId: started.snapshot.runId,
+      definition: diamond("changed"),
+      parentSessionId,
+    })
     const amendmentEvent = store.readEvents(started.snapshot.runId, 1, { limit: 10 }).events[0] as DagRunEvent
     const retriedPayload = dagNodeRetriedEvent({
       nodeId: "B" as DagNodeId,
@@ -692,7 +713,12 @@ describe("createDagManager amend", () => {
     const { store, dag } = manager(tempProject())
     const started = await dag.start({ definition: diamond(), parentSessionId, rootSessionId })
     const old = completeDiamond(store, started.snapshot.runId)
-    await dag.amend({ runId: started.snapshot.runId, definition: diamond("changed"), parentSessionId })
+    await dag.amend({
+      holder: noLiveHolder,
+      runId: started.snapshot.runId,
+      definition: diamond("changed"),
+      parentSessionId,
+    })
 
     // when the record the event replays against violates the amendment's preconditions: the node it
     // changes is now running, and the fingerprint no longer matches previousFingerprint.

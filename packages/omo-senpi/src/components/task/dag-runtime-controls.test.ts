@@ -4,6 +4,7 @@ import { pausedRun } from "../../../../senpi-task/src/dag/__fixtures__/paused-ru
 import { createDagManager } from "../../../../senpi-task/src/dag/manager"
 import { cancelPausedDagNode } from "../../../../senpi-task/src/dag/paused-controls"
 import { createDagRuntimeControls } from "./dag-runtime-controls"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 
 afterEach(cleanupProjects)
 
@@ -15,9 +16,8 @@ test("paused send and staged retry cannot recreate or adopt a retired scheduler"
     schedulerOptions,
     schedulers: new Map(),
     sessionId: () => "parent-1",
-    controller: () => {
-      throw new Error("paused controls must not create a scheduler")
-    },
+    holdsRun: () => false,
+    reservations: createDagRunReservations(),
     adoptReentry: () => {
       throw new Error("paused controls must not adopt a scheduler")
     },

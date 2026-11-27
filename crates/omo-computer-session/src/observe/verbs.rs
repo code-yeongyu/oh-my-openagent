@@ -1,11 +1,10 @@
 //! The session's read verbs over the observation model: `observe`, `ax.drill`, `ax.node` and
 //! `ax.children`. Each resolves refs through the registry before it reads anything by ref.
 
-use omo_computer_core::error::Reason;
 use omo_computer_core::ax::NodeRead;
-use omo_computer_core::listing::Rect;
 use omo_computer_core::backend::Refusal;
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::listing::Rect;
 use omo_computer_core::observation::Observation;
 use omo_computer_core::params::{AxRefParams, DrillParams, ObserveParams, ReportMode};
 use omo_computer_core::results::AxNode;

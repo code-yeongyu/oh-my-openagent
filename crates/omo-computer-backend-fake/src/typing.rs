@@ -60,9 +60,15 @@ mod tests {
 
     use crate::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
 
+    /// Window 101 exists so a background input addressed to it is delivered (row 21a refuses an
+    /// address the desktop does not hold).
+    const WINDOW_101: &str = r#""windows":[{"id":"101","title":"Untitled - Notes","app":"Notes","pid":4242,"x":100,"y":120,"width":800,"height":600,"focused":true,"elevated":null}]"#;
+
     fn fake(unit: &str) -> (FakeBackend, RecordingSink) {
         let sink = RecordingSink::default();
-        let scenario = FakeScenario::from_json(&format!("{{{unit}}}")).expect("scenario");
+        let sep = if unit.is_empty() { "" } else { "," };
+        let scenario = FakeScenario::from_json(&format!("{{{WINDOW_101}{sep}{unit}}}"))
+            .expect("scenario");
         (
             FakeBackend::with_parts(scenario, FakeClock::default(), sink.clone()),
             sink,
@@ -72,7 +78,7 @@ mod tests {
     #[test]
     fn an_uninterrupted_text_leaves_the_same_single_sink_line_as_post_input() {
         let (mut backend, sink) = fake("");
-        let delivery = backend.post_text("hunter2", Route::BackgroundWindow, 9, &mut |_| false);
+        let delivery = backend.post_text("hunter2", Route::BackgroundWindow { window: "101".to_owned() }, 9, &mut |_| false);
         assert_eq!((delivery.sent, delivery.of, delivery.interrupted), (7, 7, false));
         assert_eq!(
             sink.lines(),
@@ -87,7 +93,7 @@ mod tests {
         let asked = Cell::new(0);
         let delivery = backend.post_text(
             "abcdefghij",
-            Route::BackgroundWindow,
+            Route::BackgroundWindow { window: "101".to_owned() },
             1,
             &mut |b: &mut dyn Backend| {
                 asked.set(asked.get() + 1);

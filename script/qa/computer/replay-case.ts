@@ -6,6 +6,13 @@ import { access, chmod, mkdir, readdir, readFile, writeFile } from "node:fs/prom
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 export const ROOT = resolve(import.meta.dir, "../../..")
+
+// A case as its result lines and the parity ledgers name it: the repository-relative path with forward slashes on every
+// OS, else the path given.
+export function caseName(casePath: string): string {
+  const rel = relative(ROOT, casePath).replaceAll("\\", "/")
+  return rel.startsWith("..") ? casePath : rel
+}
 const PROVENANCE = join(ROOT, "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv")
 // R70bj: the scenario an imported (pinned) case is replayed with, so its bytes never change;
 // row 28 retires this table with the explicit-stop-key fixture copies.

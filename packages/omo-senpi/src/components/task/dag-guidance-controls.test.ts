@@ -5,6 +5,7 @@ import { createDagManager } from "../../../../senpi-task/src/dag/manager"
 import { controlJournal } from "../../../../senpi-task/src/dag/node-control-context"
 import { runDagTool } from "./dag-tool"
 import type { DagToolDeps } from "./dag-tool-contract"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 
 afterEach(cleanupProjects)
 
@@ -28,9 +29,8 @@ test.each([
         schedulerOptions,
         schedulers: new Map(),
         sessionId: () => "parent-1",
-        controller: () => {
-          throw new Error("guidance must not create a scheduler")
-        },
+        holdsRun: () => false,
+        reservations: createDagRunReservations(),
         adoptReentry: () => {
           throw new Error("guidance must not adopt a scheduler")
         },

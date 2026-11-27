@@ -51,6 +51,19 @@ const base64url = (base64: string): string => Buffer.from(base64, "base64").toSt
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
+/**
+ * One sign-in: its device and both private keys, with the generation the store minted for them and the account it
+ * names wherever the held one has them (#12945). A credential stored before generations existed has none until the
+ * store's next write.
+ */
+const sameIdentity = (current: Credentials | null, held: Credentials): current is Credentials =>
+  current !== null &&
+  current.device.id === held.device.id &&
+  current.signingPrivateKey === held.signingPrivateKey &&
+  current.sealingPrivateKey === held.sealingPrivateKey &&
+  (held.credentialGeneration === undefined || current.credentialGeneration === held.credentialGeneration) &&
+  (held.accountId === undefined || current.accountId === undefined || current.accountId === held.accountId)
+
 export async function signedInSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const api = serviceOrigin(options.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
   const store = options.store ?? createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
@@ -66,22 +79,54 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
       log: (line) => process.stderr.write(`${line}\n`),
     }),
   })
-  const token = () => session.accessToken()
+  // The sign-in this context holds. A credential stored before generations existed has none until the store's next
+  // write (the account write below, or a token refresh): the first one seen is taken, once, and nothing else is.
+  let held = credentials
+  // Set when the stored record turned out to be another sign-in that keeps this device and these keys.
+  let replaced = false
+  const stillHeld = (current: Credentials | null): current is Credentials => {
+    if (replaced || !sameIdentity(current, held)) return false
+    if (held.credentialGeneration === undefined && current.credentialGeneration !== undefined)
+      held = { ...held, credentialGeneration: current.credentialGeneration }
+    return true
+  }
+  // A request carries this sign-in's token or is not sent: a replacement's token never rides beside this keyring.
+  const token = () => session.accessToken(stillHeld)
   const doFetch = options.fetch ?? fetch
-  const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(await token()) })
+  const accountNamed = (answer: unknown): string | undefined => {
+    const id = isRecord(answer) && isRecord(answer["account"]) ? answer["account"]["id"] : undefined
+    return typeof id === "string" && id !== "" ? id : undefined
+  }
+  const askedWith = await token()
+  const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(askedWith) })
   if (!me.ok) {
     const body: unknown = await me.json().catch(() => null)
     const code = isRecord(body) && isRecord(body["error"]) ? body["error"]["code"] : undefined
     throw new ApiRefusal(typeof code === "string" ? code : "unknown", me.status)
   }
-  const body: unknown = await me.json()
-  const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
-  if (typeof account !== "string" || account === "")
-    throw new SignInError("The service named no account for this sign-in.")
+  const account = accountNamed(await me.json())
+  if (account === undefined) throw new SignInError("The service named no account for this sign-in.")
+  /** The account the service names for `accessToken`, or undefined when it cannot be learned. */
+  const accountOf = async (accessToken: string): Promise<string | undefined> => {
+    const answer = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(accessToken) }).catch(() => undefined)
+    return answer?.ok === true ? accountNamed(await answer.json().catch(() => null)) : undefined
+  }
+  // From here the held sign-in is this account's: the same device and keys under another account is another sign-in,
+  // also for a credential stored before accounts were recorded.
+  if (held.accountId === undefined) held = { ...held, accountId: account }
   // Every credential that can earn a sync pin names its account, so discarding its keys can retire the pin (#12280).
   await session.update(async (current) => {
-    if (current !== null && current.device.id === credentials.device.id && current.accountId === undefined)
-      await store.write({ ...current, accountId: account })
+    if (!stillHeld(current) || current.accountId !== undefined) return
+    // The stored token is not the one the account was asked with: a refresh, or a sign-in to another account that
+    // keeps this device and these keys. Only the service can tell them apart, so it is asked again before this
+    // record is named; an answer that is another account, or no answer, leaves the record alone and ends this context.
+    if (current.accessToken !== askedWith && (await accountOf(current.accessToken)) !== account) {
+      replaced = true
+      return
+    }
+    await store.write({ ...current, accountId: account })
+    // A credential stored before generations existed gets its generation from this write.
+    stillHeld(await store.readAuthoritative())
   })
   const http = {
     baseUrl: api,
@@ -89,10 +134,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
   }
   const retired = new AbortController()
-  const captured = (current: Credentials | null) =>
-    current !== null &&
-    current.device.id === credentials.device.id &&
-    current.signingPrivateKey === credentials.signingPrivateKey
   const authority: SyncOperationAuthority = {
     signal: retired.signal,
     admit: (dispatch) => {
@@ -102,7 +143,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     boundary: async (dispatch) =>
       (
         await session.update(async (current) => {
-          if (!captured(current)) retired.abort(new Error("The signed-in device is no longer current."))
+          if (!stillHeld(current)) retired.abort(new Error("The signed-in device is no longer current."))
           retired.signal.throwIfAborted()
           // Box the value: the lock is released after the synchronous dispatch, not an in-flight request.
           return { value: dispatch() }
@@ -121,6 +162,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
-    listDevices: () => listLiveDevices(session),
+    listDevices: () => listLiveDevices({ accessToken: token, request: session.request }),
   }
 }

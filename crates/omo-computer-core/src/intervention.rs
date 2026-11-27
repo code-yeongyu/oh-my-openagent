@@ -144,7 +144,7 @@ mod backend_default_tests {
             asked.set(asked.get() + 1);
             true
         };
-        let delivery = bare.post_text("hello", Route::BackgroundWindow, 7, &mut interrupt);
+        let delivery = bare.post_text("hello", Route::BackgroundWindow { window: "101".to_owned() }, 7, &mut interrupt);
         assert_eq!(
             delivery,
             TextDelivery {
@@ -164,7 +164,7 @@ mod backend_default_tests {
             refuse: true,
             ..Bare::default()
         };
-        let delivery = bare.post_text("hi", Route::BackgroundWindow, 7, &mut |_| false);
+        let delivery = bare.post_text("hi", Route::BackgroundWindow { window: "101".to_owned() }, 7, &mut |_| false);
         assert_eq!((delivery.sent, delivery.of), (0, 2));
         assert_eq!(delivery.refusal, Some(Refusal::bare(EngineCode::InputFailed)));
     }

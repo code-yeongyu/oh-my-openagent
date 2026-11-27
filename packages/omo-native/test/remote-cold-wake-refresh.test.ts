@@ -27,7 +27,7 @@ const homeWithUnit = (version: string, agentDir: string): { home: string; unit: 
   return { home, unit }
 }
 
-const refreshAt = async (home: string, version: string) => {
+const refreshAt = async (home: string, version: string, agentDir: string) => {
   const lines: string[] = []
   await refreshColdWakeAtLaunch(
     {
@@ -35,6 +35,7 @@ const refreshAt = async (home: string, version: string) => {
       isOlder: (installed) => olderRuntime(installed, version),
       platform: "linux",
       home,
+      agentDir,
     },
     (line) => lines.push(line),
   )
@@ -70,21 +71,21 @@ describe.skipIf(process.platform === "win32")("refreshing at launch", () => {
   test("a same-version unit and a non-release launch leave the unit as it is and say nothing", async () => {
     const { home, unit } = homeWithUnit("5.1.77", "/srv/profile-b/agent")
     const before = readFileSync(unit, "utf8")
-    expect(await refreshAt(home, "5.1.77")).toEqual([])
-    expect(await refreshAt(home, "dev")).toEqual([])
+    expect(await refreshAt(home, "5.1.77", "/srv/profile-b/agent")).toEqual([])
+    expect(await refreshAt(home, "dev", "/srv/profile-b/agent")).toEqual([])
     expect(readFileSync(unit, "utf8")).toBe(before)
   })
 
   test("no installed unit: nothing is written and nothing is said", async () => {
     const home = mkdtempSync(join(tmpdir(), "cwr-"))
     homes.push(home)
-    expect(await refreshAt(home, "5.1.77")).toEqual([])
+    expect(await refreshAt(home, "5.1.77", join(home, ".omo", "agent"))).toEqual([])
   })
 
   test("an older unit that cannot be rebuilt costs the launch one stderr line and keeps its text", async () => {
     const { home, unit } = homeWithUnit("5.1.75", "relative/agent")
     const before = readFileSync(unit, "utf8")
-    const lines = await refreshAt(home, "5.1.77")
+    const lines = await refreshAt(home, "5.1.77", "relative/agent")
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain("unit")
     expect(readFileSync(unit, "utf8")).toBe(before)

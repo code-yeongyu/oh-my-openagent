@@ -1,7 +1,7 @@
+import { recoverAndTurnOnSync } from "../memory-core/src/sync/account/recover-sync.ts"
 import { createRejectionCounter } from "../memory-core/src/sync/crypto/rejection.ts"
 import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts"
 import type { PasskeyAuthenticator } from "../memory-core/src/sync/recovery/ports.ts"
-import { recoverOnFreshDevice } from "../memory-core/src/sync/recovery/recover.ts"
 import { EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "./sync-cli"
 import type { SyncContext } from "./sync-context"
 import {
@@ -26,6 +26,9 @@ const noPasskeys: PasskeyAuthenticator = {
 
 const RECOVER_YOURSELF = "Run `omo sync recover` yourself in a terminal."
 const RECOVERED = "Your memory is recovered on this device and memory sync is on."
+// The same wording #14454 settled for a recovery whose switches failed: the cause, and a read-only join is not called a full recovery.
+const recoveredSyncOff = (readOnly: boolean, reason: string): string =>
+  `${readOnly ? "This device can read your recovered memory" : "Your memory is recovered on this device"}, but memory sync could not be turned on (${reason}). Run \`omo sync enable\` to turn it on.`
 const RECOVERED_READ_ONLY =
   "This device can read your recovered memory, but another step is still pending before it can write. Run `omo sync recover` again later."
 
@@ -43,8 +46,9 @@ export const recoverRefused = (dependencies: SyncCommandDependencies): boolean =
 
 export async function recover(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const surface = lazyTerminalSurface(dependencies.terminal ?? openControllingTerminal, context.account)
+  let switchFailure = "unknown error"
   try {
-    const outcome = await recoverOnFreshDevice({
+    const outcome = await recoverAndTurnOnSync({
       account: context.account,
       rpId: "",
       keyring: context.keyring,
@@ -53,12 +57,27 @@ export async function recover(dependencies: SyncCommandDependencies, context: Sy
       rejections: createRejectionCounter(),
       stateDir: context.pinDir,
       method: "phrase",
+      serviceDeviceId: context.serviceDeviceId,
+      pairing: context.pairing,
+      authority: context.authority,
+      onSwitchFailed: (error) => {
+        switchFailure = error instanceof Error ? error.message : "unknown error"
+      },
     })
     if (outcome.ok) {
+      if (outcome.sync === "off") {
+        dependencies.error(recoveredSyncOff(outcome.state !== "recovered", switchFailure))
+        return 1
+      }
       dependencies.output(outcome.state === "recovered" ? RECOVERED : RECOVERED_READ_ONLY)
       return 0
     }
     switch (outcome.reason) {
+      case "already-member":
+        dependencies.error(
+          "This device is already part of your memory sync. Run `omo sync enable` instead of recovering.",
+        )
+        return 1
       case "cancelled":
         dependencies.error("Recovery was cancelled. Nothing changed.")
         return 1

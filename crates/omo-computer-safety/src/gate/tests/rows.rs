@@ -1,8 +1,7 @@
 //! Every `(code, reason)` pair any gate or stage emits resolves through the one error table
 //! to a row that admits a refusal before send, with a next call.
 
-use omo_computer_core::error::Reason;
-use omo_computer_core::error::{NextCall, NothingSent};
+use omo_computer_core::error::{NextCall, NothingSent, Reason};
 
 use super::super::verdicts::{
     ConsentRefusal, ConsequentialRefusal, FrameRefusal, LeaseRefusal, LockRefusal,

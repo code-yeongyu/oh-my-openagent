@@ -32,7 +32,7 @@ const lastJson = (out: readonly string[]): Record<string, unknown> => {
 describe("omo remote open", () => {
   test("#given --project #when open runs #then the one open_session carries that directory and the address is printed", async () => {
     const result = await onEngine(["open", "studio", "--project", "/work/b"])
-    expect([result.code, result.out]).toEqual([REMOTE_EXIT.ok, [`${PEER}/bmV3LXNlc3Npb24ta2V5MQ`]])
+    expect([result.code, result.out]).toEqual([REMOTE_EXIT.ok, [`${PEER}/FAKE_session_key_test1`]])
     expect(result.sent("open_session").map((rpc) => rpc["cwd"])).toEqual(["/work/b"])
   })
 

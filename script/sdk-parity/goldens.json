@@ -309,5 +309,34 @@
         }
       }
     }
+  },
+  "sdk-config-status-diagnostics": {
+    "answer": {
+      "kind": "ok",
+      "value": {
+        "files": [
+          {
+            "scope": "user",
+            "exists": true,
+            "loaded": false
+          },
+          {
+            "scope": "project",
+            "exists": true,
+            "loaded": false
+          }
+        ],
+        "diagnostics": [
+          {
+            "kind": "validation",
+            "count": 1
+          },
+          {
+            "kind": "parse",
+            "count": 1
+          }
+        ]
+      }
+    }
   }
 }
