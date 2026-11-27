@@ -64,6 +64,7 @@ export class HostSessionClient {
   private identity: SenpiHostProtocolInfo | undefined
   private reattached = false
   private confirmingClose = false
+  private transportLost = false
   private openInput: HostSessionOpenInput | undefined
   private detachments = 0
   private readonly parent: ChildParentLink
@@ -186,20 +187,30 @@ export class HostSessionClient {
     this.routingId = undefined
     if (client === undefined) return false
     let answered = false
+    let lost = false
     try {
       if (routingId !== undefined) {
-        await client.closeSession(routingId)
-        answered = true
+        // A host that stops with the close in flight must settle it at the transport loss, not at
+        // the engine's 30 s request deadline (#11642).
+        answered = await Promise.race([
+          client.closeSession(routingId).then(() => true),
+          this.transportGone.then(() => false),
+        ])
       }
     } finally {
+      lost = !answered && this.transportLost
       if (this.client === client) this.client = undefined
-      // A stop failure after the host answered must not erase that answer (omo#11765).
+      // A stop failure after the host answered must not erase that answer (omo#11765); after a
+      // transport loss there is no connection left to release, so its stop failure is not one either.
       await client.stop().catch((error: unknown) => {
-        if (!answered) throw error
-        log("senpi-task host session client stop failed after an answered close", {
-          socket: this.socketPath,
-          error: String(error),
-        })
+        if (answered) {
+          log("senpi-task host session client stop failed after an answered close", {
+            socket: this.socketPath,
+            error: String(error),
+          })
+          return
+        }
+        if (!lost) throw error
       })
     }
     return answered
@@ -316,6 +327,7 @@ export class HostSessionClient {
     this.parent.close()
     this.routingId = undefined
     this.client = undefined
+    this.transportLost = true
     this.transportLoss.resolve(error)
   }
 }

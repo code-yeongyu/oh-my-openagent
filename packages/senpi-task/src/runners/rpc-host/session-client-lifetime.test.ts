@@ -18,8 +18,29 @@ async function observedWithin(signal: Promise<void>): Promise<boolean> {
 }
 
 describe("HostSessionClient connection lifetime", () => {
-  test("#given an unacknowledged close_session #when teardown detaches #then it releases the in-flight close transport", async () => {
+  test("#given the host stops with a close in flight #when the connection drops #then the close settles at the transport loss, not at the request deadline", async () => {
     const host = await harness.fakeHost()
+    const client = harness.hostClient(host)
+    await client.open(childOpenInput("/tmp/sessions/lifetime-host-gone-close.jsonl"))
+    await host.waitForConnections(1)
+    host.withholdReply("close_session")
+    const requested = host.waitForCommand("close_session")
+    const closing = client.close()
+    try {
+      await requested
+      // The host process dies before it can answer the close: the socket drops.
+      host.cutConnections()
+      const settled = await observedWithin(closing.then(() => undefined))
+      expect(settled).toBe(true)
+      expect(await closing).toBe(false)
+    } finally {
+      host.cutConnections()
+      await closing.catch(() => undefined)
+    }
+    expect(host.connections).toBe(0)
+  })
+
+  test("#given an unacknowledged close_session #when teardown detaches #then it releases the in-flight close transport", async () => {    const host = await harness.fakeHost()
     const client = harness.hostClient(host)
     await client.open(childOpenInput("/tmp/sessions/lifetime-unacknowledged-close.jsonl"))
     await host.waitForConnections(1)
