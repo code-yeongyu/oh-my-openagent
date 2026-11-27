@@ -240,6 +240,9 @@ describe("a joined device with sync on and no memory repository (#14094)", () =>
 
     // then: the joiner rejects with the creator's error, not one of its own, and the failure is not remembered
     expect(failures[0]).toBeInstanceOf(Error)
+    // The shared failure must be the creation's own mkdir EEXIST (the file where the repo directory
+    // goes), not a lock-contention error a contended path could also produce (#14236).
+    expect((failures[0] as NodeJS.ErrnoException).code).toBe("EEXIST")
     expect(failures[1]).toBe(failures[0])
     expect(retried.created).toBe(true)
     expect(commitCount(paths.repo)).toBe(1)
