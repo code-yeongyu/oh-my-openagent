@@ -82,8 +82,10 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   // The sign-in this context holds. A credential stored before generations existed has none until the store's next
   // write (the account write below, or a token refresh): the first one seen is taken, once, and nothing else is.
   let held = credentials
+  // Set when the stored record turned out to be another sign-in that keeps this device and these keys.
+  let replaced = false
   const stillHeld = (current: Credentials | null): current is Credentials => {
-    if (!sameIdentity(current, held)) return false
+    if (replaced || !sameIdentity(current, held)) return false
     if (held.credentialGeneration === undefined && current.credentialGeneration !== undefined)
       held = { ...held, credentialGeneration: current.credentialGeneration }
     return true
@@ -91,22 +93,37 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   // A request carries this sign-in's token or is not sent: a replacement's token never rides beside this keyring.
   const token = () => session.accessToken(stillHeld)
   const doFetch = options.fetch ?? fetch
-  const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(await token()) })
+  const accountNamed = (answer: unknown): string | undefined => {
+    const id = isRecord(answer) && isRecord(answer["account"]) ? answer["account"]["id"] : undefined
+    return typeof id === "string" && id !== "" ? id : undefined
+  }
+  const askedWith = await token()
+  const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(askedWith) })
   if (!me.ok) {
     const body: unknown = await me.json().catch(() => null)
     const code = isRecord(body) && isRecord(body["error"]) ? body["error"]["code"] : undefined
     throw new ApiRefusal(typeof code === "string" ? code : "unknown", me.status)
   }
-  const body: unknown = await me.json()
-  const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
-  if (typeof account !== "string" || account === "")
-    throw new SignInError("The service named no account for this sign-in.")
+  const account = accountNamed(await me.json())
+  if (account === undefined) throw new SignInError("The service named no account for this sign-in.")
+  /** The account the service names for `accessToken`, or undefined when it cannot be learned. */
+  const accountOf = async (accessToken: string): Promise<string | undefined> => {
+    const answer = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(accessToken) }).catch(() => undefined)
+    return answer?.ok === true ? accountNamed(await answer.json().catch(() => null)) : undefined
+  }
   // From here the held sign-in is this account's: the same device and keys under another account is another sign-in,
   // also for a credential stored before accounts were recorded.
   if (held.accountId === undefined) held = { ...held, accountId: account }
   // Every credential that can earn a sync pin names its account, so discarding its keys can retire the pin (#12280).
   await session.update(async (current) => {
     if (!stillHeld(current) || current.accountId !== undefined) return
+    // The stored token is not the one the account was asked with: a refresh, or a sign-in to another account that
+    // keeps this device and these keys. Only the service can tell them apart, so it is asked again before this
+    // record is named; an answer that is another account, or no answer, leaves the record alone and ends this context.
+    if (current.accessToken !== askedWith && (await accountOf(current.accessToken)) !== account) {
+      replaced = true
+      return
+    }
     await store.write({ ...current, accountId: account })
     // A credential stored before generations existed gets its generation from this write.
     stillHeld(await store.readAuthoritative())

@@ -43,6 +43,8 @@ async function context(
     readonly beforeBuild?: (secrets: Secrets) => void
     readonly whileAccountIsFetched?: (secrets: Secrets) => void
     readonly onRequest?: (request: Request) => void
+    /** The account the service names for a bearer token; every token is this context's account unless told otherwise. */
+    readonly accountOf?: (bearer: string) => string
   } = {},
 ) {
   const secrets = memorySecrets()
@@ -50,7 +52,8 @@ async function context(
     moments.onRequest?.(request)
     if (new URL(request.url).pathname !== "/v1/me") return new Response(null, { status: 404 })
     moments.whileAccountIsFetched?.(secrets)
-    return Response.json({ user: { id: "u" }, account: { id: "acct-fence" } })
+    const bearer = (request.headers.get("authorization") ?? "").replace(/^Bearer /, "")
+    return Response.json({ user: { id: "u" }, account: { id: moments.accountOf?.(bearer) ?? "acct-fence" } })
   })
   const store = secrets.store(api)
   await store.write({ ...grant, ...privateKeys })
@@ -251,4 +254,26 @@ test("#given a sync context #when another sign-in replaced the stored one #then 
   }))
   await expect(ctx.listDevices?.()).rejects.toBeInstanceOf(CredentialIdentityChanged)
   expect(paths).toEqual(["/v1/me"])
+})
+
+// #13138 third review: a record that keeps the device and keys and names no account may still be another account's
+// fresh sign-in (a machine-bound device reuses its keys). Its token changed, so the service is asked again whose it is.
+test("#given a credential with neither a generation nor an account #when a sign-in to another account on the same device and keys replaces it while the account is fetched #then that account is not overwritten and no pin write is admitted", async () => {
+  let replacement: Stored | undefined
+  const { ctx, secrets } = await context({
+    beforeBuild: (secrets) => {
+      plant(secrets, beforeGenerations)
+    },
+    whileAccountIsFetched: (secrets) => {
+      replacement = plant(secrets, (stored) => ({
+        ...stored,
+        accessToken: "other-account-access",
+        refreshToken: "other-account-refresh",
+        credentialGeneration: "generation-of-the-other-sign-in",
+      }))
+    },
+    accountOf: (bearer) => (bearer === "other-account-access" ? "acct-other" : "acct-fence"),
+  })
+  expect(storedCredential(secrets)).toEqual(replacement ?? {})
+  await expect(ctx.authority.boundary?.(() => undefined)).rejects.toThrow("no longer current")
 })
