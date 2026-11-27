@@ -96,6 +96,8 @@ function run(input: Case): Outcome {
       ENABLE_FAILS: input.enableFails ? "1" : "",
       RELEASE_BRANCH: "release/v9.9.9-source-state",
       RELEASE_REF: input.releaseRef ?? "dev",
+      // The merge wait's poll count (120 in a release); a few polls reach its timeout branch the same way.
+      RELEASE_STATE_MERGE_WAIT_ATTEMPTS: "3",
       VERSION: "9.9.9",
       GITHUB_OUTPUT: join(root, "output"),
       GITHUB_REPOSITORY: "code-yeongyu/oh-my-openagent",
@@ -129,6 +131,10 @@ describe("publish.yml release-state refusal (#15126)", () => {
     expect(result.output).toContain(
       "Timed out waiting for release-state PR #77 to merge; refusing to publish npm packages.",
     )
+    // One check read per poll: the timeout is reached only after every configured poll ran.
+    expect(
+      result.ghCalls.split("\n").filter((call) => call.startsWith("pr view 77 --json statusCheckRollup")),
+    ).toHaveLength(3)
     expect(result.armed).toBe(false)
   })
 
