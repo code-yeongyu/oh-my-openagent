@@ -70,6 +70,26 @@ export function createChainSealer(input: {
       })
       return { bytes, epoch, link, recordSig }
     },
+    appended: async (own) => {
+      const keys = keyring.publicKeys()
+      await chain.acceptOwn({
+        seq: own.seq,
+        kind: "batch",
+        account: chain.account,
+        base_seq: own.baseSeq,
+        digest: Buffer.from(own.digest, "hex").toString("base64url"),
+        epoch: own.epoch,
+        link: own.link,
+        keyring_link: null,
+        author: {
+          kind: "device",
+          id: keyring.principal().id,
+          sealing_public_key: keys.sealing,
+          signing_public_key: keys.signing,
+        },
+        record_sig: own.recordSig,
+      })
+    },
     sealedBySelf: (sealed) =>
       verifyRecordSig(keyring.publicKeys().signing, {
         account: chain.account,

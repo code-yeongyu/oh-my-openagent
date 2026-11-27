@@ -101,7 +101,7 @@ These are not phases — read them when the situation calls for them:
 4. **Never declare done on type-check/compile alone.** Types catch declaration bugs. Only running the actual user scenario catches the actual user bug.
 5. **Never ask the user a question that runtime evidence can already answer.** Escalation is for genuine ambiguity.
 6. **Never silently swallow errors while debugging.** If the system swallows errors, that is often the bug itself. Make them loud temporarily; restore at cleanup.
-7. **Never `git commit` from inside this skill.** Commits belong to `/git-master` after the user confirms the fix.
+7. **Never `git commit` from inside this skill.** Commits belong to `/git` after the user confirms the fix.
 8. **Never attach without having read the runtime reference.** The gate rule.
 </safety>
 

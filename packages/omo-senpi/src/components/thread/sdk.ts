@@ -25,6 +25,7 @@ import { locateControl } from "./control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
+import { inSendResultOrder } from "./contracts/send-result-order"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -323,7 +324,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   function named(sent: DeliveryOutcome): ThreadSdkSendResult {
     if (sent.kind !== "ok") return sent
     const { thread_id, ...facts } = sent
-    return { ...facts, thread: thread_id }
+    return inSendResultOrder({ ...facts, thread: thread_id })
   }
 
   return {

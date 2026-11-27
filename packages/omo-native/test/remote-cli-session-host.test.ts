@@ -53,7 +53,7 @@ describe("omo remote and the cold-wake unit", () => {
       uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
       status: async () => undefined,
     }
-    const { code, out, err } = await run(["enable", "--json"], undefined, SIGNED_IN, testBootstrap(), undefined, {
+    const { code, out, err } = await run(["enable", "--json"], undefined, SIGNED_IN, testBootstrap(), {
       coldWake: failing,
     })
     expect(code).toBe(REMOTE_EXIT.ok)
@@ -110,9 +110,9 @@ describe("omo remote enable: the one command after sign-in", () => {
       uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
       status: async () => local,
     }
-    const json = await run(["status", "--json"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
+    const json = await run(["status", "--json"], undefined, SIGNED_IN, testBootstrap(), { coldWake })
     expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0", local })
-    const human = await run(["status"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
+    const human = await run(["status"], undefined, SIGNED_IN, testBootstrap(), { coldWake })
     expect(human.out.some((line) => line.startsWith("Session host") && line.includes("pinned"))).toBe(true)
   })
 })
@@ -144,20 +144,20 @@ describe("omo remote enable links a sign-in the service has not seen", () => {
 
   test("hands the signed-in device to a service that holds none, so the device ends connected", async () => {
     const { owner, reads, linkDevice } = await serviceWithoutDevice(false)
-    const { code } = await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, { linkDevice })
+    const { code } = await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), { linkDevice })
     expect(code).toBe(REMOTE_EXIT.ok)
     expect([reads, owner.state.adoptions, owner.state.status.device?.id]).toEqual([["credential"], 1, "dev-self"])
   })
 
   test("reads no credential when the service already holds a device", async () => {
     const { owner, reads, linkDevice } = await serviceWithoutDevice(true)
-    await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, { linkDevice })
+    await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), { linkDevice })
     expect([reads, owner.state.adoptions]).toEqual([[], 0])
   })
 
   test("says to sign in when there is no signed-in session to hand over", async () => {
     const { owner } = await serviceWithoutDevice(false)
-    const { code, err } = await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), undefined, {
+    const { code, err } = await run(["enable"], owner.stateDir, SIGNED_IN, testBootstrap(), {
       linkDevice: async () => "signed_out",
     })
     expect([code, err.length, owner.state.adoptions]).toEqual([REMOTE_EXIT.ok, 1, 0])
