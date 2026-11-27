@@ -114,7 +114,7 @@ For EACH batch, fire a deep agent:
 ```
 task(
   category="deep",
-  load_skills=["programming", "git-master"],
+  load_skills=["programming", "git"],
   run_in_background=true,
   description="Remove dead code batch N: [brief description]",
   prompt="[see template below]"
