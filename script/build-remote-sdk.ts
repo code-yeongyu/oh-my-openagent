@@ -147,50 +147,70 @@ async function declarations(): Promise<Artifacts> {
 }
 
 /**
- * Every path where what a commit ships differs from the build: an artifact git does not track (missing, or written but
- * never added), one with other bytes, or a tracked file in the types tree the build no longer emits.
+ * Every path where what a commit ships differs from the build: an artifact git's index does not hold (missing, or written
+ * but never added), one whose indexed bytes differ, or an indexed file in the types tree the build no longer emits. The
+ * working tree is never read: an install's prepare build rewrites it, so it would always look current.
  */
 export function staleArtifacts(
   artifacts: ReadonlyMap<string, string>,
   typesRoot: string,
-  tracked: ReadonlySet<string>,
+  indexed: ReadonlyMap<string, string>,
 ): string[] {
-  const extra = new Set([...tracked].filter((path) => path.startsWith(`${typesRoot}/`)))
+  const extra = new Set([...indexed.keys()].filter((path) => path.startsWith(`${typesRoot}/`)))
   const differing = [...artifacts]
     .filter(([path, text]) => {
       extra.delete(path)
-      return !tracked.has(path) || !existsSync(path) || readFileSync(path, "utf8") !== text
+      return indexed.get(path) !== text
     })
     .map(([path]) => path)
   return [...differing, ...extra]
 }
 
-/** The files git tracks under `dir`, as absolute paths: the outputs a commit ships, whatever else is on disk. */
-async function trackedFiles(dir: string): Promise<Set<string>> {
-  const git = Bun.spawn(["git", "ls-files", "-z", "--", relative(root, dir)], {
-    cwd: root,
+async function git(repo: string, args: readonly string[], input?: string): Promise<Buffer> {
+  const run = Bun.spawn(["git", ...args], {
+    cwd: repo,
+    stdin: input === undefined ? "ignore" : new TextEncoder().encode(input),
     stdout: "pipe",
     stderr: "pipe",
   })
   const [stdout, stderr, code] = await Promise.all([
-    new Response(git.stdout).text(),
-    new Response(git.stderr).text(),
-    git.exited,
+    new Response(run.stdout).arrayBuffer(),
+    new Response(run.stderr).text(),
+    run.exited,
   ])
-  if (code !== 0) throw new Error(`git ls-files failed (${code}): ${stderr}`)
-  return new Set(
-    stdout
-      .split("\0")
-      .filter((path) => path !== "")
-      .map((path) => join(root, path)),
-  )
+  if (code !== 0) throw new Error(`git ${args[0]} failed (${code}): ${stderr}`)
+  return Buffer.from(stdout)
+}
+
+/** The bytes git's index holds for every file under `dir`, keyed by absolute path: what a commit ships. */
+export async function indexedFiles(repo: string, dir: string): Promise<Map<string, string>> {
+  // `ls-files -s -z`: "<mode> <blob> <stage>\t<path>" per entry; the blobs' bytes come back from one cat-file batch.
+  const entries = (await git(repo, ["ls-files", "-s", "-z", "--", relative(repo, dir)]))
+    .toString("utf8")
+    .split("\0")
+    .filter((entry) => entry !== "")
+    .map((entry) => {
+      const tab = entry.indexOf("\t")
+      return { blob: entry.slice(0, tab).split(" ")[1] ?? "", path: join(repo, entry.slice(tab + 1)) }
+    })
+  if (entries.length === 0) return new Map()
+  const batch = await git(repo, ["cat-file", "--batch"], `${entries.map((e) => e.blob).join("\n")}\n`)
+  const indexed = new Map<string, string>()
+  let at = 0
+  for (const { path } of entries) {
+    const header = batch.indexOf(0x0a, at)
+    const size = Number(batch.subarray(at, header).toString("utf8").split(" ")[2])
+    indexed.set(path, batch.subarray(header + 1, header + 1 + size).toString("utf8"))
+    at = header + 1 + size + 1
+  }
+  return indexed
 }
 
 export async function buildRemoteSdk(check = false): Promise<void> {
   const artifacts = await declarations()
   artifacts.set(join(lib, "remote-sdk.generated.js"), await bundle())
   if (check) {
-    const stale = staleArtifacts(artifacts, join(lib, TYPES_DIR), await trackedFiles(lib))
+    const stale = staleArtifacts(artifacts, join(lib, TYPES_DIR), await indexedFiles(root, lib))
     if (stale.length > 0) {
       const listed = stale.map((path) => relative(root, path)).join("\n  ")
       throw new Error(`Remote SDK bundle is stale; run bun script/build-remote-sdk.ts\n  ${listed}`)

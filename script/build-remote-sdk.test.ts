@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } fr
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
-import { buildRemoteSdk, staleArtifacts } from "./build-remote-sdk"
+import { buildRemoteSdk, indexedFiles, staleArtifacts } from "./build-remote-sdk"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const lib = join(root, "packages/omo-native/bin/lib")
@@ -74,52 +74,45 @@ describe("omo-ai/remote build", () => {
     await buildRemoteSdk(true)
   })
 
-  const SHIPPED = ["types/a.d.ts", "bundle.js"] as const
-  // --check on a checkout without the generated outputs (a car whose train top generates them) must report them
-  // stale, not crash walking the absent types tree.
+  // --check judges what a commit ships, git's index, never the working tree (#15186): a car checkout without the
+  // generated outputs reports them stale instead of crashing, and an install's prepare build that rewrote the tree
+  // cannot make stale committed bytes look current.
+  const BUILT = { "types/a.d.ts": "export {}\n", "bundle.js": "new" } as const
   test.each([
-    ["current", (_: string) => {}, SHIPPED, []],
-    [
-      "the types tree absent",
-      (dir: string) => rmSync(join(dir, "types"), { recursive: true }),
-      SHIPPED,
-      ["types/a.d.ts"],
-    ],
-    [
-      "an artifact with other bytes",
-      (dir: string) => writeFileSync(join(dir, "bundle.js"), "old"),
-      SHIPPED,
-      ["bundle.js"],
-    ],
-    ["a declaration built but never added to git", (_: string) => {}, ["bundle.js"], ["types/a.d.ts"]],
-    [
-      "a tracked declaration the build no longer emits",
-      (dir: string) => writeFileSync(join(dir, "types/gone.d.ts"), ""),
-      [...SHIPPED, "types/gone.d.ts"],
-      ["types/gone.d.ts"],
-    ],
-    [
-      "an untracked leftover the build no longer emits",
-      (dir: string) => writeFileSync(join(dir, "types/gone.d.ts"), ""),
-      SHIPPED,
-      [],
-    ],
-  ] as const)("#given %s #when checked #then the stale paths are listed", (_, mutate, tracked, expected) => {
-    const dir = mkdtempSync(join(tmpdir(), "omo-remote-sdk-stale-"))
+    ["current", BUILT, []],
+    ["nothing indexed (a car without the outputs)", {}, ["types/a.d.ts", "bundle.js"]],
+    ["an artifact indexed with other bytes", { ...BUILT, "bundle.js": "old" }, ["bundle.js"]],
+    ["a declaration built but never added", { "bundle.js": "new" }, ["types/a.d.ts"]],
+    ["an indexed declaration the build no longer emits", { ...BUILT, "types/gone.d.ts": "" }, ["types/gone.d.ts"]],
+  ] as const)("#given %s #when compared #then the stale paths are listed", (_, index, expected) => {
+    const at = (path: string) => join("/repo", path)
+    const artifacts = new Map(Object.entries(BUILT).map(([path, text]) => [at(path), text]))
+    const indexed = new Map(Object.entries(index).map(([path, text]) => [at(path), text]))
+    expect(staleArtifacts(artifacts, at("types"), indexed).map((path) => relative("/repo", path))).toEqual([
+      ...expected,
+    ])
+  })
+
+  test("#given stale bytes committed and fresh bytes rebuilt but not committed #when the index is read #then the output is stale", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "omo-remote-sdk-index-"))
     try {
-      mkdirSync(join(dir, "types"))
-      const artifacts = new Map([
-        [join(dir, "types/a.d.ts"), "export {}\n"],
-        [join(dir, "bundle.js"), "new"],
-      ])
-      for (const [path, text] of artifacts) writeFileSync(path, text)
-      mutate(dir)
-      const trackedPaths = new Set(tracked.map((path) => join(dir, path)))
-      expect(staleArtifacts(artifacts, join(dir, "types"), trackedPaths).map((path) => relative(dir, path))).toEqual([
-        ...expected,
+      const run = (...args: string[]) => {
+        const done = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: repo })
+        expect(done.exitCode).toBe(0)
+      }
+      run("init", "-q")
+      mkdirSync(join(repo, "lib/types"), { recursive: true })
+      writeFileSync(join(repo, "lib/types/a.d.ts"), "export {} // stale\n")
+      run("add", "-A")
+      run("commit", "-q", "-m", "stale")
+      writeFileSync(join(repo, "lib/types/a.d.ts"), "export {}\n")
+      const artifacts = new Map([[join(repo, "lib/types/a.d.ts"), "export {}\n"]])
+      const indexed = await indexedFiles(repo, join(repo, "lib"))
+      expect(staleArtifacts(artifacts, join(repo, "lib/types"), indexed).map((path) => relative(repo, path))).toEqual([
+        "lib/types/a.d.ts",
       ])
     } finally {
-      rmSync(dir, { recursive: true, force: true })
+      rmSync(repo, { recursive: true, force: true })
     }
   })
 
