@@ -1,6 +1,6 @@
 export { type ApproveOutcome, approveDevice } from "./approve.ts"
 export { deviceKeyringFromMaterial } from "./device-keyring.ts"
-export { type DisableOutcome, disableSync } from "./device-switch.ts"
+export { type DisableOutcome, disableSync, turnDeviceSyncOn } from "./device-switch.ts"
 export { type EnableOutcome, type EnableSyncInput, enableSync } from "./enable.ts"
 export type {
   GenesisBridge,
