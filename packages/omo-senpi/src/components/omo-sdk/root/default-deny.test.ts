@@ -81,4 +81,12 @@ describe("default deny at the root's boundary", () => {
       details: { reason: "no_matrix_cell" },
     })
   })
+
+  // Review of #14983 at 699c480398 (MEDIUM 1, security): a kind outside the matrix's five never reads an inherited
+  // Object.prototype member as its cell; every boundary line refuses it.
+  test("#given a principal kind the matrix has no cell for #when the boundary is computed #then the calls refused to every principal stay refused", () => {
+    const refused = boundaryRefusals({ kind: "__proto__" } as never, {})
+    expect(refused.get("devices.rename")?.code).toBe("sender_not_allowed")
+    expect(refused.get("account.signIn")?.code).toBe("sender_not_allowed")
+  })
 })

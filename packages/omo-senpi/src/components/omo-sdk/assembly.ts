@@ -1,17 +1,14 @@
-import { userInfo } from "node:os"
-
 import { createAccountAccess } from "./access"
 import type { OmoSdk, OmoSdkOptions } from "./options"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
+import { rootPrincipal } from "./root-principal"
 import { type CoreLoaders, LAUNCHER_NAMESPACES } from "./root/members"
 import { shippedNamespaces } from "./root/shipped"
 import { threadsServing } from "./thread-assembly"
 
 /** What only the entry that ships the launcher library sets; never part of the public options (design 4.1). */
 export type OmoSdkAssembly = { readonly cores?: CoreLoaders }
-
-const processUid = (): number => process.getuid?.() ?? userInfo().uid
 
 /** Launcher-side cores are the shipping entry's to set; a caller's own value is not taken by any public entry. */
 export function refuseCallerCores(options: object): void {
@@ -37,7 +34,7 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
   const ports = options.ports ?? {}
   const cores = assembly.cores ?? {}
   assertLauncherCores(cores)
-  const principal = options.principal ?? { kind: "script", uid: options.uid ?? processUid() }
+  const principal = rootPrincipal(options)
   const access = createAccountAccess({ ...(options.api === undefined ? {} : { api: options.api }), env, cwd, ports })
   const shipped = shippedNamespaces({
     access,

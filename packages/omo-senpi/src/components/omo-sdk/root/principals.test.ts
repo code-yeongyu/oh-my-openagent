@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import type { OmoPrincipal } from "../contract"
 import { createOmoSdk } from ".."
+import { assembleThreadFacade } from "../thread-assembly"
 
 // Design lane ruling (P1b, point 4): a root built for a session or a connector serves no thread cell the matrix
 // allows it until the slice that moves that authority under the root (T2, X1b); those cells answer not_implemented,
@@ -37,4 +38,20 @@ describe("thread cells by principal", () => {
     await root.dispose()
     rmSync(agentDir, { recursive: true, force: true })
   })
+})
+
+// Review of #14983 at 699c480398 (MEDIUM 1, security): a root is built for exactly one of the five principals of the
+// security design's section 3. Any other value is refused when the root is built, on both entries, never served.
+describe("a root built for a value that is not one of the five principals", () => {
+  const invalid: readonly unknown[] = [
+    { kind: "__proto__" },
+    { kind: "constructor" },
+    { kind: "person", uid: -5 },
+    { kind: "service", extra: true },
+  ]
+  for (const principal of invalid)
+    test(`#given ${JSON.stringify(principal)} #when either root is built #then it throws a TypeError`, () => {
+      expect(() => createOmoSdk({ env: {}, cwd: tmpdir(), principal } as never)).toThrow(TypeError)
+      expect(() => assembleThreadFacade({ env: {}, cwd: tmpdir(), principal } as never)).toThrow(TypeError)
+    })
 })

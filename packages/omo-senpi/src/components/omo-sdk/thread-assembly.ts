@@ -6,11 +6,10 @@ import type { OmoSdkOptions } from "./options"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
 import { threadsNamespace } from "./root/threads"
+import { processUid, rootPrincipal } from "./root-principal"
 
 // The thread half of the root, on its own: what the standalone thread SDK runtime (plugin/runtime/thread-sdk) reaches.
 // It imports no other namespace's core, so that bundle inlines what it did before the root existed.
-
-const processUid = (): number => process.getuid?.() ?? userInfo().uid
 
 export function threadsServing(
   options: OmoSdkOptions,
@@ -49,7 +48,7 @@ export type FacadeInternals = { readonly releaseLocated: ReturnType<typeof threa
 export function assembleThreadFacade(options: OmoSdkOptions): { readonly root: OmoSdkRoot } & FacadeInternals {
   const env = options.env ?? process.env
   const cwd = options.cwd ?? process.cwd()
-  const principal = options.principal ?? { kind: "script", uid: options.uid ?? processUid() }
+  const principal = rootPrincipal(options)
   const threads = threadsServing(options, env, cwd, principal, false)
   const root = assembleRoot([threads], {}, { env, cwd, principal }, boundaryRefusals(principal, options))
   return { root, releaseLocated: threads.releaseLocated }
