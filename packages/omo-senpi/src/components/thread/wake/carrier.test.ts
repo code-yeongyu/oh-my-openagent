@@ -366,6 +366,25 @@ describe("the carrier lifts, reads finished, and hands back", () => {
   })
 })
 
+// Production case (2026-11-27): an interactive session whose engine paused its stale goal waits on human kinds
+// `goal_paused` and `stalled`, with no dialog open. A delivery is the input that resumes it; it is no person's wait.
+describe("a paused goal is not a person's wait", () => {
+  test("#given a session whose only waits are goal_paused and stalled, with no dialog #when a queued row wakes it #then it opens and the engine's wake is sent", async () => {
+    const { fake, store, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), {
+      ...STALLED,
+      lifecycle: {
+        state: "waiting_human",
+        waitingOn: { children: 0, background: [], human: [{ kind: "goal_paused" }, { kind: "stalled" }] },
+      },
+    })
+
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
+    expect(sent(fake, "wake")).toHaveLength(1)
+    expect(await store.sessionWait.read({ durable_id: "s1" })).toBeUndefined()
+  })
+})
+
 describe("waiting for a person (A3.2.6)", () => {
   test("#given an approval that arose after admission #when 30 minutes pass with only the carrier attached #then the state is read again and close_session ends it", async () => {
     const { h, fake, store, carrier, path } = await setup()
