@@ -1,10 +1,14 @@
-import { expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
+import { expect, setDefaultTimeout, test } from "bun:test"
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { RpcClient } from "../../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/rpc-client.js"
 import { resolveSenpi } from "../bin/lib/package-paths.js"
+import { createDaemonTestRunner, TREE_BOUNDED_TEST_TIMEOUT_MS } from "./daemon-test-runner"
+
+// Like the other real-engine suites, each engine call is bounded by its process tree's progress; bun's timeout is
+// only the outer bound (a loaded host stretches two cold engine starts past the 20 s suite default).
+setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
 
 test.skipIf(process.platform === "win32")(
   "npm ensure opens a real session with thread_send; a live bare primary is reported, not killed",
@@ -25,14 +29,14 @@ test.skipIf(process.platform === "win32")(
       OMO_CODING_AGENT_DIR: agent,
       SENPI_CODING_AGENT_DIR: agent,
     }
-    const call = (entry: string, ...args: string[]) =>
-      spawnSync("node", [entry, ...args], { env, cwd: home, encoding: "utf8", timeout: 90_000 })
+    const runner = createDaemonTestRunner()
+    const call = (entry: string, ...args: string[]) => runner.run("node", [entry, ...args], env)
     let pid: number | undefined
     let client: RpcClient | undefined
-    const stop = () => {
+    const stop = async () => {
       if (pid === undefined) return
-      const result = call(engine, "host", "stop", "--socket", socket, "--drain", "--wait-ms", "10000")
-      if (result.status !== 0 || JSON.parse(result.stdout).exited !== true) {
+      const result = await call(engine, "host", "stop", "--socket", socket, "--drain", "--wait-ms", "10000")
+      if (result.exitCode !== 0 || JSON.parse(result.stdout).exited !== true) {
         try {
           process.kill(pid, "SIGTERM")
         } catch (e) {
@@ -55,8 +59,8 @@ test.skipIf(process.platform === "win32")(
       export default pi => pi.rpc.handle("fixture.tools", async () => pi.getAllTools().map(tool => tool.name))
     `,
       )
-      const started = call(launcher, "host", "ensure", "--json")
-      expect(started.status, started.stderr + started.stdout).toBe(0)
+      const started = await call(launcher, "host", "ensure", "--json")
+      expect(started.exitCode, started.stderr + started.stdout).toBe(0)
       pid = JSON.parse(started.stdout).pid
       client = new RpcClient({ socketPath: socket, keyRoot: agent })
       await client.start()
@@ -65,14 +69,14 @@ test.skipIf(process.platform === "win32")(
       await client.closeSession()
       await client.stop()
       client = undefined
-      stop()
+      await stop()
 
-      const bare = call(engine, "host", "ensure", "--socket", socket, "--json")
-      expect(bare.status, bare.stderr + bare.stdout).toBe(0)
+      const bare = await call(engine, "host", "ensure", "--socket", socket, "--json")
+      expect(bare.exitCode, bare.stderr + bare.stdout).toBe(0)
       const identity = JSON.parse(bare.stdout)
       pid = identity.pid
-      const reused = call(launcher, "host", "ensure", "--policy", "never", "--json")
-      expect(reused.status, reused.stdout + reused.stderr).toBe(3)
+      const reused = await call(launcher, "host", "ensure", "--policy", "never", "--json")
+      expect(reused.exitCode, reused.stdout + reused.stderr).toBe(3)
       expect(JSON.parse(reused.stdout)).toMatchObject({
         action: "refuse",
         reason: "primary_without_product_plugin",
@@ -84,8 +88,9 @@ test.skipIf(process.platform === "win32")(
         await client?.stop()
       } finally {
         try {
-          stop()
+          await stop()
         } finally {
+          runner.killChildren()
           rmSync(home, { recursive: true, force: true })
         }
       }
