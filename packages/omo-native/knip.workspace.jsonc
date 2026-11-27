@@ -33,6 +33,7 @@
         "test/process-tree-cpu.ts",
         "test/daemon-test-support.ts",
         "test/keychain-helper.test-support.ts",
+        "test/sync-cli-recover.test-support.ts",
         "test/fixtures/compiled-setup/entry.ts",
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
