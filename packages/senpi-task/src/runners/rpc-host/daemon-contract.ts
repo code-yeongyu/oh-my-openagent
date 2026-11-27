@@ -61,15 +61,24 @@ export class HostUnavailableError extends Error {
   // The refused spec's path, computed by omo itself (never child output), so the public start
   // failure can name the file and its fix.
   readonly launchSpecPath?: string
+  // The host lacks `session_persona` and the child carries instructions or a tool policy (#13057): a recorded
+  // child is refused with its own reason, so its parent can tell it apart from any other incompatible host.
+  readonly personaUnsupported?: true
 
   constructor(
     reason: HostUnavailableReason,
-    options: { readonly fallbackAllowed: boolean; readonly detail?: string; readonly launchSpecPath?: string },
+    options: {
+      readonly fallbackAllowed: boolean
+      readonly detail?: string
+      readonly launchSpecPath?: string
+      readonly personaUnsupported?: true
+    },
   ) {
     super(`task daemon unavailable (${reason})${options.detail === undefined ? "" : `: ${options.detail}`}`)
     this.reason = reason
     this.fallbackAllowed = options.fallbackAllowed
     if (options.launchSpecPath !== undefined) this.launchSpecPath = options.launchSpecPath
+    if (options.personaUnsupported === true) this.personaUnsupported = true
   }
 }
 

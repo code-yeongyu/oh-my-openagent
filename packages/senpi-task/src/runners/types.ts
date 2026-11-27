@@ -19,7 +19,17 @@ export type RpcSpawnSpec = {
   readonly memberEnv?: Readonly<Record<string, string>>
 }
 
-export type RpcRunnerSpec = {
+// The agent persona an out-of-process child must get, as an in-process child gets it through its
+// session options: as senpi flags for its own process (rpc/persona-args.ts), or as
+// `open_session.persona` for a daemon-hosted session (rpc-host/session-transport.ts).
+export type RpcPersona = {
+  readonly instructions?: string
+  readonly toolAllowlist?: readonly string[]
+  readonly toolDenylist?: readonly string[]
+  readonly memberScopedToolNames?: readonly string[]
+}
+
+export type RpcRunnerSpec = RpcPersona & {
   readonly taskStoreDir?: string
   readonly task_id: string
   readonly cwd: string

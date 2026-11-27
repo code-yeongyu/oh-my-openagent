@@ -22,6 +22,23 @@ function openPayloads(commands: readonly FakeHostCommand[]): readonly Record<str
 }
 
 describe("a daemon-hosted child's persona (#13057)", () => {
+  // The wire never confuses "no allowlist" (every tool) with "an empty allowlist" (no tools).
+  test.each([
+    ["no allowlist", { toolDenylist: [DENIED] }, { excludeTools: [DENIED] }],
+    ["an empty allowlist", { toolAllowlist: [] }, { tools: [] }],
+  ] as const)("#given %s #when the open request is built #then the persona says exactly that", async (_case, spec, wire) => {
+    // given
+    const host = await fakeHost({ capabilities: PERSONA_CAPABLE })
+    const runner = runnerOver(host)
+
+    // when
+    const handle = await runner.start(childSpec(spec))
+
+    // then
+    expect(openPayloads(host.commands)[0]?.["persona"]).toEqual(wire)
+    await handle.terminate()
+  })
+
   test("#given a host that holds a session persona #when a child with a tool policy starts #then open_session carries its instructions, allowlist and denylist", async () => {
     // given
     const host = await fakeHost({ capabilities: PERSONA_CAPABLE })
@@ -107,7 +124,9 @@ describe("a daemon-hosted child's persona (#13057)", () => {
     )
 
     // then
-    await expect(revived).rejects.toMatchObject({ failure: { kind: "host_unavailable" } })
+    await expect(revived).rejects.toMatchObject({
+      failure: { kind: "host_unavailable", reason: "host_persona_unsupported" },
+    })
     expect(fallback.starts).toHaveLength(0)
     expect(openPayloads(host.commands)).toHaveLength(0)
   })

@@ -12,6 +12,15 @@ export function recordedEndpointFailure(
   error: unknown,
   socket: string | undefined,
 ): RunnerError {
+  if (error instanceof HostUnavailableError && error.personaUnsupported === true) {
+    notice("host_incompatible", socket)
+    return new RunnerError({
+      kind: "host_unavailable",
+      reason: "host_persona_unsupported",
+      message: error.message,
+      cause: error,
+    })
+  }
   if (isHostIncompatible(error)) {
     notice("host_incompatible", socket)
     return new RunnerError({

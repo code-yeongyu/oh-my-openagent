@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { RunnerError } from "../runners/in-process/runner-error"
 import { PersonaTooLargeError } from "../runners/rpc/persona-args"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, type TaskRecord } from "../state"
@@ -60,5 +61,29 @@ describe("process respawn keeps the persona or fails closed", () => {
     // then
     expect(result).toMatchObject({ ok: false, disposition: "unrecoverable", code: "respawn_failed" })
     expect(fixture.starts[0]?.toolDenylist).toEqual(["write", "edit"])
+  })
+
+  test("#given a v1 process record with instructions #when it is respawned fresh #then the child is started with its instructions and the record's denylist", async () => {
+    // given
+    const fixture = harness({ version: 1, cwd: "/tmp", prompt: "review", instructions: "SYNTHETIC-PERSONA" }, refuse(new Error("stop after the launch spec is captured")))
+
+    // when
+    await fixture.manager.respawn(fixture.record, undefined)
+
+    // then
+    expect(fixture.starts[0]).toMatchObject({ instructions: "SYNTHETIC-PERSONA", toolDenylist: ["write", "edit"] })
+  })
+
+  test("#given a recorded host that cannot hold the persona #when the child resumes #then it waits, retryable, under its own reason and is launched nowhere else", async () => {
+    // given
+    const refusal = new RunnerError({ kind: "host_unavailable", reason: "host_persona_unsupported", message: "missing session_persona" })
+    const fixture = harness({ version: 1, cwd: "/tmp", prompt: "review" }, refuse(refusal))
+
+    // when
+    const result = await fixture.manager.respawn(fixture.record, "/tmp/persona-resume.jsonl")
+
+    // then
+    expect(result).toMatchObject({ ok: false, disposition: "retryable", code: "host_persona_unsupported" })
+    expect(fixture.starts).toHaveLength(1)
   })
 })

@@ -16,7 +16,8 @@ export function classifyResumeFailure(error: unknown): RespawnResult {
 export function hostRefusal(error: unknown): RespawnResult | undefined {
   if (!RunnerError.is(error) || error.failure.kind !== "host_unavailable") return undefined
   const { reason, message } = error.failure
-  if (reason !== "store_index_unavailable" && reason !== "host_incompatible") return undefined
+  if (reason !== "store_index_unavailable" && reason !== "host_incompatible" && reason !== "host_persona_unsupported")
+    return undefined
   return failure("retryable", reason, message)
 }
 

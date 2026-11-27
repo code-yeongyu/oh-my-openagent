@@ -33,7 +33,7 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
       detail: "the daemon accepts connections but did not answer get_protocol_info",
     })
   }
-  const identity = assertHostUsable(probed, input.retryFallback)
+  const identity = assertHostUsable(probed, input.retryFallback, input.persona)
   const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
   client.onEvent(ports.onEvent)
   await client.start()
