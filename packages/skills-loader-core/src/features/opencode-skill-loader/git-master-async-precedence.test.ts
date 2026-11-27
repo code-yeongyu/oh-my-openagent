@@ -32,10 +32,14 @@ afterEach(() => {
   }
 })
 
-function createConfiguredGitMasterSkill(content: string): void {
-  const exactDir = join(testConfigDir, "skills", "git-master")
+function createConfiguredSkill(name: string, content: string): void {
+  const exactDir = join(testConfigDir, "skills", name)
   mkdirSync(exactDir, { recursive: true })
-  writeFileSync(join(exactDir, "SKILL.md"), `---\nname: git-master\ndescription: exact git master\n---\n${content}`)
+  writeFileSync(join(exactDir, "SKILL.md"), `---\nname: ${name}\ndescription: exact ${name}\n---\n${content}`)
+}
+
+function createConfiguredGitMasterSkill(content: string): void {
+  createConfiguredSkill("git-master", content)
 }
 
 describe("git-master async precedence", () => {
@@ -49,6 +53,18 @@ describe("git-master async precedence", () => {
     // then: configured skill wins over the builtin
     expect(result).not.toBeNull()
     expect(result).toContain("custom git master content")
+  })
+
+  it("#given custom git and git-master skills in one root #when each name is resolved #then each request gets its own exact skill", async () => {
+    createConfiguredSkill("git", "custom git content")
+    createConfiguredGitMasterSkill("custom git master content")
+
+    const legacy = await resolveSkillContentAsync("git-master")
+    const canonical = await resolveSkillContentAsync("git")
+
+    expect(legacy).toContain("custom git master content")
+    expect(legacy).not.toContain("custom git content")
+    expect(canonical).toContain("custom git content")
   })
 
   it("prefers configured git-master over builtin git-master in batch", async () => {

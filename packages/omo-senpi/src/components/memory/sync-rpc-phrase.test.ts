@@ -4,20 +4,51 @@ import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
 
 afterEach(disposeSyncRpcFixtures)
 
-const gate = (enabled: boolean): PhraseGate => ({ enabled, serviceFloor: async () => "on", refused: () => undefined })
+const gate = (enabled: boolean, floor: PhraseGate["serviceFloor"] = async () => "on"): PhraseGate => ({
+  enabled,
+  ...(floor === undefined ? {} : { serviceFloor: floor }),
+  refused: () => undefined,
+})
 
-test("#given the phrase flag off or on #when features is asked #then phrase-genesis is listed only while the flag is on (amendment A1)", async () => {
-  const off = await setup({ phraseGate: gate(false) })
-  expect(await off.call("features", owner("a").context)).toEqual({
-    features: ["enable-method", "acknowledge", "disable"],
+test("#given the service floor for the signed-in account #when features is asked #then phrase-genesis is listed only while the service answers on (#14432)", async () => {
+  const without = ["enable-method", "acknowledge", "disable"]
+  const seen: unknown[] = []
+  const on = await setup({
+    phraseGate: gate(true, async (chain) => {
+      seen.push(chain)
+      return "on"
+    }),
   })
-  const absent = await setup()
-  expect(await absent.call("features", owner("a").context)).toEqual({
-    features: ["enable-method", "acknowledge", "disable"],
-  })
-  const on = await setup({ phraseGate: gate(true) })
   expect(await on.call("features", owner("a").context)).toEqual({
     features: ["enable-method", "phrase-genesis", "acknowledge", "disable"],
+  })
+  expect(seen.length).toBe(1)
+  for (const floor of [
+    async () => "off" as const,
+    async () => "unknown" as const,
+    async () => {
+      throw new Error("unreachable")
+    },
+  ]) {
+    const f = await setup({ phraseGate: gate(true, floor) })
+    expect(await f.call("features", owner("a").context)).toEqual({ features: without })
+  }
+  expect(await (await setup({ phraseGate: gate(false) })).call("features", owner("a").context)).toEqual({
+    features: without,
+  })
+  expect(await (await setup()).call("features", owner("a").context)).toEqual({ features: without })
+})
+
+test("#given a floor read that never answers #when features is asked #then it answers within the floor timeout without phrase-genesis (review L1)", async () => {
+  const hung: PhraseGate = {
+    enabled: true,
+    serviceFloor: () => new Promise(() => {}),
+    floorTimeoutMs: 5,
+    refused: () => undefined,
+  }
+  const f = await setup({ phraseGate: hung })
+  expect(await f.call("features", owner("a").context)).toEqual({
+    features: ["enable-method", "acknowledge", "disable"],
   })
 })
 
@@ -109,4 +140,15 @@ test("#given an unresolved local phrase read and a verified-chain reader #when s
   expect(status).toMatchObject({ phraseVoid: { purpose: "enroll" } })
   expect(status).not.toHaveProperty("phraseUnresolved")
   expect(seen.length).toBe(1)
+})
+
+test("#given the engine refuses phrase creation naming devices to update #when enable answers over RPC #then the device labels reach the wire (per-account phrase gate)", async () => {
+  const f = await setup()
+  const devices = [{ label: "Work MacBook", kind: "desktop", platform: "macos", lastSyncAt: "2026-11-19T10:00:00Z" }]
+  f.runtime.enableSync = async () => ({ kind: "phrase_unavailable", reason: "service-floor-off", devices })
+  expect(await f.call("enable", owner("a").context, { method: "phrase" })).toEqual({
+    kind: "phrase_unavailable",
+    reason: "service-floor-off",
+    devices,
+  })
 })

@@ -25,7 +25,7 @@ The `skill` tool. Dual purpose: (1) load a skill by name to inject its SKILL.md 
 ## EXECUTION FLOW
 
 ```
-skill(name="git-master")
+skill(name="git")
   -> matchSkillByName()    # exact, then short-name
   -> ask(permission)       # host skill permission gate
   -> extractSkillBody()    # load SKILL.md content

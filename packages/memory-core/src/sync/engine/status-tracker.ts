@@ -41,6 +41,11 @@ export class StatusTracker {
     return this.shown?.failure.kind === "offline"
   }
 
+  /** Whether the latest cycle was refused by the service's client floor: the engine starts no cycle but a slow recheck then. */
+  updateRequired(): boolean {
+    return this.failing?.failure.kind === "client_update_required"
+  }
+
   succeeded(): void {
     this.failing = null
     this.shown = null
