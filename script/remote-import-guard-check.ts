@@ -14,7 +14,9 @@ export type GuardRules = {
   readonly s3: {
     readonly surface: (file: string) => boolean
     readonly layers: readonly string[]
-    readonly entry: string
+    readonly entries: readonly string[]
+    /** Declaration surfaces: they may reach `reaches` through type-only imports, and no other layer. */
+    readonly declarations: { readonly files: ReadonlySet<string>; readonly reaches: string }
   }
 }
 
@@ -97,7 +99,9 @@ export function checkImports(facts: readonly FileFacts[], resolve: Resolver, rul
       for (const rule of rules.s1) {
         if (target.startsWith(rule.target) && !under(fact.file, rule.allowedImporters)) add(s1, fact.file, rule.target)
       }
-      if (rules.s3.surface(fact.file) && target !== rules.s3.entry && !rules.s3.surface(target))
+      const declares =
+        edge.typeOnly && rules.s3.declarations.files.has(fact.file) && target.startsWith(rules.s3.declarations.reaches)
+      if (rules.s3.surface(fact.file) && !rules.s3.entries.includes(target) && !rules.s3.surface(target) && !declares)
         for (const layer of rules.s3.layers) if (target.startsWith(layer)) add(s3, fact.file, layer)
       if (under(fact.file, rules.s2AllowedImporters)) continue
       const ownNames = new Set(

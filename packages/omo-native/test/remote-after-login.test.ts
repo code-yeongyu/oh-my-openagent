@@ -45,7 +45,6 @@ describe("the background enable omo login starts", () => {
       stateDir,
       SIGNED_IN,
       installWithDisableMeanwhile(stateDir, record),
-      undefined,
       { optOut },
     )
     expect([code, out.map((line) => JSON.parse(line)), coldWake]).toEqual([
@@ -64,7 +63,6 @@ describe("the background enable omo login starts", () => {
       stateDir,
       SIGNED_IN,
       installWithDisableMeanwhile(stateDir, record),
-      undefined,
       { optOut },
     )
     expect([code, coldWake, owners[0]?.state.status.enabled, record.off]).toEqual([
