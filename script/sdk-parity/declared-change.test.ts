@@ -1,10 +1,16 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 
-import type { ExemptionProvider } from "./declared-change"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { sha256 } from "./baseline"
+import { type ExemptionProvider, loadBaseScenarioTable } from "./declared-change"
 import { EXEMPTION_PROVIDERS, type GateInput, gateReport, renderReport } from "./gate"
-import { HEAD, input, rows, unresolved } from "./gate-fixture"
+import { HEAD, input, rows, text, unresolved } from "./gate-fixture"
 import type { Outcome } from "./scenario-run"
-import type { Scenario } from "./scenarios"
+import { SCENARIOS, type Scenario } from "./scenarios"
+import { readDeclaredVersions } from "./version-mask"
 import { verifyReview } from "./verify-review"
 
 // The declared form of #15199, its controls: each breaks one thing and expects the gate (or verify-review) to refuse it.
@@ -176,19 +182,147 @@ describe("the declared form: controls that must fail", () => {
 })
 
 describe("where a declaration is read in the body", () => {
-  test("#given a marker line inside a code fence #then it is parsed and judged like any other line", () => {
-    const fenced = withOutcomes(ok(1), ok(2), "Example:\n\n```\nSDK-Parity-Changed: s1 answer\n```\n")
-    expect(gateReport(fenced).exempted).toEqual([expect.stringMatching(/^s1#exempt=declared:answer@/)])
-    const broken = withOutcomes(ok(1), ok(2), "```\nSDK-Parity-Changed: <scenario-id> <kind>[ <arg> ...]\n```\n")
-    expect(failuresOf(broken).join("\n")).toMatch(/is not one of/)
+  // The security reader's measured table, each line as exact bytes. Read: a declaration; refused: read and failed with
+  // its problem; not read: no declaration, so the difference fails as undeclared.
+  const read = /^s1#exempt=declared:answer@/
+  const VARIANTS: readonly (readonly [string, string, "read" | RegExp | "not read"])[] = [
+    ["plain", "SDK-Parity-Changed: s1 answer", "read"],
+    ["CRLF", "SDK-Parity-Changed: s1 answer\r", "read"],
+    ["no space after the colon", "SDK-Parity-Changed:s1 answer", "read"],
+    ["trailing spaces", "SDK-Parity-Changed: s1 answer   ", "read"],
+    ["two spaces between the tokens", "SDK-Parity-Changed: s1  answer", /the kind {2}is not one of/],
+    ["a tab between the tokens", "SDK-Parity-Changed:\ts1\tanswer", /names no scenario and kind/],
+    ["trailing text", "SDK-Parity-Changed: s1 answer (see above)", /takes 0 argument\(s\), not 2/],
+    ["a leading space", " SDK-Parity-Changed: s1 answer", "not read"],
+    ["a lower-case marker", "sdk-parity-changed: s1 answer", "read"],
+    ["a quote block", "> SDK-Parity-Changed: s1 answer", "not read"],
+    ["inside backticks", "`SDK-Parity-Changed: s1 answer`", "not read"],
+    ["a list item", "- SDK-Parity-Changed: s1 answer", "not read"],
+    ["inside a fence", "```\nSDK-Parity-Changed: s1 answer\n```", "read"],
+    ["inside an HTML comment", "<!--\nSDK-Parity-Changed: s1 answer\n-->", "read"],
+    [
+      "the marker twice on one line",
+      "SDK-Parity-Changed: s1 answer SDK-Parity-Changed: s2 answer",
+      /takes 0 argument\(s\), not 3/,
+    ],
+    ["a mixed-case kind", "SDK-Parity-Changed: s1 Answer", /the kind Answer is not one of/],
+  ]
+  for (const [name, line, expected] of VARIANTS)
+    test(`#given ${name} #then the line is ${expected === "read" ? "read" : expected === "not read" ? "not read" : "read and refused"}`, () => {
+      const report = gateReport(withOutcomes(ok(1), ok(2), `intro\n${line}\nmore\n`))
+      if (expected === "read") {
+        expect(report.failures).toEqual([])
+        expect(report.exempted).toEqual([expect.stringMatching(read)])
+      } else if (expected === "not read")
+        expect(report.failures).toEqual([expect.stringMatching(/scenario s1 answers differently/)])
+      else expect(report.failures.join("\n")).toMatch(expected)
+    })
+})
+
+describe("the merge base's scenario table", () => {
+  const dirs: string[] = []
+  afterAll(() => {
+    for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
+  })
+  const file = (body: string) => {
+    const dir = mkdtempSync(join(tmpdir(), "sdk-parity-base-table-"))
+    dirs.push(dir)
+    const path = join(dir, "scenarios.ts")
+    writeFileSync(path, body)
+    return path
+  }
+
+  test("#given a base table that throws on import, or exports no table #then loading it fails with its error", async () => {
+    await expect(loadBaseScenarioTable(file('throw new Error("broken table")\n'))).rejects.toThrow("broken table")
+    await expect(loadBaseScenarioTable(file("export const OTHER = 1\n"))).rejects.toThrow("exports no SCENARIOS array")
   })
 
-  test("#given a marker that does not start its line, inline or indented #then it is not a declaration", () => {
-    const body = "Written as `SDK-Parity-Changed: s1 answer` in a sentence.\n    SDK-Parity-Changed: s1 answer\n"
-    expect(failuresOf(withOutcomes(ok(1), ok(2), body)).join("\n")).toMatch(
-      /answers differently on the merge base and the head/,
-    )
+  // Tripwire on the entry's wiring: only an absent file skips the rule; a load failure is a failure of the check.
+  test("#given the command-line entry #then it skips the rule only when the base has no table file", async () => {
+    const source = await Bun.file(new URL("./gate-cli.ts", import.meta.url)).text()
+    expect(source).toContain('show(mergeBase, "script/sdk-parity/scenarios.ts") === undefined')
+    expect(source).toContain("...(baseTableProblem === undefined ? [] : [baseTableProblem])")
   })
+})
+
+describe("the exempt mark and what it binds", () => {
+  test("#given a provider whose detail carries a separator #then the gate fails it and writes no mark", () => {
+    for (const detail of ["answer@x#exempt=declared:answer@y", "a,b", "a\nb"]) {
+      const forging: ExemptionProvider = () => ({ detail })
+      const report = gateReport(withOutcomes(ok(1), ok(2), ""), { forging })
+      expect({ failures: report.failures.join("\n"), exempted: report.exempted }).toEqual({
+        failures: expect.stringMatching(/provider forging answered a detail with a reserved character/),
+        exempted: [],
+      })
+    }
+  })
+
+  test("#given any provider #then the gate writes the scenario and that provider's name, never the provider", () => {
+    const named: ExemptionProvider = () => ({ detail: "x" })
+    expect(gateReport(withOutcomes(ok(1), ok(2), ""), { named }).exempted).toEqual(["s1#exempt=named:x"])
+  })
+
+  test("#given a declared change #then its hash is of the HEAD outcome", () => {
+    const report = gateReport(withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n"))
+    expect(report.exempted).toEqual([`s1#exempt=declared:answer@${sha256(JSON.stringify(ok(2))).slice(0, 24)}`])
+  })
+
+  test("#given outcomes equal for 900 characters and different after #then the print shows the difference and says the heads match", () => {
+    const long = "x".repeat(900)
+    const output = renderReport(
+      gateReport(withOutcomes(ok(`${long}A`), ok(`${long}B`), "SDK-Parity-Changed: s1 answer\n")),
+    )
+    expect(output).toMatch(/first difference at offset \d+; the printed heads above are equal/)
+    expect(output).toMatch(/merge base: \.\.\.x+A/)
+    expect(output).toMatch(/head: {7}\.\.\.x+B/)
+  })
+
+  test("#given a declared scenario whose difference the version mask absorbs #then the declaration fails as never judged", () => {
+    const declared = readDeclaredVersions(".")
+    if (declared === undefined) throw new Error("the repository has no native package manifest")
+    const committed = JSON.parse(text("script/sdk-parity/goldens.json")) as Record<string, Outcome>
+    const base = committed["native-version"] ?? {}
+    const bumped = { ...declared, engine: "2099.1.2" }
+    const after = { ...base, stdout: `${base["stdout"]}`.split(declared.engine).join("2099.1.2") }
+    const report = gateReport(
+      input({
+        scenarios: SCENARIOS.filter((scenario) => scenario.id === "native-version"),
+        base: { ...input().base, outcomes: { "native-version": base } },
+        head: { ...input().head, outcomes: { "native-version": after } },
+        versions: { base: declared, head: bumped },
+        body: "SDK-Parity-Changed: native-version answer\n",
+      }),
+    )
+    expect(report.versionMasked).toEqual(["native-version#version-mask"])
+    expect(report.failures).toEqual([expect.stringMatching(/native-version: its difference is admitted elsewhere/)])
+  })
+})
+
+describe("the call part of each surface", () => {
+  const tool: Scenario = {
+    id: "s1",
+    capability: "threads.send",
+    surface: "tool",
+    tool: "thread_send",
+    args: { thread: "a" },
+  }
+  const sdk: Scenario = {
+    id: "s1",
+    capability: "threads.send",
+    surface: "sdk",
+    member: "config.status",
+    files: { a: "1" },
+  }
+  for (const [name, baseScenario, headScenario] of [
+    ["a tool scenario's args", tool, { ...tool, args: { thread: "b" } }],
+    ["an sdk scenario's files", sdk, { ...sdk, files: { a: "2" } }],
+    ["an sdk scenario's member", sdk, { ...sdk, member: "config.other" }],
+  ] as const)
+    test(`#given ${name} changed at the head #then the scenario's call changed and it fails`, () => {
+      expect(failuresOf(input({ baseScenarios: [baseScenario], scenarios: [headScenario] })).join("\n")).toMatch(
+        /changes its call/,
+      )
+    })
 })
 
 describe("the one place where exemptions are consulted", () => {
@@ -197,27 +331,37 @@ describe("the one place where exemptions are consulted", () => {
     expect(Object.keys(EXEMPTION_PROVIDERS)).toEqual(["declared"])
   })
 
-  // Architecture contract (the closed list): the command-line entry builds the gate's input with the shipped list; no
-  // flag, environment variable or file reaches the test-only providers input.
-  test("#given the gate's command-line entry #then it passes no providers of its own", async () => {
+  // A tripwire, not a proof (architecture contract, the closed list): the provider list is gateReport's second
+  // parameter, so the command-line entry's one call of the gate passes its input object and nothing else.
+  test("#given the gate's command-line entry #then its one call of the gate passes a single argument", async () => {
     const source = await Bun.file(new URL("./gate-cli.ts", import.meta.url)).text()
-    expect(source.match(/\bproviders\b|EXEMPTION_PROVIDERS/g) ?? []).toEqual([])
+    expect([...source.matchAll(/\bgateReport\(/g)].length).toBe(1)
+    let depth = 0
+    let commas = 0
+    for (let at = source.indexOf("gateReport(") + "gateReport".length; at < source.length; at++) {
+      const char = source[at] ?? ""
+      if ("({[".includes(char)) depth++
+      else if (")}]".includes(char)) {
+        depth--
+        if (depth === 0) break
+      } else if (char === "," && depth === 1) commas++
+    }
+    expect({ commas, providers: source.includes("EXEMPTION_PROVIDERS") }).toEqual({ commas: 0, providers: false })
   })
 
   // A second provider that exists only here: it exempts s1 whatever its outcomes.
-  const always: ExemptionProvider = (scenario) => (scenario.id === "s1" ? { exempt: "s1#exempt=always" } : undefined)
+  const always: ExemptionProvider = (scenario) => (scenario.id === "s1" ? {} : undefined)
 
   test("#given control 20: a scenario two providers would both exempt #then it fails as ambiguous", () => {
-    const gate = withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n", {
-      providers: { declared: EXEMPTION_PROVIDERS["declared"] as ExemptionProvider, always },
-    })
-    expect(failuresOf(gate).join("\n")).toMatch(/more than one provider \(always, declared\)/)
+    const gate = withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n")
+    const providers = { declared: EXEMPTION_PROVIDERS["declared"] as ExemptionProvider, always }
+    expect(gateReport(gate, providers).failures.join("\n")).toMatch(/more than one provider \(always, declared\)/)
   })
 
   test("#given control 21: the same inputs with the providers in reverse order #then the report is the same", () => {
     const declared = EXEMPTION_PROVIDERS["declared"] as ExemptionProvider
-    const forward = gateReport(withOutcomes(ok(1), ok(2), "", { providers: { always, declared } }))
-    const reverse = gateReport(withOutcomes(ok(1), ok(2), "", { providers: { declared, always } }))
+    const forward = gateReport(withOutcomes(ok(1), ok(2), ""), { always, declared })
+    const reverse = gateReport(withOutcomes(ok(1), ok(2), ""), { declared, always })
     expect(renderReport(reverse)).toBe(renderReport(forward))
     expect(forward.exempted).toEqual(["s1#exempt=always"])
   })
@@ -234,6 +378,27 @@ describe("verify-review over the two classes", () => {
     expect(verifyReview(output, declared.body, verdict(output)).decision).toBe("accepted")
     expect(verifyReview(output, "SDK-Parity-Unchanged: yes\n", verdict(output)).decision).toBe("withheld")
     expect(verifyReview(output, "SDK-Parity-Changed: s1 refusal\n", verdict(output)).decision).toBe("withheld")
+  })
+
+  test("#given every printed id exempt #then an Unchanged line is refused; #given other ids beside them #then it is required", () => {
+    const allExempt = withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n", {
+      changedFiles: ["packages/omo-native/bin/lib/thread.js"],
+    })
+    const exemptOnly = check(allExempt)
+    expect(verifyReview(exemptOnly, `${allExempt.body}SDK-Parity-Unchanged: yes\n`, verdict(exemptOnly)).decision).toBe(
+      "withheld",
+    )
+    const mixed = withOutcomes(ok(1), ok(2), "SDK-Parity-Changed: s1 answer\n", {
+      changedFiles: ["packages/omo-native/bin/lib/thread.js", "packages/omo-native/bin/lib/account.js"],
+      closures: new Map([
+        ["threads.send", new Set(["packages/omo-native/bin/lib/thread.js"])],
+        ["account.show", new Set(["packages/omo-native/bin/lib/account.js"])],
+      ]),
+    })
+    const both = check(mixed)
+    expect(both).toContain("account.show")
+    expect(verifyReview(both, mixed.body, verdict(both)).decision).toBe("withheld")
+    expect(verifyReview(both, `${mixed.body}SDK-Parity-Unchanged: yes\n`, verdict(both)).decision).toBe("accepted")
   })
 
   test("#given the fixed form: a body with no declaration and a signed review #then it verifies exactly as before", () => {

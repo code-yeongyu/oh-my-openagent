@@ -32,7 +32,9 @@ export type KindCheck = (
   context: KindContext,
 ) => string | undefined
 
-const DECLARATION_LINE = /^SDK-Parity-Changed:(.*)$/gm
+// A declaration is a line that starts with the marker, anywhere in the body (a code fence included); the marker is
+// matched without regard to case, as the Unchanged line is. The scenario id and the kind are matched exactly.
+const DECLARATION_LINE = /^SDK-Parity-Changed:(.*)$/gim
 
 const resultOf = (outcome: Outcome): Record<string, unknown> | undefined => {
   const result =
@@ -164,13 +166,12 @@ function judgeDeclaration(
 }
 
 /** The digest's entry for a declared change: its scenario, the provider, kind, arguments and its head outcome's hash. */
-const declaredMark = (change: DeclaredChange): string =>
-  `${change.scenario}#exempt=declared:${[change.kind, ...change.args].join(" ")}@${change.hash}`
+const declaredDetail = (change: DeclaredChange): string => `${[change.kind, ...change.args].join(" ")}@${change.hash}`
 
-// What a provider answers for one scenario: it exempts it (with the mark the digest binds), it states the problem that
-// keeps it failing, or it has nothing to say.
+// What a provider answers for one scenario: it exempts it (optionally with a detail the digest binds; the gate writes the
+// scenario and the provider's name itself), it states the problem that keeps it failing, or it has nothing to say.
 export type ProviderAnswer =
-  { readonly exempt: string; readonly change?: DeclaredChange } | { readonly problem: string } | undefined
+  { readonly detail?: string; readonly change?: DeclaredChange } | { readonly problem: string } | undefined
 
 export type ExemptionProvider = (
   scenario: Scenario,
@@ -184,18 +185,48 @@ export const declaredProvider: ExemptionProvider = (scenario, before, after, con
   const declaration = context.declarations.get(scenario.id)
   if (declaration === undefined) return undefined
   const judged = judgeDeclaration(declaration, scenario, before, after, context)
-  return typeof judged === "string" ? { problem: judged } : { exempt: declaredMark(judged), change: judged }
+  return typeof judged === "string" ? { problem: judged } : { detail: declaredDetail(judged), change: judged }
 }
 
 const BOUND = 600
 const MASKS = ["<sandbox>", "<tree>", "<tmp>"]
 
 /** One side's outcome as the check prints it: bounded, with each masked span counted so the signer sees what was hidden. */
-export function printedOutcome(outcome: Outcome): string {
+function printedOutcome(outcome: Outcome): string {
   const text = JSON.stringify(outcome)
   const masked = MASKS.map((mask) => [mask, text.split(mask).length - 1] as const)
     .filter(([, count]) => count > 0)
     .map(([mask, count]) => `${mask} x${count}`)
   const shown = text.length > BOUND ? `${text.slice(0, BOUND)}... (${text.length} chars)` : text
   return masked.length === 0 ? shown : `${shown} [masked: ${masked.join(", ")}]`
+}
+
+const WINDOW = 120
+
+/**
+ * Both sides of a declared change as the check prints them: the head of each, then a window around the first offset
+ * where they differ, so a change past the printed head is still shown to the signer.
+ */
+export function printedPair(before: Outcome, after: Outcome): string[] {
+  const [a, b] = [JSON.stringify(before), JSON.stringify(after)]
+  let at = 0
+  while (at < a.length && at < b.length && a[at] === b[at]) at++
+  const lines = [`  merge base: ${printedOutcome(before)}`, `  head:       ${printedOutcome(after)}`]
+  if (a === b) return lines
+  const window = (text: string) =>
+    `${at > WINDOW ? "..." : ""}${text.slice(Math.max(0, at - WINDOW), at + WINDOW)}${at + WINDOW < text.length ? "..." : ""}`
+  const hidden = a.slice(0, BOUND) === b.slice(0, BOUND)
+  return [
+    ...lines,
+    `  first difference at offset ${at}${hidden ? "; the printed heads above are equal, the outcomes differ after them" : ""}:`,
+    `  merge base: ${window(a)}`,
+    `  head:       ${window(b)}`,
+  ]
+}
+
+/** The merge base's own scenario table, loaded from its file: a file that exists and does not load is an error. */
+export async function loadBaseScenarioTable(file: string): Promise<readonly Scenario[]> {
+  const module = (await import(file)) as { readonly SCENARIOS?: unknown }
+  if (!Array.isArray(module.SCENARIOS)) throw new Error(`${file} exports no SCENARIOS array`)
+  return module.SCENARIOS as readonly Scenario[]
 }

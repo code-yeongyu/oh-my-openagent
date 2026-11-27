@@ -4,7 +4,7 @@ import {
   declaredProvider,
   type ExemptionProvider,
   parseDeclarations,
-  printedOutcome,
+  printedPair,
 } from "./declared-change"
 import { type Goldens, type PresentationRow, presentationProblems, presentationRowProblems } from "./presentation"
 import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
@@ -47,8 +47,6 @@ export type GateInput = {
   readonly baseScenarios?: readonly Scenario[]
   // The gate's fresh-toolAhead map by capability, handed to the declared kinds (#15199).
   readonly ahead?: ReadonlyMap<string, unknown>
-  // The exemption providers to consult; absent, the gate's own closed list. Only tests pass another list.
-  readonly providers?: Readonly<Record<string, ExemptionProvider>>
 }
 
 // The closed, named list of exemptions the one failing place consults (#15199). Adding a provider is a change of the
@@ -111,7 +109,12 @@ export function candidateDigest(head: string, ids: readonly string[]): string {
 export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
-export function gateReport(input: GateInput): GateReport {
+// The exemption providers are not part of the input the command-line entry builds: they are this second parameter,
+// which defaults to the closed list, and only tests pass another.
+export function gateReport(
+  input: GateInput,
+  providers: Readonly<Record<string, ExemptionProvider>> = EXEMPTION_PROVIDERS,
+): GateReport {
   const baseRowsText = new Set((input.presentation.base ?? []).map((row) => JSON.stringify(row)))
   const added = input.presentation.head.filter((row) => !baseRowsText.has(JSON.stringify(row)))
   const failures: string[] = [...presentationRowProblems(added, input.scenarios)]
@@ -123,6 +126,9 @@ export function gateReport(input: GateInput): GateReport {
   const presentationRows: string[] = []
   const versionMasked: string[] = []
   const declaredChanges: DeclaredChange[] = []
+  // Every declaration must be judged by its kind at the one consulting place; one whose difference another branch
+  // absorbed (the version mask, presentation) fails here rather than pass the gate unjudged.
+  const judged = new Set<string>()
   const exempted: string[] = []
   const parsed = parseDeclarations(input.body)
   failures.push(...parsed.problems)
@@ -198,6 +204,7 @@ export function gateReport(input: GateInput): GateReport {
       continue
     }
     if (JSON.stringify(before) === JSON.stringify(after)) {
+      if (declared.has(scenario.id)) judged.add(scenario.id)
       if (declared.has(scenario.id))
         failures.push(
           `SDK-Parity-Changed: ${scenario.id}: its outcome is equal on the merge base and the head; there is nothing to declare`,
@@ -220,8 +227,9 @@ export function gateReport(input: GateInput): GateReport {
         presentationRows.push(`${scenario.id}#presentation=${[...matched].toSorted().join("+")}`)
         continue
       }
+      judged.add(scenario.id)
       // The one place exemptions are consulted: every provider is asked, in name order, and exactly one may answer.
-      const answers = Object.entries(input.providers ?? EXEMPTION_PROVIDERS)
+      const answers = Object.entries(providers)
         .toSorted(([a], [b]) => a.localeCompare(b))
         .map(([name, provider]) => [name, provider(scenario, before, after, providerContext)] as const)
         .filter(([, answer]) => answer !== undefined)
@@ -239,8 +247,17 @@ export function gateReport(input: GateInput): GateReport {
           failures.push(answer.problem)
           flagged.add(scenario.capability)
         } else if (answer !== undefined) {
-          exempted.push(answer.exempt.includes("#exempt=") ? answer.exempt : `${scenario.id}#exempt=${name}`)
-          if (answer.change !== undefined) declaredChanges.push(answer.change)
+          // The gate writes the scenario and the provider's name; a provider gives only its detail, which may not carry
+          // the separators the mark and the printed id list are read by.
+          if (answer.detail !== undefined && /[#,\s]/.test(answer.detail.replaceAll(" ", ""))) {
+            failures.push(
+              `${scenario.capability}: scenario ${scenario.id}: provider ${name} answered a detail with a reserved character (# , or a line break)`,
+            )
+            flagged.add(scenario.capability)
+          } else {
+            exempted.push(`${scenario.id}#exempt=${name}${answer.detail === undefined ? "" : `:${answer.detail}`}`)
+            if (answer.change !== undefined) declaredChanges.push(answer.change)
+          }
         }
         continue
       }
@@ -253,6 +270,13 @@ export function gateReport(input: GateInput): GateReport {
       )
       flagged.add(scenario.capability)
     }
+  }
+  for (const declaration of parsed.declarations) {
+    const scenario = scenarioById.get(declaration.scenario)
+    if (scenario !== undefined && unresolved.has(scenario.capability) && !judged.has(declaration.scenario))
+      failures.push(
+        `SDK-Parity-Changed: ${declaration.scenario}: its difference is admitted elsewhere (the version mask or presentation), so the declaration was never judged; remove it`,
+      )
   }
   const slices = new Set([...input.body.matchAll(SLICE_LINE)].map((match) => match[1]))
   const atHead = unresolved
@@ -372,8 +396,7 @@ export function renderReport(report: GateReport): string {
       "",
       ...report.changed.flatMap((change) => [
         `- ${change.scenario} (${change.capability}) ${[change.kind, ...change.args].join(" ")}`,
-        `  merge base: ${printedOutcome(change.before)}`,
-        `  head:       ${printedOutcome(change.after)}`,
+        ...printedPair(change.before, change.after),
       ]),
       "",
     )

@@ -30,9 +30,13 @@ export function verifyReview(checkOutput: string, body: string, verdict: string)
   // digest; the author's SDK-Parity-Unchanged line covers the remaining ids only.
   const ids = (printed[4] ?? "").split(",").filter((id) => id !== "")
   const DECLARED = "#exempt=declared:"
+  // A mark is '<scenario>#exempt=<provider>[:<detail>]' with the first '#exempt=' as its separator.
   const printedChanged = ids
-    .filter((id) => id.includes(DECLARED))
-    .map((id) => id.slice(0, id.lastIndexOf("@")).replace(DECLARED, " "))
+    .filter((id) => id.slice(id.indexOf("#exempt=")).startsWith(DECLARED))
+    .map((id) => {
+      const at = id.indexOf(DECLARED)
+      return `${id.slice(0, at)} ${id.slice(at + DECLARED.length, id.lastIndexOf("@"))}`
+    })
     .toSorted()
   const others = ids.filter((id) => !id.includes("#exempt="))
   const parsed = parseDeclarations(body)
