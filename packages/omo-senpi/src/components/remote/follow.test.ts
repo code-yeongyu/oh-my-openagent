@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { PEER } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
 import { DEADLINES } from "./deadlines"
+import { remoteFailure } from "./codes"
 import { sessionStatusOf } from "./follow"
 import { handleOf } from "./seams"
 import { clientOn, closeClients, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
@@ -902,5 +903,139 @@ describe("sessionStatusOf: the rule sessions.get reads an engine state by (#1375
     ["isStreaming true", RUNNING, [], "running"],
   ] as const)("#given %s #then %s", (_name, state, entries, status) => {
     expect(sessionStatusOf(state, entries)).toBe(status)
+  })
+})
+
+// #13414 4c-2 (F1): a caller follows before it sends, so no record of a fast turn arrives unseen, and hands follow the
+// send's receipt as a promise. follow attaches at once and holds every record until the receipt resolves, then judges
+// them by it; a send that failed (the promise rejects) ends the stream with that failure.
+describe("sessions.follow and sessions.wait rows: from a send whose receipt is still pending (F1)", () => {
+  const deferred = () => {
+    let settle: { resolve: (receipt: SendReceipt) => void; reject: (reason: unknown) => void } | undefined
+    const promise = new Promise<SendReceipt>((resolve, reject) => (settle = { resolve, reject }))
+    if (settle === undefined) throw new Error("a Promise runs its executor at once")
+    return { promise, ...settle }
+  }
+  // One request on the client's connection: the owner answers it after every event it pushed before it, so the
+  // follow's attach has taken the pushed records once this returns.
+  const delivered = async (client: RemoteClient): Promise<void> => {
+    await client.service.status()
+  }
+
+  test("#given a fast turn whose records all arrive before the receipt resolves #when it resolves #then the turn is followed to its end", async () => {
+    const { owner, client } = await on(IDLE)
+    const receipt = deferred()
+    const events = reader(client.sessions.follow(THREAD, { from: receipt.promise }))
+    await listening(client)
+    pushRecords(owner, promptRun("run-2", 3, [["cm-2", "ping"]]))
+    await delivered(client)
+    receipt.resolve(receiptOf("cm-2", "started", "2"))
+    expect(await drain(events)).toEqual([
+      { kind: "waiting", state: "turn_running" },
+      { kind: "text", delta: "ping" },
+      { kind: "end", outcome: { reason: "settled", text: "ping", turn_id: "2" } },
+    ])
+  })
+
+  test("#given a pending receipt #when the send fails and the promise rejects with its failure #then the stream ends failed with it", async () => {
+    const { client } = await on(IDLE)
+    const receipt = deferred()
+    const events = reader(client.sessions.follow(THREAD, { from: receipt.promise }))
+    const refusal = remoteFailure("not_steerable", "Nothing is running to steer.", "Send without steer.")
+    receipt.reject(refusal)
+    expect(await drain(events)).toEqual([{ kind: "failed", failure: refusal }])
+  })
+
+  test("#given a pending receipt #when the promise rejects with a thrown error #then the stream ends failed, internal_error", async () => {
+    const { client } = await on(IDLE)
+    const receipt = deferred()
+    const events = reader(client.sessions.follow(THREAD, { from: receipt.promise }))
+    receipt.reject(new Error("socket closed"))
+    expect(await drain(events)).toEqual([
+      { kind: "failed", failure: expect.objectContaining({ kind: "error", code: "internal_error" }) },
+    ])
+  })
+
+  test("#given a receipt that never resolves #when the follow's deadline passes on the clock #then it ends failed, timeout", async () => {
+    const { client, clock } = await on(IDLE)
+    const events = reader(client.sessions.follow(THREAD, { from: deferred().promise, deadlineMs: 30_000 }))
+    await listening(client)
+    clock.advance(30_000)
+    expect(await drain(events)).toEqual([
+      { kind: "failed", failure: expect.objectContaining({ code: "timeout", details: { deadline_ms: 30_000 } }) },
+    ])
+  })
+
+  test("#given a wait from a pending receipt #when the send's turn ran before the receipt resolved #then it settles on that turn's end", async () => {
+    const { owner, client } = await on(IDLE)
+    const receipt = deferred()
+    const settling = client.sessions.wait(THREAD, { from: receipt.promise })
+    await listening(client)
+    pushRecords(owner, promptRun("run-2", 3, [["cm-2", "ping"]]))
+    await delivered(client)
+    receipt.resolve(receiptOf("cm-2", "started", "2"))
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "settled", status: "idle" } })
+  })
+})
+
+// Carried from the CLI's own follow (#13414 4c-2): what a person reads as one answer keeps its blocks and messages apart,
+// and a session that closes under a send's turn ends it as closed, never as settled.
+describe("sessions.follow rows: the text a person reads, and a session closing under a send", () => {
+  const delta = (index: number, text: string): JsonObject => ({
+    type: "message_update",
+    message: {},
+    assistantMessageEvent: { type: "text_delta", contentIndex: index, delta: text, partial: {} },
+  })
+
+  test("#given two content blocks, then a second message #when the turn streams them #then a line break joins each to the text before it", async () => {
+    const { owner, client } = await on(IDLE)
+    const { events } = await following(client)
+    pushRecords(owner, [
+      { type: "agent_start", runId: "run-7" },
+      delta(0, "first"),
+      delta(1, "second"),
+      { type: "message_end", message: { role: "assistant" } },
+      { type: "message_start", message: { role: "assistant" } },
+      delta(0, "Done.\n"),
+      delta(1, "after a line end"),
+      { type: "agent_end", messages: [], willRetry: false },
+      { type: "agent_settled" },
+    ])
+    const seen = await drain(events)
+    expect(seen.flatMap((event) => (event.kind === "text" ? [event.delta] : []))).toEqual([
+      "first",
+      "\n",
+      "second",
+      "\n",
+      "Done.\n",
+      "after a line end",
+    ])
+    expect(seen.at(-1)).toEqual({
+      kind: "end",
+      outcome: { reason: "settled", text: "first\nsecond\nDone.\nafter a line end", turn_id: "run-7" },
+    })
+  })
+
+  test("#given a send's turn #when senpi settles it because its session closed #then the follow ends session_closed", async () => {
+    const { owner, client } = await on(IDLE)
+    const events = reader(client.sessions.follow(THREAD, { from: receiptOf("cm-2", "started", "2") }))
+    await listening(client)
+    pushRecords(owner, [
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { ...textDelta("par"), clientMessageId: "cm-2" },
+      { type: "agent_settled", reason: "session_closed" },
+    ])
+    expect((await drain(events)).at(-1)).toEqual({ kind: "end", outcome: { reason: "session_closed" } })
+  })
+
+  test("#given a wait from a send #when senpi settles its turn because its session closed #then it ended, closed", async () => {
+    const { owner, client } = await on(IDLE)
+    const settling = client.sessions.wait(THREAD, { from: receiptOf("cm-2", "started", "2") })
+    await listening(client)
+    pushRecords(owner, [
+      { type: "turn_start", clientMessageId: "cm-2" },
+      { type: "agent_settled", reason: "session_closed" },
+    ])
+    expect(await settling).toMatchObject({ kind: "ok", value: { outcome: "ended", status: "closed" } })
   })
 })

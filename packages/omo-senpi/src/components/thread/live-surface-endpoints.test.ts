@@ -147,6 +147,33 @@ describe("thread tools across host endpoints", () => {
     expect(engines).toEqual({ "dur-terminal": "2026.11.19-3", "dur-desktop": "5.1.70" })
   })
 
+  test("#given an engineVersion key that is null, not a string, or past 128 characters #when thread_list runs #then the row has no engine_version and never falls back to serverVersion, while 128 characters is kept", async () => {
+    // omo-relay-spec #314: a present engineVersion key is the only source; serverVersion is read only when the key is absent.
+    const atCap = "e".repeat(128)
+    const cases: ReadonlyArray<readonly [Frame, Frame, string | undefined, string | undefined]> = [
+      [{ serverVersion: "5.1.79", engineVersion: null }, { serverVersion: "5.1.70", engineVersion: 20261119 }, undefined, undefined],
+      [{ serverVersion: "5.1.79", engineVersion: atCap }, { serverVersion: "5.1.70", engineVersion: `${atCap}x` }, atCap, undefined],
+    ]
+    for (const [legacyProtocol, shardProtocol, legacyEngine, shardEngine] of cases) {
+      // given
+      const dir = tempDir("thr-ev-")
+      const legacy = join(dir, "rpc.sock")
+      const shard = join(dir, "i-0123456789abcdef.sock")
+      await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")), legacyProtocol)
+      await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")), shardProtocol)
+      const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)] })
+
+      // when
+      const listed = await w.run("thread_list", { all_scope: true })
+
+      // then
+      expect(listed.kind).toBe("ok")
+      const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; engine_version?: string }>
+      const engines = Object.fromEntries(threads.map((thread) => [thread.thread, thread.engine_version]))
+      expect(engines).toEqual({ "dur-terminal": legacyEngine, "dur-desktop": shardEngine })
+    }
+  })
+
   test("#given both endpoints hold a session routed as rpc-1 #when thread_send and thread_read target the i-* thread #then every per-session request dials the i-* socket and none reaches the legacy one", async () => {
     // given
     const dir = tempDir("thr-ep-")
