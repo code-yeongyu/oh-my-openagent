@@ -7,6 +7,8 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
+export type ExecFileText = (command: string, args: string[]) => Promise<string | null>
+
 async function execFileText(command: string, args: string[]): Promise<string | null> {
   return await new Promise((resolve) => {
     // powershell.exe is a console-subsystem binary, and under a Node runtime (no bun:ffi, so the
@@ -99,11 +101,16 @@ async function readProcessStartIdentity(pid: number): Promise<string | null> {
     if (getPidLiveness(pid) === "dead") return null
     const startSeconds = await readDarwinProcessStartSeconds(pid)
     if (startSeconds !== null) return `proc-start-epoch:${startSeconds}`
-    const value = await execFileText("/bin/ps", ["-o", "lstart=", "-p", String(pid)])
-    return value === null ? null : `ps-lstart:${value.replace(/\s+/g, " ")}`
+    return await readPsLstartIdentity(pid)
   }
   if (process.platform === "win32") return await readWin32StartIdentity(pid)
   return null
+}
+
+/** The darwin/freebsd fallback when `bun:ffi` cannot read the start time: what `ps -o lstart=` prints for `pid`. */
+export async function readPsLstartIdentity(pid: number, exec: ExecFileText = execFileText): Promise<string | null> {
+  const value = await exec("/bin/ps", ["-o", "lstart=", "-p", String(pid)])
+  return value === null ? null : `ps-lstart:${value.replace(/\s+/g, " ")}`
 }
 
 /**
