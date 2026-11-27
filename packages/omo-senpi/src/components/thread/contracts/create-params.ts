@@ -4,6 +4,12 @@ import { IdempotencyKey, THREAD_MESSAGE_MAX_BYTES, ThreadDeliveryMode, thinkingL
 import { PERMISSION_PRESETS } from "./permission-presets"
 
 export const ThreadCreateParams = Type.Object({
+  resume: Type.Optional(
+    Type.Literal(true, { description: "Resume an existing interrupted run. Never releases a person's Stop." }),
+  ),
+  all_scope: Type.Optional(
+    Type.Boolean({ description: "For resume only: resolve an existing target across workspaces." }),
+  ),
   thread: Type.Optional(
     Type.String({
       minLength: 1,

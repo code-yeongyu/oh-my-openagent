@@ -300,9 +300,9 @@ describe("omo thread: exit codes", () => {
     },
   )
 
-  test("#given --help #when run #then the usage names exactly list, send, read and close", async () => {
+  test("#given --help #when run #then the usage names exactly list, send, read, close and resume", async () => {
     const result = await run(["--help"])
-    expect(result.stdout.split("\n")[0]).toBe("usage: omo thread <list|send|read|close> [options] [--json]")
+    expect(result.stdout.split("\n")[0]).toBe("usage: omo thread <list|send|read|close|resume> [options] [--json]")
     expect(result.stdout).not.toMatch(/\b(bind|unbind|rebind|bindings|report|answer|outbox|ack)\b|--binding/)
   })
 
