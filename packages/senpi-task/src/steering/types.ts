@@ -132,12 +132,18 @@ export type InterruptOutcome =
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
+// The session a tool call acts for. When present, only that session's tasks resolve and an undefined
+// session id resolves nothing; the engine's own callers omit it.
+export type CallerScope = { readonly sessionId: string | undefined }
+
+export type InterruptOptions = { readonly caller?: CallerScope }
+
 export type CancelOptions = {
-  readonly callerSessionId?: string
   readonly abort?: "request" | "skip"
   // Cancel only the run a handle minted at this epoch names: any other run answers `stale` and
   // nothing is cancelled. task_cancel never sets it.
   readonly expectedRunEpoch?: number
+  readonly caller?: CallerScope
 }
 
 export type CancelOutcome =
@@ -194,7 +200,7 @@ export type SteeringEngine = {
   hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.
   sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
+  interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.
   notifyStarted(taskId: string): Promise<void>

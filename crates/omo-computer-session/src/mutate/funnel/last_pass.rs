@@ -7,7 +7,7 @@
 //! stop pressed during it refuses `Suspended`, and an input the user made right before switching
 //! away holds the send.
 
-use omo_computer_core::backend::Refusal;
+use omo_computer_core::backend::{Refusal, Route};
 use omo_computer_core::error::EngineCode;
 
 use super::super::{Mutation, Refused, TRANSACTION_FAILED};
@@ -28,6 +28,7 @@ impl Session {
     pub(super) fn last_pass(
         &mut self,
         mutation: &Mutation<'_>,
+        route: &Route,
         admission: &mut Admission,
         pausing: Option<u64>,
         object: bool,
@@ -41,7 +42,7 @@ impl Session {
             })?;
             // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel,
             // the epoch is read fresh and the gate runs on a fresh plan's stages.
-            if let Err(refused) = self.readmit(mutation) {
+            if let Err(refused) = self.readmit(mutation, route) {
                 let (stage, out) = *refused;
                 return Err(Box::new((stage, self.stamp(out, object))));
             }

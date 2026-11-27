@@ -85,7 +85,7 @@ describe("runTaskSend", () => {
     expect(alias.details).toMatchObject({ kind: "steered", task_id: started.task_id, nickname: "Selene" })
     const sent = await runTaskSend(manager, { to: "worker", message: "keep going" }, "p1")
     expect(sent.details).toMatchObject({ kind: "steered", task_id: started.task_id, name: "worker", nickname: "Selene" })
-    const cancelled = await runTaskCancel(manager, { task_id: started.task_id })
+    const cancelled = await runTaskCancel(manager, { task_id: started.task_id }, "p1")
     expect(cancelled.details).toMatchObject({
       kind: "cancelled", task_id: started.task_id, name: "worker", nickname: "Selene",
     })

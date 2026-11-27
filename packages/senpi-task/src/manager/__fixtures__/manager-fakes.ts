@@ -16,6 +16,7 @@ import type { ExecutionModeGate } from "../execution-mode"
 import { createTaskManager } from "../manager"
 import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec, TaskManagerOptions } from "../types"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
+import type { DestructionPort } from "../../steering"
 
 const cleanupRoots: string[] = []
 
@@ -186,6 +187,7 @@ export function makeManager(
     admit?: AdmitResident
     executionModeGate?: ExecutionModeGate
     onNicknameConflict?: NonNullable<TaskManagerOptions["onNicknameConflict"]>
+    destruction?: DestructionPort
   } = {},
 ) {
   const project = options.project ?? tempProject()
@@ -202,6 +204,7 @@ export function makeManager(
     ...(options.onNicknameConflict !== undefined && { onNicknameConflict: options.onNicknameConflict }),
     ...(options.admit !== undefined && { admit: options.admit }),
     ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),
+    ...(options.destruction !== undefined && { destruction: options.destruction }),
   })
   return { manager, store, inProcess, process: processRunner, project }
 }

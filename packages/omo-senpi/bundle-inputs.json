@@ -2378,6 +2378,7 @@
     "packages/senpi-task/src/steering/revival-rollback.ts",
     "packages/senpi-task/src/steering/revive-running.ts",
     "packages/senpi-task/src/steering/revive.ts",
+    "packages/senpi-task/src/steering/scope-resolver.ts",
     "packages/senpi-task/src/steering/stale-run.ts",
     "packages/senpi-task/src/steering/types.ts",
     "packages/senpi-task/src/store/claim.ts",

@@ -332,7 +332,7 @@ function registerTaskTools(
     }),
     runs: "brain",
   })
-  pi.registerTool({ ...createTaskCancelTool({ manager }), runs: "brain" })
+  pi.registerTool({ ...createTaskCancelTool({ manager, resolveCallerSessionId }), runs: "brain" })
   const output = createTaskOutputTool({
     manager,
     stateDir: engine.stateDir,

@@ -5,9 +5,9 @@ import type { Static } from "typebox"
 import type { TaskStatus } from "../../state"
 import { taskReferenceLabel } from "../../manager/task-target"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
+import { defaultResolveCallerSessionId } from "./caller-session"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
-import { defaultResolveCallerSessionId } from "./caller-session"
 import type { CallerSessionResolver, CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
@@ -34,7 +34,11 @@ export type TaskCancelDeps = {
   readonly resolveCallerSessionId?: CallerSessionResolver
 }
 
-export async function runTaskCancel(manager: CancelManager, params: TaskCancelInput, callerSessionId?: string): Promise<CancelToolResult> {
+export async function runTaskCancel(
+  manager: CancelManager,
+  params: TaskCancelInput,
+  callerSessionId: string | undefined,
+): Promise<CancelToolResult> {
   const idOrName = params.task_id ?? params.name
   if (idOrName === undefined) {
     return toolResult("Provide task_id or name to identify the child task.", {
@@ -43,7 +47,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     })
   }
 
-  const outcome = await manager.cancelTask(idOrName, params.reason, callerSessionId === undefined ? undefined : { callerSessionId })
+  const outcome = await manager.cancelTask(idOrName, params.reason, { caller: { sessionId: callerSessionId } })
   const worker = "task_id" in outcome && outcome.kind !== "stale" ? manager.get(outcome.task_id) : undefined
   const reference = "task_id" in outcome ? taskReferenceLabel(outcome.task_id, worker?.nickname) : idOrName
   const label =

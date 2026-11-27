@@ -24,19 +24,14 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
-import type {
-  AwaitingInputReason,
-  LiveRunStats,
-  ResolvedModelRecord,
-  TaskRecord,
-  TaskRunStats,
-} from "../state"
+import type { AwaitingInputReason, LiveRunStats, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
-import { createSteeringEngine } from "../steering"
+import { createSteeringEngine, ownsTask, resolveTaskCallerFirst } from "../steering"
 import type {
   CancelOptions,
   CancelOutcome,
   DestructionPort,
+  InterruptOptions,
   InterruptOutcome,
   RedispatchOutcome,
   SendInput,
@@ -116,7 +111,6 @@ import { newestSessionPath } from "../lifecycle/session-path"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { TaskSequence } from "./task-sequence"
 import { createNicknameAllocator } from "./nickname-allocation"
-import { resolveTaskTarget } from "./task-target"
 import { resolveAgentHome } from "../agent-home"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeChildFacts } from "./child-facts"
@@ -874,8 +868,8 @@ class TaskManagerImpl implements TaskManager {
     return outcome
   }
 
-  async interruptTask(idOrName: string): Promise<InterruptOutcome> {
-    const outcome = await this.#steering.interruptTask(idOrName)
+  async interruptTask(idOrName: string, options?: InterruptOptions): Promise<InterruptOutcome> {
+    const outcome = await this.#steering.interruptTask(idOrName, options)
     if (outcome.kind === "interrupted") {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)
@@ -908,17 +902,16 @@ class TaskManagerImpl implements TaskManager {
   // flagged task's dead session is abandoned and a FRESH child launches from the persisted prompt,
   // under the same task identity and a new run epoch. Only a non-terminal flagged task may take it.
   async redispatchTask(idOrName: string, callerSessionId?: string, allScope?: boolean): Promise<RedispatchOutcome> {
-    const records = this.list({ scope: "all" }).map(({ record }) => record)
-    const record = resolveTaskTarget(records, idOrName, callerSessionId)
+    const listed = this.list({ scope: "all" }).map((entry) => entry.record)
+    const record = resolveTaskCallerFirst(
+      { load: (taskId) => listed.find((entry) => entry.task_id === taskId), list: () => listed },
+      idOrName,
+      callerSessionId,
+    )
     if (record === undefined) {
       return { kind: "not_found", reason: `No task named ${idOrName}.` }
     }
-    if (
-      callerSessionId !== undefined &&
-      allScope !== true &&
-      callerSessionId !== record.parent_session_id &&
-      callerSessionId !== record.root_session_id
-    ) {
+    if (callerSessionId !== undefined && allScope !== true && !ownsTask(callerSessionId, record)) {
       return {
         kind: "scope_denied",
         task_id: record.task_id,

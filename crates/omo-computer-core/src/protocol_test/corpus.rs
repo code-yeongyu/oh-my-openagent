@@ -16,14 +16,14 @@ const CORPORA: &[&str] = &[
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 
-struct Case {
-    path: String,
+pub(super) struct Case {
+    pub(super) path: String,
     name: String,
     transport: String,
-    steps: Vec<Value>,
+    pub(super) steps: Vec<Value>,
 }
 
-fn cases() -> Vec<Case> {
+pub(super) fn cases() -> Vec<Case> {
     let mut cases = Vec::new();
     for corpus in CORPORA {
         let mut paths: Vec<_> = std::fs::read_dir(crate_path(corpus))
