@@ -9,8 +9,9 @@ import { formatDoctorLines, formatEndpointLines } from "../bin/lib/daemon-status
 import { buildSenpiArgs } from "../compile-args"
 
 test("npm daemon run, host ensure, host handoff and host session open give the engine the product launch spec", () => {
-  // The launcher names its spec by its own real path, so the expectation does too (macOS tmpdir is /var -> /private/var).
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-host-launch-")))
+  // The launcher names its spec by its own real path, so the expectation does too: macOS tmpdir is /var -> /private/var,
+  // and a Windows tmpdir can carry an 8.3 short home (RUNNER~1) that only the native realpath expands.
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-host-launch-")))
   try {
     const home = join(root, "home")
     const engine = join(root, "node_modules", "@code-yeongyu", "senpi")
