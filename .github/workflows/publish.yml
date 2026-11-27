@@ -906,16 +906,47 @@ jobs:
             return 1
           }
 
+          # Once its PR exists, every failed exit of this step disarms it: auto-merge waits only on the required checks, so an
+          # armed stamp would land a version on the base that nothing published (#15126, 5.1.84's #15124). Best-effort; it
+          # reports one snapshot of the PR (state and auto-merge read together) and never masks the original failure.
+          disarm_release_pr() {
+            local snapshot="" state="" armed=""
+            for api_retry in 1 2 3 4 5; do
+              gh pr merge "$PR_NUMBER" --disable-auto >/dev/null 2>&1 || true
+              snapshot="$(gh pr view "$PR_NUMBER" --json state,autoMergeRequest --jq '"\(.state) \(.autoMergeRequest != null)"' 2>/dev/null)" || snapshot=""
+              read -r state armed <<< "$snapshot" || true
+              if [ -n "$state" ] && { [ "$state" != OPEN ] || [ "$armed" = false ]; }; then break; fi
+              if [ "$api_retry" != "5" ]; then sleep 5; fi
+            done
+            case "$state $armed" in
+              "OPEN false") echo "Disabled auto-merge on release-state PR #${PR_NUMBER}; it stays open and unmerged for a maintainer." ;;
+              "CLOSED "*) echo "Release-state PR #${PR_NUMBER} is closed; nothing was merged." ;;
+              "MERGED "*)
+                echo "::error::Release-state PR #${PR_NUMBER} merged into ${BASE_REF} before its auto-merge was disabled: ${BASE_REF} now declares v${VERSION}, which this run did not publish."
+                if [ -n "${SOURCE_SHA:-}" ]; then
+                  echo "::error::Recover by re-dispatching publish.yml with version=${VERSION} and source_sha=${SOURCE_SHA}: it reuses the merged stamp while that stamp is on ${BASE_REF} with ${SOURCE_SHA} as its first parent."
+                else
+                  echo "::error::Recover by re-dispatching publish.yml on ${BASE_REF} with version=${VERSION}: it reuses the merged stamp only while ${BASE_REF}'s tree still equals it; otherwise publish an unused version."
+                fi
+                ;;
+              *) echo "::error::Could not confirm that auto-merge is off on release-state PR #${PR_NUMBER} (last read: '${snapshot:-none}'); disable it by hand before it merges." ;;
+            esac
+          }
+
           PR_NUMBER="$(retry_gh "List release-state PR" gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
           if [ -z "$PR_NUMBER" ]; then
             PR_NUMBER="$(create_release_pr)"
           fi
+
+          release_pr_settled=false
+          trap 'status=$?; git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git" || true; if [ "$status" != 0 ] && [ "$release_pr_settled" != true ]; then disarm_release_pr; fi; exit "$status"' EXIT
 
           enable_release_auto_merge
 
           for attempt in $(seq 1 120); do
             PR_STATE="$(retry_gh "Read release-state PR state" gh pr view "$PR_NUMBER" --json state --jq '.state')"
             if [ "$PR_STATE" = "MERGED" ]; then
+              release_pr_settled=true
               MERGE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
               RELEASE_SHA="$(retry_gh "Read release-state PR source SHA" gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
               git fetch origin "$MERGE_SHA" "$RELEASE_SHA"
@@ -937,7 +968,7 @@ jobs:
 
             FAILURES="$(retry_gh "Read release-state PR checks" gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
             if [ "$FAILURES" != "0" ]; then
-              echo "::error::Release-state PR #${PR_NUMBER} has failing required checks; refusing to publish npm packages."
+              echo "::error::Release-state PR #${PR_NUMBER} has failing checks; refusing to publish npm packages."
               retry_gh "Read failing release-state PR checks" gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}' || true
               exit 1
             fi
