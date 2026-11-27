@@ -6,9 +6,11 @@ import { compareVersions } from "./release/version.ts"
 const ENDPOINT_PRIMARY_MIN_SERVICE_VERSION = "0.1.11"
 
 /**
- * omo#14195: the device names no engine endpoint as its own. Every create fails the same way until
- * omo runs on that device again, or its device service (or this one) is updated to name a primary, so it is its own
- * refusal, never a transient code a caller would simply retry.
+ * omo#14195: the device names no engine endpoint as its own. Every create fails the same way until that device's
+ * primary host answers again (`omo host ensure` replaces a host whose process lives while its socket is dead, omo#15003;
+ * when ensure refuses, stopping only that primary host and ensuring again, or restarting an omob, which has no `host`
+ * command), or a host too old to list `session-endpoint-primary:v1` gets its device service updated: such a host names
+ * no primary however often its engine restarts. It is its own refusal, never a transient code a caller would retry.
  */
 export class NoPrimaryEndpointError extends NotSentError {
   constructor(device: string, listed: number) {
@@ -16,7 +18,7 @@ export class NoPrimaryEndpointError extends NotSentError {
       "unsupported",
       `${device} lists ${listed} engine endpoint(s) and names none as its own engine; nothing was opened`,
       {
-        action: `Start or restart omo on ${device}; if that does not help, update the device service on both devices.`,
+        action: `On ${device} run \`omo host ensure\`; if it answers primary_without_product_plugin, run \`omo host handoff\` once that host's sessions are idle; if it refuses, save its output and \`omo host status --json\`, stop only the primary host (\`omo host stop\`; never \`--force\`, which ends its live sessions) and ensure again; with no \`omo host\` command (omob), restart that omo; if it still names no engine, update the device service on both devices.`,
       },
     )
   }
