@@ -25,7 +25,10 @@ describe("cancellation while transport recovery reads state", () => {
     world.host.cutConnections()
     await bounded(stateAsked, "the reattach's state read")
 
-    const cancelled = await bounded(runTaskCancel(parent.manager, { task_id: child.task_id }), "task_cancel")
+    const cancelled = await bounded(
+      runTaskCancel(parent.manager, { task_id: child.task_id }, parent.sessionId),
+      "task_cancel",
+    )
     const resumeOpen = Promise.withResolvers<void>()
     const openStarted = Promise.withResolvers<void>()
     const lateSession = Promise.withResolvers<{ readonly session: FakeHostSession; readonly attached: boolean }>()

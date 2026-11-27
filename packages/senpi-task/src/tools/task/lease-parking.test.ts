@@ -242,7 +242,7 @@ test("task_output shows parked; task_cancel drops a parked parent without reacqu
     )
     expect(output.details).toMatchObject({ kind: "status", snapshot: { lease: "parked" } })
     const epoch = fixture.manager.get(parent.task_id)!.notification.run_epoch
-    await runTaskCancel(fixture.manager, { task_id: parent.task_id })
+    await runTaskCancel(fixture.manager, { task_id: parent.task_id }, "root")
     fixture.finishLeaf.resolve()
     for (const { record } of fixture.manager.list({ scope: "all" }))
       await fixture.manager.waitFor(record.task_id, { signal: AbortSignal.timeout(20_000) })
