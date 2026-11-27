@@ -421,15 +421,20 @@ export function resolveOutputs(options) {
   }
 }
 
+export const omoSenpiBuildDefines = (version) => ({ OMO_SENPI_PACKAGE_VERSION: version, OMO_SENPI_BUNDLED: true })
+
+// The root SDK runtime's externals: node builtins, the wake sidecar the root's thread core carries like the thread SDK
+// below (#14972), and the thread client sidecar, which the root's thread core loads on its first host operation (P1b
+// size ruling: an external file takes bytes out, a dynamic import inside this file does not). The plugin manifest maps
+// both to their shipped extensions. plugin/scripts/omo-sdk-static-set.mjs builds with the same list.
+const OMO_SDK_EXTERNALS = [...sdkExternalSpecifiers, "#omo-wake-runtime", "#omo-thread-client-runtime"]
+
 export async function buildExtension(options = {}) {
   const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"))
   if (typeof packageManifest.version !== "string" || packageManifest.version.length === 0) {
     throw new Error("omo-senpi package manifest must contain a version")
   }
-  const buildDefines = {
-    OMO_SENPI_PACKAGE_VERSION: packageManifest.version,
-    OMO_SENPI_BUNDLED: true,
-  }
+  const buildDefines = omoSenpiBuildDefines(packageManifest.version)
   const {
     output,
     taskOutput,
@@ -465,7 +470,8 @@ export async function buildExtension(options = {}) {
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
-  const omoSdkInputs = await buildEntry(omoSdkEntryPath, omoSdkOutput, buildDefines, sdkExternalSpecifiers)
+  // The root's thread core carries the same parked-session wake as the thread SDK below (#14972), loaded the same way.
+  const omoSdkInputs = await buildOmoSdkRuntime(omoSdkOutput, buildDefines)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
@@ -574,7 +580,22 @@ export async function buildExtension(options = {}) {
 
 // `assets`: the entry imports files (the Loro wasm) through Bun's file loader, which is a second output
 // that --outfile cannot write; --outdir with fixed names puts the entry at `output` and each asset beside it.
-async function buildEntry(entry, output, buildDefines, externals = externalSpecifiers, { assets = false } = {}) {
+/**
+ * The one build of the SDK root runtime (`runtime/omo-sdk/sdk.js`). `keepMetafile` copies the bundler's metafile out
+ * before it is removed: plugin/scripts/omo-sdk-static-set.mjs reads what this build keeps (#14950); `entry` lets its
+ * control build one extra import on top of the same entry with the same settings.
+ */
+export function buildOmoSdkRuntime(output, buildDefines, { keepMetafile, entry = omoSdkEntryPath } = {}) {
+  return buildEntry(entry, output, buildDefines, OMO_SDK_EXTERNALS, { keepMetafile })
+}
+
+async function buildEntry(
+  entry,
+  output,
+  buildDefines,
+  externals = externalSpecifiers,
+  { assets = false, keepMetafile } = {},
+) {
   await mkdir(dirname(output), { recursive: true })
   const metafile = `${output}.meta.json`
   const target = assets
@@ -597,7 +618,7 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
     ])
     await normalizeBuiltinImports(output, builtinModuleNames)
     await minifyBundle(output)
-    return await attachBuildMarker({
+    const inputs = await attachBuildMarker({
       output,
       entry,
       metafile,
@@ -606,6 +627,9 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
       buildSettings: digestSettingsFor(externals, builtinModuleNames),
       buildScriptPath,
     })
+    // Kept only for a build that succeeded, so a failed build's own error is what the caller sees.
+    if (keepMetafile !== undefined) await copyFile(metafile, keepMetafile)
+    return inputs
   } finally {
     await rm(metafile, { force: true })
   }

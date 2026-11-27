@@ -65,6 +65,7 @@ export const PORT_OPERATIONS = {
     "sessions.answer",
   ],
   deviceService: [
+    "devices.list",
     "service.info",
     "service.status",
     "service.setEnabled",

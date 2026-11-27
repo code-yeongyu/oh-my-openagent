@@ -73,3 +73,29 @@ export function parseThreadParams<S extends TObject>(schema: S, input: unknown):
     ),
   }
 }
+
+const refusedKeys = (...args: Parameters<typeof threadToolFailure>): ThreadDataError => ({
+  kind: "error",
+  error: threadToolFailure(...args),
+})
+
+/**
+ * A script names only the keys an operation reads: a misspelt one (`allScope` for `all_scope`) is refused by name
+ * instead of silently ignored (#14316).
+ */
+export function unknownKeys(request: unknown, known: readonly string[]): ThreadDataError | undefined {
+  if (typeof request !== "object" || request === null || Array.isArray(request))
+    return refusedKeys(
+      "invalid_arguments",
+      "The options must be an object.",
+      `Pass an object with ${known.join(", ")}.`,
+    )
+  const unknown = Object.keys(request).filter((key) => !known.includes(key))
+  if (unknown.length === 0) return undefined
+  return refusedKeys(
+    "invalid_arguments",
+    `Unknown option${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}.`,
+    `Pass only ${known.join(", ")}.`,
+    { unknown },
+  )
+}

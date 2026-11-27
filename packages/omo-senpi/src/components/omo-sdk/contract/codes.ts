@@ -86,7 +86,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Call devices.list; retry once the device is online.",
   },
   device_service_unavailable: {
-    namespaces: ["deviceService"],
+    namespaces: ["deviceService", "devices"],
     next_action: "Call deviceService.status, then retry.",
   },
   foreign_live_owner: {
@@ -231,11 +231,11 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Read details for the account service's reason.",
   },
   service_unreachable: {
-    namespaces: ["account", "devices", "install"],
+    namespaces: ["account", "install"],
     next_action: "Check the network, then retry.",
   },
   session_ended: {
-    namespaces: ["account", "devices"],
+    namespaces: ["account"],
     next_action: "The session ended; open it again with threads.create.",
   },
   signed_out: {
@@ -276,7 +276,13 @@ export const OMO_CODE_REGISTRY = {
   },
 } as const satisfies Readonly<Record<string, CodeEntry>>
 
-export type OmoCode = keyof typeof OMO_CODE_REGISTRY
+/**
+ * Design 4.4: reserved for a call whose slice has not landed. It is outside the registry on purpose: no row may return
+ * it as an outcome (a scenario that expects it fails, script/sdk-parity/conformance.ts), so no refusal scenario names it.
+ */
+const RESERVED_CODES = ["not_implemented"] as const
+
+export type OmoCode = keyof typeof OMO_CODE_REGISTRY | (typeof RESERVED_CODES)[number]
 
 export type HeldCode =
   | { readonly because: "held-rows"; readonly rows: readonly string[] }

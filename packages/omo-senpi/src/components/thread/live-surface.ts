@@ -343,11 +343,10 @@ function isConnectRefusal(error: unknown): boolean {
  */
 export function createLiveThreadSurface(
   _pi: SenpiExtensionAPI | undefined,
-  options: LiveThreadSurfaceOptions = {},
+  { connect = (path: string) => createConnection(path), ...options }: LiveThreadSurfaceOptions = {},
 ): LiveThreadSurface {
   const env = options.env ?? process.env
   const exists = options.exists ?? existsSync
-  const connect = options.connect ?? ((path: string) => createConnection(path))
   const now = options.now ?? Date.now
   const monotonic = options.monotonic ?? (() => performance.now())
   const statusAll = options.statusAll ?? (async () => undefined)
