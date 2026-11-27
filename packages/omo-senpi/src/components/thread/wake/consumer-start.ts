@@ -61,9 +61,9 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
     chainCountLimit: input.chainCountLimit,
     wake: input.wake,
     ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-    // A pass that fails on the deadline timer's path is retried by the consumer; it is reported every time (#15241 L1).
+    // Every error the consumer reports (a settlement pass, a refusal notice, a wake, a limit read) reaches the log (#15241 L1, L3).
     onError: (error) =>
-      input.log(`thread wake: a delivery settlement pass failed: ${error instanceof Error ? error.message : String(error)}`),
+      input.log(`thread wake: delivery consumer error: ${error instanceof Error ? error.message : String(error)}`),
   })
   input.onConsumer?.(consumer)
   let started: ConsumerStart
