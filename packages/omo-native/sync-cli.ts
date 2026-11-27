@@ -16,7 +16,12 @@ import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
 import { approve, spacedCode } from "./sync-approve-cli"
 import { deliverVoidNotice } from "./sync-void-notice"
-import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
+import {
+  CREATION_UNAVAILABLE,
+  phraseCreationGuidance,
+  RUN_IT_YOURSELF,
+  updateDeviceFirst,
+} from "./sync-creation-guidance"
 import { readEngineSyncStatus, type EngineSyncRead } from "./sync-engine-status"
 import { recover, recoverRefused } from "./sync-recover-cli"
 import { collectSyncStatus, syncStatusLines } from "./sync-status-cli"
@@ -30,7 +35,7 @@ export interface SyncCommandDependencies {
   readonly error: (line: string) => void
   readonly confirm: (question: string) => Promise<boolean>
   readonly interactive: boolean
-  /** The environment the refusal markers and the phrase flag are read from. */
+  /** The environment the agent, CI and terminal refusal markers are read from. */
   readonly env?: Readonly<Record<string, string | undefined>>
   /** Opens the controlling terminal; null when there is none. Words never go anywhere else. */
   readonly terminal?: () => PhraseTerminal | null
@@ -44,7 +49,6 @@ export interface SyncCommandDependencies {
   readonly engineStatus?: () => Promise<EngineSyncRead>
 }
 
-export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
 const CANCELLED = "Turning on memory sync was cancelled. Nothing was saved."
 
 // Review L9: an enrollment or rotation also holds this lock, so the line must not say "turning on sync".
@@ -82,7 +86,8 @@ const phraseSetup = (
   // Checked before any secret exists: an agent harness, CI, or no controlling terminal never sees words (sec 7).
   refused: agentMarkerSet(env) || !(dependencies.terminalAvailable ?? controllingTerminalAvailable)(),
   gate: {
-    enabled: env[PHRASE_GENESIS_FLAG] === "1",
+    // Creation follows the service's own accepts_phrase_keys answer alone; there is no client flag (#14432).
+    enabled: true,
     serviceFloor: dependencies.phraseFloor ?? readServiceFloor,
     refused: (reason, account) =>
       dependencies.error(`memory sync refused to create a recovery phrase (${reason}) for account ${account}.`),
@@ -139,7 +144,9 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
       dependencies.error(CANCELLED)
       return 1
     case "phrase_unavailable":
-      dependencies.error(phraseCreationGuidance[outcome.reason])
+      if (outcome.devices !== undefined && outcome.devices.length > 0)
+        for (const device of outcome.devices) dependencies.error(updateDeviceFirst(device.label))
+      else dependencies.error(phraseCreationGuidance[outcome.reason])
       return EXIT_UNSUPPORTED_HERE
     case "acknowledge_required":
     case "method_required":

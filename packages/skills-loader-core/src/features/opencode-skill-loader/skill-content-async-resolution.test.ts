@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { gitMasterSkill } from "../builtin-skills/skills/index"
+import { gitSkill } from "../builtin-skills/skills/index"
 import { clearSkillCache, resolveSkillContentAsync } from "./skill-content"
 import { getAllSkills } from "./skill-discovery"
 import { matchSkillByName } from "../../tools/skill/skill-matcher"
@@ -53,7 +53,7 @@ afterEach(() => {
 
 describe("resolveSkillContentAsync", () => {
   it("should return template for builtin skill async", async () => {
-    // given: builtin git-master with runtime transformations disabled
+    // given: builtin git skill, requested by its retired name, with runtime transformations disabled
     const options = {
       directory: testConfigDir,
       gitMasterConfig: {
@@ -66,8 +66,8 @@ describe("resolveSkillContentAsync", () => {
     // when: resolving content async
     const result = await resolveSkillContentAsync("git-master", options)
 
-    // then: returns the git-master source template
-    expect(result === gitMasterSkill.template).toBe(true)
+    // then: returns the git source template
+    expect(result === gitSkill.template).toBe(true)
   })
 
   it("should return null for disabled skill async", async () => {

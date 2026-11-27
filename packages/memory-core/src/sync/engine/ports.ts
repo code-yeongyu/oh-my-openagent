@@ -50,13 +50,18 @@ export interface AppendRequest {
   readonly epoch: number
   readonly link: string
   readonly recordSig: string
+  /** The sealed object itself, sent in the append instead of an upload (`uploadId` is then ignored). */
+  readonly inline?: Uint8Array
 }
 
 export interface StreamHandlers {
   /** `sync.advanced` / `sync.keyring.changed`: a trigger carrying the advertised head, never data. */
   readonly onAdvanced: (head: number) => void
-  /** The stream connected (true) or dropped (false); while down the engine polls. */
-  readonly onConnected: (connected: boolean) => void
+  /**
+   * The stream connected (true), or it is down (false): it dropped, or a connect attempt failed, `cause` naming why
+   * (the HTTP status and code, or the error). Sent again on every failed retry; while down the engine polls.
+   */
+  readonly onConnected: (connected: boolean, cause?: string) => void
   /** `sync.state.changed`: the account state moved without an append (a rotation is pending, or sync was toggled). */
   readonly onStateChanged: () => void
 }
@@ -93,7 +98,11 @@ export interface FreezeSettler {
 
 export interface Transport {
   /** Entries with `seq > after`, in sequence order, at most `limit` of them. */
-  pull(after: number, limit: number): Promise<PullPage>
+  /**
+   * `advertised`: the highest head the event stream announced; a transport may answer from the entries alone when
+   * they reach it, instead of reading the head first.
+   */
+  pull(after: number, limit: number, advertised?: number): Promise<PullPage>
   /** Object bytes, fetched through the Worker after the account check. */
   download(objectId: string): Promise<Uint8Array>
   /** Reserve exactly `size` bytes with this SHA-256; returns the upload id. */
@@ -105,6 +114,8 @@ export interface Transport {
    * that its own landed append has already moved, and answering "stale" there would duplicate it.
    */
   append(request: AppendRequest): Promise<AppendResult>
+  /** The largest batch the service takes inline in the append; 0 or absent when it does not (send an upload). */
+  inlineBytes?(): number
   /** Subscribe to the account event stream; returns the unsubscribe. */
   subscribe(handlers: StreamHandlers): () => void
 }
@@ -170,6 +181,15 @@ export interface Sealer {
     readonly link: string
     readonly recordSig: string
   }): Promise<boolean>
+  /** The service appended this session's own sealed batch at `seq`: the chain may take it without reading it back. */
+  appended?(own: {
+    readonly seq: number
+    readonly baseSeq: number
+    readonly digest: string
+    readonly epoch: number
+    readonly link: string
+    readonly recordSig: string
+  }): Promise<void>
 }
 
 /** The item model (#10203 device API) as the engine uses it. */

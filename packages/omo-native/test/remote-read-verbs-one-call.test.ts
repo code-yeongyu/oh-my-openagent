@@ -66,7 +66,7 @@ describe("omo remote read verbs (G3: one person-client call per verb)", () => {
     [["wake", "off"], "service.setWake"],
   ])("#given %p --json #when it runs #then it calls %s once and prints its value", async (args, member) => {
     const calls: string[] = []
-    const { code, out } = await run([...args, "--json"], privateDir(), undefined, undefined, undefined, {
+    const { code, out } = await run([...args, "--json"], privateDir(), undefined, undefined, {
       client: spyClient(calls),
     })
     expect(code).toBe(REMOTE_EXIT.ok)
@@ -81,7 +81,7 @@ const failingClient = (failure: Record<string, unknown>) => () =>
 
 describe("omo remote read verbs: failures of the person client", () => {
   const fail = (failure: Record<string, unknown>) =>
-    run(["status"], privateDir(), undefined, undefined, undefined, { client: failingClient(failure) })
+    run(["status"], privateDir(), undefined, undefined, { client: failingClient(failure) })
 
   test("#given the connection itself failed #when status runs #then it says the service is not running, exit 3", async () => {
     const { code, err } = await fail({

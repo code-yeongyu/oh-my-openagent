@@ -9,7 +9,7 @@ const corpusPaths = [
   ".agents/skills/opencode-qa/SKILL.md",
   ".agents/skills/security-research/SKILL.md",
   "packages/skills-loader-core/src/features/builtin-skills/dev-browser/SKILL.md",
-  "packages/skills-loader-core/src/features/builtin-skills/git-master/SKILL.md",
+  "packages/shared-skills/skills/git/SKILL.md",
   ".omo/rules/test-discipline.md",
 ] as const
 
