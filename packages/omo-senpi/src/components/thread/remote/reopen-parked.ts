@@ -40,6 +40,7 @@ export async function reopenParkedRow(
       details,
     )
   const view = known ?? (await holderView(remote, listed))
+  if (typeof view !== "string") return { result: view }
   if (view === "absent")
     return failure(
       "not_found",
