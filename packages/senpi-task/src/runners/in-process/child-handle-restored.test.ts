@@ -53,7 +53,12 @@ function createFakeSession(sessionId = "restored-session-1"): FakeSessionControl
 describe("createRestoredChildHandle", () => {
   test('#given completion "turn" and a restored session without assistant output #when waitForIdle is awaited #then it settles completed with empty text instead of child-turn-failed', async () => {
     const fake = createFakeSession()
-    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session, completion: "turn" })
+    const handle = createRestoredChildHandle({
+      workEvidence: "none-pending",
+      taskId: "task-1",
+      session: fake.session,
+      completion: "turn",
+    })
 
     expect(await handle.waitForIdle()).toEqual({ status: "completed", finalResponse: "" })
     expect(fake.promptCalls()).toBe(0)
@@ -65,7 +70,7 @@ describe("createRestoredChildHandle", () => {
     fake.lastText.value = "previous result"
 
     // when the restored handle is created
-    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session })
+    const handle = createRestoredChildHandle({ workEvidence: "none-pending", taskId: "task-1", session: fake.session })
 
     // then the original prompt is NOT replayed, and the idle handle settles on the transcript outcome
     expect(fake.promptCalls()).toBe(0)
@@ -75,7 +80,7 @@ describe("createRestoredChildHandle", () => {
   test("#given a restored session without assistant output #when waitForIdle is awaited #then a typed empty-turn outcome settles instead of hanging", async () => {
     // given a transcript with no assistant text (nothing durable to drain)
     const fake = createFakeSession()
-    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session })
+    const handle = createRestoredChildHandle({ workEvidence: "none-pending", taskId: "task-1", session: fake.session })
 
     // when the idle outcome is awaited
     const outcome = await handle.waitForIdle()
@@ -92,7 +97,7 @@ describe("createRestoredChildHandle", () => {
     // given a restored idle handle
     const fake = createFakeSession()
     fake.lastText.value = "previous result"
-    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session })
+    const handle = createRestoredChildHandle({ workEvidence: "none-pending", taskId: "task-1", session: fake.session })
 
     // when a follow-up revives it
     await handle.followUp("continue the work")
@@ -108,7 +113,7 @@ describe("createRestoredChildHandle", () => {
   test("#given a restored handle with a turn in flight #when a follow-up arrives #then it queues on the session exactly like a live resident", async () => {
     // given a restored handle whose revival turn is running
     const fake = createFakeSession()
-    const handle = createRestoredChildHandle({ taskId: "task-1", session: fake.session })
+    const handle = createRestoredChildHandle({ workEvidence: "none-pending", taskId: "task-1", session: fake.session })
     await handle.followUp("first")
 
     // when another follow-up arrives mid-turn

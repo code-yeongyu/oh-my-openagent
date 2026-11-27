@@ -128,7 +128,7 @@ describe("a reopened session's finished transcript settles only an idle session 
     )
 
     // when
-    await handle.adoptFinishedTurn("waiting for the test run")
+    await handle.adoptFinishedTurn("waiting for the test run", "unrecorded")
 
     // then
     expect(await settledYet(outcome)).toBe(false)
@@ -147,7 +147,7 @@ describe("a reopened session's finished transcript settles only an idle session 
       )
 
     // when
-    await handle.adoptFinishedTurn("all green")
+    await handle.adoptFinishedTurn("all green", "unrecorded")
 
     // then
     expect(await outcome).toEqual({ status: "completed", finalResponse: "all green" })
@@ -160,7 +160,7 @@ describe("a reopened session's finished transcript settles only an idle session 
     const outcome = handle.waitForOutcome()
 
     // when
-    await handle.adoptFinishedTurn("all green")
+    await handle.adoptFinishedTurn("all green", "unrecorded")
 
     // then
     expect(await settledYet(outcome)).toBe(false)

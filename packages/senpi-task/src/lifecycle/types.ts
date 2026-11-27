@@ -3,6 +3,7 @@ import type { TaskRecord } from "../state"
 import type { HostSessionCancelPort } from "./host-session"
 import type { HostSessionParkOptions, HostSessionParkOutcome } from "./host-session-revive"
 import type { DestroyCause, DetachedRevivalRollbackResult } from "./port"
+import type { PendingRevivals } from "./revival-pending"
 
 export type AdmissionResult =
   | { readonly kind: "admitted" }
@@ -12,6 +13,7 @@ export type AdmissionResult =
 export type ReconcileOutcomeKind = "resumed" | "lost" | "lost_and_terminated" | "foreign_live_owner" | "deferred"
 
 export type ReconcileDeferredReason =
+  | "usage_limit"
   | "capacity"
   | "lock_contended"
   | "foreign_live_owner"
@@ -85,6 +87,8 @@ export type TaskLifecycle = {
   reclaimIdleResidents?(): Promise<readonly string[]>
   // Release a finished child still resident here (task_cancel on a terminal task, omo#9785); false when there is none.
   parkTerminalResident(taskId: string): Promise<boolean>
+  // Whether this host's lifecycle still owes a child a revival; workflow recovery asks it (#15150).
+  readonly pendingRevivals?: PendingRevivals
   // A cancel of a daemon-hosted child this process holds no handle for (omo#11765): its confirmed end, and its retry driver.
   hostSessionCancel?: HostSessionCancelPort
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
