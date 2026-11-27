@@ -23,6 +23,14 @@ describe("config.explain routing keys", () => {
     })
   })
 
+  test("#given an upper-case credential prefix under the model key #when it is explained #then the value is withheld", async () => {
+    sandbox = configSandbox()
+    sandbox.userConfig({ categories: { quick: { model: "SK-PROJ-CANARY-1" } } })
+    const answer = valueOf(await sandbox.config().explain({ path: "categories.quick.model" }))
+    expect(answer).toMatchObject({ set: true, value_withheld: true, source: "user" })
+    expect(JSON.stringify(answer)).not.toContain("CANARY")
+  })
+
   test("#given a model list with object entries #when it is explained #then each entry keeps only model, variant and reasoning", async () => {
     sandbox = configSandbox()
     sandbox.userConfig({

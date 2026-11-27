@@ -33,7 +33,7 @@ const NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/
 const PROTOTYPE_NAMES: ReadonlySet<string> = new Set(["constructor", "prototype"])
 const TOKEN = /^[a-z0-9][a-z0-9_-]{0,31}$/
 const MODEL_ID = /^(?:[A-Za-z0-9._:-]+\/)?[A-Za-z0-9._:-]+$/
-const CREDENTIAL_PREFIX = /^(?:sk-|pk-|rk-|ghp_|gho_|ghs_|xox[abpr]-|AKIA|AIza)/
+const CREDENTIAL_PREFIX = /^(?:sk-|pk-|rk-|ghp_|gho_|ghs_|xox[abpr]-|AKIA|AIza)/i
 const CREDENTIAL_RUN = /[A-Za-z0-9_]{24,}/
 const VERSION = /^[0-9A-Za-z.+-]{1,40}$/
 
