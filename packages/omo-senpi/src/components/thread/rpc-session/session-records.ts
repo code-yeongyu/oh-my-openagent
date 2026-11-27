@@ -10,6 +10,8 @@ export type SessionRecords = {
   /** Every host frame that is not the answer to the stream's own requests, in host order. */
   readonly accept: (frame: RpcRecord) => void
   readonly bind: (sessionId: string) => void
+  /** The durable id the host's `session_opened` record names for this handle, when one arrived before the answer. */
+  readonly openedDurableId: (sessionId: string) => string | undefined
   readonly tag: (record: RpcRecord) => RpcRecord
   readonly end: (reason: RpcSessionEnd) => void
   readonly isEnded: () => boolean
@@ -72,6 +74,11 @@ export function createSessionRecords(): SessionRecords {
       if (reason !== undefined) return
       if (handle !== undefined) return route(frame)
       if (typeof frame.sessionId === "string") early.push(frame)
+    },
+    openedDurableId: (sessionId) => {
+      const opened = early.find((frame) => frame.type === "session_opened" && frame.sessionId === sessionId)
+      const durable = opened?.durableSessionId
+      return typeof durable === "string" && durable !== "" ? durable : undefined
     },
     bind: (sessionId) => {
       handle = sessionId

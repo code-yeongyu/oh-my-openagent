@@ -51,13 +51,24 @@ function answerOf(
   return failure(SESSION_GONE.has(code) ? "session_not_found" : "refused", `${what}: ${code}`)
 }
 
-async function open(host: RpcSocketStream, fields: RpcRecord, timeoutMs: number): Promise<Begun | RpcSessionFailure> {
+/**
+ * The host names the opened session's durable id in the `session_opened` record it writes for the handle before it
+ * answers (the answer's `state` does not carry it); an answer that names it is read as well.
+ */
+async function open(
+  host: RpcSocketStream,
+  session: SessionRecords,
+  fields: RpcRecord,
+  timeoutMs: number,
+): Promise<Begun | RpcSessionFailure> {
   const answer = answerOf(await host.request({ ...fields, type: "open_session" }, timeoutMs), "open_session")
   if (answer.kind === "error") return answer
   const sessionId = text(answer.data.sessionId)
   if (sessionId === undefined) return failure("refused", "open_session answered no sessionId")
   const state = isRecord(answer.data.state) ? answer.data.state : {}
-  return { kind: "ok", sessionId, durableSessionId: text(state.durableSessionId) ?? text(answer.data.durableSessionId) }
+  const durableSessionId =
+    session.openedDurableId(sessionId) ?? text(state.durableSessionId) ?? text(answer.data.durableSessionId)
+  return { kind: "ok", sessionId, durableSessionId }
 }
 
 /** The host routes by its handle, so a durable id is looked up in its listing first, as the thread client does. */
@@ -77,8 +88,10 @@ async function attach(
   return attached.kind === "error" ? attached : { kind: "ok", sessionId, durableSessionId }
 }
 
-const begin = (host: RpcSocketStream, target: RpcSessionTarget, timeoutMs: number) =>
-  "open" in target ? open(host, target.open, timeoutMs) : attach(host, target.attach.durableSessionId, timeoutMs)
+const begin = (host: RpcSocketStream, session: SessionRecords, target: RpcSessionTarget, timeoutMs: number) =>
+  "open" in target
+    ? open(host, session, target.open, timeoutMs)
+    : attach(host, target.attach.durableSessionId, timeoutMs)
 
 function streamOf(host: RpcSocketStream, session: SessionRecords, begun: Begun, timeoutMs: number): RpcSessionStream {
   const lines = createJsonlLines()
@@ -141,7 +154,7 @@ export async function attachRpcSession(options: AttachRpcSessionOptions): Promis
   } catch (error) {
     return failureOf(error)
   }
-  const begun = await begin(host, options.session, timeoutMs).catch(failureOf)
+  const begun = await begin(host, session, options.session, timeoutMs).catch(failureOf)
   if (begun.kind === "error") {
     host.close()
     return begun

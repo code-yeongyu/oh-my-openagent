@@ -73,6 +73,22 @@ describe("attachRpcSession", () => {
     })
   })
 
+  test("#given a host that names the durable id in its session_opened record, as a real host does #when the session opens #then the stream carries that id and the record still streams", async () => {
+    const opened = { type: "session_opened", durableSessionId: "dur-opened", kind: "interactive" }
+    await withStream({ beforeOpen: [opened] }, OPEN, async (stream) => {
+      // given
+      const next = reader(stream)
+
+      // when
+      const first = await next("the session_opened record")
+
+      // then
+      expect(stream.durableSessionId).toBe("dur-opened")
+      expect(first).toEqual(opened)
+      await stream.detach()
+    })
+  })
+
   test("#given raw JSONL bytes split across writes with a line that is not JSON #when written #then each whole record is sent and the bad line is answered back", async () => {
     await withStream({}, OPEN, async (stream) => {
       // given
