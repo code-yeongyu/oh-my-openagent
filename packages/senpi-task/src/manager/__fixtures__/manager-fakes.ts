@@ -16,6 +16,7 @@ import type { ExecutionModeGate } from "../execution-mode"
 import { createTaskManager } from "../manager"
 import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
+import type { DestructionPort } from "../../steering"
 
 const cleanupRoots: string[] = []
 
@@ -185,6 +186,7 @@ export function makeManager(
     process?: ManagedRunner
     admit?: AdmitResident
     executionModeGate?: ExecutionModeGate
+    destruction?: DestructionPort
   } = {},
 ) {
   const project = options.project ?? tempProject()
@@ -199,6 +201,7 @@ export function makeManager(
     cwd: project,
     ...(options.admit !== undefined && { admit: options.admit }),
     ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),
+    ...(options.destruction !== undefined && { destruction: options.destruction }),
   })
   return { manager, store, inProcess, process: processRunner, project }
 }
