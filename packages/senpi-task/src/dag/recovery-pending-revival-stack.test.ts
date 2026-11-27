@@ -47,12 +47,12 @@ function nodeTransitions(store: DagFileStore, nodeId: string): readonly string[]
 }
 
 /** Resolves on the node's next transition to `to`, subscribed before the action that causes it. */
-function transitionTo(store: DagFileStore, nodeId: string, to: string): Promise<void> {
-  const seen = Promise.withResolvers<void>()
+function transitionTo(store: DagFileStore, nodeId: string, to: string): Promise<undefined> {
+  const seen = Promise.withResolvers<undefined>()
   const stop = subscribeDagJournal(store, runId, (event) => {
     if (event.type !== "dag.node.transitioned" || event.nodeId !== nodeId || event.to !== to) return
     stop()
-    seen.resolve()
+    seen.resolve(undefined)
   })
   return seen.promise
 }
