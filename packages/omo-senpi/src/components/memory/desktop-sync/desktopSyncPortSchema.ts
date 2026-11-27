@@ -115,19 +115,27 @@ export class DesktopSyncServiceError extends Error {
   override readonly name = "DesktopSyncServiceError"
   readonly code: string
   readonly status: number
-  constructor(code: string, status: number) {
+  /** The refusal's `error.detail`, untrusted; read only through a typed decoder. */
+  readonly detail: unknown
+  constructor(code: string, status: number, detail?: unknown) {
     super(`Desktop sync service refused the request (${status}).`)
     this.code = code
     this.status = status
+    this.detail = detail
   }
 }
-const errorCode = z.object({ error: z.object({ code: z.string() }) })
+const errorCode = z.object({ error: z.object({ code: z.string(), detail: z.unknown().optional() }) })
 export function requireSyncSuccess(input: unknown) {
   const response = reply.parse(input)
   if (response.status < 200 || response.status >= 300) {
     const parsed = response.kind === "json" ? errorCode.safeParse(response.body) : undefined
     const code = parsed?.success === true ? parsed.data.error.code : "unknown"
-    throw new DesktopSyncServiceError(response.status >= 500 ? "unavailable" : code, response.status)
+    if (response.status >= 500) throw new DesktopSyncServiceError("unavailable", response.status)
+    throw new DesktopSyncServiceError(
+      code,
+      response.status,
+      parsed?.success === true ? parsed.data.error.detail : undefined,
+    )
   }
   return response
 }

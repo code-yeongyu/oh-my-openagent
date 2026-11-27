@@ -5,13 +5,12 @@ import { fileURLToPath } from "node:url"
 
 import { resolveOmoGitMasterSettings, type OmoGitMasterSettings } from "@oh-my-opencode/omo-config-core"
 import { buildSkillPrepend, createFsSkillLoader, type SkillLoader } from "@oh-my-opencode/senpi-task"
+import { isGitSkillName } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/git-skill-metadata"
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "../bundled-skills"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { carriesAttributionDirective, resolveGitMasterSkillAdditions } from "../git-master/skill-content"
-
-const GIT_MASTER_SKILL_NAME = "git-master"
 
 export interface TaskSkillLoaderOptions {
   readonly env?: Record<string, string | undefined>
@@ -54,11 +53,11 @@ function withGitMasterSettings(loader: SkillLoader, loadSettings: (cwd: string) 
   return (names, cwd) => {
     const resolution = loader(names, cwd)
     const resolvedSkills = resolution.skills ?? []
-    if (!resolvedSkills.some((skill) => skill.name === GIT_MASTER_SKILL_NAME)) return resolution
+    if (!resolvedSkills.some((skill) => isGitSkillName(skill.name))) return resolution
     const additions = resolveGitMasterSkillAdditions(loadSettings(cwd))
     if (additions === undefined) return resolution
     const skills = resolvedSkills.map((skill) => {
-      if (skill.name !== GIT_MASTER_SKILL_NAME) return skill
+      if (!isGitSkillName(skill.name)) return skill
       const content = additions.rewriteSkillText(skill.content)
       const appendDirective = additions.directive !== undefined && !carriesAttributionDirective([skill.content])
       return { ...skill, content: appendDirective ? `${content}\n\n${additions.directive}` : content }

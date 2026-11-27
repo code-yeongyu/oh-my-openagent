@@ -9,6 +9,7 @@ import {
   RequestFailure,
 } from "@oh-my-opencode/omo-opencode/service-auth"
 import { LocalApiError } from "@oh-my-opencode/device-service-core"
+import { closeClients, fakeClock, startOwner } from "../remote/testing/fake-service"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 
 const ORIGIN = "https://accounts.example.test"
@@ -83,8 +84,9 @@ function secretKeys(value: unknown, path = "$"): string[] {
 }
 
 const homes: string[] = []
-afterEach(() => {
+afterEach(async () => {
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
+  await closeClients()
 })
 
 describe("createOmoSdk reads", () => {
@@ -106,9 +108,9 @@ describe("createOmoSdk reads", () => {
     })
   })
 
-  test("#given the account lists a revoked device #when devices.list runs #then only live devices return, this one current", async () => {
+  test("#given the account lists a revoked device #when account.devices runs #then only live devices return with the account's own fields, this one current", async () => {
     const { ports } = fakes()
-    expect(valueOf(await sdkWith(ports).devices.list())).toEqual([
+    expect(valueOf(await sdkWith(ports).account.devices())).toEqual([
       { id: "dev_this", name: "device-a", kind: "cli", platform: "linux", current: true },
       { id: "dev_other", name: "device-b", platform: "macos", machineBound: true, current: false },
     ])
@@ -118,7 +120,9 @@ describe("createOmoSdk reads", () => {
     const { ports } = fakes()
     const home = mkdtempSync(join(tmpdir(), "omo-sdk-home-"))
     homes.push(home)
-    const sdk = createOmoSdk({ env: { OMO_SERVICE_API_URL: ORIGIN, HOME: home }, cwd: home, home, ports })
+    const owner = await startOwner()
+    const env = { OMO_SERVICE_API_URL: ORIGIN, HOME: home, OMO_DEVICE_SERVICE_STATE_DIR: owner.stateDir }
+    const sdk = createOmoSdk({ env, cwd: home, home, ports: { ...ports, remoteTimers: fakeClock() } })
     const values = [
       await sdk.account.whoami(),
       await sdk.devices.list(),
@@ -133,7 +137,7 @@ describe("createOmoSdk reads", () => {
 describe("createOmoSdk refusals", () => {
   test("#given no stored sign-in #when a read runs #then it answers signed_out and makes no request", async () => {
     const { ports, calls } = fakes({ store: null })
-    const error = errorOf(await sdkWith(ports).devices.list())
+    const error = errorOf(await sdkWith(ports).account.whoami())
     expect(error.code).toBe("signed_out")
     expect(error.next_action).not.toBe("")
     expect(calls).toEqual([])
@@ -153,7 +157,7 @@ describe("createOmoSdk refusals", () => {
         throw new ApiRefusal("unauthorized", 401)
       },
     })
-    const result = await sdkWith(ports).devices.list()
+    const result = await sdkWith(ports).account.whoami()
     expect(errorOf(result)).toMatchObject({ code: "session_ended", details: { code: "unauthorized" } })
     expect(secretKeys(result)).toEqual([])
   })
@@ -164,7 +168,7 @@ describe("createOmoSdk refusals", () => {
         throw new ApiRefusal("forbidden", 403)
       },
     })
-    expect(errorOf(await sdkWith(ports).devices.list())).toMatchObject({
+    expect(errorOf(await sdkWith(ports).account.whoami())).toMatchObject({
       code: "service_refused",
       details: { status: 403, code: "forbidden" },
     })
@@ -265,14 +269,115 @@ describe("deviceService.status", () => {
 })
 
 describe("config.status", () => {
-  test("#given an unparsable user config #when status runs #then the file is listed unloaded with its parse diagnostic", async () => {
+  test("#given an unparsable user config #when status runs #then the file is listed by scope, unloaded, with one parse diagnostic", async () => {
     const home = mkdtempSync(join(tmpdir(), "omo-sdk-config-"))
     homes.push(home)
     mkdirSync(join(home, ".omo"))
-    const configPath = join(home, ".omo", "omo.jsonc")
-    writeFileSync(configPath, "{ not json")
+    writeFileSync(join(home, ".omo", "omo.jsonc"), "{ not json")
     const status = valueOf(await createOmoSdk({ env: { HOME: home }, cwd: home }).config.status())
-    expect(status.files).toContainEqual({ path: configPath, scope: "user", exists: true, loaded: false })
-    expect(status.diagnostics).toContainEqual(expect.objectContaining({ kind: "parse", path: configPath }))
+    expect(status.files).toContainEqual({ scope: "user", exists: true, loaded: false })
+    expect(status.diagnostics).toContainEqual({ kind: "parse", count: 1 })
   })
+
+  // Security contract (the security owner's ruling): the SDK reports the configuration by scope, kind and count. No key
+  // name, key path, value, parse excerpt or file path from a config file reaches an SDK caller; the command a person
+  // runs (its configuration check) keeps the full text.
+  test("#given user and project configs with unknown keys, a wrong-typed value and a parse error #when status runs #then the answer names none of them and no file path", async () => {
+    const home = mkdtempSync(join(tmpdir(), "zz-canary-home-"))
+    homes.push(home)
+    const project = join(home, "zz-canary-project")
+    mkdirSync(join(home, ".omo"))
+    mkdirSync(join(project, ".omo"), { recursive: true })
+    writeFileSync(
+      join(home, ".omo", "omo.jsonc"),
+      JSON.stringify({
+        zz_canary_top_key: 1,
+        task: { host_engine_policy: "zz-canary-value", zz_canary_nested_key: true },
+        agents: { zz_canary_agent: { model: "anthropic/claude-opus-5", zz_canary_agent_key: true } },
+      }),
+    )
+    writeFileSync(join(project, ".omo", "omo.jsonc"), '{ "zz_canary_parse_excerpt": ')
+    const status = valueOf(await createOmoSdk({ env: { HOME: home }, cwd: project }).config.status())
+    expect(JSON.stringify(status).match(/zz[_-]canary[\w-]*/g) ?? []).toEqual([])
+    expect(status.files.every((file) => Object.keys(file).sort().join() === "exists,loaded,scope")).toBe(true)
+    expect(status.diagnostics.every((entry) => Object.keys(entry).sort().join() === "count,kind")).toBe(true)
+    expect(status.diagnostics.map((entry) => entry.kind)).toEqual(
+      expect.arrayContaining(["unknown-keys", "invalid-value", "parse"]),
+    )
+  })
+
+  // The same contract over nine shapes of file text (the security reader's variants): each body is written into both the
+  // user file and the project file, and the whole serialized answer, or a thrown error's message, carries no canary
+  // token and no absolute path.
+  const VARIANTS: readonly (readonly [string, string])[] = [
+    ["values under unknown keys", JSON.stringify({ providers: { x: { apiKey: "CANARY-VALUE-1" } } })],
+    ["a canary as a top-level key name", JSON.stringify({ "CANARY-KEYNAME-2": 1 })],
+    ["a canary as a nested key name", JSON.stringify({ agents: { "CANARY-KEYNAME-3": { model: "m" } } })],
+    ["a syntax error right after a canary value", '{ "apiKey": "CANARY-VALUE-4" oops }'],
+    ["a syntax error inside a canary token", '{ "a": CANARY-VALUE-5 }'],
+    [
+      "a known-looking key with a wrong type holding a canary",
+      JSON.stringify({
+        model: { nested: "CANARY-VALUE-6" },
+        agents: "CANARY-VALUE-7",
+        categories: ["CANARY-VALUE-8"],
+        disabled_hooks: "CANARY-VALUE-9",
+        mcp: "CANARY-VALUE-10",
+        $schema: "https://u:CANARY-VALUE-11@example.test/s.json",
+      }),
+    ],
+    [
+      "a string where an enum is expected",
+      JSON.stringify({
+        agents: { build: { model: "CANARY-VALUE-12", reasoning: "CANARY-VALUE-13", permission: "CANARY-VALUE-14" } },
+        default_mode: "CANARY-VALUE-15",
+      }),
+    ],
+    ["a comment holding a canary, then an error", '// CANARY-VALUE-16\n{ "a": }'],
+    ["not JSON at all: one line that is a token", "CANARY-VALUE-17"],
+  ]
+  test("#given a configuration load that throws a canary #when status runs #then it answers the fixed refusal with the class name and none of the thrown text", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-sdk-config-throw-"))
+    homes.push(home)
+    const env = new Proxy(
+      { HOME: home },
+      {
+        get(target, key) {
+          if (key === "HOME") throw new Error(`CANARY-THROWN-1 at ${home}`)
+          return Reflect.get(target, key)
+        },
+      },
+    )
+    expect(await createOmoSdk({ env, cwd: home }).config.status()).toEqual({
+      kind: "error",
+      error: {
+        code: "internal_error",
+        message: "the omo SDK failed unexpectedly",
+        next_action: "retry; report it if it repeats",
+        details: { name: "Error" },
+      },
+    })
+  })
+
+  for (const [label, body] of VARIANTS)
+    test(`#given ${label} in the user and the project file #when status runs #then the answer carries no canary and no path`, async () => {
+      const base = mkdtempSync(join(tmpdir(), "omo-sdk-config-variant-"))
+      homes.push(base)
+      const home = join(base, "home")
+      const project = join(base, "project")
+      for (const dir of [join(home, ".omo"), join(project, ".omo")]) mkdirSync(dir, { recursive: true })
+      writeFileSync(join(home, ".omo", "omo.jsonc"), body)
+      writeFileSync(join(project, ".omo", "omo.jsonc"), body)
+      let answer: unknown
+      try {
+        answer = await createOmoSdk({ env: { HOME: home }, cwd: project }).config.status()
+      } catch (error) {
+        answer = { threw: error instanceof Error ? error.message : String(error) }
+      }
+      const text = JSON.stringify(answer)
+      expect({ canaries: text.match(/CANARY-[A-Z]+-\d+/g) ?? [], path: text.includes(base) }).toEqual({
+        canaries: [],
+        path: false,
+      })
+    })
 })

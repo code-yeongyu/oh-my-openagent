@@ -1,5 +1,6 @@
 import type { KeyringBody, KeyringEntry, SyncAuthor, VerifiedWrap, WrapEntry } from "../crypto/entry.ts"
 import type { Principal, RecoveryKey } from "../crypto/parse.ts"
+import type { PhraseKeyBlocker } from "../genesis/phrase-gate.ts"
 import type { SyncOperationOptions } from "../operation-authority.ts"
 import type { PhraseEnrollBridgeRequest } from "./bridge-enroll-phrase.ts"
 import type { PhraseRecoverBeginRequest } from "./bridge-recover-phrase.ts"
@@ -228,7 +229,13 @@ export type KeyringAppendRequest = {
 export type TransportRefusal = "stale_base" | "rate_limited" | "not_found" | "refused" | "phrase_keys_not_accepted"
 
 export type AppendResult =
-  { readonly ok: true; readonly seq: number } | { readonly ok: false; readonly reason: TransportRefusal }
+  | { readonly ok: true; readonly seq: number }
+  | {
+      readonly ok: false
+      readonly reason: TransportRefusal
+      /** Set on `phrase_keys_not_accepted` when the service names the devices to update first (per-account phrase gate). */
+      readonly devices?: ReadonlyArray<PhraseKeyBlocker>
+    }
 
 /** The signed-in account's sync routes this module uses (contract 1.17.0 bootstrap reads and appends). */
 export interface RecoveryTransport {

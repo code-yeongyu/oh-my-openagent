@@ -80,11 +80,13 @@ type RecoverSetup = {
   readonly plain?: boolean
   readonly chain?: Record<string, unknown>
   readonly contexts?: { count: number }
+  readonly setDeviceSync?: (id: string, enabled: boolean) => Promise<void>
 }
 
 const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup: RecoverSetup = {}) => {
   const world = setup.plain === true ? await createWorld() : await enrolledAccount()
   const fresh = await newDevice()
+  const switches: string[] = []
   const out: string[] = []
   const err: string[] = []
   const initial = process.exitCode
@@ -104,8 +106,10 @@ const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup:
           ...setup.chain,
         },
         pairing: {
-          setAccountSync: unused,
-          setDeviceSync: unused,
+          setAccountSync: async (enabled: boolean) => void switches.push(`account ${enabled}`),
+          setDeviceSync:
+            setup.setDeviceSync ??
+            (async (id: string, enabled: boolean) => void switches.push(`device ${id} ${enabled}`)),
           disableDeviceSync: unused,
           listPending: unused,
           openPending: unused,
@@ -128,7 +132,7 @@ const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup:
   await program.parseAsync(["sync", "recover"], { from: "user" })
   const exit = process.exitCode
   process.exitCode = initial ?? 0
-  return { world, out, err, exit }
+  return { world, out, err, exit, switches }
 }
 
 for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
@@ -157,6 +161,8 @@ test("#given the enrolled phrase typed at the terminal #when omo sync recover ru
   const r = await runRecover({ terminal: terminal.open })
   expect(r.exit).toBe(0)
   expect(r.out.join("\n")).toContain("recovered")
+  // #14453: the service gates every sync read on these switches, so a recovered device that leaves them off is refused.
+  expect(r.switches).toEqual(["account true", "device svc-fresh true"])
   const joined = (await verified(r.world, r.world.owner)).received.some(
     (record) => record.body.kind === "recovery-join",
   )
@@ -178,6 +184,7 @@ test("#given a mistyped phrase then a cancel #when omo sync recover runs #then t
   expect(r.exit).toBe(1)
   expect(terminal.written.join("")).toContain("check for a typo")
   expect(r.err.join("\n")).toContain("cancelled")
+  expect(r.switches).toEqual([])
 })
 
 test("#given a valid phrase this account never enrolled #when omo sync recover runs #then it refuses as history-incomplete and nothing joins", async () => {
@@ -196,6 +203,7 @@ test("#given an account whose only recovery key is a passkey #when omo sync reco
   const r = await runRecover({ terminal: terminal.open }, { plain: true })
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
   expect(r.err.join("\n")).toContain("has no recovery phrase")
+  expect(r.switches).toEqual([])
   expect(terminal.opened()).toBe(0)
 })
 
@@ -214,4 +222,22 @@ test("#given the enrolled phrase and a rotation append the service refuses #when
   )
   expect(r.exit).toBe(0)
   expect(r.out.join("\n")).toContain("another step is still pending")
+  // #14453 review L1: a read-only join can read, so it turns sync on too.
+  expect(r.switches).toEqual(["account true", "device svc-fresh true"])
+})
+
+test("#given a recovery that succeeds and a device switch the service refuses to turn on #when omo sync recover runs #then it says memory was recovered, names omo sync enable to turn sync on, and exits 1 (#14453 review L2)", async () => {
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover(
+    { terminal: terminal.open },
+    {
+      setDeviceSync: async () => {
+        throw new Error("service unavailable")
+      },
+    },
+  )
+  expect(r.exit).toBe(1)
+  expect(r.out).toEqual([])
+  expect(r.err.join("\n")).toContain("`omo sync enable`")
+  expect(r.err.join("\n")).toContain("(service unavailable)")
 })
