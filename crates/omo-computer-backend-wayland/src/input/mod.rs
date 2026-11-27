@@ -11,7 +11,7 @@ mod regions;
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::params::Point;
 
-pub use client::{EiSession, LinkError};
+pub use client::{keymap_len, EiSession, LinkError, MAX_KEYMAP_BYTES};
 pub use emit::{Clock, Emit};
 pub use fd::{describe, EisFd};
 pub use link::{libei_lost, Link, RECONNECT_BACKOFF_MS};

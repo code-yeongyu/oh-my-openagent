@@ -235,9 +235,25 @@ impl EiSession {
     }
 }
 
+/// The largest keymap the engine reads: 1 MiB, about 15 times a compiled two-layout XKB keymap
+/// (`testdata/us-fr.xkb` is 70 KB) and under the engine's 5 MB inline payload budget
+/// (`INLINE_BUDGET_BYTES`). The size is the server's declaration, so it is checked before any
+/// allocation.
+pub const MAX_KEYMAP_BYTES: usize = 1 << 20;
+
+/// The byte length to read for a keymap the server declares as `size` bytes, `None` past
+/// [`MAX_KEYMAP_BYTES`].
+#[must_use]
+pub fn keymap_len(size: u32) -> Option<usize> {
+    usize::try_from(size)
+        .ok()
+        .filter(|len| *len <= MAX_KEYMAP_BYTES)
+}
+
 fn read_keymap(keymap: &reis::event::Keymap) -> Option<String> {
+    let len = keymap_len(keymap.size)?;
     let file = std::fs::File::from(keymap.fd.try_clone().ok()?);
-    let mut bytes = vec![0; usize::try_from(keymap.size).ok()?];
+    let mut bytes = vec![0; len];
     file.read_exact_at(&mut bytes, 0).ok()?;
     let text = String::from_utf8_lossy(&bytes);
     Some(text.trim_end_matches('\0').to_owned())

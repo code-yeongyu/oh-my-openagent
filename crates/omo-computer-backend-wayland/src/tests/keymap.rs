@@ -6,6 +6,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 
 use super::support::{send, text, Rig, FR, SETTLE, US, US_FR};
 use crate::fake::Mode;
+use crate::input::{keymap_len, MAX_KEYMAP_BYTES};
 
 /// evdev codes of the two keys whose glyphs differ between US and French.
 const KEY_Q: u32 = 16;
@@ -115,4 +116,32 @@ fn unresolvable_grapheme_sends_no_libei_event_and_a_following_paste_reads_back()
         rig.eis.log().keys.is_empty(),
         "the paste typed nothing either"
     );
+}
+
+#[test]
+fn a_declared_keymap_size_is_bounded_before_allocation() {
+    let at = u32::try_from(MAX_KEYMAP_BYTES).expect("the bound fits a wire size");
+    assert_eq!(
+        keymap_len(at),
+        Some(MAX_KEYMAP_BYTES),
+        "the bound itself is accepted"
+    );
+    assert_eq!(
+        keymap_len(at + 1),
+        None,
+        "one byte past the bound is refused"
+    );
+    assert_eq!(
+        keymap_len(u32::MAX),
+        None,
+        "the largest wire size is refused"
+    );
+    for shipped in [US, FR, US_FR] {
+        let size = u32::try_from(shipped.len()).expect("a shipped keymap fits a wire size");
+        assert_eq!(
+            keymap_len(size),
+            Some(shipped.len()),
+            "a real keymap is read whole"
+        );
+    }
 }
