@@ -31,6 +31,37 @@ let firstList = true
 // its first record mutation: the ownership CAS. The test lands the other worker's claim there.
 let holdProbe = gate === "hold-probe"
 let holdClaim = gate === "hold-claim"
+
+// Machine-readable lose-point report (omo#11682): the record's ownership fields at each barrier and
+// how many record mutations this worker made in total. The test asserts each forced row's lose-point
+// from this report, so a future store.mutate added before the CAS moves the barrier and fails the row.
+type Observation = {
+  readonly host_pid: number | undefined
+  readonly residency_state: string
+  readonly residency_claim: string | undefined
+  readonly updated_at: string
+  readonly run_epoch: number
+}
+const observe = (record: ReturnType<TaskRecordStore["load"]>): Observation | undefined =>
+  record === null
+    ? undefined
+    : {
+        host_pid: record.host_pid,
+        residency_state: record.residency_state,
+        residency_claim: record.residency_claim,
+        updated_at: record.updated_at,
+        run_epoch: record.notification.run_epoch,
+      }
+
+let scannedTaskId: string | undefined
+const lists: Observation[] = []
+let scanObservation: Observation | undefined
+let probeObservation: Observation | undefined
+let claimBefore: Observation | undefined
+let claimAfter: Observation | undefined
+let mutateCount = 0
+let heldClaimInFlight = false
+
 const store: TaskRecordStore = {
   ...backing,
   list: () => {
@@ -38,15 +69,27 @@ const store: TaskRecordStore = {
     if (firstList) {
       firstList = false
       barrier("started")
+      scannedTaskId = snapshot.records.find((record) => record.parent_session_id === parentSessionId)?.task_id
     }
+    const own = snapshot.records.find((record) => record.parent_session_id === parentSessionId)
+    lists.push(observe(own ?? null) as Observation)
+    scanObservation = lists[lists.length - 1]
     return snapshot
   },
   mutate: (taskId, mutation) => {
+    mutateCount += 1
     if (holdClaim) {
       holdClaim = false
+      heldClaimInFlight = true
+      claimBefore = observe(backing.load(taskId))
       barrier("claiming")
     }
-    return backing.mutate(taskId, mutation)
+    const result = backing.mutate(taskId, mutation)
+    if (heldClaimInFlight) {
+      heldClaimInFlight = false
+      claimAfter = observe(backing.load(taskId))
+    }
+    return result
   },
 }
 
@@ -65,6 +108,7 @@ const lifecycle = createTaskLifecycle({
     isAlive: (pid) => {
       if (holdProbe && pid !== process.pid) {
         holdProbe = false
+        probeObservation = observe(scannedTaskId === undefined ? null : backing.load(scannedTaskId))
         barrier("probing")
       }
       try {
@@ -96,6 +140,17 @@ const lifecycle = createTaskLifecycle({
 })
 
 const result = await lifecycle.reconcileOnSessionStart(parentSessionId)
-process.stdout.write(`${JSON.stringify(result)}\n`)
+process.stdout.write(
+  `${JSON.stringify({
+    ...result,
+    report: {
+      scan: scanObservation,
+      lists,
+      probe: probeObservation,
+      claim: claimBefore === undefined ? undefined : { before: claimBefore, after: claimAfter },
+      mutateCount,
+    },
+  })}\n`,
+)
 const exitSignal = Buffer.alloc(1)
 readSync(0, exitSignal, 0, 1, null)

@@ -70,14 +70,52 @@ describe("reconcileOnSessionStart scoped revival ownership race", () => {
       // then
       const launches = readFileSync(launchLog, "utf8").trim().split("\n").filter(Boolean)
       expect(launches).toHaveLength(1)
-      const reported = outcomes.map(outcomeOf)
+      const [winnerOutcome, loserOutcome] = outcomes.map(outcomeOf)
       if (forced) {
-        expect(reported).toEqual([`${taskId}:${WON}`, `${taskId}:${LOST}`])
+        expect(winnerOutcome?.outcome).toBe(`${taskId}:${WON}`)
+        expect(loserOutcome?.outcome).toBe(`${taskId}:${LOST}`)
         expect(launches).toEqual([`${winner.pid}:${taskId}`])
       } else {
-        expect([...reported].sort()).toEqual([`${taskId}:${LOST}`, `${taskId}:${WON}`])
+        expect([winnerOutcome?.outcome, loserOutcome?.outcome].sort()).toEqual([
+          `${taskId}:${LOST}`,
+          `${taskId}:${WON}`,
+        ])
       }
       expect(exits).toEqual([0, 0])
+
+      // Each forced row asserts its own lose-point from the worker's barrier report (omo#11682),
+      // not only the final outcome, so a barrier that silently moves fails the row.
+      const SEEDED_HOST_PID = 2_147_483_647
+      const SEEDED = {
+        host_pid: SEEDED_HOST_PID,
+        residency_state: "resident",
+        residency_claim: undefined,
+        updated_at: new Date(1_000_000).toISOString(),
+        run_epoch: 0,
+      }
+      // The winner's own report: its final view is its claim, and it mutated twice (the CAS + the
+      // resumed record mark). The unforced row asserts only the outcome split above.
+      if (forced) expect(winnerOutcome?.report.scan?.host_pid).toBe(winner.pid)
+      if (!forced) return
+      if (loserHold === "none") {
+        // The loser lost at its scan: its scan already saw the winner's claim, and it never mutated.
+        expect(loserOutcome?.report.scan?.host_pid).toBe(winner.pid)
+        expect(loserOutcome?.report.mutateCount).toBe(0)
+      } else if (loserHold === "hold-probe") {
+        // The loser lost at its post-probe ownership re-read: at the probe the record still matched
+        // its scan, and after the probe it saw the winner's claim without ever mutating.
+        expect(loserOutcome?.report.probe).toEqual(SEEDED)
+        expect(loserOutcome?.report.mutateCount).toBe(0)
+        expect(loserOutcome?.report.scan?.host_pid).toBe(winner.pid)
+      } else {
+        // The loser lost at the ownership CAS: parked at its first record mutation with the record
+        // still matching its scan, and the mutation found the winner's claim. Exactly two mutations
+        // today (the CAS plus the deferral mark), so an earlier store.mutate added before the CAS
+        // moves the barrier and fails this row.
+        expect(loserOutcome?.report.claim?.before).toEqual(SEEDED)
+        expect(loserOutcome?.report.claim?.after?.host_pid).toBe(winner.pid)
+        expect(loserOutcome?.report.mutateCount).toBe(2)
+      }
     },
     20_000,
   )
@@ -126,13 +164,43 @@ function spawnWorker(store: TaskRecordStore, launchLog: string, hold: Hold): Wor
   }
 }
 
-function outcomeOf(line: string): string {
+function outcomeOf(line: string): {
+  readonly outcome: string
+  readonly report: {
+    readonly scan?: Observation
+    readonly probe?: Observation
+    readonly claim?: { readonly before?: Observation; readonly after?: Observation }
+    readonly mutateCount: number
+  }
+} {
   const result = JSON.parse(line) as {
     readonly outcomes: readonly { readonly task_id: string; readonly kind: string; readonly reason?: string }[]
+    readonly report?: {
+      readonly scan?: Observation
+      readonly probe?: Observation
+      readonly claim?: { readonly before?: Observation; readonly after?: Observation }
+      readonly mutateCount?: number
+    }
   }
   expect(result.outcomes).toHaveLength(1)
   const [outcome] = result.outcomes
-  return `${outcome?.task_id}:${outcome?.kind}:${outcome?.reason}`
+  return {
+    outcome: `${outcome?.task_id}:${outcome?.kind}:${outcome?.reason}`,
+    report: {
+      scan: result.report?.scan,
+      probe: result.report?.probe,
+      claim: result.report?.claim,
+      mutateCount: result.report?.mutateCount ?? -1,
+    },
+  }
+}
+
+type Observation = {
+  readonly host_pid: number | undefined
+  readonly residency_state: string
+  readonly residency_claim: string | undefined
+  readonly updated_at: string
+  readonly run_epoch: number
 }
 
 function lineReader(stream: ReadableStream<Uint8Array>): () => Promise<string> {
