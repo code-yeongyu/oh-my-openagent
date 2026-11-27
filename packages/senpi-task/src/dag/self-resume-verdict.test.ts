@@ -47,7 +47,7 @@ describe("selfResumeVerdict boundary table (#12134 on #11381)", () => {
     ["running", run("running"), false, current, "allow"],
     ["running, cancelling", run("running"), true, current, "refuse:retire"],
     ["paused by shutdown", run("paused"), false, current, "allow"],
-    ["paused by the user", run("paused", userStop), false, current, "allow"],
+    ["paused by the user", run("paused", userStop), false, current, "refuse:hold"],
     ["failed", run("failed"), false, current, "refuse:hold"],
     ["completed", run("completed"), false, current, "refuse:hold"],
     ["cancelled", run("cancelled"), false, current, "refuse:retire"],
@@ -57,5 +57,16 @@ describe("selfResumeVerdict boundary table (#12134 on #11381)", () => {
   ] as const)("#given %s #then the verdict is the single answer", (_case, record, cancelling, task, expected) => {
     const verdict = selfResumeVerdict(task, record, cancelling)
     expect(verdict.kind === "allow" ? "allow" : `refuse:${verdict.disposition}`).toBe(expected)
+  })
+
+  test("#given a turn the user stop holds #when the caller can record it #then only that row carries the record effect, which the caller supplied", () => {
+    const recordHeld = (): void => undefined
+    const held = selfResumeVerdict(current, run("paused", userStop), false, recordHeld)
+    const failed = selfResumeVerdict(current, run("failed"), false, recordHeld)
+    const shutdown = selfResumeVerdict(current, run("paused"), false, recordHeld)
+
+    expect(held.kind === "refuse" ? held.record : undefined).toBe(recordHeld)
+    expect(failed.kind === "refuse" ? failed.record : "allow").toBeUndefined()
+    expect(shutdown.kind).toBe("allow")
   })
 })
