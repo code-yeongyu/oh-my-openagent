@@ -19,6 +19,8 @@ export interface WireServerOptions {
   /** device name -> device id, one bearer token each. */
   readonly devices: Readonly<Record<string, string>>
   readonly port?: number
+  /** Serve the inline append (omo-service #1315): the state route says so and `POST /v1/sync/batches` takes `inline`. */
+  readonly inline?: boolean
 }
 
 /** The contract headers one request carried, as the service floor reads them. */
@@ -32,6 +34,8 @@ export interface WireRequest {
 export interface WireServer {
   readonly url: string
   readonly requests: readonly WireRequest[]
+  /** Whether the inline append is served now; a test turns it off to model a service rollback (#14496 review M1). */
+  inline: boolean
   pageSize: number
   refuseNext: string | null
   failNext: number | null
@@ -78,6 +82,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
   for (const id of Object.values(options.devices)) freeze.addDevice({ id, kind: "cli", principal: id, signingKey: id })
   freeze.onStateChanged(() => broadcast({ type: "sync.state.changed" }))
   const state = {
+    inline: options.inline === true,
     pageSize: 500,
     refuseNext: null as string | null,
     failNext: null as number | null,
@@ -144,6 +149,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
                   record_sig: "S",
                 },
           min_client_format: 1,
+          ...(state.inline ? { accepts_inline_batches: true } : {}),
         })
       }
       if (req.method === "GET" && path === "/v1/sync/batches") {
@@ -202,14 +208,25 @@ export function startWireServer(options: WireServerOptions): WireServer {
       }
       if (req.method === "POST" && path === "/v1/sync/batches") {
         const body = (await req.json()) as {
-          upload_id: string
+          upload_id?: string
+          inline?: string
           digest: string
           base_seq: number
           idempotency_key: string
         }
-        const up = uploads.get(body.upload_id)
-        if (up === undefined || up.data === null || up.device !== device) return refusal("not_found")
         const replay = rows.find((r) => r.batchId === body.idempotency_key)
+        if (body.inline !== undefined) {
+          if (!state.inline || body.upload_id !== undefined) return refusal("invalid_request")
+          const data = new Uint8Array(Buffer.from(body.inline, "base64url"))
+          if (new Bun.CryptoHasher("sha256").update(data).digest("hex") !== hex(body.digest))
+            return refusal("invalid_request")
+          if (replay !== undefined) return Response.json({ seq: replay.seq })
+          const objectId = randomBytes(16).toString("base64url")
+          uploads.set(objectId, { bytes: data.byteLength, sha256: hex(body.digest), objectId, device, data })
+          body.upload_id = objectId
+        }
+        const up = uploads.get(body.upload_id ?? "")
+        if (up === undefined || up.data === null || up.device !== device) return refusal("not_found")
         if (replay !== undefined) return Response.json({ seq: replay.seq })
         if (freeze.pending) return freeze.staleRefusal()
         if (body.base_seq !== (rows.at(-1)?.seq ?? 0)) return refusal("stale_base")
@@ -230,6 +247,12 @@ export function startWireServer(options: WireServerOptions): WireServer {
   })
   return {
     url: `http://127.0.0.1:${server.port}`,
+    get inline() {
+      return state.inline
+    },
+    set inline(on) {
+      state.inline = on
+    },
     get pageSize() {
       return state.pageSize
     },
