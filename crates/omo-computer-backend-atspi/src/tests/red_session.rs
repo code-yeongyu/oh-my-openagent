@@ -1,6 +1,8 @@
 //! RED-first behaviour of the session surface: capabilities without a bus, the a11y flag,
 //! notification banners and the XDG app entries (AC-84(b), AC-24, GAP-10).
 
+use std::ffi::OsString;
+
 use omo_computer_core::backend::{Backend, SettleSource};
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::AppSource;
@@ -23,9 +25,9 @@ impl Launcher for Recording {
     }
 }
 
-fn pairs(env: &[(&str, &str)]) -> Vec<(String, String)> {
+fn pairs(env: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
     env.iter()
-        .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+        .map(|(key, value)| (OsString::from(key), OsString::from(value)))
         .collect()
 }
 
@@ -177,6 +179,7 @@ fn apps_open_child_has_no_activation_token_or_startup_id_env() {
         ("PATH", "/usr/bin"),
         ("XDG_ACTIVATION_TOKEN", "token-of-the-agent"),
         ("DESKTOP_STARTUP_ID", "agent_TIME123"),
+        ("SENPI_PRIVATE_FDS", r#"{"memory-sync":5}"#),
         ("HOME", "/home/q"),
     ]);
     let mut fx = gedit();
