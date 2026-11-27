@@ -98,6 +98,38 @@ describe("bunshin-ts pickTransport", () => {
     expect(seams.probes).toEqual([alt])
   })
 
+  it("#given no home seam and an env naming its own home #when picked #then the probe asks that home's state dir, not this process's", async () => {
+    const own = mkdtempSync(join(home, "env-home-"))
+    const env = { HOME: own, USERPROFILE: own }
+    const { home: _seam, ...withoutHome } = deps({ connected: true })
+    const probes: string[] = []
+    await pickTransport(env, {
+      ...withoutHome,
+      relayStatus: async (status) => {
+        probes.push(status?.stateDir ?? "<default>")
+        return { connected: true }
+      },
+    })
+    expect(probes).toEqual([deviceServiceStateDir(process.platform, env, own)])
+  })
+
+  it("#given no home seam and an env naming no home or state dir #when picked #then no_transport is thrown and nothing is probed", async () => {
+    const { home: _seam, ...withoutHome } = deps({ connected: true })
+    const probes: string[] = []
+    const picked = pickTransport(
+      { PATH: "/usr/bin" },
+      {
+        ...withoutHome,
+        relayStatus: async (status) => {
+          probes.push(status?.stateDir ?? "<default>")
+          return { connected: true }
+        },
+      },
+    )
+    expect(await errorCode(picked)).toBe("no_transport")
+    expect(probes).toEqual([])
+  })
+
   it("#given an unknown choice #when picked #then bad_choice is thrown", async () => {
     expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "nonsense" }, deps({ connected: true })))).toBe(
       "bad_choice",

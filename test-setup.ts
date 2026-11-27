@@ -1,4 +1,7 @@
 /// <reference types="bun-types" />
+// First: the guards resolve this machine's own device-service dir and credential store before installHermeticHome()
+// replaces HOME and installs the hermetic in-memory store.
+import "./test-support/real-account-test-guard.preload"
 import { afterEach, beforeEach, mock, setDefaultTimeout } from "bun:test"
 import { rmSync } from "node:fs"
 import { join } from "node:path"

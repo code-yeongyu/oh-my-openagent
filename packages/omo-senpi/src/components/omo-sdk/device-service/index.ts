@@ -31,16 +31,30 @@ const readStatus: DeviceServiceStatusPort = ({ stateDir, signal }) =>
     ...(signal === undefined ? {} : { signal }),
   })
 
+/**
+ * The answer for a root whose environment names no device-service state dir and no home: it has no device service of its
+ * own, and the process's home belongs to someone else's sign-in (a sandboxed test or script must never reach it).
+ */
+export const noDeviceServiceHome = (): OmoResult<never> =>
+  refused(
+    "device_service_unavailable",
+    "this SDK's environment names no home and no device-service state dir, so it has no device service to reach",
+    "pass home, or set HOME (USERPROFILE on Windows) or OMO_DEVICE_SERVICE_STATE_DIR in the env you give createOmoSdk",
+    { code: "no_home" },
+  )
+
 export function createDeviceServiceApi(options: {
-  readonly stateDir: () => string
+  readonly stateDir: () => string | undefined
   readonly status?: DeviceServiceStatusPort
 }): DeviceServiceApi {
   const status = options.status ?? readStatus
   return {
     async status(callOptions = {}) {
+      const stateDir = options.stateDir()
+      if (stateDir === undefined) return noDeviceServiceHome()
       try {
         const answer = await status({
-          stateDir: options.stateDir(),
+          stateDir,
           ...(callOptions.signal === undefined ? {} : { signal: callOptions.signal }),
         })
         if (answer === "not_running" || answer === "no_answer")

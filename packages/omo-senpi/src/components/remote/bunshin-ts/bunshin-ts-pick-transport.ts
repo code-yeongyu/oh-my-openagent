@@ -1,6 +1,4 @@
-import { homedir } from "node:os"
-
-import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
+import { deviceServiceStateDirIn } from "@oh-my-opencode/device-service-core/state-dir"
 
 import type { MachineHubTransport } from "../../../../vendor/bunshin-ts/index.js"
 import { createRelayTransport, relayStatus } from "../../../../vendor/bunshin-ts-relay/index.js"
@@ -39,8 +37,18 @@ const nonEmpty = (value: string | undefined): string | undefined => {
 
 // The device service's local API rule (#13597): an absolute OMO_DEVICE_SERVICE_STATE_DIR, else the discovery file
 // beside the default dir, else the default. Resolved here, so the vendored relay SDK never guesses.
-const stateDirOf = (env: Env, deps: PickTransportDeps): string =>
-  deviceServiceStateDir(process.platform, env, deps.home ?? homedir())
+// The home comes from `deps.home`, else from the env the caller passed, never from this process: a sandboxed env must not
+// reach the machine's own device service. An env that names neither a state dir nor a home has no service to reach.
+const stateDirOf = (env: Env, deps: PickTransportDeps): string => {
+  const stateDir = deviceServiceStateDirIn(process.platform, env, deps.home)
+  if (stateDir !== undefined) return stateDir
+  throw new BunshinSessionError(
+    "no_transport",
+    "the environment names no home and no device-service state dir, so there is no device service to reach",
+    "pass HOME (USERPROFILE on Windows) or OMO_DEVICE_SERVICE_STATE_DIR in the env given to pickTransport",
+    { details: { reason: "no_home" } },
+  )
+}
 
 const relayTransport = (env: Env, stateDir: string): MachineHubTransport => {
   const sessionRef = nonEmpty(env[SESSION_REF_ENV])

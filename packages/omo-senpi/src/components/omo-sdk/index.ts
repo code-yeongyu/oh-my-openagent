@@ -1,5 +1,5 @@
 import { homedir } from "node:os"
-import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
+import { deviceServiceStateDir, deviceServiceStateDirIn } from "@oh-my-opencode/device-service-core/state-dir"
 import { type AccessPorts, createAccountAccess } from "./access"
 import { type AccountApi, createAccountApi, type SignInProcess } from "./account"
 import { launcherSignInProcess } from "./account/sign-in-process"
@@ -45,8 +45,13 @@ export function createOmoSdk(options: OmoSdkOptions = {}): OmoSdk {
   const env = options.env ?? process.env
   const cwd = options.cwd ?? process.cwd()
   const ports = options.ports ?? {}
-  // The state dir rule the fleet SDK's transport picker uses (#13597): status and devices.list read the same service.
-  const stateDir = () => deviceServiceStateDir(process.platform, env, options.home ?? homedir())
+  // The state dir rule the fleet SDK's transport picker uses (#13597): status and devices.list read the same service. A
+  // root given an environment reaches the service that environment names (its state dir, else its home), never this
+  // process's own home; one with neither has no device service and refuses (credential safety for sandboxed callers).
+  const stateDir = () =>
+    options.env === undefined && options.home === undefined
+      ? deviceServiceStateDir(process.platform, env, homedir())
+      : deviceServiceStateDirIn(process.platform, env, options.home)
   const access = createAccountAccess({ ...(options.api === undefined ? {} : { api: options.api }), env, cwd, ports })
   return {
     account: createAccountApi(access, {
