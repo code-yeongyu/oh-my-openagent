@@ -202,7 +202,7 @@ describe("DeviceService", () => {
 })
 
 describe("DeviceService.endpointCommand (relay daemon #393's attach-less session.command)", () => {
-  const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+  const ENDPOINT = "FAKE_endpoint_key_tst1"
   const endpointWorld = (): World => ({
     ...defaultWorld(),
     endpoints: { [PEER]: [ENDPOINT] },

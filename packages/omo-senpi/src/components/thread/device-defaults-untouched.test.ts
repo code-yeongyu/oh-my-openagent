@@ -2,7 +2,7 @@ import { fakeRemoteClient } from "./thread-remote-fixture"
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { type ChildProcess, spawn } from "node:child_process"
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join, resolve } from "node:path"
 
@@ -13,6 +13,7 @@ import { createGatewayStore } from "./gateway/store"
 import { createLiveThreadSurface } from "./live-surface"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
 import { createThreadTools, type ThreadHost } from "./tools"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 // #13485 against the REAL pinned engine: a thread's model and reasoning change on that session only. Each test runs the
 // engine on its own temp HOME and agent dir (never a real device's settings.json), changes the session through the
@@ -67,7 +68,7 @@ const fauxModel = (id: string) => ({
 })
 
 function sandbox() {
-  const home = mkdtempSync("/tmp/thr-scope.")
+  const home = shortTempDir("thr-scope.")
   roots.push(home)
   const agentDir = join(home, "agent")
   mkdirSync(agentDir, { recursive: true, mode: 0o700 })

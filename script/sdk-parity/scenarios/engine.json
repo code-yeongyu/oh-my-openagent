@@ -1,0 +1,1299 @@
+{
+  "domain": "engine",
+  "inert": {
+    "engine.schedule.run.signal": "An AbortSignal the caller holds: it ends a watch the caller started, and that ending is the stream's terminal cancelled event (design 4.4), not a call a fake port observes; a JSON scenario also cannot carry an AbortSignal."
+  },
+  "scenarios": [
+    {
+      "id": "engine.config.agentDir/record",
+      "row": "engine.config.agentDir",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.agentDir"
+        }
+      ]
+    },
+    {
+      "id": "engine.config.resources/global",
+      "row": "engine.config.resources",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.resources"
+        }
+      ]
+    },
+    {
+      "id": "engine.config.resources/project-trusted",
+      "row": "engine.config.resources",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.resources",
+          "args": {
+            "local": true,
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.resources/trust-project",
+      "row": "engine.config.resources",
+      "kind": "effect",
+      "input": {
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.resources",
+          "args": {
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.resources/ignore-project-files",
+      "row": "engine.config.resources",
+      "kind": "effect",
+      "input": {
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.resources",
+          "args": {
+            "trust": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.resources/project-untrusted",
+      "row": "engine.config.resources",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "local": true,
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.resources",
+          "args": {
+            "local": true,
+            "trust": false
+          },
+          "result": {
+            "error": "Project is not trusted. Use --approve to modify local resource config."
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.resources/local-not-boolean",
+      "row": "engine.config.resources",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "local": "yes"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.resources",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/global-enable",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "enabled": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "enabled": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/global-enable-trusted",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "enabled": true,
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "enabled": true,
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/project-inherit",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "inherit"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "inherit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/project-inherit-trusted",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "inherit",
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "inherit",
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/project-untrusted",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "inherit",
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "inherit",
+            "trust": false
+          },
+          "result": {
+            "error": "Project is not trusted. Use --approve to modify local resource config."
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/resource-without-path",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions"
+        },
+        "enabled": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/global-with-state",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "enabled": true,
+        "state": "load"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/project-with-enabled",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "inherit",
+        "enabled": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/project-without-state",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/global-without-enabled",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        }
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/local-false",
+      "row": "engine.config.setResource",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "local": false,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "enabled": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/one-provider",
+      "row": "engine.models.discover",
+      "kind": "effect",
+      "input": {
+        "provider": "local-llm"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "args": {
+            "provider": "local-llm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/provider-not-defined",
+      "row": "engine.models.discover",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "provider": "nope"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "args": {
+            "provider": "nope"
+          },
+          "result": {
+            "error": "Provider \"nope\" is not defined in models.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/provider-not-openai-compatible",
+      "row": "engine.models.discover",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "input": {
+        "provider": "anthropic"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "args": {
+            "provider": "anthropic"
+          },
+          "result": {
+            "error": "Provider \"anthropic\" uses api \"anthropic-messages\", not an OpenAI-compatible api"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.models.discover/empty-provider",
+      "row": "engine.models.discover",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "provider": ""
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.discover",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.list/every-model",
+      "row": "engine.models.list",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list"
+        }
+      ]
+    },
+    {
+      "id": "engine.models.list/matching-pattern",
+      "row": "engine.models.list",
+      "kind": "effect",
+      "input": {
+        "pattern": "claude"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list",
+          "args": {
+            "pattern": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.models.list/empty-pattern",
+      "row": "engine.models.list",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "pattern": ""
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.models.update/refresh-catalogs",
+      "row": "engine.models.update",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "models.update"
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/global",
+      "row": "engine.packages.install",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "args": {
+            "source": "npm:@foo/bar"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-trusted",
+      "row": "engine.packages.install",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "local": true,
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "args": {
+            "source": "npm:@foo/bar",
+            "local": true,
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/trust-project",
+      "row": "engine.packages.install",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "args": {
+            "source": "npm:@foo/bar",
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/ignore-project-files",
+      "row": "engine.packages.install",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "args": {
+            "source": "npm:@foo/bar",
+            "trust": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-untrusted",
+      "row": "engine.packages.install",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "source": "npm:@foo/bar",
+        "local": true,
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "args": {
+            "source": "npm:@foo/bar",
+            "local": true,
+            "trust": false
+          },
+          "result": {
+            "error": "Project is not trusted. Use --approve to modify local package config."
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/missing-source",
+      "row": "engine.packages.install",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.list/default",
+      "row": "engine.packages.list",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.list"
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.list/trust-project",
+      "row": "engine.packages.list",
+      "kind": "effect",
+      "input": {
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.list",
+          "args": {
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.list/trust-not-boolean",
+      "row": "engine.packages.list",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "trust": "yes"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/global",
+      "row": "engine.packages.remove",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "args": {
+            "source": "npm:@foo/bar"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trusted",
+      "row": "engine.packages.remove",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "local": true,
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "args": {
+            "source": "npm:@foo/bar",
+            "local": true,
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/trust-project",
+      "row": "engine.packages.remove",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "args": {
+            "source": "npm:@foo/bar",
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/ignore-project-files",
+      "row": "engine.packages.remove",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar",
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "args": {
+            "source": "npm:@foo/bar",
+            "trust": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/not-installed",
+      "row": "engine.packages.remove",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "source": "npm:@foo/missing"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "args": {
+            "source": "npm:@foo/missing"
+          },
+          "result": {
+            "error": "No matching package found for npm:@foo/missing"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-untrusted",
+      "row": "engine.packages.remove",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "source": "npm:@foo/bar",
+        "local": true,
+        "trust": false
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "args": {
+            "source": "npm:@foo/bar",
+            "local": true,
+            "trust": false
+          },
+          "result": {
+            "error": "Project is not trusted. Use --approve to modify local package config."
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/empty-source",
+      "row": "engine.packages.remove",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "source": ""
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/every-package",
+      "row": "engine.packages.update",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update"
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/one-package",
+      "row": "engine.packages.update",
+      "kind": "effect",
+      "input": {
+        "source": "npm:@foo/bar"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "args": {
+            "source": "npm:@foo/bar"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/trust-project",
+      "row": "engine.packages.update",
+      "kind": "effect",
+      "input": {
+        "trust": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "args": {
+            "trust": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/empty-source",
+      "row": "engine.packages.update",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "source": ""
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.promptSizes/default-runtime",
+      "row": "engine.promptSizes",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "promptSizes"
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.cancel/by-id",
+      "row": "engine.schedule.cancel",
+      "kind": "effect",
+      "input": {
+        "id": "job-1"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.cancel",
+          "args": {
+            "id": "job-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.cancel/unknown-id",
+      "row": "engine.schedule.cancel",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "id": "job-404"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.cancel",
+          "args": {
+            "id": "job-404"
+          },
+          "result": null
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.cancel/missing-id",
+      "row": "engine.schedule.cancel",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.cancel",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.list/every-job",
+      "row": "engine.schedule.list",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.list"
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/fire-due-once",
+      "row": "engine.schedule.run",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run"
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/watch",
+      "row": "engine.schedule.run",
+      "kind": "effect",
+      "input": {
+        "watch": true
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "args": {
+            "watch": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/deliver-by-exec",
+      "row": "engine.schedule.run",
+      "kind": "effect",
+      "input": {
+        "exec": "chat-bridge"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "args": {
+            "exec": "chat-bridge"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/watch-poll-interval",
+      "row": "engine.schedule.run",
+      "kind": "effect",
+      "input": {
+        "watch": true,
+        "poll_seconds": 30
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "args": {
+            "watch": true,
+            "poll_seconds": 30
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/delivery-time-limit",
+      "row": "engine.schedule.run",
+      "kind": "effect",
+      "input": {
+        "timeout_seconds": 60
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "args": {
+            "timeout_seconds": 60
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/concurrency",
+      "row": "engine.schedule.run",
+      "kind": "effect",
+      "input": {
+        "concurrency": 2
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "args": {
+            "concurrency": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.schedule.run/zero-concurrency",
+      "row": "engine.schedule.run",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "concurrency": 0
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "schedule.run",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.sessionOfPid/attested",
+      "row": "engine.sessionOfPid",
+      "kind": "effect",
+      "input": {
+        "pid": 4242
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessionOfPid",
+          "args": {
+            "pid": 4242
+          },
+          "result": {
+            "attested": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.sessionOfPid/not-attested",
+      "row": "engine.sessionOfPid",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "pid": 4243
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessionOfPid",
+          "args": {
+            "pid": 4243
+          },
+          "result": {
+            "attested": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.sessionOfPid/zero-pid",
+      "row": "engine.sessionOfPid",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "pid": 0
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessionOfPid",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.sessions.exportHtml/engine-chosen-path",
+      "row": "engine.sessions.exportHtml",
+      "kind": "effect",
+      "input": {
+        "session": "/sessions/a.jsonl"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessions.exportHtml",
+          "args": {
+            "session": "/sessions/a.jsonl"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.sessions.exportHtml/named-path",
+      "row": "engine.sessions.exportHtml",
+      "kind": "effect",
+      "input": {
+        "session": "/sessions/a.jsonl",
+        "out": "/tmp/a.html"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessions.exportHtml",
+          "args": {
+            "session": "/sessions/a.jsonl",
+            "out": "/tmp/a.html"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.sessions.exportHtml/session-file-missing",
+      "row": "engine.sessions.exportHtml",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {
+        "session": "/sessions/missing.jsonl"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessions.exportHtml",
+          "args": {
+            "session": "/sessions/missing.jsonl"
+          },
+          "result": {
+            "error": "File not found: /sessions/missing.jsonl"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.sessions.exportHtml/missing-session",
+      "row": "engine.sessions.exportHtml",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "sessions.exportHtml",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.tips/list",
+      "row": "engine.tips",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "tips"
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/state-unload",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "unload"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "unload"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/state-load",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "load"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "load"
+          }
+        }
+      ]
+    }
+  ]
+}

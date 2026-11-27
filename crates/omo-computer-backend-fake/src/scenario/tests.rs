@@ -152,3 +152,25 @@ fn fail_next_is_typed_through_the_error_table() {
         (InvalidKind::Reference, "/fail_next/0")
     );
 }
+
+/// R70bs(3): the v3- copy of the oracle-pinned two-displays fixture is its base plus exactly ONE
+/// member, `consent` (`{ "stopHotkey": null }`: the file has no key), so it can never drift.
+#[test]
+fn the_consent_copy_of_two_displays_equals_its_base_plus_one_member() {
+    let read = |name: &str| -> serde_json::Value {
+        let text = std::fs::read_to_string(fixtures_dir().join(name)).expect("fixture");
+        serde_json::from_str(&text).expect("json")
+    };
+    let mut copy = read("v3-two-displays-one-window-consent.json");
+    let consent = copy.as_object_mut().and_then(|map| map.remove("consent"));
+    assert_eq!(
+        consent,
+        Some(serde_json::json!({ "stopHotkey": null })),
+        "only the consent member"
+    );
+    assert_eq!(
+        copy,
+        read("two-displays-one-window.json"),
+        "the copy equals its base"
+    );
+}

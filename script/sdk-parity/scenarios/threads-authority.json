@@ -1,0 +1,2102 @@
+{
+  "domain": "threads",
+  "inert": {
+    "threads.runToCompletion.signal": "an abort signal; cancellation is a P1b scenario on the virtual clock"
+  },
+  "scenarios": [
+    {
+      "id": "threads.attach/authority-base",
+      "row": "threads.attach",
+      "kind": "effect",
+      "input": {
+        "thread": "studio"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach"
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/authority-this-device",
+      "row": "threads.attach",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "studio"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "args": {
+            "thread": "studio"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/authority-other-device",
+      "row": "threads.attach",
+      "kind": "effect",
+      "target": "other_device",
+      "input": {
+        "thread": "laptop/studio"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "args": {
+            "thread": "laptop/studio"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/authority-thread",
+      "row": "threads.attach",
+      "kind": "effect",
+      "input": {
+        "thread": "studio"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "args": {
+            "thread": "studio"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionOps/authority-base",
+      "row": "threads.extensions.sessionOps",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_ops"
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/authority-base",
+      "row": "threads.extensions.sessionCall",
+      "kind": "effect",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call"
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/authority-name",
+      "row": "threads.extensions.sessionCall",
+      "kind": "effect",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call",
+          "args": {
+            "name": "x-name"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/authority-op",
+      "row": "threads.extensions.sessionCall",
+      "kind": "effect",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call",
+          "args": {
+            "op": "x-op"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-base",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message"
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt"
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-message",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message"
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "message": "x-message"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-agent",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message",
+        "agent": "x-agent"
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "agent": "x-agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-model",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message",
+        "model": "x-model"
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "model": "x-model"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-directory",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message",
+        "directory": "x-directory"
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "directory": "x-directory"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-session-id",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message",
+        "session_id": "x-session_id"
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "session_id": "x-session_id"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-endpoint",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message",
+        "endpoint": {
+          "port": 1
+        }
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "endpoint": {
+              "port": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/authority-on-complete",
+      "row": "threads.runToCompletion",
+      "kind": "effect",
+      "input": {
+        "message": "x-message",
+        "on_complete": {
+          "command": "x-command"
+        }
+      },
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "args": {
+            "on_complete": {
+              "command": "x-command"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.send/authority-base",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery"
+        }
+      ]
+    },
+    {
+      "id": "threads.send/authority-author",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "x-platform_user_id",
+          "display": "x-display"
+        }
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "author": {
+              "platform_user_id": "x-platform_user_id",
+              "display": "x-display"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/authority-base",
+      "row": "threads.sendAndFollow",
+      "kind": "effect",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery"
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/authority-author",
+      "row": "threads.sendAndFollow",
+      "kind": "effect",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "x-platform_user_id",
+          "display": "x-display"
+        }
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "author": {
+              "platform_user_id": "x-platform_user_id",
+              "display": "x-display"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.create/authority-base",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session"
+        }
+      ]
+    },
+    {
+      "id": "threads.create/authority-launch-spec",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "launch_spec": "x-launch_spec"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "launch_spec": "x-launch_spec"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.create/authority-prompt",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": {
+          "message": "hi",
+          "author": {
+            "platform_user_id": "u1",
+            "display": "Ada"
+          }
+        }
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "prompt": {
+              "message": "hi",
+              "author": {
+                "platform_user_id": "u1",
+                "display": "Ada"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.register/authority-base",
+      "row": "threads.extensions.register",
+      "kind": "effect",
+      "input": {
+        "name": "x-name",
+        "migrations": [
+          [
+            "x-migrations"
+          ]
+        ],
+        "moduleUrl": "x-moduleUrl"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "register_extension"
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.register/authority-session-callable",
+      "row": "threads.extensions.register",
+      "kind": "effect",
+      "input": {
+        "name": "x-name",
+        "migrations": [
+          [
+            "x-migrations"
+          ]
+        ],
+        "moduleUrl": "x-moduleUrl",
+        "sessionCallable": [
+          {
+            "op": "x-op",
+            "parameters": {
+              "$handle": "fake-readable"
+            },
+            "toolName": "op_one",
+            "description": "x-description"
+          }
+        ]
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "register_extension",
+          "args": {
+            "sessionCallable": [
+              {
+                "op": "x-op",
+                "parameters": {
+                  "$handle": "fake-readable"
+                },
+                "toolName": "op_one",
+                "description": "x-description"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.list/read-refuses-connector",
+      "row": "threads.list",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.list/read-refuses-service",
+      "row": "threads.list",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.read/read-refuses-connector",
+      "row": "threads.read",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.read/read-refuses-service",
+      "row": "threads.read",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.entries/read-refuses-connector",
+      "row": "threads.entries",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.entries/read-refuses-service",
+      "row": "threads.entries",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.get/read-refuses-connector",
+      "row": "threads.get",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.get/read-refuses-service",
+      "row": "threads.get",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.wait/read-refuses-connector",
+      "row": "threads.wait",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.wait/read-refuses-service",
+      "row": "threads.wait",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.follow/read-refuses-connector",
+      "row": "threads.follow",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.follow/read-refuses-service",
+      "row": "threads.follow",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_entries",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.read/self-address-refuses-person",
+      "row": "threads.read",
+      "input": {
+        "thread": "self"
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.read/self-address-refuses-script",
+      "row": "threads.read",
+      "input": {
+        "thread": "self"
+      },
+      "principal": {
+        "kind": "script",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.read/self-address-refuses-connector",
+      "row": "threads.read",
+      "input": {
+        "thread": "self"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_messages",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/fuzzy-target-refuses-person",
+      "row": "threads.handoff",
+      "input": {
+        "thread": "stud",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "not_found",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/fuzzy-target-refuses-script",
+      "row": "threads.handoff",
+      "input": {
+        "thread": "stud",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "script",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "not_found",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/fuzzy-target-refuses-connector",
+      "row": "threads.handoff",
+      "input": {
+        "thread": "stud",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "not_found",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/send-this-device-refuses-person",
+      "row": "threads.send",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/send-this-device-refuses-connector",
+      "row": "threads.send",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/send-this-device-refuses-service",
+      "row": "threads.send",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/send-this-device-refuses-person",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/send-this-device-refuses-connector",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/send-this-device-refuses-service",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/send-another-device-refuses-connector",
+      "row": "threads.send",
+      "input": {
+        "thread": "laptop/studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/send-another-device-refuses-service",
+      "row": "threads.send",
+      "input": {
+        "thread": "laptop/studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/send-another-device-refuses-connector",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "laptop/studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/send-another-device-refuses-service",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "laptop/studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/author-refuses-person",
+      "row": "threads.send",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "u1",
+          "display": "Ada"
+        }
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/author-refuses-script",
+      "row": "threads.send",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "u1",
+          "display": "Ada"
+        }
+      },
+      "principal": {
+        "kind": "script",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/author-refuses-session",
+      "row": "threads.send",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "u1",
+          "display": "Ada"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/author-refuses-person",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "u1",
+          "display": "Ada"
+        }
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/author-refuses-script",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "u1",
+          "display": "Ada"
+        }
+      },
+      "principal": {
+        "kind": "script",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/author-refuses-session",
+      "row": "threads.sendAndFollow",
+      "input": {
+        "thread": "studio",
+        "message": "x-message",
+        "author": {
+          "platform_user_id": "u1",
+          "display": "Ada"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.create/create-refuses-service",
+      "row": "threads.create",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.create/create-wider-mode-refuses-connector",
+      "row": "threads.create",
+      "input": {
+        "permission_preset": "full-access"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.create/create-wider-mode-refuses-session",
+      "row": "threads.create",
+      "input": {
+        "permission_preset": "full-access"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.create/create-wider-mode-refuses-service",
+      "row": "threads.create",
+      "input": {
+        "permission_preset": "full-access"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.interrupt/control-refuses-connector",
+      "row": "threads.interrupt",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.interrupt/control-refuses-service",
+      "row": "threads.interrupt",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.close/control-refuses-connector",
+      "row": "threads.close",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.close/control-refuses-service",
+      "row": "threads.close",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/control-refuses-connector",
+      "row": "threads.setModel",
+      "input": {
+        "thread": "studio",
+        "model": "x-model"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/control-refuses-service",
+      "row": "threads.setModel",
+      "input": {
+        "thread": "studio",
+        "model": "x-model"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setReasoning/control-refuses-connector",
+      "row": "threads.setReasoning",
+      "input": {
+        "thread": "studio",
+        "level": "off"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setReasoning/control-refuses-service",
+      "row": "threads.setReasoning",
+      "input": {
+        "thread": "studio",
+        "level": "off"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.rename/control-refuses-connector",
+      "row": "threads.rename",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.rename/control-refuses-service",
+      "row": "threads.rename",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.archive/control-refuses-connector",
+      "row": "threads.archive",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "store",
+          "op": "set_archived",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.archive/control-refuses-service",
+      "row": "threads.archive",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "set_archived",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/control-refuses-connector",
+      "row": "threads.handoff",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "change": "B5",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/control-refuses-service",
+      "row": "threads.handoff",
+      "input": {
+        "thread": "studio",
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.unload/unload-refuses-connector",
+      "row": "threads.unload",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.unload/unload-refuses-session",
+      "row": "threads.unload",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.unload/unload-refuses-service",
+      "row": "threads.unload",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/attach-refuses-connector",
+      "row": "threads.attach",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/attach-refuses-session",
+      "row": "threads.attach",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/attach-refuses-service",
+      "row": "threads.attach",
+      "input": {
+        "thread": "studio"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.register/extension-refuses-connector",
+      "row": "threads.extensions.register",
+      "input": {
+        "name": "x-name",
+        "migrations": [
+          [
+            "x-migrations"
+          ]
+        ],
+        "moduleUrl": "x-moduleUrl"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "register_extension",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.register/extension-refuses-session",
+      "row": "threads.extensions.register",
+      "input": {
+        "name": "x-name",
+        "migrations": [
+          [
+            "x-migrations"
+          ]
+        ],
+        "moduleUrl": "x-moduleUrl"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "register_extension",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.register/extension-refuses-service",
+      "row": "threads.extensions.register",
+      "input": {
+        "name": "x-name",
+        "migrations": [
+          [
+            "x-migrations"
+          ]
+        ],
+        "moduleUrl": "x-moduleUrl"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "register_extension",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.call/extension-refuses-connector",
+      "row": "threads.extensions.call",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "extension_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.call/extension-refuses-session",
+      "row": "threads.extensions.call",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "extension_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.call/extension-refuses-service",
+      "row": "threads.extensions.call",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "store",
+          "op": "extension_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionOps/session-op-refuses-person",
+      "row": "threads.extensions.sessionOps",
+      "input": {},
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_ops",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionOps/session-op-refuses-script",
+      "row": "threads.extensions.sessionOps",
+      "input": {},
+      "principal": {
+        "kind": "script",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_ops",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionOps/session-op-refuses-connector",
+      "row": "threads.extensions.sessionOps",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_ops",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionOps/session-op-refuses-service",
+      "row": "threads.extensions.sessionOps",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_ops",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/session-op-refuses-person",
+      "row": "threads.extensions.sessionCall",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "person",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/session-op-refuses-script",
+      "row": "threads.extensions.sessionCall",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "script",
+        "uid": 1000
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/session-op-refuses-connector",
+      "row": "threads.extensions.sessionCall",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.extensions.sessionCall/session-op-refuses-service",
+      "row": "threads.extensions.sessionCall",
+      "input": {
+        "name": "x-name",
+        "op": "x-op",
+        "args": "$callback"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "caller_context_missing",
+      "expect": [
+        {
+          "port": "store",
+          "op": "session_call",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/run-refuses-connector",
+      "row": "threads.runToCompletion",
+      "input": {
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/run-refuses-session",
+      "row": "threads.runToCompletion",
+      "input": {
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/run-refuses-service",
+      "row": "threads.runToCompletion",
+      "input": {
+        "message": "x-message"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/on-complete-refuses-connector",
+      "row": "threads.runToCompletion",
+      "input": {
+        "message": "x-message",
+        "on_complete": {
+          "command": "true"
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/on-complete-refuses-session",
+      "row": "threads.runToCompletion",
+      "input": {
+        "message": "x-message",
+        "on_complete": {
+          "command": "true"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.runToCompletion/on-complete-refuses-service",
+      "row": "threads.runToCompletion",
+      "input": {
+        "message": "x-message",
+        "on_complete": {
+          "command": "true"
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "opencodeServer",
+          "op": "prompt",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } 
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
-import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
+import { createCredentialStore, CredentialStoreError, INTERACTIVE_READ_WAIT } from "./keystore"
 import { beginLogin } from "./login-prelude"
 import { signInByRoute } from "./login-routes"
 import { type ChooseDevice, type ListedDevice, serviceOrigin, SignInError } from "./protocol"
@@ -166,14 +166,20 @@ async function run(
       console.log(`This computer's earlier OmO device (id ${terminalText(replacedDeviceId)}) was signed out.`)
     await signedIn()
   } catch (error) {
+    // #11065: a logout whose credential-store read failed is store-unavailable (exit 9, like omo account's
+    // native storage failures): the store was waited on exactly once, nothing was cleared, and the stored
+    // credentials were left as they were. Other actions and other errors keep exit 1.
+    const storeUnavailable = action === "logout" && error instanceof CredentialStoreError
     console.error(
       controller.signal.aborted
         ? "Sign-in cancelled."
-        : error instanceof SignInError
-          ? error.message
-          : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.",
+        : storeUnavailable
+          ? "OmO could not read the credential store. Stored credentials and device keys were left untouched; run omo logout again when the keyring answers."
+          : error instanceof SignInError
+            ? error.message
+            : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.",
     )
-    process.exitCode = 1
+    process.exitCode = storeUnavailable ? 9 : 1
   } finally {
     process.removeListener("SIGINT", cancel)
     process.removeListener("SIGTERM", cancel)

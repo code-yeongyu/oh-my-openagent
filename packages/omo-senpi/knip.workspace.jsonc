@@ -7,6 +7,23 @@
       // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
       // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
       "entry": [
+        // run by path from scripts/qa/thread-tools/run-all.mjs; they use the gateway kit lib/gateway.mjs, which script/qa/sdk-proof imports too
+        "scripts/qa/thread-tools/adopt.mjs",
+        "scripts/qa/thread-tools/busy-backlog.mjs",
+        "scripts/qa/thread-tools/default-delivery.mjs",
+        "scripts/qa/thread-tools/draft-preservation.mjs",
+        "scripts/qa/thread-tools/graceful-close.mjs",
+        "scripts/qa/thread-tools/held-then-exit.mjs",
+        "scripts/qa/thread-tools/host-to-tui.mjs",
+        "scripts/qa/thread-tools/loop-guard.mjs",
+        "scripts/qa/thread-tools/lost-ack.mjs",
+        "scripts/qa/thread-tools/offline-queue.mjs",
+        "scripts/qa/thread-tools/receiver-crash.mjs",
+        "scripts/qa/thread-tools/repeated-wake.mjs",
+        "scripts/qa/thread-tools/run-all.mjs",
+        "scripts/qa/thread-tools/sender-death.mjs",
+        "scripts/qa/thread-tools/stopped-target.mjs",
+        "scripts/qa/thread-tools/tui-to-tui.mjs",
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
@@ -47,6 +64,8 @@
         "src/components/telemetry/posthog-runtime.ts",
         "src/components/telemetry/session-summary-recovery.ts",
         "src/components/thread/live-surface.ts",
+        // the gateway store's Worker entry: started by URL (store.ts gatewayStoreWorkerUrl), never imported
+        "src/components/thread/gateway/store-worker.ts",
         // spawned by path from host-ensure.test.ts as the engine CLI `host ensure` runs
         "src/components/thread/wake/testing/fake-engine-cli.ts",
         // spawned by path as a child process from hand-browser-placement.test.ts
@@ -54,6 +73,8 @@
         "src/extension/omo-task.ts",
       ],
       "ignoreFiles": [
+        // type declarations for scripts/qa/thread-tools/lib/gateway.mjs, which script/qa/sdk-proof imports from TypeScript
+        "scripts/qa/thread-tools/lib/gateway.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/expect-exit.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -345,27 +366,13 @@
         // run by path from scripts/qa/thread-tools/run-all.mjs (#14079: local thread calls in an approved eval cell ask nothing)
         "scripts/qa/thread-tools/local-approvals.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/adopt.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/binding-author.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/cli-surface.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/desktop-client.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/desktop-to-cli.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/draft-preservation.mjs",
-        // run by path from scripts/qa/thread-tools/run-all.mjs (#14333: no mode starts an idle TUI and steers a busy one)
-        "scripts/qa/thread-tools/default-delivery.mjs",
-        // run by path from scripts/qa/thread-tools/run-all.mjs (#14313: a graceful close of a busy daemon session and terminal)
-        "scripts/qa/thread-tools/graceful-close.mjs",
         // run by path as the free-plan cross-workspace thread-tools QA driver (#14201)
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/held-then-exit.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/host-to-tui.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/desktop-shell.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -374,24 +381,8 @@
         "scripts/qa/thread-tools/lib/gateway.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/harness.mjs",
-        // run by name from run-all.mjs, which knip does not trace
-        "scripts/qa/thread-tools/default-delivery.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/loop-guard.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/lost-ack.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/offline-queue.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/plugin-surface.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/receiver-crash.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/repeated-wake.mjs",
-        // a QA scenario that run-all.mjs runs by name (#14428), like its siblings
-        "scripts/qa/thread-tools/busy-backlog.mjs",
-        // a QA scenario that run-all.mjs runs by name (#13396), like its siblings
-        "scripts/qa/thread-tools/report-origin-auto-steer.mjs",
         // a QA scenario that run-all.mjs runs by name (#14058), like its siblings
         "scripts/qa/thread-tools/create-prompt-authority.mjs",
         // a QA scenario that run-all.mjs runs by name (#14063), like its siblings
@@ -401,21 +392,9 @@
         // run by run-all.mjs as a child process (legacy suite), never imported
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/report-origin-steer.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/report-origin.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/run-all.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/sender-death.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/session-control-qa.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/stopped-target.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/terminal-to-ui.mjs",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "scripts/qa/thread-tools/tui-to-tui.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/todo-fanout-reminder-e2e.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -844,44 +823,30 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_SUMMARY_MAX_LENGTH
     "packages/omo-senpi/src/components/thread/contracts/fields.ts": ["THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
-    "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadReportParams, ThreadOutboxParams, ThreadOutboxAckParams and 1 more
-    "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
+    "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, socketNamesDirectory
     "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "socketNamesDirectory"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) isBlankAnswer
-    "packages/omo-senpi/src/components/thread/gateway/answer-shape.ts": ["isBlankAnswer"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) AUTHOR_ID_MAX_LENGTH, AUTHOR_DISPLAY_MAX_LENGTH
-    "packages/omo-senpi/src/components/thread/gateway/author.ts": ["AUTHOR_ID_MAX_LENGTH", "AUTHOR_DISPLAY_MAX_LENGTH"],
     // #14428: readTargetBacklogs is called only by store-worker.ts, a worker thread knip does not reach (as toolReceiptRelease, #12925)
-    "packages/omo-senpi/src/components/thread/gateway/backlog.ts": ["readTargetBacklogs"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
-    "packages/omo-senpi/src/components/thread/gateway/bindings.ts": ["BINDING_SCHEMA_VERSION", "BINDING_PLATFORMS", "BINDING_STATUSES", "COMPLETION_OUTCOMES", "BINDING_MAX_TTL_SECONDS", "BINDING_DEFAULT_POLICY_ID"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
     "packages/omo-senpi/src/components/thread/gateway/constants.ts": ["GATEWAY_SCHEMA_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) queuedNotice
     "packages/omo-senpi/src/components/thread/gateway/drain.ts": ["queuedNotice"],
     // pre-existing at origin dev 4686e425b5: unused export(s) AWAIT_TIMEOUT_MAX_MS, REGISTERED_TOOL_NAME_MAX, registeredToolName, listSessionOps
-    "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": ["AWAIT_TIMEOUT_MAX_MS", "REGISTERED_TOOL_NAME_MAX", "registeredToolName", "listSessionOps"],
+    "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": ["AWAIT_TIMEOUT_MAX_MS", "REGISTERED_TOOL_NAME_MAX", "registeredToolName"],
     // pre-existing at origin dev 4686e425b5: unused export(s) WAKE_FILE_RECHECK_MS
     "packages/omo-senpi/src/components/thread/gateway/extension-session-await.ts": ["WAKE_FILE_RECHECK_MS"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ExtensionTransactionEndedError, ExtensionTransactionBusyError
-    "packages/omo-senpi/src/components/thread/gateway/extension-transaction.ts": ["ExtensionTransactionEndedError", "ExtensionTransactionBusyError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ExtensionTransactionEndedError
     // pre-existing at origin dev 4686e425b5: unused export(s) LOCK_WAIT_EXCEEDED_CODE
     "packages/omo-senpi/src/components/thread/gateway/lock-wait.ts": ["LOCK_WAIT_EXCEEDED_CODE"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_TABLES
     "packages/omo-senpi/src/components/thread/gateway/schema.ts": ["GATEWAY_TABLES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
-    "packages/omo-senpi/src/components/thread/gateway/store-extension-session-ops.ts": ["recordThreadCreation", "sessionCall"],
     // pre-existing at origin dev 4686e425b5: unused export(s) migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats, migrateLegacyMailboxes
-    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "refuseReturned", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
+    // #14312: OPEN_STATES, enqueue, completeReceipt, abandonReceipt and deliveryView are reached only through store-worker.ts (not traced) since the extension enqueue went
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
-    "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
-    // #12925: toolReceiptRelease is called only by store-worker.ts, which runs as a worker thread knip does not reach (same as toolReceiptBegin/Settle)
-    "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "toolReceiptRelease", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
     // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
     "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
+    // store-worker.ts, which runs as a worker thread knip does not reach, is the only caller (#12925)
     // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
     "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
     // pre-existing at origin dev 4686e425b5: unused export(s) messageText
@@ -917,8 +882,6 @@
     "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
     // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
     "packages/omo-senpi/src/index.ts": ["omoSenpiAdapterPackageName"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
-    "packages/omo-senpi/src/install/local-launcher.ts": ["localLauncherCmdPath"],
     // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
     "packages/omo-senpi/src/omo-native-capture-path.audit.test.ts": ["findDirectNativeCaptureViolations"]
   }

@@ -10,8 +10,6 @@ import type { ExecutorContext } from "../executor-types"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
 
-const logMock = mock((..._args: unknown[]) => {})
-
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
   () =>
@@ -65,7 +63,6 @@ describe("resolveSubagentExecution", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -74,9 +71,6 @@ describe("resolveSubagentExecution", () => {
     loadProjectAgentsMock.mockReset()
     loadUserAgentsMock.mockImplementation(() => ({}))
     loadProjectAgentsMock.mockImplementation(() => ({}))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
     spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
     spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
@@ -1289,7 +1283,6 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -1298,9 +1291,6 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     loadProjectAgentsMock.mockReset()
     loadUserAgentsMock.mockImplementation(() => ({}))
     loadProjectAgentsMock.mockImplementation(() => ({}))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
     spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
     spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(

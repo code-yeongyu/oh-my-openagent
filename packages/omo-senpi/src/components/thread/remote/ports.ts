@@ -33,6 +33,10 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /** Rows 6: the holder's retry wait as its engine names it (`{kind, attempt, maxAttempts, delayMs, until}`); absent = none or unknown. */
+  readonly waiting?: unknown
+  /** Rows 7: the version of the engine that holds the session live; absent = unknown. */
+  readonly engine_version?: string
 }
 
 export type RemoteDevice = {
@@ -147,6 +151,12 @@ export type RemoteWatchOutcome =
   { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
+  /** Authenticated query-only device-service request; never an engine command or cold wake. */
+  readonly receipt?: (
+    device: string,
+    durableId: string,
+    deliveryId: string,
+  ) => Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }>
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>
@@ -203,6 +213,11 @@ export type RemoteSessionsPort = {
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
   /** omo#13037 A4.2/A4.3: one single-probe locate of `durableId` on `device`. Absent: no lookup is ever made. */
   readonly lookup?: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
+  /**
+   * #14748 review M1/M3: one lookup sent while no other locate of this port is in flight, its turn and that wait both
+   * within `waitMs`; undefined when they did not fit (nothing was sent). Absent: no lookup can be made alone.
+   */
+  readonly lookupAlone?: (device: string, durableId: string, waitMs: number) => Promise<RemoteLookupOutcome | undefined>
   /**
    * omo#13037 5.4: an `admit_external_message` record to a session of `device` that no listing maps, by its durable id.
    * `unavailable` when this device's own service cannot carry it (nothing is sent). Absent: the same as `unavailable`.
@@ -276,6 +291,18 @@ export type RemoteThreadSurface = {
   readonly permissionPreset?: () => string | undefined
 }
 
+// A UUIDv7 carries its creation time in its first 48 bits (RFC 9562 section 5.7); engine durable ids are UUIDv7.
+const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/**
+ * A listing row's creation time. The row carries none and its `updated_ms` is not one (#14474), so it is the time a
+ * UUIDv7 durable id encodes; a row without such an id keeps `updated_ms`.
+ */
+export function rowCreatedAt(row: RemoteSessionRow): string {
+  const match = UUID_V7.exec(row.durable_id ?? "")
+  return new Date(match === null ? row.updated_ms : Number.parseInt(`${match[1]}${match[2]}`, 16)).toISOString()
+}
+
 /**
  * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
  * device that did not answer is a snapshot (often days old, of sessions long gone), never proof the session runs (#14043).
@@ -301,6 +328,17 @@ export async function probeMayBuildEndedRow(sessions: Pick<RemoteSessionsPort, "
  * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its
  * stable key and the durable id. It carries no name and no folder, and its state `ended` sends a delivery down the wake path.
  */
+/**
+ * The port's lookup fence stayed closed for a whole lookup cap (a solo lookup's locate still running): nothing was sent,
+ * so the session's state is unknown, never "gone". A caller that can wait retries it (#14748 review round 7).
+ */
+export class LookupFenceRefused extends Error {
+  constructor() {
+    super("lookup_fence_timeout: a solo lookup's locate is still running on this port")
+    this.name = "LookupFenceRefused"
+  }
+}
+
 export function endedRow(device: string, key: string, durableId: string): RemoteSessionRow {
   return {
     device,

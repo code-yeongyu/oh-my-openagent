@@ -1,5 +1,3 @@
-import type { AnswerFields } from "./answer-shape"
-
 /**
  * The narrow seam between the gateway and senpi. Every senpi interaction the store, engine and
  * drain need goes through these two ports, typed against the senpi `feat/tui-control-endpoint`
@@ -88,19 +86,7 @@ export type GatewayEndpointPort = {
     request: ReleaseSessionRequest,
   ) => Promise<ReleaseSessionReply>
   readonly classifyLiveness?: (endpoint: GatewayEndpointRef) => Promise<EndpointLiveness>
-  /**
-   * Answers the session's pending extension UI request on its own endpoint (senpi#2372: the frame
-   * names the request in `uiRequestId` and keeps its own `id`, which the reply echoes). Resolves the
-   * session's verdict; throws only when no verdict came back. `thread_answer` calls it only after
-   * the reply token matched.
-   */
-  readonly respondUi?: (endpoint: GatewayEndpointRef, answer: UiAnswer) => Promise<UiAnswerReply>
 }
-
-/** `fields` is the answer in the shape its request kind reads (`answer-shape.ts`). */
-export type UiAnswer = { readonly ui_request_id: string; readonly fields: AnswerFields }
-/** `error` is the endpoint's own refusal code (`unknown_request`, `question_already_resolved`, ...). */
-export type UiAnswerReply = { readonly delivered: true } | { readonly delivered: false; readonly error: string }
 
 export type RuntimePhase = "idle" | "mid_turn" | "waiting_question" | "compacting"
 
@@ -122,6 +108,8 @@ export type AdmitExternalMessageInput = {
   readonly text: string
   readonly deliverAs: "steer" | "followUp"
   readonly expected_turn_id?: number
+  /** senpi `whenIdle`: `queue` puts a delivery to an idle session in its `deliverAs` queue without starting a turn. */
+  readonly whenIdle?: "start" | "queue"
   /** Ignored by a senpi from before delivery senders; the header in `text` still names the sender. */
   readonly sender?: DeliverySender
   readonly display_text?: string

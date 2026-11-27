@@ -8,6 +8,7 @@ import type {
   SnapshotBody,
   Status,
 } from "../../../src/local-api/protocol.ts"
+import type { RowsVersion } from "./fake-owner-rows.ts"
 
 // What an owner knows, described as plain JSON so the same fixtures can drive the fake owner here and any other
 // server implementation that can put itself into this state.
@@ -44,8 +45,8 @@ export type World = {
   readonly listing: {
     readonly revisions: readonly WorldRevision[]
     readonly devices: { readonly [device: string]: RoundDeviceState }
-    // The newest sessions.list `rows` version the service knows (default 4); a newer one is refused invalid_request.
-    readonly rowsNewest?: 1 | 2 | 3 | 4
+    // The newest sessions.list `rows` version the service knows (default 7); a newer one is refused invalid_request.
+    readonly rowsNewest?: RowsVersion
   }
   readonly sessions: readonly WorldSession[]
   // Decision 0018: the engine endpoint keys of the devices whose host takes delegated commands; others answer unsupported.

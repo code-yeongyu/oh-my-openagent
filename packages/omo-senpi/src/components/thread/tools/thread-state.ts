@@ -16,10 +16,12 @@ import type { RemoteSessionRow } from "../remote/ports"
 export function threadState(facts: {
   readonly archived?: unknown
   readonly held: boolean
+  readonly opening?: boolean
   readonly activity?: unknown
 }): ThreadState {
   if (facts.archived === true) return "archived"
   if (!facts.held) return "inactive"
+  if (facts.opening) return "opening"
   // A queued or approval-waiting thread is mid-turn: running. A failed turn has ended: idle (its detail says errored).
   return facts.activity === "running" || facts.activity === "queued" || facts.activity === "awaiting_approval"
     ? "running"
@@ -75,6 +77,16 @@ export function retryWait(running: boolean, waiting: unknown): { readonly waitin
       max_attempts: maxAttempts as number,
     },
   }
+}
+
+/** omo-relay-spec #314: a holder version is an opaque, nonempty, well-formed string of at most 128 UTF-16 code units. */
+const ENGINE_VERSION_MAX_CHARS = 128
+
+/** The holder's engine version when it is one (see above); anything else is unknown and shown as nothing. */
+export function holderVersion(value: unknown): { readonly engine_version?: string } {
+  return typeof value === "string" && value !== "" && value.length <= ENGINE_VERSION_MAX_CHARS && value.isWellFormed()
+    ? { engine_version: value }
+    : {}
 }
 
 /** A reported model, when it is exactly a non-empty provider and id. */

@@ -3,7 +3,8 @@ import { expect, test } from "bun:test"
 import { GitCommandError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
 import { SyncCommitError } from "./adapters/git-sync-repo"
-import { SyncHttpError } from "./adapters/http-transport"
+import { OwnershipUnprovenError } from "./account-journal"
+import { createHttpTransport, SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 import { describeSyncFailure } from "./failure"
 import { logCycleFailure } from "./failure-cause"
 
@@ -47,6 +48,31 @@ test("a non-transient service refusal names the service code and HTTP status", (
     reason: expect.any(String),
     action: expect.any(String),
     cause: { errorClass: "SyncHttpError", code: "payload_too_large", httpStatus: 413, stage: "push" },
+  })
+})
+
+test("#given the service's real 426 client floor refusal #when a request is refused #then the failure is its own client_update_required kind keeping the service code and HTTP status (#14483)", async () => {
+  const floored = createHttpTransport({
+    baseUrl: "http://sync.example",
+    token: () => "tok",
+    fetch: (async () =>
+      Response.json(
+        { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+        { status: 426 },
+      )) as unknown as typeof fetch,
+  })
+  const refusal = await floored.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
+
+  const failure = describeSyncFailure(refusal, "receive")
+
+  expect(failure).toEqual({
+    kind: "client_update_required",
+    reason: expect.any(String),
+    action: expect.any(String),
+    cause: { errorClass: "SyncHttpError", code: "client_update_required", httpStatus: 426, stage: "receive" },
   })
 })
 
@@ -120,4 +146,19 @@ test("a failed sync-repo commit on the warning names its class only; its git out
   expect(lines.filter(({ level }) => level === "info").map(({ line }) => line)).toEqual([
     expect.stringContaining("secret-value"),
   ])
+})
+
+test("#given the ownership proof failed #when its cause is an expired sign-in #then the status asks for a sign-in, not a wait (#14491 review r3 L1)", () => {
+  expect(
+    describeSyncFailure(new OwnershipUnprovenError(new SyncAuthError(new Error("refresh failed"))), "load").kind,
+  ).toBe("auth_expired")
+  expect(
+    describeSyncFailure(new OwnershipUnprovenError(new SyncHttpError("unauthorized", 401, false)), "load").kind,
+  ).toBe("auth_expired")
+  expect(
+    describeSyncFailure(new OwnershipUnprovenError(new SyncNetworkError(new TypeError("fetch failed"))), "load"),
+  ).toMatchObject({
+    kind: "offline",
+    reason: expect.stringContaining("which account"),
+  })
 })

@@ -16,9 +16,9 @@ builtin-skills/
 ├── skills.ts             # createBuiltinSkills() factory + resolveActiveBuiltinSkills()
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
-│   ├── git-master.ts                  # Wraps git-master/ SKILL.md + section constants
+│   ├── git.ts                         # OpenCode's own git skill template from git-master-sections/ (kept as it was; the shared skills/git/SKILL.md is the native and Codex body)
 │   ├── git-master-sections/           # Prompt sub-sections (history-search, rebase, atomic-planning…)
-│   ├── git-master-skill-metadata.ts   # Companion to git-master
+│   ├── git-skill-metadata.ts          # GIT_SKILL_NAME, description, isGitSkillName (alias-aware)
 │   ├── playwright.ts                  # Facade over browser provider variants
 │   ├── playwright-mcp-skill.ts        # createPlaywrightSkill() factory (mcp_args)
 │   ├── playwright-cli.ts              # CLI variant
@@ -33,7 +33,6 @@ builtin-skills/
 │   ├── security-research.ts           # Team Mode exploitability-driven security research
 │   ├── security-review.ts             # Reuses security-research
 │   └── index.ts                       # skill barrel
-├── git-master/                        # Resources for git-master skill
 ├── frontend/                    # Resources for frontend skill
 ├── dev-browser/                       # Resources for dev-browser
 └── security-research/                 # Resources for security-research
@@ -45,7 +44,7 @@ Selected skills; the provider registry is defined in `skills.ts`.
 
 | Skill | MCP | Notes |
 |-------|-----|-------|
-| `git-master` | — | 1107-LOC SKILL.md; atomic commits, rebase, history search; included by default for delegate-task `git` category |
+| `git` | — | Section-based template: atomic commits, rebase, history search; `git-master` resolves as an alias (`skill-name-aliases.ts`) |
 | `playwright` | `@playwright/mcp` | Browser automation via MCP |
 | `playwright-cli` | — | Browser automation via shell CLI (no MCP) |
 | `dev-browser` | — | Persistent page state browser for dev work |

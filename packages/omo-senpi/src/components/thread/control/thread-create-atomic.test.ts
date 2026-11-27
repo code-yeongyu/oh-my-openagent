@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
-import { hashArgs } from "../gateway/bindings"
+import { hashArgs } from "../gateway/hash-args"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { ThreadHostSession } from "../tools"
 import { createdThreadId } from "./session-host"
@@ -52,9 +52,10 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(enqueuedFor(id)).toBe(1)
     const again = (await run("thread_create", args)) as Created
-    // A third run under the key finds the same thread; the prompt's own receipt answers it as already delivered.
-    expect(again).toMatchObject({ kind: "ok", thread: id, prompt: { deduplicated: true } })
+    // #14623 H1: the recovery's answer was recorded, so a third run under the key replays it and runs nothing.
+    expect(again).toEqual(retry)
     expect(openSession).toHaveBeenCalledTimes(1)
+    expect(enqueuedFor(id)).toBe(1)
   })
 
   test("#given a host that ignores the derived id and a lost reply #when the create is retried under the same key #then idempotency_uncertain and no second thread", async () => {
