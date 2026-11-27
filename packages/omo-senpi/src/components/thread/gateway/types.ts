@@ -1,4 +1,5 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
+import type { EngineTurnCap } from "./adapter"
 
 export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
@@ -111,6 +112,11 @@ export type DeliveryRow = {
   readonly admission_kind: string | null
   /** What the receiver was parked on when it queued the delivery (#13014); null when it was not. */
   readonly wait_kind: "approval" | null
+  /**
+   * The engine-turn cap an admitted `held` row is kept behind (senpi#7138); null on every other row. Stored in the row's
+   * `reason` column, which only a refused row otherwise uses, so no schema step is needed and older binaries ignore it.
+   */
+  readonly engine_turn_cap?: EngineTurnCap | null
   readonly turn_epoch: number | null
   readonly root_id: string
   readonly hop: number
@@ -267,6 +273,7 @@ export type OutcomeRecord =
       readonly admission_kind: string
       readonly turn_epoch: number
       readonly wait_kind?: "approval"
+      readonly engine_turn_cap?: EngineTurnCap
       /** The lane the admission actually took, when it differs from the one claimed (decided again at admission). */
       readonly mode_effective?: EffectiveLane
     }
@@ -275,6 +282,7 @@ export type OutcomeRecord =
       readonly admission_kind: string
       readonly turn_epoch: number
       readonly wait_kind?: "approval"
+      readonly engine_turn_cap?: EngineTurnCap
       readonly mode_effective?: EffectiveLane
     }
   | { readonly kind: "requeue" }
@@ -295,10 +303,13 @@ export type GatewayDeliveryDelivery =
 
 /**
  * What the receiver is parked on while the delivery waits (omo#13037 5.1): an approval (a tool permission or question) a
- * human must answer on that device, a hold on the session, or the wake of a session no engine runs. `device` is the account
- * device it waits on; absent when this install has no device identity (#13014).
+ * human must answer on that device, a hold on the session, the wake of a session no engine runs, or the engine-turn cap
+ * that stopped the turn it would start (senpi#7138: `reason` and `count` name the cap; a person's message or a Resume
+ * lifts it). `device` is the account device it waits on; absent when this install has no device identity (#13014).
  */
-export type DeliveryWait = { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
+export type DeliveryWait =
+  | { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
+  | ({ readonly kind: "engine_turn_cap"; readonly device?: string } & EngineTurnCap)
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"

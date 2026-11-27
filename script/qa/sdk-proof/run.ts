@@ -4,6 +4,8 @@
 // .omo/evidence/<date>-sdk-proof-x1a) and the summary table, rewritten in RESULTS.md beside this file.
 //   bun run build:senpi-plugin
 //   THREAD_QA_SENPI_VERSION=<the engine omo pins> bun script/qa/sdk-proof/run.ts [--evidence-dir <dir>] [--only sdk,tools,cli]
+// With --capped it runs only the capped-holder case (capped.ts) in a world whose device B is capped, and leaves
+// RESULTS.md as it is.
 // A failing or unavailable cell is a finding: it names the slice that fixes it. Nothing here makes a cell pass.
 import { createHash } from "node:crypto"
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
@@ -11,6 +13,7 @@ import { join, resolve } from "node:path"
 
 import { createCliDriver } from "./drivers/cli.ts"
 import { type Driver, isRecord } from "./drivers/driver.ts"
+import { CAP_B, type CappedRecord, cappedTable, runCapped } from "./capped.ts"
 import { createToolsDriver } from "./drivers/tools.ts"
 import { redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
 import { type KeyedRecord, keyedTable, openKeyedThread, runKeyedPairs } from "./keyed.ts"
@@ -102,7 +105,26 @@ async function runKeyed(world: World): Promise<KeyedRecord[]> {
   }
 }
 
+async function runCappedCase(world: World): Promise<CappedRecord[]> {
+  const ready = await prepared(
+    Promise.all([driverFor("tools", world), driverFor("cli", world)]),
+    STEP_DEADLINE_MS,
+    (late) => void Promise.all(late.map((driver) => driver.close())),
+  )
+  if (ready === undefined)
+    return [
+      { step: "start", raw: null, cell: "not reached", why: "the drivers were not ready within the step deadline" },
+    ]
+  const [tools, cli] = ready
+  try {
+    return await runCapped(tools, cli, DEVICE_B.id, world.observer)
+  } finally {
+    await Promise.all([tools.close(), cli.close()])
+  }
+}
+
 async function main(): Promise<void> {
+  const cappedOnly = process.argv.includes("--capped")
   const only = (arg("--only") ?? SURFACES.join(","))
     .split(",")
     .filter((s): s is Surface => SURFACES.some((x) => x === s))
@@ -113,7 +135,10 @@ async function main(): Promise<void> {
   mkdirSync(evidence, { recursive: true })
   // The world's start (install, engine hosts, A's daemon) is bounded too: a stall ends the run, its children stopped.
   const world = await prepared(
-    startWorld((line) => appendFileSync(join(evidence, "relay-trace.jsonl"), `${line}\n`)),
+    startWorld(
+      (line) => appendFileSync(join(evidence, "relay-trace.jsonl"), `${line}\n`),
+      cappedOnly ? { capB: CAP_B } : {},
+    ),
     WORLD_DEADLINE_MS,
     (late) => void late.close(),
   )
@@ -127,12 +152,17 @@ async function main(): Promise<void> {
   const runs: Record<Surface, StepRecord[]> = { sdk: [], tools: [], cli: [] }
   let isolation: Isolation = { refused: [], guarded: 0, sessionBus: false }
   let keyed: KeyedRecord[] = []
+  let capped: CappedRecord[] = []
   try {
-    for (const surface of only) {
+    if (cappedOnly) {
+      capped = await runCappedCase(world)
+      writeFileSync(join(evidence, "capped.json"), redact(JSON.stringify(capped, null, 2), redaction))
+    }
+    for (const surface of cappedOnly ? [] : only) {
       runs[surface] = await runSurface(surface, world)
       writeFileSync(join(evidence, `${surface}.md`), redact(transcript(surface, build, runs[surface]), redaction))
     }
-    if (only.length === SURFACES.length) {
+    if (!cappedOnly && only.length === SURFACES.length) {
       keyed = await runKeyed(world)
       writeFileSync(join(evidence, "keyed.json"), redact(JSON.stringify(keyed, null, 2), redaction))
     }
@@ -170,9 +200,13 @@ async function main(): Promise<void> {
     "Attribution: a fail cell is the product's only on the surface's own answer (its error code, or its success while device B, read through B's own engine, shows otherwise); a stall is the harness's; a world-setup failure is not reached. Each observation is tied to its call: B's thread by the id its open adopted, a tool result by a nonce in that step's prompt, an SDK result by its request id, a CLI result by its own process.",
     "The table states what this world (real engine hosts, fake model, account and relay) shows; it claims nothing about production beyond it.",
   ])
-  const results = keyed.length === 0 ? table : `${table}${keyedTable(keyed)}`
+  const results = cappedOnly
+    ? redact(cappedTable(capped), redaction)
+    : keyed.length === 0
+      ? table
+      : `${table}${keyedTable(keyed)}`
   writeFileSync(join(evidence, "summary.md"), results)
-  writeFileSync(join(import.meta.dir, "RESULTS.md"), results)
+  if (!cappedOnly) writeFileSync(join(import.meta.dir, "RESULTS.md"), results)
   // The synthetic credential must leave no trace: every evidence file and RESULTS.md is scanned for its canary.
   const leaked = [
     ...readdirSync(evidence).map((name) => join(evidence, name)),
@@ -180,7 +214,8 @@ async function main(): Promise<void> {
   ].filter((path) => readFileSync(path, "utf8").includes(CANARY))
   if (leaked.length > 0) process.stderr.write(`x1a: the credential canary appears in ${leaked.join(", ")}\n`)
   process.stdout.write(`${results}\nevidence: ${evidence}\n`)
-  if (!isolated || leaked.length > 0 || !tornDown) process.exitCode = 1
+  const cappedFailed = cappedOnly && (capped.length === 0 || capped.some((record) => record.cell !== "pass"))
+  if (!isolated || leaked.length > 0 || !tornDown || cappedFailed) process.exitCode = 1
 }
 
 if (import.meta.main) await main()

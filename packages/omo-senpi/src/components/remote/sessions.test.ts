@@ -378,6 +378,31 @@ describe("sessions.send and sessions.read", () => {
     expect(header.filter((field) => field.startsWith("device"))).toEqual([])
   })
 
+  // #14941 review LOW: the receipt keeps what the peer's engine said the message waits on, not only an approval.
+  test.each([
+    [
+      "the engine-turn cap",
+      { kind: "held", turnId: "8", engineTurnCap: { reason: "cap-per-message", count: 3 } },
+      { kind: "engine_turn_cap", reason: "cap-per-message", count: 3 },
+    ],
+    ["a person's Stop", { kind: "held", turnId: "8", holds: ["session_hold"] }, { kind: "hold" }],
+  ] as const)(
+    "#given a peer engine that keeps a session client's message behind %s #when sessions.send runs #then the receipt is queued and names that wait",
+    async (_wait, admitted, waitingOn) => {
+      const base = world()
+      const sessions = base.sessions.map((session) => ({
+        ...session,
+        delegated: { data: { ...SESSION_REPLY, ...admitted }, frames: [] },
+      }))
+      const owner = await startOwner({ ...base, service_version: "0.1.30", sessions })
+      const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
+      expect(await valueOf(session.sessions.send(LIVE, { text: "hello" }))).toMatchObject({
+        lane: "queued",
+        waiting_on: { ...waitingOn, device: PEER },
+      })
+    },
+  )
+
   test("#given an attachment or an author on a person client #when sessions.send runs #then it is refused typed and nothing is sent", async () => {
     const { owner } = await onWorld()
     const client = clientOn(owner.stateDir, fakeClock())

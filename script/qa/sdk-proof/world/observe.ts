@@ -32,6 +32,8 @@ export type Observer = {
   readonly adopt: (before: ReadonlySet<string>) => Promise<string | undefined>
   readonly keys: () => Promise<ReadonlySet<string>>
   readonly read: (key: string | undefined) => Promise<BState>
+  /** B's own `get_state` answer for the session, as the engine gives it (the capped case reads `engineTurnCap`). */
+  readonly engineState: (key: string) => Promise<Record<string, unknown>>
   /** `answered`: the surface reported success; only then is B given time to reach the state, else it is read once. */
   readonly judge: (
     key: string | undefined,
@@ -98,6 +100,7 @@ export async function observeB(socket: string, heldTags: () => readonly string[]
     adopt: async (before) => [...(await keys())].find((key) => !before.has(key)),
     keys,
     read,
+    engineState: async (key) => dataOf(await client.request({ type: "get_state", sessionId: key })),
     judge,
     fill: async (key) => {
       if (key === undefined) return { failed: "no thread on B to fill" }

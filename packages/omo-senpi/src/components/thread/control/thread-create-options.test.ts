@@ -319,6 +319,35 @@ describe("thread_create whose first prompt the thread admitted to its queue", ()
     expect(a.sent.filter((entry) => entry.via === "wake")).toHaveLength(1)
   })
 
+  // #14941 (senpi#7138): b's engine-turn cap stops the turn the prompt would start, so it runs only when a person sends a
+  // message or resumes the thread. The create answers that wait by name with a next_action not to resend.
+  test("#given b's engine-turn cap holds the prompt #when thread_create opens the thread with it, twice under one key #then ok, the prompt queued waiting on the cap with a do-not-resend next_action naming the thread", async () => {
+    const cap = { reason: "cap-per-resume-window", count: 8 }
+    const a = account({
+      admitOutcome: {
+        kind: "ok",
+        response: {
+          type: "response",
+          id: null,
+          command: "admit_external_message",
+          success: true,
+          data: { kind: "held", turnId: "8", engineTurnCap: cap },
+        },
+      },
+    })
+    const { run } = surface(a.remote)
+    const args = { thread: "dur-on-b", prompt: "carry on", idempotency_key: "create-cap-1" }
+    const first = await run("thread_create", args)
+    expect(first).toMatchObject({
+      kind: "ok",
+      prompt: { delivery: { kind: "queued", waiting_on: { kind: "engine_turn_cap", ...cap, device: "b" } } },
+    })
+    const next = (first as { prompt?: { next_action?: string } }).prompt?.next_action
+    expect(next).toEqual(expect.stringContaining("dur-on-b"))
+    expect(next).toEqual(expect.stringContaining("thread_read"))
+    expect(await run("thread_create", args)).toEqual(first)
+  })
+
   test("#given the live thread on b waits on a question #when thread_create opens it with a prompt #then ok, the prompt queued waiting on that approval on b", async () => {
     const a = account({
       engine: {

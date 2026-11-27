@@ -158,7 +158,17 @@ const addThinkingModel = (agentDir: string): void => {
 /** Stops every child the kit started (the world's start did not finish, so no World exists to close). */
 export const stopWorldChildren = (): Promise<void> => cleanupAll()
 
-export async function startWorld(trace: (line: string) => void): Promise<World> {
+/** `capB`: B's engine stops automatic turns after this many per person's message (`engineTurns.maxPerUserInput`). */
+export type WorldOptions = { readonly capB?: number }
+
+// The capped case (capped.ts): B's settings carry the engine-turn cap before B's engine host starts.
+const capEngineTurns = (agentDir: string, maxPerUserInput: number): void => {
+  const path = join(agentDir, "settings.json")
+  const settings = JSON.parse(readFileSync(path, "utf8"))
+  writeFileSync(path, `${JSON.stringify({ ...settings, engineTurns: { maxPerUserInput } }, null, 2)}\n`)
+}
+
+export async function startWorld(trace: (line: string) => void, options: WorldOptions = {}): Promise<World> {
   installCleanupHooks()
   // The model reports usage the way a real provider does (about four characters a token over the whole request), so B's
   // context estimate follows the thread and a switch can need a compaction (the parked step, #14939).
@@ -171,6 +181,7 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
   const a = makeScratch("x1a-a", fake)
   const b = makeScratch("x1a-b", fake)
   addThinkingModel(b.agentDir)
+  if (options.capB !== undefined) capEngineTurns(b.agentDir, options.capB)
   const guards = [isolate(a), isolate(b)]
   const relayDir = join(a.dir, "ds")
   mkdirSync(relayDir, { recursive: true })

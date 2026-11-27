@@ -26,15 +26,22 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
   },
 }
 
-/** What a row the receiver admitted to its queue waits on, if anything: the hold it was kept under, or the approval its receiver was parked on. */
+/**
+ * What a row the receiver admitted to its queue waits on, if anything: the engine-turn cap or the hold it was kept under,
+ * or the approval its receiver was parked on.
+ */
 export function admittedWait(row: DeliveryRow): DeliveryWait | undefined {
   // A row here was sent and is received on this install, so the device its sender stamped (#13004) is the one the
   // receiver waits on (#13014); a row with no stamped device names none, so a replayed answer reads the same.
   const device = row.envelope.provenance?.device
+  const where = device === undefined ? {} : { device }
+  // senpi#7138: a `held` answer that named the engine-turn cap is kept behind that cap, which no hold release lifts.
+  if (row.admission_kind === "held" && row.engine_turn_cap)
+    return { kind: "engine_turn_cap", ...row.engine_turn_cap, ...where }
   // An engine that keeps the delivery as a held notice (senpi#7014: a Stop, an interrupted run or a parent's hold) answers
   // `held`: the delivery waits on that hold, and the sender is told so instead of a bare queued.
   const waitKind = row.admission_kind === "held" ? "hold" : row.wait_kind
-  return waitKind === null ? undefined : { kind: waitKind, ...(device === undefined ? {} : { device }) }
+  return waitKind === null ? undefined : { kind: waitKind, ...where }
 }
 
 export function resultFromRow(

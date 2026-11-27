@@ -322,6 +322,21 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
     })
 
+    test("#given the woken engine answered held behind its engine-turn cap (senpi#7138) #then the result is queued waiting on that cap on the receiving device, never started", async () => {
+      expect(
+        await answered(
+          queuedEnvelope({ kind: "held", turnId: "3", engineTurnCap: { reason: "cap-per-message", count: 3 } }),
+        ),
+      ).toMatchObject({
+        kind: "ok",
+        delivery: {
+          kind: "queued",
+          queue_position: 1,
+          waiting_on: { kind: "engine_turn_cap", reason: "cap-per-message", count: 3, device: "c" },
+        },
+      })
+    })
+
     test("#given the receiver answered an existing row #then the result is deduplicated", async () => {
       expect(
         await answered(

@@ -153,6 +153,22 @@ describe("thread_send / thread_handoff results", () => {
     ).toEqual(["-> planner  queued #3: no engine is running the thread; it starts to take the message"])
   })
 
+  test("#given a queued delivery the engine-turn cap holds (senpi#7138) #when it renders #then it names the cap and the device, and says what lifts it", () => {
+    expect(
+      result(
+        "thread_send",
+        sent({
+          kind: "queued",
+          queue_position: 1,
+          waiting_on: { kind: "engine_turn_cap", reason: "cap-per-message", count: 3, device: "b" },
+        }),
+        sendArgs,
+      ),
+    ).toEqual([
+      "-> planner  queued #1: automatic turns paused (cap-per-message at 3) on b; runs when a person sends a message or resumes the thread",
+    ])
+  })
+
   test("#given an offline target #when it renders #then it says the message waits for the thread to start", () => {
     const offline = {
       kind: "ok",

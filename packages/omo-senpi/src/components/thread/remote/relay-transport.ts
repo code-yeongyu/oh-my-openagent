@@ -3,6 +3,7 @@ import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"
 import { pairLoopGuardMessage, pairLoopGuardNextAction, threadToolFailure, type ThreadToolFailure } from "../errors"
+import { engineTurnCapOf } from "../gateway/adapter"
 import { hashArgs } from "../gateway/hash-args"
 import { decideDelivery, effectiveLaneOf } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
@@ -705,6 +706,15 @@ export function createRelayTransport(
     // A receiver parked on an approval (an open question its human must answer on that device) waits behind that
     // approval (#12886); a paused or held one waits on its holds. `held` is the engine's own word for that: idle under a
     // hold a peer cannot release (a Stop, an interrupted run, a parent's run hold; senpi#7014), kept until it is released.
+    // senpi#7138: `held` with `engineTurnCap` instead of `holds` is kept behind the engine-turn cap, which no hold
+    // release lifts: the wait names the cap.
+    const cap = kind === "held" ? engineTurnCapOf(reply["engineTurnCap"]) : undefined
+    if (cap !== undefined)
+      return ok({
+        kind: "queued",
+        queue_position: pending ?? 1,
+        waiting_on: { kind: "engine_turn_cap", ...cap, device: row.device },
+      })
     if (kind === "held" || (kind === "queued" && afterState?.held === true))
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "queued" && afterState?.parkedOnApproval === true)
@@ -760,7 +770,10 @@ export function createRelayTransport(
           kind: "queued",
           queue_position: 1,
           waiting_on: {
-            kind: typeof wait === "string" && WAITS.has(wait) ? (wait as DeliveryWait["kind"]) : "wake",
+            kind:
+              typeof wait === "string" && WAITS.has(wait)
+                ? (wait as Exclude<DeliveryWait["kind"], "engine_turn_cap">)
+                : "wake",
             device,
           },
         },
@@ -771,7 +784,14 @@ export function createRelayTransport(
     const turnId = typeof data["turnId"] === "string" ? data["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
     if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
-    if (kind === "held") return ok({ kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device } })
+    if (kind === "held") {
+      const cap = engineTurnCapOf(data["engineTurnCap"])
+      return ok({
+        kind: "queued",
+        queue_position: 1,
+        waiting_on: cap === undefined ? { kind: "hold", device } : { kind: "engine_turn_cap", ...cap, device },
+      })
+    }
     return fail(
       "idempotency_uncertain",
       `Device ${device} accepted the message but answered an unknown admission (${String(kind)}).`,

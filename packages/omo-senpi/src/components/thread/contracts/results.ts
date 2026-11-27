@@ -129,13 +129,22 @@ export type ThreadDelivery =
   | { readonly kind: "started"; readonly turn_id: string }
   /**
    * `waiting_on`: what the message waits on, on that device (`device`, absent when this install has no device identity):
-   * an `approval` a human must answer, a `hold` on the session (a Stop, a pause), or the `wake` of a session no engine runs
-   * (omo#13037); the message runs after it.
+   * an `approval` a human must answer, a `hold` on the session (a Stop, a pause), the `wake` of a session no engine runs
+   * (omo#13037), or the `engine_turn_cap` that stopped the turn it would start (senpi#7138: `reason`, e.g.
+   * `cap-per-resume-window`, and the `count` it stopped at; a person's message or a Resume lifts it, a resend does not);
+   * the message runs after it.
    */
   | {
       readonly kind: "queued"
       readonly queue_position: number
-      readonly waiting_on?: { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
+      readonly waiting_on?:
+        | { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
+        | {
+            readonly kind: "engine_turn_cap"
+            readonly reason: string
+            readonly count: number
+            readonly device?: string
+          }
     }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
   | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
