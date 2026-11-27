@@ -60,6 +60,20 @@ const OWNER_PID = 4444
 const CLAIMED_START = "linux-proc-start-ticks:100"
 const REUSED_START = "linux-proc-start-ticks:999"
 
+/** A live child of this run (its owner names it) for a node the run no longer has, under another session. */
+function seedStaleChildOfRemovedNode(f: ReturnType<typeof liveParentFixture>): void {
+  seedRecord(f.store, {
+    task_id: "st_0000cafe",
+    parent_session_id: "another-session",
+    status: "running",
+    residency_state: "resident",
+  })
+  f.store.mutate("st_0000cafe", (record) => ({
+    ...record,
+    owner: { kind: "dag", runId, nodeId: "k-gone" as DagNodeId, fingerprint: "removed-node" },
+  }))
+}
+
 /** The host died with the child mid-turn; its record still claims an owner pid the OS reports alive. */
 async function deadHostChildClaimedBy(observedStart: string) {
   const f = fixture("in-process")
@@ -137,22 +151,30 @@ describe("a waiting node on the stacked engine (#15150, stack)", () => {
     await run.scheduler.suspend()
   })
 
+  test("#given a live child of a node the run no longer has when the session reopens #when recovery runs #then the fence stops it first and the pending node still waits and then follows its child", async () => {
+    // given - recovery's order: the child gate's fence (rule 1) runs before any node is resolved
+    const f = fixture("in-process", { residency_max_children: 1, default_concurrency: 2 })
+    const { hang, side, store } = await reopenOverCapacity(f)
+    seedStaleChildOfRemovedNode(f)
+
+    // when
+    const run = await recoverRun(f, store)
+
+    // then - the stale child was stopped by the fence; the waiting branch was not touched by it
+    expect(f.store.load("st_0000cafe")?.status).toBe("cancelled")
+    expect(nodeStates(store)).toEqual(WAITING)
+    await freeSlot(f, side)
+    await lifecycleRetryTick(f)
+    await finishRun(f, store, hang)
+    expect((await run.settled).record?.status).toBe("completed")
+  })
+
   test("#given a waiting node and a live child of a node the run no longer has #when the waiting child is revived #then the child gate refuses to follow it: the node fails and the revived child is stopped", async () => {
     // given
     const f = fixture("in-process", { residency_max_children: 1, default_concurrency: 2 })
     const { hang, side, store } = await reopenOverCapacity(f)
     const run = await recoverRun(f, store)
-    // A child of this run (its owner names it) that runs under another session's residency.
-    seedRecord(f.store, {
-      task_id: "st_0000cafe",
-      parent_session_id: "another-session",
-      status: "running",
-      residency_state: "resident",
-    })
-    f.store.mutate("st_0000cafe", (record) => ({
-      ...record,
-      owner: { kind: "dag", runId, nodeId: "k-gone" as DagNodeId, fingerprint: "removed-node" },
-    }))
+    seedStaleChildOfRemovedNode(f)
 
     // when
     await freeSlot(f, side)
