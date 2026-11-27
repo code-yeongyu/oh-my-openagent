@@ -65,7 +65,10 @@ fn a_cancelled_consent_dialog_is_denied_and_not_asked_again_in_the_lifecycle() {
         );
     }
     let seen = portal.log();
-    assert_eq!(seen.dialogs, 1, "one dialog per lifecycle, even after a cancel");
+    assert_eq!(
+        seen.dialogs, 1,
+        "one dialog per lifecycle, even after a cancel"
+    );
     assert_eq!(seen.connects, 0, "nothing reached ConnectToEIS");
     assert!(rig.eis.log().keys.is_empty(), "nothing was sent");
 }
@@ -81,6 +84,9 @@ fn a_kept_token_is_read_back_from_a_file_that_existed_with_a_loose_mode() {
     consent.keep(Some("token-1"));
 
     assert_eq!(consent.token().as_deref(), Some("token-1"));
-    let mode = std::fs::metadata(&file).expect("state file").permissions().mode();
+    let mode = std::fs::metadata(&file)
+        .expect("state file")
+        .permissions()
+        .mode();
     assert_eq!(mode & 0o777, 0o600, "the kept token is owner-only");
 }

@@ -26,6 +26,8 @@ pub struct PortalLink {
     pub(crate) portal: Box<dyn RemoteDesktop>,
     pub(crate) started: Option<Started>,
     consent: Consent,
+    /// The user cancelled the consent dialog: denied for the rest of this lifecycle.
+    denied: bool,
 }
 
 /// The route the hand's input takes.
@@ -47,6 +49,11 @@ fn unavailable() -> Refusal {
     Refusal::new(EngineCode::Internal, Reason::InputUnsupported)
 }
 
+/// The user cancelled the consent dialog (acceptance 31).
+fn denied() -> Refusal {
+    Refusal::bare(EngineCode::PermissionDenied)
+}
+
 impl Link {
     #[must_use]
     pub fn portal(portal: Box<dyn RemoteDesktop>, consent: Consent) -> Self {
@@ -54,6 +61,7 @@ impl Link {
             portal,
             started: None,
             consent,
+            denied: false,
         })
     }
 
@@ -61,18 +69,29 @@ impl Link {
     /// moment the consent dialog may open (the first input call).
     ///
     /// # Errors
-    /// `Internal{input_unsupported}` with nothing sent when the route cannot connect.
+    /// `Internal{input_unsupported}` with nothing sent when the route cannot connect;
+    /// `PermissionDenied` with nothing sent, and no further dialog this lifecycle, once the
+    /// user cancelled it.
     pub fn connect(&mut self) -> Result<EiSession, Refusal> {
         let stream = match self {
             Self::Socket(path) => UnixStream::connect(&*path).map_err(|_| unavailable())?,
             Self::Portal(link) => {
+                if link.denied {
+                    return Err(denied());
+                }
                 if link.started.is_none() {
                     let clipboard = link.portal.clipboard_version().is_some();
                     let token = link.consent.token();
                     let started = link
                         .portal
                         .start(token.as_deref(), link.consent.persist(), clipboard)
-                        .map_err(|_| unavailable())?;
+                        .map_err(|error| {
+                            if error == PortalError::Cancelled {
+                                link.denied = true;
+                                return denied();
+                            }
+                            unavailable()
+                        })?;
                     link.consent.keep(started.restore_token.as_deref());
                     link.started = Some(started);
                 }
