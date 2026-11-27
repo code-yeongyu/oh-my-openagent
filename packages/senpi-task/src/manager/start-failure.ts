@@ -54,6 +54,16 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   const trusted = error.failure.reason === undefined
   const cause = trusted ? causeOf(failureKind, error.failure.cause) : undefined
   const exited = trusted && cause === undefined && rejectedWhile === "exited" ? exit : undefined
+  // The typed open_session refusal's own detail is first-party host text captured at the wire
+  // boundary, so unlike `message` it may name the refusal's cause in the parent's surfaces (#11681).
+  const refusalDetail =
+    failureKind === "session_unavailable" &&
+    reason !== undefined &&
+    SESSION_REFUSAL_REASONS.has(reason) &&
+    typeof error.failure.refusal_detail === "string" &&
+    error.failure.refusal_detail.length > 0
+      ? error.failure.refusal_detail
+      : undefined
   const errorMessage =
     trusted && error.failure.cause instanceof RpcRequestTimeout
       ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
@@ -63,7 +73,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
           ? causedMessage(failureKind, cause)
           : exited !== undefined && failureKind === "child-prompt-failed"
             ? `Child prompt failed to start: ${describeChildExit(exited)}.`
-            : publicMessage(failureKind, reason)
+            : publicMessage(failureKind, reason, refusalDetail)
   return {
     errorMessage,
     failureKind,
@@ -71,6 +81,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
     eventFacts: {
       failure_kind: failureKind,
       ...(reason === undefined ? {} : { failure_reason: reason }),
+      ...(refusalDetail === undefined ? {} : { refusal_detail: refusalDetail }),
       ...(namedSpec === undefined ? {} : { launch_spec_path: namedSpec }),
       ...(rejectedWhile === undefined ? {} : { rejected_while: rejectedWhile }),
       ...(exit === undefined ? {} : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
@@ -103,7 +114,11 @@ function launchSpecInsecureMessage(path: string): string {
   return `The task host launch spec is writable by other users or not owned by you, so no task host was started (launch_spec_insecure: ${path}). Fix: run chmod 644 ${path} and make sure the file is yours.`
 }
 
-function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReason | undefined): string {
+function publicMessage(
+  kind: TaskStartFailureKind,
+  reason: TaskStartFailureReason | undefined,
+  refusalDetail: string | undefined,
+): string {
   const reasonMessage = reason === undefined ? undefined : REASON_MESSAGES[reason]
   if (reasonMessage !== undefined) return reasonMessage
 
@@ -120,7 +135,9 @@ function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReaso
       return MODEL_UNAVAILABLE_MESSAGE
     case "session_unavailable":
       return reason !== undefined && SESSION_REFUSAL_REASONS.has(reason)
-        ? `The task host refused the child session (${reason}).`
+        ? refusalDetail === undefined
+          ? `The task host refused the child session (${reason}).`
+          : `The task host refused the child session (${reason}): ${refusalDetail}.`
         : "The task host could not open the child session."
     case "host_unavailable":
       return reason !== undefined && HOST_UNAVAILABLE_REASONS.has(reason)

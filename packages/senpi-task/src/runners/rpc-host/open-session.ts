@@ -50,6 +50,9 @@ export async function openTaskHostSession(input: {
       kind: "session_unavailable",
       message: error instanceof Error ? error.message : String(error),
       ...(reason === undefined ? {} : { reason }),
+      // The typed refusal's own detail is first-party host text; it rides the dedicated field so the
+      // parent's task_output and completion can name the cause (#11681). `message` stays unsurfaced.
+      ...(error instanceof HostSessionOpenError ? { refusal_detail: error.detail } : {}),
       cause: error,
     })
   }
