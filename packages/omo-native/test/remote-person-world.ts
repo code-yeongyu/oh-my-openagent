@@ -6,11 +6,11 @@ import { defaultWorld, type World } from "../../device-service-core/test/local-a
 // up, and every session answers a delegated command the way a session host does.
 
 export const PEER = "dev-peer-1"
-export const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
 export const NEW_KEY = "bmV3LXNlc3Npb24ta2V5MQ"
-export const ENGINE_ID = "dur-new"
+const ENGINE_ID = "dur-new"
 
-export const SESSION_REPLY: JsonObject = {
+const SESSION_REPLY: JsonObject = {
   isStreaming: false,
   currentTurnId: "7",
   pendingMessageCount: 0,
