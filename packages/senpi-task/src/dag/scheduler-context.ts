@@ -28,6 +28,10 @@ export type AttachedTaskSettlement =
   | { readonly nodeId: DagNodeId; readonly kind: "orphaned"; readonly message: string }
   // A waiting node let go unjournaled because its lifecycle stopped; the run parks for the next recovery.
   | { readonly nodeId: DagNodeId; readonly kind: "released" }
+  // A waiting node's child is revived or ended: attach it through the one attachment path (#15150).
+  | { readonly nodeId: DagNodeId; readonly kind: "followed"; readonly taskId: string }
+  // The child gate refused to attach a waiting node's revived child; the child was asked to stop.
+  | { readonly nodeId: DagNodeId; readonly kind: "refused"; readonly message: string }
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId

@@ -1,3 +1,4 @@
+import { isTerminalRecord } from "../manager/manager-helpers"
 import type { TaskRecord, TaskStatus } from "../state"
 import type { OwnedStartResult } from "./owner"
 import { dagNodeTaskAttachedEvent } from "./events"
@@ -149,12 +150,27 @@ export function foldSettlement(context: SchedulerContext, settled: AttachedTaskS
       failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
     } else if (settled.kind === "orphaned") {
       failNode(context, settled.nodeId, "resume_task_orphaned", settled.message)
+    } else if (settled.kind === "refused") {
+      failNode(context, settled.nodeId, "stale_attempt_alive", settled.message)
+    } else if (settled.kind === "followed") {
+      followRevivedChild(context, settled.nodeId, settled.taskId)
     } else if (settled.kind === "record") {
       foldTaskOutcome(context, settled.nodeId, settled.record)
     }
   } finally {
     task?.resolveFolded()
   }
+}
+
+// A waiting node's child came back (revived, or ended by the lifecycle): the node attaches it exactly as
+// admission would, so a self-resumed or held turn is followed by the same watch and folded once (#15150).
+function followRevivedChild(context: SchedulerContext, nodeId: DagNodeId, taskId: string): void {
+  const record = context.taskManager.get(taskId)
+  const live = record !== undefined && !isTerminalRecord(record)
+  if (live && nodeById(context.journal.snapshot(), nodeId).state === "scheduled") {
+    transition(context, nodeId, "running", { kind: "resumed" })
+  }
+  attachTaskSettlement(context, nodeId, taskId)
 }
 
 function foldTaskOutcome(context: SchedulerContext, nodeId: DagNodeId, task: TaskRecord): void {
