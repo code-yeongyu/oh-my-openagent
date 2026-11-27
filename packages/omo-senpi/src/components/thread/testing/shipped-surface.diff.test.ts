@@ -67,6 +67,21 @@ describe("the shipped thread surface against dev", () => {
     const keys = CELLS.map((cell) => cell.key)
     expect(keys.toSorted()).toEqual(Object.keys(dev).toSorted())
     expect([...devAhead].filter((key) => !keys.includes(key))).toEqual([])
+    // The compared surface is pinned (review of 5774980bda, LOW 1 and 2): a cell dropped from both CELLS and the capture,
+    // or a regression silenced by listing its cells as dev-ahead, changes a number here. The one dev-ahead entry covers
+    // SDK sends only (the wake it names), so a cell of any other kind cannot be listed under it.
+    expect(keys.length).toBe(160)
+    expect(devAhead.size).toBe(11)
+    expect([...devAhead].filter((key) => !key.startsWith("sdk send"))).toEqual([])
+  })
+
+  test("#given an answer with a key that equals the run directory's name #when it is normalized #then the key is kept", () => {
+    // Review of 5774980bda (LOW 4): run from a directory named "source", the unanchored rewrite turned every "source"
+    // key into <cwd-name>, a false red. Only a whole value equal to the directory's name is a placeholder.
+    expect(normalize({ source: "live_host", cwd: "source" }, "/work/source")).toEqual({
+      source: "live_host",
+      cwd: "<cwd-name>",
+    })
   })
 
   test.each(CELLS.map((cell) => [cell.key, cell] as const))(

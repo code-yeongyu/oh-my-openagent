@@ -152,8 +152,10 @@ export function normalize(answer: unknown, cwd: string): unknown {
   const text = JSON.stringify(answer ?? null)
     .split(cwd)
     .join("<cwd>")
-    .split(`"${basename(cwd)}`)
-    .join('"<cwd-name>')
+    // A whole string value equal to the directory's name only: a key (a string followed by a colon) or a longer value
+    // that starts with it is kept (review of 5774980bda, LOW 4: run from a directory named "source", every "source" key
+    // became <cwd-name>).
+    .replace(new RegExp(`"${basename(cwd).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"(?!:)`, "g"), '"<cwd-name>"')
     .split(`[${basename(cwd)}]`)
     .join("[<cwd-name>]")
     .replace(/\/tmp\/[A-Za-z0-9._/-]+/g, "<tmp>")
