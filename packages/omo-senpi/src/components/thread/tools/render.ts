@@ -251,7 +251,7 @@ function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView 
     headline: `-> ${target}  ${outcome}`,
     details: [
       ...(r.resolved_by === "fuzzy" ? ["matched by fuzzy name"] : []),
-      ...(r.deduplicated === true ? ["already sent under this key; not delivered twice"] : []),
+      ...(r.deduplicated === true ? ["already accepted under this key; not delivered twice"] : []),
       ...device(r),
     ],
   }

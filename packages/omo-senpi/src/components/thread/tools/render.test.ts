@@ -201,7 +201,7 @@ describe("thread_send / thread_handoff results", () => {
     } as ThreadToolResult
     expect(result("thread_send", offline, { thread: "reviewer", message: "hi" })).toEqual([
       "-> reviewer  queued #1: thread is offline, delivers when it starts",
-      "  already sent under this key; not delivered twice",
+      "  already accepted under this key; not delivered twice",
     ])
   })
 
