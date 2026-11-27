@@ -81,6 +81,8 @@ export type DagScheduler = {
   /** Retires this controller without cancelling children; await before releasing its lease. */
   readonly suspend: () => Promise<void>
   readonly snapshot: () => DagRunRecordV1
+  /** True from the moment cancel starts, before the run's cancellation is journaled. */
+  readonly cancelling: () => boolean
   readonly subscribe: (listener: DagJournalListener) => () => void
   readonly whenIdle: () => Promise<void>
   /**
@@ -201,6 +203,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
       context.attachedTaskIds.clear()
     },
     snapshot: journal.snapshot,
+    cancelling: () => context.cancellationStarted,
     subscribe: journal.subscribe,
     whenIdle: journal.whenIdle,
     retryNode: (runId, nodeIds, retryOptions) => retryDagNodes(options, runId, nodeIds, retryOptions),

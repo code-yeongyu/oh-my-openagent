@@ -102,6 +102,33 @@ export function transition(
   context.journal.append(dagNodeTransitionedEvent({ nodeId, from, to, reason }))
 }
 
+/**
+ * Every owned task of the node that can still do work, whether or not this controller attached it.
+ * Not only the newest: an earlier attempt's finished child can resume on its own after the next
+ * attempt's task exists (#11381).
+ */
+export function liveOwnedTasks(context: SchedulerContext, nodeId: DagNodeId): readonly TaskRecord[] {
+  return context.taskManager
+    .findOwnedTasks({ kind: "dag", runId: context.journal.snapshot().runId, nodeId })
+    .filter((task) => isLiveOwnedTask(context.taskManager, task))
+}
+
+/**
+ * The one liveness predicate for a run's owned children (#11381): a record that can still do work, or
+ * one whose refused self-started turn the manager has not confirmed stopped. Every reader of a run's
+ * live children - cancel drain, outstanding stop, admission fence, sweep, recovery - asks here.
+ */
+export function isLiveOwnedTask(
+  tasks: Pick<TaskManager, "selfResumeStopPending">,
+  task: TaskRecord | null | undefined,
+): boolean {
+  return isLiveTask(task) || (task != null && tasks.selfResumeStopPending?.(task.task_id) === true)
+}
+
+export function isLiveTask(task: TaskRecord | null | undefined): boolean {
+  return task?.status === "pending" || task?.status === "running" || task?.status === "paused"
+}
+
 export function failNode(context: SchedulerContext, nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void {
   context.pendingErrors.set(nodeId, nodeError(nodeId, code, message, context.now))
   transition(context, nodeId, "failed", { kind: "failed" })

@@ -7,7 +7,7 @@ import type { TaskRecord, TaskStatus } from "../../state"
 import { compileDag, type DagDefinition } from "../graph"
 import { subscribeDagJournal } from "../journal"
 import type { DagRunRecordV1 } from "../manager"
-import type { DagTaskOwner, OwnedStartResult } from "../owner"
+import type { DagTaskOwner, DagTaskOwnerScope, OwnedStartResult } from "../owner"
 import type { DagFileStore } from "../store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "../types"
 
@@ -136,6 +136,17 @@ export class LongRunningTaskManager implements TaskManager {
   }
 
   // The LAST match wins, as in the real manager: a retried node's newest claim is its live owner.
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
+    return [...this.#tasks.values()]
+      .map(({ record }) => record)
+      .filter(
+        (record) =>
+          record.owner?.kind === owner.kind &&
+          record.owner.runId === owner.runId &&
+          (owner.nodeId === undefined || record.owner.nodeId === owner.nodeId),
+      )
+  }
+
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
     return [...this.#tasks.values()].findLast(
       ({ record }) =>

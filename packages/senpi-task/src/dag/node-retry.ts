@@ -15,7 +15,13 @@ import {
 } from "./node-control-context"
 import { appendWhileStopped } from "./paused-controls"
 import { assertRetryable, defaultRetryTargets, skippedDependentsOf } from "./retry-targets"
-import { resumeIfSettled, startReentry, withRevivalCapacity, type DagRunReentry } from "./run-reentry"
+import {
+  assertNoOutstandingStop,
+  resumeIfSettled,
+  startReentry,
+  withRevivalCapacity,
+  type DagRunReentry,
+} from "./run-reentry"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
 import type { DagNode, DagNodeId, DagRunId } from "./types"
 
@@ -42,6 +48,9 @@ export function retryDagNodes(
   const { record, abandon } = acquireReentryLease(options, runId)
   try {
     const targets = retryTargets(record, runId, nodeIds, retryOptions)
+    // The child gate's rule 2 on the acquired record (#11381): a settled run that still owns a live
+    // child refuses before anything is journaled, and the catch gives the acquired lease back.
+    assertNoOutstandingStop(options, record)
     // A prompt override is a definition amendment: it is recorded even when the cap then refuses the retry.
     let current = record
     if (retryOptions?.prompt !== undefined) {

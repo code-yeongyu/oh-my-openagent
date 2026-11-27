@@ -8,6 +8,7 @@ import {
 } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
+  createDagOwnerResumeFence,
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
@@ -135,6 +136,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const coreManager = createDagManager({
     store,
     materializeSkills,
+    ownedTasks: deps.engine.manager,
     ...(dagSettings === undefined ? {} : { settings: dagSettings }),
   })
   const taskManager = admissionTaskManager(deps.engine.manager, (runId) => stoppedAdmissions.has(runId))
@@ -202,6 +204,15 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const stopObservingSchedulers = observeDagSchedulers(taskManager, (scheduler) => {
     scheduler.subscribe(publishSchedulerEvent)
   })
+  const stopFencingResumes = deps.engine.registerOwnerResumeFence(
+    createDagOwnerResumeFence({
+      store,
+      heldTriggers: { ...schedulerOptions, taskManager: deps.engine.manager },
+      // A held scheduler's cancel, or a cancel of a run no scheduler here holds (in flight on its reservation).
+      cancelling: (runId) =>
+        schedulers.get(runId)?.scheduler.cancelling() === true || reservations.inFlight(runId) === "cancel",
+    }),
+  )
 
   const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)
   const { holdsRun, ensureScheduled, adoptReentry, adoptInstalled } = createDagSchedulerRegistry({
@@ -214,15 +225,13 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     recover: (sessionId) => sweeps.recover({ sessionId }),
     closure: childClosure,
   })
-  const holders = { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive }
+
   const cancelRun = createDagRunCancel({
     store,
     schedulerOptions,
     schedulers,
     reservations,
-    holders,
-    children: deps.engine.manager,
-    closure: childClosure,
+    holders: { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive },
     holdsRun,
   })
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
@@ -258,7 +267,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     sessionId: () => deps.engine.runtime.sessionId() ?? "",
   })
 
-  const waitSurface = createDagWaitSurface({ store, subscribe, cancel })
+  const waitSurface = createDagWaitSurface({ store, subscribe, cancel, ownedTasks: taskManager })
   const wait = async (runId: DagRunId, parentSessionId: string) => {
     const result = await waitSurface.wait(runId, parentSessionId)
     const owned = schedulers.get(runId)
@@ -573,6 +582,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     dispose() {
       unregisterPauseSource?.()
       stopObservingSchedulers()
+      stopFencingResumes()
       sweeps.cancelWatches()
       bridge.dispose()
       activeSessionId = undefined

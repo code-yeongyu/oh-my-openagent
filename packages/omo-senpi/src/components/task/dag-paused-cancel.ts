@@ -1,9 +1,7 @@
 import { cancelPausedDagNode } from "../../../../senpi-task/src/dag/paused-controls"
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/node-control-context"
-import { currentNodeTask } from "../../../../senpi-task/src/dag/run-lease"
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagNodeId, DagRunId } from "../../../../senpi-task/src/dag/types"
-import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 import { isTerminalRecord } from "../../../../senpi-task/src/manager/manager-helpers"
 import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 
@@ -12,7 +10,6 @@ export type PausedNodeHoldPort = {
 }
 
 type ChildLookup = Pick<TaskManager, "get" | "getResidentHandle">
-type NodeChildLookup = ChildLookup & Pick<TaskManager, "findOwnedTask" | "cancelTask">
 
 /**
  * A cancelled child's session is gone, and its inherited hold with it: closure is proven by the
@@ -27,29 +24,6 @@ export function endedChildClosure(manager: ChildLookup): PausedNodeHoldPort {
         throw new Error(`task ${taskId} has not ended, so its run hold is still in place`)
       }
     },
-  }
-}
-
-/**
- * Every node's current child of a run no scheduler holds is ended before the run is journaled cancelled.
- * With `onUnclosed`, a child that cannot be stopped or closed is reported and the others still are.
- */
-export async function endPausedRunChildren(
-  manager: NodeChildLookup,
-  record: DagRunRecordV1,
-  closure: PausedNodeHoldPort,
-  onUnclosed?: (nodeId: DagNodeId, taskId: string, error: unknown) => void,
-): Promise<void> {
-  for (const node of record.nodes) {
-    const task = currentNodeTask(manager, record, node)
-    if (task === undefined || isTerminalRecord(task)) continue
-    try {
-      await manager.cancelTask(task.task_id, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
-      await closure.closeHold(task.task_id, "run_cancelled")
-    } catch (error) {
-      if (onUnclosed === undefined) throw error
-      onUnclosed(node.id, task.task_id, error)
-    }
   }
 }
 

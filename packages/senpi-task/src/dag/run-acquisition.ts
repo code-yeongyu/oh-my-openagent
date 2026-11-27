@@ -74,11 +74,14 @@ export const dagRunEligibility = {
       stoppedByUser(fresh) &&
       fresh.pause?.pauseSeq === pauseSeq &&
       heldHere() !== true,
-  /** Cancel of a run no scheduler here holds: of this session, not yet settled. */
+  /**
+   * Cancel of a run no scheduler here holds: of this session. A settled one is eligible too, because a
+   * child it owns can still be live (#11381); the cancel then only drains it and writes no lease.
+   */
   unheldCancel:
     (parentSessionId: string): Eligibility =>
     (fresh) =>
-      fresh.parentSessionId === parentSessionId && !TERMINAL_DAG_RUN_STATUSES.has(fresh.status),
+      fresh.parentSessionId === parentSessionId,
   /** Parking a run whose scheduler here failed: of this session, still `running`, no scheduler here holds it. */
   parkFailed:
     (parentSessionId: string, heldHere: () => boolean): Eligibility =>

@@ -1,10 +1,11 @@
 import type { ResidencyDenied } from "../manager/types"
 import type { OwnedStartResult } from "./owner"
 import { errorMessage, failNode, transition, type SchedulerContext } from "./scheduler-context"
-import { resolveAdmissionIdle } from "./scheduler-cancellation"
+import { fenceStaleChildren, resolveAdmissionIdle, supersededChildren } from "./scheduler-cancellation"
 import { emitWaveAdmissions } from "./scheduler-frontier"
 import { startSpec, owner, isRunnable } from "./scheduler-start"
 import { attachStarted, settleOne } from "./scheduler-task-attachment"
+import { settleOwnerConflict, stopSupersededClaims, type SupersededStop } from "./scheduler-owner-conflict"
 import type { DagNodeId, DagNodeErrorCode } from "./types"
 
 type ResidencyPark = "queued" | "lease" | "failed"
@@ -24,6 +25,10 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
       )
       .map((node) => node.id)
     if (denied.length === 0 && runnable.length === 0) return true
+    const stale = supersededChildren(context)
+    if (stale.length > 0 && (await fenceStaleChildren(context, stale, [...denied, ...runnable])).length === 0) {
+      return !(context.suspended || context.cancellationStarted)
+    }
 
     for (const nodeId of runnable) transition(context, nodeId, "scheduled", { kind: "scheduled" })
     emitWaveAdmissions(context, runnable)
@@ -35,6 +40,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     const awaitingAdmission = [...denied, ...runnable]
     context.admissionInProgress = true
     let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
+    let supersededStops: ReadonlyMap<string, SupersededStop> = new Map()
     try {
       results = await Promise.allSettled(
         awaitingAdmission.map(async (nodeId) => ({
@@ -47,6 +53,17 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
             owner(context, nodeId),
           ),
         })),
+      )
+      // An automatic infrastructure retry raises execAttempt mid-run, so the failed attempt's child
+      // can resume before re-admission (#11381). Stop it inside the admission pass, which cancel and
+      // suspend wait for, before its node is settled.
+      supersededStops = await stopSupersededClaims(
+        context,
+        results.flatMap((settled) =>
+          settled.status === "fulfilled" && settled.value.result.kind === "owner_conflict"
+            ? [settled.value.nodeId]
+            : [],
+        ),
       )
     } finally {
       context.admissionInProgress = false
@@ -77,7 +94,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
         }
       } else {
         context.residencyQueued.delete(nodeId)
-        attachOrFail(context, nodeId, result)
+        attachOrFail(context, nodeId, result, supersededStops)
       }
     }
     if (context.cancellationStarted) return false
@@ -135,6 +152,7 @@ function attachOrFail(
   context: SchedulerContext,
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
+  supersededStops: ReadonlyMap<string, SupersededStop>,
 ): void {
   if (result.kind === "held") {
     context.journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq: result.pauseSeq })
@@ -143,13 +161,7 @@ function attachOrFail(
     return
   }
   if (result.kind === "owner_conflict") {
-    attachStarted(context, nodeId, {
-      kind: "started",
-      reused: true,
-      task_id: result.task_id,
-      status: "running",
-      name: result.task_id,
-    })
+    settleOwnerConflict(context, nodeId, result, supersededStops)
     return
   }
   if (result.kind !== "started") {

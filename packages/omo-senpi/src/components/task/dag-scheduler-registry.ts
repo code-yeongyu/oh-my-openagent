@@ -37,7 +37,7 @@ export function createDagSchedulerRegistry(ports: {
   readonly reservations: DagRunReservations
   // Re-runs this session's recovery: a run whose scheduler here failed is handed to it.
   recover(sessionId: string): Promise<readonly DagRecoveryOutcome[]>
-  // Ends a parked run's live children (the unheld road cancel takes).
+  // Confirms a parked run's stopped children closed their holds (bookkeeping on the one drain's result).
   readonly closure: PausedNodeHoldPort
 }) {
   const { schedulers, store, schedulerOptions, logger } = ports

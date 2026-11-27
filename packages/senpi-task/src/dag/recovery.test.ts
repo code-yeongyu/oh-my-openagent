@@ -18,7 +18,7 @@ import { createTaskRecordStore } from "../store"
 import { dagFingerprint, ownerFingerprintInput } from "./fingerprint"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
-import type { DagTaskOwner, OwnedStartResult } from "./owner"
+import type { DagTaskOwner, OwnedStartResult, DagTaskOwnerScope } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
@@ -192,10 +192,18 @@ class RecoveryTaskManager implements TaskManager {
   }
 
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].findLast(
-      ({ record }) =>
-        record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
-    )?.record
+    return this.findOwnedTasks(owner).at(-1)
+  }
+
+  findOwnedTasks(owner: DagTaskOwnerScope): readonly TaskRecord[] {
+    return [...this.#tasks.values()]
+      .map(({ record }) => record)
+      .filter(
+        (record) =>
+          record.owner?.kind === owner.kind &&
+          record.owner.runId === owner.runId &&
+          (owner.nodeId === undefined || record.owner.nodeId === owner.nodeId),
+      )
   }
 
   get(taskId: string): TaskRecord | undefined {

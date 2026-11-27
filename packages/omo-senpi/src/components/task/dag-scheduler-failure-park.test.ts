@@ -32,8 +32,6 @@ function cancelOf(run: ReturnType<typeof failedSchedulerRun>) {
     schedulers: new Map(),
     reservations: run.reservations,
     holders: { taskManager: run.children, hostPid: THIS_HOST, isProcessAlive: (pid) => pid === THIS_HOST },
-    children: run.children,
-    closure: { closeHold: async () => undefined },
     holdsRun: () => false,
   })
 }

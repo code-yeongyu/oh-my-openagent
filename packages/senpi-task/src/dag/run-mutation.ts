@@ -1,6 +1,7 @@
 import { applyRunPause } from "./run-pause"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
 import { pausedAmendmentUnsafe } from "./amend-safety"
+import { clearHeldTrigger } from "./held-trigger-record"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagBottleneck, DagDiagnostic, DagEdge, DagNode, DagNodeId, DagRunEvent, DagWave } from "./types"
 type DagPersistedDefinition = DagRunRecordV1["definition"]
@@ -33,6 +34,7 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
           startedAt: _startedAt,
           output: _output,
           outputBytes: _outputBytes,
+          heldTrigger: _heldTrigger,
           ...kept
         } = node as DagNode & {
           readonly resultArtifact?: unknown
@@ -63,7 +65,7 @@ export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent):
     name: mutation.definition.name,
     definition: mutation.definition,
     definitionFingerprint: event.fingerprint,
-    nodes: mutation.nodes,
+    nodes: mutation.nodes.map(clearHeldTrigger),
     edges: mutation.edges,
     waves: mutation.waves,
     criticalPath: mutation.criticalPath,

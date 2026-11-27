@@ -2,7 +2,7 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 
 import { lintDagDefinitionNodes } from "./dag-lint"
 import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
-import { DagManagerError, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
+import { DagManagerError, heldTriggerNotice, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 // The per-node control verbs are not on the package's dag barrel; the runtime already reaches the
 // scheduler module by path for the same reason, and both resolve to the same source file, so the
 // instanceof check below stays sound.
@@ -138,7 +138,7 @@ async function waitAction(deps: DagToolDeps, params: DagToolInput, runId: string
     )
   }
   const result = await deps.wait(runId as DagRunId, parentSessionId)
-  return toolResult(`Dag run ${runId} finished with status ${result.status}.`, {
+  return toolResult(`Dag run ${runId} finished with status ${result.status}.${stopNotice(result.snapshot)}`, {
     kind: "waited",
     run_id: runId,
     result,
@@ -157,6 +157,13 @@ async function cancelAction(deps: DagToolDeps, runId: string, reason?: string): 
   })
 }
 
+// A settled run that still owns a live child owes a stop (#11381): every answer that shows the run says so.
+function stopNotice(snapshot: { readonly outstandingStop?: { readonly liveTaskIds: readonly string[] } }): string {
+  const owed = snapshot.outstandingStop
+  if (owed === undefined) return ""
+  return ` Its stop is outstanding: child ${owed.liveTaskIds.join(", ")} is still live; cancel the run again.`
+}
+
 export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   try {
     if (params.action === "start") return await startAction(deps, params)
@@ -169,16 +176,19 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       case "attach": {
         const handle = deps.manager.attach(runId as DagRunId, deps.parentSessionId())
         const snapshot = handle.snapshot()
-        return toolResult(`Attached to dag run ${runId} (${snapshot.status}).`, {
-          kind: "attached",
-          run_id: runId,
-          snapshot,
-        })
+        return toolResult(
+          `Attached to dag run ${runId} (${snapshot.status}).${stopNotice(snapshot)}${heldTriggerNotice(snapshot.nodes)}`,
+          {
+            kind: "attached",
+            run_id: runId,
+            snapshot,
+          },
+        )
       }
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
         return toolResult(
-          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`,
+          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${stopNotice(snapshot)}${heldTriggerNotice(snapshot.nodes)}${quietNodesNotice(snapshot.nodes, Date.now())}`,
           {
             kind: "snapshot",
             run_id: runId,

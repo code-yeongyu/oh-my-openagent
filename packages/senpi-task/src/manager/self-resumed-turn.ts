@@ -4,6 +4,7 @@ import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { buildRevived } from "../steering/engine-policy"
 import type { ManagedChildHandle } from "./child-handle"
+import type { OwnerResumeFence, OwnerResumeVerdict } from "./types"
 import { publishHostTaskStatus } from "./host-task-status"
 import { nowIso } from "./manager-helpers"
 
@@ -18,6 +19,9 @@ export type SelfResumedTurnPorts = {
     taskId: string,
   ) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
   readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
+  readonly ownerResumeFence?: OwnerResumeFence
+  readonly markRefusedStop: (taskId: string, handle: ManagedChildHandle, disposition: "retire" | "hold") => void
+  readonly stopRefusedRun: (taskId: string) => Promise<boolean>
 }
 
 function reopenable(
@@ -57,13 +61,26 @@ export async function reopenSelfResumedTurn(
   const epoch = nextRunEpoch(settled)
   const reservation = ports.reserveForRevive(taskId)
   let reopened = false
+  let refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }> | undefined
   ports.store.mutate(taskId, (fresh) => {
     if (!reopenable(fresh, handle, ports) || nextRunEpoch(fresh) !== epoch) return fresh
+    // The owner answers in the same synchronous step as the reopen: whatever it journaled before is
+    // seen here, and whatever it does after sees a running record (#11381).
+    const verdict = fresh.owner?.kind === "dag" ? ports.ownerResumeFence?.(fresh) : undefined
+    if (verdict?.kind === "refuse") {
+      refusal = verdict
+      return fresh
+    }
     reopened = true
     return { ...buildRevived(fresh, nowIso(ports.now)), resumed_run_epoch: epoch }
   })
   if (!reopened) {
+    // Marked before any await: from this step on the refused turn counts as live until its stop is
+    // confirmed, for every reader of the run's live children (#11381).
+    if (refusal !== undefined) ports.markRefusedStop(taskId, handle, refusal.disposition)
+    if (refusal !== undefined) recordRefusal(refusal, taskId)
     if (reservation.ok) reservation.release()
+    if (refusal !== undefined) await refuseSelfResumedRun(ports, taskId, epoch, refusal)
     return
   }
   ports.store.appendEvent(taskId, { type: "task_self_resumed", payload: { run_epoch: epoch } })
@@ -73,4 +90,33 @@ export async function reopenSelfResumedTurn(
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)
   log("senpi-task child resumed on its own after its turn settled", { taskId, runEpoch: epoch })
+}
+
+// The owner's durable record of the refusal; a failure to record never undoes the refusal itself.
+function recordRefusal(refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }>, taskId: string): void {
+  try {
+    refusal.record?.()
+  } catch (error) {
+    log("senpi-task could not record a refused self-started run", { taskId, reason: String(error) })
+  }
+}
+
+async function refuseSelfResumedRun(
+  ports: SelfResumedTurnPorts,
+  taskId: string,
+  epoch: number,
+  refusal: Extract<OwnerResumeVerdict, { readonly kind: "refuse" }>,
+): Promise<void> {
+  const { reason, disposition } = refusal
+  ports.store.appendEvent(taskId, {
+    type: "task_self_resume_refused",
+    payload: { run_epoch: epoch, reason, disposition },
+  })
+  log("senpi-task refused a run a settled DAG child started on its own", {
+    taskId,
+    runEpoch: epoch,
+    reason,
+    disposition,
+  })
+  await ports.stopRefusedRun(taskId)
 }

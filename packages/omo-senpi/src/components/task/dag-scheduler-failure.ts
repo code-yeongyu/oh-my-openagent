@@ -13,9 +13,17 @@ import {
   type DagRunReservations,
 } from "../../../../senpi-task/src/dag/run-acquisition"
 import { releaseDagRunLease, type DagRunHolderProbe } from "../../../../senpi-task/src/dag/run-lease"
+import type { DagRunStopper } from "../../../../senpi-task/src/dag/outstanding-stop"
+import {
+  DagRunChildrenLiveError,
+  liveRunChildren,
+  stopRunChildren,
+} from "../../../../senpi-task/src/dag/run-children-stop"
+import { currentNodeTask } from "../../../../senpi-task/src/dag/run-lease"
 import type { DagNodeId } from "../../../../senpi-task/src/dag/types"
+import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 import type { ComponentLogger } from "../../extension/types"
-import { endPausedRunChildren, type PausedNodeHoldPort } from "./dag-paused-cancel"
+import type { PausedNodeHoldPort } from "./dag-paused-cancel"
 
 /**
  * What this runtime does when one of its schedulers ends with an error instead of settling its run
@@ -24,16 +32,23 @@ import { endPausedRunChildren, type PausedNodeHoldPort } from "./dag-paused-canc
  * re-entered) has nothing to hand on. First failure: hand the run to recovery, whose claim
  * (`automaticRecovery`) follows its live children again. A repeated failure of the same sequence is not
  * handed back (a recurring fault would loop): the run is parked through the one acquisition, holding
- * its reservation: live children are stopped (one that will not close is reported, never counted as
- * ended), each active node fails with the real error, and the run is paused `scheduler_failed`, the
- * write that drops the lease. A park that throws after its acquisition unwinds the lease it wrote.
+ * its reservation. Every live child the run owns is stopped through the one run-wide drain
+ * (`stopRunChildren`, #11381), and the run's live children are read again. A node whose child is still
+ * live is not failed as if it had stopped: it stays active and the survivors are logged, so a later
+ * cancel or recovery follows that live child, and the bound on repeated hand-offs is then this
+ * sequence's failure count. Every other active node fails with the real error; a stopped child whose
+ * hold did not close (`closure`, bookkeeping on the drain's result, never a second choice of what to
+ * stop) is reported on its node's error. The run is paused `scheduler_failed`, the write that drops the
+ * lease; when every child stopped the park leaves no active node, so a later automatic recovery
+ * re-admits nothing and settles the run `failed`. A park that throws after its acquisition unwinds the
+ * lease it wrote.
  */
 export function createSchedulerFailureHandler(ports: {
   readonly schedulerOptions: Omit<DagSchedulerOptions, "initialRecord">
   readonly reservations: DagRunReservations
   readonly probe: DagRunHolderProbe
   readonly logger: ComponentLogger
-  readonly children: Parameters<typeof endPausedRunChildren>[0]
+  readonly children: DagRunStopper & Pick<TaskManager, "get" | "findOwnedTask">
   readonly closure: PausedNodeHoldPort
   holdsRun(runId: DagRunId): boolean
   // This session's recovery sweep; it answers for each of the session's runs (none while closed).
@@ -73,15 +88,39 @@ export function createSchedulerFailureHandler(ports: {
     }
     let nodesFailed = false
     try {
+      // The one drain: it collects every stop's outcome and never throws, so the park always goes on.
+      const record = acquired.record
+      const failure = await stopRunChildren(ports.children, record, new Set(), "the run's scheduler failed again")
+      const surviving = liveRunChildren(ports.children, record)
+      const survives = (nodeId: DagNodeId, taskId: string | undefined): boolean =>
+        surviving.some((task) => task.owner?.nodeId === nodeId || task.task_id === taskId)
+      const active = record.nodes.filter(
+        (node) => (node.state === "scheduled" || node.state === "running") && !survives(node.id, node.taskId),
+      )
       const unclosed = new Map<DagNodeId, string>()
-      await endPausedRunChildren(ports.children, acquired.record, ports.closure, (nodeId, taskId, cause) => {
-        const reason = cause instanceof Error ? cause.message : String(cause)
-        unclosed.set(nodeId, ` Its child ${taskId} did not close (${reason}) and may still be running.`)
-        ports.logger.warn("omo-senpi dag parked run's child did not close", { runId, nodeId, taskId, error: reason })
-      })
+      for (const node of active) {
+        const task = currentNodeTask(ports.children, record, node)
+        if (task === undefined) continue
+        try {
+          await ports.closure.closeHold(task.task_id, "run_cancelled")
+        } catch (cause) {
+          const reason = cause instanceof Error ? cause.message : String(cause)
+          unclosed.set(node.id, ` Its child ${task.task_id} did not close (${reason}); its stop is not confirmed.`)
+          ports.logger.warn("omo-senpi dag parked run's child did not close", { runId, nodeId: node.id, error: reason })
+        }
+      }
+      if (surviving.length > 0)
+        ports.logger.error("omo-senpi dag run parked with children that did not stop; their nodes stay active", {
+          runId,
+          survivors: surviving.map((task) => task.task_id),
+        })
+      if (failure !== undefined && !(failure instanceof DagRunChildrenLiveError))
+        ports.logger.error("omo-senpi dag run park: stopping the run's children was rejected", {
+          runId,
+          reason: failure instanceof Error ? failure.message : String(failure),
+        })
       const at = new Date().toISOString()
       const message = `the run's scheduler failed again in this session: ${error}`
-      const active = acquired.record.nodes.filter((node) => node.state === "scheduled" || node.state === "running")
       const errors = new Map(
         active.map((node) => [
           node.id,
