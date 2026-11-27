@@ -305,5 +305,7 @@ describe("omo#14428 target backlog admission", () => {
       ["for 6 min", "queued", null],
       ["unrelated", "queued", null],
     ])
-  })
+    // 100 real gateway sends take seconds of wall clock; under CPU contention the 5 s default
+    // kills the case and its cleanup (#15037). The bound matches the work, not the load.
+  }, 30_000)
 })

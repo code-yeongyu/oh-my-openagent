@@ -137,6 +137,9 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
       expect(there).toEqual(await walk((args) => localAt(leaf, args)))
       expect(there.length).toBe(Math.min(60, senpiContext([...entries], leaf).length))
     },
+    // The branched walk pages up to 100 times over real harness calls; under CPU contention the
+    // 5 s default kills the case and its cleanup (#15037). The bound matches the work.
+    30_000,
   )
 
   test("#given a session with more than a window of messages since its compaction #when thread_read runs cold #then one page of b's newest entries answers it (the compaction's kept entries are never fetched), as this device's engine reads it", async () => {
