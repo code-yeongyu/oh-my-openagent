@@ -16,7 +16,7 @@ export type DagRunHolderProbe = {
 type LeasedRecord = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
 type LeaseStore = Pick<DagFileStore, "withRunLock" | "readCheckpoint" | "writeCheckpoint">
 
-export function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
+function ownerKey(record: DagRunRecordV1, nodeId: DagNodeId) {
   return { kind: "dag" as const, runId: record.runId, nodeId }
 }
 
@@ -38,7 +38,7 @@ export function currentNodeTask(
 // owns its active children stands in for it. Lifecycle reconcile runs first and takes over the
 // children of a dead owner, so a child still under a live foreign pid means that process runs it.
 // An ended child holds nothing even though its resident record keeps the pid of the host that ran it.
-export function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): number | undefined {
+function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1): number | undefined {
   for (const node of record.nodes) {
     if (node.state !== "scheduled" && node.state !== "running") continue
     const task = currentNodeTask(probe.taskManager, record, node)
@@ -54,7 +54,7 @@ export function liveChildOwner(probe: DagRunHolderProbe, record: DagRunRecordV1)
  * may still be draining, else (for a record naming neither) the live owner of an active child. The
  * claim, the unheld cancel and the shutdown pause all ask this (#15125).
  */
-export function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): number | undefined {
+function runHolder(probe: DagRunHolderProbe, record: LeasedRecord): number | undefined {
   return record.leaseHolderPid ?? record.previousLeaseHolderPid ?? liveChildOwner(probe, record)
 }
 
