@@ -1,0 +1,12 @@
+{
+  "name": "github",
+  "private": true,
+  "type": "module",
+  "description": "github: one definition served as a typed SDK (sdk.ts), a CLI and an MCP server (cli.ts).",
+  "scripts": {
+    "mcp": "bun cli.ts mcp"
+  },
+  "engines": {
+    "bun": ">=1.4"
+  }
+}

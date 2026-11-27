@@ -96,7 +96,7 @@
   },
   "native-version": {
     "exit": 0,
-    "stdout": "omo 5.1.83 (engine: senpi 2026.11.23)\n",
+    "stdout": "omo 5.1.84 (engine: senpi 2026.11.23)\n",
     "stderr": ""
   },
   "opencode-help": {
@@ -141,7 +141,7 @@
   },
   "opencode-version": {
     "exit": 0,
-    "stdout": "oh-my-openagent v5.1.83\n",
+    "stdout": "oh-my-openagent v5.1.84\n",
     "stderr": ""
   },
   "opencode-local-version-help": {
@@ -307,6 +307,35 @@
         "details": {
           "kind": "thread"
         }
+      }
+    }
+  },
+  "sdk-config-status-diagnostics": {
+    "answer": {
+      "kind": "ok",
+      "value": {
+        "files": [
+          {
+            "scope": "user",
+            "exists": true,
+            "loaded": false
+          },
+          {
+            "scope": "project",
+            "exists": true,
+            "loaded": false
+          }
+        ],
+        "diagnostics": [
+          {
+            "kind": "validation",
+            "count": 1
+          },
+          {
+            "kind": "parse",
+            "count": 1
+          }
+        ]
       }
     }
   }

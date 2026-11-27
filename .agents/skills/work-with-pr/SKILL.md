@@ -100,7 +100,7 @@ Within each PR, stay minimal: deliver its one slice, add the test, prove it, sto
 
 ### Commit strategy
 
-`ulw-loop` commits through `git-master`. Keep commits atomic so that if CI fails on one change you can isolate and fix it without unwinding everything:
+`ulw-loop` commits through `git`. Keep commits atomic so that if CI fails on one change you can isolate and fix it without unwinding everything:
 
 ```
 3+ files changed  → 2+ commits minimum
@@ -395,5 +395,5 @@ git rebase "origin/$BASE_BRANCH"
 | Deleting worktree on failure | User loses ability to inspect/resume | HIGH |
 | Ignoring Cubic false positives without justification | Cubic issues should be evaluated, not blindly dismissed | MEDIUM |
 | Bundling independent slices into one big PR | Atomic review dies — a 2000-line PR gets rubber-stamped, regressions hide, and one bad slice blocks all the others | HIGH |
-| Giant single commits | Harder to isolate failures, violates git-master principles | MEDIUM |
+| Giant single commits | Harder to isolate failures, violates the git skill's one-commit-per-change rule | MEDIUM |
 | Not running local checks before push | Wastes CI time on obvious failures | MEDIUM |
