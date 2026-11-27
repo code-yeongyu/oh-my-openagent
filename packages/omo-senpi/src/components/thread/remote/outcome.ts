@@ -1,4 +1,4 @@
-import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import type { CommandResult } from "../../remote/index"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { REFUSAL_CODES } from "../gateway/result"

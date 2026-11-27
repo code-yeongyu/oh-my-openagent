@@ -1,6 +1,5 @@
 import { dispatchCall, preparesMutation } from "../call-budget/call-deadline"
 import { createConnection, type Socket } from "node:net"
-import { holderVersion } from "./tools/thread-state"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import {
@@ -11,6 +10,7 @@ import {
   type RpcObject,
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
+import { holderVersion } from "./tools/thread-state"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { readDiskSessionAsync, type AddressBookHost, type DiskSession } from "./address-book"
@@ -1061,7 +1061,8 @@ export function createLiveThreadSurface(
 }
 
 export { createServiceAliasRegistry } from "./remote/alias-registry"
-export { createCliRemoteSurface, remoteClient, remoteSessionsPort } from "../remote/port/thread-runtime"
+export { remoteClient, remoteSessionsPort } from "../remote/index"
+export { createCliRemoteSurface } from "./remote/cli-remote-surface"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { readReceipt } from "./remote/receipt"
 export { createRemoteMonitorSource, resolveMonitorTarget } from "./remote/monitor-source"

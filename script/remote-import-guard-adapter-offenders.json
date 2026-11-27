@@ -6,8 +6,6 @@
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
       "packages/omo-senpi/src/components/thread/remote/",
       "packages/thread-address-core/"
     ],
@@ -58,8 +56,6 @@
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
       "packages/omo-senpi/src/components/thread/remote/",
       "packages/thread-address-core/"
     ],
@@ -72,8 +68,6 @@
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
       "packages/omo-senpi/src/components/thread/remote/",
       "packages/thread-address-core/"
     ],
@@ -110,8 +104,6 @@
       "packages/device-service-core/src/",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
       "packages/omo-senpi/src/components/thread/remote/"
     ],
     "removedBy": "#14943 T3 and A2a (omo remote onto the SDK)"
@@ -129,29 +121,13 @@
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
       "packages/omo-senpi/src/components/thread/remote/"
     ],
     "removedBy": "#14943 T3 and A2a (omo remote onto the SDK)"
   },
   "packages/omo-native/remote-local.ts": {
     "uses": [
-      "packages/device-service-core/src/",
-      "packages/omo-opencode/src/cli/service-auth/",
-      "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
-      "packages/omo-senpi/src/components/thread/remote/"
-    ],
-    "removedBy": "#14943 T3 and A2a (omo remote onto the SDK)"
-  },
-  "packages/omo-native/remote-session-verbs.ts": {
-    "uses": [
-      "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
-      "packages/omo-senpi/src/components/thread/remote/"
+      "packages/omo-opencode/src/cli/service-auth/"
     ],
     "removedBy": "#14943 T3 and A2a (omo remote onto the SDK)"
   },
@@ -162,8 +138,6 @@
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
-      "packages/omo-senpi/src/components/thread/control/",
-      "packages/omo-senpi/src/components/thread/gateway/",
       "packages/omo-senpi/src/components/thread/remote/"
     ],
     "removedBy": "#14943 A1b (account verbs onto the SDK)"

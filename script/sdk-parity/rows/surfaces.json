@@ -35,6 +35,39 @@
       "note": "The judge the session runtime's shell shims ask before a kill; it serves the launch operations of 6.9 and is anchored on the interactive launch (amendment 2, D5)."
     },
     {
+      "id": "internal.device-service-bootstrap",
+      "kind": "internal",
+      "sdk": "deviceService.bootstrap",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "__device-service-bootstrap"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The worker the engine's device-service start-up spawns as `$OMO_BIN __device-service-bootstrap` (#13414); it runs the same bootstrap as `omo remote bootstrap` and is anchored on that capability."
+    },
+    {
       "id": "internal.loro-smoke",
       "kind": "internal",
       "sdk": "diagnostics.run",
