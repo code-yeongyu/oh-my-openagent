@@ -4,6 +4,7 @@ import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import type { ThreadCore } from "../../thread/sdk-core"
 import type { ThreadHost } from "../../thread/tools/ports"
 import type { Endpoint, OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
+import { OMO_CODE_REGISTRY } from "../contract/codes"
 import type * as result from "../contract/results/threads"
 import { ROOT_DISPOSED } from "./assemble"
 import { extensionFailure } from "./extension-codes"
@@ -221,9 +222,16 @@ export function threadsNamespace(options: {
         return { kind: "ok", value: await (await thread()).warm() }
       } catch (error) {
         if (error === CORE_NOT_CREATED) throw error
-        // The warm's own transport error, as `omo daemon run` prints it today; slice C1a words it as the daemon core's.
-        const message = error instanceof Error ? error.message : String(error)
-        return { kind: "error", error: { code: "internal_error", message, next_action: "Run omo daemon run again." } }
+        // A refused warm (the host's identity or key record) answers fixed text: the exception names local paths and
+        // modes, which never reach the caller (review of #14983 at 699c480398, LOW 2; LEAD ruling).
+        return {
+          kind: "error",
+          error: {
+            code: "host_unavailable",
+            message: "The daemon's host refused the warm request.",
+            next_action: OMO_CODE_REGISTRY.host_unavailable.next_action,
+          },
+        }
       }
     },
   }
