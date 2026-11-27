@@ -3,8 +3,10 @@ import { isTerminalRecord } from "../manager/manager-helpers"
 import { orphanedTaskReason } from "./child-backing"
 import { childStartRefusal, staleLiveRefusal } from "./child-gate"
 import { disposeSupersededChildren, supersededChildren } from "./scheduler-cancellation"
+import { ownedClaimAge } from "./owned-attempt"
 import {
   deferredSignal,
+  failNode,
   isLiveOwnedTask,
   type AttachedTaskSettlement,
   type SchedulerContext,
@@ -47,15 +49,13 @@ async function revivalSettlement(
   taskId: string,
   revivals: PendingRevivals,
 ): Promise<AttachedTaskSettlement> {
-  const flagged = new Set<string>()
   for (;;) {
     const record = context.taskManager.get(taskId)
     if (
       record !== undefined &&
       (isTerminalRecord(record) || context.taskManager.getResidentHandle(taskId) !== undefined)
     ) {
-      const decision = await gateDecision(context, nodeId, record, flagged)
-      if (decision === "again") continue
+      const decision = gateDecision(context, nodeId, record, revivals)
       if (decision !== "wait") return decision
     } else {
       const ended = obligationEnd(revivals, nodeId, taskId, record)
@@ -86,50 +86,78 @@ function obligationEnd(
 }
 
 /**
- * Following a revived child attaches it, so the child gate decides first (#11381), and each refusal gets
- * that rule's own action:
- * - `stale_live`: another task (a superseded attempt or a removed node's child) is live. It is stopped by
- *   the scheduler's fence, the same stop admission uses (each asked once per scheduler), and the gate is
- *   asked again; the node's own child is never stopped for it. A stale child whose stop is not confirmed
- *   keeps the node waiting, flagged once, until a lifecycle pass after a store change (the survivor's
- *   stop landing) or the run's cancel ends the wait.
- * - `not_current`: the child in hand is itself not the node's current attempt. It is stopped through the
- *   same fence; a confirmed stop fails the node `stale_attempt_alive`, an unconfirmed one keeps the node
- *   active as a survivor (it may still run) until that stop lands.
- * - `stop_owed`: only a settled run owes a stop, and a scheduler that is still following its nodes holds
- *   a running run, so this cannot be reached here; were it, the node waits for the run's cancel to drain it.
+ * Following a revived child attaches it, so the child gate decides first (#11381). The waiter only
+ * decides; anything it stops is stopped by the frontier (`runRevivalFences`), never from here:
+ * - `stale_live`: another task of the run (a superseded attempt or a removed node's child) is live. The
+ *   node follows its own child either way - acting on it starts nothing - and the frontier fences the
+ *   stale children once; a survivor is flagged on the node. A dependent's start stays behind admission's
+ *   own fence, which refuses it retryably (`stale_attempt_alive`) while the survivor is live.
+ * - `not_current`: the child in hand is itself not the node's current attempt; the frontier stops it and
+ *   fails the node `stale_attempt_alive` on a confirmed stop, or keeps it waiting, flagged, until the stop
+ *   lands (a run cancel's drain ends it otherwise).
+ * - `stop_owed`: only a settled run owes a stop, and a scheduler still following its nodes holds a running
+ *   run, so this cannot be reached here; were it, the node waits for the run's cancel to drain it.
  */
-async function gateDecision(
+function gateDecision(
   context: SchedulerContext,
   nodeId: DagNodeId,
   record: TaskRecord,
-  flagged: Set<string>,
-): Promise<AttachedTaskSettlement | "again" | "wait"> {
-  const refusal = childStartRefusal(context.taskManager, context.journal.snapshot(), record)
-  if (refusal === undefined) return { nodeId, kind: "followed", taskId: record.task_id }
-  if (refusal.rule === "stale_live") {
-    await disposeSupersededChildren(context, supersededChildren(context))
-    const alive = supersededChildren(context).filter(({ taskId }) => taskId !== record.task_id)
-    if (alive.length === 0) return "again"
-    flagOnce(context, nodeId, flagged, `${staleLiveRefusal(alive)}; the node waits until its stop lands`)
-    return "wait"
+  revivals: PendingRevivals,
+): AttachedTaskSettlement | "wait" {
+  const run = context.journal.snapshot()
+  const refusal = childStartRefusal(context.taskManager, run, record)
+  if (refusal === undefined) return { nodeId, kind: "followed", taskId: record.task_id, fenceStale: false }
+  if (refusal.rule === "stop_owed") return "wait"
+  if (ownedClaimAge(record, run) === "current") {
+    return { nodeId, kind: "followed", taskId: record.task_id, fenceStale: true }
   }
-  if (refusal.rule === "not_current") {
-    await disposeSupersededChildren(context, [{ nodeId, taskId: record.task_id }])
-    if (!isLiveOwnedTask(context.taskManager, context.taskManager.get(record.task_id))) {
-      return { nodeId, kind: "refused", message: refusal.message }
-    }
-    const message = `${refusal.message}; it was asked to stop and is still live, so the node stays active until its stop lands`
-    flagOnce(context, nodeId, flagged, message)
-    return "wait"
-  }
-  flagOnce(context, nodeId, flagged, refusal.message)
-  return "wait"
+  const message = `task ${record.task_id} belongs to an earlier attempt of DAG node "${nodeId}", not its current one`
+  return { nodeId, kind: "not_current", taskId: record.task_id, message, revivals }
 }
 
-function flagOnce(context: SchedulerContext, nodeId: DagNodeId, flagged: Set<string>, message: string): void {
-  if (flagged.has(message)) return
-  flagged.add(message)
+/**
+ * The fences waiting nodes' folds asked for, run by the frontier between admission passes (#15150). The
+ * run's stale children - and any child in hand that is not its node's current attempt - are stopped by
+ * the scheduler's one stop (`disposeSupersededChildren`, each asked once per scheduler), then read again.
+ */
+export async function runRevivalFences(context: SchedulerContext): Promise<void> {
+  const requests = [...context.revivalFences]
+  context.revivalFences.clear()
+  const stale = supersededChildren(context)
+  const inHand = requests.flatMap(([nodeId, request]) =>
+    request.rule === "not_current" && !stale.some(({ taskId }) => taskId === request.taskId)
+      ? [{ nodeId, taskId: request.taskId }]
+      : [],
+  )
+  await disposeSupersededChildren(context, [...stale, ...inHand])
+  if (context.suspended || context.cancellationStarted) return
+  const alive = supersededChildren(context)
+  for (const [nodeId, request] of requests) {
+    if (request.rule === "stale_live") {
+      const survivors = alive.filter(({ taskId }) => taskId !== request.taskId)
+      const refusal = staleLiveRefusal(survivors)
+      if (refusal !== undefined) flagOnce(context, nodeId, `${refusal}; no dependent is admitted while it is live`)
+      continue
+    }
+    if (!isLiveOwnedTask(context.taskManager, context.taskManager.get(request.taskId))) {
+      failNode(context, nodeId, "stale_attempt_alive", request.message)
+      continue
+    }
+    flagOnce(
+      context,
+      nodeId,
+      `${request.message}; it was asked to stop and is still live, so the node waits until its stop lands`,
+    )
+    followPendingRevivals(context, { tasks: new Map([[nodeId, request.taskId]]), revivals: request.revivals })
+  }
+}
+
+// Once per node and message, from the run's own diagnostics, so a re-armed waiter does not repeat it.
+function flagOnce(context: SchedulerContext, nodeId: DagNodeId, message: string): void {
+  const flagged = context.journal
+    .snapshot()
+    .diagnostics.some((entry) => entry.kind === "node_flag" && entry.nodeId === nodeId && entry.message === message)
+  if (flagged) return
   context.journal.append({
     type: "dag.diagnostic.added",
     diagnostic: { kind: "node_flag", nodeId, message, at: new Date(context.now()).toISOString() },

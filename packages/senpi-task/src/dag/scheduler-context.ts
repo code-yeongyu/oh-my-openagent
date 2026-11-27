@@ -1,3 +1,4 @@
+import type { PendingRevivals } from "../lifecycle/revival-pending"
 import type { TaskManager } from "../manager/types"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { TaskRecord } from "../state"
@@ -28,10 +29,26 @@ export type AttachedTaskSettlement =
   | { readonly nodeId: DagNodeId; readonly kind: "orphaned"; readonly message: string }
   // A waiting node let go unjournaled because its lifecycle stopped; the run parks for the next recovery.
   | { readonly nodeId: DagNodeId; readonly kind: "released" }
-  // A waiting node's child is revived or ended: attach it through the one attachment path (#15150).
-  | { readonly nodeId: DagNodeId; readonly kind: "followed"; readonly taskId: string }
-  // The child gate refused to attach a waiting node's revived child; the child was asked to stop.
-  | { readonly nodeId: DagNodeId; readonly kind: "refused"; readonly message: string }
+  // A waiting node's child is revived or ended: attach it through the one attachment path (#15150). With
+  // `fenceStale`, another task of the run is a live stale child: the frontier fences it after the fold.
+  | { readonly nodeId: DagNodeId; readonly kind: "followed"; readonly taskId: string; readonly fenceStale: boolean }
+  // A waiting node's revived child is not its current attempt: the frontier stops it and decides the node.
+  | {
+      readonly nodeId: DagNodeId
+      readonly kind: "not_current"
+      readonly taskId: string
+      readonly message: string
+      readonly revivals: PendingRevivals
+    }
+
+export type RevivalFenceRequest =
+  | { readonly rule: "stale_live"; readonly taskId: string }
+  | {
+      readonly rule: "not_current"
+      readonly taskId: string
+      readonly message: string
+      readonly revivals: PendingRevivals
+    }
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId
@@ -93,6 +110,9 @@ export type SchedulerContext = {
   // waitFor resolves only at terminal, so this watch is the only signal that folds the task
   // engine's later queue promotion into a scheduled -> running node transition.
   readonly promotionWatches: Map<DagNodeId, () => void>
+  // Stale-child fences a waiting node's fold asked for (#15150): run by the frontier's own loop, between
+  // admission passes, never from a fold, so the admission flag has one holder at a time.
+  readonly revivalFences: Map<DagNodeId, RevivalFenceRequest>
   // omo#10487: armed before waitFor, kept through completion so an early self-resume supersedes
   // the attached settlement and a later one reopens the node; disposed at run end.
   readonly selfResumeWatches: Map<DagNodeId, () => void>

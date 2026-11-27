@@ -150,10 +150,12 @@ export function foldSettlement(context: SchedulerContext, settled: AttachedTaskS
       failNode(context, settled.nodeId, "task_error", errorMessage(settled.error))
     } else if (settled.kind === "orphaned") {
       failNode(context, settled.nodeId, "resume_task_orphaned", settled.message)
-    } else if (settled.kind === "refused") {
-      failNode(context, settled.nodeId, "stale_attempt_alive", settled.message)
     } else if (settled.kind === "followed") {
       followRevivedChild(context, settled.nodeId, settled.taskId)
+      if (settled.fenceStale) context.revivalFences.set(settled.nodeId, { rule: "stale_live", taskId: settled.taskId })
+    } else if (settled.kind === "not_current") {
+      const { taskId, message, revivals } = settled
+      context.revivalFences.set(settled.nodeId, { rule: "not_current", taskId, message, revivals })
     } else if (settled.kind === "record") {
       foldTaskOutcome(context, settled.nodeId, settled.record)
     }

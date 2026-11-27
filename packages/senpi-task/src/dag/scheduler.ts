@@ -163,6 +163,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
     promotionWatches: new Map<DagNodeId, () => void>(),
+    revivalFences: new Map(),
     selfResumeWatches: new Map<DagNodeId, () => void>(),
   }
   // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
