@@ -6,7 +6,9 @@
 pub mod backend;
 pub mod capture;
 pub mod displays;
+pub mod input;
 pub mod ocr;
+pub mod release_helper;
 
 pub use backend::Win32Backend;
 
