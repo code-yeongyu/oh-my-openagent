@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, resolve, sep } from "node:path"
 
 import { connectDeviceService } from "../../../packages/device-service-core/src/index.ts"
 import { MAPPING as CLI_MAPPING } from "./drivers/cli.ts"
@@ -33,7 +33,7 @@ const closure = (entry: string): { readonly files: string[]; readonly outside: s
     for (const specifier of specifiers(readFileSync(file, "utf8"))) {
       if (specifier.startsWith("node:")) continue
       const target = resolve(dirname(file), specifier)
-      const allowed = target === join(HERE, "scenario.ts") || target.startsWith(join(HERE, "drivers") + "/")
+      const allowed = target === join(HERE, "scenario.ts") || target.startsWith(join(HERE, "drivers") + sep)
       if (!allowed || !specifier.startsWith(".")) outside.push(`${file.slice(HERE.length + 1)} -> ${specifier}`)
       else visit(target)
     }

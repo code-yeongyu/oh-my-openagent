@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import path, { dirname, join, relative, resolve } from "node:path"
+import nodePath, { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 // `omo-ai/remote` (omo#13413): the remote module bundled for node plus its declaration tree. TypeScript 7 has no
@@ -74,7 +74,11 @@ function relink(out: string, file: string, text: string, core: Record<string, st
       unresolved.push(specifier)
       return whole
     }
-    const path = relative(dirname(file), target).replace(/\.d\.ts$/, ".js")
+    // A module specifier uses "/" on every OS; a Windows separator would turn `.\remote...` into an escape sequence.
+    const path = relative(dirname(file), target)
+      .split(sep)
+      .join("/")
+      .replace(/\.d\.ts$/, ".js")
     return `${lead}${quote}${path.startsWith(".") ? path : `./${path}`}${quote}`
   })
   if (unresolved.length > 0)
@@ -156,7 +160,7 @@ export function staleArtifacts(
   artifacts: ReadonlyMap<string, string>,
   typesRoot: string,
   indexed: ReadonlyMap<string, string>,
-  paths: typeof path = path,
+  paths: typeof nodePath = nodePath,
 ): string[] {
   const inTypes = (file: string): boolean => {
     const below = paths.relative(typesRoot, file)

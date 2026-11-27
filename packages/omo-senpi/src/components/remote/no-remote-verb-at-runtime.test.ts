@@ -4,7 +4,7 @@
 // (components/remote/tui/command.ts, PR 5), which runs the CLI as the person at that terminal.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join, relative } from "node:path"
+import { join, relative, sep } from "node:path"
 import { parseSync } from "oxc-parser"
 
 const SRC = join(import.meta.dir, "..", "..")
@@ -43,9 +43,10 @@ function remoteVerbArgvs(path: string, source: string): string[] {
 
 describe("no `omo remote` verb at runtime (G4)", () => {
   test("#given omo-senpi's sources #when every spawn argv is scanned #then none starts with the remote verb", async () => {
-    const files = [...new Bun.Glob("**/*.ts").scanSync({ cwd: SRC })].filter(
-      (file) => !EXEMPT.test(`/${file}`) && !EXCEPTIONS.has(file),
-    )
+    // Bun.Glob yields the platform's separator; the exemptions and the anchor below are POSIX paths.
+    const files = [...new Bun.Glob("**/*.ts").scanSync({ cwd: SRC })]
+      .map((file) => file.split(sep).join("/"))
+      .filter((file) => !EXEMPT.test(`/${file}`) && !EXCEPTIONS.has(file))
     expect(files).toContain("components/device-service/runner.ts")
     const offenders = files.flatMap((file) =>
       remoteVerbArgvs(file, readFileSync(join(SRC, file), "utf8")).map(
