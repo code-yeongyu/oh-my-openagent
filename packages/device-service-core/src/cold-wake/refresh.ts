@@ -28,6 +28,23 @@ const installedRuntimeVersion = (argv: readonly string[]): string | undefined =>
 
 const INSTALLED: ColdWakeOutcome = { kind: "installed", serviceRestarted: false }
 
+const sessionHostUnitPath = (host: ColdWakeHost): string =>
+  host.platform === "darwin"
+    ? plistPath(host.home, SESSION_HOST_LAUNCHD_LABEL)
+    : join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
+
+/**
+ * The omo-managed runtime version the installed session host unit names, whatever agent dir it serves; undefined when
+ * no unit is installed or none of its arguments names one. A runtime prune keeps it (#15264 review M1): a unit serving
+ * another agent dir is never refreshed by this launch, so deleting its runtime would leave it naming a missing binary.
+ */
+export function installedSessionHostRuntimeVersion(host: ColdWakeHost): string | undefined {
+  const path = sessionHostUnitPath(host)
+  if (!existsSync(path)) return undefined
+  const installed = readInstalledSessionHostUnit(readFileSync(path, "utf8"), host.platform === "darwin")
+  return installed === undefined ? undefined : installedRuntimeVersion(installed.argv)
+}
+
 /**
  * omo#14191: a launch of a newer runtime brings an installed session host unit's program and shape forward - an older
  * omo's KeepAlive / Restart=always unit naming an older `binary-runtime/<version>/omo` - and nothing else. The agent dir
@@ -47,9 +64,7 @@ export async function refreshColdWake(
   },
 ): Promise<ColdWakeOutcome | undefined> {
   const darwin = host.platform === "darwin"
-  const path = darwin
-    ? plistPath(host.home, SESSION_HOST_LAUNCHD_LABEL)
-    : join(unitDir(host.home), SESSION_HOST_SYSTEMD_UNIT)
+  const path = sessionHostUnitPath(host)
   if (!existsSync(path)) return undefined
   const installed = readInstalledSessionHostUnit(readFileSync(path, "utf8"), darwin)
   const version = installed === undefined ? undefined : installedRuntimeVersion(installed.argv)

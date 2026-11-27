@@ -4,6 +4,7 @@ import {
   type ColdWakeOutcome,
   ColdWakeUnitError,
   installColdWake,
+  installedSessionHostRuntimeVersion,
   readColdWake,
   refreshColdWake,
   runCommand,
@@ -145,6 +146,18 @@ export async function refreshColdWakeAtLaunch(
   } catch (cause) {
     error(`Cold wake could not be refreshed (${cause instanceof Error ? cause.message : String(cause)}).`)
   }
+}
+
+/**
+ * The runtime version this device's installed session host unit names, whatever agent dir it serves; undefined off
+ * Linux and macOS or with no unit. A launch's runtime prune keeps it (#15264 review M1). A unit that exists but cannot
+ * be read throws, so the caller skips the prune rather than delete a runtime the unit may name.
+ */
+export function sessionHostRuntimeVersion(
+  options: { readonly platform?: NodeJS.Platform; readonly home?: string } = {},
+): string | undefined {
+  const host = coldWakeHost(options.platform ?? process.platform, options.home)
+  return host === undefined ? undefined : installedSessionHostRuntimeVersion(host)
 }
 
 export async function applyColdWake(
