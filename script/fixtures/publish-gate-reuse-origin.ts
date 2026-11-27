@@ -1,6 +1,7 @@
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "node:child_process"
 import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { HERMETIC_GIT_CONFIG } from "../../test-hermetic-home"
 
 // A real git origin for publish-gate-reuse-ci-basis-waiver.test.ts: the gate-reuse waiver fetches,
 // checks ancestry and diffs real commits, so its delta rule is exercised against git, not a stub.
@@ -83,7 +84,9 @@ export interface GitOrigin {
 
 export function createGitOrigin(root: string, seed?: GitOrigin): GitOrigin {
   const gitConfig = join(root, "gitconfig")
-  writeFileSync(gitConfig, "")
+  // The run's hermetic git config: a detached `git gc --auto` after the step's push would outlive the step and rewrite
+  // the case's directory after its cleanup.
+  writeFileSync(gitConfig, HERMETIC_GIT_CONFIG)
   const gitEnv = { PATH: process.env.PATH ?? "", HOME: root, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: gitConfig }
   const git = (cwd: string, args: readonly string[], input?: string): void => {
     const result = spawnSync("git", args, { cwd, env: gitEnv, encoding: "utf8", input })

@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "6c903680c978cfcdcbab93c82c89cbe5345624c8f37bc6bcc9f39a0be087eb20",
+  "workflowSha256": "6b3556bfa908052c1080d7da9d718452e0c42b082ff248579a72db8debbf6a36",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
@@ -167,7 +167,8 @@
       "Run actions/cache@v6",
       "Install dependencies",
       "Run root test shard 2 heavy",
-      "Run Senpi compatibility tests",
+      "Run Senpi compatibility tests (thread and memory)",
+      "Run Senpi compatibility tests (rest)",
       "Upload macOS JUnit reports",
       "Write job summary"
     ],

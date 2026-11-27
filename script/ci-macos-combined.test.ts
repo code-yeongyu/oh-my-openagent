@@ -49,7 +49,8 @@ const macosJobs = {
   ],
   "macos-combined-2": [
     ["shard2a", "root-tests-posix-2a"],
-    ["senpi", "senpi-tests-posix"],
+    ["senpi-core", "senpi-tests-posix-core"],
+    ["senpi-rest", "senpi-tests-posix-rest"],
   ],
 } as const
 type MacosJob = keyof typeof macosJobs
@@ -130,7 +131,12 @@ describe("combined macOS CI execution contract (#9974)", () => {
     expect(steps.find((step) => step.id === "codex-platform-tests")?.run).toBe(
       "bash .github/scripts/ci-codex-platform-build.sh\nbash .github/scripts/ci-codex-platform-node.sh\nbun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts\n",
     )
-    expect(steps.find((step) => step.id === "senpi-tests-posix")?.run).toBe("bash .github/scripts/ci-senpi-posix.sh")
+    expect(steps.find((step) => step.id === "senpi-tests-posix-core")?.run).toBe(
+      "bash .github/scripts/ci-senpi-posix.sh core",
+    )
+    expect(steps.find((step) => step.id === "senpi-tests-posix-rest")?.run).toBe(
+      "bash .github/scripts/ci-senpi-posix.sh rest",
+    )
     expect(script("ci-codex-platform-build.sh").trim().split("\n").slice(2)).toEqual([
       "bun run build:codex-install",
       "bun run build:git-bash-mcp",
@@ -155,7 +161,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
     ["macos-test-1-status", "test", ["lsp", "shard1a", "shard1b"]],
     ["macos-test-2-status", "test", ["lsp", "shard2a", "shard2b"]],
     ["macos-codex-status", "codex-compatibility", ["codex"]],
-    ["macos-senpi-status", "senpi-compatibility", ["senpi"]],
+    ["macos-senpi-status", "senpi-compatibility", ["senpi-core", "senpi-rest"]],
   ] as const)(
     "#given %s #when its status is published #then Ubuntu judges only the corresponding parts from the jobs that ran them",
     (id, name, outputs) => {

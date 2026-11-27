@@ -739,12 +739,13 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
     runs-on: macos-latest
-    # The job budget is the sum of the part budgets (40) plus 10 minutes for checkout, setup, install (measured 2-6 min)
+    # The job budget is the sum of the part budgets (55) plus 10 minutes for checkout, setup, install (measured 2-6 min)
     # and the upload/summary steps; ci-macos-combined.test.ts checks that sum.
-    timeout-minutes: 50
+    timeout-minutes: 65
     outputs:
       shard2a: ${{ steps.root-tests-posix-2a.outcome }}
-      senpi: ${{ steps.senpi-tests-posix.outcome }}
+      senpi-core: ${{ steps.senpi-tests-posix-core.outcome }}
+      senpi-rest: ${{ steps.senpi-tests-posix-rest.outcome }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -769,13 +770,23 @@ jobs:
         env:
           CI_JUNIT_DIR: ${{ runner.temp }}/junit
         run: bash .github/scripts/ci-root-shard-2.sh heavy
-      - name: Run Senpi compatibility tests
-        id: senpi-tests-posix
+      # The Senpi suite as two steps by measured macOS file time: one 20-minute step took 10.2-16.9 min on green runs and
+      # was cut off at ~98% on a slow runner. core = components/thread + components/memory (6.2-11.1 min of tests), rest =
+      # every other omo-senpi test (3.4-7.6 min) plus the one-off pack, daemon and typecheck steps (~1.5 min).
+      - name: Run Senpi compatibility tests (thread and memory)
+        id: senpi-tests-posix-core
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
         env:
           CI_JUNIT_DIR: ${{ runner.temp }}/junit
-        run: bash .github/scripts/ci-senpi-posix.sh
+        run: bash .github/scripts/ci-senpi-posix.sh core
+      - name: Run Senpi compatibility tests (rest)
+        id: senpi-tests-posix-rest
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 15
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: bash .github/scripts/ci-senpi-posix.sh rest
 
       # The JUnit reports prove a re-sharded layout runs exactly the tests this one runs (#13315).
       - name: Upload macOS JUnit reports
@@ -795,7 +806,8 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Root shard 2 heavy: `${{ steps.root-tests-posix-2a.outcome }}`.
-            - Senpi: `${{ steps.senpi-tests-posix.outcome }}`.
+            - Senpi thread and memory: `${{ steps.senpi-tests-posix-core.outcome }}`.
+            - Senpi rest: `${{ steps.senpi-tests-posix-rest.outcome }}`.
           JOB_SUMMARY_NEXT: Inspect the failed part; independent parts continue after an earlier failure.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
@@ -895,7 +907,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ needs.macos-combined-2.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined-2.outputs.senpi || 'missing' }}
+          TEST_OUTCOMES: ${{ needs.macos-combined-2.outputs.senpi-core || 'missing' }} ${{ needs.macos-combined-2.outputs.senpi-rest || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
