@@ -23,7 +23,13 @@ afterEach(async () => {
 
 const answers = (kind: string): RemoteCommandOutcome => ({
   kind: "ok",
-  response: { type: "response", id: null, command: "admit_external_message", success: true, data: { kind, turnId: "3" } },
+  response: {
+    type: "response",
+    id: null,
+    command: "admit_external_message",
+    success: true,
+    data: { kind, turnId: "3" },
+  },
 })
 
 const HEAD = 40
@@ -35,7 +41,9 @@ describe("a send's answer leads with its delivery state", () => {
       const a = account({ admitOutcome: answers(engineAnswer) })
       const { run } = surface(a.remote)
       // `output()` serializes exactly this object into the text the model reads.
-      const text = JSON.stringify(await run("thread_send", { thread: B_ROW.durable_id, message: "hi", all_scope: true }))
+      const text = JSON.stringify(
+        await run("thread_send", { thread: B_ROW.durable_id, message: "hi", all_scope: true }),
+      )
       expect(text.slice(0, HEAD)).toContain('"delivery":{"kind":"queued"')
       expect(text).toStartWith('{"kind":"ok","delivery":')
     },

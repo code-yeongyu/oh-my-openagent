@@ -41,10 +41,15 @@ function result(
 function tones(name: ThreadToolName, value: ThreadToolResult, args: Record<string, unknown> = {}): string[] {
   const named = { fg: (color: ThemeColor, text: string) => `<${color}>${text}`, bold: (text: string) => text }
   const output = { content: [{ type: "text" as const, text: JSON.stringify(value) }], details: { result: value } }
-  return renderThreadResult(name)(output, { expanded: false, isPartial: false }, named as unknown as Theme, {
-    args,
-    isError: false,
-  } as never)
+  return renderThreadResult(name)(
+    output,
+    { expanded: false, isPartial: false },
+    named as unknown as Theme,
+    {
+      args,
+      isError: false,
+    } as never,
+  )
     .render(WIDE)
     .map((line) => /^<(\w+)>/.exec(line)?.[1] ?? "")
 }
