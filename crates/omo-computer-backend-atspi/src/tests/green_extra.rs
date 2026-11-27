@@ -180,6 +180,11 @@ fn exec_quoting_and_field_codes_follow_the_desktop_entry_spec() {
         argv("/bin/bash -c \"gedit\""),
         Err(ExecRefusal::ShellCommand("bash".to_owned()))
     );
+    assert_eq!(
+        argv("env sh -c \"a; b\""),
+        Err(ExecRefusal::ShellCommand("sh".to_owned())),
+        "a wrapper does not hide the shell"
+    );
     assert_eq!(argv("  "), Err(ExecRefusal::Empty));
     let _ = Reason::LaunchNeedsUser;
 }

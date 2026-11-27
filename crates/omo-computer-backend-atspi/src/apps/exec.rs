@@ -7,7 +7,7 @@
 pub enum ExecRefusal {
     /// An unquoted shell operator, a command substitution, or an unterminated quote.
     ShellOperator(char),
-    /// The program is a shell asked to run a command string.
+    /// A shell asked to run a command string, as the program or behind a wrapper (`env sh -c`).
     ShellCommand(String),
     Empty,
 }
@@ -93,15 +93,19 @@ pub fn argv(exec: &str) -> Result<Vec<String>, ExecRefusal> {
             argv.push(expanded);
         }
     }
-    let program = argv.first().ok_or(ExecRefusal::Empty)?;
-    let base = program.rsplit('/').next().unwrap_or(program);
-    if SHELLS.contains(&base)
-        && argv
-            .iter()
-            .skip(1)
-            .any(|arg| arg.starts_with('-') && arg.contains('c'))
-    {
-        return Err(ExecRefusal::ShellCommand(base.to_owned()));
+    if argv.is_empty() {
+        return Err(ExecRefusal::Empty);
+    }
+    // Any word, not only the program: a wrapper (`env`, `nice`, `setsid`) runs the shell it names.
+    for (at, word) in argv.iter().enumerate() {
+        let base = word.rsplit('/').next().unwrap_or(word);
+        if SHELLS.contains(&base)
+            && argv[at + 1..]
+                .iter()
+                .any(|arg| arg.starts_with('-') && arg.contains('c'))
+        {
+            return Err(ExecRefusal::ShellCommand(base.to_owned()));
+        }
     }
     Ok(argv)
 }
