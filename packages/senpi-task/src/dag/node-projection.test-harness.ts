@@ -12,6 +12,7 @@ import { createDagManager, type DagManager, type DagRunRecordV1 } from "./manage
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 export const PARENT_SESSION_ID = "session-node-projection-parent"
@@ -129,7 +130,12 @@ export async function startHeldRun(nodeIds: readonly string[]): Promise<Projecti
     rootSessionId: "session-node-projection-root",
   })
   const runId = started.snapshot.runId
-  const scheduler = createDagScheduler({ store, taskManager, initialRecord: manager.record(runId, PARENT_SESSION_ID) })
+  const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
+    store,
+    taskManager,
+    initialRecord: manager.record(runId, PARENT_SESSION_ID),
+  })
   const run = scheduler.run()
   await runner.whenStarted(nodeIds.length)
   const whenNodeRunning = (nodeId: string): Promise<void> => {

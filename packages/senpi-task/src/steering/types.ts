@@ -197,6 +197,10 @@ export type RedispatchOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
+  // The one resolution of a task address (id first, then name) every steering verb uses.
+  resolve(idOrName: string): TaskRecord | undefined
+  // The one scope decision for a send: the denial an out-of-scope caller gets, or undefined.
+  scopeDenial(record: TaskRecord, input: SendInput): SendOutcome | undefined
   hasPendingSends(taskId: string): boolean
   hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.

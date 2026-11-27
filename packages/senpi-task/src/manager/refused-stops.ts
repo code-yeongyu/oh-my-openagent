@@ -121,32 +121,42 @@ export class RefusedStops {
   }
 }
 
-/** A cancel of a task with a refused turn stops that turn as its refusal said, never the settled record. */
-export async function cancelBehindRefusedStop(
+/**
+ * A cancel of a task with a refused turn stops that turn as its refusal said, never the settled record.
+ * Undefined, synchronously, for any other task: a plain cancel must run its synchronous transition in
+ * the caller's tick, ahead of a write the caller is in the middle of (a runtime-fallback handoff).
+ */
+export function cancelBehindRefusedStop(
   stops: RefusedStops,
   taskId: string,
-  status: () => TaskStatus,
-): Promise<CancelOutcome | undefined> {
+  status: () => TaskStatus | undefined,
+): Promise<CancelOutcome> | undefined {
   if (!stops.pending(taskId)) return undefined
-  if (await stops.attempt(taskId)) {
-    return {
-      kind: "noop",
-      task_id: taskId,
-      status: status(),
-      reason: "its refused self-started turn is confirmed stopped",
-    }
-  }
-  return {
-    kind: "cancel_pending",
-    task_id: taskId,
-    previous_status: status(),
-    reason: "refused turn not confirmed stopped",
-  }
+  return stops.attempt(taskId).then((confirmed): CancelOutcome => {
+    const current = status() ?? "completed"
+    return confirmed
+      ? { kind: "noop", task_id: taskId, status: current, reason: "its refused self-started turn is confirmed stopped" }
+      : {
+          kind: "cancel_pending",
+          task_id: taskId,
+          previous_status: current,
+          reason: "refused turn not confirmed stopped",
+        }
+  })
 }
 
-/** Reviving into a refused turn that may still be running is not a revive: the send waits for its stop. */
-export async function sendBehindRefusedStop(stops: RefusedStops, taskId: string): Promise<SendOutcome | undefined> {
-  if (await stops.attempt(taskId)) return undefined
-  const reason = "its self-started turn is not confirmed stopped yet; send again once it is"
-  return { kind: "unresponsive", task_id: taskId, retryable: true, reason }
+/**
+ * Reviving into a refused turn that may still be running is not a revive: the send waits for its stop.
+ * Undefined, synchronously, for a task with no refused turn, so its send starts in the caller's tick.
+ */
+export function sendBehindRefusedStop(
+  stops: RefusedStops,
+  taskId: string,
+): Promise<SendOutcome | undefined> | undefined {
+  if (!stops.pending(taskId)) return undefined
+  return stops.attempt(taskId).then((confirmed) => {
+    if (confirmed) return undefined
+    const reason = "its self-started turn is not confirmed stopped yet; send again once it is"
+    return { kind: "unresponsive", task_id: taskId, retryable: true, reason }
+  })
 }
