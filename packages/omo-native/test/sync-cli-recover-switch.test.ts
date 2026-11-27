@@ -51,7 +51,9 @@ test("#given a device that already syncs this account #when omo sync recover run
   expect(r.out).toEqual([])
   expect(r.err.join("\n")).toContain("`omo sync enable`")
   expect(service.state).toEqual({ account: false, device: false })
-  const joined = (await verified(r.world, r.world.owner)).received.some((record) => record.body.kind === "recovery-join")
+  const joined = (await verified(r.world, r.world.owner)).received.some(
+    (record) => record.body.kind === "recovery-join",
+  )
   expect(joined).toBe(false)
 })
 
