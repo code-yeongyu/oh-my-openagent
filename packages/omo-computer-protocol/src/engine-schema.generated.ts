@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b1e294f921009a741e7503e5ed45e5056d0025a3c8f82eac712c3fca02a68fd2" as const
+export const SCHEMA_SHA256 = "faf0562409ee599fe649375fadc2b04b32551f16befecf9b95787580e818c25f" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -72,6 +72,7 @@ export const METHODS = [
 	{ name: "display.release", effect: "exec", exposure: "hostOnly(session)" },
 	{ name: "display.resume", effect: "exec", exposure: "hostOnly(session)" },
 	{ name: "preview.subscribe", effect: "read", exposure: "hostOnly(session)" },
+	{ name: "presence.cursorTrace", effect: "read", exposure: "hostOnly(session)" },
 	{ name: "stopPath.start", effect: "exec", exposure: "hostOnly(authority)" },
 	{ name: "stopPath.status", effect: "read", exposure: "public" },
 	{ name: "stopPath.heartbeat", effect: "read", exposure: "hostOnly(session)" },
@@ -690,6 +691,26 @@ export type CuaAdapter = CuaAdapterMode | boolean
 export type CuaAdapterMode = "auto" | "on" | "off"
 
 export type CursorMode = "os" | "engine" | "none"
+
+export type CursorTrace = {
+	frames: CursorTraceFrame[]
+	dropped: number
+}
+
+export type CursorTraceAction = "idle" | "navigate" | "click" | "drag" | "scroll" | "text" | "key"
+
+export type CursorTraceFrame = {
+	t_ms: number
+	x: number
+	y: number
+	display: string
+	action: CursorTraceAction
+}
+
+export type CursorTraceParams = {
+	session: string
+	since?: number | null
+}
 
 export type Cut = {
 	ref: string
@@ -1739,6 +1760,7 @@ export type MethodParams = {
 	"display.release": EmptyParams
 	"display.resume": EmptyParams
 	"preview.subscribe": EmptyParams
+	"presence.cursorTrace": CursorTraceParams
 	"stopPath.start": StopPathStartParams
 	"stopPath.status": EmptyParams
 	"stopPath.heartbeat": EmptyParams
@@ -1811,6 +1833,7 @@ export type MethodResults = {
 	"display.release": null
 	"display.resume": null
 	"preview.subscribe": null
+	"presence.cursorTrace": CursorTrace
 	"stopPath.start": StopPathStatus
 	"stopPath.status": StopPathStatus
 	"stopPath.heartbeat": null
