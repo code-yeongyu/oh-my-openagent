@@ -198,7 +198,7 @@ export function threadsNamespace(options: {
       if (released.kind === "error") return released
       // Design lane ruling: the root's failures are refusals; the engine's release_unsupported reply (a row with no
       // local endpoint) is answered as one. The thread facade keeps the engine's shape through its own path.
-      if (!released.value.success && released.value.error === "release_unsupported")
+      if (released.kind === "ok" && !released.value.success && released.value.error === "release_unsupported")
         return {
           kind: "error",
           error: {
@@ -232,9 +232,9 @@ export function threadsNamespace(options: {
     "threads.extensions.call": async (input) => {
       return answered(
         await use(async (core) => {
-          const answered = await settledExtension(async () => core.extensions.call(input.name, input.op, input.args))
-          if (answered === undefined) return EXTENSION_UNEXPECTED
-          return answered.kind === "ok" ? answered : extensionFailure(answered)
+          const reply = await settledExtension(async () => core.extensions.call(input.name, input.op, input.args))
+          if (reply === undefined) return EXTENSION_UNEXPECTED
+          return reply.kind === "ok" ? reply : extensionFailure(reply)
         }),
       )
     },

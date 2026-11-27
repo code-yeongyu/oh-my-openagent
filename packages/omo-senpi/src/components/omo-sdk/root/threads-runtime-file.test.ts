@@ -7,7 +7,7 @@ import {
   CORE_CALLS,
   RUNTIME_FILE_MISMATCH,
   RUNTIME_FILE_UNAVAILABLE,
-  type threadCoreAccess,
+  threadCoreAccess,
   type ThreadsRuntime,
 } from "./thread-runtime-file"
 import { ROOT_DISPOSED } from "./assemble"
@@ -526,6 +526,13 @@ describe("a dispose that races the first thread call", () => {
       if (firstRead !== "ran") misuses.push(`${name} read as .${firstRead} before .ran`)
       if (new RegExp(`\\b${name}\\s+as\\b`).test(rest)) misuses.push(`${name} cast, which skips the narrowing`)
     }
+    // The control finds the helper and the core path by their names, so a local that re-binds either name would make it
+    // reason about the wrong thing: each is bound exactly once, by the import and by threadCoreAccess's destructuring.
+    const bindings = [
+      ...source.matchAll(/\b(?:const|let|var|function|class)\s+(answered|use)\b|[{(,]\s*(answered|use)\s*(?=[,}):=])/g),
+    ].map((binding) => binding[1] ?? binding[2])
+    if (bindings.filter((name) => name === "answered").length !== 1) misuses.push("answered is re-bound in threads.ts")
+    if (bindings.filter((name) => name === "use").length !== 1) misuses.push("use is re-bound in threads.ts")
     const uses = source.match(/\buse\(async/g)?.length ?? 0
     expect({ uses, accounted: handedOn.length + kept.length, misuses }).toEqual({
       uses,
@@ -863,4 +870,96 @@ describe("a core's refusal and the root's refusal are told apart for every membe
       expect({ answer, calls }).toEqual({ answer: { kind: "error", error: ROOT_DISPOSED }, calls: [] })
     })
   }
+})
+
+// The design lane's ruling on use()'s outcome, the tag itself (t72y's N1): `ran` is what a member that inspects the
+// answer relies on, so each way the root refuses answers ran: false with that refusal, and a core that ran answers
+// ran: true with its answer, an error-kind answer included.
+describe("use() answers whether the core ran", () => {
+  const ROW_REFUSAL = { kind: "error", error: { code: "not_found", message: "no such row", next_action: "list it" } }
+  const ready = () => Promise.resolve(runtimeWith(() => ({ kind: "ok", threads: [] })))
+  const access = (load: () => Promise<ThreadsRuntime>, construct: () => unknown = () => fullCore()) =>
+    threadCoreAccess({
+      loadThreadsRuntime: load,
+      construct: construct as Parameters<typeof threadCoreAccess>[0]["construct"],
+      disposePorts: async () => undefined,
+    })
+  type Use = ReturnType<typeof threadCoreAccess>["use"]
+  const listing = (use: Use) => use(async (core) => core.list({} as Parameters<typeof core.list>[0]))
+  const tag = (outcome: Awaited<ReturnType<typeof listing>>) =>
+    outcome.ran ? { ran: true, value: outcome.value } : { ran: false, refusal: outcome.refusal }
+
+  test("#given a runtime file that cannot load #then use answers ran: false with the file's refusal", async () => {
+    const outcome = tag(await listing(access(() => Promise.reject(new Error(EXCEPTION_TEXT))).use))
+    expect({ ran: outcome.ran, details: outcome.refusal?.error.details }).toEqual({
+      ran: false,
+      details: { reason: RUNTIME_FILE_UNAVAILABLE, file: "threads" },
+    })
+  })
+
+  test("#given a core whose creation fails #then use answers ran: false with the creation's refusal", async () => {
+    const outcome = tag(
+      await listing(
+        access(ready, () => {
+          throw new Error(CONSTRUCTION_TEXT)
+        }).use,
+      ),
+    )
+    expect({ ran: outcome.ran, code: outcome.refusal?.error.code }).toEqual({ ran: false, code: "internal_error" })
+  })
+
+  test("#given dispose began before the call #then use answers ran: false with the disposed refusal", async () => {
+    const { use, disposing } = access(ready)
+    disposing()
+    expect(tag(await listing(use))).toEqual({ ran: false, refusal: { kind: "error", error: ROOT_DISPOSED } })
+  })
+
+  test("#given dispose began while the core was being created #then use answers ran: false with the disposed refusal", async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let constructing: () => void = () => undefined
+    const asked = new Promise<void>((resolve) => {
+      constructing = resolve
+    })
+    const { use, dispose } = access(ready, async () => {
+      constructing()
+      await gate
+      return fullCore()
+    })
+    const outcome = listing(use)
+    await asked
+    const disposed = dispose()
+    release()
+    expect(tag(await outcome)).toEqual({ ran: false, refusal: { kind: "error", error: ROOT_DISPOSED } })
+    await disposed
+  })
+
+  test("#given a core that ran and answered #then use answers ran: true with that answer", async () => {
+    const answer = { kind: "ok", threads: [] }
+    const outcome: unknown = tag(await listing(access(ready, () => fullCore({ list: async () => answer })).use))
+    expect(outcome).toEqual({ ran: true, value: answer })
+  })
+
+  test("#given a core that ran and refused #then use answers ran: true with the core's refusal as its answer", async () => {
+    const outcome: unknown = tag(await listing(access(ready, () => fullCore({ list: async () => ROW_REFUSAL })).use))
+    expect(outcome).toEqual({ ran: true, value: ROW_REFUSAL })
+  })
+})
+
+// t72y's N2 and the design lane's ruling: threads.release hands an answer of its core that is not the ok shape on
+// unchanged, as before the tagged outcome; it never throws for it (this slice's failures are typed, never thrown).
+test("#given a core whose release answers without a kind #when threads.release runs #then that answer is handed on unchanged", async () => {
+  const offContract = { success: false, error: "no_kind" }
+  const runtime: ThreadsRuntime = {
+    ...runtimeWith(() => ({ kind: "ok", threads: [] })),
+    createThreadCore: (() =>
+      fullCore({ release: async () => offContract })) as unknown as ThreadsRuntime["createThreadCore"],
+  }
+  const answer: unknown = await callMember(
+    namespace(() => Promise.resolve(runtime)),
+    "threads.release",
+  )({ thread: "t" })
+  expect(answer).toEqual(offContract)
 })
