@@ -22,6 +22,15 @@ pub(super) const fn granted_permissions() -> PermissionProbe {
 }
 
 impl FakeBackend {
+    /// Row 27 (R51): the scenario's scripted `permissions` block; absent leaves every permission granted.
+    pub(super) fn scripted_permissions(&self) -> PermissionProbe {
+        self.lock().scenario.permissions.map_or(granted_permissions(), |p| PermissionProbe {
+            capture: p.capture,
+            input: p.input,
+            accessibility: p.accessibility,
+        })
+    }
+
     pub(super) fn scripted_capabilities(&self) -> Capabilities {
         let displays = self.lock().displays.len();
         let mut capabilities =

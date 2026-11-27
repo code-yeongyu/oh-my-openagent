@@ -44,7 +44,7 @@ impl FakeBackend {
     /// A backend on the given clock (its creation time is the clock's current time) and sink.
     #[must_use]
     pub fn with_parts(scenario: FakeScenario, clock: FakeClock, sink: RecordingSink) -> Self {
-        let persona = scenario.persona.unwrap_or_else(Persona::host);
+        let persona = scenario.persona.unwrap_or(Persona::DEFAULT);
         let state = FakeState::new(scenario, clock.now_ms());
         Self {
             shared: Arc::new(Mutex::new(state)),

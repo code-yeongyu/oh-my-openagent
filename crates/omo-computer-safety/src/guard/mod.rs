@@ -105,6 +105,18 @@ impl Guard {
         )
     }
 
+    /// A-IS-64 (a): the protected-targets table of the OS the session's backend acts on, applied
+    /// once at `session.open` and held for the session; every admission reads it.
+    pub fn apply_table(&mut self, os: Os) {
+        self.table = ProtectedTable::of(os);
+    }
+
+    /// The table every admission of this session reads.
+    #[must_use]
+    pub const fn table(&self) -> &'static ProtectedTable {
+        self.table
+    }
+
     #[must_use]
     pub const fn with_table(mut self, table: &'static ProtectedTable) -> Self {
         self.table = table;

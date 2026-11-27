@@ -9,3 +9,16 @@ crate-type = ["rlib"]
 
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
+omo-computer-safety = { path = "../omo-computer-safety" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+atspi.workspace = true
+futures-lite = { version = "=2.6.1", default-features = false }
+regex = "=1.13.1"
+serde.workspace = true
+tokio = { workspace = true, features = ["time"] }
+zbus.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
