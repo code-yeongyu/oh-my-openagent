@@ -26,7 +26,7 @@ describe("a cancel the host crash interrupts", () => {
     const child = recordAt(parent, 0)
     world.host.withholdReply("abort")
     const abortAsked = world.host.waitForCommand("abort")
-    const cancelling = runTaskCancel(parent.manager, { task_id: child.task_id })
+    const cancelling = runTaskCancel(parent.manager, { task_id: child.task_id }, parent.sessionId)
     await bounded(abortAsked, "the cancel's abort")
     const mark = world.host.commands.length
 
