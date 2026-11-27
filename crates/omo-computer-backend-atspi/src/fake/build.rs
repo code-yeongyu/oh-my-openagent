@@ -133,6 +133,11 @@ impl FakeBus {
         self.at(node).hung = true;
     }
 
+    /// `DoAction` on `node` acts (a menu opens) but its reply times out.
+    pub fn set_unconfirmed(&mut self, node: &NodeId) {
+        self.at(node).unconfirmed = true;
+    }
+
     /// Detaches `node` from its parent: the object is gone.
     pub fn remove(&mut self, node: &NodeId) {
         if let Some(parent) = self.nodes.remove(node).and_then(|gone| gone.parent) {

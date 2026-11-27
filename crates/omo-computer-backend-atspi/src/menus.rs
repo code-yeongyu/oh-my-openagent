@@ -7,9 +7,9 @@
 
 use std::time::Duration;
 
-use omo_computer_core::backend::Delivered;
+use omo_computer_core::backend::{Delivered, Refusal};
 use omo_computer_core::error::EngineCode;
-use omo_computer_core::menus::{prove, MenuNode};
+use omo_computer_core::menus::{find_exact, prove, MenuNode};
 
 use crate::backend::{press, AtspiBackend};
 use crate::bus::{read_slice, Bus, NodeId};
@@ -81,6 +81,22 @@ fn step<'a>(reads: &'a [MenuRead], label: &str) -> Option<&'a MenuRead> {
     reads.iter().find(|read| read.node.title == label)
 }
 
+/// Proves `path` against the tree as read before anything is pressed, level by level, as far
+/// as that tree reaches: a level whose items were read and that refuses (a missing or
+/// disabled label, or two items with one label) is the answer, with nothing pressed. A level
+/// with no items read yet (a submenu that fills in only once opened) is proven by the walk.
+fn prove_read(mut level: &[MenuNode], path: &[String]) -> Result<(), Refusal> {
+    for label in path {
+        if level.is_empty() {
+            break;
+        }
+        let at = std::slice::from_ref(label);
+        prove(level, at)?;
+        level = &find_exact(level, at)?.children;
+    }
+    Ok(())
+}
+
 impl<B: Bus> AtspiBackend<B> {
     /// The menu tree of `window`, read without opening, moving or focusing anything.
     ///
@@ -120,12 +136,7 @@ fn walk<B: Bus>(
 ) -> Result<Delivered, AxRefusal> {
     let mut level = read_level(bus, &container, 0, &mut 0);
     let full: Vec<String> = path.iter().map(|label| (*label).to_owned()).collect();
-    match prove(&nodes(&level), &full) {
-        Err(refusal) if refusal.code != EngineCode::StaleRef => {
-            return Err(AxRefusal::plain(refusal))
-        }
-        _ => {}
-    }
+    prove_read(&nodes(&level), &full).map_err(AxRefusal::plain)?;
     let mut delivered = Delivered { count: 0, of: 0 };
     for label in path {
         let label = (*label).to_owned();
@@ -151,7 +162,12 @@ fn walk<B: Bus>(
             .ok()
             .flatten()
             .unwrap_or_else(|| container.clone());
-        delivered = press(bus, &item.id, &item.role)?;
+        // A press that timed out may still have opened its menu, so its container is closed too.
+        delivered = press(bus, &item.id, &item.role).inspect_err(|refused| {
+            if refused.code() == EngineCode::AxUnconfirmed {
+                opened.push(holder.clone());
+            }
+        })?;
         opened.push(holder);
         container = item.id.clone();
         level = read_level(bus, &container, 0, &mut 0);

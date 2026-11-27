@@ -5,7 +5,7 @@ use omo_computer_core::backend::Delivered;
 use omo_computer_core::error::EngineCode;
 
 use super::{gedit, Fixture, GEDIT_XID};
-use crate::bus::NodeId;
+use crate::bus::{NodeId, States};
 
 /// gedit's File menu holding `items`, each pressable unless named in `inert`.
 fn file_menu(items: &[&str], inert: &[&str]) -> (Fixture, NodeId, NodeId) {
@@ -44,7 +44,8 @@ fn a_menu_item_is_selected_by_its_exact_label() {
     assert_eq!(delivered, Delivered { count: 1, of: 1 });
     assert_eq!(
         handle.performed(),
-        vec![(file.clone(), 0), (close, 0), (file, 0)]
+        vec![(file, 0), (close, 0)],
+        "the read tree disproves Clos, so File is not pressed again"
     );
     assert_eq!(
         missing.code(),
@@ -86,20 +87,42 @@ fn the_menu_tree_is_read_without_acting_and_twin_labels_are_ambiguous() {
 }
 
 #[test]
-fn a_refused_select_closes_every_menu_its_walk_opened() {
-    let (fx, bar, file) = file_menu(&["Mark done", "Mark done later"], &[]);
+fn a_path_the_read_tree_disproves_presses_nothing() {
+    let (mut fx, _, file) = file_menu(&["Mark done", "Mark done later"], &[]);
+    let print = fx.bus.node(&file, "menu item", "Print");
+    fx.bus.set_actions(&print, &["click"]);
+    fx.bus.set_states(&print, States::default());
     let (mut backend, handle) = fx.backend();
 
     let near_miss = backend
         .select_menu(GEDIT_XID, &["File", "Mark"])
         .expect_err("no item is labelled exactly Mark");
+    let disabled = backend
+        .select_menu(GEDIT_XID, &["File", "Print"])
+        .expect_err("Print is disabled");
 
     assert_eq!(near_miss.code(), EngineCode::StaleRef);
-    assert_eq!(handle.performed(), vec![(file, 0)], "only File was pressed");
+    assert_eq!(disabled.code(), EngineCode::StaleRef);
+    assert!(handle.performed().is_empty(), "File was never pressed");
+    assert!(handle.cleared().is_empty(), "nothing was opened to close");
+}
+
+#[test]
+fn a_menu_press_that_times_out_is_closed_again() {
+    let (mut fx, bar, file) = file_menu(&["Mark done"], &[]);
+    fx.bus.set_unconfirmed(&file);
+    let (mut backend, handle) = fx.backend();
+
+    let unconfirmed = backend
+        .select_menu(GEDIT_XID, &["File", "Mark done"])
+        .expect_err("File's DoAction reply timed out");
+
+    assert_eq!(unconfirmed.code(), EngineCode::AxUnconfirmed);
+    assert_eq!(handle.performed(), vec![(file, 0)]);
     assert_eq!(
         handle.open_menus(),
         Vec::<NodeId>::new(),
-        "File is closed again"
+        "the menu the timed-out press opened is closed again"
     );
     assert_eq!(handle.cleared(), vec![bar]);
 }
