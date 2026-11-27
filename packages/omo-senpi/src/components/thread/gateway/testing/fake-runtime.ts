@@ -2,7 +2,8 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 
 import type {
   AdmitExternalMessageInput,
-  ExternalAdmissionKind,
+  AdmitExternalMessageResult,
+  EngineTurnCap,
   RuntimePhase,
   SessionAdmissionGate,
   SessionRuntimePort,
@@ -25,6 +26,8 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   editorHold: "draft" | undefined = undefined
   /** senpi#7014: an idle session under these holds keeps a delivery as a held notice and answers `held`. */
   sessionHolds: readonly string[] = []
+  /** senpi#7138: the engine-turn cap a new turn would meet; an idle session keeps a delivery behind it and answers `held`. */
+  engineTurnCap: EngineTurnCap | undefined = undefined
   editorRevision = 0
   closedReason: string | undefined
   readonly enqueueCalls: { readonly lane: Lane; readonly delivery_id: string }[] = []
@@ -56,9 +59,7 @@ export class FakeSessionRuntime implements SessionRuntimePort {
     turn_epoch: this.epoch,
   })
 
-  admitExternalMessage = (
-    input: AdmitExternalMessageInput,
-  ): { readonly kind: ExternalAdmissionKind; readonly turn_epoch: number } => {
+  admitExternalMessage = (input: AdmitExternalMessageInput): AdmitExternalMessageResult => {
     if (this.closedReason !== undefined) throw new Error(this.closedReason)
     const turnEpoch = this.epoch
     const id = input.delivery_id
@@ -71,6 +72,10 @@ export class FakeSessionRuntime implements SessionRuntimePort {
     if (!this.isBusy() && this.sessionHolds.length > 0) {
       this.pending.set(id, "followUp")
       return { kind: "held", turn_epoch: turnEpoch }
+    }
+    if (!this.isBusy() && input.whenIdle !== "queue" && this.engineTurnCap !== undefined) {
+      this.pending.set(id, "followUp")
+      return { kind: "held", turn_epoch: turnEpoch, engine_turn_cap: this.engineTurnCap }
     }
     if (!this.isBusy() && input.whenIdle !== "queue") {
       this.pending.set(id, "start")

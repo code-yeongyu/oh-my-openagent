@@ -18,7 +18,11 @@ export type GatewayEndpointRef = {
   readonly durable_session_id: string
 }
 
-/** `held` (senpi#7014): kept under a hold a peer cannot release; it starts once a person releases that hold. */
+/**
+ * `held` (senpi#7014): kept under a hold a peer cannot release; it starts once a person releases that hold. With
+ * `engine_turn_cap` (senpi#7138) it is kept behind the engine-turn cap instead: no turn started, and the turn a person's
+ * message or a Resume starts answers it.
+ */
 export type ExternalAdmissionKind =
   "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "held" | "already_admitted"
 
@@ -116,6 +120,19 @@ export type AdmitExternalMessageInput = {
 }
 
 /**
+ * senpi#7138: the engine-turn cap that stopped the turn a delivery would start: `reason` is the `engine-paused` record's
+ * reason (`cap-per-resume-window`, `cap-per-message`, `cap-per-minute` today), `count` the count it stopped at.
+ */
+export type EngineTurnCap = { readonly reason: string; readonly count: number }
+
+/** `engine_turn_cap` is present only on `held` from an engine with senpi#7138, and then `holds` is not. */
+export type AdmitExternalMessageResult = {
+  readonly kind: ExternalAdmissionKind
+  readonly turn_epoch: number
+  readonly engine_turn_cap?: EngineTurnCap
+}
+
+/**
  * Receiver side: the target session's own runtime, called from its drain. All four calls are
  * synchronous and microsecond-scale in senpi (`pi.session.*`); `admitExternalMessage` may throw
  * once a `release_session` closed admission, which the drain treats as "not admitted here".
@@ -123,10 +140,7 @@ export type AdmitExternalMessageInput = {
 export type SessionRuntimePort = {
   readonly phase: () => RuntimePhase
   readonly admissionGate: () => SessionAdmissionGate
-  readonly admitExternalMessage: (input: AdmitExternalMessageInput) => {
-    readonly kind: ExternalAdmissionKind
-    readonly turn_epoch: number
-  }
+  readonly admitExternalMessage: (input: AdmitExternalMessageInput) => AdmitExternalMessageResult
   readonly listAdmittedDeliveries: () => { readonly pending: readonly string[]; readonly emitted: readonly string[] }
 }
 

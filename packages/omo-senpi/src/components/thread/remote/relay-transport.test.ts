@@ -588,6 +588,33 @@ describe("a receiver whose engine holds the delivery answers the hold, never an 
     expect(admits(a.sent)).toHaveLength(1)
     relay.dispose()
   })
+
+  test("#given b's engine answers held behind its engine-turn cap (senpi#7138) #when a message is sent #then the send is queued waiting on that cap on b, by name, never started", async () => {
+    const a = account({
+      engine: { ...ENGINE, pending: 0 },
+      admitOutcome: {
+        kind: "ok" as const,
+        response: {
+          type: "response",
+          command: "admit_external_message",
+          success: true,
+          data: { kind: "held", turnId: "8", engineTurnCap: { reason: "cap-per-resume-window", count: 8 } },
+        },
+      },
+    })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("to a capped b", "k-cap"))).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery: {
+        kind: "queued",
+        queue_position: 1,
+        waiting_on: { kind: "engine_turn_cap", reason: "cap-per-resume-window", count: 8, device: "b" },
+      },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
 })
 
 describe("a listing row whose device left the roster is refused, never resolved onto another device", () => {
