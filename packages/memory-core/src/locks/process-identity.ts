@@ -110,8 +110,8 @@ async function readProcessStartIdentity(pid: number): Promise<string | null> {
 /**
  * The darwin/freebsd fallback when `bun:ffi` cannot read the start time. `ps -o lstart=` renders in the reader's
  * timezone and locale, so it runs under UTC and the C locale, and every reader sees the same bytes for one process
- * (#12108). The scheme is `ps-lstart-utc:`: a record an older reader wrote in local time (`ps-lstart:`) is then a
- * different scheme, which `startIdentitiesConflict` never counts as proof that its owner died.
+ * (#12108). The scheme is `ps-lstart-utc:`; a record an older reader wrote in local time (`ps-lstart:`) is compared
+ * with it by `legacyPsLstartConflict`.
  */
 export async function readPsLstartIdentity(pid: number, exec: ExecFileText = execFileText): Promise<string | null> {
   const env = { ...process.env, TZ: "UTC", LC_ALL: "C", LANG: "C" }
@@ -146,13 +146,47 @@ function identityScheme(identity: string): string | null {
   return separator <= 0 ? null : identity.slice(0, separator)
 }
 
+const LSTART_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const LSTART_C_RENDERING = /^[A-Z][a-z]{2} ([A-Z][a-z]{2}) (\d{1,2}) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/
+
+// The wall-clock time a C-locale `ps -o lstart=` rendering names, read as if it were UTC, in ms; null when the text is
+// not that rendering (another locale, or garbled).
+function lstartWallClockMs(rendering: string): number | null {
+  const match = LSTART_C_RENDERING.exec(rendering)
+  if (match === null) return null
+  const [, month, day, hours, minutes, seconds, year] = match
+  const monthIndex = LSTART_MONTHS.indexOf(month ?? "")
+  if (monthIndex < 0) return null
+  return Date.UTC(Number(year), monthIndex, Number(day), Number(hours), Number(minutes), Number(seconds))
+}
+
+// Every timezone offset in use lies in [UTC-12, UTC+14] and is a whole number of 15 minutes.
+const MIN_ZONE_OFFSET_MS = -12 * 3_600_000
+const MAX_ZONE_OFFSET_MS = 14 * 3_600_000
+const ZONE_OFFSET_STEP_MS = 15 * 60_000
+
+/**
+ * The upgrade window (#12108 -> `ps-lstart-utc:`): a lock an older reader recorded as `ps-lstart:` holds the owner's start
+ * as local wall time in a zone nobody recorded. It still proves the pid was reused when no real zone offset maps that
+ * wall time onto the live process's UTC start. A record that cannot be read (a non-C locale) proves nothing.
+ */
+function legacyPsLstartConflict(recorded: string, actual: string): boolean {
+  const recordedWall = lstartWallClockMs(recorded.slice("ps-lstart:".length))
+  const actualUtc = lstartWallClockMs(actual.slice("ps-lstart-utc:".length))
+  if (recordedWall === null || actualUtc === null) return false
+  const offset = recordedWall - actualUtc
+  return offset < MIN_ZONE_OFFSET_MS || offset > MAX_ZONE_OFFSET_MS || offset % ZONE_OFFSET_STEP_MS !== 0
+}
+
 // `ps -o lstart=` once rendered local time (`ps-lstart:`), so the same pid yielded different bytes to two processes
-// that disagreed about the timezone, and a mismatch is what proves an owner dead. Comparing across schemes
-// would therefore let a live owner's lock be stolen during an upgrade, so anything not directly
-// comparable is reported as no conflict and the owner keeps its lock.
+// that disagreed about the timezone, and a mismatch is what proves an owner dead. Byte comparison across schemes
+// would therefore let a live owner's lock be stolen during an upgrade: a legacy `ps-lstart:` record is judged against a
+// `ps-lstart-utc:` reading by the zone bound above, and any other pair of different schemes is no conflict.
 export function startIdentitiesConflict(recorded: string, actual: string): boolean {
   const recordedScheme = identityScheme(recorded)
-  if (recordedScheme === null || recordedScheme !== identityScheme(actual)) return false
+  const actualScheme = identityScheme(actual)
+  if (recordedScheme === "ps-lstart" && actualScheme === "ps-lstart-utc") return legacyPsLstartConflict(recorded, actual)
+  if (recordedScheme === null || recordedScheme !== actualScheme) return false
   return recorded !== actual
 }
 
