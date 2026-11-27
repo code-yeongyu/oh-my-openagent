@@ -5,6 +5,7 @@ import { createRecoveryBridge } from "../../memory-core/src/sync/recovery/bridge
 import { enrollPhraseRecoveryKey } from "../../memory-core/src/sync/recovery/enroll-phrase"
 import { generateRecoveryPhrase, TypedPhrase } from "../../memory-core/src/sync/recovery/phrase"
 import { fakeAuthenticator } from "../../memory-core/src/sync/recovery/testing/fake-passkey.test-support"
+import { pinnedDir } from "../../memory-core/src/sync/recovery/testing/pinned-dir.test-support"
 import {
   createWorld,
   freshStateDir,
@@ -84,6 +85,8 @@ type RecoverSetup = {
   readonly contexts?: { count: number }
   readonly pairing?: Record<string, unknown>
   readonly pinDir?: string
+  /** Runs as the account's own pinned device, a member of the chain, instead of a fresh one. */
+  readonly member?: boolean
 }
 
 /** The service's read gate (svc sync/store/consent.ts): a pull answers 200 only once both switches are on. */
@@ -106,10 +109,10 @@ export const consentService = (failDevice = false) => {
 
 export const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup: RecoverSetup = {}) => {
   const world = setup.plain === true ? await createWorld() : await enrolledAccount()
-  const fresh = await newDevice()
+  const fresh = setup.member === true ? world.owner : await newDevice()
   const out: string[] = []
   const err: string[] = []
-  const pinDir = setup.pinDir ?? freshStateDir()
+  const pinDir = setup.pinDir ?? (setup.member === true ? await pinnedDir(world) : freshStateDir())
   const initial = process.exitCode
   const program = new Command("omo").exitOverride()
   configureSyncCommands(program, {

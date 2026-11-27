@@ -1,7 +1,11 @@
 import { afterAll, expect, test } from "bun:test"
 import { disableSync, isDeviceSyncOff } from "../../memory-core/src/sync/account/device-switch"
 import { createPairingHttp } from "../../memory-core/src/sync/account/pairing-http"
-import { freshStateDir, removeWorldStateDirs } from "../../memory-core/src/sync/recovery/testing/world.test-support"
+import {
+  freshStateDir,
+  removeWorldStateDirs,
+  verified,
+} from "../../memory-core/src/sync/recovery/testing/world.test-support"
 import { OFFLINE, words, ENROLLED, typing, consentService, runRecover } from "./sync-cli-recover.test-support"
 
 afterAll(removeWorldStateDirs)
@@ -37,6 +41,18 @@ test("#given recovery succeeds but the device switch call fails #when omo sync r
   )
   expect(r.err.join("\n")).toContain("`omo sync enable`")
   expect(service.pull()).toBe(403)
+})
+
+test("#given a device that already syncs this account #when omo sync recover runs #then it refuses already-member, points at omo sync enable, exits 1 and touches neither switch", async () => {
+  const service = consentService()
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover({ terminal: terminal.open }, { pairing: service.pairing, member: true })
+  expect(r.exit).toBe(1)
+  expect(r.out).toEqual([])
+  expect(r.err.join("\n")).toContain("`omo sync enable`")
+  expect(service.state).toEqual({ account: false, device: false })
+  const joined = (await verified(r.world, r.world.owner)).received.some((record) => record.body.kind === "recovery-join")
+  expect(joined).toBe(false)
 })
 
 test("#given a phrase that does not match #when omo sync recover refuses #then neither switch was touched", async () => {

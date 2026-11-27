@@ -11,7 +11,6 @@ export type PinnedMembership =
  * Whether `deviceId` is a member of the account's chain as walked from the device's own pinned anchor: the
  * predicate enable uses (D12 section 1, membership guard). A walk refused because the served genesis is not the pinned
  * one (the anchor check calls it an untrusted root) is a pin conflict; every other failed walk keeps its reason.
- * The genesis digest only labels a refusal the walk already made.
  */
 export const pinnedMembership = async (
   transport: RecoveryTransport,
@@ -23,10 +22,7 @@ export const pinnedMembership = async (
   const served = await loadServedChain(transport, account, rejections, anchor)
   if (!served.ok) {
     if (served.reason === "unavailable") return { ok: false, reason: "unavailable" }
-    const keys = await transport.listKeys()
-    const genesis = Array.isArray(keys) ? keys[0]?.digest : undefined
-    const conflict = served.reason === "anchor-mismatch" || (genesis !== undefined && genesis !== anchor.genesisDigest)
-    return { ok: false, reason: conflict ? "pin-conflict" : "unverified" }
+    return { ok: false, reason: served.reason === "anchor-mismatch" ? "pin-conflict" : "unverified" }
   }
   return { ok: true, member: served.state.authority?.members.has(deviceId) === true }
 }

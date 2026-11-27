@@ -80,10 +80,7 @@ test("#given a pinned device that was retired from the chain #when it recovers #
   expect(outcome).toMatchObject({ ok: true, state: "recovered" })
 })
 
-test("#given a pinned device and a served chain that does not verify #when it recovers #then it refuses before the bridge with the walk's reason", async () => {
-  const world = await createWorld()
-  const dir = await pinnedDir(world)
-  const broken: RecoveryTransport = { ...transportFor(world, world.owner), listEntries: async () => null }
+const guardedRecover = async (world: World, transport: RecoveryTransport, dir: string) => {
   const bridge = createRecoveryBridge(fakeAuthenticator(world.provider), world.owner.keyring)
   let begun = 0
   const outcome = await recoverOnFreshDevice({
@@ -97,10 +94,35 @@ test("#given a pinned device and a served chain that does not verify #when it re
         return bridge.recoverBegin(request)
       },
     },
-    transport: broken,
+    transport,
     rejections: createRejectionCounter(),
     stateDir: dir,
   })
+  return { outcome, begun }
+}
+
+test("#given a pinned device and a served chain whose last row was altered #when it recovers #then it refuses unverified before the bridge", async () => {
+  const world = await createWorld()
+  const dir = await pinnedDir(world)
+  const served = transportFor(world, world.owner)
+  const altered: RecoveryTransport = {
+    ...served,
+    listEntries: async (operation) => {
+      const rows = await served.listEntries(operation)
+      if (rows === null) return null
+      return rows.map((row, n) => (n === rows.length - 1 ? { ...row, digest: `${row.digest.slice(0, -1)}A` } : row))
+    },
+  }
+  const { outcome, begun } = await guardedRecover(world, altered, dir)
+  expect(outcome).toEqual({ ok: false, reason: "unverified" })
+  expect(begun).toBe(0)
+})
+
+test("#given a pinned device and a service that cannot return the chain #when it recovers #then it refuses unavailable before the bridge", async () => {
+  const world = await createWorld()
+  const dir = await pinnedDir(world)
+  const broken: RecoveryTransport = { ...transportFor(world, world.owner), listEntries: async () => null }
+  const { outcome, begun } = await guardedRecover(world, broken, dir)
   expect(outcome).toEqual({ ok: false, reason: "unavailable" })
   expect(begun).toBe(0)
 })
