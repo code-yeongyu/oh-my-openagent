@@ -12,7 +12,10 @@ const CELL: PendingAsyncWork = {
 const NOTE = { status: "completed", finalResponse: "waiting for the eval cell" } as const
 
 /** The hold over scripted reads: `work` is what the engine reports, `idle` what each probe answers. */
-function holdOver(idle: () => boolean | undefined, options?: { readonly staleLimitMs?: number }) {
+function holdOver(
+  idle: () => boolean | undefined,
+  options?: { readonly staleLimitMs?: number; readonly wakeDeliveryGraceMs?: number },
+) {
   const scheduler = createManualSettlementScheduler()
   let work: PendingAsyncWork | undefined = CELL
   let settled: RunnerOutcome | undefined
@@ -25,13 +28,18 @@ function holdOver(idle: () => boolean | undefined, options?: { readonly staleLim
     schedule: scheduler.scheduler,
     intervalMs: 1_000,
     staleLimitMs: options?.staleLimitMs ?? 3_000,
+    ...(options?.wakeDeliveryGraceMs === undefined ? {} : { wakeDeliveryGraceMs: options.wakeDeliveryGraceMs }),
   })
   hold.begin(NOTE, CELL)
   return {
+    hold,
     scheduler,
     settled: () => settled,
     drain: () => {
       work = undefined
+    },
+    resume: () => {
+      work = CELL
     },
     confirm: async () => {
       scheduler.runNext()
@@ -79,5 +87,75 @@ describe("createAsyncWorkHold never resolves to the held note (omo#10487)", () =
     // then
     expectTyped(h.settled(), "did not answer for 3 s")
     expect(h.scheduler.pending()).toBe(0)
+  })
+})
+
+// The engine delivers a finished monitor's wake only after its notifier's coalescing window, while the
+// work has already left its lifecycle: drained and idle is not "nothing woke the child" until a grace
+// of continuous quiet has passed (3 confirmations here: 3 s / 1 s).
+describe("createAsyncWorkHold waits out the engine's wake delivery before concluding nothing woke the child (omo#10487)", () => {
+  const GRACE = { wakeDeliveryGraceMs: 3_000, staleLimitMs: 60_000 }
+
+  async function quietReads(h: ReturnType<typeof holdOver>, reads: number): Promise<void> {
+    for (let read = 0; read < reads; read += 1) {
+      await h.confirm()
+      expect(h.settled()).toBeUndefined()
+    }
+  }
+
+  test("#given a hold whose work drained #when the session reads idle #then it settles nothing until the grace has passed, then async_work_pending", async () => {
+    // given
+    const h = holdOver(() => true, GRACE)
+    h.drain()
+
+    // when - the first drained+idle read opens the window, two more stay inside it
+    await quietReads(h, 3)
+    await h.confirm()
+
+    // then - exactly one grace after the window opened, never later
+    expectTyped(h.settled(), "nothing woke the child")
+    expect(h.scheduler.pending()).toBe(0)
+  })
+
+  test("#given a drained idle hold inside the grace #when the wake turn starts and the caller cancels the hold #then it never settles", async () => {
+    // given
+    const h = holdOver(() => true, GRACE)
+    h.drain()
+    await quietReads(h, 2)
+
+    // when
+    h.hold.cancel()
+
+    // then
+    expect(h.scheduler.pending()).toBe(0)
+    expect(h.settled()).toBeUndefined()
+  })
+
+  test("#given an open quiet window #when work reappears, the session reads busy, or the child shows activity #then the window restarts and the failure comes one full grace after the last quiet start", async () => {
+    // given
+    let idle = true
+    const h = holdOver(() => idle, GRACE)
+    h.drain()
+    await quietReads(h, 2)
+
+    // when - work reappears for one read, then drains again
+    h.resume()
+    await quietReads(h, 1)
+    h.drain()
+    await quietReads(h, 2)
+
+    // when - the session reads busy for one read
+    idle = false
+    await quietReads(h, 1)
+    idle = true
+    await quietReads(h, 2)
+
+    // when - the child shows activity
+    h.hold.activity()
+    await quietReads(h, 3)
+    await h.confirm()
+
+    // then
+    expectTyped(h.settled(), "nothing woke the child")
   })
 })

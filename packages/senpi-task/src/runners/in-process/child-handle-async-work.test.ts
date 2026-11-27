@@ -8,6 +8,9 @@ import { createChildHandle, type RunnerOutcome } from "./child-handle"
 const INTERVAL_MS = 1_000
 const STALE_LIMIT_MS = 5_000
 const STALE_CHECKS = 5
+// The wake-delivery grace as confirmations: the first drained+idle read opens it, three more close it.
+const GRACE_MS = 3_000
+const GRACE_CHECKS = 3
 
 /**
  * The in-process runner (the `auto` fallback) over a session that behaves like senpi's
@@ -21,7 +24,12 @@ function harness() {
     taskId: "st_10487_inproc",
     session: fake.session,
     promptText: "run the delayed eval, then answer FINAL-RESULT",
-    asyncWork: { schedule: scheduler.scheduler, intervalMs: INTERVAL_MS, staleLimitMs: STALE_LIMIT_MS },
+    asyncWork: {
+      schedule: scheduler.scheduler,
+      intervalMs: INTERVAL_MS,
+      staleLimitMs: STALE_LIMIT_MS,
+      wakeDeliveryGraceMs: GRACE_MS,
+    },
   })
   let settled: RunnerOutcome | undefined
   void handle.waitForIdle().then((outcome) => {
@@ -80,8 +88,12 @@ describe("createChildHandle pending async work from the engine lifecycle (omo#10
     const h = harness()
     await h.endTurnWithDetachedCell()
 
-    // when - the work drains and the session idles with no engine turn
+    // when - the work drains and the session idles with no engine turn for the whole grace
     h.setWaits(undefined)
+    for (let check = 0; check < GRACE_CHECKS; check += 1) {
+      await h.confirm()
+      expect(h.settled()).toBeUndefined()
+    }
     await h.confirm()
 
     // then
@@ -90,6 +102,27 @@ describe("createChildHandle pending async work from the engine lifecycle (omo#10
     if (outcome?.status !== "error") throw new Error("expected the typed failure")
     expect(outcome.failure.kind).toBe("async_work_pending")
     expect(outcome.failure.message).toContain("nothing woke the child")
+    await h.handle.dispose()
+  })
+
+  test("#given a held turn whose monitor ended #when a confirmation reads the drained idle session before the monitor's wake arrives #then that wake turn's answer is the outcome, never async_work_pending", async () => {
+    // given - the turn ended with the monitor live, and the monitor left the engine's lifecycle
+    const h = harness()
+    await h.endTurnWithDetachedCell()
+    h.setWaits(undefined)
+
+    // when - a confirmation lands inside the engine's coalescing window: drained and idle, no wake yet
+    await h.confirm()
+    expect(h.settled()).toBeUndefined()
+
+    // when - the coalesced monitor event wakes the child and it answers
+    h.emit({ type: "agent_start" })
+    h.emit(assistantEnd(FINAL_RESULT))
+    h.emit({ type: "agent_end" })
+    await flushSettlement()
+
+    // then
+    expect(h.settled()).toEqual({ status: "completed", finalResponse: FINAL_RESULT })
     await h.handle.dispose()
   })
 
