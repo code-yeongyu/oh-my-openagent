@@ -364,7 +364,7 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
 
 /** Runs one parsed local verb: the account notice, then the read verb on the person client or the verb's connection. */
 export async function runLocalRemoteVerb(dependencies: RemoteCommandDependencies, parsed: Parsed): Promise<number> {
-  const signedOut = await accountNotice(dependencies)
+  const signedOut = await accountNotice(dependencies, parsed.json)
   if (signedOut !== undefined) return signedOut
   if (READ_VERBS.has(parsed.command)) {
     const client = (dependencies.client ?? (() => personClient(dependencies)))()
@@ -407,9 +407,24 @@ export async function connectVerb(dependencies: RemoteCommandDependencies): Prom
   }
 }
 
-export async function accountNotice(dependencies: RemoteCommandDependencies): Promise<number | undefined> {
-  const notice = accountStateNotice(classifyAccountShow(await dependencies.accountShow()))
+export async function accountNotice(dependencies: RemoteCommandDependencies, json = false): Promise<number | undefined> {
+  const state = classifyAccountShow(await dependencies.accountShow())
+  const notice = accountStateNotice(state)
   if (notice === undefined) return undefined
+  if (json) {
+    // Design ruling on #15181 (SDK design coordinator r2): under --json a bootstrap refusal prints the client's
+    // own failure shape on stdout so a script gets something parseable; the exit stays REMOTE_EXIT.unavailable.
+    dependencies.output(
+      JSON.stringify({
+        kind: "error",
+        code: "host_unavailable",
+        message: notice,
+        next_action: "sign this device in to OmO, then retry",
+        details: { reason: state.kind },
+      }),
+    )
+    return REMOTE_EXIT.unavailable
+  }
   dependencies.error(notice)
   return REMOTE_EXIT.unavailable
 }
