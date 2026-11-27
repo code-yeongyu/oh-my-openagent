@@ -33,7 +33,7 @@ function projectGrantFixture() {
   mkdirSync(join(foreignRepo, ".git"), { recursive: true })
   mkdirSync(join(setup.foreignRoot, "runtime"), { recursive: true })
   writeFileSync(gitConfig, "[core]")
-  registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
+  registerMemoryFilesystemPolicy(setup.pi, () => setup.own, setup.memoryRoot)
   const policy = registeredPolicy(setup)
   const decide = (operation: FilesystemOperation, path: string) =>
     policy.check({ operation, canonicalPath: canonical(path), toolName: operation === "write" ? "write" : "read" })
@@ -78,7 +78,7 @@ describe("project memory read grants (#10044)", () => {
     const first = projectGrantFixture()
     const second = policyFixture(roots)
     await grantProjectMemoryRead(first.setup.own, first.foreignRepo)
-    registerMemoryFilesystemPolicy(second.pi, () => second.own)
+    registerMemoryFilesystemPolicy(second.pi, () => second.own, second.memoryRoot)
 
     // when
     const decision = await registeredPolicy(second).check({

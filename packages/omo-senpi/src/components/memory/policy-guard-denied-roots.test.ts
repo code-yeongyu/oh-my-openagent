@@ -17,7 +17,7 @@ afterEach(() => {
 describe("memory filesystem policy denied roots", () => {
   test("#given a durable sibling that only appears after registration #when deniedRoots is first read #then it is resolved against the filesystem at read time", () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own, setup.memoryRoot)
     const lateRoot = durableSibling(setup, "late")
 
     const deniedRoots = registeredPolicy(setup).deniedRoots ?? []
@@ -27,7 +27,7 @@ describe("memory filesystem policy denied roots", () => {
 
   test("#given deniedRoots already read once #when another durable sibling appears #then the read snapshot is reused instead of re-enumerating", () => {
     const setup = policyFixture(roots)
-    registerMemoryFilesystemPolicy(setup.pi, () => setup.own)
+    registerMemoryFilesystemPolicy(setup.pi, () => setup.own, setup.memoryRoot)
     const policy = registeredPolicy(setup)
     const first = policy.deniedRoots ?? []
     const laterRoot = durableSibling(setup, "later")
