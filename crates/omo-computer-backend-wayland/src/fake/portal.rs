@@ -28,6 +28,7 @@ struct Behaviour {
     inheritable: bool,
     clipboard_version: Option<u32>,
     closed: bool,
+    cancel: bool,
 }
 
 #[derive(Debug, Default)]
@@ -68,6 +69,12 @@ impl FakePortal {
     #[must_use]
     pub fn handing_inheritable_fds(self, inheritable: bool) -> Self {
         self.with(|shared| shared.behaviour.inheritable = inheritable)
+    }
+
+    /// The user cancels every consent dialog the portal opens.
+    #[must_use]
+    pub fn cancelling_dialogs(self, cancel: bool) -> Self {
+        self.with(|shared| shared.behaviour.cancel = cancel)
     }
 
     #[must_use]
@@ -130,6 +137,9 @@ impl RemoteDesktop for FakePortalClient {
             }
             if !honoured {
                 shared.log.dialogs += 1;
+                if shared.behaviour.cancel {
+                    return Err(PortalError::Cancelled);
+                }
             }
             let granted = clipboard && shared.behaviour.clipboard_version.is_some();
             shared.log.clipboard_requested_before_start |= granted;
