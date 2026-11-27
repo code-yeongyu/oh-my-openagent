@@ -9,11 +9,11 @@ import { isWorkpoolYieldTool } from "../workpool/worker-tool-identity"
 import {
   createRestoredChildHandle,
   createStagedChildHandle,
-  discardUnstartedChildSession,
   type ChildHandle,
   type ChildCompletionPolicy,
   type ChildSession,
 } from "./in-process/child-handle"
+import { discardUnstartedChildSession } from "./in-process/child-session-shutdown"
 import {
   buildChildSessionOptions,
   requireChildSessionDir,

@@ -56,7 +56,7 @@ function heldChild() {
   seedRecord(store, { task_id: TASK, status: "running", residency_state: "resident", host_pid: process.pid })
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
   const destroyed: string[] = []
-  const destroyedSignal = signal<void>()
+  const destroyedSignal = signal<undefined>()
   const port: SteeringPort = {
     store,
     liveHandle: (taskId) => (registry.get(taskId) === undefined ? undefined : managed),
@@ -67,7 +67,7 @@ function heldChild() {
       destroyResidentTask: async (taskId, cause) => {
         destroyed.push(`${taskId}:${cause}`)
         await lifecycle.destroyResidentTask(taskId, cause)
-        destroyedSignal.resolve()
+        destroyedSignal.resolve(undefined)
       },
     },
     runStatsSnapshot: () => undefined,

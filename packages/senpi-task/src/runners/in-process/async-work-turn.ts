@@ -19,6 +19,9 @@ export type InProcessAsyncWork = {
   readonly supersede: (next: Promise<RunnerOutcome>) => void
   readonly abandon: () => void
   readonly abort: () => void
+  // A cancel was accepted: a held turn with no wake turn running ends cancelled now, and no later
+  // turn is held again (a wake turn already running reaches its end, which answers cancelled).
+  readonly stop: () => void
   readonly dispose: () => void
 }
 
@@ -52,6 +55,8 @@ export function createInProcessAsyncWork(input: {
 }): InProcessAsyncWork {
   const { session } = input
   let release: Release | undefined
+  let stopped = false
+  let waking = false
   // The answer's evidence window, as in the RPC tracker (rpc/turn-async-work.ts): from the turn's end
   // until a new agent_start, work seen pending stays evidence even if it drains before prompt()
   // resolves. Subscribed first, so every later listener reads the window this event opened or closed.
@@ -73,6 +78,7 @@ export function createInProcessAsyncWork(input: {
     if (outcome.status !== "completed") return Promise.resolve(outcome)
     const work = answerWork()
     if (work === undefined) return Promise.resolve(outcome)
+    if (stopped) return Promise.resolve({ status: "cancelled" })
     return new Promise<RunnerOutcome>((resolve) => {
       let engineTurn = false
       const hold = createAsyncWorkHold({
@@ -88,6 +94,7 @@ export function createInProcessAsyncWork(input: {
       const own: Release = (value) => {
         if (release !== own) return
         release = undefined
+        waking = false
         const abandoned = hold.abandoned() ?? { status: "cancelled" }
         hold.cancel()
         unsubscribe()
@@ -97,6 +104,7 @@ export function createInProcessAsyncWork(input: {
         hold.activity()
         if (event.type === "agent_start" && !engineTurn) {
           engineTurn = true
+          waking = true
           // The work's wake turn answers now: stop confirming, but keep the work it answers for
           // until that turn ends, so a teardown meanwhile is still the abandoned work (omo#10487).
           hold.disarm()
@@ -117,6 +125,10 @@ export function createInProcessAsyncWork(input: {
     supersede: (next) => release?.(next),
     abandon: () => release?.("abandoned"),
     abort: () => release?.({ status: "cancelled" }),
+    stop: () => {
+      stopped = true
+      if (!waking) release?.({ status: "cancelled" })
+    },
     dispose: unsubscribeWindow,
   }
 }

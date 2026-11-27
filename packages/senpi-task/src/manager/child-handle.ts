@@ -75,7 +75,8 @@ export type ManagedChildHandle = {
   onDurableSessionId?(listener: (id: string) => void): () => void
   // A daemon-session child whose connection dropped and is being recovered (omo#9403).
   transportRecovering?(): boolean
-  // A cancel was accepted: no transport recovery may bring this child back as running.
+  // A cancel was accepted: no transport recovery may bring this child back as running, and an
+  // in-process turn held on the child's own work ends cancelled at once, never held again (omo#10487).
   markStopping?(): void
   // Host-session: the host answered this child's end of its session (omo#11765).
   hostEndAnswered?(): boolean
@@ -121,6 +122,7 @@ export function adaptInProcessHandle(handle: InProcessChildHandle): ManagedChild
     steer: (text, identity) => handle.steer(text, identity),
     followUp: (text, identity) => handle.followUp(text, identity),
     abort: () => handle.abort(),
+    markStopping: () => handle.markStopping?.(),
     subscribe: (listener) => handle.subscribe(listener),
     waitForOutcome: () => handle.waitForIdle(),
     lastAssistantText: () => handle.lastAssistantText(),
