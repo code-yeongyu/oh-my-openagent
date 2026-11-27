@@ -22,6 +22,13 @@ fn jpeg(width: u32, height: u32, len: usize) -> FrameBytes {
     }
 }
 
+fn preview_session(extra: &serde_json::Value, enabled: bool) -> crate::Session {
+    let mut s = session(extra, &RecordingSink::default(), None);
+    s.open(params(json!({ "reportMode": "object", "settings": { "preview": enabled } }))).expect("open");
+    s.stop_path_start(params(json!({})));
+    s
+}
+
 #[test]
 fn lease_without_presence_surface_refused() {
     let sink = RecordingSink::default();
@@ -65,7 +72,7 @@ fn preview_only_to_subscriber_only_during_lease_zero_model_bound() {
         let now = now.clone();
         Arc::new(move || now.load(Ordering::SeqCst)) as crate::grant::MachineClock
     };
-    let mut s = session(&json!({}), &RecordingSink::default(), None).with_clock(clock);
+    let mut s = preview_session(&json!({ "session_timeline": [{"t_ms":0}] }), true).with_clock(clock);
     assert_eq!(s.offer_preview(jpeg(960, 540, 1_000)), Err(Dropped::NotSubscribed));
     s.preview_subscribe();
     assert_eq!(s.offer_preview(jpeg(960, 540, 1_000)), Err(Dropped::NoLease));
@@ -81,15 +88,23 @@ fn preview_only_to_subscriber_only_during_lease_zero_model_bound() {
     let png = FrameBytes { mime: ImageMime::Png, ..jpeg(10, 10, 10) };
     assert_eq!(s.offer_preview(png), Err(Dropped::NotJpeg));
     assert_eq!(s.offer_preview(jpeg(960, 540, MAX_BYTES)), Ok(()));
+    let frames = s.take_preview_frames();
+    assert_eq!(frames.len(), 1, "a slow subscriber gets only the latest frame");
+    assert_eq!((frames[0].at_ms, frames[0].frame.bytes.len()), (500, MAX_BYTES));
+    now.fetch_add(500, Ordering::SeqCst);
+    assert_eq!(s.offer_preview(jpeg(320, 200, 64)), Ok(()));
+    s.control_release();
+    s.control_acquire().expect("new lease");
+    assert!(s.take_preview_frames().is_empty(), "a new lease cannot drain the old lease's frame");
     s.control_release();
     now.fetch_add(500, Ordering::SeqCst);
     assert_eq!(s.offer_preview(jpeg(960, 540, 1_000)), Err(Dropped::NoLease), "lease-only");
-    assert_eq!(s.take_preview_frames().len(), 2);
+    assert!(s.take_preview_frames().is_empty());
 }
 
 #[test]
 fn preview_frames_never_reach_model_context() {
-    let mut s = session(&json!({ "object": true }), &RecordingSink::default(), None);
+    let mut s = preview_session(&json!({ "session_timeline": [{"t_ms":0}] }), true);
     assert_eq!(s.offer_preview(jpeg(320, 200, 64)), Err(Dropped::NotSubscribed));
     s.preview_subscribe();
     s.control_grant(params(json!({ "reason": "r" })));
@@ -102,6 +117,73 @@ fn preview_frames_never_reach_model_context() {
     let frames = s.take_preview_frames();
     assert_eq!(frames.len(), 1, "the frame went to the host outbox only");
     assert!(s.take_preview_frames().is_empty());
+}
+
+#[test]
+fn preview_withholds_unknown_protected_or_disabled_pictures() {
+    for (extra, enabled) in [
+        (json!({}), true),
+        (json!({"session_timeline":[{"t_ms":0,"secure_input_active":true}]}), true),
+        (json!({"session_timeline":[{"t_ms":0,"screen_locked":true}]}), true),
+        (json!({"session_timeline":[{"t_ms":0}]}), false),
+    ] {
+        let mut s = preview_session(&extra, enabled);
+        s.preview_subscribe();
+        s.control_grant(params(json!({"reason":"test"})));
+        s.control_acquire().expect("lease");
+        assert_eq!(s.offer_preview(jpeg(32, 16, 64)), Err(Dropped::PictureWithheld));
+        assert!(s.take_preview_frames().is_empty());
+    }
+}
+
+#[test]
+fn preview_subscription_and_frames_do_not_follow_a_reopened_session() {
+    let mut s = preview_session(&json!({"session_timeline":[{"t_ms":0}]}), true).with_clock(Arc::new(|| 0));
+    s.preview_subscribe();
+    s.control_grant(params(json!({"reason":"first"})));
+    s.control_acquire().expect("first lease");
+    s.offer_preview(jpeg(32, 16, 64)).expect("first session");
+    s.close();
+    s.open(params(json!({"settings":{"preview":true}}))).expect("new session");
+    s.control_grant(params(json!({"reason":"second"})));
+    s.control_acquire().expect("second lease");
+    assert_eq!(s.offer_preview(jpeg(32, 16, 64)), Err(Dropped::NotSubscribed));
+    s.preview_subscribe();
+    assert!(s.take_preview_frames().is_empty());
+    assert_eq!(s.offer_preview(jpeg(32, 16, 64)), Err(Dropped::TooSoon));
+}
+
+#[test]
+fn preview_subscriber_cannot_borrow_another_sessions_foreground_lease() {
+    let dir = tempfile::tempdir().expect("shared runtime");
+    let state = json!({"session_timeline":[{"t_ms":0}]});
+    let mut owner = session(&state, &RecordingSink::default(), Some((dir.path(), "owner")));
+    let mut other = session(&state, &RecordingSink::default(), Some((dir.path(), "other")));
+    for s in [&mut owner, &mut other] {
+        s.open(params(json!({"settings":{"preview":true}}))).expect("open");
+        s.preview_subscribe();
+    }
+    owner.control_grant(params(json!({"reason":"owner"})));
+    owner.control_acquire().expect("owner lease");
+    owner.offer_preview(jpeg(32, 16, 64)).expect("owner can preview");
+    assert_eq!(other.offer_preview(jpeg(32, 16, 64)), Err(Dropped::NoLease));
+    assert!(other.take_preview_frames().is_empty());
+    assert_eq!(owner.take_preview_frames().len(), 1);
+}
+
+#[test]
+fn later_screen_lock_discards_the_waiting_preview_before_delivery() {
+    let mut s = preview_session(&json!({"session_timeline":[
+        {"t_ms":100,"screen_locked":true}, {"t_ms":200,"screen_locked":false}
+    ]}), true);
+    s.preview_subscribe();
+    s.control_grant(params(json!({"reason":"test"})));
+    s.control_acquire().expect("lease");
+    s.offer_preview(jpeg(32, 16, 64)).expect("eligible when offered");
+    s.backend.clock().expect("clock").wait_ms(100);
+    assert!(s.take_preview_frames().is_empty(), "locked at delivery");
+    s.backend.clock().expect("clock").wait_ms(100);
+    assert!(s.take_preview_frames().is_empty(), "unlock cannot replay it");
 }
 
 #[test]

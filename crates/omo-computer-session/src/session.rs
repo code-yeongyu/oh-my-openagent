@@ -34,6 +34,7 @@ pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 
 pub(crate) struct Opened {
     pub(crate) report_mode: ReportMode,
+    pub(crate) preview_enabled: bool,
     pub(crate) tag: u64,
     pub(crate) settings: crate::intervention::OpenSettings,
 }
@@ -82,6 +83,7 @@ impl Session {
         self.guard.open(policy, HostAdditions::default())?;
         self.opened = Some(Opened {
             report_mode: request.report_mode,
+            preview_enabled: request.config.as_ref().and_then(|c| c.capture.preview) == Some(true),
             tag: random_u64(),
             settings: crate::intervention::OpenSettings::read(&request),
         });

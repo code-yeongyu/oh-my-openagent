@@ -150,6 +150,7 @@ impl Session {
 
     /// The lease ends under the user (the next report reads `user_moved_on`, no `Suspended`).
     pub(crate) fn end_lease(&mut self, why: LeaseEnd) {
+        self.funnel.control.preview.discard_pending();
         self.funnel.control.presence.end(why);
         self.funnel.control.slot.release(&self.funnel.control.token);
         self.funnel.control.lease_epoch = None;
@@ -187,14 +188,38 @@ impl Session {
     /// # Errors
     /// Why the frame was dropped.
     pub fn offer_preview(&mut self, frame: FrameBytes) -> Result<(), Dropped> {
+        self.check_preview_delivery()?;
         let now = self.funnel.control.now_ms();
-        let lease = self.holds_lease();
-        self.funnel.control.preview.offer(now, lease, frame)
+        self.funnel.control.preview.offer_eligible(now, frame)
     }
 
     /// The frames for the host's `preview.frame` notifications.
     pub fn take_preview_frames(&mut self) -> Vec<PreviewFrame> {
+        if self.check_preview_delivery().is_err() {
+            return Vec::new();
+        }
         self.funnel.control.preview.drain()
+    }
+
+    fn check_preview_delivery(&mut self) -> Result<(), Dropped> {
+        use omo_computer_core::session_state::Tristate;
+        if !self.funnel.control.preview.is_subscribed() {
+            return Err(Dropped::NotSubscribed);
+        }
+        self.reconcile_stop();
+        let refusal = if !self.holds_lease() {
+            Dropped::NoLease
+        } else if !self.opened.as_ref().is_some_and(|s| s.preview_enabled) {
+            Dropped::PictureWithheld
+        } else {
+            let state = self.backend.capabilities().session;
+            if state.screen_locked == Tristate::Known(false) && state.secure_input_active == Tristate::Known(false) {
+                return Ok(());
+            }
+            Dropped::PictureWithheld
+        };
+        self.funnel.control.preview.discard_pending();
+        Err(refusal)
     }
 
     /// Whether this session holds the machine's foreground lease.
@@ -357,6 +382,7 @@ impl Session {
     /// Session close: the lease, the reservations and the presence surface end.
     pub(crate) fn close_control(&mut self) {
         self.control_release();
+        self.funnel.control.preview.end_session();
         self.funnel.control.reservations.release_all(&self.funnel.control.token);
     }
 }
