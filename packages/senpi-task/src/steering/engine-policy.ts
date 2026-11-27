@@ -4,6 +4,7 @@ import { interactionPolicyForAgent } from "../agents"
 import { type DeferralOutlook, deferralOutlookFor } from "../lifecycle/deferred-revival-reasons"
 import { isHostSessionRecord } from "../lifecycle/host-session"
 import { nextRunEpoch, type TaskRecord } from "../state"
+import { ownsTask } from "./scope-resolver"
 import type { SendInput, SendOutcome } from "./types"
 
 export function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined {
@@ -16,8 +17,7 @@ export function oneShotPolicyDenial(record: TaskRecord): SendOutcome | undefined
 
 export function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {
   if (input.callerSessionId === undefined || input.allScope === true) return undefined
-  const caller = input.callerSessionId
-  if (caller === record.parent_session_id || caller === record.root_session_id) return undefined
+  if (ownsTask(input.callerSessionId, record)) return undefined
   return {
     kind: "scope_denied",
     task_id: record.task_id,
