@@ -30,6 +30,8 @@ export function productPluginState(profile, pluginRoot) {
 }
 
 export function operatorHostLaunch(args, agentDir, env = process.env) {
+  // The operator socket is Unix-only. Windows descriptor-pair launches must keep inherited stdio.
+  if (process.platform === "win32") return false
   if (args[0] !== "host" || !["ensure", "handoff"].includes(args[1])) return false
   const index = args.indexOf("--socket")
   const socket = index === -1 ? (env.OMO_RPC_SOCKET ?? env.SENPI_RPC_SOCKET ?? env.PI_RPC_SOCKET) : args[index + 1]
