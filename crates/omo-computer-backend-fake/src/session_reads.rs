@@ -157,7 +157,7 @@ mod tests {
             event: InputEvent::Text("a".to_owned()),
             tag: 1,
         };
-        assert!(backend.post_input(&text, Route::BackgroundWindow).is_ok());
+        assert!(backend.post_input(&text, Route::BackgroundWindow { window: "101".to_owned() }).is_ok());
         let liveness = reads(&backend).target_liveness("101").expect("exited");
         assert_eq!((liveness.pid, liveness.exit_code), (4242, Some(3)));
     }

@@ -20,6 +20,7 @@ import {
   scopeDenied,
 } from "./engine-policy"
 import { reviveDetachedTerminalOnSend, reviveTerminal } from "./revive"
+import { resolveTask, resolveTaskCallerFirst, type TaskLookup } from "./scope-resolver"
 import { reviveRunningOnSend } from "./revive-running"
 import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
@@ -44,11 +45,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   // session shutdown that suspends the pending child) and drains, in persisted order, when the
   // child eventually launches. The record is the single source of truth - no in-memory shadow.
 
-  function resolve(idOrName: string): TaskRecord | undefined {
-    const byId = tryLoad(idOrName)
-    if (byId !== undefined) return byId
-    return port.store.list().records.find((record) => record.name === idOrName)
-  }
+  const lookup: TaskLookup = { load: tryLoad, list: () => port.store.list().records }
 
   function tryLoad(taskId: string): TaskRecord | undefined {
     try {
@@ -63,7 +60,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   async function sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome> {
-    const record = resolve(input.idOrName)
+    const record = resolveTaskCallerFirst(lookup, input.idOrName, input.callerSessionId)
     if (record === undefined) {
       return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
     }
@@ -295,9 +292,13 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
 
   return {
     sendToTask,
-    ...createSteeringControls(port, resolve, (taskId) => {
-      clearPersistedQueue(taskId, undefined, "cancelled")
-    }),
+    ...createSteeringControls(
+      port,
+      (idOrName, caller) => resolveTask(lookup, idOrName, caller),
+      (taskId) => {
+        clearPersistedQueue(taskId, undefined, "cancelled")
+      },
+    ),
     notifyStarted,
     hasPendingSends,
     hasInFlightSends,
