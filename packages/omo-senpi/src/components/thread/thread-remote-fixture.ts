@@ -179,7 +179,7 @@ export const comparable = (result: ThreadToolResult): unknown => {
  * A record the prompt's run writes, as senpi streams it: the prompt's own user message (`message_start`/`message_end`)
  * carries the client message id the prompt named, when it named one and the record names none.
  */
-export const stampPromptRecord = (record: JsonObject, clientMessageId: unknown): JsonObject => {
+const stampPromptRecord = (record: JsonObject, clientMessageId: unknown): JsonObject => {
   const message = record["message"]
   if (
     typeof clientMessageId !== "string" ||

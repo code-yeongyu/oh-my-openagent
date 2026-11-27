@@ -1,7 +1,15 @@
 import { type BaselineEntry, sha256 } from "./baseline"
+import {
+  type DeclaredChange,
+  declaredProvider,
+  type ExemptionProvider,
+  parseDeclarations,
+  printedPair,
+} from "./declared-change"
 import { type Goldens, type PresentationRow, presentationProblems, presentationRowProblems } from "./presentation"
+import { type DeclaredVersions, equalUnderVersionMask } from "./version-mask"
 import type { Outcome } from "./scenario-run"
-import type { Scenario } from "./scenarios"
+import { callPart, type Scenario } from "./scenarios"
 import type { Row } from "./schema"
 import { schemaDifferences, type DiscoveredTool } from "./tool-check"
 
@@ -32,7 +40,18 @@ export type GateInput = {
     readonly head: readonly PresentationRow[]
   }
   readonly goldens: Goldens
+  // Each tree's declared omo and engine versions (version-mask.ts); the merge base's is undefined when it has no manifest.
+  readonly versions: { readonly base: DeclaredVersions | undefined; readonly head: DeclaredVersions }
+  // The merge base's own scenario table (ids and capabilities); undefined when the base has none. The trees both run the
+  // head's table, so a scenario the head dropped is caught here and nowhere else.
+  readonly baseScenarios?: readonly Scenario[]
+  // The gate's fresh-toolAhead map by capability, handed to the declared kinds (#15199).
+  readonly ahead?: ReadonlyMap<string, unknown>
 }
+
+// The closed, named list of exemptions the one failing place consults (#15199). Adding a provider is a change of the
+// gate's rule, read as such: a test enumerates this list.
+export const EXEMPTION_PROVIDERS: Readonly<Record<string, ExemptionProvider>> = { declared: declaredProvider }
 
 export type GateReport = {
   readonly failures: readonly string[]
@@ -40,6 +59,12 @@ export type GateReport = {
   readonly liveSchema: readonly string[]
   readonly presentation: readonly string[]
   readonly presentationRows: readonly string[]
+  readonly versionMasked: readonly string[]
+  // Scenarios the body declares changed on purpose whose kind holds: their capabilities are the class 'changed', never
+  // candidates.
+  readonly changed: readonly DeclaredChange[]
+  // Every exempt scenario, as '<scenario>#exempt=<provider>[:<detail>]'; the digest binds each.
+  readonly exempted: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -84,7 +109,12 @@ export function candidateDigest(head: string, ids: readonly string[]): string {
 export const CANDIDATES_LINE =
   /^SDK-Parity-Candidates: head=([0-9a-f]{40}) digest=([0-9a-f]{24}) count=(\d+) ids=(.*)$/m
 
-export function gateReport(input: GateInput): GateReport {
+// The exemption providers are not part of the input the command-line entry builds: they are this second parameter,
+// which defaults to the closed list, and only tests pass another.
+export function gateReport(
+  input: GateInput,
+  providers: Readonly<Record<string, ExemptionProvider>> = EXEMPTION_PROVIDERS,
+): GateReport {
   const baseRowsText = new Set((input.presentation.base ?? []).map((row) => JSON.stringify(row)))
   const added = input.presentation.head.filter((row) => !baseRowsText.has(JSON.stringify(row)))
   const failures: string[] = [...presentationRowProblems(added, input.scenarios)]
@@ -94,6 +124,47 @@ export function gateReport(input: GateInput): GateReport {
   const flagged = new Set<string>()
   const presentation: string[] = []
   const presentationRows: string[] = []
+  const versionMasked: string[] = []
+  const declaredChanges: DeclaredChange[] = []
+  // Every declaration must be judged by its kind at the one consulting place; one whose difference another branch
+  // absorbed (the version mask, presentation) fails here rather than pass the gate unjudged.
+  const judged = new Set<string>()
+  const exempted: string[] = []
+  const parsed = parseDeclarations(input.body)
+  failures.push(...parsed.problems)
+  const declared = new Map(parsed.declarations.map((declaration) => [declaration.scenario, declaration]))
+  const scenarioById = new Map(input.scenarios.map((scenario) => [scenario.id, scenario]))
+  for (const declaration of parsed.declarations) {
+    const scenario = scenarioById.get(declaration.scenario)
+    if (scenario === undefined)
+      failures.push(`SDK-Parity-Changed: ${declaration.scenario} names no scenario the gate runs on both trees`)
+    else if (!unresolved.has(scenario.capability))
+      failures.push(
+        `SDK-Parity-Changed: ${declaration.scenario}: its capability ${scenario.capability} is resolved; only a scenario of an unresolved capability can be declared`,
+      )
+  }
+  // The trees both run the head's table, so the merge base's own calls are kept here: every scenario of an unresolved
+  // capability stays in the head's table with the same call, or the call that differed would never run again.
+  for (const scenario of input.baseScenarios ?? []) {
+    if (!unresolved.has(scenario.capability)) continue
+    const atHead = scenarioById.get(scenario.id)
+    if (atHead === undefined)
+      failures.push(
+        `${scenario.capability}: scenario ${scenario.id} is in the merge base's table and not in the head's; a scenario of an unresolved capability may not be removed or renamed`,
+      )
+    else if (JSON.stringify(callPart(scenario)) !== JSON.stringify(callPart(atHead)))
+      failures.push(
+        `${scenario.capability}: scenario ${scenario.id} changes its call; keep the merge base's call and add a new scenario beside it`,
+      )
+  }
+  const providerContext = {
+    declarations: declared,
+    outcomes: { base: input.base.outcomes, head: input.head.outcomes },
+    rows: { base: input.base.rows, head: input.head.rows },
+    unresolved: { base: input.base.unresolved, head: input.head.unresolved },
+    tools: { base: input.base.tools, head: input.head.tools },
+    ahead: input.ahead ?? new Map<string, unknown>(),
+  }
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
@@ -124,14 +195,70 @@ export function gateReport(input: GateInput): GateReport {
       )
       continue
     }
-    // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
-    if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
+    // Both trees run the head's table, so a scenario the head adds is answered by the merge base's code too and compared
+    // like any other; a missing base outcome means the runner did not run it.
+    if (before === undefined) {
+      failures.push(
+        `${scenario.capability}: scenario ${scenario.id} has no outcome at the merge base; the runner did not run it`,
+      )
+      continue
+    }
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      if (declared.has(scenario.id)) judged.add(scenario.id)
+      if (declared.has(scenario.id))
+        failures.push(
+          `SDK-Parity-Changed: ${scenario.id}: its outcome is equal on the merge base and the head; there is nothing to declare`,
+        )
+      continue
+    }
+    const baseVersions = input.versions.base
+    if (
+      baseVersions !== undefined &&
+      equalUnderVersionMask(before, after, { base: baseVersions, head: input.versions.head })
+    ) {
+      versionMasked.push(`${scenario.id}#version-mask`)
+      continue
+    }
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       const matched = new Set<string>()
       const notPresentation = presentationProblems(scenario, before, after, added, input.goldens, matched)
       if (notPresentation.length === 0) {
         presentation.push(scenario.id)
         presentationRows.push(`${scenario.id}#presentation=${[...matched].toSorted().join("+")}`)
+        continue
+      }
+      judged.add(scenario.id)
+      // The one place exemptions are consulted: every provider is asked, in name order, and exactly one may answer.
+      const answers = Object.entries(providers)
+        .toSorted(([a], [b]) => a.localeCompare(b))
+        .map(([name, provider]) => [name, provider(scenario, before, after, providerContext)] as const)
+        .filter(([, answer]) => answer !== undefined)
+      if (answers.length > 1) {
+        failures.push(
+          `${scenario.capability}: scenario ${scenario.id} is exempted by more than one provider (${answers.map(([name]) => name).join(", ")}); an exemption must be unambiguous`,
+        )
+        flagged.add(scenario.capability)
+        continue
+      }
+      const [only] = answers
+      if (only !== undefined) {
+        const [name, answer] = only
+        if (answer !== undefined && "problem" in answer) {
+          failures.push(answer.problem)
+          flagged.add(scenario.capability)
+        } else if (answer !== undefined) {
+          // The gate writes the scenario and the provider's name; a provider gives only its detail, which may not carry
+          // the separators the mark and the printed id list are read by.
+          if (answer.detail !== undefined && /[#,\s]/.test(answer.detail.replaceAll(" ", ""))) {
+            failures.push(
+              `${scenario.capability}: scenario ${scenario.id}: provider ${name} answered a detail with a reserved character (# , or a line break)`,
+            )
+            flagged.add(scenario.capability)
+          } else {
+            exempted.push(`${scenario.id}#exempt=${name}${answer.detail === undefined ? "" : `:${answer.detail}`}`)
+            if (answer.change !== undefined) declaredChanges.push(answer.change)
+          }
+        }
         continue
       }
       const why =
@@ -143,6 +270,13 @@ export function gateReport(input: GateInput): GateReport {
       )
       flagged.add(scenario.capability)
     }
+  }
+  for (const declaration of parsed.declarations) {
+    const scenario = scenarioById.get(declaration.scenario)
+    if (scenario !== undefined && unresolved.has(scenario.capability) && !judged.has(declaration.scenario))
+      failures.push(
+        `SDK-Parity-Changed: ${declaration.scenario}: its difference is admitted elsewhere (the version mask or presentation), so the declaration was never judged; remove it`,
+      )
   }
   const slices = new Set([...input.body.matchAll(SLICE_LINE)].map((match) => match[1]))
   const atHead = unresolved
@@ -159,7 +293,15 @@ export function gateReport(input: GateInput): GateReport {
   const closureMoved = [...input.closures]
     .filter(([id, files]) => unresolved.has(id) && !flagged.has(id) && [...files].some((file) => changed.has(file)))
     .map(([id]) => id)
-  const candidates = [...new Set([...closureMoved, ...annotated])].toSorted()
+  const changedCapabilities = new Set(declaredChanges.map((change) => change.capability))
+  const candidates = [...new Set([...closureMoved, ...annotated])]
+    .filter((id) => !changedCapabilities.has(id))
+    .toSorted()
+  const unchangedLine = UNCHANGED_LINE.test(input.body)
+  if (unchangedLine && candidates.length === 0 && declaredChanges.length > 0)
+    failures.push(
+      "SDK-Parity-Unchanged: yes covers no candidate: every capability with a moved closure is declared changed",
+    )
   // Design 7.4 (amendment 5, from review 6061874518): on a row whose call is BUILT, a nested requiredness or shape change
   // can change what callers may pass, so equal sampled outcomes cannot clear it. It is printed with its own mark; the
   // reviewer checks the live schema and accepted-input compatibility, and the digest covers the marked ids too.
@@ -177,13 +319,20 @@ export function gateReport(input: GateInput): GateReport {
     liveSchema,
     presentation: presentation.toSorted(),
     presentationRows: presentationRows.toSorted(),
+    versionMasked: versionMasked.toSorted(),
     head: input.headSha,
+    // Digest input order: candidates, live-schema, (changed,) presentation rows, then version-mask ids LAST. A tier
+    // added later appends after these, so a merge that keeps both tiers keeps one order.
+    changed: declaredChanges.toSorted((a, b) => a.scenario.localeCompare(b.scenario)),
+    exempted: exempted.toSorted(),
     digest: candidateDigest(input.headSha, [
       ...candidates,
       ...liveSchema.map((id) => `${id}#live-schema`),
+      ...exempted.toSorted(),
       ...presentationRows,
+      ...versionMasked,
     ]),
-    unchangedLine: UNCHANGED_LINE.test(input.body),
+    unchangedLine,
     initialization,
   }
 }
@@ -209,7 +358,9 @@ export function goldenProblems(
 const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
+  ...report.exempted,
   ...report.presentationRows,
+  ...report.versionMasked,
 ]
 
 export function renderReport(report: GateReport): string {
@@ -232,6 +383,21 @@ export function renderReport(report: GateReport): string {
   if (report.presentation.length > 0)
     lines.push(
       `PRESENTATION ONLY: ${report.presentationRows.map((entry) => entry.replace("#presentation=", " (row ") + ")").join(", ")}: the usage text of an existing verb changed with the exit code, the structure and every other line equal, as named in script/sdk-parity/presentation.json; the reviewer confirms the change is wording, not a capability, before CLEAR.`,
+      "",
+    )
+  if (report.versionMasked.length > 0)
+    lines.push(
+      `VERSION MASK: ${report.versionMasked.map((entry) => entry.replace("#version-mask", "")).join(", ")}: equal only once each tree's own declared omo package version and engine pin (packages/omo-native/package.json) are replaced by placeholders; the reviewer confirms the version is the only difference before CLEAR.`,
+      "",
+    )
+  if (report.changed.length > 0)
+    lines.push(
+      `CHANGED ON PURPOSE: ${report.changed.length} declared scenario(s); the body's SDK-Parity-Changed lines, each held by its kind. Their capabilities are not candidates; the reviewer's digest covers them.`,
+      "",
+      ...report.changed.flatMap((change) => [
+        `- ${change.scenario} (${change.capability}) ${[change.kind, ...change.args].join(" ")}`,
+        ...printedPair(change.before, change.after),
+      ]),
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

@@ -66,4 +66,4 @@ Fix each, or carry it with a SPECIFIC stated reason. Rationale, workaround detec
    ```
 
 2. **Re-read your diff against every axiom and smell above**, and state in your reply which you carried and why. A test you added or reshaped must go red when its production owner breaks and match no row of `references/testing/junk-classes.md`.
-3. **Fix every failure before declaring done.** When a smell fired or the review found more than two issues, load the `refactor` skill and run its protocol; never improvise a structural change. When the branch carries AI-authored patterns (broad catch, dead helpers, junk tests, vague comments), load the `remove-ai-slops` skill.
+3. **Fix every failure before declaring done.** When a smell fired or the review found more than two issues, load the `refactor` skill and run its protocol; never improvise a structural change. When the branch carries AI-authored patterns (broad catch, dead helpers, junk tests, vague comments), load the `remove-ai-slops` skill. Commit with the `git` skill; push, open the PR, wait for CI and merge with the `github` skill.

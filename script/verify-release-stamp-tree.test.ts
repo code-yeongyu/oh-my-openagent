@@ -56,6 +56,7 @@ beforeAll(() => {
     else fs.writeFileSync('${extension}',v);`,
   )
   write("script/build-service-auth.ts", "export {}")
+  write("script/build-remote-sdk.ts", "export {}")
   write("script/build-codex-install.ts", "export {}")
   write("packages/omo-senpi/plugin/scripts/build-install.mjs", "export {}")
   write(
