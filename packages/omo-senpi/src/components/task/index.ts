@@ -36,6 +36,7 @@ import { composeTaskEngine, type TaskEngine } from "./engine"
 import { registerEvalHandleHost } from "./eval-handle-host"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge, type EventBridge } from "./event-bridge"
 import { wireHostPrewarm } from "./host-prewarm"
+import { wireTaskControlExposure } from "./task-control-exposure"
 import { installJobWidgetAuthor } from "./job-widget-author"
 import { loadJobWidgetHost, type JobWidgetHostApi } from "./job-widget-host"
 import { createTaskJobWidgetFeed } from "./job-widget-sources"
@@ -172,6 +173,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         dagRuntime,
         ctx.idleCoordinator,
       )
+      wireTaskControlExposure(pi, ctx.logger)
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)

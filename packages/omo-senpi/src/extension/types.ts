@@ -111,6 +111,15 @@ export interface SenpiExtensionAPI {
     on(name: string, handler: (payload: unknown) => void): () => void
   }
   registerTool(tool: Record<string, unknown>): void
+  /** Session-local exposure, after the host applies tool allow/exclude filters. */
+  getAllTools?(): readonly {
+    readonly name: string
+    readonly exposure?: string
+    readonly allowLazyActivation?: boolean
+    readonly evalOnly?: boolean
+  }[]
+  getActiveTools?(): string[]
+  setActiveTools?(names: string[]): void
   /**
    * Adds figures to senpi's on-demand memory report (`SENPI_MEMORY_REPORT=1`), read only when a report
    * is taken. Optional: hosts older than the release that added the report do not have it.
