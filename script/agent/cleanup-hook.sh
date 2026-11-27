@@ -120,7 +120,9 @@ resolve_log_dir() {
     printf '%s\n' "$fallback"
     return 0
   fi
-  printf '%s\n' "${physical_candidate%/}"
+  # Containment was decided on the resolved identity; report the caller's own spelling, which names
+  # the same directory on symlinked temp paths like /tmp -> /private/tmp (#11647).
+  printf '%s\n' "${candidate%/}"
 }
 
 LOG_DIR="$(resolve_log_dir)"
