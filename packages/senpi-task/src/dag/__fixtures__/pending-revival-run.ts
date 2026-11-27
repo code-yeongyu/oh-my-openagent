@@ -11,7 +11,7 @@ import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 import type { DagDefinition } from "../graph"
 import { subscribeDagJournal } from "../journal"
 import type { DagRunRecordV1 } from "../manager"
-import { createDagRecovery, type InstalledDagRun } from "../recovery"
+import { createDagRecovery, type DagRecoveryOptions, type InstalledDagRun } from "../recovery"
 import { createDagFileStore, type DagFileStore } from "../store"
 import type { DagNode } from "../types"
 import { node, owner, pausedRecord, runId } from "./reattached-run"
@@ -56,7 +56,11 @@ export function seedRun(f: Fixture, children: Readonly<Record<string, string>>):
 }
 
 /** Workflow recovery as the session-start sweep runs it, over the fixture's CURRENT manager and lifecycle. */
-export async function recoverRun(f: Fixture, store: DagFileStore): Promise<InstalledDagRun> {
+export async function recoverRun(
+  f: Fixture,
+  store: DagFileStore,
+  extra: Partial<DagRecoveryOptions> = {},
+): Promise<InstalledDagRun> {
   const recovery = createDagRecovery({
     store,
     taskManager: f.manager,
@@ -64,6 +68,7 @@ export async function recoverRun(f: Fixture, store: DagFileStore): Promise<Insta
     isProcessAlive: () => false,
     isRunHeldInProcess: () => false,
     ...(f.lifecycle.pendingRevivals === undefined ? {} : { pendingRevivals: f.lifecycle.pendingRevivals }),
+    ...extra,
   })
   const installed: InstalledDagRun[] = []
   await recovery.installPausedRuns(PARENT, (run) => {

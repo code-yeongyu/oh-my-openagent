@@ -13,6 +13,7 @@ import {
   nodeStates,
   PARENT,
   reopenOverCapacity,
+  reopenWithTaskHostDown,
 } from "../../../../senpi-task/src/dag/__fixtures__/pending-revival-run"
 import { runId } from "../../../../senpi-task/src/dag/__fixtures__/reattached-run"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
@@ -31,10 +32,13 @@ afterEach(() => {
   cleanupManagers()
 })
 
-async function waitingRunWithFailureHandler() {
-  const f = liveParentFixture("in-process", { residency_max_children: 1, default_concurrency: 2 })
+async function waitingRunWithFailureHandler(waiting: "over capacity" | "task host down" = "over capacity") {
+  const f =
+    waiting === "over capacity"
+      ? liveParentFixture("in-process", { residency_max_children: 1, default_concurrency: 2 })
+      : liveParentFixture("host-session")
   fixtures.push(f)
-  const { hang, store } = await reopenOverCapacity(f)
+  const { hang, store } = waiting === "over capacity" ? await reopenOverCapacity(f) : await reopenWithTaskHostDown(f)
   const reservations = createDagRunReservations()
   const isProcessAlive = () => false
   const holder: { run?: InstalledDagRun } = {}
@@ -107,6 +111,28 @@ describe("a scheduler failure over a node waiting for its child's revival (#1515
     expect(nodeStates(store)).toEqual(["k-hang:failed:task_cancelled", "k-after:pending"])
     expect(record?.nodes[0]?.error?.message).toContain("scheduler fault")
     expect(f.store.load(hang)?.status).toBe("cancelled")
+    expect(f.lifecycle.pendingRevivals?.obligation(hang)).toBe("none")
+    // and - nothing revives the child into the parked run
+    f.advance(5_000)
+    expect(f.manager.getResidentHandle(hang)).toBeUndefined()
+    expect(f.store.load(hang)?.status).toBe("cancelled")
+  })
+
+  test("#given a waiting node whose child's stop cannot be confirmed (its task host is down) #when its scheduler fails again #then the park keeps the node active as a survivor and the lifecycle owes the child no revival", async () => {
+    // given
+    const { f, hang, store, failScheduler } = await waitingRunWithFailureHandler("task host down")
+    await failScheduler()
+
+    // when
+    await failScheduler()
+
+    // then - the one drain's rule: a child that may still run keeps its node; its cancel ends the revival
+    const record = store.readCheckpoint<DagRunRecordV1 & { readonly leaseHolderPid?: number }>(runId)
+    expect(record?.status).toBe("paused")
+    expect(record?.leaseHolderPid).toBeUndefined()
+    expect(nodeStates(store)).toEqual(["k-hang:running", "k-after:pending"])
+    expect(f.store.load(hang)).toMatchObject({ status: "running" })
+    expect(f.store.load(hang)?.cancel_requested).toBeDefined()
     expect(f.lifecycle.pendingRevivals?.obligation(hang)).toBe("none")
   })
 })

@@ -256,7 +256,7 @@ export function liveParentFixture(
       return result.task_id
     },
     park: (id: string) => runner.handles.get(id)?.park("idle_evicted"),
-    restart: () => {
+    restart: (extra: Partial<LifecycleDeps> = {}) => {
       lifecycle.dispose?.()
       backing = createTaskRecordStore({
         project_dir: backing.stateDir,
@@ -265,7 +265,7 @@ export function liveParentFixture(
       notifier = newNotifier()
       store = observed()
       manager = newManager()
-      lifecycle = createTaskLifecycle({ ...deps, store })
+      lifecycle = createTaskLifecycle({ ...deps, ...extra, store })
       return lifecycle
     },
     dispose: () => lifecycle.dispose?.(),

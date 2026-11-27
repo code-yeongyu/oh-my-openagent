@@ -15,6 +15,7 @@ import {
 } from "./__fixtures__/pending-revival-run"
 import { runId } from "./__fixtures__/reattached-run"
 import type { DagRunRecordV1 } from "./manager"
+import { outstandingRunStop } from "./outstanding-stop"
 import type { DagNodeId } from "./types"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
@@ -91,5 +92,8 @@ describe("a run whose only active node waits for its child's revival (#15150 on 
     expect(nodeStates(store)).toEqual(["k-hang:cancelled", "k-after:cancelled"])
     expect(f.store.load(hang)?.status).toBe("cancelled")
     expect(f.lifecycle.pendingRevivals?.obligation(hang)).toBe("none")
+    // and - the cancelled run owes no stop: a child never revived is not counted live (the one drain)
+    const record = store.readCheckpoint<DagRunRecordV1>(runId)
+    expect(record === null ? "missing" : outstandingRunStop(f.manager, record)).toBeUndefined()
   })
 })
