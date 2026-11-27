@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
+import { resolveMemoryRoot, type MemoryBlockCache, type ReservedRun, type TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
@@ -225,8 +225,10 @@ export function registerMemoryStatic(input: {
       },
     },
   )
-  registerMemoryFilesystemPolicy(pi, () =>
-    activeSession.current === undefined ? undefined : resolveContext(activeSession.current),
+  registerMemoryFilesystemPolicy(
+    pi,
+    () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),
+    resolveMemoryRoot(options.env, options.cwd()),
   )
   registerMemoryGuard(pi, ctx, {
     getContext: (eventContext) => {

@@ -45,18 +45,20 @@ export type MemoryPolicyRegistration = { readonly status: "registered" } | { rea
  *
  * Registration happens once, when the extension loads: Senpi composes the policies its file tools
  * enforce when the runtime is built, before session_start, and a policy registered later is never
- * consulted (#15251). The policy reads the session's bound identity on every call instead. Until a
- * session binds (and for resume-conflict sessions, which never bind) it allows everything, exactly
- * as when no policy was registered: without a bound identity there is no carve-out to anchor, and the
- * policy must never deny everything. Hosts without the capability keep the P28 soft guard (guard.ts
- * tool_call hook) as the sole enforcement layer.
+ * consulted (#15251). The policy reads the bound identity of this extension instance's own session on
+ * every call (each senpi session runtime loads its own instance, so a policy never sees another session's
+ * binding). With no bound identity (before the session binds, after it shut down, or a resume-conflict
+ * session, which never binds) it fails closed on memory only: both memory areas under `memoryRoot` are
+ * denied, since there is no own root to carve out, and everything outside them stays allowed. Hosts without
+ * the capability keep the P28 soft guard (guard.ts tool_call hook) as the sole enforcement layer.
  */
 export function registerMemoryFilesystemPolicy(
   pi: SenpiExtensionAPI,
   boundContext: () => MemoryIdentityContext | undefined,
+  memoryRoot: string,
 ): MemoryPolicyRegistration {
   if (!hasFilesystemPolicySupport(pi)) return { status: "unsupported" }
-  pi.registerFilesystemPolicy(buildMemoryFilesystemPolicy(boundContext))
+  pi.registerFilesystemPolicy(buildMemoryFilesystemPolicy(boundContext, memoryRoot))
   return { status: "registered" }
 }
 
@@ -77,7 +79,11 @@ export function registerMemoryFilesystemPolicy(
  * memoised, so a host that asks repeatedly - per spawned sandbox, say - still pays one enumeration
  * per bound session, exactly as binding used to.
  */
-function buildMemoryFilesystemPolicy(boundContext: () => MemoryIdentityContext | undefined): FilesystemPolicy {
+function buildMemoryFilesystemPolicy(
+  boundContext: () => MemoryIdentityContext | undefined,
+  memoryRoot: string,
+): FilesystemPolicy {
+  const unboundAreas = stableRoots([join(memoryRoot, "agents"), join(memoryRoot, TRANSIENT_DIRNAME)])
   // Per bound identity, computed on its first call: a rebind to another identity gets its own roots.
   const layouts = new WeakMap<MemoryIdentityContext, IdentityLayout>()
   const layoutOf = (context: MemoryIdentityContext): IdentityLayout => {
@@ -91,13 +97,17 @@ function buildMemoryFilesystemPolicy(boundContext: () => MemoryIdentityContext |
   return {
     get deniedRoots(): readonly string[] {
       const context = boundContext()
-      return context === undefined ? [] : layoutOf(context).deniedRoots()
+      return context === undefined ? unboundAreas : layoutOf(context).deniedRoots()
     },
     check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
       const context = boundContext()
-      if (context === undefined) return { allow: true }
-      const { ownRoots, deniedAreas } = layoutOf(context)
       const target = resolve(request.canonicalPath)
+      if (context === undefined) {
+        return unboundAreas.some((area) => isWithin(area, target))
+          ? { allow: false, reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}` }
+          : { allow: true }
+      }
+      const { ownRoots, deniedAreas } = layoutOf(context)
       if (request.operation === "read" && isGrantedProjectMemoryRead(context, target)) return { allow: true }
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
       if (deniedAreas.some((root) => isWithin(root, target))) {
