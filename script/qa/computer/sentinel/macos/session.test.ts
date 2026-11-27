@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, jest, spyOn, test } from "bun:test"
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -6,36 +6,31 @@ import { join } from "node:path"
 import { summarize } from "../summary.ts"
 import { MacSession } from "./session.ts"
 
-// Fake typist and recorder processes speak the helper protocol, so the harness's own waiting is tested without macOS.
-// The fake recorder drains for just under the budget the harness sends with stop (3.9 s when none is sent), then
-// reports one read still pending, exactly what a real recorder does when a new-window read outlives its drain.
+// Fake helpers speak the recorder protocol without macOS. The test controls the second keystroke and the end of
+// the drain so neither depends on when a child process is scheduled.
 const FAKE = `
 const role = process.argv[2]
 const emit = (value) => process.stdout.write(JSON.stringify(value) + "\\n")
 let index = 0
-let stopped = false
-let finalAsked = false
-const finalRead = () => emit({ t: Date.now(), kind: "field", text: "a".repeat(index), final: true })
+let stopping = false
+let finalPending = false
+const key = () => emit({ t: Date.now(), kind: "typed", index: index++, char: "a" })
 emit(role === "typist" ? { ctl: "hello", pid: process.pid, window: 1, frontmost: true } : { ctl: "ready", role })
 for await (const line of console) {
-  const [command, argument] = line.trim().split(" ")
+  const [command] = line.trim().split(" ")
   if (command === "quit") process.exit(0)
   if (command === "reset") emit({ ctl: "reset" })
-  if (command === "type") {
-    const key = () => emit({ t: Date.now(), kind: "typed", index: index++, char: "a" })
-    key()
-    setInterval(key, 1_000)
-  }
+  if (command === "type" || command === "key") key()
   if (command === "start") emit({ t: Date.now(), kind: "start" })
-  if (command === "stop")
-    setTimeout(() => {
-      stopped = true
-      emit({ t: Date.now(), kind: "stop", pendingReads: 1, pendingRegistrations: 0 })
-      if (finalAsked) finalRead()
-    }, Number(argument ?? 4_000) - 100)
-  if (command === "final") {
-    if (stopped) finalRead()
-    else finalAsked = true
+  if (command === "stop") stopping = true
+  if (command === "final" && stopping) {
+    finalPending = true
+    emit({ ctl: "draining" })
+  }
+  if (command === "finish-drain" && finalPending) {
+    emit({ t: Date.now(), kind: "stop", pendingReads: 1, pendingRegistrations: 0 })
+    emit({ t: Date.now(), kind: "field", text: "aa", final: true })
+    emit({ ctl: "drained" })
   }
 }
 `
@@ -65,13 +60,37 @@ describe("a recording segment's stop", () => {
         idleApp: "",
       }
       const session = await MacSession.open({ helpers, targetPids: [], withPlanter: false })
+      const { recorder, typist } = session
+      const nextEvent = session.nextEvent.bind(session)
+      let virtualStopDeadlineArmed = false
+      const observeWait = spyOn(session, "nextEvent").mockImplementation((match, timeoutMs, what) => {
+        const isStopWait = what === "recorder stop marker"
+        // Only the stop/final deadlines need virtual time; the segment's landing windows remain real.
+        if (isStopWait) jest.useFakeTimers()
+        const event = nextEvent(match, timeoutMs, what)
+        if (isStopWait) virtualStopDeadlineArmed = true
+        if (what === "a keystroke after the window") typist?.send("key")
+        return event
+      })
       try {
-        const events = await session.segment(async () => {}, 50)
+        if (recorder === undefined || typist === undefined) throw new Error("sentinel helpers did not open")
+        // Register these I/O bounds on the real clock before the segment installs its virtual marker timers.
+        const draining = recorder.next((line) => line.ctl === "draining", 2_500, "stop and final commands")
+        const drained = recorder.next((line) => line.ctl === "drained", 2_500, "stop and final replies")
+        const release = draining.then(() => {
+          if (!virtualStopDeadlineArmed) throw new Error("recorder stop deadline was not armed on the virtual clock")
+          // The old wait expired at 3 s, before the recorder's 4 s drain budget.
+          jest.advanceTimersByTime(3_900)
+          recorder.send("finish-drain")
+        })
+        const flush = drained.then(() => jest.runOnlyPendingTimers())
+        const [events] = await Promise.all([session.segment(async () => {}, 0), release, flush])
         expect(summarize(events).faults).toContain("dialog: 1 new-window reads were still running at stop")
       } finally {
+        jest.useRealTimers()
+        observeWait.mockRestore()
         await session.close()
       }
     },
-    20_000,
   )
 })
