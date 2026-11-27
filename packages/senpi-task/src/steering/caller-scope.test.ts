@@ -20,9 +20,13 @@ function pending(h: SteeringHarness, overrides: Partial<TaskRecordInput>): TaskR
   return h.seedRecord(overrides)
 }
 
-function running(h: SteeringHarness, overrides: Partial<TaskRecordInput>): TaskRecord {
+function running(h: SteeringHarness, overrides: Partial<TaskRecordInput>, childSessionId?: string): TaskRecord {
   const seeded = h.seedRecord(overrides)
-  h.store.transition(seeded.task_id, { type: "start", timestamp: AT })
+  h.store.transition(seeded.task_id, {
+    type: "start",
+    timestamp: AT,
+    ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
+  })
   h.setLive(seeded.task_id, makeFakeHandle(seeded.task_id, "in-process").handle)
   return load(h, seeded.task_id)
 }
@@ -109,7 +113,7 @@ describe("task_cancel applies the caller's scope", () => {
 
   test("#given a child session #when it cancels its sibling, its parent's other task, or its own task #then each reads as not found, and its own child is cancellable", async () => {
     const h = makeHarness()
-    const self = running(h, { ...session("sess-A"), child_session_id: "child-A" })
+    const self = running(h, session("sess-A"), "child-A")
     const sibling = running(h, session("sess-A"))
     const parentPending = pending(h, session("sess-A"))
     const grandchild = running(h, { parent_session_id: "child-A", root_session_id: "sess-A" })

@@ -106,7 +106,8 @@ describe("task_cancel called from an in-process child", () => {
       },
       get: () => undefined,
     }
-    const runner = new InProcessRunner({ sharedParentTools: [createTaskCancelTool({ manager })] })
+    const { renderCall: _renderCall, renderResult: _renderResult, ...cancelTool } = createTaskCancelTool({ manager })
+    const runner = new InProcessRunner({ sharedParentTools: [cancelTool] })
 
     const handle = await runner.start(machine.spec)
     await awaitWithinTestBudget(handle.waitForIdle(), "the child's turn")
