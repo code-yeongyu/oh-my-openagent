@@ -56,13 +56,6 @@ function chunkBySize(files: readonly string[], budget: number, maxFiles: number)
 // destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
 // This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
-  {
-    file: "packages/omo-senpi/plugin/runtime/omo-sdk/sdk.js",
-    call: "t.connect",
-    count: 1,
-    reason:
-      "no TLS and no remote host: the remote module's client (components/remote/client.ts, bundled since the SDK's devices.list goes through it, #13413) calls its `connect` dependency, defaulting to device-service-core connectDeviceService, which opens the local device service through node:net createConnection on <stateDir>/<socket> or, on Windows, 127.0.0.1; the bundle imports no node:tls/https/http2.",
-  },
   ...["omo-codex", "omo-senpi"].flatMap((edition) =>
     ["https", "tls"].map((module) => ({
       file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
