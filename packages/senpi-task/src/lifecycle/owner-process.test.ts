@@ -188,4 +188,27 @@ describe("host claim stamp", () => {
     // then
     expect(store.load(record.task_id)?.host_claim).toEqual(stamp)
   })
+
+  test("#given a record this process stamped #when its host pid is released #then the stored record carries no claim", async () => {
+    // given
+    const store = tempStore()
+    const record = seedRecord(store, {
+      task_id: "st_7c000004",
+      status: "running",
+      residency_state: "resident",
+      host_pid: process.pid,
+    })
+    await getProcessStartIdentity(process.pid)
+    store.mutate(record.task_id, (fresh) => ({ ...fresh, revival_deferred_reason: "capacity" }))
+    expect(store.load(record.task_id)?.host_claim?.pid).toBe(process.pid)
+
+    // when
+    store.mutate(record.task_id, (fresh) => {
+      const { host_pid: _hostPid, ...released } = fresh
+      return released
+    })
+
+    // then
+    expect(store.load(record.task_id)?.host_claim).toBeUndefined()
+  })
 })
