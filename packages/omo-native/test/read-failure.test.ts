@@ -5,8 +5,8 @@ import { describeReadFailure } from "../bin/lib/read-failure.js"
 
 const TOKEN = "sk-test-SYNTHETIC-describe"
 
-function withCode(code: string): Error {
-  return Object.assign(new Error(`${code}: open '${TOKEN}'`), { code })
+function withCode(code: string, path?: string): Error {
+  return Object.assign(new Error(`${code}: open '${TOKEN}'`), path === undefined ? { code } : { code, path })
 }
 
 describe("describeReadFailure", () => {
@@ -27,6 +27,7 @@ describe("describeReadFailure", () => {
       "not valid JSON",
     ],
     ["a filesystem error", withCode("EACCES"), "EACCES"],
+    ["a filesystem error with its path", withCode("EISDIR", "/tmp/omo.jsonc"), "EISDIR (/tmp/omo.jsonc)"],
     ["a non-filesystem code", withCode("ERR_SOMETHING"), "an unexpected error"],
     ["an arbitrary error", new Error(`failed near ${TOKEN}`), "an unexpected error"],
     ["a thrown non-error", TOKEN, "an unexpected error"],

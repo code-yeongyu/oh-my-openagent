@@ -21,7 +21,9 @@ export function describeReadFailure(error) {
   // node:sqlite on Node and Bun: `errstr` is SQLite's own text for the result code
   // (sqlite3_errstr), a fixed table that never contains the database's contents.
   if (typeof error?.errcode === "number" && typeof error.errstr === "string") return `SQLite: ${error.errstr}`
-  // A filesystem error code (EACCES, EISDIR, ...) names the failure without the file's bytes.
-  if (typeof error?.code === "string" && /^E[A-Z0-9]+$/.test(error.code)) return error.code
+  // A filesystem error code (EACCES, EISDIR, ...) and the path it was raised for name the failure
+  // without the file's bytes; the path is what a notice already shows.
+  if (typeof error?.code === "string" && /^E[A-Z0-9]+$/.test(error.code))
+    return typeof error.path === "string" ? `${error.code} (${error.path})` : error.code
   return "an unexpected error"
 }
