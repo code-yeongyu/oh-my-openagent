@@ -117,6 +117,7 @@
     "packages/omo-senpi/plugin/runtime/thread-sdk/sdk.js: omo doctor x3",
     "packages/omo-senpi/src/components/omo-sdk/root/pending-cells.ts: omo doctor x2",
     "packages/omo-senpi/src/components/omo-sdk/root/threads.ts: omo doctor",
+    "packages/omo-senpi/src/components/omo-sdk/root/threads-runtime-file.test.ts: omo doctor",
     "packages/omo-native/bin/lib/doctor-memory-runtime.js: omo doctor",
     "packages/omo-native/task-config-entry.ts: omo doctor x2",
     "packages/omo-native/test/doctor-memory-runtime.test.ts: omo doctor x2",

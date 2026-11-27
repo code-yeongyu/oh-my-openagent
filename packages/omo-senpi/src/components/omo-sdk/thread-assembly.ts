@@ -5,6 +5,7 @@ import type { OmoPrincipal, OmoSdkRoot } from "./contract"
 import type { OmoSdkOptions } from "./options"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
+import type { ThreadsRuntime } from "./root/thread-runtime-file"
 import { threadsNamespace } from "./root/threads"
 
 // The thread half of the root, on its own: what the standalone thread SDK runtime (plugin/runtime/thread-sdk) reaches.
@@ -18,6 +19,7 @@ export function threadsServing(
   cwd: string,
   principal: OmoPrincipal,
   checkModuleUrl = true,
+  loadThreadsRuntime?: () => Promise<ThreadsRuntime>,
 ) {
   const ports = options.ports ?? {}
   return threadsNamespace({
@@ -28,6 +30,7 @@ export function threadsServing(
     env,
     principal,
     checkModuleUrl,
+    ...(loadThreadsRuntime === undefined ? {} : { loadThreadsRuntime }),
     ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
     ...(options.threads === undefined ? {} : { threads: options.threads }),
     ports: {
@@ -35,6 +38,7 @@ export function threadsServing(
       ...(ports.store === undefined ? {} : { store: ports.store }),
       ...(ports.remote === undefined ? {} : { remote: ports.remote }),
       ...(ports.now === undefined ? {} : { now: ports.now }),
+      ...(ports.onUnexpected === undefined ? {} : { onUnexpected: ports.onUnexpected }),
     },
   })
 }

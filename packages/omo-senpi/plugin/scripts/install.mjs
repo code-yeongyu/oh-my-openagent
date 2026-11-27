@@ -3,14 +3,14 @@
 
 // packages/omo-senpi/src/install/cli-local.ts
 import { existsSync as existsSync3, readFileSync } from "fs";
-import { dirname as dirname5, join as join6, resolve as resolve5 } from "path";
+import { dirname as dirname5, join as join7, resolve as resolve5 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 
 // packages/omo-senpi/src/install/install-senpi.ts
 import { execFile } from "node:child_process";
 import { existsSync as existsSync2 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join5, resolve as resolve4 } from "node:path";
+import { dirname as dirname4, join as join6, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -204,7 +204,7 @@ function uninstallLocalLauncher(homeDir = homedir2()) {
 import { createHash } from "node:crypto";
 import { constants as constants2 } from "node:fs";
 import { access as access2, readFile as readFile2, stat } from "node:fs/promises";
-import { dirname as dirname3, join as join4 } from "node:path";
+import { dirname as dirname3, join as join5 } from "node:path";
 
 // packages/memory-core/src/personas/manifest.ts
 var PERSONA_ASSET_FILENAMES = {
@@ -220,13 +220,40 @@ var PERSONA_ASSET_FILES = [
   PERSONA_ASSET_FILENAMES.kibitzer
 ];
 
+// packages/omo-senpi/plugin/scripts/runtime-files.mjs
+import { join as join3 } from "node:path";
+var SDK_RUNTIME_FILES = [
+  {
+    name: "root",
+    entry: "src/extension/omo-sdk.ts",
+    output: "runtime/omo-sdk/sdk.js",
+    specifier: "#omo-sdk",
+    lazy: false,
+    ceiling: 785413,
+    staticSet: "omo-sdk-static-modules.json",
+    packages: ["jsonc-parser", "typebox", "zod"]
+  },
+  {
+    name: "threads",
+    entry: "src/components/thread/sdk-core/runtime-entry.ts",
+    output: "runtime/omo-sdk/threads.js",
+    specifier: "#omo-sdk-threads-runtime",
+    lazy: true,
+    ceiling: 246735,
+    staticSet: "omo-sdk-threads-static-modules.json",
+    packages: ["typebox"]
+  }
+];
+var runtimeArtifactPaths = (table = SDK_RUNTIME_FILES) => table.map((row) => join3(...row.output.split("/")));
+var RUNTIME_IMPORT_MAP = "package.json";
+
 // packages/omo-senpi/src/install/senpi-settings.ts
 import { constants } from "node:fs";
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { basename, dirname as dirname2, join as join3, resolve as resolve3 } from "node:path";
+import { basename, dirname as dirname2, join as join4, resolve as resolve3 } from "node:path";
 var OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi";
 var GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/;
-var LEGACY_BUILTIN_SHADOW_PACKAGES = [join3("packages", "pi-goal"), join3("packages", "pi-webfetch")];
+var LEGACY_BUILTIN_SHADOW_PACKAGES = [join4("packages", "pi-goal"), join4("packages", "pi-webfetch")];
 async function readSettings(settingsPath) {
   let raw;
   try {
@@ -304,7 +331,7 @@ function isRecord(value) {
 async function readPackageName(packagePath) {
   let raw;
   try {
-    raw = await readFile(join3(packagePath, "package.json"), "utf8");
+    raw = await readFile(join4(packagePath, "package.json"), "utf8");
   } catch (error) {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR"))
       return;
@@ -336,92 +363,93 @@ function isErrno(error, code) {
 
 // packages/omo-senpi/src/install/plugin-artifacts.ts
 var REQUIRED_PLUGIN_ARTIFACTS = [
-  join4("extensions", "omo.js"),
-  join4("extensions", "omo-task.js"),
-  join4("extensions", "omo-computer-use.js"),
-  join4("extensions", "omo-memory-doctor.js"),
-  join4("extensions", "omo-memory-memfs.js"),
-  join4("extensions", "omo-memory-palace.js"),
-  join4("extensions", "omo-device-account.js"),
-  join4("extensions", "omo-memory-commands.js"),
-  join4("extensions", "omo-session-history.js"),
-  join4("extensions", "omo-recall-store.js"),
-  join4("extensions", "omo-device-service.js"),
-  join4("extensions", "omo-telemetry-posthog.js"),
-  join4("extensions", "omo-telemetry-otlp.js"),
-  join4("extensions", "omo-memory-sync.js"),
-  join4("extensions", "loro_wasm_bg.wasm"),
-  join4("extensions", "CaseFolding.txt"),
-  join4("extensions", "omo-thread-client.js"),
-  join4("extensions", "omo-wake.js"),
-  join4("extensions", "omo-telemetry-recovery.js"),
-  join4("extensions", "omo-feedback.js"),
-  join4("extensions", "omo-desktop-toolkit.js"),
-  join4("extensions", "omo-claim-receipt.js"),
-  join4("extensions", "assets.generated.json"),
-  join4("extensions", "omo-member.js"),
-  join4("extensions", "memory-run-supervisor.mjs"),
-  join4("extensions", "gateway-store-worker.mjs"),
-  join4("extensions", "omo-computer-run-worker.mjs"),
-  join4("extensions", "quickjs.wasm"),
-  ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
-  join4("skills", "ast-grep", "SKILL.md"),
-  join4("skills", "browser", "SKILL.md"),
-  join4("skills", "browser", "runtime", "omowright", "index.js"),
-  join4("skills", "browser", "runtime", "omowright", "page-bundle.js"),
-  join4("skills", "coding-agent-sessions", "SKILL.md"),
-  join4("skills", "debugging", "SKILL.md"),
-  join4("skills", "frontend", "SKILL.md"),
-  join4("skills", "git", "SKILL.md"),
-  join4("skills", "github", "SKILL.md"),
-  join4("skills", "init-deep", "SKILL.md"),
-  join4("skills", "lsp-setup", "SKILL.md"),
-  join4("skills", "programming", "SKILL.md"),
-  join4("skills", "refactor", "SKILL.md"),
-  join4("skills", "remove-ai-slops", "SKILL.md"),
-  join4("skills", "review-work", "SKILL.md"),
-  join4("skills", "ultimate-browsing", "SKILL.md"),
-  join4("skills", "ultrawork", "SKILL.md"),
-  join4("skills", "ulw-execute", "SKILL.md"),
-  join4("skills", "ulw-loop", "SKILL.md"),
-  join4("skills", "ulw-plan", "SKILL.md"),
-  join4("skills", "ulw-research", "SKILL.md"),
-  join4("skills", "visual-qa", "SKILL.md"),
-  join4("skills-conditional", "x-search", "SKILL.md"),
-  join4("runtime", "agent-toolkit-sdk", "sdk.js"),
-  join4("runtime", "bunshin-ts", "sdk.js"),
-  join4("runtime", "omo-sdk", "sdk.js"),
-  join4("runtime", "thread-sdk", "sdk.js"),
-  join4("runtime", "ast-grep-mcp", "cli.js"),
-  join4("runtime", "lsp-daemon", "dist", "cli.js"),
-  join4("runtime", "lsp-daemon", "dist", "index.js"),
-  join4("runtime", "lsp-daemon", "dist", "index.d.ts"),
-  join4("runtime", "lsp-daemon", "dist", "daemon-client.js"),
-  join4("runtime", "lsp-daemon", "dist", "daemon-client.d.ts"),
-  join4("runtime", "lsp-daemon", "dist", "package.json"),
-  join4("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
-  join4("scripts", "install.mjs"),
+  join5("extensions", "omo.js"),
+  join5("extensions", "omo-task.js"),
+  join5("extensions", "omo-computer-use.js"),
+  join5("extensions", "omo-memory-doctor.js"),
+  join5("extensions", "omo-memory-memfs.js"),
+  join5("extensions", "omo-memory-palace.js"),
+  join5("extensions", "omo-device-account.js"),
+  join5("extensions", "omo-memory-commands.js"),
+  join5("extensions", "omo-session-history.js"),
+  join5("extensions", "omo-recall-store.js"),
+  join5("extensions", "omo-device-service.js"),
+  join5("extensions", "omo-telemetry-posthog.js"),
+  join5("extensions", "omo-telemetry-otlp.js"),
+  join5("extensions", "omo-memory-sync.js"),
+  join5("extensions", "loro_wasm_bg.wasm"),
+  join5("extensions", "CaseFolding.txt"),
+  join5("extensions", "omo-thread-client.js"),
+  join5("extensions", "omo-wake.js"),
+  join5("extensions", "omo-telemetry-recovery.js"),
+  join5("extensions", "omo-feedback.js"),
+  join5("extensions", "omo-desktop-toolkit.js"),
+  join5("extensions", "omo-claim-receipt.js"),
+  join5("extensions", "assets.generated.json"),
+  join5("extensions", "omo-member.js"),
+  join5("extensions", "memory-run-supervisor.mjs"),
+  join5("extensions", "gateway-store-worker.mjs"),
+  join5("extensions", "omo-computer-run-worker.mjs"),
+  join5("extensions", "quickjs.wasm"),
+  ...PERSONA_ASSET_FILES.map((filename) => join5("extensions", filename)),
+  join5("skills", "ast-grep", "SKILL.md"),
+  join5("skills", "browser", "SKILL.md"),
+  join5("skills", "browser", "runtime", "omowright", "index.js"),
+  join5("skills", "browser", "runtime", "omowright", "page-bundle.js"),
+  join5("skills", "coding-agent-sessions", "SKILL.md"),
+  join5("skills", "debugging", "SKILL.md"),
+  join5("skills", "frontend", "SKILL.md"),
+  join5("skills", "git", "SKILL.md"),
+  join5("skills", "github", "SKILL.md"),
+  join5("skills", "init-deep", "SKILL.md"),
+  join5("skills", "lsp-setup", "SKILL.md"),
+  join5("skills", "programming", "SKILL.md"),
+  join5("skills", "refactor", "SKILL.md"),
+  join5("skills", "remove-ai-slops", "SKILL.md"),
+  join5("skills", "review-work", "SKILL.md"),
+  join5("skills", "ultimate-browsing", "SKILL.md"),
+  join5("skills", "ultrawork", "SKILL.md"),
+  join5("skills", "ulw-execute", "SKILL.md"),
+  join5("skills", "ulw-loop", "SKILL.md"),
+  join5("skills", "ulw-plan", "SKILL.md"),
+  join5("skills", "ulw-research", "SKILL.md"),
+  join5("skills", "visual-qa", "SKILL.md"),
+  join5("skills-conditional", "x-search", "SKILL.md"),
+  join5("runtime", "agent-toolkit-sdk", "sdk.js"),
+  join5("runtime", "bunshin-ts", "sdk.js"),
+  ...runtimeArtifactPaths(),
+  RUNTIME_IMPORT_MAP,
+  join5("runtime", "thread-sdk", "sdk.js"),
+  join5("runtime", "ast-grep-mcp", "cli.js"),
+  join5("runtime", "lsp-daemon", "dist", "cli.js"),
+  join5("runtime", "lsp-daemon", "dist", "index.js"),
+  join5("runtime", "lsp-daemon", "dist", "index.d.ts"),
+  join5("runtime", "lsp-daemon", "dist", "daemon-client.js"),
+  join5("runtime", "lsp-daemon", "dist", "daemon-client.d.ts"),
+  join5("runtime", "lsp-daemon", "dist", "package.json"),
+  join5("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
+  join5("scripts", "install.mjs"),
   "daemon-launch-spec.json"
 ];
 async function ensurePluginArtifacts(context) {
   if (context.allowBuild) {
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "build-extension.mjs")], {
+    await context.runCommand("node", [join5(context.pluginPath, "scripts", "build-extension.mjs")], {
       cwd: context.repoRoot
     });
-    await context.runCommand("node", [join4("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot });
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "sync-skills.mjs")], {
+    await context.runCommand("node", [join5("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot });
+    await context.runCommand("node", [join5(context.pluginPath, "scripts", "sync-skills.mjs")], {
       cwd: context.repoRoot
     });
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "build-install.mjs")], {
+    await context.runCommand("node", [join5(context.pluginPath, "scripts", "build-install.mjs")], {
       cwd: context.repoRoot
     });
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], {
+    await context.runCommand("node", [join5(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], {
       cwd: context.repoRoot
     });
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], {
+    await context.runCommand("node", [join5(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], {
       cwd: context.repoRoot
     });
-    await context.runCommand("node", [join4(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], {
+    await context.runCommand("node", [join5(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], {
       cwd: context.repoRoot
     });
   }
@@ -432,14 +460,14 @@ async function ensurePluginArtifacts(context) {
 }
 async function hasMissingPluginArtifact(pluginPath) {
   for (const artifact of REQUIRED_PLUGIN_ARTIFACTS) {
-    if (!await fileExists2(join4(pluginPath, artifact)))
+    if (!await fileExists2(join5(pluginPath, artifact)))
       return true;
   }
   return false;
 }
 async function verifyAstGrepRuntimeIntegrity(pluginPath, platform) {
-  const runtimeEntry = join4(pluginPath, "runtime", "ast-grep-mcp", "cli.js");
-  const manifestPath = join4(dirname3(runtimeEntry), "manifest.json");
+  const runtimeEntry = join5(pluginPath, "runtime", "ast-grep-mcp", "cli.js");
+  const manifestPath = join5(dirname3(runtimeEntry), "manifest.json");
   let runtimeStat;
   try {
     runtimeStat = await stat(runtimeEntry);
@@ -514,7 +542,7 @@ async function runSenpiInstaller(options = {}) {
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
   const launcherPath = installLocalLauncher({
     pluginPath: context.pluginPath,
-    senpiCliPath: join5(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
+    senpiCliPath: join6(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
     homeDir: context.homeDir,
     platform: context.platform
   });
@@ -558,13 +586,13 @@ function resolveInstallContext(options) {
   const repoRoot = resolve4(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname4(fileURLToPath(import.meta.url))) : dirname4(resolve4(options.pluginPath))));
   const homeDir = options.homeDir ?? env.HOME ?? homedir3();
   const agentDir = resolve4(options.agentDir ?? resolveAgentHome({ env, homeDir }));
-  const pluginPath = resolve4(options.pluginPath ?? join5(repoRoot, "packages", "omo-senpi", "plugin"));
+  const pluginPath = resolve4(options.pluginPath ?? join6(repoRoot, "packages", "omo-senpi", "plugin"));
   return {
     env,
     repoRoot,
     agentDir,
     homeDir,
-    settingsPath: join5(agentDir, "settings.json"),
+    settingsPath: join6(agentDir, "settings.json"),
     pluginPath,
     platform: options.platform ?? process.platform,
     allowBuild,
@@ -581,7 +609,7 @@ async function defaultRunCommand(command, args, options) {
 function findRepoRoot(importerDir) {
   let current = importerDir;
   for (let depth = 0;depth <= 7; depth += 1) {
-    if (fileExistsSync(join5(current, "packages", "omo-senpi", "plugin", "package.json")))
+    if (fileExistsSync(join6(current, "packages", "omo-senpi", "plugin", "package.json")))
       return current;
     current = resolve4(current, "..");
   }
@@ -641,13 +669,13 @@ function printJson(result) {
 function resolvePackagedPluginPath(importerUrl) {
   const scriptDir = dirname5(fileURLToPath2(importerUrl));
   const candidate = resolve5(scriptDir, "..");
-  const manifestPath = join6(candidate, "package.json");
+  const manifestPath = join7(candidate, "package.json");
   if (!existsSync3(manifestPath))
     return;
   const parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
   if (!isRecord2(parsed) || parsed.name !== "@code-yeongyu/omo-senpi")
     return;
-  if (!existsSync3(join6(candidate, "extensions", "omo.js")))
+  if (!existsSync3(join7(candidate, "extensions", "omo.js")))
     return;
   return candidate;
 }

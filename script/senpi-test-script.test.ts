@@ -5,9 +5,10 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { readFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { runSenpiInstaller } from "../packages/omo-senpi/src/install/install-senpi"
 import { BUILD_NODES, selectBuildNodes } from "./build-nodes"
+import { runtimeArtifactPaths } from "../packages/omo-senpi/plugin/scripts/runtime-files.mjs"
 
 const packageManifestPath = new URL("../package.json", import.meta.url)
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
@@ -153,8 +154,10 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
       await mkdir(join(pluginRoot, "runtime", "bunshin-ts"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
-      await mkdir(join(pluginRoot, "runtime", "omo-sdk"), { recursive: true })
-      await writeFile(join(pluginRoot, "runtime", "omo-sdk", "sdk.js"), "export {}\n")
+      for (const artifact of runtimeArtifactPaths()) {
+        await mkdir(dirname(join(pluginRoot, artifact)), { recursive: true })
+        await writeFile(join(pluginRoot, artifact), "export {}\n")
+      }
       await mkdir(join(pluginRoot, "runtime", "thread-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")

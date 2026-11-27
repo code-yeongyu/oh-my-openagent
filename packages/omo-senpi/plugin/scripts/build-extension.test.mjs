@@ -16,6 +16,7 @@ import {
   toPortableBuildPath,
 } from "./build-extension.mjs"
 import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
+import { sdkRuntimeOutputPaths } from "./runtime-files.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture, outputPathsIn, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 import {
@@ -268,7 +269,8 @@ describe("checkExtensionCurrent", () => {
 
     // when
     const carriers = probes.map(() => [])
-    for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
+    const { sdkRuntimeRoot, ...files } = outputPathsIn(outputs.root)
+    for (const [name, path] of Object.entries({ ...files, ...sdkRuntimeOutputPaths(sdkRuntimeRoot) })) {
       const bundle = await readFile(path, "utf8")
       probes.forEach((probe, index) => {
         if (bundle.includes(probe)) carriers[index].push(name)
@@ -833,6 +835,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-wake-runtime": "./extensions/omo-wake.js",
+      "#omo-sdk-threads-runtime": "./runtime/omo-sdk/threads.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",

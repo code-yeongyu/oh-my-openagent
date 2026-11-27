@@ -6,10 +6,15 @@ import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
 import { type CoreLoaders, LAUNCHER_NAMESPACES } from "./root/members"
 import { shippedNamespaces } from "./root/shipped"
+import type { ThreadsRuntime } from "./root/thread-runtime-file"
 import { threadsServing } from "./thread-assembly"
 
 /** What only the entry that ships the launcher library sets; never part of the public options (design 4.1). */
-export type OmoSdkAssembly = { readonly cores?: CoreLoaders }
+export type OmoSdkAssembly = {
+  readonly cores?: CoreLoaders
+  /** Loads the thread runtime file; absent, its import-map specifier. The non-disclosure scan drives its failures. */
+  readonly loadThreadsRuntime?: () => Promise<ThreadsRuntime>
+}
 
 const processUid = (): number => process.getuid?.() ?? userInfo().uid
 
@@ -48,7 +53,7 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
     ...(ports.deviceServiceStatus === undefined ? {} : { deviceServiceStatus: ports.deviceServiceStatus }),
     ...(ports.remoteTimers === undefined ? {} : { remoteTimers: ports.remoteTimers }),
   })
-  const threads = threadsServing(options, env, cwd, principal)
+  const threads = threadsServing(options, env, cwd, principal, true, assembly.loadThreadsRuntime)
   const root = assembleRoot(
     [shipped, threads],
     cores,
