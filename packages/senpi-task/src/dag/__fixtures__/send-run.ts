@@ -16,7 +16,7 @@ import type { DagNodeId } from "../types"
 import { LongRunningTaskManager, node, owner, pausedRecord, runId, taskRecord } from "./reattached-run"
 
 export const THIS_HOST = 101
-export const OTHER_HOST = 202
+const OTHER_HOST = 202
 export const LIVE_THIRD_HOST = 303
 
 export type Leased = DagRunRecordV1 & { readonly leaseHolderPid?: number; readonly previousLeaseHolderPid?: number }
