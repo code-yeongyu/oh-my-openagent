@@ -98,8 +98,10 @@ export const ratchetedFiles = (files: readonly string[]): string[] =>
 // #14220: minified bundle output is not a test source, but the bundler's short function names collide
 // with the test API names the two omo-testing rules key on, so every bundle regeneration moved their
 // counts between files (train #14196 had to hand-edit the baseline for exactly that). Bundle output
-// therefore never counts for the test rules; every other rule keeps counting everywhere.
-const BUNDLE_OUTPUT = /packages[/\\][^/\\]+[/\\]plugin[/\\](?:extensions|runtime)[/\\]/
+// therefore never counts for the test rules; every other rule keeps counting everywhere. The gateway's historical store
+// worker fixtures (`testing/v<n>/`, byte copies of a shipped bundle pinned by sha256) are that same bundle output.
+const BUNDLE_OUTPUT =
+  /packages[/\\][^/\\]+[/\\](?:plugin[/\\](?:extensions|runtime)|src[/\\]components[/\\]thread[/\\]gateway[/\\]testing[/\\]v\d+)[/\\]/
 export const countsTowardRatchet = (code: string, filename: string): boolean =>
   // oxlint emits plugin rules as "omo-testing(rule)" before the ratchet normalizes them to
   // "omo-testing/rule", so the namespace prefix matches both shapes.

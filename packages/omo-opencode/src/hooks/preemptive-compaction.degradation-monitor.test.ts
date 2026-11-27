@@ -1,18 +1,10 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import * as logger from "../shared/logger"
+import { createPreemptiveCompactionHook } from "./preemptive-compaction"
 
 const logMock = mock(() => {})
-
-mock.module("../shared/logger", () => ({
-  log: logMock,
-}))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
 type AssistantHistoryMessage = {
   info: {
@@ -92,6 +84,11 @@ function buildAssistantUpdate(input: { sessionID: string; id: string; parts: unk
 describe("preemptive-compaction post-compaction degradation monitor", () => {
   beforeEach(() => {
     logMock.mockClear()
+    spyOn(logger, "log").mockImplementation(logMock)
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   it("triggers recovery summarize after three consecutive no-text tail messages", async () => {

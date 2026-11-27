@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -9,6 +9,7 @@ import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAl
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 type Frame = Record<string, unknown>
 type Answer = (frame: Frame) => Record<string, unknown>
@@ -20,7 +21,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 
 function tempDir(prefix: string): string {
   // Short /tmp paths: a unix socket path is capped near 104 bytes on darwin.
-  const directory = mkdtempSync(join("/tmp", prefix))
+  const directory = shortTempDir(prefix)
   cleanups.push(async () => rmSync(directory, { recursive: true, force: true }))
   return directory
 }
@@ -144,6 +145,33 @@ describe("thread tools across host endpoints", () => {
     // Every row names the engine version of the host that holds it.
     const engines = Object.fromEntries((threads as ReadonlyArray<{ thread: string; engine_version?: string }>).map((thread) => [thread.thread, thread.engine_version]))
     expect(engines).toEqual({ "dur-terminal": "2026.11.19-3", "dur-desktop": "5.1.70" })
+  })
+
+  test("#given an engineVersion key that is null, not a string, or past 128 characters #when thread_list runs #then the row has no engine_version and never falls back to serverVersion, while 128 characters is kept", async () => {
+    // omo-relay-spec #314: a present engineVersion key is the only source; serverVersion is read only when the key is absent.
+    const atCap = "e".repeat(128)
+    const cases: ReadonlyArray<readonly [Frame, Frame, string | undefined, string | undefined]> = [
+      [{ serverVersion: "5.1.79", engineVersion: null }, { serverVersion: "5.1.70", engineVersion: 20261119 }, undefined, undefined],
+      [{ serverVersion: "5.1.79", engineVersion: atCap }, { serverVersion: "5.1.70", engineVersion: `${atCap}x` }, atCap, undefined],
+    ]
+    for (const [legacyProtocol, shardProtocol, legacyEngine, shardEngine] of cases) {
+      // given
+      const dir = tempDir("thr-ev-")
+      const legacy = join(dir, "rpc.sock")
+      const shard = join(dir, "i-0123456789abcdef.sock")
+      await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")), legacyProtocol)
+      await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")), shardProtocol)
+      const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)] })
+
+      // when
+      const listed = await w.run("thread_list", { all_scope: true })
+
+      // then
+      expect(listed.kind).toBe("ok")
+      const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; engine_version?: string }>
+      const engines = Object.fromEntries(threads.map((thread) => [thread.thread, thread.engine_version]))
+      expect(engines).toEqual({ "dur-terminal": legacyEngine, "dur-desktop": shardEngine })
+    }
   })
 
   test("#given both endpoints hold a session routed as rpc-1 #when thread_send and thread_read target the i-* thread #then every per-session request dials the i-* socket and none reaches the legacy one", async () => {

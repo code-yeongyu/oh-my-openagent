@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, watch } from "node:fs"
-import { basename, dirname } from "node:path"
+import { dirname } from "node:path"
+import { awaitWithinTestBudget } from "../../../test-support/test-deadline"
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import {
@@ -85,7 +86,8 @@ describe("#13010 remote CLI session identity", () => {
     const result = await run(["open", PEER, "--project", "/work/b", "--model", "test/model", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")) }).toMatchObject({
       code: REMOTE_EXIT.ok,
-      json: { kind: "ok", thread: DURABLE, model: MODEL },
+      // --json prints the client's OpenResult: the thread as <device>/<listing key> and the model it opened on.
+      json: { thread: `${PEER}/${SESSION_ID}`, model: MODEL },
     })
     expect(JSON.stringify(fake.state.commands)).not.toContain("set_model")
   })
@@ -95,7 +97,7 @@ describe("#13010 remote CLI session identity", () => {
     const result = await run(["interrupt", "missing-session", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject({
       code: REMOTE_EXIT.failed,
-      json: { kind: "error", error: { code: "not_found" } },
+      json: { kind: "error", code: "not_found" },
       commands: [],
     })
   })
@@ -116,7 +118,7 @@ describe("#13010 remote CLI session identity", () => {
       expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject(
         {
           code: REMOTE_EXIT.failed,
-          json: { kind: "error", error: { code: "ambiguous_target" } },
+          json: { kind: "error", code: "ambiguous_target" },
           commands: [],
         },
       )
@@ -135,8 +137,9 @@ describe("#13010 remote CLI session identity", () => {
       expect({ target, code: result.code, json: result.out.map((line) => JSON.parse(line)) }).toMatchObject({
         target,
         code: REMOTE_EXIT.ok,
-        // A listing key typed behind its device answers with that key, as before the address module (#14305 review L2).
-        json: [{ kind: "ok", thread: target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE }],
+        // A listing key typed behind its device names the session by that key, as before the address module (#14305
+        // review L2); any other form names it by its durable id.
+        json: [{ thread: `${PEER}/${target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE}` }],
       })
     }
   })
@@ -165,20 +168,19 @@ describe("#13010 remote CLI session identity", () => {
         const socket = prepared.engineArgs[1]
         if (socket === undefined) throw new Error("attach did not name its endpoint")
         const endpoint = dirname(socket)
-        // Closing the service schedules the endpoint's asynchronous server.close; wait for that endpoint's removal.
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
+        expect(existsSync(endpoint)).toBe(true)
+        // Closing the service ends the attach (#13414 4c-2: the client's attach owns the endpoint), and the attach's end
+        // removes the endpoint's directory: watched from its parent before the close, so the removal is not missed.
+        const removed = new Promise<void>((resolve) => {
+          const watcher = watch(dirname(endpoint), () => {
+            if (existsSync(endpoint)) return
             watcher.close()
-            reject(new Error("attach endpoint was not removed"))
-          }, 2_000)
-          const watcher = watch(dirname(endpoint), (_event, name) => {
-            if (name !== basename(endpoint) || existsSync(endpoint)) return
-            watcher.close()
-            clearTimeout(timer)
             resolve()
           })
-          service.close()
         })
+        service.close()
+        await awaitWithinTestBudget(removed, "the attach endpoint's removal")
+        expect(existsSync(endpoint)).toBe(false)
       } finally {
         service.close()
       }

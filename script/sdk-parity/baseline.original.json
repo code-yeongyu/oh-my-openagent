@@ -1,0 +1,815 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "account.adopt",
+      "gap": "no SDK call",
+      "slice": "A1d",
+      "issue": "new"
+    },
+    {
+      "id": "account.credentials.handOver",
+      "gap": "no SDK call",
+      "slice": "A1d",
+      "issue": "new"
+    },
+    {
+      "id": "account.forget",
+      "gap": "no SDK call",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.keys.init",
+      "gap": "no SDK call",
+      "slice": "OC1c",
+      "issue": "new"
+    },
+    {
+      "id": "account.keys.status",
+      "gap": "no SDK call",
+      "slice": "OC1c",
+      "issue": "new"
+    },
+    {
+      "id": "account.show",
+      "gap": "partial: `whoami`",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.signIn",
+      "gap": "partial: device code only, and it runs the CLI as a child (`S/account/sign-in-process.ts`)",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.signInCheck",
+      "gap": "no SDK call",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.signOut",
+      "gap": "no SDK call",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.store.disable",
+      "gap": "no SDK call",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.store.enable",
+      "gap": "no SDK call",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.store.status",
+      "gap": "no SDK call",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "account.whoami",
+      "gap": "partial: `whoami`",
+      "slice": "A1b",
+      "issue": "#14364"
+    },
+    {
+      "id": "boulder.status",
+      "gap": "no SDK call",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "config.migrate",
+      "gap": "no SDK call",
+      "slice": "OC1a",
+      "issue": "new"
+    },
+    {
+      "id": "config.modelCapabilities.refresh",
+      "gap": "no SDK call",
+      "slice": "OC1a",
+      "issue": "new"
+    },
+    {
+      "id": "config.status",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "P1b",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.ensure",
+      "gap": "partial: `warmDaemon`",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.gc",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.handoff",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.rollbackPrepare",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.run",
+      "gap": "partial: `warmDaemon` only",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.shardPath",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.status",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.stop",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.stopAll",
+      "gap": "no SDK call",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "daemon.warm",
+      "gap": "partial: `warmDaemon`",
+      "slice": "C1a",
+      "issue": "new"
+    },
+    {
+      "id": "devices.list",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "P1b",
+      "issue": "new"
+    },
+    {
+      "id": "devices.rename",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "A1c",
+      "issue": "#14523"
+    },
+    {
+      "id": "devices.resolve",
+      "gap": "partial: remote module",
+      "slice": "T1a",
+      "issue": "#13016"
+    },
+    {
+      "id": "devices.revoke",
+      "gap": "no SDK call",
+      "slice": "A1c",
+      "issue": "#14523"
+    },
+    {
+      "id": "deviceService.bootstrap",
+      "gap": "partial: remote module, `admin.ts`",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.control",
+      "gap": "partial: remote module",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.disable",
+      "gap": "partial: remote module `service.setEnabled`, `admin.ts`",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.enable",
+      "gap": "partial: remote module `service.setEnabled`, `admin.ts`",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.info",
+      "gap": "partial: the omo SDK's narrower status; remote module `service.status`, `service.info`",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.setControl",
+      "gap": "partial: remote module",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.setWake",
+      "gap": "partial: remote module",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.status",
+      "gap": "partial: the omo SDK's narrower status; remote module `service.status`, `service.info`",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "deviceService.wake",
+      "gap": "partial: remote module",
+      "slice": "A2a",
+      "issue": "new"
+    },
+    {
+      "id": "diagnostics.fixReflectionLock",
+      "gap": "no SDK call",
+      "slice": "C1b",
+      "issue": "new"
+    },
+    {
+      "id": "diagnostics.models",
+      "gap": "no SDK call",
+      "slice": "C1b",
+      "issue": "new"
+    },
+    {
+      "id": "diagnostics.reapStaleEngines",
+      "gap": "no SDK call",
+      "slice": "C1b",
+      "issue": "new"
+    },
+    {
+      "id": "diagnostics.run",
+      "gap": "no SDK call",
+      "slice": "C1b",
+      "issue": "new"
+    },
+    {
+      "id": "engine.auth.apiKey",
+      "gap": "no SDK call",
+      "slice": "E1a-s",
+      "issue": "new"
+    },
+    {
+      "id": "engine.auth.bearerToken",
+      "gap": "no SDK call",
+      "slice": "E1a-s",
+      "issue": "new"
+    },
+    {
+      "id": "engine.auth.check",
+      "gap": "no SDK call",
+      "slice": "E1a-s",
+      "issue": "new"
+    },
+    {
+      "id": "engine.auth.credentials",
+      "gap": "no SDK call",
+      "slice": "E1a-s",
+      "issue": "new"
+    },
+    {
+      "id": "engine.config.agentDir",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.config.resources",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.config.setResource",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.launch.hand",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
+      "slice": "E1a-s",
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
+    },
+    {
+      "id": "engine.launch.headless",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
+      "slice": "E1a-s",
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
+    },
+    {
+      "id": "engine.launch.interactive",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
+      "slice": "E1a-s",
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
+    },
+    {
+      "id": "engine.launch.print",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
+      "slice": "E1a-s",
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
+    },
+    {
+      "id": "engine.launch.rpc",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
+      "slice": "E1a-s",
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
+    },
+    {
+      "id": "engine.models.discover",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.models.list",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.models.update",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.packages.install",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.packages.list",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.packages.remove",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.packages.update",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.promptSizes",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.schedule.cancel",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.schedule.list",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.schedule.run",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.sessionOfPid",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.sessions.exportHtml",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.tips",
+      "gap": "no SDK call",
+      "slice": "E1a",
+      "issue": "new"
+    },
+    {
+      "id": "engine.trust.ensure",
+      "gap": "no SDK call; security-gated, cleared only after the security design (S0) covers it",
+      "slice": "C1a",
+      "issue": "new",
+      "clearedOnlyBy": "C1a"
+    },
+    {
+      "id": "install.cleanup",
+      "gap": "no SDK call",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "install.localVersion",
+      "gap": "no SDK call",
+      "slice": "OC1a",
+      "issue": "new"
+    },
+    {
+      "id": "install.plugin",
+      "gap": "no SDK call",
+      "slice": "OC1a",
+      "issue": "new"
+    },
+    {
+      "id": "install.sdkRoot",
+      "gap": "no SDK call",
+      "slice": "C1c",
+      "issue": "new"
+    },
+    {
+      "id": "install.setup.apply",
+      "gap": "no SDK call",
+      "slice": "C1c",
+      "issue": "new"
+    },
+    {
+      "id": "install.setup.detect",
+      "gap": "no SDK call",
+      "slice": "C1c",
+      "issue": "new"
+    },
+    {
+      "id": "install.setup.plan",
+      "gap": "no SDK call",
+      "slice": "C1c",
+      "issue": "new"
+    },
+    {
+      "id": "install.update",
+      "gap": "no SDK call",
+      "slice": "C1c",
+      "issue": "new"
+    },
+    {
+      "id": "install.version",
+      "gap": "no SDK call",
+      "slice": "C1c",
+      "issue": "new"
+    },
+    {
+      "id": "mcp.oauth.login",
+      "gap": "no SDK call",
+      "slice": "OC1c",
+      "issue": "new"
+    },
+    {
+      "id": "mcp.oauth.logout",
+      "gap": "no SDK call",
+      "slice": "OC1c",
+      "issue": "new"
+    },
+    {
+      "id": "mcp.oauth.status",
+      "gap": "no SDK call",
+      "slice": "OC1c",
+      "issue": "new"
+    },
+    {
+      "id": "sync.approve",
+      "gap": "no SDK call",
+      "slice": "A2b",
+      "issue": "new"
+    },
+    {
+      "id": "sync.disable",
+      "gap": "no SDK call",
+      "slice": "A2b",
+      "issue": "new"
+    },
+    {
+      "id": "sync.enable",
+      "gap": "no SDK call",
+      "slice": "A2b",
+      "issue": "new"
+    },
+    {
+      "id": "sync.recover",
+      "gap": "no SDK call",
+      "slice": "A2c",
+      "issue": "#14464"
+    },
+    {
+      "id": "sync.retirePin",
+      "gap": "no SDK call",
+      "slice": "A2b",
+      "issue": "new"
+    },
+    {
+      "id": "sync.status",
+      "gap": "no SDK call",
+      "slice": "A2b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.adopt",
+      "gap": "partial: `locate` and `release`; the launch plan is built in the CLI (`N/bin/lib/daemon-adopt.js:118-155`)",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.aliases.clear",
+      "gap": "partial: remote module `aliases.*`",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.aliases.resolve",
+      "gap": "partial: remote module `aliases.*`",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.aliases.set",
+      "gap": "partial: remote module `aliases.*`",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.archive",
+      "gap": "no SDK call",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.attach",
+      "gap": "partial: remote module `attach`",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.close",
+      "gap": "partial: the key is accepted and not honoured (`T/sdk.ts:488-495`)",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.create",
+      "gap": "partial: the thread SDK creates; `omo remote open` skips the create orchestration (#13016 OMO-CTL-26); no `launch_spec`, no prompt metadata",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.entries",
+      "gap": "partial: remote module `sessions.read(thread, { before, tail })`",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.extensions.call",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "P1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.extensions.register",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "P1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.extensions.sessionCall",
+      "gap": "no SDK call",
+      "slice": "T1e",
+      "issue": "new"
+    },
+    {
+      "id": "threads.extensions.sessionOps",
+      "gap": "no SDK call",
+      "slice": "T1e",
+      "issue": "new"
+    },
+    {
+      "id": "threads.follow",
+      "gap": "partial: remote module `sessions.follow`",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.get",
+      "gap": "partial: remote module `sessions.get`",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.handoff",
+      "gap": "no SDK call",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.interrupt",
+      "gap": "partial: the key is accepted and not honoured outside the tool's receipt",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.list",
+      "gap": "partial: no `workspace`, `device`, `project`, `name`, `archived` in the thread SDK (remote module has them, `R/types.ts:68, 233-239`)",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.locate",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "P1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.messages",
+      "gap": "no SDK call",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.read",
+      "gap": "partial: no `idempotency_key`; `--limit` is sliced in the CLI (`N/bin/lib/thread.js:92-95`)",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.readAfterWait",
+      "gap": "no SDK call",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.receipt",
+      "gap": "no SDK call",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.release",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.rename",
+      "gap": "no conformance scenario of its inputs yet",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.resolve",
+      "gap": "partial: remote module `sessions.resolve`",
+      "slice": "T1a",
+      "issue": "#13016"
+    },
+    {
+      "id": "threads.runToCompletion",
+      "gap": "no SDK call",
+      "slice": "OC1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.send",
+      "gap": "partial: own target construction (#13016); `summary` and attachments only in the remote module; the facade's names are `text`, `mode`",
+      "slice": "T1a",
+      "issue": "#13016"
+    },
+    {
+      "id": "threads.sendAndFollow",
+      "gap": "partial: remote module `sessions.send` then `follow` with the promised receipt (`R/follow.ts`)",
+      "slice": "T1c",
+      "issue": "new"
+    },
+    {
+      "id": "threads.setModel",
+      "gap": "partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`)",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.setReasoning",
+      "gap": "no SDK call",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.unload",
+      "gap": "no SDK call",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "threads.wait",
+      "gap": "partial: remote module `sessions.wait`; the local wait is inside the tool body",
+      "slice": "T1b",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.addGoal",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.checkpoint",
+      "gap": "partial: see below; the advance input (--no-advance) is missing from the component manifest",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.completeGoals",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.createGoals",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.criteria",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.forSession",
+      "gap": "no SDK call",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.help",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.recordEvidence",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.recordReviewBlockers",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.status",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "toolkit.steer",
+      "gap": "partial: see below",
+      "slice": "OC2",
+      "issue": "new"
+    },
+    {
+      "id": "worktrees.sweep",
+      "gap": "no SDK call",
+      "slice": "OC2",
+      "issue": "new"
+    }
+  ]
+}

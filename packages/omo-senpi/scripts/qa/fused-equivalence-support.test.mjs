@@ -29,6 +29,26 @@ const status = (key, text) => ({ type: "extension_ui_request", method: "setStatu
 const turnEvent = (type) => ({ type })
 
 describe("splitStatusChannels", () => {
+  test("#given a channel compared at its settled point #when the last line before the final clear differs #then the compared value differs", () => {
+    // #13046: a settled-point channel must still fail the compare when the session settles on the wrong line.
+    const settledOn = (last) =>
+      splitStatusChannels(
+        {
+          turn: [
+            status("memory", undefined),
+            status("memory", "just now"),
+            status("memory", last),
+            status("memory", undefined),
+          ],
+          surfaces: [],
+        },
+        ["setStatus:memory"],
+      ).status["setStatus:memory"]
+
+    expect(settledOn("just now (+1)")).toEqual({ settled: "just now (+1)" })
+    expect(settledOn("just now")).not.toEqual(settledOn("just now (+1)"))
+  })
+
   test("#given a channel that published twice #when split #then both snapshots are kept in order and counted", () => {
     const client = {
       turn: [turnEvent("agent_start"), status("memory", "a"), turnEvent("turn_end"), status("memory", "b")],

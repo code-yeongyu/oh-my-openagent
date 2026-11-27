@@ -1,5 +1,5 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
-import type { BindingRecord, OutboxRow } from "../gateway/bindings"
+import type { ReceiptOutcome } from "../gateway/types"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
 import type { ThreadActivity, ThreadModel, ThreadState } from "./state"
 
@@ -146,6 +146,7 @@ export type ThreadDelivery =
  * endpoint internal (#14044): only the SDK's send (`endpoint_kind`, for `omo thread send` and connectors) reports it.
  */
 export type ThreadGatewayDeliveryFacts = {
+  readonly outcome?: ReceiptOutcome
   readonly delivery_id?: string
   readonly effective_mode?: "auto" | "start" | "steer" | "follow_up"
   /** The target already held this sender's earlier message under the same collapse_key: this text was not delivered. */
@@ -276,6 +277,14 @@ export type ThreadListResult =
       readonly unanswered_endpoints?: number
     }
   | ThreadDataError
+
+/** A query-only read of the caller's original delivery; the transcript read type stays unchanged. */
+export type ThreadReceiptResult = {
+  readonly kind: "ok"
+  readonly thread: string
+  readonly delivery_id: string
+  readonly outcome: ReceiptOutcome
+}
 
 export type ThreadReadResult =
   | {
@@ -425,52 +434,11 @@ export type ThreadSetReasoningResult =
     }
   | ThreadDataError
 
-export type ThreadBinding = BindingRecord
-
-export type ThreadOutboxRow = OutboxRow
-
-export type ThreadReportResult =
-  | {
-      readonly kind: "ok"
-      readonly binding_id: string
-      readonly revision: number
-      readonly event: "milestone" | "report" | "question" | "completion"
-      /** The outbox row written; null for a completion, which is written when the session settles. */
-      readonly cursor: number | null
-      readonly reply_token: string | null
-      readonly armed: boolean
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadOutboxResult =
-  | {
-      readonly kind: "ok"
-      readonly binding_id: string
-      readonly revision: number
-      readonly status: ThreadBinding["status"]
-      readonly rows: readonly ThreadOutboxRow[]
-      readonly next_cursor: number
-      readonly acked_cursor: number
-    }
-  | ThreadDataError
-
-export type ThreadOutboxAckResult =
-  | { readonly kind: "ok"; readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }
-  | ThreadDataError
-
-export type ThreadAnswerResult =
-  | { readonly kind: "ok"; readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string }
-  | ThreadDataError
-
 export type ThreadToolResult =
-  | ThreadReportResult
-  | ThreadOutboxResult
-  | ThreadOutboxAckResult
-  | ThreadAnswerResult
   | ThreadCreateResult
   | ThreadListResult
   | ThreadReadResult
+  | ThreadReceiptResult
   | ThreadSendResult
   | ThreadInterruptResult
   | ThreadCloseResult

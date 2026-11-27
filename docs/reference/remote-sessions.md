@@ -23,7 +23,7 @@ omo remote attach <session>      # open a session in the terminal UI, to watch a
 omo remote open <device> --project P [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
                 [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]] [--json]
                                  # start a session on another device; prints <device>/<session>
-omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
+omo remote send <session> <text|-> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
 omo remote model <session> <provider/id> [--json]   # switch the session's model
 omo remote interrupt <session> [--json]   # stop the session's running turn
@@ -32,6 +32,8 @@ omo remote close <session> [--force] [--json]  # end the session on its device; 
 
 `open` requires `--project` to name the working folder on the target device. Without it the command reports
 `invalid_arguments` and does not create a session in the service's working directory.
+
+`send <session> -` reads the message from stdin, so its text never appears in the process list; an empty stdin is a usage error. `close` exits 0 only when it closed the session; a session its device no longer holds is a `not_found` error with a non-zero exit.
 
 `devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
 `last_seen_ms` and `caps` (`attach`, `machine`, `control`), and `kind` when one is reported (this device's row has
@@ -219,8 +221,8 @@ The text of one command is limited to 1,000,000 characters and 3,000,000 bytes o
 
 ## Install and update
 
-An interactive `omo` start (a TUI session started by the `omo` launcher) runs `omo remote bootstrap` in
-the background, once per process, in its own process with a 10-minute deadline
+An interactive `omo` start (a TUI session started by the `omo` launcher) runs the same bootstrap as
+`omo remote bootstrap`, through the internal `omo __device-service-bootstrap --json` entry, in the background, once per process, in its own process with a 10-minute deadline
 (`packages/omo-senpi/src/components/device-service/runner.ts`). It does not run under CI or in task
 children, and `device_service.enabled: false` in `omo.json` turns it off. When you are signed in, it
 connects to a running device service at the pinned version or newer; only when none runs, or the
@@ -242,7 +244,7 @@ fails verification is not installed and the command says so. The state dir is `~
 
 ## Session host unit and cold wake
 
-`omo remote bootstrap` (every omo start) and `omo remote enable` install and start one fixed, always-on
+`omo remote bootstrap` (and the same bootstrap at every omo start) and `omo remote enable` install and start one fixed, always-on
 per-user unit that runs the omo session host next to the device service, and record it in the device service's
 service table as the only unit it may start for a cold wake: a message another device sends to a session that is
 not running (`packages/device-service-core/src/cold-wake/`).
@@ -269,7 +271,7 @@ command prints a notice instead. Nothing runs as root, and neither the unit's na
 configured.
 
 The device service's installer rewrites its macOS plist on every install and update, which drops the entry;
-the next `omo remote bootstrap` (every omo start) writes it back. The Linux drop-in survives an install.
+the next bootstrap (every omo start, or `omo remote bootstrap`) writes it back. The Linux drop-in survives an install.
 
 `omo remote disable` disables and removes the unit and the entry, and while remote sessions are off,
 `omo remote bootstrap` removes them again instead of installing them. Removing the unit also stops the host

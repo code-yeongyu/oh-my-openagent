@@ -114,11 +114,6 @@ export function createLazyLiveThreadSurface(
         if (gateway.classifyLiveness === undefined) throw new Error("unsupported:classifyLiveness")
         return await gateway.classifyLiveness(endpoint)
       },
-      respondUi: async (endpoint, answer) => {
-        const gateway = (await load()).gateway
-        if (gateway.respondUi === undefined) throw new Error("unsupported:respondUi")
-        return await gateway.respondUi(endpoint, answer)
-      },
     },
   }
 }

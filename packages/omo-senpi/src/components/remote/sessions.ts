@@ -10,9 +10,9 @@ import { createRelayControl } from "../thread/control/relay-control"
 import { createRelaySessionHost } from "../thread/control/relay-session-host"
 import type { SessionOpenRequest } from "../thread/control/session-host"
 import type { ThreadToolFailure } from "../thread/errors"
-import { hashArgs } from "../thread/gateway/bindings"
+import { hashArgs } from "../thread/gateway/hash-args"
 import { resolveProvenance } from "../thread/gateway/provenance-resolver"
-import type { ToolReceiptBegin } from "../thread/gateway/store-relay-ops"
+import type { ToolReceiptBegin } from "../thread/gateway/store-tool-receipts"
 import type { GatewaySender } from "../thread/gateway/types"
 import { namedDeviceRow } from "../thread/remote/address-book"
 import { outcomeFailure } from "../thread/remote/outcome"
@@ -24,11 +24,13 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
-import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
+import { idShaped } from "@oh-my-opencode/thread-address-core"
+import { budget, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
 import { sessionDetail } from "./session-detail"
+import { attachPreSend, followsSend, type PreSend, preSendView, SEND_TAIL } from "./send-transcript"
 import type {
   DeviceRow,
   SessionRow,
@@ -41,8 +43,28 @@ import type {
   RemoteFailure,
   SendReceipt,
   SendRequest,
+  ReadPage,
   ThreadHandle,
 } from "./types"
+
+/** One page of a session's history on another device, through a short-lived attach. */
+async function readOn(
+  svc: DeviceService,
+  target: Target,
+  page?: { readonly before?: string; readonly tail?: number },
+): R<ReadPage> {
+  const attached = await svc.attach(target.device, target.session)
+  try {
+    return await attached
+      .read({
+        ...(page?.before === undefined ? {} : { before: page.before }),
+        ...(page?.tail === undefined ? {} : { tail: page.tail }),
+      })
+      .then(ok, readFailureFromError)
+  } finally {
+    await attached.detach()
+  }
+}
 
 type SessionMembers = Pick<
   RemoteClient["sessions"],
@@ -232,6 +254,26 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
       return held.delete(keyOf(request))
     },
     deliveryView: async () => null,
+    reconcileRemoteReceipt: async (request) => {
+      const known = held.get(keyOf({ ...request, operation: "thread_send:remote" }))
+      if (known === undefined || !known.settled || typeof known.result !== "object" || known.result === null)
+        return { kind: "outcome_unavailable" }
+      if (
+        Reflect.get(known.result, "delivery_id") !== request.delivery_id ||
+        Reflect.get(known.result, "device") !== request.device ||
+        Reflect.get(known.result, "thread_id") !== request.target_durable_id
+      )
+        return { kind: "outcome_unavailable" }
+      const old = Reflect.get(known.result, "outcome")
+      if (
+        typeof old === "object" &&
+        old !== null &&
+        (Reflect.get(old, "kind") === "applied" || Reflect.get(old, "kind") === "refused")
+      )
+        return old as import("../thread/gateway/types").ReceiptOutcome
+      known.result = { ...known.result, outcome: request.outcome }
+      return request.outcome
+    },
   }
 }
 
@@ -260,6 +302,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       connect: async () => ({ conn: svc, owned: false }),
       dialEndpoint: async () => ({ conn: await core.dial(), owned: true }),
     })
+    // The port's held attaches and their idle timers end with the client, not only with the borrowed connection.
+    core.onClose(() => void port.close?.())
     const remote: RemoteThreadSurface = {
       // The thread bodies this member runs read the account through the client they belong to (#13414 U5).
       client: core.self(),
@@ -379,7 +423,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       return ok({ device: ref.id, session: keyed.value.target.session, row: byDurable, deviceRow })
     // #13748: a session just opened is not in the listing yet; only an id-shaped session part passes to its device,
     // where the port's attach locates it and its own typed refusal answers. Anything else is this resolver's refusal.
-    if (idShapedSession(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
+    if (idShaped(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
     return (
       listingIncomplete(
         thread,
@@ -462,7 +506,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const from = gatewaySender()
     if ("kind" in from) return from
     const device = target.deviceRow
-    return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
+    let preSend: PreSend | undefined
+    const sent = await core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device))
         return from.sender.kind === "person"
           ? await localSend(thread, target, device, request, from.caller)
@@ -476,6 +521,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         from.sender.kind === "person" && mode !== "steer"
           ? clientMessageIdOf(from.caller, request.idempotency_key)
           : undefined
+      // A follow waits on this send: what the session held before it went out tells an engine's id-less turn from an
+      // earlier identical send's (send-transcript.ts). A send nobody follows reads nothing.
+      if (clientMessageId !== undefined && followsSend(core, thread))
+        preSend = await preSendView(request.text, () => readOn(svc, target, { tail: SEND_TAIL }))
       const sent = await legOf(svc).relay.deliver({
         sender: from.sender,
         caller_id: from.caller,
@@ -527,6 +576,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           return ok({ ...base, lane: "queued_offline", queue_position: delivery.queue_position, wake: "none" })
       }
     })
+    if (sent.kind === "ok" && preSend !== undefined) attachPreSend(sent.value, preSend)
+    return sent
   }
 
   const open = async (request: OpenRequest, opts?: Opts): R<OpenResult> => {
@@ -679,17 +730,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
         if (await isThisDevice(svc, target.device))
           return await onThisDevice(target.device, (local) => local.read(target, page))
-        const attached = await svc.attach(target.device, target.session)
-        try {
-          return await attached
-            .read({
-              ...(page?.before === undefined ? {} : { before: page.before }),
-              ...(page?.tail === undefined ? {} : { tail: page.tail }),
-            })
-            .then(ok, readFailureFromError)
-        } finally {
-          await attached.detach()
-        }
+        return await readOn(svc, target, page)
       })
     },
     // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).

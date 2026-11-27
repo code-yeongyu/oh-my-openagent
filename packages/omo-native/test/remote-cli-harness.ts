@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { afterEach, beforeEach } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
 import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -8,8 +8,8 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
+import type { FakeClock } from "../../omo-senpi/src/components/remote/testing/fake-service"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
-import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createLocalSessions } from "../../omo-senpi/src/components/remote/local-sessions"
 import type { ThreadHost } from "../../omo-senpi/src/components/thread/tools/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
@@ -24,8 +24,29 @@ export const NOW = 1_790_000_400_000
 export const owners: FakeOwner[] = []
 const dirs: string[] = []
 
+/**
+ * A send writes its receipt to the gateway store at `canonicalAgentDir()`, which is the hermetic HOME's `~/.omo/agent`.
+ * A run from source refuses to migrate a store under an account home (#14892), so every test that reaches the send
+ * path gets its own agent dir outside HOME, as the guard asks (#14909).
+ */
+function useIsolatedAgentDir(): void {
+  let saved: string | undefined
+  let dir = ""
+  beforeEach(() => {
+    saved = process.env.OMO_CODING_AGENT_DIR
+    dir = mkdtempSync(join(tmpdir(), "omo-remote-agent-"))
+    process.env.OMO_CODING_AGENT_DIR = dir
+  })
+  afterEach(() => {
+    if (saved === undefined) delete process.env.OMO_CODING_AGENT_DIR
+    else process.env.OMO_CODING_AGENT_DIR = saved
+    rmSync(dir, { recursive: true, force: true })
+  })
+}
+
 /** Each test file calls this once: it stops the fake owners and removes the dirs its tests made. */
 export function useRemoteCliCleanup(): void {
+  useIsolatedAgentDir()
   afterEach(async () => {
     for (const owner of owners.splice(0)) await owner.stop()
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
@@ -83,13 +104,21 @@ export async function run(
   stateDir?: string,
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
-  remote?: RemoteThreadSurface,
   extra: {
-    readonly packageRoot?: string
+    /** The verb's connection (the conformance owner's by default): a test wraps it to stand in for an engine's answer. */
+    readonly connect?: () => ReturnType<typeof connectDeviceService>
+    /** The person client's clock: a waiting send's --timeout runs on it. */
+    readonly timers?: FakeClock
     readonly coldWake?: ColdWake
     readonly linkDevice?: DeviceLink
     readonly client?: () => RemoteClient
     readonly optOut?: RemoteOptOut
+    readonly localPermissionPreset?: () => string
+    readonly readStdin?: () => Promise<string>
+    /** The real stdio writers (localRemoteDependencies), for a test of what reaches the terminal. */
+    readonly output?: (line: string) => void
+    readonly write?: (text: string) => void
+    readonly error?: (line: string) => void
   } = {},
 ) {
   let dir = stateDir
@@ -129,7 +158,6 @@ export async function run(
       },
       optOut: { read: () => false, record: () => {}, clear: () => {} },
       localSessions: async () => createLocalSessions(async () => noLocalSessions),
-      ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,
     },
     args,

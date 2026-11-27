@@ -1,0 +1,243 @@
+{
+  "domain": "diagnostics",
+  "rows": [
+    {
+      "id": "diagnostics.fixReflectionLock",
+      "kind": "capability",
+      "sdk": "diagnostics.fixReflectionLock",
+      "today": "no",
+      "slices": [
+        "C1b",
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "doctor"
+          ],
+          "flags": {
+            "--fix": "when",
+            "--dry-run": "dry_run=true"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "diagnostics.models",
+      "kind": "capability",
+      "sdk": "diagnostics.models",
+      "today": "no",
+      "slices": [
+        "C1b",
+        "OC1a"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "doctor"
+          ],
+          "flags": {
+            "--models": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "diagnostics.reapStaleEngines",
+      "kind": "capability",
+      "sdk": "diagnostics.reapStaleEngines",
+      "today": "no",
+      "slices": [
+        "C1b",
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "pids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "pids"
+        ]
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "doctor"
+          ],
+          "flags": {
+            "--reap": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "diagnostics.run",
+      "kind": "capability",
+      "sdk": "diagnostics.run",
+      "today": "no",
+      "slices": [
+        "C1b",
+        "OC1a"
+      ],
+      "input": {
+        "properties": {
+          "status": {
+            "type": "boolean"
+          },
+          "verbose": {
+            "type": "boolean"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "opencode"
+              },
+              {
+                "type": "string",
+                "const": "codex"
+              }
+            ]
+          }
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "doctor"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [
+            "doctor"
+          ],
+          "flags": {
+            "--status": "status=true",
+            "--verbose": "verbose=true",
+            "--json": "render",
+            "--platform": "platform"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11",
+      "position": 3,
+      "ids": [
+        "diagnostics.run"
+      ],
+      "cells": [
+        "`diagnostics.run({ status?, verbose?, platform? })`",
+        "`doctor [--status] [--verbose] [--json] [--platform]`",
+        "**no**",
+        "Planned (OC1a), on the findings shape of C1b",
+        "OC1a"
+      ]
+    },
+    {
+      "table": "6.7",
+      "position": 13,
+      "ids": [
+        "diagnostics.run",
+        "diagnostics.models",
+        "diagnostics.fixReflectionLock",
+        "diagnostics.reapStaleEngines"
+      ],
+      "cells": [
+        "`diagnostics.run({ status?, verbose?, platform? })` answering findings as data; `.models()`; `.fixReflectionLock({ dry_run? })`; `.reapStaleEngines({ pids })`",
+        "`omo doctor`; `--models`; `--fix [--dry-run]`; `--reap`. OpenCode edition: `doctor [--status] [--verbose] [--json] [--platform]`, keeping its platform selection and its output-mode precedence",
+        "none",
+        "**no**",
+        "Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only",
+        "C1b; OC1a"
+      ]
+    }
+  ]
+}

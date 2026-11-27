@@ -7,6 +7,7 @@ import type { CoreListedSkill, SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { clearSkillCache, getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
+import { isGitSkillName } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/git-skill-metadata"
 import * as commandDiscovery from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
@@ -184,7 +185,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
         let body = await extractSkillBody(matchedSkill)
 
-        if (matchedSkill.name === "git-master") {
+        if (isGitSkillName(matchedSkill.name)) {
           body = injectGitMasterConfig(body, options.gitMasterConfig)
         }
 
