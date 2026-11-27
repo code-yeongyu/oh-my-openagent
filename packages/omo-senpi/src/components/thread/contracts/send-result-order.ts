@@ -4,7 +4,7 @@
  * reads whether the message started, was steered or waits, never the start of a link. Keys outside this list keep their
  * relative order after it.
  */
-export const SEND_RESULT_KEY_ORDER = [
+const SEND_RESULT_KEY_ORDER = [
   "kind",
   "delivery",
   "effective_mode",
