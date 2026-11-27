@@ -1,12 +1,11 @@
 //! The imported scripting fields drive the `Backend` half as their scenarios say.
 
-use omo_computer_core::error::Reason;
 use omo_computer_core::backend::{
     Backend, CaptureOptions, InputEvent, Route, TaggedInput, Target, WindowFilter,
 };
 use omo_computer_core::params::Point;
 
-use omo_computer_core::error::{ComputerCode, EngineCode};
+use omo_computer_core::error::{ComputerCode, EngineCode, Reason};
 
 use crate::{
     fixtures_dir, FakeBackend, FakeScenario, FocusRecordKind, FocusRecordOutcome, UserInputKind,
@@ -55,7 +54,7 @@ fn identity_epoch_and_display_scripts_fire_after_their_call() {
         epochs.next_change().ok().flatten().map(|e| e.reason),
         Some("lock".to_owned())
     );
-    fake.post_input(&click(), Route::BackgroundWindow)
+    fake.post_input(&click(), Route::BackgroundWindow { window: "101".to_owned() })
         .expect("delivered");
     assert_eq!(
         fake.displays().map(|d| d.len()),
