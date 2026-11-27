@@ -51,13 +51,18 @@ const base64url = (base64: string): string => Buffer.from(base64, "base64").toSt
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-/** One sign-in: its device, both private keys and the generation the store minted for them (#12945). */
+/**
+ * One sign-in: its device and both private keys, with the generation the store minted for them and the account it
+ * names wherever the held one has them (#12945). A credential stored before generations existed has none until the
+ * store's next write.
+ */
 const sameIdentity = (current: Credentials | null, held: Credentials): current is Credentials =>
   current !== null &&
   current.device.id === held.device.id &&
   current.signingPrivateKey === held.signingPrivateKey &&
   current.sealingPrivateKey === held.sealingPrivateKey &&
-  current.credentialGeneration === held.credentialGeneration
+  (held.credentialGeneration === undefined || current.credentialGeneration === held.credentialGeneration) &&
+  (held.accountId === undefined || current.accountId === undefined || current.accountId === held.accountId)
 
 export async function signedInSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const api = serviceOrigin(options.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
@@ -74,7 +79,16 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
       log: (line) => process.stderr.write(`${line}\n`),
     }),
   })
-  const token = () => session.accessToken()
+  // The sign-in this context holds. Its generation moves only when the store mints its first one: by the account
+  // write below, or by a token refresh of a credential stored before generations existed. That one is taken once.
+  let held = credentials
+  const stillHeld = (current: Credentials | null): current is Credentials => {
+    if (!sameIdentity(current, held)) return false
+    if (held.credentialGeneration === undefined && current.credentialGeneration !== undefined) held = current
+    return true
+  }
+  // A request carries this sign-in's token or is not sent: a replacement's token never rides beside this keyring.
+  const token = () => session.accessToken(stillHeld)
   const doFetch = options.fetch ?? fetch
   const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(await token()) })
   if (!me.ok) {
@@ -86,13 +100,11 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
   if (typeof account !== "string" || account === "")
     throw new SignInError("The service named no account for this sign-in.")
-  // The sign-in this context holds. Only its own account write below can move its generation.
-  let held = credentials
   // Every credential that can earn a sync pin names its account, so discarding its keys can retire the pin (#12280).
   await session.update(async (current) => {
-    if (!sameIdentity(current, held) || current.accountId !== undefined) return
+    if (!stillHeld(current) || current.accountId !== undefined) return
     await store.write({ ...current, accountId: account })
-    // A credential stored before generations existed gets its generation from this write.
+    // The held sign-in now names its account, and its generation if this write minted it.
     held = (await store.readAuthoritative()) ?? held
   })
   const http = {
@@ -110,7 +122,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     boundary: async (dispatch) =>
       (
         await session.update(async (current) => {
-          if (!sameIdentity(current, held)) retired.abort(new Error("The signed-in device is no longer current."))
+          if (!stillHeld(current)) retired.abort(new Error("The signed-in device is no longer current."))
           retired.signal.throwIfAborted()
           // Box the value: the lock is released after the synchronous dispatch, not an in-flight request.
           return { value: dispatch() }

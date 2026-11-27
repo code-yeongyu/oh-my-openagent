@@ -8,6 +8,7 @@
 import { expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
 
+import { CredentialIdentityChanged } from "../../omo-opencode/src/cli/service-auth/keystore"
 import { fakeApi, grant, memorySecrets, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
 import { signedInSyncContext } from "../sync-context"
 
@@ -41,10 +42,12 @@ async function context(
   moments: {
     readonly beforeBuild?: (secrets: Secrets) => void
     readonly whileAccountIsFetched?: (secrets: Secrets) => void
+    readonly onRequest?: (request: Request) => void
   } = {},
 ) {
   const secrets = memorySecrets()
   const api = fakeApi((request) => {
+    moments.onRequest?.(request)
     if (new URL(request.url).pathname !== "/v1/me") return new Response(null, { status: 404 })
     moments.whileAccountIsFetched?.(secrets)
     return Response.json({ user: { id: "u" }, account: { id: "acct-fence" } })
@@ -154,4 +157,65 @@ test("#given a credential stored before generations existed #when the sync conte
   })
   expect(storedCredential(secrets)).toMatchObject({ accountId: "acct-fence", credentialGeneration: expect.any(String) })
   expect(await ctx.authority.boundary?.(() => "published")).toBe("published")
+})
+
+// #13138 review L2: the same device and keys under another account is another sign-in.
+test("#given a sync context #when the stored sign-in keeps its device and keys but names another account #then no pin write is admitted", async () => {
+  const { ctx, secrets } = await context()
+  plant(secrets, (stored) => ({ ...stored, accountId: "acct-other" }))
+  let published = false
+  await expect(
+    ctx.authority.boundary?.(() => {
+      published = true
+    }),
+  ).rejects.toThrow("no longer current")
+  expect(published).toBe(false)
+})
+
+// #13138 review L1: a credential stored before generations existed gets its generation from the store's next
+// write, and that write can be a token refresh instead of this context's own account write.
+const beforeGenerations: Change = ({ credentialGeneration: _minted, ...stored }) => stored
+const refreshMintsGeneration: Change = (stored) => ({
+  ...rotatedTokens(stored),
+  credentialGeneration: "generation-minted-by-refresh",
+})
+
+test("#given a credential stored before generations existed #when a token refresh mints its generation while the account is fetched #then the account is recorded and a pin write is admitted", async () => {
+  let refreshed: Stored | undefined
+  const { ctx, secrets } = await context({
+    beforeBuild: (secrets) => {
+      plant(secrets, beforeGenerations)
+    },
+    whileAccountIsFetched: (secrets) => {
+      refreshed = plant(secrets, refreshMintsGeneration)
+    },
+  })
+  expect(storedCredential(secrets)).toEqual({ ...refreshed, accountId: "acct-fence" })
+  expect(await ctx.authority.boundary?.(() => "published")).toBe("published")
+})
+
+test("#given a context that took the generation a token refresh minted #when the stored sign-in later carries another generation #then no pin write is admitted", async () => {
+  const { ctx, secrets } = await context({
+    beforeBuild: (secrets) => {
+      plant(secrets, beforeGenerations)
+    },
+    whileAccountIsFetched: (secrets) => {
+      plant(secrets, refreshMintsGeneration)
+    },
+  })
+  plant(secrets, (stored) => ({ ...stored, credentialGeneration: "generation-other" }))
+  await expect(ctx.authority.boundary?.(() => undefined)).rejects.toThrow("no longer current")
+})
+
+// #13138 review L3: a request of this context carries its own sign-in's token or is not sent.
+test("#given a sync context #when another sign-in replaced the stored one #then its account request is refused before it is sent", async () => {
+  const paths: string[] = []
+  const { ctx, secrets } = await context({ onRequest: (request) => paths.push(new URL(request.url).pathname) })
+  plant(secrets, (stored) => ({
+    ...stored,
+    device: { ...grant.device, id: "device-other" },
+    accessToken: "replacement-access",
+  }))
+  await expect(ctx.chain.state()).rejects.toBeInstanceOf(CredentialIdentityChanged)
+  expect(paths).toEqual(["/v1/me"])
 })
