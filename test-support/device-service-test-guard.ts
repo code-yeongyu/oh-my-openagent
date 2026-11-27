@@ -1,7 +1,7 @@
 import { afterEach } from "bun:test"
-import { existsSync, readFileSync, realpathSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync } from "node:fs"
 import net from "node:net"
-import { dirname, join, resolve, sep } from "node:path"
+import { basename, dirname, join, resolve, sep } from "node:path"
 
 // A test never dials this machine's own device service (credential safety): the service answers for the signed-in user,
 // so a test that reaches it reads, and through a refresh can write, the developer's real account state. The real state
@@ -33,6 +33,12 @@ const LOOPBACK: ReadonlySet<unknown> = new Set([undefined, "127.0.0.1", "localho
 // The real path when it exists (the socket, else its directory), so a symlinked route to the state dir compares equal.
 const canonical = (path: string): string => {
   const absolute = resolve(path)
+  if (existsSync(absolute)) {
+    const entry = lstatSync(absolute)
+    // Bun on macOS cannot realpath a Unix socket. Resolve its directory, following a leaf link first.
+    if (entry.isSymbolicLink()) return canonical(resolve(realpathSync(dirname(absolute)), readlinkSync(absolute)))
+    if (entry.isSocket()) return join(realpathSync(dirname(absolute)), basename(absolute))
+  }
   for (const candidate of [absolute, dirname(absolute)])
     if (existsSync(candidate)) {
       const real = realpathSync(candidate)

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
-import { createConnection } from "node:net"
+import { createConnection, createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { guardSecrets } from "./credential-store-test-guard"
@@ -45,6 +45,25 @@ describe("credential store test guard", () => {
 })
 
 describe("device-service test guard routes", () => {
+  test.skipIf(process.platform === "win32")(
+    "a link outside the guarded directory cannot dial its listening socket",
+    async () => {
+      const dir = realDir()
+      const socket = join(dir, "s")
+      const server = createServer()
+      await new Promise<void>((resolve, reject) => server.once("error", reject).listen(socket, resolve))
+      try {
+        const link = join(realDir(), "link")
+        symlinkSync(socket, link)
+        const guard = createDeviceServiceGuard(dir)
+        expect(() => guard.check([{ path: link }])).toThrow(/real device service/)
+        expect(guard.takeViolations()).toHaveLength(1)
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()))
+      }
+    },
+  )
+
   test("#given a symlink to the guarded dir #when a test dials the socket through it #then it is refused", () => {
     const dir = realDir()
     const link = join(realDir(), "link")
