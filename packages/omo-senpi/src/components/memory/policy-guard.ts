@@ -104,7 +104,10 @@ function buildMemoryFilesystemPolicy(
       const target = resolve(request.canonicalPath)
       if (context === undefined) {
         return unboundAreas.some((area) => isWithin(area, target))
-          ? { allow: false, reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}` }
+          ? {
+              allow: false,
+              reason: `cross-identity memory access denied: ${request.operation} ${request.canonicalPath}`,
+            }
           : { allow: true }
       }
       const { ownRoots, deniedAreas } = layoutOf(context)
@@ -133,7 +136,11 @@ function identityLayout(context: MemoryIdentityContext): IdentityLayout {
   let resolvedDeniedRoots: readonly string[] | undefined
   return {
     ownRoots: stableRoots([ownRoot]),
-    deniedAreas: stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)]),
+    deniedAreas: stableRoots([
+      dirname(ownRoot),
+      durableAgentsRoot,
+      join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME),
+    ]),
     deniedRoots: () => {
       resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
       return resolvedDeniedRoots

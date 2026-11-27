@@ -94,8 +94,16 @@ describe("memory filesystem policy registration in the memory component (#15251)
     const memoryHome = join(policyFixture(roots).workspace, "memory")
     const first = registeredComponent(memoryHome, join(memoryHome, "..", "project-one"))
     const second = registeredComponent(memoryHome, join(memoryHome, "..", "project-two"))
-    await first.pi.dispatch("session_start", {}, sessionContext({ notifications: [], sessionId: "session-one", cwd: join(memoryHome, "..", "project-one") }))
-    await second.pi.dispatch("session_start", {}, sessionContext({ notifications: [], sessionId: "session-two", cwd: join(memoryHome, "..", "project-two") }))
+    await first.pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ notifications: [], sessionId: "session-one", cwd: join(memoryHome, "..", "project-one") }),
+    )
+    await second.pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ notifications: [], sessionId: "session-two", cwd: join(memoryHome, "..", "project-two") }),
+    )
     const firstFile = join(first.own, "system", "persona.md")
     const secondFile = join(second.own, "system", "persona.md")
 
