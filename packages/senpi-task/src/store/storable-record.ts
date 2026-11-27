@@ -56,7 +56,17 @@ function ownStartIdentity(): string | undefined {
   return ownStart
 }
 
+// The claim is its owner's stamp, so a record that names no host stores none: whatever releases
+// `host_pid` releases the claim with it, and a finished record keeps no pid or start of a process
+// that no longer owns it.
+function withoutHostClaim(record: TaskRecord): TaskRecord {
+  if (record.host_claim === undefined) return record
+  const { host_claim: _released, ...unowned } = record
+  return unowned
+}
+
 function withHostClaim(record: TaskRecord): TaskRecord {
+  if (record.host_pid === undefined) return withoutHostClaim(record)
   if (record.host_pid !== process.pid) return record
   const start = ownStartIdentity()
   const claim = record.host_claim

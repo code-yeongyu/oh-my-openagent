@@ -153,7 +153,10 @@ export type TaskRecord = TaskRecordInput &
     readonly terminal_at?: string
     readonly pid?: number
     readonly host_pid?: number
-    /** Stamped by the process named in `host_pid` when it writes a record it owns; see lifecycle/owner-process.ts. */
+    /**
+     * Stamped by the process named in `host_pid` when it writes a record it owns, and stored only while
+     * the record names a host; see lifecycle/owner-process.ts.
+     */
     readonly host_claim?: HostClaim
     readonly child_session_id?: string
     readonly spawn_spec?: TaskSpawnSpec
