@@ -2,7 +2,7 @@
 // directory under the run directory, so nothing depends on the host having /run/user/<uid>.
 import { mkdtempSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 import { expect, test } from "bun:test"
 
 import { privateDirs } from "./runtime-dirs.ts"
@@ -12,9 +12,10 @@ test("a session's runtime and state directories are fresh, private and inside th
   try {
     const dirs = privateDirs(runDir)
     for (const dir of [dirs.XDG_RUNTIME_DIR, dirs.XDG_STATE_HOME]) {
-      expect(dir.startsWith(`${runDir}/`)).toBe(true)
+      expect(dir.startsWith(`${runDir}${sep}`)).toBe(true)
       expect(statSync(dir).isDirectory()).toBe(true)
-      expect(statSync(dir).mode & 0o777).toBe(0o700)
+      // Windows keeps no POSIX permission bits; privacy there is the per-user temp directory's ACL.
+      if (process.platform !== "win32") expect(statSync(dir).mode & 0o777).toBe(0o700)
     }
     expect(dirs.XDG_RUNTIME_DIR).not.toBe(dirs.XDG_STATE_HOME)
   } finally {
