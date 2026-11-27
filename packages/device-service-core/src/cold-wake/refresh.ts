@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 import { bootstrapJob, plistPath } from "./darwin.ts"
 import { type ColdWakeHost, type ColdWakeOutcome, failed, writeIfChanged } from "./host.ts"
@@ -33,12 +33,18 @@ const INSTALLED: ColdWakeOutcome = { kind: "installed", serviceRestarted: false 
  * omo's KeepAlive / Restart=always unit naming an older `binary-runtime/<version>/omo` - and nothing else. The agent dir
  * and PATH stay the installed unit's, so the launching process's environment never reaches the unit (#14194 review H1/M1).
  * Undefined, after one file read and no service manager call, when there is nothing to do: no unit (a refresh never
- * installs one), a unit no omo-managed runtime owns (binary-runtime or omo-versions, omo#14258), or one `isOlder` does
- * not call older than this runtime.
+ * installs one), a unit no omo-managed runtime owns (binary-runtime or omo-versions, omo#14258), one `isOlder` does
+ * not call older than this runtime, or one that serves another agent dir than the launch's own (omo#15029): a launch
+ * with an isolated agent dir, such as a test or QA run of a local build, must never point the device-wide unit at its
+ * runtime or restart the shared host.
  */
 export async function refreshColdWake(
   host: ColdWakeHost,
-  options: { readonly runtime: string; readonly isOlder: (installedRuntimeVersion: string) => boolean },
+  options: {
+    readonly runtime: string
+    readonly isOlder: (installedRuntimeVersion: string) => boolean
+    readonly agentDir: string
+  },
 ): Promise<ColdWakeOutcome | undefined> {
   const darwin = host.platform === "darwin"
   const path = darwin
@@ -49,7 +55,7 @@ export async function refreshColdWake(
   const version = installed === undefined ? undefined : installedRuntimeVersion(installed.argv)
   if (installed === undefined || version === undefined || !options.isOlder(version)) return undefined
   const agentDir = installed.env.get("OMO_CODING_AGENT_DIR")
-  if (agentDir === undefined) return undefined
+  if (agentDir === undefined || resolve(agentDir) !== resolve(options.agentDir)) return undefined
   let launch: SessionHostLaunch
   try {
     const unitPath = installed.env.get("PATH")

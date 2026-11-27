@@ -120,11 +120,13 @@ function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
  * omo#14191: a launch of `runtime` (release `version`) brings an installed session host unit an older runtime wrote to
  * this runtime's program and shape; `omo update` cannot, because the new runtime copy only exists once the new launcher
  * has run. Every other launch costs one file read. A failure is one line on `error` and never blocks the launch.
+ * `agentDir` is the launch's own: only the unit that serves it is ever refreshed (omo#15029).
  */
 export async function refreshColdWakeAtLaunch(
   options: {
     readonly runtime: string
     readonly isOlder: (installedRuntimeVersion: string) => boolean
+    readonly agentDir: string
     readonly platform?: NodeJS.Platform
     readonly home?: string
   },
@@ -133,7 +135,11 @@ export async function refreshColdWakeAtLaunch(
   const host = coldWakeHost(options.platform ?? process.platform, options.home)
   if (host === undefined) return
   try {
-    const outcome = await refreshColdWake(host, { runtime: options.runtime, isOlder: options.isOlder })
+    const outcome = await refreshColdWake(host, {
+      runtime: options.runtime,
+      isOlder: options.isOlder,
+      agentDir: options.agentDir,
+    })
     const notice = outcome === undefined ? undefined : coldWakeNotice(outcome)
     if (notice !== undefined) error(notice)
   } catch (cause) {

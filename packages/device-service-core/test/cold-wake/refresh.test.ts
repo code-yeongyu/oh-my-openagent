@@ -16,7 +16,8 @@ afterEach(removeTempHomes)
 
 const RUNTIME = "/h/.omo/binary-runtime/5.1.77/omo"
 const olderThan5177 = (installed: string) => Bun.semver.order(installed, "5.1.77") < 0
-const refresh = (host: ColdWakeHost) => refreshColdWake(host, { runtime: RUNTIME, isOlder: olderThan5177 })
+const refresh = (host: ColdWakeHost, agentDir = "/srv/profile-b/agent") =>
+  refreshColdWake(host, { runtime: RUNTIME, isOlder: olderThan5177, agentDir })
 
 const launchOf = (version: string, agentDir = "/h/.omo/agent", path?: string) => {
   const omoBin = `/h/.omo/binary-runtime/${version}/omo`
