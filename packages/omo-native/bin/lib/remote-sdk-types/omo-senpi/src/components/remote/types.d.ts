@@ -149,8 +149,17 @@ export type SendReceipt = {
 } | {
     readonly lane: "queued";
     readonly queue_position: number;
+    /**
+     * What the message waits on, on its device: an approval its person must answer, a hold (a Stop, an interrupted run),
+     * or the engine-turn cap that stopped automatic turns (senpi#7138; a person's message or a Resume lifts it).
+     */
     readonly waiting_on?: {
-        readonly kind: "approval";
+        readonly kind: "approval" | "hold";
+        readonly device?: string;
+    } | {
+        readonly kind: "engine_turn_cap";
+        readonly reason: string;
+        readonly count: number;
         readonly device?: string;
     };
 } | {

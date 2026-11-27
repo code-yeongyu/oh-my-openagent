@@ -29,6 +29,21 @@ describe("#13268: a send that waits reports its message's fate at once", () => {
     expect(
       sendWaitNotice("b/s1", receipt({ lane: "queued", queue_position: 1, waiting_on: { kind: "approval" } })),
     ).toBe("Queued on b/s1 at position 1, waiting for an approval on that device.")
+    expect(
+      sendWaitNotice("b/s1", receipt({ lane: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "b" } })),
+    ).toBe("Queued on b/s1 at position 1: the session is paused or stopped on b; it runs when the session resumes.")
+    expect(
+      sendWaitNotice(
+        "b/s1",
+        receipt({
+          lane: "queued",
+          queue_position: 1,
+          waiting_on: { kind: "engine_turn_cap", reason: "cap-per-message", count: 3, device: "b" },
+        }),
+      ),
+    ).toBe(
+      "Queued on b/s1 at position 1: automatic turns are paused on b (cap-per-message at 3); it runs when a person sends a message or resumes the session.",
+    )
     expect(sendWaitNotice("b/s1", receipt({ lane: "started", turn_id: "7" }))).toBe(null)
     expect(sendWaitNotice("b/s1", receipt({ lane: "steered", turn_id: "7" }))).toBe(null)
   })

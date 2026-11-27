@@ -556,21 +556,22 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         case "steered":
           return ok({ ...base, lane: delivery.kind, ...(delivery.turn_id === "" ? {} : { turn_id: delivery.turn_id }) })
         case "queued":
-          // A delivery that waits on a wake is offline there; one behind an approval names it; a hold is plain queued.
-          if (delivery.waiting_on?.kind === "wake")
+          // A delivery that waits on a wake is offline there; one behind an approval, a hold or the engine-turn cap names it.
+          const wait = delivery.waiting_on
+          if (wait?.kind === "wake")
             return ok({ ...base, lane: "queued_offline", queue_position: delivery.queue_position, wake: "started" })
           return ok({
             ...base,
             lane: "queued",
             queue_position: delivery.queue_position,
-            ...(delivery.waiting_on?.kind === "approval"
-              ? {
-                  waiting_on: {
-                    kind: "approval",
-                    ...(delivery.waiting_on.device === undefined ? {} : { device: delivery.waiting_on.device }),
-                  },
-                }
-              : {}),
+            ...(wait === undefined
+              ? {}
+              : {
+                  waiting_on:
+                    wait.kind === "engine_turn_cap"
+                      ? wait
+                      : { kind: wait.kind, ...(wait.device === undefined ? {} : { device: wait.device }) },
+                }),
           })
         case "queued_offline":
           return ok({ ...base, lane: "queued_offline", queue_position: delivery.queue_position, wake: "none" })

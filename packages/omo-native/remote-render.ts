@@ -202,9 +202,18 @@ export function sessionLines(listing: SessionsList, now: number): string[] {
  */
 const queuedLine = (label: string, receipt: Extract<SendReceipt, { readonly queue_position: number }>): string => {
   const waitingOn = "waiting_on" in receipt ? receipt.waiting_on : undefined
-  if (waitingOn?.kind === "approval")
-    return `Queued on ${label} at position ${receipt.queue_position}, waiting for an approval on ${waitingOn.device ?? "that device"}.`
-  return `Queued on ${label} at position ${receipt.queue_position}.`
+  const at = `Queued on ${label} at position ${receipt.queue_position}`
+  const where = waitingOn?.device ?? "that device"
+  switch (waitingOn?.kind) {
+    case "approval":
+      return `${at}, waiting for an approval on ${where}.`
+    case "hold":
+      return `${at}: the session is paused or stopped on ${where}; it runs when the session resumes.`
+    case "engine_turn_cap":
+      return `${at}: automatic turns are paused on ${where} (${waitingOn.reason} at ${waitingOn.count}); it runs when a person sends a message or resumes the session.`
+    default:
+      return `${at}.`
+  }
 }
 
 /** The human answer of a send that did not wait; `label` is the session as its address names it. */
