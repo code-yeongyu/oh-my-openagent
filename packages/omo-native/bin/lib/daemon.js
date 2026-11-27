@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { observedLaunch, withProductLaunchSpec } from "./host-launch.js"
 import {
   parseEngineLine,
   parseStoreArgs,
@@ -71,10 +72,10 @@ function resolvePolicy(args, config) {
  */
 const ENGINE_SUBCOMMAND = { run: "ensure", status: "status", stop: "stop", handoff: "handoff" }
 
-function buildArgs(subcommand, args, { specPath, policy }) {
+function buildArgs(subcommand, args, { pluginRoot, policy }) {
   const engineArgs = ["host", ENGINE_SUBCOMMAND[subcommand], "--json"]
   if (subcommand === "run" || subcommand === "handoff") {
-    engineArgs.push("--launch-spec", specPath, "--policy", policy)
+    return [...withProductLaunchSpec(engineArgs, pluginRoot), "--policy", policy]
   }
   if (subcommand === "stop" && args.includes("--drain")) engineArgs.push("--drain")
   if (subcommand === "status" && args.includes("--include-workers")) engineArgs.push("--include-workers")
@@ -243,6 +244,7 @@ export function runDaemonCommand(args, options) {
       config,
       stdout,
       stderr,
+      observe: options.observe,
     })
   }
   if (subcommand === "stop" && args.includes("--all")) {
@@ -261,19 +263,25 @@ export function runDaemonCommand(args, options) {
     })
     if (outcome !== undefined) return outcome
   }
-  const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config) })
+  const engineArgs = buildArgs(subcommand, args, { pluginRoot, policy: resolvePolicy(args, config) })
   const commandEnv = hostCommandEnvironment(env, agentDir, config)
   // omo#13594: the session host unit's run. Only the host this ensure starts is pinned; task hosts drop the variable.
   if (subcommand === "run" && args.includes("--pinned")) commandEnv.SENPI_RPC_HOST_COLD_START = "persistent"
   const result = engine.run(engineArgs, { env: commandEnv })
-  const parsed = parseEngineLine(result.stdout ?? "")
-
-  if (result.stderr) stderr.write(result.stderr)
-
-  if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
-  else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
-  if (subcommand === "run" && result.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
-  return result.exitCode
+  const finish = (answer) => {
+    const parsed = parseEngineLine(answer.stdout ?? "")
+    if (answer.stderr) stderr.write(answer.stderr)
+    if (args.includes("--json") && answer.stdout) stdout.write(answer.stdout.trim() + "\n")
+    else {
+      const profile = parsed?.productPlugin ? `; product plugin: ${parsed.productPlugin}` : ""
+      stdout.write(`${summarize(subcommand, parsed, answer.exitCode)}${profile}\n`)
+    }
+    if (subcommand === "run" && answer.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
+    return answer.exitCode
+  }
+  return subcommand === "run" && options.observe
+    ? observedLaunch(result, { args: engineArgs, agentDir, pluginRoot, observe: options.observe }).then(finish)
+    : finish(result)
 }
 
 /**

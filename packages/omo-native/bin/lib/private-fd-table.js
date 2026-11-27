@@ -94,6 +94,18 @@ export function inspectPrivateFdTable(table, platform = process.platform) {
   return { table: JSON.stringify(forwarded), fds, discard: [...new Set(discard)] }
 }
 
+/**
+ * Child-spawn options for a host launch whose stdout the launcher reads (#15263): the same table and forwarded
+ * descriptors as privateFdHandoffFor, on the same slots, with only stdout made a pipe. Present with or without a
+ * table, because reading stdout always needs a child.
+ */
+export function capturedStdoutHandoffFor(env, table, platform = process.platform) {
+  const handoff = privateFdHandoffFor(env, table, platform) ?? { env, stdio: ["inherit", "inherit", "inherit"] }
+  const stdio = [...handoff.stdio]
+  stdio[1] = "pipe"
+  return { ...handoff, stdio }
+}
+
 /** Child-spawn options that carry this launch's table and descriptors, or undefined when it has no table. */
 export function privateFdHandoffFor(env, table, platform = process.platform, { shell = false } = {}) {
   if (!table) return undefined
