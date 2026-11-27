@@ -30,6 +30,9 @@ import { remapSenpiEnvironment } from "./compiled-environment"
 import { SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
 import { runServiceAuthCommand } from "./service-auth-command"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
+import { observedLaunch, operatorHostLaunch, withProductLaunchSpec } from "./bin/lib/host-launch.js"
+import { runChild, propagateResult } from "./bin/lib/child-process.js"
+import { privateFdHandoffFor, PRIVATE_FDS_ENV } from "./bin/lib/private-fd-table.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
 import { runDoctor } from "./bin/lib/doctor.js"
@@ -224,6 +227,44 @@ export async function runCompiledLauncher(
     return true
   }
   if (refuseRetiredCommand(args)) return true
+  if (operatorHostLaunch(args, canonicalAgentDir())) {
+    if (process.env.OMO_HOST_LAUNCH_RAW === "1") {
+      delete process.env.OMO_HOST_LAUNCH_RAW
+      return false
+    }
+    const pluginRoot = join(execDir, "plugin")
+    const launchEnv = { ...process.env, OMO_HOST_LAUNCH_RAW: "1" }
+    const handoff = privateFdHandoffFor(launchEnv, process.env[PRIVATE_FDS_ENV])
+    const launchArgs = withProductLaunchSpec(args, pluginRoot)
+    const child = await runChild(
+      process.execPath,
+      import.meta.url.startsWith("file:") && process.argv[1]?.endsWith("/compile-entry.ts")
+        ? [process.argv[1], ...launchArgs]
+        : launchArgs,
+      {
+        ...(handoff ?? { env: launchEnv }),
+        captureStdout: true,
+      },
+    )
+    propagateResult(child)
+    const answer = await observedLaunch(
+      { exitCode: child.status ?? 1, stdout: child.stdout },
+      {
+        args,
+        pluginRoot,
+        agentDir: canonicalAgentDir(),
+        observe: async (socket: string, timeout: number, options: { keyRoot: string }) =>
+          (await import("../../node_modules/@code-yeongyu/senpi/dist/modes/rpc/host-probe.js")).observeProtocolInfo(
+            socket,
+            timeout,
+            options,
+          ),
+      },
+    )
+    process.stdout.write(answer.stdout)
+    process.exitCode = answer.exitCode
+    return true
+  }
   // The compiled binary IS the engine's process, so the host CLI is reached by re-running this
   // executable with `host ...` - an early command that goes to the engine untouched. Spawning a
   // node path here would re-enter omo itself and leave a phantom session behind.

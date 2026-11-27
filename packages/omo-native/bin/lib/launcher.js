@@ -3,7 +3,8 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { isEngineCommand } from "./engine-commands.js"
-import { spawnNode } from "./child-process.js"
+import { observedLaunch, operatorHostLaunch, withProductLaunchSpec } from "./host-launch.js"
+import { propagateResult, runChild, spawnNode } from "./child-process.js"
 import { privateFdHandoff } from "./private-fds.js"
 import { launchClaimsMemorySyncAtBoot } from "./memory-sync-boot.js"
 import { doctorCoverageLines } from "./category-coverage.js"
@@ -72,13 +73,13 @@ async function bootsWithMemorySyncClaim(args, env) {
   }
 }
 
-async function spawnSenpi(args, withExtension) {
+async function spawnSenpi(args, withExtension, captureStdout = false) {
   const senpi = preparedSenpi()
   const finalArgs = withExtension ? ["--extension", join(packageRoot, "plugin"), ...args] : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
   const handoff = privateFdHandoff(env)
-  if (handoff === undefined && process.platform !== "win32" && typeof process.execve === "function") {
+  if (!captureStdout && handoff === undefined && process.platform !== "win32" && typeof process.execve === "function") {
     try {
       process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
       return
@@ -86,11 +87,16 @@ async function spawnSenpi(args, withExtension) {
       // A failed replacement still uses the signal-aware child path below.
     }
   }
-  if (handoff !== undefined && (await bootsWithMemorySyncClaim(finalArgs, handoff.env))) {
-    await spawnNode(ENGINE_BOOT_ENTRY, [senpi.cliPath, ...finalArgs], handoff)
-    return
+  const childArgs =
+    handoff !== undefined && (await bootsWithMemorySyncClaim(finalArgs, handoff.env))
+      ? [ENGINE_BOOT_ENTRY, senpi.cliPath, ...finalArgs]
+      : [senpi.cliPath, ...finalArgs]
+  if (captureStdout) {
+    const result = await runChild(process.execPath, childArgs, { ...(handoff ?? { env }), captureStdout: true })
+    propagateResult(result)
+    return { exitCode: result.status ?? 1, stdout: result.stdout }
   }
-  await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
+  await spawnNode(childArgs[0], childArgs.slice(1), handoff ?? { env })
 }
 
 // `omo remote attach`: the engine's attach TUI runs as a signal-forwarding child, never an execve replacement,
@@ -201,6 +207,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
   if (command === "daemon") {
     const outcome = await runDaemonCommand(args.slice(1), {
       engine: { run: engineHostCall },
+      observe: observeProductHost,
       migration: { run: rollbackMigrateCall },
       pluginRoot: join(packageRoot, "plugin"),
       agentDir: canonicalAgentDir(),
@@ -295,7 +302,15 @@ export async function runLauncher(args = process.argv.slice(2)) {
   }
   // One-shot engine commands go over unchanged: the engine dispatches them on argv[0] (#9572).
   if (isEngineCommand(args)) {
-    await spawnSenpi(args, false)
+    const pluginRoot = join(packageRoot, "plugin")
+    const launch = withProductLaunchSpec(args, pluginRoot)
+    const agentDir = canonicalAgentDir()
+    if (operatorHostLaunch(args, agentDir)) {
+      const result = await spawnSenpi(launch, false, true)
+      const answer = await observedLaunch(result, { args, agentDir, pluginRoot, observe: observeProductHost })
+      process.stdout.write(answer.stdout)
+      process.exitCode = answer.exitCode
+    } else await spawnSenpi(args, false)
     return
   }
   if (isInteractiveDefault(args)) {
@@ -305,4 +320,9 @@ export async function runLauncher(args = process.argv.slice(2)) {
     }
   }
   await spawnSenpi(args, true)
+}
+
+async function observeProductHost(socket, timeout, options) {
+  const url = pathToFileURL(join(resolveSenpi().packageRoot, "dist/modes/rpc/host-probe.js"))
+  return (await import(url.href)).observeProtocolInfo(socket, timeout, options)
 }
