@@ -19,7 +19,7 @@ import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import { loadBaseScenarioTable } from "./declared-change"
 import { GOLDENS_PATH, readBaseInputs } from "./base-inputs"
-import { outcomeProducers } from "./outcome-producers"
+import { gateChangeSet } from "./outcome-producers"
 import type { DiscoveredTool } from "./tool-check"
 
 // The CI entry of the changed-capability gate: bun script/sdk-parity/gate-cli.ts --base <ref> [--body <file>]
@@ -124,7 +124,7 @@ try {
     scenarios: SCENARIOS,
     closures,
     changedFiles,
-    outcomeProducers: outcomeProducers(REPO_ROOT),
+    outcomeProducers: gateChangeSet(REPO_ROOT, baseTree),
     body,
     headSha: git("rev-parse", "HEAD").trim(),
     versions: { base: baseVersions, head: headVersions },

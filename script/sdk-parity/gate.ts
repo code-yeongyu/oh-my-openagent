@@ -414,7 +414,7 @@ export function renderReport(report: GateReport): string {
     )
   if (report.gateChanges.length > 0)
     lines.push(
-      `GATE CHANGE: this pull request changes how outcomes are produced or normalized (${report.gateChanges.map((id) => id.replace("#gate-change", "")).join(", ")}): read it as a gate change; the security reader signs the digest.`,
+      `GATE CHANGE: this pull request changes the parity harness's own modules (${report.gateChanges.map((id) => id.replace("#gate-change", "")).join(", ")}), which produce, normalize or judge the outcomes; what the harness calls in the product is what the outcomes compare. Read it as a gate change; the security reader signs the digest.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")
