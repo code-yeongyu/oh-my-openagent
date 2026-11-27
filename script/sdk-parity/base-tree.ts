@@ -1,4 +1,5 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 import path, { join } from "node:path"
 
 // The merge-base tree the gate builds shares the head's installed external packages (when bun.lock is unchanged), but
@@ -112,4 +113,15 @@ export function isolationProblems(root: string, names: readonly string[] = works
         )
     }
   return problems
+}
+
+/**
+ * A file or directory as it is at a git ref. It answers undefined only when the ref has no such path; a ref that does not
+ * resolve, or any other git failure, throws, so a check that reads the merge base never takes an error for absence.
+ */
+export function showAtRef(repo: string, ref: string, file: string): string | undefined {
+  const run = (args: readonly string[]) =>
+    execFileSync("git", args, { cwd: repo, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 256 << 20 })
+  if (run(["ls-tree", "--name-only", ref, "--", file.replace(/\/$/, "")]).trim() === "") return undefined
+  return run(["show", `${ref}:${file}`])
 }

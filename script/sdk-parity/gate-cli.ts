@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
-import { isolationProblems, prepareBaseTree } from "./base-tree"
+import { isolationProblems, prepareBaseTree, showAtRef } from "./base-tree"
 import { capabilityClosures, ImportGraph } from "./closures"
 import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
@@ -32,18 +32,7 @@ const arg = (flag: string): string | undefined => {
 }
 const git = (...args: string[]): string =>
   execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 256 << 20 })
-const show = (ref: string, path: string): string | undefined => {
-  try {
-    return execFileSync("git", ["show", `${ref}:${path}`], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      maxBuffer: 256 << 20,
-    })
-  } catch {
-    return undefined
-  }
-}
+const show = (ref: string, path: string): string | undefined => showAtRef(REPO_ROOT, ref, path)
 const LOOP_CLI = "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts"
 const OPENCODE_CLI = "packages/omo-opencode/src/cli/index.ts"
 const GOLDENS_PATH = "script/sdk-parity/goldens.json"

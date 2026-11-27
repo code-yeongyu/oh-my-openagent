@@ -204,11 +204,12 @@ export function gateReport(
       continue
     }
     if (JSON.stringify(before) === JSON.stringify(after)) {
-      if (declared.has(scenario.id)) judged.add(scenario.id)
-      if (declared.has(scenario.id))
+      if (declared.has(scenario.id)) {
+        judged.add(scenario.id)
         failures.push(
           `SDK-Parity-Changed: ${scenario.id}: its outcome is equal on the merge base and the head; there is nothing to declare`,
         )
+      }
       continue
     }
     const baseVersions = input.versions.base

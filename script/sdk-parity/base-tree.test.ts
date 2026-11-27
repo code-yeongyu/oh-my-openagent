@@ -3,7 +3,9 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os"
 import { join, posix, win32 } from "node:path"
 
-import { isInside, isInstalled, isolationProblems, prepareBaseTree } from "./base-tree"
+import { execFileSync } from "node:child_process"
+
+import { isInside, isInstalled, isolationProblems, prepareBaseTree, showAtRef } from "./base-tree"
 
 // Review 6061267823 H2: the merge-base tree must run its own workspace packages, never the head's. Guards the gate's
 // base-versus-head comparison (design 7.4): a base that imports the head's source compares the head with itself.
@@ -108,5 +110,36 @@ describe("merge-base dependency isolation (review H2)", () => {
     expect(isolationProblems(base)).toEqual([
       `workspace package @ws/core (node_modules) resolves to ${join(head, "packages", "core")}, outside the tree ${base}; the comparison would run the other tree's source`,
     ])
+  })
+})
+
+// The gate reads the merge base through this: only a path the ref lacks reads as absent, so an error never turns a rule
+// that depends on the merge base's files into a skipped one.
+describe("showAtRef", () => {
+  const repo = () => {
+    const root = mkdtempSync(join(tmpdir(), "sdk-parity-show-"))
+    roots.push(root)
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.test", ...args], { cwd: root })
+    git("init", "-q")
+    mkdirSync(join(root, "dir"))
+    writeFileSync(join(root, "dir", "file.txt"), "content\n")
+    git("add", ".")
+    git("commit", "-qm", "one")
+    return root
+  }
+
+  test("#given a path the ref has #then its content; a directory lists its entries", () => {
+    const root = repo()
+    expect(showAtRef(root, "HEAD", "dir/file.txt")).toBe("content\n")
+    expect(showAtRef(root, "HEAD", "dir/")).toContain("file.txt")
+  })
+
+  test("#given a path the ref lacks #then undefined", () => {
+    expect(showAtRef(repo(), "HEAD", "dir/missing.txt")).toBeUndefined()
+  })
+
+  test("#given a ref that does not resolve #then it throws rather than answer absent", () => {
+    expect(() => showAtRef(repo(), "no-such-ref", "dir/file.txt")).toThrow()
   })
 })
