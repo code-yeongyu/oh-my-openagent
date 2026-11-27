@@ -8,11 +8,16 @@ const HEX_32 = /^[0-9a-f]{64}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const KEY_ROOT_REMEDY = "set SENPI_RPC_KEY_ROOT to the host's agent dir"
 
+/**
+ * `sessionText`, when set, is what an agent session is told instead of the message: one fixed sentence with no path and
+ * no remedy, so a model with a shell cannot act on a key record by deleting it.
+ */
 export class RpcIdentityError extends Error {
   constructor(
     readonly code: "unsafe_key_record" | "host_identity_unproven" | "auth_failed" | "auth_required",
     location: string,
     detail?: string,
+    readonly sessionText?: string,
   ) {
     super(detail === undefined ? `${code}:${location}` : `${code}:${location}: ${detail}`)
   }
@@ -57,8 +62,11 @@ function checkDirectory(path: string, exactMode?: number): void {
 
 type KeyRecord = { readonly path: string; readonly key: Buffer; readonly endpoint: unknown }
 
-const DELETE_REMEDY = "; delete this file"
-const EMPTY_RECORD = "empty, a launch may still be writing it; retry, and delete this file if it stays empty"
+const UNUSABLE_RECORD = "a key record under the key root cannot be used"
+/** A record the listing cannot use: the person sees the file and its remedy, a session only that one exists. */
+const unusable = (path: string, detail: string) =>
+  new RpcIdentityError("unsafe_key_record", path, detail, UNUSABLE_RECORD)
+const EMPTY_RECORD = "empty; a launch may still be writing it"
 
 const errorCode = (error: unknown) => (error instanceof Error && "code" in error ? String(error.code) : "invalid")
 
@@ -76,17 +84,17 @@ function checkKeyDirectories(root: string): string {
  * its remedy, and an empty file is told apart: senpi creates the file before it writes it.
  */
 function readRecord(keys: string, launchId: string, listing = false): KeyRecord | undefined {
-  const remedy = listing ? DELETE_REMEDY : ""
+  const fault = listing ? unusable : unsafe
   const path = join(keys, launchId)
   let descriptor: number | undefined
   try {
     descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
     const stat = fstatSync(descriptor)
-    if (!stat.isFile()) throw unsafe(path, `not a regular file${remedy}`)
+    if (!stat.isFile()) throw fault(path, "not a regular file")
     if (stat.uid !== process.getuid?.()) throw unsafe(path, `owned by uid ${stat.uid}, not the current user`)
     if ((stat.mode & 0o7777) !== 0o600)
       throw unsafe(path, `mode ${octal(stat.mode)}, must be 0600; run chmod 600 ${path}`)
-    if (listing && stat.size === 0) throw unsafe(path, EMPTY_RECORD)
+    if (listing && stat.size === 0) throw fault(path, EMPTY_RECORD)
     const row: unknown = JSON.parse(readFileSync(descriptor, "utf8"))
     if (
       !object(row) ||
@@ -95,27 +103,37 @@ function readRecord(keys: string, launchId: string, listing = false): KeyRecord 
       typeof row.key !== "string" ||
       !HEX_32.test(row.key)
     )
-      throw unsafe(path, `not a valid version 1 key record for this launch${remedy}`)
+      throw fault(path, "not a valid version 1 key record for this launch")
     return { path, key: Buffer.from(row.key, "hex"), endpoint: row.endpoint }
   } catch (error) {
     if (error instanceof RpcIdentityError) throw error
     if (missing(error)) return undefined
-    throw unsafe(path, `unreadable (${errorCode(error)})${remedy}`)
+    throw fault(path, `unreadable (${errorCode(error)})`)
   } finally {
     if (descriptor !== undefined) closeSync(descriptor)
   }
 }
 
-/** The challenged launch's key; a missing record is refused like any other unusable one, so a challenge is never served keyless. */
-function readKey(root: string, launchId: string): Buffer {
+/**
+ * The challenged launch's key. A launch with no record is not proven (host_identity_unproven, as senpi's client answers
+ * it), so a challenge is never served keyless; the person's text names the record looked for and the key root.
+ */
+function readKey(root: string, launchId: string, endpoint: string): Buffer {
   const path = join(root, "rpc", "keys", launchId)
+  const unrecorded = () =>
+    new RpcIdentityError(
+      "host_identity_unproven",
+      endpoint,
+      `no key record ${path}; ${KEY_ROOT_REMEDY}`,
+      "the thread host's launch has no key record under the key root",
+    )
   try {
     const record = readRecord(checkKeyDirectories(root), launchId)
-    if (record === undefined) throw unsafe(path, `missing; ${KEY_ROOT_REMEDY}`)
+    if (record === undefined) throw unrecorded()
     return record.key
   } catch (error) {
     if (error instanceof RpcIdentityError) throw error
-    if (missing(error)) throw unsafe(path, `missing; ${KEY_ROOT_REMEDY}`)
+    if (missing(error)) throw unrecorded()
     throw unsafe(path, `unreadable (${errorCode(error)})`)
   }
 }
@@ -157,13 +175,14 @@ function recordNaming(root: string, endpoint: string): string | undefined {
       "host_identity_unproven",
       endpoint,
       `the dialed endpoint cannot be resolved (${errorCode(error)})`,
+      "the thread host's endpoint cannot be resolved",
     )
   }
   for (const name of names) {
     const record = readRecord(keys, name, true)
     if (record === undefined) continue
     if (typeof record.endpoint !== "string" || !isAbsolute(record.endpoint))
-      throw unsafe(record.path, `names no absolute endpoint, not a valid version 1 key record${DELETE_REMEDY}`)
+      throw unusable(record.path, "names no absolute endpoint, not a valid version 1 key record")
     let served: string
     try {
       served = canonical(record.endpoint)
@@ -174,8 +193,6 @@ function recordNaming(root: string, endpoint: string): string | undefined {
   }
   return undefined
 }
-
-const STALE_REMEDY = "if that launch has ended, the next senpi host start sweeps the record, or delete it"
 
 /** POSIX public endpoint authentication; raw terminal and Windows secret transports never call it. */
 export async function authenticateRpcHost(
@@ -195,7 +212,8 @@ export async function authenticateRpcHost(
       throw new RpcIdentityError(
         "host_identity_unproven",
         endpoint,
-        `the host did not authenticate, and key record ${named} names this endpoint; ${STALE_REMEDY}`,
+        `the host did not authenticate, and key record ${named} names this endpoint`,
+        "the thread host did not authenticate, and a key record names its endpoint",
       )
     return reply
   }
@@ -211,7 +229,7 @@ export async function authenticateRpcHost(
   ) {
     throw new RpcIdentityError("host_identity_unproven", endpoint)
   }
-  const key = readKey(root, auth.launch_id)
+  const key = readKey(root, auth.launch_id, endpoint)
   const proof = (label: string, first: string, second: string) =>
     createHmac("sha256", key).update([label, auth.launch_id, first, second].join("\n"), "utf8").digest()
   if (

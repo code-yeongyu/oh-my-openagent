@@ -26,6 +26,8 @@ type Outcome =
       readonly code: RpcIdentityError["code"]
       readonly detail?: string | ((scene: Scene) => string)
       readonly file?: (scene: Scene) => string
+      /** The fixed sentence an agent session is told instead; absent where the text is the person's alone. */
+      readonly session?: string
     }
 type Row = {
   readonly host: HostKind
@@ -88,7 +90,15 @@ function scriptedHost(kind: HostKind, launch: string, key: string) {
 }
 
 const NO_CHALLENGE = (scene: Scene) =>
-  `the host did not authenticate, and key record ${join(scene.keys, FIRST)} names this endpoint; if that launch has ended, the next senpi host start sweeps the record, or delete it`
+  `the host did not authenticate, and key record ${join(scene.keys, FIRST)} names this endpoint`
+const NAMING_SESSION = "the thread host did not authenticate, and a key record names its endpoint"
+const UNUSABLE_SESSION = "a key record under the key root cannot be used"
+const unrecorded = (launch: string) => ({
+  code: "host_identity_unproven" as const,
+  detail: (s: Scene) => `no key record ${join(s.keys, launch)}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+  file: (s: Scene) => s.socket,
+  session: "the thread host's launch has no key record under the key root",
+})
 const asToday = (detail: string, launch = FIRST) => ({
   code: "unsafe_key_record" as const,
   detail,
@@ -101,8 +111,9 @@ const keysMode = {
 }
 const malformedRecord = (detail: string, launch = FIRST) => ({
   code: "unsafe_key_record" as const,
-  detail: `${detail}; delete this file`,
+  detail,
   file: (scene: Scene) => join(scene.keys, launch),
+  session: UNUSABLE_SESSION,
 })
 
 const ROWS: Record<string, Row> = {
@@ -114,17 +125,17 @@ const ROWS: Record<string, Row> = {
   "B challenge, no record": {
     host: "challenge",
     records: () => {},
-    outcome: { code: "unsafe_key_record", detail: "missing; set SENPI_RPC_KEY_ROOT to the host's agent dir" },
+    outcome: unrecorded(FIRST),
   },
   "C no challenge, a record names the endpoint": {
     host: "no-challenge",
     records: (s) => named(s),
-    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE },
+    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE, session: NAMING_SESSION },
   },
   "C3 no challenge, the record naming the endpoint is a finished launch's": {
     host: "no-challenge",
     records: (s) => write(s.keys, FIRST, senpiRecord(FIRST, KEY, s.socket, DEAD_PID)),
-    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE },
+    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE, session: NAMING_SESSION },
   },
   "C4 no challenge, the record names the endpoint through a symlinked directory": {
     host: "no-challenge",
@@ -132,13 +143,13 @@ const ROWS: Record<string, Row> = {
       symlinkSync(join(s.root, "sock"), join(s.root, "alias"))
       write(s.keys, FIRST, senpiRecord(FIRST, KEY, join(s.root, "alias", "h.sock")))
     },
-    outcome: { code: "host_identity_unproven", detail: (s) => NO_CHALLENGE(s) },
+    outcome: { code: "host_identity_unproven", detail: (s) => NO_CHALLENGE(s), session: NAMING_SESSION },
   },
   "C5 no challenge, dialed by a relative path": {
     host: "no-challenge",
     records: (s) => named(s),
     dialedPath: (s) => relative(process.cwd(), s.socket),
-    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE },
+    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE, session: NAMING_SESSION },
   },
   "C2 no challenge, the only record names another endpoint": {
     host: "no-challenge",
@@ -153,13 +164,13 @@ const ROWS: Record<string, Row> = {
   "C6 no challenge, the record names the endpoint with doubled slashes": {
     host: "no-challenge",
     records: (s) => write(s.keys, FIRST, senpiRecord(FIRST, KEY, s.socket.replace("/sock/", "//sock//"))),
-    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE },
+    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE, session: NAMING_SESSION },
   },
   "C7 no challenge, dialed with doubled slashes": {
     host: "no-challenge",
     records: (s) => named(s),
     dialedPath: (s) => s.socket.replace("/sock/", "//sock//"),
-    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE },
+    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE, session: NAMING_SESSION },
   },
   "C8 no challenge, dialed through a symlinked directory": {
     host: "no-challenge",
@@ -168,7 +179,7 @@ const ROWS: Record<string, Row> = {
       symlinkSync(join(s.root, "sock"), join(s.root, "alias"))
     },
     dialedPath: (s) => join(s.root, "alias", "h.sock"),
-    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE },
+    outcome: { code: "host_identity_unproven", detail: NO_CHALLENGE, session: NAMING_SESSION },
   },
   "D no challenge, no record at all": { host: "no-challenge", records: () => {}, outcome: "unauthenticated" },
   "D2 no challenge, only a name that is not a launch id": {
@@ -180,7 +191,11 @@ const ROWS: Record<string, Row> = {
     host: "no-challenge",
     records: (s) => named(s),
     dialedPath: () => "/nonexistent-dir-for-dial/h.sock",
-    outcome: { code: "host_identity_unproven", detail: "the dialed endpoint cannot be resolved (ENOENT)" },
+    outcome: {
+      code: "host_identity_unproven",
+      detail: "the dialed endpoint cannot be resolved (ENOENT)",
+      session: "the thread host's endpoint cannot be resolved",
+    },
   },
   "E malformed launch id": { host: "malformed", records: (s) => named(s), outcome: { code: "host_identity_unproven" } },
   "F wrong server proof": { host: "bad-proof", records: (s) => named(s), outcome: { code: "host_identity_unproven" } },
@@ -197,7 +212,7 @@ const ROWS: Record<string, Row> = {
   "I challenge under a launch that has no record (the found case)": {
     host: "challenge-other-launch",
     records: (s) => named(s),
-    outcome: asToday("missing; set SENPI_RPC_KEY_ROOT to the host's agent dir", SECOND),
+    outcome: unrecorded(SECOND),
   },
   "I2 proven as a recorded launch whose record names another endpoint (no endpoint comparison on a challenge)": {
     host: "challenge",
@@ -236,8 +251,9 @@ const ROWS: Record<string, Row> = {
     records: (s) => write(s.keys, FIRST, ""),
     outcome: {
       code: "unsafe_key_record",
-      detail: "empty, a launch may still be writing it; retry, and delete this file if it stays empty",
+      detail: "empty; a launch may still be writing it",
       file: (s) => join(s.keys, FIRST),
+      session: UNUSABLE_SESSION,
     },
   },
   "R3 no challenge, a damaged record under a launch name": {
@@ -362,6 +378,8 @@ describe.skipIf(process.platform === "win32")("authenticateRpcHost dial outcomes
     if (detail !== undefined) expect((outcome as Error).message).toEndWith(`: ${detail}`)
     if (row.outcome.file !== undefined)
       expect((outcome as Error).message).toBe(`${row.outcome.code}:${row.outcome.file(scene)}: ${detail}`)
+    expect((outcome as RpcIdentityError).sessionText).toBe(row.outcome.session)
+    if (row.outcome.session !== undefined) expect(row.outcome.session).not.toMatch(/\/|delete|remove/)
     expect(types).toEqual(
       row.outcome.code === "auth_failed" ? ["get_protocol_info", "authenticate"] : ["get_protocol_info"],
     )

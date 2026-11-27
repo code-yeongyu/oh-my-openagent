@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { withContractHost, type ContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { DIAL_SCENES } from "../../../../senpi-task/src/runners/rpc-host/testing/dial-refusals"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createLocalAttach } from "../remote/local-attach"
+import { parseThreadParams, threadToolParamSchemas } from "./contracts"
+import { hashArgs } from "./gateway/hash-args"
+import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { createThreadTools } from "./tools"
 import { createLiveThreadSurface } from "./live-surface"
 import { connectCarrierHost } from "./wake/carrier-connection"
 
@@ -73,4 +80,108 @@ describe.skipIf(process.platform === "win32")("an rpc host dial over the key rec
         })
       },
     )
+})
+
+function sessionTools(host: ContractHost, dialed: string, store: GatewayStore, agentDir: string) {
+  return createThreadTools({
+    host: surface(host, dialed),
+    store,
+    stateDirectory: agentDir,
+    callerSessionId: () => "caller",
+    callerWorkspaceRoot: () => process.cwd(),
+  })
+}
+
+const SESSION_CALLS = [
+  ["thread_list", { all_scope: true }],
+  ["thread_read", { thread: "dur-selected", all_scope: true }],
+  ["thread_rename", { thread: "dur-selected", name: "renamed", all_scope: true }],
+] as const
+
+describe.skipIf(process.platform === "win32")("an agent session told of a refused rpc host dial", () => {
+  const refused = Object.entries(DIAL_SCENES).filter(([, scene]) => scene.session !== undefined)
+  test.each(refused)(
+    "#given %s #when a thread tool runs #then it is told the code and one fixed sentence, with no path and nothing to remove",
+    async (_name, scene) => {
+      await withContractHost(scene.options, async (host) => {
+        scene.arrange(host)
+        const dialed = scene.dialed?.(host) ?? host.socket
+        const agentDir = mkdtempSync(join(tmpdir(), "session-refusal-"))
+        const store = createGatewayStore({ agentDir })
+        try {
+          const tools = sessionTools(host, dialed, store, agentDir)
+          for (const [name, args] of SESSION_CALLS) {
+            const tool = tools.find((candidate) => candidate.name === name)
+            if (tool === undefined) throw new Error(`${name} is not registered`)
+            const answer = JSON.stringify(
+              (await tool.execute("call-1", args, undefined, undefined, {} as never)).details.result,
+            )
+            expect(JSON.parse(answer)).toMatchObject({
+              kind: "error",
+              error: { message: `Thread operation failed: ${scene.session}` },
+            })
+            expect(answer).not.toContain(host.root)
+            expect(answer).not.toMatch(/delete|remove|\/rpc\//)
+          }
+        } finally {
+          await store.dispose()
+          rmSync(agentDir, { recursive: true, force: true })
+        }
+      })
+    },
+  )
+})
+
+const RECEIPTED_CALLS = [
+  ["thread_rename", { thread: "dur-selected", name: "renamed", all_scope: true, idempotency_key: "rename-refused-1" }],
+  ["thread_interrupt", { thread: "dur-selected", all_scope: true, idempotency_key: "interrupt-refused-1" }],
+  ["thread_create", { name: "refused-create", prompt: "hello", idempotency_key: "create-refused-1" }],
+] as const
+
+describe.skipIf(process.platform === "win32")("a receipted call refused by an rpc host dial, and its repeat", () => {
+  const refused = Object.entries(DIAL_SCENES).filter(([, scene]) => scene.session !== undefined)
+  test.each(refused)(
+    "#given %s #when a receipted call is made twice under one key #then neither answer nor the stored receipt carries a path or anything to remove",
+    async (_name, scene) => {
+      await withContractHost(scene.options, async (host) => {
+        scene.arrange(host)
+        const dialed = scene.dialed?.(host) ?? host.socket
+        const agentDir = mkdtempSync(join(tmpdir(), "session-receipt-"))
+        const store = createGatewayStore({ agentDir })
+        try {
+          const tools = sessionTools(host, dialed, store, agentDir)
+          const ectx = { sessionManager: { getSessionId: () => "caller" } }
+          for (const [name, args] of RECEIPTED_CALLS) {
+            const tool = tools.find((candidate) => candidate.name === name)
+            if (tool === undefined) throw new Error(`${name} is not registered`)
+            const first = JSON.stringify(
+              (await tool.execute("call-1", args, undefined, undefined, ectx as never)).details.result,
+            )
+            const again = JSON.stringify(
+              (await tool.execute("call-2", args, undefined, undefined, ectx as never)).details.result,
+            )
+            const parsed = parseThreadParams(threadToolParamSchemas[name], args)
+            if (parsed.kind !== "ok") throw new Error(`invalid ${name} args`)
+            const receipt = JSON.stringify(
+              await store.toolReceiptBegin({
+                principal: "session:caller",
+                operation: name,
+                idempotency_key: args.idempotency_key,
+                now: Date.now(),
+                args_hash: hashArgs(parsed.value),
+              }),
+            )
+            expect(first).toContain(String(scene.session))
+            for (const text of [first, again, receipt]) {
+              expect(text).not.toContain(host.root)
+              expect(text).not.toMatch(/delete|remove|\/rpc\//)
+            }
+          }
+        } finally {
+          await store.dispose()
+          rmSync(agentDir, { recursive: true, force: true })
+        }
+      })
+    },
+  )
 })

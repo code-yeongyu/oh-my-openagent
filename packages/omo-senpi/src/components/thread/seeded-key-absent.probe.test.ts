@@ -34,7 +34,7 @@ test.skipIf(process.platform === "win32")(
         kind: "error",
         error: expect.objectContaining({
           code: "internal_error",
-          message: `Thread operation failed: unsafe_key_record:${seeded.keyRecord}: missing; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+          message: `Thread operation failed: host_identity_unproven:${seeded.socket}: no key record ${seeded.keyRecord}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
           next_action: "Run omo thread list and retry after checking the target.",
         }),
       })

@@ -183,9 +183,9 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
             (error: unknown) => error,
           )
           expect(refusal).toBeInstanceOf(RpcIdentityError)
-          expect((refusal as RpcIdentityError).code).toBe("unsafe_key_record")
+          expect((refusal as RpcIdentityError).code).toBe("host_identity_unproven")
           expect((refusal as Error).message).toBe(
-            `unsafe_key_record:${host.recordPath}: missing; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+            `host_identity_unproven:${host.socket}: no key record ${host.recordPath}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
           )
         }
         expect(lines).toEqual([])

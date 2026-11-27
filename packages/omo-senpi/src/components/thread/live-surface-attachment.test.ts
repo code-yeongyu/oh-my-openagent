@@ -224,7 +224,7 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
               (error: unknown) => error,
             )
             expect((refusal as Error).message).toBe(
-              `unsafe_key_record:${host.recordPath}: missing; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+              `host_identity_unproven:${host.socket}: no key record ${host.recordPath}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
             )
             expect(host.mutations).toEqual([])
             expect(host.frames.filter(({ frame }) => frame.type !== "get_protocol_info")).toEqual([])
@@ -263,7 +263,7 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
                 (error: unknown) => error,
               )
             expect((refusal as Error).message).toBe(
-              `unsafe_key_record:${host.recordPath}: missing; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+              `host_identity_unproven:${host.socket}: no key record ${host.recordPath}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
             )
             expect(host.frames.filter(({ frame }) => frame.type !== "get_protocol_info")).toEqual([])
           })

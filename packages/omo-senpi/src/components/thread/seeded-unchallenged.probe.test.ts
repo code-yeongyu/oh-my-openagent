@@ -43,7 +43,7 @@ test.skipIf(process.platform === "win32")(
       kind: "error",
       error: expect.objectContaining({
         code: "internal_error",
-        message: `Thread operation failed: host_identity_unproven:${socket}: the host did not authenticate, and key record ${keyRecord} names this endpoint; if that launch has ended, the next senpi host start sweeps the record, or delete it`,
+        message: `Thread operation failed: host_identity_unproven:${socket}: the host did not authenticate, and key record ${keyRecord} names this endpoint`,
         next_action: "Run omo thread list and retry after checking the target.",
       }),
     })
