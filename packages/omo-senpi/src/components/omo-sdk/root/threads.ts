@@ -253,8 +253,10 @@ export function threadsNamespace(options: {
     releaseLocated: async (located, request) => (await thread()).releaseRow(located, request),
     dispose: async () => {
       disposed = true
-      if (core === undefined) return disposePorts()
-      await (await core).dispose()
+      // A core that never built owns nothing: the caller's ports are released here (review of 699c480398, LOW 3).
+      const built = core === undefined ? undefined : await core.catch(() => undefined)
+      if (built === undefined) return disposePorts()
+      await built.dispose()
     },
   }
 }
