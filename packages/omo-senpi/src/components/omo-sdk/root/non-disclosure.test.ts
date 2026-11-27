@@ -107,7 +107,9 @@ const GATEWAY_STORE = "gateway.sqlite"
 const INPUT_ALLOWED_IN_STORE = ["deliveries.body"] as const
 
 function storeColumnsHolding(path: string, canaries: readonly string[]): string[] {
-  const db = new Database(path, { readonly: true })
+  // Read-write, though it only reads: a read-only connection cannot create the WAL index (-shm) the writer removed on
+  // close, so on macOS it fails with SQLITE_CANTOPEN; only SELECTs run below.
+  const db = new Database(path)
   try {
     const tables = db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
     return tables.flatMap(({ name }) => {
