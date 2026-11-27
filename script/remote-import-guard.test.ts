@@ -60,6 +60,143 @@ describe("remote import guard G1 over packages/**", () => {
   })
 })
 
+// omo#13413: the omo SDK's devices.list is the remote module's devices.list, so a script has one device-service listing.
+// The account service's own listing is the SDK's account view (account.devices, the fields only the account holds) and
+// nothing else: devices.list reaching it, or a remote client built past the barrel, fails here.
+const sdkFactsOf = (facts: ReturnType<typeof scanRepository>) =>
+  facts.filter(
+    (fact) =>
+      (fact.file.startsWith("packages/omo-senpi/src/components/omo-sdk/") ||
+        fact.file === "packages/omo-senpi/src/extension/omo-sdk.ts") &&
+      !REMOTE_IMPORT_RULES.testFile(fact.file),
+  )
+
+// Value reaches only: a type-only import of the remote module is erased at build (no runtime path; the fused bundle
+// carries no remote/types.ts module), so only values count. Every value reach is pinned by exact file and target.
+const sdkRemoteValueReaches = (facts: ReturnType<typeof scanRepository>, resolve: ReturnType<typeof createResolver>) =>
+  sdkFactsOf(facts).flatMap((fact) =>
+    fact.edges
+      .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
+      // A type-only edge is erased. An edge with no names is a runtime path: `export * from` or a namespace import
+      // ("*"), or a bare side-effect import.
+      .filter((edge) => !edge.typeOnly && (edge.names.length === 0 || edge.names.some((named) => !named.typeOnly)))
+      .map((edge) => ({
+        file: fact.file,
+        target: resolve(fact.file, edge.specifier),
+        values:
+          edge.names.length === 0
+            ? [edge.whole ? "*" : "(side-effect)"]
+            : edge.names.filter((named) => !named.typeOnly).map((named) => named.name),
+      })),
+  )
+
+const SDK_REMOTE_VALUE_REACHES = [
+  // The contract's code table, data only: no device or session client.
+  {
+    file: "packages/omo-senpi/src/components/omo-sdk/contract/code-sources.ts",
+    target: "packages/omo-senpi/src/components/remote/codes.ts",
+    values: ["REMOTE_CODES"],
+  },
+  {
+    file: "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
+    target: "packages/omo-senpi/src/components/remote/index.ts",
+    values: ["remoteClientForSession"],
+  },
+]
+
+describe("the omo SDK's one device listing", () => {
+  // One scan of the repository serves every case here (repoFacts, above), so no case re-scans the tree.
+  const repoResolve = createResolver(REPO_ROOT)
+  const sdkFiles = sdkFactsOf(repoFacts)
+
+  test("#given the omo SDK's sources #then only the account view imports the account service's device listing", () => {
+    const listings = sdkFiles.flatMap((fact) =>
+      fact.edges
+        .filter(
+          (edge) =>
+            edge.names.some((named) => named.name === "listLiveDevices") ||
+            (edge.whole && edge.specifier.includes("service-auth")),
+        )
+        .map((edge) => `${fact.file} <- ${edge.specifier}`),
+    )
+    expect(listings).toEqual([
+      "packages/omo-senpi/src/components/omo-sdk/account/index.ts <- @oh-my-opencode/omo-opencode/service-auth",
+    ])
+  })
+
+  test("#given the omo SDK's sources #then devices.list reaches the remote module only through its barrel's session factory", () => {
+    expect(sdkRemoteValueReaches(repoFacts, repoResolve)).toEqual(SDK_REMOTE_VALUE_REACHES)
+  })
+
+  test("#given a value import past the barrel, or the code table from a second file #then each is a reach the pinned list refuses; a type-only import is not one", () => {
+    const root = mkdtempSync(join(tmpdir(), "sdk-remote-reach-"))
+    try {
+      const sdk = "packages/omo-senpi/src/components/omo-sdk"
+      const remote = "packages/omo-senpi/src/components/remote"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${remote}/index.ts`, "export const remoteClientForSession = () => 1\n")
+      put(`${remote}/codes.ts`, "export const REMOTE_CODES = []\n")
+      put(`${remote}/types.ts`, "export type RemoteRow = { id: string }\n")
+      put(`${remote}/sessions.ts`, "export const openSessions = () => 1\n")
+      put(`${sdk}/devices/index.ts`, 'import { remoteClientForSession } from "../../remote/index.ts"\n')
+      put(`${sdk}/contract/code-sources.ts`, 'import { REMOTE_CODES } from "../../remote/codes.ts"\n')
+      put(`${sdk}/contract/results/rows.ts`, 'import type { RemoteRow } from "../../../remote/types.ts"\n')
+      const scan = (): ReturnType<typeof sdkRemoteValueReaches> => {
+        execFileSync("git", ["add", "packages"], { cwd: root })
+        return sdkRemoteValueReaches(scanRepository(root), createResolver(root))
+      }
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      // The allowed shape, type-only reach included, is exactly the pinned list.
+      expect(scan()).toEqual(SDK_REMOTE_VALUE_REACHES)
+
+      put(
+        `${sdk}/devices/index.ts`,
+        'import { remoteClientForSession } from "../../remote/index.ts"\nimport { openSessions } from "../../remote/sessions.ts"\n',
+      )
+      put(`${sdk}/contract/other-codes.ts`, 'import { REMOTE_CODES } from "../../remote/codes.ts"\n')
+      put(`${sdk}/contract/everything.ts`, 'export * from "../../remote/sessions.ts"\n')
+      put(`${sdk}/contract/warm.ts`, 'import "../../remote/sessions.ts"\n')
+      put(`${sdk}/contract/later.ts`, 'export const later = () => import("../../remote/sessions.ts")\n')
+      put(`${sdk}/contract/required.ts`, 'export const required = require("../../remote/sessions.ts")\n')
+      put(`${sdk}/contract/whole.ts`, 'import * as remote from "../../remote/sessions.ts"\nexport const all = remote\n')
+      const grown = scan()
+      for (const file of ["later", "required", "whole"])
+        expect(grown).toContainEqual({
+          file: `${sdk}/contract/${file}.ts`,
+          target: `${remote}/sessions.ts`,
+          values: ["*"],
+        })
+      expect(grown).toContainEqual({
+        file: `${sdk}/contract/everything.ts`,
+        target: `${remote}/sessions.ts`,
+        values: ["*"],
+      })
+      expect(grown).toContainEqual({
+        file: `${sdk}/contract/warm.ts`,
+        target: `${remote}/sessions.ts`,
+        values: ["(side-effect)"],
+      })
+      expect(grown).not.toEqual(SDK_REMOTE_VALUE_REACHES)
+      expect(grown).toContainEqual({
+        file: `${sdk}/devices/index.ts`,
+        target: `${remote}/sessions.ts`,
+        values: ["openSessions"],
+      })
+      expect(grown).toContainEqual({
+        file: `${sdk}/contract/other-codes.ts`,
+        target: `${remote}/codes.ts`,
+        values: ["REMOTE_CODES"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("adapter import family A (#14943 design 7.5)", () => {
   test("#given every adapter of both editions #then the layers it reaches are exactly its offender row (the list only shrinks)", () => {
     // An architecture contract: a new reach fails here, and a removed one must leave ADAPTER_OFFENDERS in the same PR.
@@ -160,6 +297,13 @@ describe("remote import guard G1 matcher", () => {
   write(`${senpi}/src/components/remote/sessions.ts`, "export const sessions = 1\n")
   write(`${senpi}/src/components/remote/port/device-service.ts`, "export const port = 1\n")
   write(`${senpi}/src/components/thread/tool-entry.ts`, 'import { createRemoteClient } from "../remote/index.ts"\n')
+  write(`${senpi}/src/components/remote/lazy.ts`, 'export { createLazyRemoteSurface } from "./port/lazy-remote.ts"\n')
+  write(`${senpi}/src/components/remote/port/lazy-remote.ts`, "export const createLazyRemoteSurface = 1\n")
+  write(`${senpi}/src/components/thread/tool-lazy.ts`, 'import { createLazyRemoteSurface } from "../remote/lazy.ts"\n')
+  write(
+    `${senpi}/src/components/thread/tool-lazy-inner.ts`,
+    'import { createLazyRemoteSurface } from "../remote/port/lazy-remote.ts"\n',
+  )
   write(`${senpi}/src/components/thread/tool-member.ts`, 'import { sessions } from "../remote/sessions.ts"\n')
   write(`${senpi}/src/components/thread/tool-port.ts`, 'import type { port } from "../remote/port/device-service.ts"\n')
   write(
@@ -172,6 +316,15 @@ describe("remote import guard G1 matcher", () => {
     'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
   )
   write("packages/omo-native/other.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
+  // The SDK's declaration surface may name the module's types directly, type-only; any value, or another layer, is a reach.
+  write(
+    "packages/omo-native/remote-sdk-api.ts",
+    'import type { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\nimport type { DeviceService } from "@oh-my-opencode/device-service-core"\n',
+  )
+  write(
+    "packages/omo-native/remote-sdk.ts",
+    'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
+  )
   write(
     `${senpi}/src/components/remote/tui/command.ts`,
     'import { sessions } from "../sessions.ts"\nimport { run } from "./run.ts"\n',
@@ -200,15 +353,21 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/require-user.cjs`]: ["connectDeviceService"],
       [`${senpi}/src/runtime.ts`]: ["connectDeviceService"],
     })
-    expect(Object.fromEntries(fixture.nonLiteralImports)).toEqual({ [`${senpi}/src/dynamic.ts`]: 1 })
+    expect(Object.fromEntries(fixture.nonLiteralImports)).toEqual({
+      [`${senpi}/src/dynamic.ts`]: 1,
+    })
   })
 
-  test("#given each import shape #then S3 holds surfaces to the module's index, type-only included, tests and non-surfaces exempt", () => {
+  test("#given each import shape #then S3 holds surfaces to the module's three entries (index.ts, lazy.ts, admin.ts), type-only included, tests and non-surfaces exempt", () => {
+    // tool-entry (index.ts) and tool-lazy (lazy.ts) pass; tool-lazy-inner reaches the same surface past its entry.
     expect(asRecord(fixture.s3)).toEqual({
       [`${senpi}/src/components/thread/tool-l1.ts`]: ["packages/device-service-core/src/"],
+      [`${senpi}/src/components/thread/tool-lazy-inner.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
       "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
+      "packages/omo-native/remote-sdk-api.ts": ["packages/device-service-core/src/"],
+      "packages/omo-native/remote-sdk.ts": ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/command.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/run.ts`]: ["packages/device-service-core/src/"],
     })
