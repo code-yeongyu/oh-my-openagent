@@ -133,6 +133,32 @@ fn twin_title_windows_are_ambiguous() {
 }
 
 #[test]
+fn a_placed_frame_near_two_twin_windows_is_ambiguous() {
+    let (mut bus, _) = FakeBus::new();
+    let app = bus.app(77, "report-viewer");
+    let placed = bus.node(&app, "frame", "Report");
+    bus.set_extents(&placed, extents(10, 10, 500, 400));
+    let unplaced = bus.node(&app, "frame", "Report");
+    bus.set_extents(&unplaced, extents(0, 0, 0, 0));
+    let window = |id: &str, x| NativeWindow {
+        id: id.to_owned(),
+        pid: Some(77),
+        app: "report-viewer".to_owned(),
+        title: "Report".to_owned(),
+        bounds: extents(x, 10, 500, 400),
+    };
+    let windows = vec![window("0x1", 10), window("0x2", 100)];
+    let mut backend = AtspiBackend::new(Some(bus), Box::new(windows));
+
+    let refused =
+        observe(&mut backend, "0x2").expect_err("both windows sit near the one placed frame");
+
+    assert_eq!(refused.refusal.reason, Some(Reason::Ambiguous));
+    let candidates = vec!["0x1".to_owned(), "0x2".to_owned()];
+    assert_eq!(refused.detail, Some(Detail::AmbiguousWindow { candidates }));
+}
+
+#[test]
 fn busy_state_reports_loading() {
     let mut fx = gedit();
     let frame = fx.frame.clone();

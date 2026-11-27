@@ -80,7 +80,20 @@ pub fn join(target: &NativeWindow, twins: &[NativeWindow], frames: &[(NodeId, No
         .filter(|(_, facts)| trusted(facts.extents).is_some_and(|e| near(e, target.bounds)))
         .collect();
     match placed.as_slice() {
-        [(node, _)] => return Join::Frame(node.clone()),
+        // The frame is the target's only when no twin window sits near it too.
+        [(node, facts)] => {
+            let shared = twins.iter().any(|twin| {
+                twin.id != target.id
+                    && trusted(Some(twin.bounds))
+                        .zip(facts.extents)
+                        .is_some_and(|(bounds, frame)| near(frame, bounds))
+            });
+            return if shared {
+                ambiguous()
+            } else {
+                Join::Frame(node.clone())
+            };
+        }
         [_, _, ..] => return ambiguous(),
         [] => {}
     }
