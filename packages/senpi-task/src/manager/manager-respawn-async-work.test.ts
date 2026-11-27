@@ -126,7 +126,7 @@ describe("respawn of a child whose last turn waited on its own async work (omo#1
     } finally {
       await handle.dispose()
     }
-  }, 5_000)
+  })
 
   test("#given a fresh parent #when the host reopened a transcript whose last answer was held on a pending cell #then the turn ends as async_work_pending, never completed", async () => {
     // given - the session file records the cell as still pending after the note
@@ -142,7 +142,7 @@ describe("respawn of a child whose last turn waited on its own async work (omo#1
     } finally {
       await handle.dispose()
     }
-  }, 5_000)
+  })
 
   test("#given a fresh parent #when the host reopened a transcript whose last answer left no work pending #then that answer is adopted", async () => {
     // given
@@ -158,7 +158,7 @@ describe("respawn of a child whose last turn waited on its own async work (omo#1
     } finally {
       await handle.dispose()
     }
-  }, 5_000)
+  })
 
   test("#given a managed child held on a live cell #when the host parks its session #then the typed failure is persisted before the handle is let go", async () => {
     // given
@@ -184,7 +184,7 @@ describe("respawn of a child whose last turn waited on its own async work (omo#1
     } finally {
       await handle.dispose()
     }
-  }, 5_000)
+  })
 
   test("#given a fresh parent #when the reopened transcript records the cell pending after the note and then drained #then the turn still ends as async_work_pending", async () => {
     // given - a positive record, then the zero record the engine appends when the cell drains
@@ -201,5 +201,5 @@ describe("respawn of a child whose last turn waited on its own async work (omo#1
     } finally {
       await handle.dispose()
     }
-  }, 5_000)
+  })
 })
