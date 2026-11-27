@@ -468,8 +468,8 @@ describe("a change to how outcomes are produced or normalized", () => {
       expect(verifyReview(output, "", verdictFor(renderReport(gateReport(input())))).decision).toBe("withheld")
     })
 
-  test("#given a diff touching only product code #then there is no gate change and nothing to sign", () => {
-    const report = gateReport(input({ changedFiles: ["packages/omo-native/bin/lib/thread.js"] }))
+  test("#given a diff outside the harness and outside every capability's closure #then there is no gate change and nothing to sign", () => {
+    const report = gateReport(input({ changedFiles: ["docs/reference/omo-thread.md"] }))
     expect(report.gateChanges).toEqual([])
     expect(verifyReview(renderReport(report), "", "").decision).toBe("accepted")
   })
