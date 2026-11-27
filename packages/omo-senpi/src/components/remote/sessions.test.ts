@@ -40,7 +40,7 @@ afterEach(async () => {
   for (const dir of emptyDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const NEW_KEY = "bmV3LXNlc3Npb24ta2V5MQ"
+const NEW_KEY = "FAKE_session_key_test1"
 const ENGINE_ID = "dur-new"
 
 // One engine reply for every record a session takes on the delegated channel (the owner answers each with the same data):

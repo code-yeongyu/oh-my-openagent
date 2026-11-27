@@ -7,7 +7,7 @@ import { defaultWorld, type World } from "../../device-service-core/test/local-a
 
 export const PEER = "dev-peer-1"
 const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
-export const NEW_KEY = "bmV3LXNlc3Npb24ta2V5MQ"
+export const NEW_KEY = "FAKE_session_key_test1"
 const ENGINE_ID = "dur-new"
 
 const SESSION_REPLY: JsonObject = {
