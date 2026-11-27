@@ -62,7 +62,6 @@ function workflowSlice(from: string, to: string): string {
 }
 
 const windowsShard1Job = () => workflowSlice("test-windows-1", "windows-test-1-status")
-const windowsShard1StatusJob = () => workflowSlice("windows-test-1-status", "typecheck")
 const senpiCompatibilityJob = () => workflowSlice("senpi-tests-windows", "windows-senpi-status")
 
 interface TestBunfig {
