@@ -51,7 +51,7 @@ export type ControlledConnection = {
   readonly reconnect: () => void
 }
 
-export function controlledHandle(taskId: string, connectable = false): ControlledHandle {
+function controlledHandle(taskId: string, connectable = false): ControlledHandle {
   const stops = { aborted: 0, disposed: 0 }
   const stopWaiters: Array<(stop: "aborted" | "disposed") => void> = []
   const stopped = (stop: "aborted" | "disposed"): void => {

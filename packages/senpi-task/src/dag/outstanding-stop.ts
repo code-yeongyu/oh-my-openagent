@@ -22,7 +22,7 @@ type RunNodes = readonly Pick<DagNode, "state" | "taskId">[]
  * re-entry - asks here, and a repeated cancel is what clears it. `nodes` is read only when a live child
  * exists, so a list over cached summaries reads a checkpoint only for a run that may owe a stop.
  */
-export function outstandingRunStop(
+function outstandingRunStop(
   tasks: DagOwnedTaskReader | undefined,
   record: Pick<DagRunRecordV1, "runId" | "status"> & { readonly nodes?: RunNodes },
   nodes: () => RunNodes | undefined = () => record.nodes,
