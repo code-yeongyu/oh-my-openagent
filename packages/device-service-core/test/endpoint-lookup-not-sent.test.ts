@@ -4,7 +4,7 @@ import type { LocalApiClient } from "../src/local-api/client.ts"
 
 // An endpoint command looks the endpoint up with session.endpoints before it writes session.command. A failure of that
 // lookup dispatched nothing, so the SDK marks it not_sent; a timeout of session.command itself keeps its command_id.
-const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+const ENDPOINT = "FAKE_endpoint_key_tst1"
 
 function client(lookup: () => Promise<unknown>, serviceVersion = "0.1.0") {
   const calls = { commandTo: 0, lookups: [] as unknown[], targets: [] as unknown[] }
@@ -77,8 +77,8 @@ describe("DeviceService.endpointCommand: a failed endpoint lookup is not_sent", 
 
 // omo#14195: a remote create opens on the device's primary engine endpoint, never on whichever key the host listed first
 // (an owner shard, or the engine of another registered agent dir that may predate the records a later send needs).
-const SHARD = "c2hhcmQtZW5kcG9pbnQtMD"
-const OTHER_DIR = "b3RoZXItYWdlbnQtZGlyLT"
+const SHARD = "FAKE_endpoint_key_tst3"
+const OTHER_DIR = "FAKE_endpoint_key_tst2"
 const PRIMARY = "cHJpbWFyeS1lbmRwb2ludC"
 
 describe("DeviceService.endpointCommand: opens on the device's primary engine endpoint (omo#14195)", () => {

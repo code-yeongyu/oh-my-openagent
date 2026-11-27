@@ -1,13 +1,18 @@
 import type {
-  ControlAttachState,
-  ControlSessionWakeState,
-  Status,
-  StatusState,
-  UnitState,
-} from "../device-service-core/src/index.ts"
-import type { DeviceRow, SessionsList } from "../omo-senpi/src/components/remote/index"
-import type { ThreadDelivery, ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+  ControlState,
+  DeviceRow,
+  InterruptResult,
+  RemoteClient,
+  SendReceipt,
+  ServiceStatus,
+  SessionsList,
+} from "../omo-senpi/src/components/remote/index"
 import type { LocalStatus } from "./remote-cold-wake"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+
+type StatusState = ServiceStatus["state"]
+type UnitState = LocalStatus["device_service"]["state"]
+type WakeState = Extract<Awaited<ReturnType<RemoteClient["service"]["wake"]>>, { readonly kind: "ok" }>["value"]
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
 const STATE_LABELS: Readonly<Record<StatusState, string>> = {
@@ -27,7 +32,8 @@ const STATE_LABELS: Readonly<Record<StatusState, string>> = {
   fail_closed: "Needs repair",
 }
 
-function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {
+function renderTable(header: readonly string[], shownRows: readonly (readonly string[])[]): string[] {
+  const rows = shownRows.map((row) => row.map((cell) => escapeForDisplay(cell)))
   const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => (row[column] ?? "").length)))
   const line = (cells: readonly string[]) =>
     cells
@@ -57,13 +63,41 @@ export function candidateLines(refusal: {
   return listed.filter(isEntry).flatMap((candidate) => {
     const id = textOf(candidate["address"]) ?? textOf(candidate["device"]) ?? textOf(candidate["thread"])
     const name = textOf(candidate["device_name"]) ?? textOf(candidate["name"])
-    return id === undefined ? [] : [`  ${id}${name === undefined ? "" : `  ${name}`}`]
+    return id === undefined ? [] : [escapeForDisplay(`  ${id}${name === undefined ? "" : `  ${name}`}`)]
   })
 }
 
 // A refusal's next action may name the agents' eval-only thread_list tool; a person at a terminal runs the CLI verb.
 export const personNextAction = (text: string): string =>
   /\bthread_list\b/.test(text) ? "Run omo remote sessions to see the account's sessions." : text
+
+/** A typed refusal as the lines a person reads on stderr: the message, the next action, then any candidates. */
+export function refusalLines(refusal: {
+  readonly code: string
+  readonly message: string
+  readonly next_action: string
+  readonly details?: Readonly<Record<string, unknown>> | undefined
+}): string[] {
+  return [
+    escapeForDisplay(`omo remote: ${refusal.message}`),
+    escapeForDisplay(personNextAction(refusal.next_action)),
+    ...candidateLines(refusal),
+  ]
+}
+
+/** `omo remote open --prompt` whose session opened but whose first prompt was not delivered. */
+export function undeliveredPromptLines(
+  label: string,
+  error: { readonly message: string; readonly next_action: string },
+): string[] {
+  return [
+    escapeForDisplay(`omo remote: opened ${label}, but its first prompt was not delivered: ${error.message}`),
+    escapeForDisplay(`${error.next_action} Send it again with omo remote send ${label} <text>.`),
+  ]
+}
+
+export const sessionEndedLine = (device: string, end: string): string =>
+  escapeForDisplay(`omo remote: the session on ${device} ended before its turn settled (${end}).`)
 
 export function ago(ms: number | null, now: number): string {
   if (ms === null) return "never"
@@ -77,7 +111,7 @@ export function ago(ms: number | null, now: number): string {
 }
 
 export function statusLines(
-  status: Status,
+  status: Omit<ServiceStatus, "service_version">,
   serviceVersion: string,
   local: readonly (readonly [string, string])[] = [],
 ): string[] {
@@ -90,7 +124,7 @@ export function statusLines(
   if (status.detail?.action) rows.push(["Action", status.detail.action])
   rows.push(...local)
   const width = Math.max(...rows.map(([label]) => label.length))
-  return rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`)
+  return rows.map(([label, value]) => escapeForDisplay(`${label.padEnd(width)}  ${value}`))
 }
 
 const UNIT_STATE_LABELS: Readonly<Record<UnitState, string>> = {
@@ -155,81 +189,84 @@ export function sessionLines(listing: SessionsList, now: number): string[] {
   if (listing.unanswered.length > 0)
     lines.push(
       "",
-      `Not answered, rows may be missing or cached: ${listing.unanswered.map((device) => device.name).join(", ")}`,
+      escapeForDisplay(
+        `Not answered, rows may be missing or cached: ${listing.unanswered.map((device) => device.name).join(", ")}`,
+      ),
     )
   return lines
 }
 
 /**
- * The queued-fate line shared by the send verb's human forms (#13268). A receiver parked on an approval its person must
- * answer on that device holds the message behind it, and the line says so instead of reading as a plain queue.
+ * The queued-fate line of a send (#13268). A receiver parked on an approval its person must answer on that device holds
+ * the message behind it, and the line says so instead of reading as a plain queue.
  */
-const queuedLine = (label: string, delivery: Extract<ThreadDelivery, { readonly queue_position: number }>): string => {
-  const waitingOn = "waiting_on" in delivery ? delivery.waiting_on : undefined
+const queuedLine = (label: string, receipt: Extract<SendReceipt, { readonly queue_position: number }>): string => {
+  const waitingOn = "waiting_on" in receipt ? receipt.waiting_on : undefined
   if (waitingOn?.kind === "approval")
-    return `Queued on ${label} at position ${delivery.queue_position}, waiting for an approval on ${waitingOn.device ?? "that device"}.`
-  return `Queued on ${label} at position ${delivery.queue_position}.`
+    return `Queued on ${label} at position ${receipt.queue_position}, waiting for an approval on ${waitingOn.device ?? "that device"}.`
+  return `Queued on ${label} at position ${receipt.queue_position}.`
 }
 
-/** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
-export function sessionVerbLines(
-  verb: "open" | "send" | "model" | "interrupt" | "close",
-  label: string,
-  result: ThreadToolResult,
-): string[] {
-  if (result.kind !== "ok") return []
-  if (verb === "open" && "deduplicated" in result && "name" in result)
-    return [`${result.device ?? ""}/${result.thread}`]
-  if (verb === "send" && "delivery" in result) {
-    const { delivery } = result
-    if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [queuedLine(label, delivery)]
-    if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
-    return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
-  }
-  if (verb === "model" && "model" in result && result.model !== undefined)
-    return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
-  if (verb === "interrupt" && "interrupted" in result) {
-    if (!result.interrupted) return [`Nothing was running on ${label}.`]
-    const { background } = result
-    if (background.status === "not_supported")
-      return [
-        `Interrupted ${label}.`,
-        `Background jobs that turn started were left running: the engine on ${label} cannot stop them.`,
-      ]
-    const jobName = (job: { readonly id: string; readonly description?: string }) => job.description ?? job.id
-    const count = background.stopped.length
+/** The human answer of a send that did not wait; `label` is the session as its address names it. */
+export function sendLines(label: string, receipt: SendReceipt): string[] {
+  if (receipt.lane === "queued" || receipt.lane === "queued_offline")
+    return [escapeForDisplay(queuedLine(label, receipt))]
+  if (receipt.lane === "steered") return [escapeForDisplay(`Steered turn ${receipt.turn_id ?? "?"} on ${label}.`)]
+  return [escapeForDisplay(`Sent to ${label}: turn ${receipt.turn_id ?? "?"} started.`)]
+}
+
+/** The human answer of an interrupt: what ran, and the background jobs of its turn it stopped or left (#13444). */
+export const interruptLines = (label: string, result: InterruptResult): string[] =>
+  interruptVerbLines(label, result).map((line) => escapeForDisplay(line))
+
+function interruptVerbLines(label: string, result: InterruptResult): string[] {
+  if (!result.interrupted) return [`Nothing was running on ${label}.`]
+  const { background } = result
+  if (background.status === "not_supported")
     return [
       `Interrupted ${label}.`,
-      ...(count === 0
-        ? []
-        : [`Stopped ${count} background job${count === 1 ? "" : "s"}: ${background.stopped.map(jobName).join(", ")}.`]),
-      ...background.failed.map((job) => `Could not stop background job ${jobName(job)}: ${job.reason}.`),
+      `Background jobs that turn started were left running: the engine on ${label} cannot stop them.`,
     ]
-  }
-  if (verb === "close" && "closed" in result) {
-    const dropped =
-      "dropped_deliveries" in result && Array.isArray(result.dropped_deliveries) ? result.dropped_deliveries : []
-    return [
-      `Closed ${label}.`,
-      ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
-    ]
-  }
-  return []
+  const jobName = (job: { readonly id: string; readonly description?: string }) => job.description ?? job.id
+  const count = background.stopped.length
+  return [
+    `Interrupted ${label}.`,
+    ...(count === 0
+      ? []
+      : [`Stopped ${count} background job${count === 1 ? "" : "s"}: ${background.stopped.map(jobName).join(", ")}.`]),
+    ...background.failed.map((job) => `Could not stop background job ${jobName(job)}: ${job.reason}.`),
+  ]
 }
+
+/** The human answer of a close, with the messages it dropped (omo#14234). */
+export function closeLines(
+  label: string,
+  closed: { readonly closed: boolean; readonly dropped_deliveries: readonly string[] },
+): string[] {
+  const dropped = closed.dropped_deliveries
+  return [
+    closed.closed ? `Closed ${label}.` : `${label} was not open.`,
+    ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
+  ].map((line) => escapeForDisplay(line))
+}
+
+/** The human answer of a model change: the model the session now uses. */
+export const modelLines = (label: string, model: string): string[] => [escapeForDisplay(`${label} now uses ${model}.`)]
+
+/** The human answer of an open: the new session's address. */
+export const openedLines = (address: string): string[] => [escapeForDisplay(address)]
 
 /**
  * The wait-mode status line for a send that waits behind a running turn (#13268): stdout stays the streamed answer
- * alone, so the CLI writes this to stderr once, when the send's own reply names the position the message joined at (it
- * is not updated as the queue drains). A send that started or steered a turn answers nothing here - its answer is
- * already streaming.
+ * alone, so the CLI writes this to stderr once, when the send's receipt names the position the message joined at (it is
+ * not updated as the queue drains). A send that started or steered a turn answers nothing here - its answer is already
+ * streaming.
  */
-export function sendWaitNotice(label: string, result: ThreadToolResult): string | null {
-  if (result.kind !== "ok" || !("delivery" in result)) return null
-  const { delivery } = result
-  return delivery.kind === "queued" || delivery.kind === "queued_offline" ? queuedLine(label, delivery) : null
+export function sendWaitNotice(label: string, receipt: SendReceipt): string | null {
+  return receipt.lane === "queued" || receipt.lane === "queued_offline" ? queuedLine(label, receipt) : null
 }
 
-export function wakeLines(state: ControlSessionWakeState): string[] {
+export function wakeLines(state: WakeState): string[] {
   const line = state.enabled
     ? "Waking is on: sessions on this device that are not running may be started by a message from your other signed-in devices."
     : "Waking is off: a message from another device waits until this session is opened here."
@@ -245,7 +282,7 @@ export function wakeLines(state: ControlSessionWakeState): string[] {
   return lines
 }
 
-export function controlLines(state: ControlAttachState, now: number): string[] {
+export function controlLines(state: ControlState, now: number): string[] {
   const line = state.attached
     ? "Remote control is on: your other signed-in devices can view and command sessions on this device."
     : "Remote control is off: your other devices cannot view or command sessions on this device."

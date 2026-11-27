@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { collectDisabledSkills, loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { resolveSkillAlias } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-name-aliases"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 
@@ -12,7 +13,7 @@ export function readDisabledSkills(cwd: string, env: Record<string, string | und
       harness: "senpi",
       layers: loaded.layers,
       ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
-    }),
+    }).map(resolveSkillAlias),
   )
 }
 

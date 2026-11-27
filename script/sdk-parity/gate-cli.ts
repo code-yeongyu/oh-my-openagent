@@ -9,6 +9,7 @@ import { capabilityClosures, ImportGraph } from "./closures"
 import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { loadPresentation, parsePresentation } from "./presentation"
+import { readDeclaredVersions } from "./version-mask"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
@@ -16,6 +17,7 @@ import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
 import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
+import { loadBaseScenarioTable } from "./declared-change"
 import type { DomainFile } from "./schema"
 import type { DiscoveredTool } from "./tool-check"
 
@@ -92,7 +94,22 @@ try {
   else prepareBaseTree(REPO_ROOT, baseTree)
   const isolation = [...isolationProblems(baseTree), ...isolationProblems(REPO_ROOT)]
   if (isolation.length > 0) throw new Error(isolation.join("\n"))
+  const baseVersions = readDeclaredVersions(baseTree)
+  const headVersions = readDeclaredVersions(REPO_ROOT)
+  if (headVersions === undefined)
+    throw new Error("the head has no packages/omo-native/package.json to read versions from")
   const baseSide = runSide(baseTree)
+  // The merge base's own scenario table: both trees run the head's, so only this shows a scenario the head dropped.
+  // Only a merge base without the table skips the rule that a scenario's call may not change; a table that exists and
+  // does not load fails the check with its error.
+  let baseTableProblem: string | undefined
+  const baseScenarios =
+    show(mergeBase, "script/sdk-parity/scenarios.ts") === undefined
+      ? undefined
+      : await loadBaseScenarioTable(join(baseTree, "script/sdk-parity/scenarios.ts")).catch((error: unknown) => {
+          baseTableProblem = `the merge base's scenario table exists and does not load: ${error instanceof Error ? error.message : String(error)}`
+          return []
+        })
   const headSide = runSide(REPO_ROOT)
   const comparedMs = Date.now() - started
   const files = loadDomainFiles(ROWS_DIR)
@@ -129,6 +146,8 @@ try {
     changedFiles,
     body,
     headSha: git("rev-parse", "HEAD").trim(),
+    versions: { base: baseVersions, head: headVersions },
+    baseScenarios,
     presentation: {
       base: baseRowsText === undefined ? undefined : parsePresentation(baseRowsText),
       head: loadPresentation(),
@@ -160,12 +179,13 @@ try {
     },
   })
   const failures = [
+    ...(baseTableProblem === undefined ? [] : [baseTableProblem]),
     ...report.failures,
     ...baselineFailures,
     ...baseFailures,
     ...goldenProblems(goldens, headSide.outcomes),
   ]
-  const text = `${renderReport({ ...report, failures })}\nMerge base ${mergeBase.slice(0, 10)}; ${SCENARIOS.length} scenarios on both trees in ${(comparedMs / 1000).toFixed(1)} s; gate total ${((Date.now() - started) / 1000).toFixed(1)} s.\n`
+  const text = `${renderReport({ ...report, failures })}\nMerge base ${mergeBase.slice(0, 10)}; ${baseScenarios === undefined ? "no scenario table at the merge base" : `${baseScenarios.length} merge-base scenarios bound`}; ${SCENARIOS.length} scenarios on both trees in ${(comparedMs / 1000).toFixed(1)} s; gate total ${((Date.now() - started) / 1000).toFixed(1)} s.\n`
   process.stdout.write(text)
   const summary = arg("--summary") ?? process.env.GITHUB_STEP_SUMMARY
   if (summary !== undefined) appendFileSync(summary, text)
