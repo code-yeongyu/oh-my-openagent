@@ -8,7 +8,7 @@ import type { DagRunId } from "./types"
 
 export type ClaimedRun =
   | { readonly kind: "claimed"; readonly record: RecoverableRecord; readonly release: () => void }
-  | { readonly kind: "skipped"; readonly reason: "foreign_session" | "not_paused" }
+  | { readonly kind: "skipped"; readonly reason: "foreign_session" | "not_paused" | "busy" }
   | { readonly kind: "skipped"; readonly reason: "live_lease"; readonly holderPid: number }
 
 // Only an immediate fork source can be adopted, and its recorded holder must still prove
@@ -80,8 +80,8 @@ function claimOutcome(
     case "held":
       return { kind: "skipped", reason: "live_lease", holderPid: acquired.holderPid }
     case "busy":
-      // Another operation of this process is installing or mutating the run.
-      return { kind: "skipped", reason: "live_lease", holderPid: context.hostPid }
+      // Another operation of this process is installing or mutating the run: ask again once it releases it.
+      return { kind: "skipped", reason: "busy" }
     case "missing":
       return { kind: "skipped", reason: "not_paused" }
   }

@@ -1,4 +1,4 @@
-import type { DagRunId, DagSchedulerOptions } from "@oh-my-opencode/senpi-task/dag"
+import type { DagRecoveryOutcome, DagRunId, DagSchedulerOptions } from "@oh-my-opencode/senpi-task/dag"
 
 import {
   DAG_SCHEDULER_FAILED_PAUSE_REASON,
@@ -51,7 +51,8 @@ export function createSchedulerFailureHandler(ports: {
   readonly children: DagRunStopper & Pick<TaskManager, "get" | "findOwnedTask">
   readonly closure: PausedNodeHoldPort
   holdsRun(runId: DagRunId): boolean
-  recover(sessionId: string): Promise<void>
+  // This session's recovery sweep; it answers for each of the session's runs (none while closed).
+  recover(sessionId: string): Promise<readonly DagRecoveryOutcome[]>
 }) {
   const { store } = ports.schedulerOptions
   // One count per uninterrupted sequence of this process's schedulers for a run: it lives only while a
@@ -156,9 +157,10 @@ export function createSchedulerFailureHandler(ports: {
     }
   }
 
-  // Each turn waits for a release of the run's reservation and repeats only when another operation of
-  // this process reserved the run again meanwhile, so it ends once no such operation remains; it never spins.
-  // Resolves true when it handed the run to a scheduler of this process (the sequence goes on).
+  // Each turn waits for a release of the run's reservation and repeats only on an answer that another
+  // operation of this process held the run (the park's acquisition, or recovery's claim answering busy),
+  // so every further turn follows one more reservation of the run; it never spins. Any other answer ends
+  // it. Resolves true when recovery took the run for a scheduler of this process (the sequence goes on).
   const handOn = async (runId: DagRunId, parentSessionId: string, first: boolean, error: string): Promise<boolean> => {
     for (;;) {
       await ports.reservations.whenFree(runId)
@@ -174,9 +176,18 @@ export function createSchedulerFailureHandler(ports: {
         if ((await park(runId, parentSessionId, error)) === "done") return false
         continue
       }
-      await ports.recover(parentSessionId)
-      if (ports.holdsRun(runId)) return true
-      if (ports.reservations.inFlight(runId) === undefined) return false
+      const answer = (await ports.recover(parentSessionId)).find((outcome) => outcome.runId === runId)
+      if (answer?.kind === "resumed" || answer?.kind === "adopted") return true
+      if (answer?.reason === "busy") continue
+      // No answer: the claim found it not eligible on the fresh record or missing, or recovery is closed.
+      ports.logger.info("omo-senpi dag run not handed on: recovery did not take it", {
+        runId,
+        reason: answer?.reason ?? "not_claimed",
+        ...(answer?.holderPid === undefined
+          ? { status: store.readCheckpoint<DagRunRecordV1>(runId)?.status ?? "missing" }
+          : { holderPid: answer.holderPid }),
+      })
+      return false
     }
   }
 

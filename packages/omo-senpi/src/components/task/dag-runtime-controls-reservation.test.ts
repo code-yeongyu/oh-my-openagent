@@ -103,7 +103,7 @@ describe("DAG runtime amend overlapping a recovery sweep", () => {
 
     // then - recovery left the run to the amend
     expect(installed).toEqual([])
-    expect(outcomes).toEqual([{ runId, kind: "skipped", reason: "live_lease", holderPid: process.pid }])
+    expect(outcomes).toEqual([{ runId, kind: "skipped", reason: "busy" }])
 
     // and when the amendment lands, its re-entry is the only scheduler that ran the node
     openGate()

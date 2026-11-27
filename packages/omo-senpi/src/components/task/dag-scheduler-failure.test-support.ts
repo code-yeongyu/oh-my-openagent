@@ -2,7 +2,12 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createDagFileStore, type DagFileStore, type DagRunRecordV1 } from "@oh-my-opencode/senpi-task/dag"
+import {
+  createDagFileStore,
+  type DagFileStore,
+  type DagRecoveryOutcome,
+  type DagRunRecordV1,
+} from "@oh-my-opencode/senpi-task/dag"
 
 import {
   LongRunningTaskManager,
@@ -31,7 +36,7 @@ export function failedSchedulerRun(
     readonly closure?: PausedNodeHoldPort
     readonly wrap?: (base: DagFileStore) => DagFileStore
     readonly directory?: string
-    readonly recover?: (sessionId: string) => Promise<void>
+    readonly recover?: (sessionId: string) => Promise<readonly DagRecoveryOutcome[]>
   } = {},
 ) {
   const directory = options.directory ?? fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-scheduler-failure-handler-"))
@@ -75,11 +80,15 @@ export function failedSchedulerRun(
     holdsRun: () => state.held,
     children,
     closure: options.closure ?? { closeHold: async () => undefined },
-    recover: async (sessionId) => {
+    recover: async (sessionId): Promise<readonly DagRecoveryOutcome[]> => {
       recovered.push(sessionId)
       if (options.recover !== undefined) return options.recover(sessionId)
       const fresh = read()
-      if (fresh?.status === "running" && fresh.leaseHolderPid === undefined) state.held = true
+      if (fresh?.status !== "running" || fresh.leaseHolderPid !== undefined) {
+        return [{ runId, kind: "skipped", reason: "not_paused" }]
+      }
+      state.held = true
+      return [{ runId, kind: "resumed" }]
     },
   })
   const fail = () => handler.failed(runId, running.parentSessionId, "fault")

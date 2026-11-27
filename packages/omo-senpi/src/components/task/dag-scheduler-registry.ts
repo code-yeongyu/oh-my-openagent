@@ -1,5 +1,6 @@
 import type {
   DagFileStore,
+  DagRecoveryOutcome,
   DagRunId,
   DagRunRecordV1,
   DagScheduler,
@@ -35,7 +36,7 @@ export function createDagSchedulerRegistry(ports: {
   readonly isProcessAlive: (pid: number) => boolean
   readonly reservations: DagRunReservations
   // Re-runs this session's recovery: a run whose scheduler here failed is handed to it.
-  recover(sessionId: string): Promise<void>
+  recover(sessionId: string): Promise<readonly DagRecoveryOutcome[]>
   // Confirms a parked run's stopped children closed their holds (bookkeeping on the one drain's result).
   readonly closure: PausedNodeHoldPort
 }) {

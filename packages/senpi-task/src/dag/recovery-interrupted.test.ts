@@ -165,7 +165,7 @@ describe("DAG recovery of a run its host left running", () => {
 
     // then
     expect(first.map((outcome) => outcome.kind)).toEqual(["resumed"])
-    expect(second).toEqual([{ runId, kind: "skipped", reason: "live_lease", holderPid: THIS_HOST_PID }])
+    expect(second).toEqual([{ runId, kind: "skipped", reason: "busy" }])
     expect(resumedEvents(store)).toBe(1)
     expect(manager.startOwnedCalls).toEqual(["slow", "next"])
   })

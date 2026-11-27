@@ -31,8 +31,8 @@ function shuttingDown(failuresBefore: number) {
   const run = failedSchedulerRun(cleanupRoots, {
     recover: async (sessionId) => {
       // A failure before this test's one: its recovery took the run, and that scheduler has since ended.
-      if (earlier-- > 0) return
-      await sweeps?.recover({ sessionId })
+      if (earlier-- > 0) return [{ runId, kind: "resumed" }]
+      return (await sweeps?.recover({ sessionId })) ?? []
     },
   })
   const quiet = { info: () => undefined, warn: () => undefined, error: () => undefined }

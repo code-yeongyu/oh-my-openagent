@@ -32,7 +32,7 @@ export function createDagRecoverySweeps(ports: {
 }) {
   const leaseWatch = createDagLeaseWatch(ports.leaseWatch)
   const leaseWatches = new Map<DagRunId, () => void>()
-  const sweeps = new Set<Promise<void>>()
+  const sweeps = new Set<Promise<readonly DagRecoveryOutcome[]>>()
   let open = true
 
   const cancelWatches = (): void => {
@@ -68,16 +68,19 @@ export function createDagRecoverySweeps(ports: {
     )
   }
 
-  const sweep = async (scope: RecoveryScope): Promise<void> => {
-    for (const outcome of await ports.install(scope)) {
+  const sweep = async (scope: RecoveryScope): Promise<readonly DagRecoveryOutcome[]> => {
+    const outcomes = await ports.install(scope)
+    for (const outcome of outcomes) {
       if (outcome.kind !== "skipped" || outcome.reason !== "live_lease" || outcome.holderPid === undefined) continue
       watchLiveLease(scope, outcome.runId, outcome.holderPid)
     }
     ports.afterSweep(scope.sessionId)
+    return outcomes
   }
 
-  const recover = (scope: RecoveryScope): Promise<void> => {
-    if (!open) return Promise.resolve()
+  /** Each of this session's runs answered by the sweep; none while recovery is closed. */
+  const recover = (scope: RecoveryScope): Promise<readonly DagRecoveryOutcome[]> => {
+    if (!open) return Promise.resolve([])
     const running = sweep(scope).finally(() => sweeps.delete(running))
     sweeps.add(running)
     return running
