@@ -239,14 +239,15 @@ function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView 
     delivery.kind === "started"
       ? `${mode}delivered (turn ${short(delivery.turn_id)})`
       : delivery.kind === "steered"
-        ? `steered into the running turn (turn ${short(delivery.turn_id)})`
+        ? `steer queued for turn ${short(delivery.turn_id)}: delivers at its next tool boundary`
         : delivery.kind === "queued"
           ? queuedLine(delivery)
           : delivery.kind === "queued_offline"
             ? `queued #${delivery.queue_position}: thread is offline, delivers when it starts`
-            : "sent"
+            : `delivery state unknown${delivery.kind === undefined ? "" : ` (${text(delivery.kind)})`}`
   return {
-    tone: delivery.kind === "started" || delivery.kind === "steered" ? "success" : "warning",
+    // Only a started turn has taken the message; a steer waits in the target's queue until its next tool boundary.
+    tone: delivery.kind === "started" ? "success" : "warning",
     headline: `-> ${target}  ${outcome}`,
     details: [
       ...(r.resolved_by === "fuzzy" ? ["matched by fuzzy name"] : []),
