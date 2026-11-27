@@ -17,6 +17,7 @@ import {
 } from "./scheduler-context"
 import { cancelledSnapshot, disposeSupersededChildren, supersededChildren } from "./scheduler-cancellation"
 import { admitFrontier } from "./scheduler-admission"
+import { runRevivalFences } from "./scheduler-pending-revival"
 import { settleOne } from "./scheduler-task-attachment"
 import type { DagNode, DagNodeId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
@@ -31,6 +32,13 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
 
   for (;;) {
     if (context.suspended || context.cancellationStarted) return cancelledSnapshot(context)
+    // A waiting node's stale-child fence runs here, between admission passes, where no admission holds
+    // the admission flag (#15150): never from the fold that asked for it. It re-arms a waiter only "after
+    // an event", so no fold, fence and re-arm cycle can repeat on microtasks alone (stack review 3).
+    if (context.revivalFences.size > 0) {
+      await runRevivalFences(context)
+      continue
+    }
     // The skip cascade runs only at frontier quiescence (nothing attached), generalizing the
     // barrier-era rule that dependents were skipped between waves: a failed node stays revivable
     // (send -> revive) while any sibling is still mid-flight, and a revived outcome can complete
@@ -45,6 +53,8 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
     if (context.attachedTasks.size === 0 && !context.infrastructureRetries.pending()) {
       // A retry timer may fire while the admission await yields, after its frontier scan.
       if (context.infrastructureRetries.takeReady()) continue
+      // A waiting node's fold detached it until its fence runs at the top of the loop (#15150).
+      if (context.revivalFences.size > 0) continue
       // #8396 (second symptom): every admission of this pass failed at start, so nothing is
       // attached while the dependents still sit pending. Their skip cascade runs at the top of the
       // loop; throwing here instead left the run `running` forever (28 leaves failed at admission,

@@ -32,7 +32,7 @@ export function staleLiveChildren(tasks: DagRunStopper, record: DagRunRecordV1):
   )
 }
 
-function staleLiveRefusal(stale: readonly StaleLiveChild[]): string | undefined {
+export function staleLiveRefusal(stale: readonly StaleLiveChild[]): string | undefined {
   if (stale.length === 0) return undefined
   const ids = stale.map(({ taskId }) => taskId).join(", ")
   return `task ${ids} of a superseded attempt or removed node is still live and could not be stopped`

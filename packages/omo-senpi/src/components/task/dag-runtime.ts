@@ -10,7 +10,6 @@ import {
   createDagFileStore,
   createDagOwnerResumeFence,
   createDagManager,
-  createDagRecovery,
   createDagWaitSurface,
   DAG_UNATTACHED_NODES_PAUSE_REASON,
   type DagDefinition,
@@ -41,6 +40,7 @@ import { endedChildClosure, type PausedNodeHoldPort } from "./dag-paused-cancel"
 import { createDagRuntimeControls } from "./dag-runtime-controls"
 import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler-registry"
 import { createDagRecoverySweeps } from "./dag-recovery-sweeps"
+import { createRuntimeDagRecovery } from "./dag-runtime-recovery"
 import { createDagRunCancel } from "./dag-run-cancel"
 import { createShutdownPause } from "./dag-runtime-shutdown"
 import { registerDagPauseSource } from "./dag-runtime-pause-wiring"
@@ -310,6 +310,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     manager: queryManager,
     runtime: deps.engine.runtime,
     logger: deps.logger,
+    childRecord: (taskId) => deps.engine.manager.get(taskId),
     ...(deps.statusUiTimers === undefined ? {} : { timers: deps.statusUiTimers }),
   })
 
@@ -447,29 +448,25 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     )
   }
 
-  const recovery = createDagRecovery({
-    store,
-    taskManager,
-    ...(deps.pausedChildren === undefined ? {} : { pausedChildren: deps.pausedChildren }),
-    ...liveness,
-    // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
-    // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
-    // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
-    isRunHeldInProcess: holdsRun,
-    reservations,
-    ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
-    ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
-    ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
-    stopAdmission: (runId) => stoppedAdmissions.add(runId),
-    reattach: (runId, taskId) => {
-      const key = `${runId}\0${taskId}`
-      if (recoveryTaskSubscriptions.has(key)) return
-      recoveryTaskSubscriptions.set(
-        key,
-        deps.engine.manager.subscribeChild(taskId, () => mutationListener()),
-      )
+  const recovery = createRuntimeDagRecovery(
+    deps.engine,
+    {
+      store,
+      taskManager,
+      ...(deps.pausedChildren === undefined ? {} : { pausedChildren: deps.pausedChildren }),
+      ...liveness,
+      // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
+      // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
+      // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
+      isRunHeldInProcess: holdsRun,
+      reservations,
+      ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
+      ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
+      stopAdmission: (runId) => stoppedAdmissions.add(runId),
     },
-  })
+    recoveryTaskSubscriptions,
+    () => mutationListener(),
+  )
 
   durableEventListener = onEvent
   mutationListener = () => {

@@ -7,7 +7,7 @@ import { DagManagerError, heldTriggerNotice, type DagRunId } from "@oh-my-openco
 // scheduler module by path for the same reason, and both resolve to the same source file, so the
 // instanceof check below stays sound.
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
-import { quietNodesNotice } from "./dag-quiet-nodes"
+import { awaitingRevivalNotice, quietNodesNotice } from "./dag-quiet-nodes"
 import { amendAction, retryAction, sendAction } from "./dag-tool-control"
 import { guideAction } from "./dag-tool-guide"
 import {
@@ -129,7 +129,7 @@ async function waitAction(deps: DagToolDeps, params: DagToolInput, runId: string
   // the eval SDK and dag library rely on.
   if (params.detach !== false && !TERMINAL_RUN_STATUSES.has(snapshot.status)) {
     return toolResult(
-      `Detached from dag run ${runId} (${snapshot.status}, ${snapshot.counts.completed}/${snapshot.counts.total} nodes complete). The session is woken as each node completes and again when the run settles; use action=snapshot for a midpoint peek or action=wait with detach=false to block until settle.${quietNodesNotice(snapshot.nodes, Date.now())}`,
+      `Detached from dag run ${runId} (${snapshot.status}, ${snapshot.counts.completed}/${snapshot.counts.total} nodes complete). The session is woken as each node completes and again when the run settles; use action=snapshot for a midpoint peek or action=wait with detach=false to block until settle.${quietNodesNotice(snapshot.nodes, Date.now())}${awaitingRevivalNotice(snapshot.nodes, deps.childRecord)}`,
       {
         kind: "detached",
         run_id: runId,
@@ -188,7 +188,7 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
         return toolResult(
-          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${stopNotice(snapshot)}${heldTriggerNotice(snapshot.nodes)}${quietNodesNotice(snapshot.nodes, Date.now())}`,
+          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${stopNotice(snapshot)}${heldTriggerNotice(snapshot.nodes)}${quietNodesNotice(snapshot.nodes, Date.now())}${awaitingRevivalNotice(snapshot.nodes, deps.childRecord)}`,
           {
             kind: "snapshot",
             run_id: runId,

@@ -23,6 +23,7 @@ import { runFrontier } from "./scheduler-frontier"
 import { attachTaskSettlement, watchRevivedInScheduler, disposePromotionWatch } from "./scheduler-task-attachment"
 import { disposeSelfResumeWatches, followCompletedNodeTasks } from "./scheduler-self-resume"
 import { createInfrastructureRetries, type RetrySchedule } from "./infrastructure-retry"
+import { followPendingRevivals, type AwaitingRevival } from "./scheduler-pending-revival"
 export { applyDagSchedulerEvent } from "./scheduler-projection"
 export { DAG_NODE_CONTROL_ERROR_CODES, DagNodeControlError } from "./node-control-context"
 export type { DagNodeControlErrorCode } from "./node-control-context"
@@ -47,6 +48,8 @@ export type DagSchedulerOptions = {
    * long-running child before the run leaves `paused`.
    */
   readonly preAttachedTasks?: ReadonlyMap<DagNodeId, string>
+  // Children whose revival this host's lifecycle still owes: their nodes follow the revival (#15150).
+  readonly awaitingRevival?: AwaitingRevival
   // Skill materialization for a retry that carries a prompt override (it re-runs the amend path).
   readonly materializeSkills?: DagMaterializeSkills
   // Lease identity for the control verbs: a run leased by a DIFFERENT live process is not ours to
@@ -160,6 +163,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     emittedWaveAdmissions: new Set<number>(),
     emittedWaveCompletions: new Set<number>(),
     promotionWatches: new Map<DagNodeId, () => void>(),
+    revivalFences: new Map(),
     selfResumeWatches: new Map<DagNodeId, () => void>(),
   }
   // #7412 defect 1: control verbs (send/revive watchers, retry) commit through their OWN journal
@@ -182,6 +186,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
   for (const [nodeId, taskId] of options.preAttachedTasks ?? []) {
     attachTaskSettlement(context, nodeId, taskId)
   }
+  if (options.awaitingRevival !== undefined) followPendingRevivals(context, options.awaitingRevival, "first decision")
 
   let running: Promise<DagRunRecordV1> | undefined
   const scheduler: DagScheduler = {

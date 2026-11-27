@@ -14,6 +14,7 @@ import type {
   DagRunSnapshot,
 } from "@oh-my-opencode/senpi-task/dag"
 
+import type { NodeChildRecord } from "./dag-quiet-nodes"
 import type { DagToolDefinitionInput } from "./dag-tool-params"
 import type { Guidance } from "../../../../senpi-task/src/pause/guidance"
 import type { PausedDagGuideCommand } from "../../../../senpi-task/src/dag/paused-controls"
@@ -134,6 +135,8 @@ export type DagToolDeps = {
   readonly send?: (runId: DagRunId, nodeId: string, message: string) => Promise<DagToolSendOutcome>
   /** Injection point for the runtime's amend entry point (edit the definition, re-enter the run). */
   readonly amend?: (runId: DagRunId, definition: DagDefinition) => Promise<DagRunSnapshot>
+  /** A node child's record, so the text can say which node waits for its child's revival (#15150). */
+  readonly childRecord?: (taskId: string) => NodeChildRecord | undefined
 }
 
 export function toolResult(text: string, details: DagToolDetails): DagToolResult {
