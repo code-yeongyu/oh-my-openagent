@@ -87,4 +87,6 @@ test("#given a note of the same name on both accounts #when the device switches 
   expect(await peerOnA.read("shared.md")).toBe(note("text only account a ever wrote\n"))
   expect(await e.read("shared.md")).toBe(note("text only account b ever wrote\n"))
   expect(await d.read(NOT_SYNCED)).toBe("not a memory\n")
+  expect(await peerOnA.read(NOT_SYNCED)).toBeNull()
+  expect(await e.read(NOT_SYNCED)).toBeNull()
 })
