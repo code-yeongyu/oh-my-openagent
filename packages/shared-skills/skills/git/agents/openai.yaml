@@ -1,0 +1,13 @@
+interface:
+  display_name: "git (omo)"
+  short_description: "Local git: commits, worktrees, base sync, push, history"
+  search_terms:
+    - "git"
+    - "git-master"
+    - "git commit"
+    - "git push"
+    - "worktree"
+    - "rebase"
+    - "git blame"
+    - "history search"
+  default_prompt: "Use $git to read the repository state, commit only the requested paths, keep worktrees and base syncs safe, and hand the pushed head SHA to the github skill."

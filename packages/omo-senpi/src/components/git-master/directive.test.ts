@@ -22,8 +22,7 @@ function occurrences(text: string, needle: string): number {
 }
 
 function exampleCommitCommand(directive: string): string {
-  const block = /```bash\n([\s\S]*?)```/.exec(directive)?.[1] ?? ""
-  const line = block.split("\n").find((candidate) => candidate.includes(" commit "))
+  const line = /`([^`]*\bgit\b[^`]* commit [^`]*)`/.exec(directive)?.[1]
   if (line === undefined) throw new Error("directive carries no commit example")
   return line
 }

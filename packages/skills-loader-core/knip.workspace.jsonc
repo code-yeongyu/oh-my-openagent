@@ -35,8 +35,6 @@
     "packages/skills-loader-core/src/config/git-env-prefix.ts": ["GIT_ENV_PREFIX_VALIDATION_MESSAGE"],
     // pre-existing at origin dev 4686e425b5: unused export(s) SkillSourceSchema, SkillDefinitionSchema, SkillEntrySchema
     "packages/skills-loader-core/src/config/skills.ts": ["SkillSourceSchema", "SkillDefinitionSchema", "SkillEntrySchema"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) SISYPHUS_CO_AUTHOR_TRAILER
-    "packages/skills-loader-core/src/features/opencode-skill-loader/git-master-template-injection.ts": ["SISYPHUS_CO_AUTHOR_TRAILER"],
     // pre-existing at origin dev 4686e425b5: unused export(s) skillProjectRoot
     "packages/skills-loader-core/src/features/opencode-skill-loader/skill-provenance.ts": ["skillProjectRoot"],
     // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME

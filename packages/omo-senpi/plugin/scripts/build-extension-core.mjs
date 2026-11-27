@@ -76,7 +76,7 @@ const toolkitSdkOutputPath = join(
   "agent-toolkit-sdk",
   "sdk.js",
 )
-const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
+const bunshinTsEntryPath = join(packageRoot, "src", "components", "remote", "bunshin-ts", "bunshin-ts-sdk.ts")
 const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
 // The account, device, device-service and configuration SDK eval cells import from OMO_SDK_ROOT.
 export const OMO_SDK_RELATIVE_PATH = join("runtime", "omo-sdk", "sdk.js")

@@ -10,6 +10,7 @@ type WaitingCallKey = {
 }[RootCallKey]
 
 const HONOURED = new Set<string>([
+  "account.devices",
   "threads.resolve",
   "threads.entries",
   "threads.get",

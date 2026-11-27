@@ -150,6 +150,7 @@ const PORT_NAMES = {
   now: true,
   deviceServiceStatus: true,
   signInProcess: true,
+  remoteTimers: true,
 } as const satisfies Record<keyof OmoSdkPorts, true>
 
 function notFake(ports: OmoSdkPorts): string[] {
@@ -203,6 +204,14 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     store: fault ? faultingStore() : createGatewayStore({ agentDir: home }),
     remote: fault ? (fakeRemote(true) as RemoteThreadSurface) : listingRemote(),
     now: () => 1_764_000_000_000,
+    // devices.list's clock: real deadlines, so a device service that never answers still settles.
+    remoteTimers: {
+      after: (ms: number, fn: () => void) => {
+        const timer = setTimeout(fn, ms)
+        return () => clearTimeout(timer)
+      },
+      now: () => Date.now(),
+    },
   })
 }
 

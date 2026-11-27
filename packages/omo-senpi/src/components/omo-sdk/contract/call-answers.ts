@@ -37,6 +37,7 @@ export const ROOT_CALL_ANSWERS: { readonly [K in RootCallKey]: (typeof ROOT_CALL
   "threads.extensions.register": "value",
   "threads.extensions.call": "value",
   "account.whoami": "value",
+  "account.devices": "value",
   "account.show": "value",
   "account.signInCheck": "value",
   "account.signOut": "value",

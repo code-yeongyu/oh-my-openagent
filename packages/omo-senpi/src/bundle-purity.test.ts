@@ -72,7 +72,7 @@ describe("omo-senpi bundle purity", () => {
       expect(
         bunshinTsInputs.filter(
           (input) =>
-            !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+|(^|\/)packages\/device-service-core\/src\/state-dir\.ts)$/.test(
+            !/(src\/components\/remote\/bunshin-ts\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+|(^|\/)packages\/device-service-core\/src\/state-dir\.ts)$/.test(
               input,
             ),
         ),

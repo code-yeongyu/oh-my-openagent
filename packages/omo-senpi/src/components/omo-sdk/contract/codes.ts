@@ -86,7 +86,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Call devices.list; retry once the device is online.",
   },
   device_service_unavailable: {
-    namespaces: ["deviceService"],
+    namespaces: ["deviceService", "devices"],
     next_action: "Call deviceService.status, then retry.",
   },
   foreign_live_owner: {
@@ -231,11 +231,11 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Read details for the account service's reason.",
   },
   service_unreachable: {
-    namespaces: ["account", "devices", "install"],
+    namespaces: ["account", "install"],
     next_action: "Check the network, then retry.",
   },
   session_ended: {
-    namespaces: ["account", "devices"],
+    namespaces: ["account"],
     next_action: "The session ended; open it again with threads.create.",
   },
   signed_out: {

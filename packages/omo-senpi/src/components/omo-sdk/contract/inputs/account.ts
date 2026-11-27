@@ -8,6 +8,7 @@ const Id = Type.String({ minLength: 1 })
 const None = Type.Object({})
 
 export const AccountWhoami = None
+export const AccountDevices = None
 export const AccountShow = Type.Object({ account: Type.Optional(Id) })
 export const AccountSignInCheck = None
 export const AccountSignOut = None
