@@ -14,7 +14,7 @@ const StructuredMessage = Type.Union([
   }),
 ])
 
-const Recipient = Type.String({ description: "Child task id/name or team member name." })
+const Recipient = Type.String({ description: "Child task ID, name, or session-local nickname; or team member name." })
 const PlainMessage = Type.String({ description: "The instruction or context to deliver." })
 const Summary = Type.Optional(Type.String({ description: "Optional one-line summary for team messages." }))
 

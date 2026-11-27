@@ -1,4 +1,5 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
+import { resolveTaskTarget } from "../manager/task-target"
 import { isTransportLostMessage, messageability } from "../state"
 import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import type { TaskRecord } from "../state"
@@ -44,10 +45,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   // session shutdown that suspends the pending child) and drains, in persisted order, when the
   // child eventually launches. The record is the single source of truth - no in-memory shadow.
 
-  function resolve(idOrName: string): TaskRecord | undefined {
+  function resolve(idOrName: string, callerSessionId?: string): TaskRecord | undefined {
     const byId = tryLoad(idOrName)
     if (byId !== undefined) return byId
-    return port.store.list().records.find((record) => record.name === idOrName)
+    return resolveTaskTarget(port.store.list().records, idOrName, callerSessionId)
   }
 
   function tryLoad(taskId: string): TaskRecord | undefined {
@@ -63,7 +64,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   }
 
   async function sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome> {
-    const record = resolve(input.idOrName)
+    const record = resolve(input.idOrName, input.expectedRunEpoch === undefined ? input.callerSessionId : undefined)
     if (record === undefined) {
       return { kind: "not_found", reason: `No task found for "${input.idOrName}".`, suggestion: NOT_FOUND_SUGGESTION }
     }

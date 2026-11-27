@@ -130,22 +130,33 @@ function rowText(
   row: { readonly start: LiveBatchStart; readonly progress: ProgressRow },
   settled: ReadonlyMap<string, string>,
 ): string {
+  const { item, result } = row.start
+  const identity = taskIdentityLabel({
+    taskId: result.task_id,
+    name: result.name,
+    description: item.description,
+    taskSummary: item.task_summary,
+  })
+  const nickname = result.nickname?.trim()
+  const displayIdentity =
+    nickname === undefined
+      ? identity
+      : `${identity} (${nickname === identity ? "" : `${nickname}, `}${result.task_id})`
   const status = settled.get(row.start.result.task_id)
   if (status !== undefined) {
     return composeStatusLine({
-      identity: taskIdentityLabel({
-        taskId: row.start.result.task_id,
-        name: row.start.result.name,
-        description: row.start.item.description,
-        taskSummary: row.start.item.task_summary,
-      }),
+      identity: displayIdentity,
       target: formatStatusTarget(progressTarget(row.start)),
       verb: status,
     })
   }
   const details = row.progress.details()
+  const activity =
+    nickname === undefined || !details.progress.activity.startsWith(identity)
+      ? details.progress.activity
+      : `${displayIdentity}${details.progress.activity.slice(identity.length)}`
   const last = row.progress.contentText()
-  return last.length === 0 ? details.progress.activity : `${details.progress.activity}\n   ${last}`
+  return last.length === 0 ? activity : `${activity}\n   ${last}`
 }
 
 function progressTarget(start: LiveBatchStart): ChildProgressTarget {

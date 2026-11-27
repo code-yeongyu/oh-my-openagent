@@ -74,7 +74,13 @@ describe("buildTaskExecute background batch fanout", () => {
       { task_id: IDS[1], name: "two", nickname: "Helios", category: "quick", status: "pending", queue_position: 1 },
       { task_id: IDS[2], name: "three", category: "quick", status: "pending", queue_position: 2 },
     ])
-    for (const taskId of IDS) expect(textOf(output)).toContain(`task_send(to="${taskId}"`)
+    const text = textOf(output)
+    for (const taskId of IDS) expect(text).toContain(`task_send(to="${taskId}"`)
+    expect(text).toContain("one (Selene) st_batch_1 (running)")
+    expect(text).toContain("[task_id: st_batch_1 - continue with task_send")
+    expect(text).toContain("two (Helios) st_batch_2 (pending)")
+    expect(text.match(/Selene/gu)).toHaveLength(1)
+    expect(text.match(/Helios/gu)).toHaveLength(1)
   })
 
   test("#given inherited and item load_skills #when background items start #then each result reports its own resolution", async () => {

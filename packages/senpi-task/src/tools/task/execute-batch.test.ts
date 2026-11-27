@@ -51,6 +51,9 @@ describe("buildTaskExecute batch fanout", () => {
     expect(output.details.status).toBe("completed")
     expect(output.details.items).toMatchObject(IDS.map((task_id) => ({ task_id, status: "completed" })))
     expect(output.details.items?.map((item) => item.nickname)).toEqual(["Selene", "Selene", "Selene"])
+    const text = output.content[0]?.type === "text" ? output.content[0].text : ""
+    expect(text).toContain("[task_id: st_batch_1, nickname: Selene")
+    expect(text).toContain("[task_id: st_batch_2, nickname: Selene")
   })
 
   test(" w2batch #given one runner error #when the sync batch settles #then both successes remain and aggregate status is error", async () => {

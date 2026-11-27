@@ -7,6 +7,18 @@ export type StartLabels = {
   readonly description?: string
 }
 
+export function startedTaskReference(started: StartedResult, label: string | undefined): string {
+  const nickname = started.nickname?.trim()
+  const primary = label === started.task_id && nickname ? nickname : label
+  if (primary === undefined || primary === started.task_id) {
+    return nickname === undefined
+      ? `${started.task_id} (${started.status})`
+      : `${nickname} (${started.task_id}, ${started.status})`
+  }
+  const nicknameToken = nickname === undefined || nickname === primary ? "" : `${nickname}, `
+  return `${primary} (${nicknameToken}${started.task_id}, ${started.status})`
+}
+
 export function backgroundStartText(started: StartedResult, labels: StartLabels): string {
   const queue =
     started.queue_position !== undefined
@@ -15,10 +27,7 @@ export function backgroundStartText(started: StartedResult, labels: StartLabels)
         ? ", the task host is still admitting it; a failed start arrives as its notification"
         : ""
   const label = labels.taskSummary ?? labels.description ?? started.name
-  const base =
-    label === started.task_id
-      ? `Started task ${started.task_id} (${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
-      : `Started task ${label} (${started.task_id}, ${started.status})${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
+  const base = `Started task ${startedTaskReference(started, label)}${queue}. Completion is automatically delivered. End your turn if no independent work remains; otherwise keep working. Use task_send only to steer it.`
   return base
 }
 

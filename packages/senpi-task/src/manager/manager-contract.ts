@@ -37,7 +37,7 @@ export type TaskManager = {
   // senpi#3266: one-step re-dispatch of a flagged "resumed, waiting for input" task onto a fresh
   // live session, replaying its persisted prompt under the same task identity and a new run epoch.
   // Optional: minimal manager fakes (and the DAG test doubles) never serve a redispatch.
-  redispatchTask?(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome>
+  redispatchTask?(idOrName: string, callerSessionId?: string, allScope?: boolean): Promise<RedispatchOutcome>
   get(taskId: string): TaskRecord | undefined
   hasPendingSends?(taskId: string): boolean
   hasInFlightSends?(taskId: string): boolean

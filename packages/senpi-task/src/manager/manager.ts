@@ -116,6 +116,7 @@ import { newestSessionPath } from "../lifecycle/session-path"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { TaskSequence } from "./task-sequence"
 import { createNicknameAllocator } from "./nickname-allocation"
+import { resolveTaskTarget } from "./task-target"
 import { resolveAgentHome } from "../agent-home"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeChildFacts } from "./child-facts"
@@ -171,7 +172,7 @@ type ReattachingTaskManager = TaskManager &
       credential?: ResumeCredential,
       options?: { readonly paused?: boolean },
     ): Promise<RespawnResult>
-    redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome>
+    redispatchTask(idOrName: string, callerSessionId?: string, allScope?: boolean): Promise<RedispatchOutcome>
     reattach(
       record: TaskRecord,
       handle: ManagedChildHandle,
@@ -906,17 +907,15 @@ class TaskManagerImpl implements TaskManager {
   // senpi#3266: the one-step action out of "resumed, waiting for input" that keeps the work. The
   // flagged task's dead session is abandoned and a FRESH child launches from the persisted prompt,
   // under the same task identity and a new run epoch. Only a non-terminal flagged task may take it.
-  // Callers passing no callerSessionId act across sessions (task_send forwards none under all_scope).
-  async redispatchTask(idOrName: string, callerSessionId?: string): Promise<RedispatchOutcome> {
-    const listed = this.list({ scope: "all" })
-    const record =
-      listed.find((entry) => entry.record.task_id === idOrName)?.record ??
-      listed.find((entry) => entry.record.name === idOrName)?.record
+  async redispatchTask(idOrName: string, callerSessionId?: string, allScope?: boolean): Promise<RedispatchOutcome> {
+    const records = this.list({ scope: "all" }).map(({ record }) => record)
+    const record = resolveTaskTarget(records, idOrName, callerSessionId)
     if (record === undefined) {
       return { kind: "not_found", reason: `No task named ${idOrName}.` }
     }
     if (
       callerSessionId !== undefined &&
+      allScope !== true &&
       callerSessionId !== record.parent_session_id &&
       callerSessionId !== record.root_session_id
     ) {

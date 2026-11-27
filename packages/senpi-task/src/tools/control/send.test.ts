@@ -72,7 +72,7 @@ describe("runTaskSend", () => {
     expect(result.details.task_id).toBe(started.task_id)
   })
 
-  test("resolved send and cancel results carry the display nickname without making it an address", async () => {
+  test("resolved send and cancel results carry the session-local nickname without replacing the canonical ID", async () => {
     const { manager } = makeManager({
       config: settings({ nicknames: { sets: { moon: ["Selene"] }, default: "moon" } }),
     })
@@ -81,8 +81,8 @@ describe("runTaskSend", () => {
     const foreign = await runTaskSend(manager, { to: started.task_id, message: "not authorized" }, "other")
     expect(foreign.details.kind).toBe("scope_denied")
     expect(foreign.details).not.toHaveProperty("nickname")
-    const alias = await runTaskSend(manager, { to: "Selene", message: "not an address" }, "p1")
-    expect(alias.details.kind).toBe("not_found")
+    const alias = await runTaskSend(manager, { to: "Selene", message: "follow-up by nickname" }, "p1")
+    expect(alias.details).toMatchObject({ kind: "steered", task_id: started.task_id, nickname: "Selene" })
     const sent = await runTaskSend(manager, { to: "worker", message: "keep going" }, "p1")
     expect(sent.details).toMatchObject({ kind: "steered", task_id: started.task_id, name: "worker", nickname: "Selene" })
     const cancelled = await runTaskCancel(manager, { task_id: started.task_id })

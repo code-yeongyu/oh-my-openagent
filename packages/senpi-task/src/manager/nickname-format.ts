@@ -181,3 +181,65 @@ function ordinalizeLastWord(phrase: string): string {
   const lastWord = phrase.slice(lastSeparator + 1)
   return `${phrase.slice(0, lastSeparator + 1)}${ORDINALS[lastWord] ?? `${lastWord}th`}`
 }
+
+/** The four accepted spellings of a persisted numbered nickname, including its visible base. */
+export function nicknameOccurrenceAliases(label: string): readonly string[] {
+  const point = splitOccurrence(label)
+  if (point === undefined) return []
+  const { base, occurrence } = point
+  const styles: readonly OccurrenceStyle[] = ["#", "roman", "full", "arabic"]
+  return styles.map((style) => `${base}${occurrenceSuffix(occurrence, style)}`)
+}
+
+function splitOccurrence(label: string): { base: string; occurrence: number } | undefined {
+  const numeric = /^(.*) (?:#([1-9]\d*)|the ([1-9]\d*)(st|nd|rd|th))$/i.exec(label)
+  const written = /^(.*) the ([a-z -]+)$/i.exec(label)
+  const roman = /^(.*) ([ivxlcdm]+)$/i.exec(label)
+  let base: string
+  let occurrence: number
+  if (numeric !== null) {
+    base = numeric[1]
+    occurrence = Number(numeric[2] ?? numeric[3])
+    if (numeric[4] !== undefined && numeric[4].toLowerCase() !== ordinalSuffix(occurrence)) return undefined
+  } else if (written !== null) {
+    base = written[1]
+    const suffix = written[2].toLowerCase()
+    occurrence = readEnglishOrdinal(suffix)
+    if (!Number.isSafeInteger(occurrence) || occurrence < 2 || toEnglishOrdinal(occurrence).toLowerCase() !== suffix)
+      return undefined
+  } else if (roman !== null) {
+    base = roman[1]
+    const suffix = roman[2].toUpperCase()
+    const amounts: Readonly<Record<string, number>> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }
+    occurrence = [...suffix].reduce(
+      (total, glyph, index) => total + amounts[glyph] * (amounts[glyph] < amounts[suffix[index + 1]] ? -1 : 1),
+      0,
+    )
+    if (occurrence > 3999 || toRoman(occurrence) !== suffix) return undefined
+  } else {
+    return undefined
+  }
+  return Number.isSafeInteger(occurrence) && occurrence >= 2 ? { base, occurrence } : undefined
+}
+
+function readEnglishOrdinal(suffix: string): number {
+  const words = suffix.split(/[ -]/)
+  const ending = words.pop() ?? ""
+  const cardinal = Object.entries(ORDINALS).find(([, word]) => word.toLowerCase() === ending)?.[0]
+  words.push(cardinal?.toLowerCase() ?? ending.replace(/th$/, ""))
+  let total = 0
+  let group = 0
+  for (const word of words) {
+    const small = SMALL_CARDINALS.findIndex((item) => item.toLowerCase() === word)
+    const tens = TENS.findIndex((item) => item.toLowerCase() === word)
+    const scale = SCALES.findIndex((item) => item.toLowerCase() === word)
+    if (small > 0) group += small
+    else if (tens > 0) group += tens * 10
+    else if (word === "hundred") group *= 100
+    else if (scale > 0) {
+      total += group * 1000 ** scale
+      group = 0
+    } else return Number.NaN
+  }
+  return total + group
+}

@@ -12,7 +12,7 @@ export const CANCEL_PENDING_REASON = "cancel requested, child unreachable"
 
 export function createSteeringControls(
   port: SteeringPort,
-  resolve: (idOrName: string) => TaskRecord | undefined,
+  resolve: (idOrName: string, callerSessionId?: string) => TaskRecord | undefined,
   clearPersistedQueue: (taskId: string) => void,
 ) {
   const nowIso = (): string => new Date(port.now()).toISOString()
@@ -72,7 +72,7 @@ export function createSteeringControls(
   }
 
   async function cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
-    const record = resolve(idOrName)
+    const record = resolve(idOrName, options?.expectedRunEpoch === undefined ? options?.callerSessionId : undefined)
     const destructionCause = options?.abort === "skip" ? "cancel_without_abort" : "cancel"
     if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
     const expected = options?.expectedRunEpoch

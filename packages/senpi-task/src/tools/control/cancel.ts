@@ -3,19 +3,21 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
+import { taskReferenceLabel } from "../../manager/task-target"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
-import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
+import { defaultResolveCallerSessionId } from "./caller-session"
+import type { CallerSessionResolver, CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
   task_id: Type.Optional(
     Type.String({
       description:
-        "Task id (st_...) of the child to cancel. Pass task_id or name; when both are given, task_id wins and name is ignored.",
+        "Task ID (st_...) or session-local nickname. If both task_id and name are given, task_id wins.",
     }),
   ),
-  name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
+  name: Type.Optional(Type.String({ description: "Canonical task name or session-local nickname." })),
   reason: Type.Optional(Type.String({ description: "Optional human-readable reason recorded on the cancelled task." })),
 })
 
@@ -29,9 +31,10 @@ const DESCRIPTION = [
 
 export type TaskCancelDeps = {
   readonly manager: CancelManager
+  readonly resolveCallerSessionId?: CallerSessionResolver
 }
 
-export async function runTaskCancel(manager: CancelManager, params: TaskCancelInput): Promise<CancelToolResult> {
+export async function runTaskCancel(manager: CancelManager, params: TaskCancelInput, callerSessionId?: string): Promise<CancelToolResult> {
   const idOrName = params.task_id ?? params.name
   if (idOrName === undefined) {
     return toolResult("Provide task_id or name to identify the child task.", {
@@ -40,8 +43,9 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     })
   }
 
-  const outcome = await manager.cancelTask(idOrName, params.reason)
+  const outcome = await manager.cancelTask(idOrName, params.reason, callerSessionId === undefined ? undefined : { callerSessionId })
   const worker = "task_id" in outcome && outcome.kind !== "stale" ? manager.get(outcome.task_id) : undefined
+  const reference = "task_id" in outcome ? taskReferenceLabel(outcome.task_id, worker?.nickname) : idOrName
   const label =
     worker?.nickname === undefined
       ? {}
@@ -51,7 +55,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
       const status = worker?.status ?? ("cancelled" satisfies TaskStatus)
       return toolResult(
         withDroppedSteeringNotice(
-          `Cancelled ${outcome.task_id} (was ${outcome.previous_status}, now ${status}).`,
+          `Cancelled ${reference} (was ${outcome.previous_status}, now ${status}).`,
           outcome.undelivered_messages ?? 0,
         ),
         {
@@ -67,7 +71,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     case "cancel_pending":
       return toolResult(
         withDroppedSteeringNotice(
-          `Cancel requested for ${outcome.task_id}, but the child is unreachable: its connection to the task host dropped. It is stopped on its host before it runs anything else once reachable, or ends when the connection does not come back; its lane is released then. task_output shows the pending cancel.`,
+          `Cancel requested for ${reference}, but the child is unreachable: its connection to the task host dropped. It is stopped on its host before it runs anything else once reachable, or ends when the connection does not come back; its lane is released then. task_output shows the pending cancel.`,
           outcome.undelivered_messages ?? 0,
         ),
         {
@@ -80,7 +84,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         },
       )
     case "noop":
-      return toolResult(`${outcome.reason} No change.`, {
+      return toolResult(`${outcome.reason.replace(outcome.task_id, () => reference)} No change.`, {
         kind: "noop",
         ...label,
         task_id: outcome.task_id,
@@ -90,7 +94,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     case "released":
       return toolResult(
         withDroppedSteeringNotice(
-          `Task ${outcome.task_id} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`,
+          `Task ${reference} had already finished (${outcome.status}); its retained child or queued continuation is now released. The result stays readable with task_output, and task_send revives it.`,
           outcome.undelivered_messages ?? 0,
         ),
         {
@@ -117,6 +121,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
 export function createTaskCancelTool(
   deps: TaskCancelDeps,
 ): ToolDefinition<typeof TaskCancelParams, CancelResultDetails> {
+  const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
   return {
     name: "task_cancel",
     label: "Task Cancel",
@@ -126,7 +131,7 @@ export function createTaskCancelTool(
     allowLazyActivation: true,
     searchKeywords: ["cancel child", "stop task", "abort subagent"],
     parameters: TaskCancelParams,
-    execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskCancel(deps.manager, params, resolveCaller(ctx)),
     renderCall: (args, theme) => renderTaskCancelCall(args, theme),
     renderResult: (result, options, theme) => renderTaskCancelResult(result, options, theme),
   }

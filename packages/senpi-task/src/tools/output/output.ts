@@ -5,6 +5,7 @@ import type { Static } from "typebox"
 
 import { shouldNotifyStatus } from "../../completion/routing"
 import type { ListScope, ListedTask } from "../../manager"
+import { resolveTaskTarget, taskReferenceLabel } from "../../manager/task-target"
 import type { TaskRecord } from "../../state"
 import { hostLivenessText } from "../../state/host-liveness"
 import { isolationLine } from "../../isolation/details"
@@ -19,10 +20,10 @@ export const TaskOutputParams = Type.Object({
   task_id: Type.Optional(
     Type.String({
       description:
-        "Task id (st_...) of the child to read. Pass task_id or name; when both are given, task_id wins and name is ignored.",
+        "Task ID (st_...) or session-local nickname. If both task_id and name are given, task_id wins.",
     }),
   ),
-  name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
+  name: Type.Optional(Type.String({ description: "Canonical task name or session-local nickname." })),
   mode: Type.Optional(
     Type.Union([Type.Literal("status"), Type.Literal("tail"), Type.Literal("full")], {
       description:
@@ -41,7 +42,7 @@ const MAX_STATUS_READS = 1024
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
-  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns one record snapshot per observed progress state, then a short no_progress result until the task changes.",
+  "Read one child task by ID, name, or session-local nickname. task_output always returns immediately: mode='status' (default) returns one record snapshot per observed progress state, then a short no_progress result until the task changes.",
   "mode='tail' returns the last tail_lines of the recorded transcript, cut to the same 30,000-character cap as full; mode='full' returns the whole transcript (capped, with a head/tail elision marker). These explicit transcript modes do not consume the status peek. Completion notifications already include the final result.",
   "READ-ONLY: this never revives, steers, or otherwise touches the child. A lost task returns a status view with a lost explanation and pid/session-dir breadcrumbs.",
   "Only the current session's children are visible.",
@@ -60,7 +61,7 @@ export function runTaskOutput(
     return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
 
   const candidates = scopedCandidates(deps.manager.list.bind(deps.manager), callerSessionId)
-  const record = resolveTarget(candidates, idOrName)
+  const record = resolveTaskTarget(candidates, idOrName, callerSessionId)
   if (record === undefined) return Promise.resolve(notFound(candidates, idOrName))
 
   const mode = params.mode ?? "status"
@@ -144,7 +145,7 @@ function transcriptResult(
     truncated: rendered.truncated || sourceTruncated === true,
     snapshot,
   }
-  return toolResult(`${record.task_id} [${record.status}] transcript via ${source}:\n${rendered.text}`, details)
+  return toolResult(`${taskReferenceLabel(record.task_id, record.nickname)} [${record.status}] transcript via ${source}:\n${rendered.text}`, details)
 }
 
 // Fail-closed scope: candidates are ONLY the caller session's children. No caller id -> nothing is
@@ -157,12 +158,6 @@ function scopedCandidates(
   return list({ scope: "parent-session", session_id: callerSessionId }).map((entry) => entry.record)
 }
 
-function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): TaskRecord | undefined {
-  return (
-    candidates.find((record) => record.task_id === idOrName) ?? candidates.find((record) => record.name === idOrName)
-  )
-}
-
 // Session-level runner notices ride the status view: one line each, after the record facts, so a
 // parent reading any child sees why its children are not daemon sessions.
 function withNotices(text: string, deps: TaskOutputDeps): string {
@@ -171,7 +166,7 @@ function withNotices(text: string, deps: TaskOutputDeps): string {
 }
 
 function statusText(snapshot: TaskSnapshot): string {
-  const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
+  const parts = [`${taskReferenceLabel(snapshot.task_id, snapshot.nickname)} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
   if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running")
     parts.push(hostLivenessText(snapshot.host_liveness))
   if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
@@ -188,7 +183,10 @@ function statusText(snapshot: TaskSnapshot): string {
 
 function notFound(candidates: readonly TaskRecord[], idOrName: string): TaskOutputToolResult {
   const known = candidates.map((record) => record.name ?? record.task_id)
-  const listText = known.length > 0 ? ` Known tasks in this session: ${known.join(", ")}.` : ""
+  const labels = candidates.map((record) => record.nickname === undefined
+    ? record.name ?? record.task_id
+    : taskReferenceLabel(record.task_id, record.nickname))
+  const listText = known.length > 0 ? ` Known tasks in this session: ${labels.join(", ")}.` : ""
   return toolResult(`No task '${idOrName}' in this session.${listText}`, {
     kind: "not_found",
     reason: `No task '${idOrName}' in this session.`,
@@ -206,9 +204,10 @@ function noProgress(record: TaskRecord): TaskOutputToolResult {
     (shouldNotifyStatus(record.status) &&
       record.notification.notified_epoch < record.notification.run_epoch &&
       (record.notify_on_terminal || record.notification.notification_failed_epoch !== undefined))
+  const label = taskReferenceLabel(record.task_id, record.nickname)
   const reason = !notificationPending
-    ? `Task ${record.task_id} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
-    : `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+    ? `Task ${label} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+    : `Task ${label} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
   return toolResult(reason, {
     kind: "no_progress",
     task_id: record.task_id,

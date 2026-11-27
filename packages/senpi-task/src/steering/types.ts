@@ -133,6 +133,7 @@ export type InterruptOutcome =
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type CancelOptions = {
+  readonly callerSessionId?: string
   readonly abort?: "request" | "skip"
   // Cancel only the run a handle minted at this epoch names: any other run answers `stale` and
   // nothing is cancelled. task_cancel never sets it.

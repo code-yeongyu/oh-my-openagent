@@ -6,6 +6,28 @@ import { taskRecord } from "./event-bridge.test-fixtures"
 import { wireHarness } from "./event-bridge.test-harness"
 
 describe("event-bridge task RPC security and bounds", () => {
+  it("#given two sessions reuse a nickname #when RPC controls use alternate spellings #then the connection targets only its own child", async () => {
+    const owned = taskRecord({ task_id: "st_owned", nickname: "Io III", status: "running" })
+    const foreign = taskRecord({
+      task_id: "st_foreign",
+      nickname: "Io #3",
+      status: "running",
+      parent_session_id: "foreign",
+    })
+    const { pi, invokeRpc, sendCalls, cancelCalls } = wireHarness("parent-session", {
+      records: { [foreign.task_id]: foreign, [owned.task_id]: owned },
+      withRpc: true,
+    })
+    await pi.dispatch("session_start", {}, {})
+    await expect(invokeRpc("omo.task.output", { task_id: "Io the Third" })).resolves.toMatchObject({
+      kind: "status", snapshot: { task_id: owned.task_id },
+    })
+    await invokeRpc("omo.task.send", { to: "Io the 3rd", message: "scoped message" })
+    await invokeRpc("omo.task.cancel", { task_id: "Io #3" })
+    expect(sendCalls).toMatchObject([{ idOrName: owned.task_id }])
+    expect(cancelCalls).toMatchObject([{ idOrName: owned.task_id }])
+  })
+
   it("#given a terminal record and a retained live tracker #when a snapshot emits #then durable terminal stats win", async () => {
     const completed = taskRecord({
       task_id: "st_terminal_stats",

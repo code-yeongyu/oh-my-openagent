@@ -1,4 +1,5 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
+export { resolveTaskTarget } from "./manager/task-target"
 export {
   CHILD_PERMISSION_EVENT,
   TASK_CHILD_EXTENSION_EVENT,

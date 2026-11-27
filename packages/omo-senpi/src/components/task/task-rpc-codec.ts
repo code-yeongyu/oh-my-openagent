@@ -74,7 +74,7 @@ export function parseTaskSend(
   if (typeof value.to !== "string" || value.to.trim().length === 0) {
     return { error: "to is required." }
   }
-  if (!validTaskId(value.to)) return { error: "to must be a task id of at most 256 characters." }
+  if (!validTaskTarget(value.to)) return { error: "to must be a task ID or nickname of at most 256 characters." }
   if (typeof value.message !== "string" || value.message.trim().length === 0) {
     return { error: "message is required." }
   }
@@ -91,7 +91,7 @@ export function parseTaskCancel(
   if (typeof value.task_id !== "string" || value.task_id.trim().length === 0) {
     return { error: "task_id is required." }
   }
-  if (!validTaskId(value.task_id)) return { error: "task_id must be a task id of at most 256 characters." }
+  if (!validTaskTarget(value.task_id)) return { error: "task_id must be a task ID or nickname of at most 256 characters." }
   if (value.reason !== undefined && typeof value.reason !== "string") {
     return { error: "reason must be a string." }
   }
@@ -119,7 +119,7 @@ export function parseTaskOutput(value: unknown):
   if (typeof value.task_id !== "string" || value.task_id.trim().length === 0) {
     return { error: "task_id is required." }
   }
-  if (!validTaskId(value.task_id)) return { error: "task_id must be a task id of at most 256 characters." }
+  if (!validTaskTarget(value.task_id)) return { error: "task_id must be a task ID or nickname of at most 256 characters." }
   if (value.mode !== undefined && value.mode !== "status" && value.mode !== "tail" && value.mode !== "full") {
     return { error: "mode must be status, tail, or full." }
   }
@@ -180,8 +180,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function validTaskId(value: string): boolean {
+export function isTaskId(value: string): boolean {
   return value.length <= MAX_TASK_ID_LENGTH && TASK_ID_PATTERN.test(value)
+}
+
+function validTaskTarget(value: string): boolean {
+  return value.length <= MAX_TASK_ID_LENGTH && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value)
 }
 
 function boundedOutputSnapshot(snapshot: TaskOutputSnapshot) {

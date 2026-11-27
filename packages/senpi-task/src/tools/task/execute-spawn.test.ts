@@ -37,6 +37,8 @@ describe("buildTaskExecute spawn", () => {
     expect(result.details.run_in_background).toBe(true)
     expect(result.details.nickname).toBe("Selene")
     expect(result.content[0]?.type).toBe("text")
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Started task bg-task (Selene, st_00000001, running)")
   })
 
   test("#given a background task #when the start result is rendered #then it directs the parent to yield instead of polling", async () => {
@@ -241,5 +243,8 @@ describe("buildTaskExecute spawn", () => {
     expect(result.details.model).toBe("openai/gpt-5.6-sol")
     expect(result.details.nickname).toBe("Selene")
     expect(result.details.run_in_background).toBe(false)
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("done")
+    expect(text).toContain("[task_id: st_00000014, nickname: Selene")
   })
 })

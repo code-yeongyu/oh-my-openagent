@@ -159,8 +159,15 @@ cursor. Projects using the same agent home share it. A different ordered list
 has its own cursor. Upgrading starts counting from the first new reservation;
 OmO does not count past tasks or rename them. A crash can skip reserved
 occurrences. If storage fails, the task runs without a nickname. Assigned
-nicknames stay fixed across model fallback and resume. They are not steering
-addresses: continue to use the task's `name` or `task_id`.
+nicknames stay fixed across model fallback and resume.
+
+Refer to workers by nickname in chat, for example, “Ask Io III to check
+the logs.” The coordinator can use the nickname directly with `task_output`,
+`task_send`, or `task_cancel` for its own child tasks. `Io III`, `Io #3`,
+`Io the Third`, and `Io the 3rd` all address the same third occurrence.
+Use the task ID if a nickname is ambiguous. Existing task IDs and canonical
+names take precedence; nicknames do not address workers in other sessions or
+replace team mailbox names.
 
 Passive consumers can read the optional top-level `nickname` string from the
 linked native task record or an `omo.task.updated` task snapshot. Older or
@@ -173,7 +180,7 @@ summary row. On narrow terminals, spawn cards trim other details before the
 nickname and preserve the full ID when it fits. Tool clients can read the
 optional `nickname` alongside `name` and
 `task_id` on a resolved result or batch item, or in `task_output`'s
-`details.snapshot`. Task controls still use the real `name` or `task_id`.
+`details.snapshot`. Structured results still return the real `name` and `task_id`.
 Team mail from a known nicknamed worker can show a `Message from` notification;
 the hidden mailbox delivery and its acknowledgment are unchanged.
 
