@@ -1,7 +1,7 @@
 {
   "description": "A delivered click leaves its pre-input marker at markers/local/default.json under the runtime root this case names (so the QA scenario can list it after the run); the marker names the case's callId and carries the stored receipt. The directory must not hold a marker of this callId before the run (a second run over it is a replay). The QA scenario creates that directory empty before the run (the fake sink file is created in it at engine start).",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live",
     "OMO_COMPUTER_RUNTIME_DIR": "target/qa-computer-v3/marker-written-before-input"

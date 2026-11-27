@@ -16,6 +16,7 @@ import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartRe
 import { createDagScheduler, type DagNodeSendResult, type DagRunReentry, type DagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { createDagRunReservations } from "./run-reservations"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
@@ -213,6 +214,7 @@ function e2eFixture(options: { readonly admit?: AdmitResident; readonly runner?:
       const runId = started.snapshot.runId
       if (!schedulers.has(runId) && started.snapshot.status === "pending") {
         const scheduler = createDagScheduler({
+          reservations: createDagRunReservations(),
           store,
           taskManager,
           initialRecord: manager.record(runId, parentSessionId),
@@ -259,6 +261,7 @@ function e2eFixture(options: { readonly admit?: AdmitResident; readonly runner?:
     const existing = schedulers.get(runId)
     if (existing !== undefined) return existing
     const fresh = createDagScheduler({
+      reservations: createDagRunReservations(),
       store,
       taskManager,
       initialRecord: manager.record(runId, parentSessionId),

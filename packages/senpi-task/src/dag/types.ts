@@ -140,35 +140,8 @@ export type DagNodeError = {
   readonly at: string
 }
 
-export type DagDiagnostic =
-  | {
-      readonly kind: "route_fallback"
-      readonly nodeId: DagNodeId
-      readonly message: string
-      readonly at: string
-    }
-  | {
-      readonly kind: "node_flag"
-      readonly nodeId: DagNodeId
-      readonly invalidatedBy?: DagNodeId
-      readonly message: string
-      readonly at: string
-    }
-  | {
-      readonly kind: "missing_skill"
-      readonly nodeId: DagNodeId
-      readonly skill: string
-      readonly message: string
-      readonly at: string
-    }
-  | { readonly kind: "run_flag"; readonly message: string; readonly at: string }
-  | {
-      readonly kind: "journal_corrupt"
-      readonly runId?: DagRunId
-      readonly path: string
-      readonly message: string
-      readonly at: string
-    }
+export type { DagDiagnostic, DagHeldTrigger, DagHeldTriggerFact } from "./diagnostic-types"
+import type { DagDiagnostic, DagHeldTrigger } from "./diagnostic-types"
 
 export type DagNode = {
   readonly id: DagNodeId
@@ -196,6 +169,9 @@ export type DagNode = {
   // because it describes a LIVE child: a node running with no recent activity is either
   // finished-but-unreaped or genuinely stalled, and `running` alone cannot tell those apart (#8674).
   readonly lastActivityAt?: string
+  // A self-started turn the fence held while the user had stopped the run (#11381), shown until the
+  // node is next sent to, retried, amended or re-opened.
+  readonly heldTrigger?: DagHeldTrigger
 }
 
 // Per-node output budget in the checkpoint. A node's final message is normally far shorter; the cap

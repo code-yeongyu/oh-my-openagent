@@ -9,6 +9,7 @@ import type { TaskManager } from "../manager/types"
 import type { DagNodeInput } from "./graph"
 import { RetryClock } from "./infra-retry-fixture"
 import type { DagTaskOwnerScope } from "./owner"
+import { createDagRunReservations } from "./run-reservations"
 import { createDagScheduler } from "./scheduler"
 import { deferred } from "./scheduler-frontier.test-harness"
 import type { DagNodeId, DagRunEvent } from "./types"
@@ -102,6 +103,7 @@ export async function admissionFixture(key: string, nodes: readonly DagNodeInput
   const runId = started.snapshot.runId
   const starts = new GatedOwnedStarts()
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store: fixture.store,
     taskManager: starts.wrap(fixture.taskManager),
     initialRecord: fixture.manager.record(runId, parentSessionId),

@@ -1,7 +1,8 @@
-// A TaskManager whose terminal wait persists a completed DAG child's result, as the runtime's adapter does.
+// A real TaskManager whose `waitFor` persists a completed DAG child's result, as the runtime's result
+// sink does, so a scheduler reading node results sees them.
 import type { TaskManager } from "../../manager/types"
-import { persistDagNodeResult } from "../results"
 import type { DagFileStore } from "../store"
+import { persistDagNodeResult } from "../results"
 
 export function resultPersistingManager(manager: TaskManager, store: DagFileStore): TaskManager {
   return new Proxy(manager, {

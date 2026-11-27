@@ -12,6 +12,7 @@ import { createDagManager } from "./manager"
 import { createDagScheduler } from "./scheduler"
 import type { DagDefinition } from "./graph"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+import { createDagRunReservations } from "./run-reservations"
 
 export type Outcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
 
@@ -75,6 +76,7 @@ export function infraFixture(
         initialRecord: manager.record(started.snapshot.runId, "parent-infra-retry"),
         scheduleRetry,
         now,
+        reservations: createDagRunReservations(),
       }
       return createDagScheduler(options)
     },

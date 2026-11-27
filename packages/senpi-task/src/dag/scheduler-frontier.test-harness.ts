@@ -8,6 +8,7 @@ import type { TaskRecord, TaskStatus } from "../state"
 import { compileDag, type DagDefinition } from "./graph"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagTaskOwner, DagTaskOwnerScope, OwnedStartResult } from "./owner"
+import { createDagRunReservations } from "./run-reservations"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunEvent, DagRunId } from "./types"
@@ -302,6 +303,7 @@ export function frontierFixture(
   store.writeCheckpoint(id, initialRecord)
   let eventTime = Date.parse("2026-08-25T00:00:02.000Z")
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store,
     taskManager: manager,
     initialRecord,
