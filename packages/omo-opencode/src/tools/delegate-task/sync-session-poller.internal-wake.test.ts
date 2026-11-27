@@ -67,7 +67,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
         toastManager: null,
         taskId: undefined,
       },
-      50,
+      50_000,
     )
 
     // then
@@ -154,9 +154,12 @@ describe("pollSyncSession internal all-complete wakes", () => {
 
   test("#given user task text collides with internal markers before terminal assistant turn #when polling #then the sync task completes", async () => {
     // given
+    // This case asserts COMPLETION, so its budget must be one the deterministic fake client cannot exhaust:
+    // under host load one poll round can exceed a 50 ms wall-clock budget and the poller answers its timeout
+    // string instead (#15184). The 50 ms budget stays only for the cases that assert the timeout.
     __setTimingConfig({
       POLL_INTERVAL_MS: 1,
-      MAX_POLL_TIME_MS: 50,
+      MAX_POLL_TIME_MS: 50_000,
     })
     const client = createClientForMessages([
       {
