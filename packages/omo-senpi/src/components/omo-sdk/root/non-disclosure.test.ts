@@ -789,7 +789,7 @@ describe("the non-disclosure scan over the whole root", () => {
           const notServed = rows.filter(([, row]) => row.notServed?.[who] !== undefined)
           const notScanned = rows.filter(([, row]) => !row.scanned && row.notServed?.[who] === undefined)
           console.info(
-            `non-disclosure healthy pass, ${who}: ${rows.length - notScanned.length - notServed.length} calls scanned through their answer, ${notServed.length} refused on a ruling for a root built with this principal, a session's own eval-cell root being a script (design 4.5) (${notServed.map(([key]) => key).join(", ")}), ${notScanned.length} not: ${notScanned.map(([key, row]) => `${key} (${row.owner}: ${row.reason})`).join("; ")}`,
+            `non-disclosure healthy pass, ${who}: ${rows.length - notScanned.length - notServed.length} calls scanned through their answer, ${notServed.length} refused on a ruling for a root built with this principal${who === "session" ? ", a session's own eval-cell root being a script (design 4.5)" : ""} (${notServed.map(([key]) => key).join(", ")}), ${notScanned.length} not: ${notScanned.map(([key, row]) => `${key} (${row.owner}: ${row.reason})`).join("; ")}`,
           )
         }
         // Reach by case, with every port faulting: a refused cell and a pure call stop before any port; a call that is

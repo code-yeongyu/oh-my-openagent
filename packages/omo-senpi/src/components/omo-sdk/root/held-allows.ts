@@ -1,9 +1,10 @@
 import type { PrincipalKind, RootCallKey } from "../contract"
 
 /**
- * The (call, principal) pairs the boundary refuses with the default refusal although no refusal cell names them: an allow
- * on a condition no test meets yet (LEAD ruling as security owner: a conditional allow is not a live allow), or a cell the
- * security design marks n/a. Closed and self-retiring: an entry whose cell becomes a plain allow or a refusal fails the
+ * The (call, principal) pairs the boundary refuses although no refusal cell names them: the four the LEAD ruled on as
+ * security owner (a conditional allow is not a live allow), each a read whose answer could carry an account detail or a
+ * configuration file's content before the slice that meets its condition. It is not every conditional allow or n/a cell:
+ * the boundary still admits the others, and their cores answer them. Closed and self-retiring: an entry whose cell becomes a plain allow or a refusal fails the
  * default-deny test as stale. Each names the condition and the slice that meets it.
  */
 export type HeldAllow = {
