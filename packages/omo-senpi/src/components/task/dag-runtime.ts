@@ -4,33 +4,28 @@ import {
   awaitingInputDetails,
   createChildProgress,
   type ManagedChildEvent,
-  type TaskManager,
   type TaskRecord,
 } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
-  createDagLeaseWatch,
   createDagManager,
   createDagRecovery,
   createDagWaitSurface,
+  DAG_UNATTACHED_NODES_PAUSE_REASON,
   type DagDefinition,
   type DagFileStore,
   type DagLeaseWatchOptions,
   type DagNodeSpawnPolicy,
   type DagManager,
-  type DagNodeId,
-  type DagRecoveryOutcome,
   type DagRunEvent,
   type DagRunId,
   type DagRunRecordV1,
   type DagRunSnapshot,
-  type DagScheduler,
-  type InstalledDagRun,
-  type OwnedStartResult,
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
+import { admissionTaskManager } from "./dag-admission-task-manager"
 import { resolveDagForkSource } from "./dag-fork-source"
 import { scheduleDagRetentionSweep, type DagRetentionSweepOptions } from "./dag-retention-sweep"
 import { createDagRpcBridge, type DagBridgeTimers } from "./dag-rpc-bridge"
@@ -39,27 +34,22 @@ import { createDagStatusUi, type DagStatusUiTimers } from "./dag-status-ui"
 import { createDagWake } from "./dag-wake"
 import { createDagWakeSource } from "./dag-wake-source"
 import type { TaskEngine } from "./engine"
-import {
-  createDagScheduler,
-  observeDagSchedulers,
-  type DagNodeSendResult,
-  type DagRunReentry,
-} from "../../../../senpi-task/src/dag/scheduler"
+import { observeDagSchedulers, type DagNodeSendResult } from "../../../../senpi-task/src/dag/scheduler"
 import { createDagSkillMaterializer } from "../../../../senpi-task/src/dag/skills"
-import {
-  createPausedNodeCancel,
-  endedChildClosure,
-  endPausedRunChildren,
-  type PausedNodeHoldPort,
-} from "./dag-paused-cancel"
+import { endedChildClosure, type PausedNodeHoldPort } from "./dag-paused-cancel"
 import { createDagRuntimeControls } from "./dag-runtime-controls"
+import { createDagSchedulerRegistry, type OwnedScheduler } from "./dag-scheduler-registry"
+import { createDagRecoverySweeps } from "./dag-recovery-sweeps"
+import { createDagRunCancel } from "./dag-run-cancel"
+import { createShutdownPause } from "./dag-runtime-shutdown"
+import { registerDagPauseSource } from "./dag-runtime-pause-wiring"
+import { createDagRunReservations } from "../../../../senpi-task/src/dag/run-acquisition"
 import type { PausedChildRecoveryPort } from "../../../../senpi-task/src/dag/paused-child-recovery"
-import { createDagRunPauseSource, type DagGuidanceDelivery } from "./dag-run-pause-source"
-import { ownedSubtree } from "./engine-run-pause"
+import type { DagGuidanceDelivery } from "./dag-run-pause-source"
+import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 
 const EVENT_PAGE_SIZE = 1000
 const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled"])
-const SCHEDULABLE_RUN_STATUSES = new Set(["pending", "running"])
 type DagRuntimeManager = Omit<DagManager, "attach"> & {
   readonly attach: ReturnType<typeof createDagWaitSurface>["attach"]
 }
@@ -108,11 +98,6 @@ export interface DagRuntimeDeps {
   readonly retentionSweep?: DagRetentionSweepOptions
 }
 
-type RecoveryScope = {
-  readonly sessionId: string
-  readonly forkSourceSessionId?: string
-}
-
 export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const dagSettings = deps.engine.settings.dag
   const baseStore = createDagFileStore({
@@ -125,12 +110,12 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   scheduleDagRetentionSweep(baseStore, deps)
   const runListeners = new Map<DagRunId, Set<(event: DagRunEvent) => void>>()
   const deliveredSeq = new Map<DagRunId, number>()
-  const schedulers = new Map<DagRunId, { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> }>()
+  const schedulers = new Map<DagRunId, OwnedScheduler>()
   const stoppedAdmissions = new Set<DagRunId>()
+  const reservations = createDagRunReservations()
   const recoveryTaskSubscriptions = new Map<string, () => void>()
   const activityTaskSubscriptions = new Map<string, () => void>()
-  const leaseWatch = createDagLeaseWatch(deps.leaseWatch ?? {})
-  const leaseWatches = new Map<DagRunId, () => void>()
+  const isProcessAlive = deps.leaseWatch?.isProcessAlive ?? defaultSignaller.isAlive
   let mutationListener = (): void => undefined
   let durableEventListener = (_event: DagRunEvent): void => undefined
   let activeSessionId: string | undefined
@@ -170,6 +155,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
+    // The same probe and (required) reservations as recovery and the registry, revive watchers included.
+    isProcessAlive,
+    reservations,
   }
 
   const subscribe = (runId: DagRunId, listener: (event: DagRunEvent) => void): (() => void) => {
@@ -215,112 +203,56 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     scheduler.subscribe(publishSchedulerEvent)
   })
 
-  const controller = (
-    runId: DagRunId,
-    parentSessionId: string,
-  ): { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } => {
-    const existing = schedulers.get(runId)
-    if (existing !== undefined) return existing
-    const initialRecord = coreManager.record(runId, parentSessionId)
-    const scheduler = createDagScheduler({ ...schedulerOptions, initialRecord })
-    const created: { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } = { scheduler }
-    schedulers.set(runId, created)
-    return created
-  }
-
-  const ensureScheduled = (runId: DagRunId, parentSessionId: string): void => {
-    const initialRecord = coreManager.record(runId, parentSessionId)
-    if (!SCHEDULABLE_RUN_STATUSES.has(initialRecord.status)) return
-    const owned = controller(runId, parentSessionId)
-    if (owned.running !== undefined) return
-    const running = owned.scheduler
-      .run()
-      .then(async (record) => {
-        await owned.scheduler.whenIdle()
-        return record
-      })
-      .finally(() => schedulers.delete(runId))
-    owned.running = running
-    void running.catch((error: unknown) => {
-      deps.logger.error("omo-senpi dag scheduler failed", {
-        runId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    })
-  }
-
   const childClosure = deps.pausedNodeHoldPort ?? endedChildClosure(deps.engine.manager)
+  const { holdsRun, ensureScheduled, adoptReentry, adoptInstalled } = createDagSchedulerRegistry({
+    schedulers,
+    store,
+    schedulerOptions,
+    logger: deps.logger,
+    isProcessAlive,
+    reservations,
+    recover: (sessionId) => sweeps.recover({ sessionId }),
+    closure: childClosure,
+  })
+  const holders = { taskManager: deps.engine.manager, hostPid: process.pid, isProcessAlive }
+  const cancelRun = createDagRunCancel({
+    store,
+    schedulerOptions,
+    schedulers,
+    reservations,
+    holders,
+    children: deps.engine.manager,
+    closure: childClosure,
+    holdsRun,
+  })
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
     const sessionId = deps.engine.runtime.sessionId() ?? ""
-    const record = coreManager.record(runId, sessionId)
-    if (TERMINAL_RUN_STATUSES.has(record.status)) return
-    // A user-stopped run has no live scheduler holding its children: end each paused child first,
-    // journal the run cancelled, and only then let the parent's fence for the run go.
-    const userStopped = record.status === "paused" && record.pause?.reason === "user_stop"
-    if (userStopped) await endPausedRunChildren(deps.engine.manager, record, childClosure)
-    await controller(runId, sessionId).scheduler.cancel(runId, reason)
-    if (!userStopped) return
+    // Only who may cancel is checked here; whether there is anything to cancel is decided inside the
+    // run's reservation (`dag-run-cancel.ts`), after any re-entry or installation in flight (#15125).
+    coreManager.record(runId, sessionId)
+    // A user-stopped run then lets the parent's fence for the run go.
+    const record = await cancelRun(runId, sessionId, reason)
+    if (record === undefined || record.status !== "paused" || record.pause?.reason !== "user_stop") return
     const runRef = { kind: "dag" as const, id: runId }
     await deps.engine.runPause?.forgetRun(record.parentSessionId, runRef)
     deps.engine.runtime.releaseRunFence(runRef)
   }
 
-  /**
-   * The single re-entry seam for the control verbs. The settled scheduler deleted itself from
-   * `schedulers` on settle, so the fresh instance the verb built must be re-registered here or the
-   * next cancel/wait would silently build a THIRD scheduler over a live run. The admission latch is
-   * cleared for the same reason it must be cleared at all: only recovery's shutdown pause ever sets
-   * it, it lives in this closure so it outlives every scheduler, and nothing else ever deletes it -
-   * a retry after a pause+resume in the SAME process would otherwise hang forever on the
-   * never-resolving admission promise instead of starting a child.
-   */
-  const adoptReentry = (runId: DagRunId, reentry: DagRunReentry): void => {
-    const owned: { readonly scheduler: DagScheduler; running?: Promise<DagRunRecordV1> } = {
-      scheduler: reentry.scheduler,
-    }
-    schedulers.set(runId, owned)
-    const running = reentry.run
-      .then(async (record) => {
-        await reentry.scheduler.whenIdle()
-        return record
-      })
-      .finally(() => {
-        if (schedulers.get(runId) === owned) schedulers.delete(runId)
-      })
-    owned.running = running
-    void running.catch((error: unknown) => {
-      deps.logger.error("omo-senpi dag scheduler failed", {
-        runId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    })
-  }
-
-  // A run recovery installed keeps running in its own scheduler: register it like any re-entry so
-  // `ensureScheduled` and `isRunHeldInProcess` see it instead of starting a second scheduler.
-  const adoptInstalled = (installed: InstalledDagRun): void => {
-    const record = store.readCheckpoint<DagRunRecordV1>(installed.runId)
-    if (record === null) throw new Error("installed DAG checkpoint is missing")
-    adoptReentry(installed.runId, {
-      scheduler: installed.scheduler,
-      record,
-      run: installed.settled.then((outcome) => {
-        if (outcome.kind !== "resumed" || outcome.record === undefined)
-          throw new Error(`installed DAG ended without a resumed outcome: ${outcome.kind}`)
-        return outcome.record
-      }),
-    })
-  }
-
+  // The admission latch is cleared on every re-entry: only recovery's shutdown pause ever sets it, it
+  // lives in this closure so it outlives every scheduler, and nothing else ever deletes it - a retry
+  // after a pause+resume in the SAME process would otherwise hang forever on the never-resolving
+  // admission promise instead of starting a child.
   const clearAdmissionLatch = (runId: DagRunId): void => {
     stoppedAdmissions.delete(runId)
   }
 
-  const { retry, send, amend, guide } = createDagRuntimeControls({
+  const { retry, send, amend, guide, cancelNode } = createDagRuntimeControls({
     coreManager,
     schedulerOptions,
     schedulers,
-    controller,
+    reservations,
+    holdsRun,
+    closure: childClosure,
     clearAdmissionLatch,
     adoptReentry,
     sessionId: () => deps.engine.runtime.sessionId() ?? "",
@@ -337,7 +269,10 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     ...coreManager,
     async start(params) {
       const result = await coreManager.start(params)
-      ensureScheduled(result.snapshot.runId, params.parentSessionId)
+      // A reused run left `running` by a scheduler this runtime does not hold is recovery's: the
+      // claim takes it only when its lease holder is gone.
+      if (!ensureScheduled(result.snapshot.runId, params.parentSessionId))
+        await sweeps.recover({ sessionId: params.parentSessionId })
       return result
     },
     attach: waitSurface.attach,
@@ -476,6 +411,11 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const onEvent = (event: DagRunEvent): void => {
     if (event.type === "dag.run.started") wakeSource.onRunStart(event.runId)
     if (event.type === "dag.run.paused") {
+      if (event.reason === DAG_UNATTACHED_NODES_PAUSE_REASON) {
+        deps.logger.error("omo-senpi dag run parked: its scheduler holds none of the children its nodes record", {
+          runId: event.runId,
+        })
+      }
       notifyPaused(event)
       return
     }
@@ -502,11 +442,12 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     store,
     taskManager,
     ...(deps.pausedChildren === undefined ? {} : { pausedChildren: deps.pausedChildren }),
-    ...(deps.leaseWatch?.isProcessAlive === undefined ? {} : { isProcessAlive: deps.leaseWatch.isProcessAlive }),
+    isProcessAlive,
     // A holder pid equal to our own says nothing about liveness (a process can always signal itself);
     // what fences the claim is whether THIS runtime still schedules the run. A disposed predecessor
     // runtime in the same process (saved-session reopen, #8006) keeps its own map, so it never fences.
-    isRunHeldInProcess: (runId) => schedulers.has(runId),
+    isRunHeldInProcess: holdsRun,
+    reservations,
     ...(deps.engine.ancestry === undefined ? {} : { ancestry: deps.engine.ancestry }),
     ...(deps.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: deps.nodeSpawnPolicy }),
     ...(dagSettings?.subscriber_ring === undefined ? {} : { subscriberRing: dagSettings.subscriber_ring }),
@@ -529,111 +470,39 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     statusUi.scheduleSync()
   }
 
-  const cancelLeaseWatches = (): void => {
-    for (const cancel of leaseWatches.values()) cancel()
-    leaseWatches.clear()
-    leaseWatch.dispose()
-  }
-
-  // A run paused for the predecessor host's shutdown is often still "held" when this host resumes
-  // the session: the old process is draining while the new one starts. Recovery runs once per
-  // session_start, so without this watch that skip was final and the run stayed paused forever.
-  const watchLiveLease = (scope: RecoveryScope, outcome: DagRecoveryOutcome & { readonly holderPid: number }): void => {
-    if (leaseWatches.has(outcome.runId)) return
-    // A live_lease naming our own pid means a scheduler in this runtime still holds the run (same-runtime
-    // pause + re-attach). A watch on our own pid could only fire once this process is gone, and the
-    // "resuming once that pid is gone" it would log could never come true.
-    if (outcome.holderPid === process.pid) return
-    deps.logger.warn("omo-senpi DAG run stays paused while its previous host exits; resuming once that pid is gone", {
-      runId: outcome.runId,
-      holderPid: outcome.holderPid,
-      sessionId: scope.sessionId,
-    })
-    leaseWatches.set(
-      outcome.runId,
-      leaseWatch.watch(outcome.holderPid, () => {
-        leaseWatches.delete(outcome.runId)
-        if (activeSessionId !== scope.sessionId) return
-        void recoverPausedRuns(scope)
-          .then(mutationListener)
-          .catch((error: unknown) => {
-            deps.logger.error("omo-senpi DAG deferred recovery failed", {
-              runId: outcome.runId,
-              error: error instanceof Error ? error.message : String(error),
-            })
-          })
-      }),
-    )
-  }
-
-  const recoverPausedRuns = async (scope: RecoveryScope): Promise<void> => {
-    let outcomes: readonly DagRecoveryOutcome[]
-    try {
-      outcomes = await recovery.installPausedRuns(scope.sessionId, adoptInstalled, scope.forkSourceSessionId)
-    } finally {
-      clearSubscriptions(recoveryTaskSubscriptions)
-    }
-    for (const outcome of outcomes) {
-      if (outcome.kind === "skipped" && outcome.reason === "live_lease" && outcome.holderPid !== undefined) {
-        watchLiveLease(scope, { ...outcome, holderPid: outcome.holderPid })
+  const sweeps = createDagRecoverySweeps({
+    leaseWatch: deps.leaseWatch ?? {},
+    logger: deps.logger,
+    install: async (scope) => {
+      try {
+        return await recovery.installPausedRuns(scope.sessionId, adoptInstalled, scope.forkSourceSessionId)
+      } finally {
+        clearSubscriptions(recoveryTaskSubscriptions)
       }
-    }
-    for (const run of manager.list(scope.sessionId)) ensureScheduled(run.runId, scope.sessionId)
-  }
+    },
+    // A run recovery left to a live holder stays `running` and unheld here, which ensureScheduled refuses.
+    afterSweep: (sessionId) => {
+      for (const run of manager.list(sessionId)) ensureScheduled(run.runId, sessionId)
+    },
+    activeSessionId: () => activeSessionId,
+    onRecovered: () => mutationListener(),
+  })
 
-  const unregisterPauseSource = deps.engine.runPause?.register(
-    createDagRunPauseSource({
-      barrier: deps.engine.admissionBarrier,
-      records: (parent) => {
-        const subtree = ownedSubtree(
-          deps.engine.manager.list({ scope: "all" }).map((entry) => entry.record),
-          parent,
-        )
-        const sessions = new Set([
-          parent,
-          ...subtree.flatMap((record) => (record.child_session_id === undefined ? [] : [record.child_session_id])),
-        ])
-        return [...sessions].flatMap((session) =>
-          coreManager.list(session).map((run) => coreManager.record(run.runId, session)),
-        )
-      },
-      options: (record) => ({ ...schedulerOptions, initialRecord: record }),
-      retire: async (runId) => {
-        stoppedAdmissions.add(runId)
-        const owned = schedulers.get(runId)
-        if (owned === undefined) return
-        await owned.scheduler.suspend()
-        await Promise.allSettled([owned.running])
-        if (schedulers.get(runId) === owned) schedulers.delete(runId)
-      },
-      prepareResume: (runId) => {
-        clearAdmissionLatch(runId)
-        if (schedulers.get(runId)?.running === undefined) schedulers.delete(runId)
-      },
-      recovery,
-      adopt: adoptInstalled,
-      cancel: async (runId) => {
-        const record = store.readCheckpoint<DagRunRecordV1>(runId)
-        if (record !== null) await controller(runId, record.parentSessionId).scheduler.cancel(runId, "run_cancelled")
-      },
-      deliverGuidance:
-        deps.pausedGuidance ??
-        (async (taskId, input) => {
-          const held = await deps.engine.manager.holdTaskInput(taskId, input)
-          if (held.kind === "input_id_conflict")
-            throw new Error(`guidance ${input.inputId} conflicts with held revision ${held.heldRevision}`)
-          return held.kind === "held" ? { entryId: held.entryId } : {}
-        }),
-    }),
-  )
+  const unregisterPauseSource = registerDagPauseSource({
+    deps,
+    coreManager,
+    store,
+    schedulerOptions,
+    schedulers,
+    reservations,
+    stoppedAdmissions,
+    clearAdmissionLatch,
+    recovery,
+    adoptInstalled,
+    cancelRun,
+  })
   const runtime: DagRuntime = {
-    cancelNode: createPausedNodeCancel(
-      (runId) => ({
-        ...schedulerOptions,
-        initialRecord: coreManager.record(runId, deps.engine.runtime.sessionId() ?? ""),
-      }),
-      childClosure,
-    ),
+    cancelNode,
     manager,
     wait,
     cancel,
@@ -643,6 +512,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     guide,
     taskRecord: (taskId) => deps.engine.manager.get(taskId),
     async attach(event) {
+      sweeps.open()
       activeSessionId = deps.engine.runtime.sessionId()
       durableEventListener = onEvent
       wake?.onSessionStart(activeSessionId)
@@ -659,7 +529,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
             reason: forkSource.diagnostic,
           })
         }
-        await recoverPausedRuns({
+        await sweeps.recover({
           sessionId,
           ...(forkSource.kind === "source" ? { forkSourceSessionId: forkSource.sessionId } : {}),
         })
@@ -685,38 +555,25 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       const detachedListeners = new Map([...runListeners].map(([runId, listeners]) => [runId, new Set(listeners)]))
       const stopping = [...schedulers].map(([runId, owned]) => owned.scheduler.cancel(runId, "runtime detached"))
       void Promise.allSettled(stopping).then(() => removeListeners(runListeners, detachedListeners))
-      cancelLeaseWatches()
+      sweeps.cancelWatches()
       clearSubscriptions(recoveryTaskSubscriptions)
       clearSubscriptions(activityTaskSubscriptions)
       bridge.detach()
       activeSessionId = undefined
       statusUi.dispose()
     },
-    async pauseForShutdown() {
-      cancelLeaseWatches()
-      // #8020: a committed shutdown RETIRES the schedulers instead of cancelling them (that is what
-      // `detach` does, and doing it here is what used to destroy a run on every session switch).
-      // The frontier loop must have exited before the pause is persisted, otherwise a late admission
-      // or settlement writes over the paused checkpoint. Retirement also drops the run from
-      // `schedulers`, so the #8029 in-process probe (`isRunHeldInProcess`) reports it unheld and a
-      // later recovery in this SAME process can reclaim it instead of skipping on a live lease.
-      const retiring = [...schedulers]
-      await Promise.all(retiring.map(([, owned]) => owned.scheduler.suspend()))
-      // Retiring the run makes `ensureScheduled`'s UNGUARDED `.finally(delete)` fire early, so it is
-      // drained here: otherwise it could land after a later control verb re-registered the same runId
-      // and evict that live controller. No assertion isolates this line - it closes a window this
-      // retirement itself opens, rather than fixing an observable behaviour of its own.
-      await Promise.allSettled(retiring.map(([, owned]) => owned.running))
-      for (const [runId, owned] of retiring) {
-        if (schedulers.get(runId) === owned) schedulers.delete(runId)
-      }
-      const sessionId = activeSessionId ?? deps.engine.runtime.sessionId()
-      if (sessionId !== undefined) recovery.pauseRunsForShutdown(sessionId)
-    },
+    pauseForShutdown: createShutdownPause({
+      sweeps,
+      reservations,
+      schedulers,
+      recovery,
+      sessionId: () => activeSessionId ?? deps.engine.runtime.sessionId(),
+      sessionRuns: (sessionId) => manager.list(sessionId).map((run) => run.runId),
+    }),
     dispose() {
       unregisterPauseSource?.()
       stopObservingSchedulers()
-      cancelLeaseWatches()
+      sweeps.cancelWatches()
       bridge.dispose()
       activeSessionId = undefined
       statusUi.dispose()
@@ -727,25 +584,6 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     },
   }
   return runtime
-}
-
-function admissionTaskManager(manager: TaskManager, admissionStopped: (runId: DagRunId) => boolean): TaskManager {
-  return new Proxy(manager, {
-    get(target, property) {
-      if (property === "startOwned") {
-        return (spec: Parameters<TaskManager["startOwned"]>[0], owner: Parameters<TaskManager["startOwned"]>[1]) => {
-          if (admissionStopped(owner.runId)) return stoppedAdmission()
-          return target.startOwned({ ...spec, run_in_background: false }, owner)
-        }
-      }
-      const value: unknown = Reflect.get(target, property, target)
-      return typeof value === "function" ? value.bind(target) : value
-    },
-  })
-}
-
-function stoppedAdmission(): Promise<OwnedStartResult> {
-  return new Promise<OwnedStartResult>(() => undefined)
 }
 
 function removeListeners(

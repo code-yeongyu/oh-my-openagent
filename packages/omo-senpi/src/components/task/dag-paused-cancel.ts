@@ -1,5 +1,6 @@
 import { cancelPausedDagNode } from "../../../../senpi-task/src/dag/paused-controls"
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/node-control-context"
+import { currentNodeTask } from "../../../../senpi-task/src/dag/run-lease"
 import type { DagSchedulerOptions } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagNodeId, DagRunId } from "../../../../senpi-task/src/dag/types"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
@@ -11,6 +12,7 @@ export type PausedNodeHoldPort = {
 }
 
 type ChildLookup = Pick<TaskManager, "get" | "getResidentHandle">
+type NodeChildLookup = ChildLookup & Pick<TaskManager, "findOwnedTask" | "cancelTask">
 
 /**
  * A cancelled child's session is gone, and its inherited hold with it: closure is proven by the
@@ -28,18 +30,26 @@ export function endedChildClosure(manager: ChildLookup): PausedNodeHoldPort {
   }
 }
 
-/** Every paused node child of a user-stopped run is ended before the run is journaled cancelled. */
+/**
+ * Every node's current child of a run no scheduler holds is ended before the run is journaled cancelled.
+ * With `onUnclosed`, a child that cannot be stopped or closed is reported and the others still are.
+ */
 export async function endPausedRunChildren(
-  manager: ChildLookup & Pick<TaskManager, "cancelTask">,
+  manager: NodeChildLookup,
   record: DagRunRecordV1,
   closure: PausedNodeHoldPort,
+  onUnclosed?: (nodeId: DagNodeId, taskId: string, error: unknown) => void,
 ): Promise<void> {
   for (const node of record.nodes) {
-    if (node.taskId === undefined) continue
-    const task = manager.get(node.taskId)
+    const task = currentNodeTask(manager, record, node)
     if (task === undefined || isTerminalRecord(task)) continue
-    await manager.cancelTask(node.taskId, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
-    await closure.closeHold(node.taskId, "run_cancelled")
+    try {
+      await manager.cancelTask(task.task_id, "run_cancelled", { expectedRunEpoch: task.notification.run_epoch })
+      await closure.closeHold(task.task_id, "run_cancelled")
+    } catch (error) {
+      if (onUnclosed === undefined) throw error
+      onUnclosed(node.id, task.task_id, error)
+    }
   }
 }
 

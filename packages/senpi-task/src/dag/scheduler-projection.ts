@@ -3,6 +3,7 @@ import * as fs from "node:fs"
 import { relative } from "node:path"
 import { applyDagRunMutation } from "./manager"
 import { applyRunPause } from "./run-pause"
+import { leaseAfterEvent } from "./run-lease"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
 import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
 import type { DagFileStore } from "./store"
@@ -12,15 +13,26 @@ import { TERMINAL_NODE_STATES, type PendingTerminalResult, type DagNodeWithResul
 import type { DagNode, DagNodeId, DagNodeState, DagNodeError, DagRunId } from "./types"
 import type { DagRunRecordV1 } from "./manager"
 
+type TerminalResults = {
+  readonly store: DagFileStore
+  readonly pendingTerminalResults: Map<DagNodeId, PendingTerminalResult>
+  readonly now: () => number
+}
+
 export function applyDagSchedulerEvent(
   record: DagRunRecordV1,
   event: DagRunEvent,
   pendingErrors: ReadonlyMap<DagNodeId, DagNodeError> = new Map(),
-  terminalResults?: {
-    readonly store: DagFileStore
-    readonly pendingTerminalResults: Map<DagNodeId, PendingTerminalResult>
-    readonly now: () => number
-  },
+  terminalResults?: TerminalResults,
+): DagRunRecordV1 {
+  return leaseAfterEvent(projectSchedulerEvent(record, event, pendingErrors, terminalResults), event)
+}
+
+function projectSchedulerEvent(
+  record: DagRunRecordV1,
+  event: DagRunEvent,
+  pendingErrors: ReadonlyMap<DagNodeId, DagNodeError>,
+  terminalResults: TerminalResults | undefined,
 ): DagRunRecordV1 {
   if (isPausedDagEvent(event)) return applyPausedDagEvent(record, event)
   const paused = applyRunPause(record, event)

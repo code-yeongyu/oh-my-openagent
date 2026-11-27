@@ -110,6 +110,8 @@ export type HostSessionChildHandle = RpcChildHandle & {
   readonly hostSession: HostSessionFacts
   reconcileTurn(record: Pick<TaskRecord, "host_session" | "final_response">): Promise<HostTurnReconciliation>
   onReconciled(listener: (notice: ReconciledTurnNotice) => void): () => void
+  /** Reconciliation continued an interrupted turn and this handle sent it the continuation (#15125). */
+  continuationDelivered(): boolean
   /** Served by the CURRENT port, so they keep working after a reattach. */
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>

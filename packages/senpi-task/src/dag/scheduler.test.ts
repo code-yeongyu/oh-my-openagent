@@ -27,6 +27,7 @@ import {
 import { createDagJournal } from "./journal"
 import { createInMemoryDagStore, journalFilesOnDisk } from "./__fixtures__/in-memory-store"
 import type { DagFileStore } from "./store"
+import { createDagRunReservations } from "./run-reservations"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
@@ -537,6 +538,7 @@ function schedulerFixture(
   store.writeCheckpoint(runId, initialRecord)
   let eventTime = Date.parse("2026-08-14T00:00:02.000Z")
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store,
     taskManager,
     initialRecord,
@@ -1035,7 +1037,12 @@ describe("DAG scheduler cancellation", () => {
     const store = memoryStore()
     const initialRecord: DagRunRecordV1 = { ...recordFor(input), status: "paused" }
     store.writeCheckpoint(runId, initialRecord)
-    const scheduler = createDagScheduler({ store, taskManager: manager, initialRecord })
+    const scheduler = createDagScheduler({
+      reservations: createDagRunReservations(),
+      store,
+      taskManager: manager,
+      initialRecord,
+    })
 
     // when
     await scheduler.cancel(runId, "cancel paused")
@@ -1430,6 +1437,7 @@ function settledFixture(
   store.writeCheckpoint(runId, initialRecord)
   let eventTime = Date.parse("2026-08-14T00:00:10.000Z")
   const scheduler = createDagScheduler({
+    reservations: createDagRunReservations(),
     store,
     taskManager: manager,
     initialRecord,
@@ -2083,7 +2091,12 @@ describe("DAG scheduler terminal-run send gate (#7412)", () => {
       dup: { state: "running", taskId: "task-dup", attempt: 1 },
     })
     const seeded = manager.seed("dup", "completed", "task-dup")
-    const options: DagSchedulerOptions = { store, taskManager: manager, initialRecord }
+    const options: DagSchedulerOptions = {
+      reservations: createDagRunReservations(),
+      store,
+      taskManager: manager,
+      initialRecord,
+    }
     const stale = controlJournal(options, durable())
     const persisted = persistDagNodeResult({
       store,

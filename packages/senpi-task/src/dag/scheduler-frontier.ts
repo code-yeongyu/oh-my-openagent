@@ -1,7 +1,9 @@
 import {
+  DAG_UNATTACHED_NODES_PAUSE_REASON,
   dagRunStartedEvent,
   dagRunFailedEvent,
   dagRunCompletedEvent,
+  dagRunPausedEvent,
   dagWaveStartedEvent,
   dagWaveCompletedEvent,
 } from "./events"
@@ -46,7 +48,11 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
       // loop; throwing here instead left the run `running` forever (28 leaves failed at admission,
       // 2 aggregators pending, retry refused with run_still_active).
       if (hasCascadableDependent(current)) continue
-      throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
+      // Nodes are recorded active, yet this scheduler holds none of their children and can admit
+      // nothing: they belong to a scheduler that is gone. Throwing here left the run `running`
+      // with nobody scheduling it. Parked as paused, recovery reattaches or fails each node.
+      context.journal.append(dagRunPausedEvent({ reason: DAG_UNATTACHED_NODES_PAUSE_REASON }))
+      return context.journal.snapshot()
     }
     if (!(await settleOne(context))) return cancelledSnapshot(context)
   }

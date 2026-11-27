@@ -4,11 +4,10 @@ import * as fs from "node:fs"
 import { join } from "node:path"
 import type { Guidance } from "../pause/guidance"
 import { applyDagRunMutation } from "./run-mutation"
-import { liveLeaseHolder, pausedAmendmentUnsafe } from "./amend-safety"
+import { pausedAmendmentUnsafe, transitiveDependents } from "./amend-safety"
 export { applyDagRunMutation } from "./run-mutation"
 import { countDagNodes as countNodes } from "./counts"
 
-import { defaultSignaller } from "../lifecycle/context"
 import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } from "./events"
 import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprintInputV1 } from "./fingerprint"
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
@@ -221,6 +220,8 @@ export type DagAmendParams = {
   readonly key?: string
   readonly definition: DagDefinition
   readonly parentSessionId: string
+  // The live process other than this one holding the run, by the caller's one holder rule (#15125).
+  readonly holder: (fresh: DagRunRecordV1) => number | undefined
 }
 
 export type DagManager = {
@@ -497,9 +498,9 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
       runId: selectedRunId,
     })
   }
-  if (oldRecord.status === "paused" && oldRecord.pause?.reason !== "user_stop" && liveLeaseHolder(oldRecord)) {
+  if (oldRecord.status === "paused" && params.holder(oldRecord) !== undefined) {
     throw new DagManagerError({
-      code: "invalid_amendment",
+      code: oldRecord.pause?.reason === "user_stop" ? "run_not_owned" : "invalid_amendment",
       message: `dag run "${selectedRunId}" is paused by another live lease`,
       runId: selectedRunId,
     })
@@ -601,13 +602,17 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     bottlenecks: compiled.bottlenecks,
     diagnostics: materializedDefinition.diagnostics,
   }
+  let heldAtWrite = false
   const journal = createDagJournal<DagRunRecordV1>({
     store: context.store,
     runId: selectedRunId,
     initialCheckpoint: oldRecord,
     applyEvent: applyDagRunMutation,
     now: context.now,
-    skipDuplicate: skipDuplicateTerminalTransition,
+    // Decided again on the fresh record under the run lock: a held paused run is never amended.
+    skipDuplicate: (recovered, payload) =>
+      skipDuplicateTerminalTransition(recovered, payload) ||
+      (heldAtWrite = recovered.status === "paused" && params.holder(recovered) !== undefined),
   })
   journal.append(mutation)
   context.store.writeKey({
@@ -624,12 +629,11 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
       message: `unknown dag run "${selectedRunId}"`,
       runId: selectedRunId,
     })
-  // The reducer no-ops instead of throwing (see applyDagRunMutation), so an unadvanced fingerprint is
-  // how a lost race surfaces. Report it here, where the WAL is already durable and consistent.
+  // The reducer no-ops on a lost race (see applyDagRunMutation): the unadvanced fingerprint reports it here.
   if (amended.definitionFingerprint !== definitionFingerprint) {
     throw new DagManagerError({
-      code: "run_still_active",
-      message: `dag run "${selectedRunId}" changed before the amendment could be applied`,
+      code: heldAtWrite ? "run_not_owned" : "run_still_active",
+      message: `dag run "${selectedRunId}" ${heldAtWrite ? "is held by another live process" : "changed before the amendment could be applied"}`,
       runId: selectedRunId,
     })
   }
@@ -659,20 +663,6 @@ function nodeFingerprintFromInput(node: DagNodeInput): DagNodeFingerprintInputV1
 function fingerprintDefinition(definition: DagDefinition): string {
   const nodes = definition.nodes.map(nodeFingerprintFromInput)
   return dagDefinitionFingerprint({ name: definition.name, scheduler: SCHEDULER_FINGERPRINT_INPUT, nodes })
-}
-
-function transitiveDependents(edges: readonly DagEdge[], seeds: readonly DagNodeId[]): DagNodeId[] {
-  const dependents = new Map<DagNodeId, DagNodeId[]>()
-  for (const edge of edges) dependents.set(edge.from, [...(dependents.get(edge.from) ?? []), edge.to])
-  const visited = new Set<DagNodeId>()
-  const queue = [...seeds]
-  while (queue.length > 0) {
-    const id = queue.shift() as DagNodeId
-    if (visited.has(id)) continue
-    visited.add(id)
-    queue.push(...(dependents.get(id) ?? []))
-  }
-  return [...visited]
 }
 
 function materializeAmendedDefinition(
