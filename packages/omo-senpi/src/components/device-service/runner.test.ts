@@ -23,19 +23,25 @@ const launcherScript = (body: string): string => {
   return path
 }
 
-describe("the omo remote bootstrap worker", () => {
-  test("an npm launcher (omo.js) runs under this runtime with `remote bootstrap --json` and its last JSON line is the report", async () => {
+describe("the omo device service bootstrap worker", () => {
+  test("an npm launcher (omo.js) runs under this runtime with `__device-service-bootstrap --json` (never a `remote` verb, G4) and its last JSON line is the report", async () => {
     const omoBin = launcherScript(
       'console.log("noise first")\nconsole.log(JSON.stringify({ state: "update_required", notice: process.argv.slice(2).join(" ") }))\nprocess.exitCode = 3\n',
     )
-    expect(await runBootstrapWorker(omoBin)).toEqual({ state: "update_required", notice: "remote bootstrap --json" })
+    expect(await runBootstrapWorker(omoBin)).toEqual({
+      state: "update_required",
+      notice: "__device-service-bootstrap --json",
+    })
   })
 
   test.skipIf(process.platform === "win32")("a compiled omo binary runs directly", async () => {
     const path = join(scratch(), "omo")
     writeFileSync(path, '#!/bin/sh\nprintf \'{"state":"service_degraded","notice":"%s"}\\n\' "$*"\n')
     chmodSync(path, 0o755)
-    expect(await runBootstrapWorker(path)).toEqual({ state: "service_degraded", notice: "remote bootstrap --json" })
+    expect(await runBootstrapWorker(path)).toEqual({
+      state: "service_degraded",
+      notice: "__device-service-bootstrap --json",
+    })
   })
 
   test.each([

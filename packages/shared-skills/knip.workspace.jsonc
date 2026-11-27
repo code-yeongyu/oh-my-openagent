@@ -12,6 +12,8 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "skills/frontend/scripts/detect/cli.ts",
+        "skills/github/scripts/cli.ts",
+        "skills/github/scripts/sdk.ts",
         "skills/programming/scripts/{python,rust,go}/new-*.ts",
         "scripts/detect-parity.ts",
         "scripts/detect-parity-oracle.ts",
@@ -119,6 +121,11 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) DRAFT_RULE_MESSAGES
     "packages/shared-skills/skills/frontend/scripts/perfection/draft-guard/findings.ts": ["DRAFT_RULE_MESSAGES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) locatorErrors, RULES, hasUnknownExactKeys, sourceUnit
+    "packages/shared-skills/skills/github/scripts/sdk.ts": ["client"],
+    "packages/shared-skills/skills/github/scripts/src/codespaces.ts": ["codespaceSummary"],
+    "packages/shared-skills/skills/github/scripts/src/discussion-lookup.ts": ["pickCategory"],
+    "packages/shared-skills/skills/github/scripts/src/env.ts": ["defaultToken"],
+    "packages/shared-skills/skills/github/scripts/surface.ts": ["createSurface"],
     "packages/shared-skills/skills/ulw-research/scripts/fact-ledger-kinds.mjs": ["locatorErrors", "RULES", "hasUnknownExactKeys", "sourceUnit"],
     // pre-existing at origin dev 4686e425b5: unused export(s) DECIMAL, isNonEmpty, isString, FACT_STATUSES, QUALIFIERS, provenanceErrors
     "packages/shared-skills/skills/ulw-research/scripts/fact-ledger-schema.mjs": ["DECIMAL", "isNonEmpty", "isString", "FACT_STATUSES", "QUALIFIERS", "provenanceErrors"],

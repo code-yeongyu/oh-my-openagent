@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { join, relative } from "node:path"
-import { casesIn, ROOT } from "./replay-case"
+import { join } from "node:path"
+import { caseName, casesIn, ROOT } from "./replay-case"
 import { classify, type Ledgers, type Outcome, readLedgers } from "./replay-owners"
 
 const DIR = "crates/omo-computer-core/fixtures/conformance"
@@ -128,7 +128,7 @@ describe("R57 replay-all classification", () => {
 
   test("(c) the parity ledgers owe every v1-consumers case to a later row at row 20", async () => {
     const ledgers = await readLedgers(join(ROOT, "crates/omo-computer-core/parity"))
-    const cases = (await casesIn(join(ROOT, V1))).map((path) => relative(ROOT, path))
+    const cases = (await casesIn(join(ROOT, V1))).map(caseName)
     expect(cases.length).toBeGreaterThan(0)
     const outcomes = cases.map((name): Outcome => ({ name, status: "failed" }))
     const { lines } = classify(20, outcomes, ledgers, PLAN)

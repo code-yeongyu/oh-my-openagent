@@ -114,7 +114,7 @@
   // tests: a released omo's code, never export-checked here either.
   // The device service local API client, vendored byte for byte from omo-relay-daemon (omo#13475, pinned by its PIN.json):
   // upstream's code and API, export-checked in that repo, never here.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/device-service-core/src/local-api/**"],
+  "ignore": ["packages/shared-skills/skills/github/scripts/vendor/**", "packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/device-service-core/src/local-api/**"],
   "workspaces": {
     ".": {
       "includeEntryExports": true,

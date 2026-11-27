@@ -10,15 +10,18 @@ import {
   getOpenCodeSkillDirs,
 } from "../../shared"
 import { createBuiltinSkills } from "../builtin-skills/skills"
+import { GIT_SKILL_NAME, isGitSkillName } from "../builtin-skills/skills/git-skill-metadata"
 import { injectGitMasterConfig } from "./git-master-template-injection"
 import { extractSkillTemplate } from "./loaded-skill-template-extractor"
 import { loadSkillFromPath } from "./loaded-skill-from-path"
 import { getAllSkills } from "./skill-discovery"
+import { resolveSkillAlias, skillNamesResolvingTo } from "./skill-name-aliases"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
 import type { LoadedSkill, SkillScope } from "./types"
 import type { DiscoveredProjectDirectory } from "../../shared/project-discovery-dirs"
 
-export function resolveSkillContent(skillName: string, options?: SkillResolutionOptions): string | null {
+export function resolveSkillContent(requestedName: string, options?: SkillResolutionOptions): string | null {
+  const skillName = resolveSkillAlias(requestedName)
   const skills = createBuiltinSkills({
     browserProvider: options?.browserProvider,
     disabledSkills: options?.disabledSkills,
@@ -27,7 +30,7 @@ export function resolveSkillContent(skillName: string, options?: SkillResolution
   const skill = skills.find((builtinSkill) => builtinSkill.name === skillName)
   if (!skill) return null
 
-  if (skill.name === "git-master") {
+  if (skill.name === GIT_SKILL_NAME) {
     return injectGitMasterConfig(skill.template, options?.gitMasterConfig, options?.shellType)
   }
 
@@ -49,9 +52,9 @@ export function resolveMultipleSkills(
   const notFound: string[] = []
 
   for (const name of skillNames) {
-    const match = skillMap.get(name)
+    const match = skillMap.get(resolveSkillAlias(name))
     if (match) {
-      if (match.name === "git-master") {
+      if (match.name === GIT_SKILL_NAME) {
         resolved.set(name, injectGitMasterConfig(match.template, options?.gitMasterConfig, options?.shellType))
       } else {
         resolved.set(name, match.template)
@@ -99,7 +102,12 @@ async function loadExactSkillFromRoot(
   return null
 }
 
-async function loadConfiguredGitMasterSkill(options?: SkillResolutionOptions): Promise<LoadedSkill | null> {
+async function loadConfiguredGitMasterSkill(
+  requestedName: string,
+  options?: SkillResolutionOptions,
+): Promise<LoadedSkill | null> {
+  // The exact requested name wins within a root: a custom skill kept under the retired name stays its own.
+  const names = [requestedName, ...skillNamesResolvingTo(GIT_SKILL_NAME).filter((name) => name !== requestedName)]
   const directory = options?.directory ?? process.cwd()
   const rootGroups: Array<{
     readonly roots: readonly (string | DiscoveredProjectDirectory)[]
@@ -115,8 +123,10 @@ async function loadConfiguredGitMasterSkill(options?: SkillResolutionOptions): P
 
   for (const group of rootGroups) {
     for (const root of group.roots) {
-      const skill = await loadExactSkillFromRoot(root, group.scope, "git-master")
-      if (skill) return skill
+      for (const name of names) {
+        const skill = await loadExactSkillFromRoot(root, group.scope, name)
+        if (skill) return skill
+      }
     }
   }
 
@@ -124,13 +134,14 @@ async function loadConfiguredGitMasterSkill(options?: SkillResolutionOptions): P
 }
 
 async function resolveBuiltinSkillTemplate(
-  skillName: string,
+  requestedName: string,
   options?: SkillResolutionOptions,
 ): Promise<string | null> {
-  if (skillName !== "git-master") return null
+  const skillName = resolveSkillAlias(requestedName)
+  if (skillName !== GIT_SKILL_NAME) return null
   if (options?.disabledSkills?.has(skillName)) return null
 
-  const configuredSkill = await loadConfiguredGitMasterSkill(options)
+  const configuredSkill = await loadConfiguredGitMasterSkill(requestedName, options)
   if (configuredSkill)
     return injectGitMasterConfig(
       await extractSkillTemplate(configuredSkill),
@@ -162,7 +173,7 @@ export async function resolveSkillContentAsync(
 
   const template = await extractSkillTemplate(skill)
 
-  if (skill.name === "git-master") {
+  if (isGitSkillName(skill.name)) {
     return injectGitMasterConfig(template, options?.gitMasterConfig, options?.shellType)
   }
 
@@ -196,7 +207,7 @@ export async function resolveMultipleSkillsAsync(
     const skill = matchSkillByName(allSkills, name)
     if (skill) {
       const template = await extractSkillTemplate(skill)
-      if (skill.name === "git-master") {
+      if (isGitSkillName(skill.name)) {
         resolvedTemplates.set(name, injectGitMasterConfig(template, options?.gitMasterConfig, options?.shellType))
       } else {
         resolvedTemplates.set(name, template)
