@@ -95,7 +95,7 @@ test("#given a same-size in-place overwrite after an observation read #when meta
 test("#given a same-size in-place overwrite after a protected read #when metadata is verified #then the snapshot fails closed", () => {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-same-size-protected-"))
   try {
-    const path = join(root, "auth.json")
+    const path = join(root, "settings.json")
     writeFileSync(path, "AAAA")
     let mutated = false
     let fileFd
@@ -117,8 +117,8 @@ test("#given a same-size in-place overwrite after a protected read #when metadat
     }
     const snapshot = snapshotProtectedState(root, raceReader(readFile))
     expect(snapshot.complete).toBe(false)
-    expect(snapshot.errors).toEqual([{ path: "auth.json", code: "FILE_CHANGED" }])
-    expect(snapshot.snapshot.has("auth.json")).toBe(false)
+    expect(snapshot.errors).toEqual([{ path: "settings.json", code: "FILE_CHANGED" }])
+    expect(snapshot.snapshot.has("settings.json")).toBe(false)
     expect(isolationState.protectedSnapshotsUntouched(snapshot, snapshot)).toBe(false)
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -134,13 +134,13 @@ test("#given an existence probe would hide inaccessible protected state #when op
       throw error
     }
     deniedRead.openSync = (file, flags) => {
-      if (file === join(root, "auth.json")) return deniedRead()
+      if (file === join(root, "settings.json")) return deniedRead()
       return openSync(file, flags)
     }
     const snapshot = snapshotProtectedState(root, raceReader(deniedRead))
     expect(snapshot.complete).toBe(false)
-    expect(snapshot.errors).toEqual([{ path: "auth.json", code: "EACCES" }])
-    expect(snapshot.snapshot.has("auth.json")).toBe(false)
+    expect(snapshot.errors).toEqual([{ path: "settings.json", code: "EACCES" }])
+    expect(snapshot.snapshot.has("settings.json")).toBe(false)
     expect(isolationState.protectedSnapshotsUntouched(snapshot, snapshot)).toBe(false)
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -247,7 +247,7 @@ test("#given replacement between initial stat and open #when snapshotted #then p
   for (const kind of ["observed", "protected"]) {
     const root = mkdtempSync(join(tmpdir(), `omo-senpi-preopen-${kind}-`))
     try {
-      const name = kind === "observed" ? "state.json" : "auth.json"
+      const name = kind === "observed" ? "state.json" : "settings.json"
       const path = join(root, name)
       writeFileSync(path, "AAAA")
       let replaced = false
@@ -281,7 +281,7 @@ test("#given success or primary failure plus close failure #when reading #then p
   for (const kind of ["observed", "protected"]) {
     const root = mkdtempSync(join(tmpdir(), `omo-senpi-close-${kind}-`))
     try {
-      const name = kind === "observed" ? "state.json" : "auth.json"
+      const name = kind === "observed" ? "state.json" : "settings.json"
       writeFileSync(join(root, name), "AAAA")
       const run = (io) =>
         kind === "observed"
@@ -332,7 +332,7 @@ test("#given success or primary failure plus close failure #when reading #then p
 test("#given ENOENT stat then open success and close failure #when absence races #then FILE_REPLACED remains primary", () => {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-absence-close-"))
   try {
-    const path = join(root, "auth.json")
+    const path = join(root, "settings.json")
     let firstStat = true
     const snapshot = snapshotProtectedState(
       root,
@@ -350,7 +350,7 @@ test("#given ENOENT stat then open success and close failure #when absence races
         },
       }),
     )
-    expect(snapshot.errors).toEqual([{ path: "auth.json", code: "FILE_REPLACED" }])
+    expect(snapshot.errors).toEqual([{ path: "settings.json", code: "FILE_REPLACED" }])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
