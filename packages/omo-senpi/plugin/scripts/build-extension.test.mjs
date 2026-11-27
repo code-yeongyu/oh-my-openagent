@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
@@ -17,7 +17,7 @@ import {
 } from "./build-extension.mjs"
 import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
-import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
+import { createBuildFixture, outputPathsIn, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 import {
   SENPI_GPT_ULTRAWORK_DIRECTIVE,
   SENPI_ULTRAWORK_DIRECTIVE,
@@ -41,6 +41,8 @@ setDefaultTimeout(90_000)
 const PACKED_STAGE_CAPS = { pack: 25_000, untar: 10_000, probe: 20_000 }
 const PACKED_TEST_TIMEOUT_MS = Object.values(PACKED_STAGE_CAPS).reduce((sum, cap) => sum + cap, 0) + 35_000
 
+// #13965: the cold builds run once as setup, bounded by their progress and CPU use, not this hook's outer bound.
+beforeAll(() => fixture.warmBuilds(), BUILD_HOOK_OUTER_BOUND_MS)
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
 
@@ -391,9 +393,10 @@ describe("checkExtensionCurrent", () => {
 
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
     const { mainInputs, threadClientInputs } = await sharedOutputs()
-    const suffix = "/components/thread/live-surface.ts"
-    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
-    expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    for (const suffix of ["/components/thread/live-surface.ts", "/components/thread/remote/receipt.ts"]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
   })
 
   // #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside the engine,

@@ -2,22 +2,12 @@ import { createBuiltinSkills } from "../builtin-skills/skills"
 import { discoverSkills } from "./loader"
 import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
+import { isDisabledSkillName } from "./skill-disable-config"
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
 
-function isDisabledAlias(name: string, disabledSkills: ReadonlySet<string>): boolean {
-  const normalizedName = name.toLowerCase()
-  if (disabledSkills.has(normalizedName)) return true
-
-  for (const disabledSkill of disabledSkills) {
-    if (disabledSkill.toLowerCase() === normalizedName) return true
-  }
-
-  return false
-}
-
 export function isDisabledSkillAlias(skill: LoadedSkill, disabledSkills: ReadonlySet<string>): boolean {
-  return isDisabledAlias(skill.name, disabledSkills)
+  return isDisabledSkillName(skill.name, disabledSkills)
 }
 
 export function clearSkillCache(): void {

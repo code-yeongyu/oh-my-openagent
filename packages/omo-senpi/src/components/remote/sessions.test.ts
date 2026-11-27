@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { connectDeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import { mkdtempSync, rmSync } from "node:fs"
 import type { Socket } from "node:net"
@@ -172,6 +172,39 @@ describe("sessions.open", () => {
     expect(sent("prompt")).toHaveLength(1)
   })
 
+  test("#given an open whose first prompt held the session's attach #when the client closes #then no attach idle timer outlives it (#14091)", async () => {
+    // given
+    const armed = new Set<unknown>()
+    const realSetTimeout = globalThis.setTimeout
+    const realClearTimeout = globalThis.clearTimeout
+    const setSpy = spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, ms?: number) => {
+      const timer = realSetTimeout(callback, ms)
+      if (ms === 600_000) armed.add(timer)
+      return timer
+    }) as typeof setTimeout)
+    const clearSpy = spyOn(globalThis, "clearTimeout").mockImplementation((timer) => {
+      armed.delete(timer)
+      Reflect.apply(realClearTimeout, globalThis, [timer])
+    })
+    try {
+      const { owner } = await onWorld()
+      const client = clientOn(owner.stateDir, fakeClock())
+      await valueOf(
+        client.sessions.open({ device: PEER, workspace: "/work", first: { text: "start" }, idempotency_key: "open-1" }),
+      )
+      expect(armed.size).toBe(1)
+
+      // when
+      client.close()
+
+      // then
+      expect(armed.size).toBe(0)
+    } finally {
+      setSpy.mockRestore()
+      clearSpy.mockRestore()
+    }
+  })
+
   test("#given a model that is not provider/id #when sessions.open runs #then invalid_arguments and nothing is sent", async () => {
     const { owner } = await onWorld()
     const client = clientOn(owner.stateDir, fakeClock())
@@ -329,6 +362,20 @@ describe("sessions.send and sessions.read", () => {
     const header = /\[OMO_GATEWAY ([^\]]*)\]/.exec(String(admitted?.["text"]))?.[1]?.split(" ") ?? []
     expect(header).toContain('device="dev-self"')
     expect(header).toContain("sender_session=dur-caller")
+  })
+
+  // #13004, the second case carried from omo-native remote-session-verbs.test.ts (#13414 4c-2): a service that names no
+  // device for this one still delivers, and its envelope names no device rather than a wrong one.
+  test("#given a device service that names no device for this one #when a session client sends #then it delivers and its envelope names no device", async () => {
+    const base = world()
+    const owner = await startOwner({ ...base, service_version: "0.1.30", status: { ...base.status, device: null } })
+    const sent = (type: string) => owner.state.commands.filter((rpc) => rpc["type"] === type)
+    const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
+    expect(await valueOf(session.sessions.send(LIVE, { text: "hello" }))).toMatchObject({ lane: "started" })
+    const [admitted] = sent("admit_external_message")
+    const header = /\[OMO_GATEWAY ([^\]]*)\]/.exec(String(admitted?.["text"]))?.[1]?.split(" ") ?? []
+    expect(header).toContain("sender_session=dur-caller")
+    expect(header.filter((field) => field.startsWith("device"))).toEqual([])
   })
 
   test("#given an attachment or an author on a person client #when sessions.send runs #then it is refused typed and nothing is sent", async () => {

@@ -14,14 +14,13 @@ export interface SyncRpcWiringOptions {
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   readonly stopSync?: () => Promise<void>
   readonly resumeSync?: () => Promise<void>
-  readonly env: Readonly<Record<string, string | undefined>>
   readonly logger: { error(message: string, fields?: Record<string, unknown>): void }
   readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }
 
 export function wireSyncRpc(options: SyncRpcWiringOptions) {
-  // The flag is a registration-time snapshot, even when the dispatcher is cold.
-  const phraseGate = phraseGateFrom(options.env, options.logger)
+  // The gate is built once at registration, even when the dispatcher is cold.
+  const phraseGate = phraseGateFrom(options.logger)
   type Runtime = ReturnType<typeof createSyncRpcRuntime>
   let runtime: Runtime | undefined
   let pending: Promise<Runtime> | undefined

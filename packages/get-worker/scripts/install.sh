@@ -325,7 +325,7 @@ main() {
   fi
   say ""
   say "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product."
-  say "The data goes to PostHog in the United States."
+  say "The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev)."
   say "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1)."
   say "Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
 }

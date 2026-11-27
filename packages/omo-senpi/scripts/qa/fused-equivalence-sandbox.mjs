@@ -1,12 +1,30 @@
 // Sandbox wiring every EQ.omo case shares (fused-equivalence-e2e.mjs): the built plugin's trust, every config/state
 // root inside the case sandbox, the telemetry opt-out, and the omo config the case runs with. Nothing here turns a
 // plugin surface off.
-import { mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
+
+// The engine walks up from the case cwd for instruction files, so a sandbox placed under an operator's home (a TMPDIR
+// there) records that home's AGENTS.md into the system prompt and the golden (omo#14904). Refuse such a location.
+const INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", join(".agents", "AGENTS.md")]
+
+function instructionFileAbove(dir) {
+  for (let parent = dirname(dir); ; parent = dirname(parent)) {
+    const found = INSTRUCTION_FILES.map((name) => join(parent, name)).find((path) => existsSync(path))
+    if (found !== undefined) return found
+    if (dirname(parent) === parent) return undefined
+  }
+}
 
 export function prepareCaseSandbox(run, omoConfig) {
   const root = run.box.dir
+  const leaking = instructionFileAbove(root)
+  if (leaking !== undefined) {
+    throw new Error(
+      `EQ case sandbox ${root} sits under an instruction file (${leaking}); the engine would load it into the recorded prompt. Run from a root with no instruction file above it (e.g. TMPDIR=/tmp).`,
+    )
+  }
   run.env.PATH = run.childPath
   // The CLI child gets its env from the senpi harness sandbox, which opts out of senpi's own telemetry (PI_TELEMETRY=0)
   // but not the plugin's. Off CI (no CI variable) and with a run root outside the OS temp dir, the plugin's consent gate

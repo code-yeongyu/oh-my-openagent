@@ -6,10 +6,10 @@ import { join, relative } from "node:path"
 import { daemonDirectoryName } from "@code-yeongyu/senpi"
 import { runStatus as runProductionStatus } from "../bin/lib/daemon-operations.js"
 import { createDaemonEngineHarness } from "./daemon-real-engine-support"
-import { RUNAWAY_CAP_MS } from "./daemon-test-runner"
+import { TREE_BOUNDED_TEST_TIMEOUT_MS } from "./daemon-test-runner"
 
 const { sandbox, ensureShard, runStatus, killShardUncleanly, cleanup } = createDaemonEngineHarness()
-setDefaultTimeout(RUNAWAY_CAP_MS + 5_000)
+setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
 afterEach(cleanup)
 
 function snapshotState(agentDir: string): string {

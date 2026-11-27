@@ -483,7 +483,7 @@ describe("createBuiltinAgents with model overrides", () => {
     // #then
     expect(agents.sisyphus.prompt).not.toContain("playwright")
     expect(agents.sisyphus.prompt).toContain("frontend")
-    expect(agents.sisyphus.prompt).toContain("git-master")
+    expect(agents.sisyphus.prompt).toMatch(/\*\*Built-in\*\*:[^\n]*\bgit\b(?!-)/)
     providerModelsSpy.mockRestore()
     connectedSpy.mockRestore()
     fetchSpy.mockRestore()

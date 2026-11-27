@@ -113,6 +113,29 @@ test("a stale base answers stale_base with the server's head", async () => {
   expect(await pushOne(b, new TextEncoder().encode("two"), 0)).toEqual({ ok: false, error: "stale_base", head: 1 })
 })
 
+test("a pull for a head the stream announced reads only the batches page once a state read placed the cursor inside the retained history (#14476)", async () => {
+  const { server, a, b } = await pair()
+  await pushOne(a, new TextEncoder().encode("one"), 0)
+  await b.pull(0, 500)
+  await pushOne(a, new TextEncoder().encode("two"), 1)
+  const before = server.requests.length
+  const page = await b.pull(1, 500, 2)
+  const routes = server.requests.slice(before).map(({ method, path }) => `${method} ${path}`)
+  expect(routes).toEqual(["GET /v1/sync/batches"])
+  expect([page.entries.map((e) => e.seq), page.head, page.more, page.snapshot]).toEqual([[2], 2, false, null])
+})
+
+test("an announced head the batches page does not reach falls back to the state read", async () => {
+  const { server, a, b } = await pair()
+  await pushOne(a, new TextEncoder().encode("one"), 0)
+  await b.pull(0, 500)
+  const before = server.requests.length
+  const page = await b.pull(1, 500, 5)
+  const routes = server.requests.slice(before).map(({ method, path }) => `${method} ${path}`)
+  expect(routes).toEqual(["GET /v1/sync/batches", "GET /v1/sync/state", "GET /v1/sync/batches"])
+  expect([page.entries.length, page.head, page.more]).toEqual([0, 1, false])
+})
+
 test("a full page asks for more, and the snapshot comes from the state route", async () => {
   const { server, a, b } = await pair()
   server.pageSize = 2
@@ -160,6 +183,103 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(heads).toEqual([1])
   expect(connected[0]).toBe(true)
   expect(await server.untilStreamsClosed()).toBe(0)
+})
+
+test("#given the service's client floor refuses this build #when the event stream opens with a 426 #then it reports the stream down, waits the floor retry instead of 5 s, and reconnects once the floor is lifted (#14483, review L2)", async () => {
+  let opened = 0
+  const floored = createHttpTransport({
+    baseUrl: "http://sync.example",
+    token: () => "tok",
+    floorRetryMs: 5,
+    fetch: (async (url: string | URL | Request) => {
+      // The connect's state re-read while inline is not accepted (#14476) is not a stream open.
+      if (new URL(url instanceof Request ? url.url : String(url)).pathname === "/v1/sync/state")
+        return Response.json({ head: { seq: 0 }, oldest_retained_seq: 1, snapshot: null })
+      opened += 1
+      if (opened === 1)
+        return Response.json(
+          { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+          { status: 426 },
+        )
+      return new Response(`data: ${JSON.stringify({ type: "sync.advanced", head: { seq: 3 } })}\n\n`, {
+        headers: { "content-type": "text/event-stream" },
+      })
+    }) as unknown as typeof fetch,
+  })
+  const connected: boolean[] = []
+  let stop: () => void = () => undefined
+  const heads: number[] = []
+  const advanced = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("waited 10s for the stream to come back after the 426, never did")),
+      10_000,
+    )
+    stop = floored.subscribe({
+      onAdvanced: (head) => {
+        heads.push(head)
+        clearTimeout(timer)
+        resolve()
+      },
+      onConnected: (up) => connected.push(up),
+      onStateChanged: () => undefined,
+    })
+  })
+  await advanced
+  stop()
+  expect(connected.slice(0, 2)).toEqual([false, true])
+  expect(heads).toEqual([3])
+  expect(opened).toBe(2)
+})
+
+test("#given repeated 426 floor waits on one subscription #when each wait ends on its timer #then no abort listener is left behind on the subscription's signal (#14483 review M1)", async () => {
+  const added: unknown[] = []
+  const removed: unknown[] = []
+  const realAdd = AbortSignal.prototype.addEventListener
+  const realRemove = AbortSignal.prototype.removeEventListener
+  AbortSignal.prototype.addEventListener = function (type: string, listener: unknown, options?: unknown) {
+    if (type === "abort") added.push(listener)
+    return realAdd.call(this, type, listener as EventListener, options as AddEventListenerOptions)
+  }
+  AbortSignal.prototype.removeEventListener = function (type: string, listener: unknown, options?: unknown) {
+    if (type === "abort") removed.push(listener)
+    return realRemove.call(this, type, listener as EventListener, options as EventListenerOptions)
+  }
+  let opened = 0
+  let stop: () => void = () => undefined
+  try {
+    const floored = createHttpTransport({
+      baseUrl: "http://sync.example",
+      token: () => "tok",
+      floorRetryMs: 1,
+      fetch: (async () => {
+        opened += 1
+        return Response.json(
+          { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+          { status: 426 },
+        )
+      }) as unknown as typeof fetch,
+    })
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("waited 10s for 4 floor waits, never reached")), 10_000)
+      stop = floored.subscribe({
+        onAdvanced: () => undefined,
+        onConnected: () => {
+          if (opened >= 4) {
+            clearTimeout(timer)
+            resolve()
+          }
+        },
+        onStateChanged: () => undefined,
+      })
+    })
+  } finally {
+    stop()
+    AbortSignal.prototype.addEventListener = realAdd
+    AbortSignal.prototype.removeEventListener = realRemove
+  }
+  const finishedWaits = Math.max(0, opened - 1)
+  expect(finishedWaits).toBeGreaterThanOrEqual(3)
+  expect(removed.filter((listener) => added.includes(listener)).length).toBeGreaterThanOrEqual(finishedWaits)
 })
 
 // #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as

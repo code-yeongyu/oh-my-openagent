@@ -108,6 +108,24 @@ describe("#given the release stamp's content check", () => {
     expect(checkStamp(head).status).toBe(0)
   })
 
+  test("a stable pin stamps root and native beta versions independently, including the lockfile", () => {
+    const lock = (rootVersion: string, nativeVersion: string) =>
+      `{"workspaces":{"":{"version":"${rootVersion}"},"packages/omo-native":{"name":"omo-ai","version":"${nativeVersion}"}}}`
+    git("checkout", "-q", "--detach", base)
+    write("packages/omo-native/package.json", '{ "version": "1.0.0" }\n')
+    write("bun.lock", lock("1.0.0", "1.0.0"))
+    git("add", "-A")
+    git("commit", "-qm", "stable pin")
+    const pin = git("rev-parse", "HEAD")
+    write("package.json", '{ "version": "1.0.1-beta.1" }\n')
+    write("packages/omo-native/package.json", '{ "version": "1.0.1-0.beta.1" }\n')
+    write("bun.lock", lock("1.0.1-beta.1", "1.0.1-0.beta.1"))
+    git("add", "-A")
+    git("commit", "-qm", "beta stamp")
+    const run = spawnSync("node", [checker, "--check-stamp", pin, "HEAD"], { cwd: repo, encoding: "utf8" })
+    expect(run.status, run.stderr).toBe(0)
+  })
+
   test.each([
     [
       "a stamped hooks file whose Windows launch line also changes",
@@ -147,7 +165,20 @@ function probeBase(name: string, legs: readonly Leg[] | null): string {
     writeFileSync(join(api, path.replace(/[^A-Za-z0-9]/g, "_")), JSON.stringify(body))
   const repo = "repos/owner/project"
   answer(`${repo}/actions/workflows/ci.yml/runs?branch=dev&event=push&status=completed&head_sha=abc&per_page=20`, {
-    workflow_runs: legs === null ? [] : [{ id: 5, created_at: "2026-11-21T08:00:00Z" }],
+    workflow_runs:
+      legs === null
+        ? []
+        : [
+            {
+              id: 5,
+              created_at: "2026-11-21T08:00:00Z",
+              conclusion: "success",
+              head_sha: "abc",
+              head_branch: "dev",
+              event: "push",
+              status: "completed",
+            },
+          ],
   })
   answer(`${repo}/actions/runs/5/jobs?filter=latest&per_page=100`, {
     jobs: [
@@ -179,7 +210,7 @@ function probeBase(name: string, legs: readonly Leg[] | null): string {
       BASE_SHA: "abc",
     },
   })
-  expect(run.stderr).toBe("")
+  expect(run.stderr).toMatch(/^base-platform-green: .*run (5|none)/)
   expect(run.status).toBe(0)
   return run.stdout.trim()
 }

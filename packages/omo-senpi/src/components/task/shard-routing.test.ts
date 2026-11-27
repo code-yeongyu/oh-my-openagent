@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
@@ -7,6 +7,7 @@ import {
   HostUnavailableError,
   RpcProcessRunner,
   RunnerError,
+  resolveShardSocket,
   shardKey,
   shardSocketPathForKey,
   type EnsureTaskDaemonInput,
@@ -16,6 +17,7 @@ import {
 import { buildProcessChildRunner } from "./engine-runners"
 import { createEngineHostRuntime, type EngineHostRuntimeOverrides } from "./host-execution-mode"
 import { TaskRuntimeContext } from "./runtime-context"
+import { shortTempDir } from "../../../test-support/short-tmp"
 
 const TREE_KEY = "0123456789abcdef"
 const CAPABLE = ["multi_session", "extension_events", "session_context", "session_kind", "generation_handoff"]
@@ -31,9 +33,10 @@ function world(input: {
   readonly env?: Record<string, string>
 }) {
   // A short root: darwin's TMPDIR alone would push the shard past the bind limit onto the alt root.
-  const root = mkdtempSync("/tmp/omo-t8-")
+  const root = shortTempDir("omo-t8-")
   dirs.push(root)
   const agentDir = join(root, "agent")
+  assertPrimaryShardFits(agentDir)
   const runtime = new TaskRuntimeContext(root)
   if (input.sessionId !== undefined) {
     runtime.captureFrom({
@@ -91,6 +94,23 @@ function world(input: {
     probes,
     answer: (value: "silent" | "H1") => (probeAnswer = value),
   }
+}
+
+// Every assertion here expects the primary shard root; a test root too long for the bind limit would silently move the
+// shard to the alternate root (or fail it) and surface as an unrelated mismatch, so say so directly.
+function assertPrimaryShardFits(agentDir: string): void {
+  const identity = { kind: "p" as const, key: TREE_KEY, ownerSessionId: "precondition", inherited: false }
+  const primary = shardSocketPathForKey(join(agentDir, "rpc", "shards"), "p", TREE_KEY)
+  let root: string
+  try {
+    root = resolveShardSocket({ agentDir, env: {}, identity }).root
+  } catch {
+    root = "alt"
+  }
+  if (root !== "primary")
+    throw new Error(
+      `test root too long: shard socket ${primary} (${primary.length} bytes) leaves no room for its siblings under the bind limit`,
+    )
 }
 
 function ensured(socket: string): EnsuredTaskDaemon {

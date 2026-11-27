@@ -76,7 +76,7 @@ const toolkitSdkOutputPath = join(
   "agent-toolkit-sdk",
   "sdk.js",
 )
-const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
+const bunshinTsEntryPath = join(packageRoot, "src", "components", "remote", "bunshin-ts", "bunshin-ts-sdk.ts")
 const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
 // The account, device, device-service and configuration SDK eval cells import from OMO_SDK_ROOT.
 export const OMO_SDK_RELATIVE_PATH = join("runtime", "omo-sdk", "sdk.js")
@@ -531,7 +531,15 @@ export async function buildExtension(options = {}) {
     buildDefines,
     sdkExternalSpecifiers,
   )
-  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, sdkExternalSpecifiers)
+  // #14616: the SDK's default account surface loads the plugin's thread client and device-account sidecars at run time
+  // through the plugin manifest's import map, so neither is inlined into it; its send loads the wake sidecar the same way
+  // to wake a parked session (#14972).
+  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, [
+    ...sdkExternalSpecifiers,
+    "#omo-thread-client-runtime",
+    "#omo-device-account-runtime",
+    "#omo-wake-runtime",
+  ])
   // Bundling inlines assets.ts but its markdown is read from disk at runtime next to the bundle,
   // so the persona and the computer-use prelude are staged into the directory the loader runs from.
   await Promise.all([
