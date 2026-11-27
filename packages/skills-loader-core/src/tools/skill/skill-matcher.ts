@@ -1,6 +1,7 @@
 import { sortByScopePriority } from "./scope-priority"
 import type { CommandInfoLike } from "../../types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import { resolveSkillAlias } from "../../features/opencode-skill-loader/skill-name-aliases"
 
 export function matchSkillByName(skills: LoadedSkill[], requestedName: string): LoadedSkill | undefined {
   const normalizedName = requestedName.toLowerCase()
@@ -8,6 +9,13 @@ export function matchSkillByName(skills: LoadedSkill[], requestedName: string): 
   const exactMatch = skills.find((skill) => skill.name.toLowerCase() === normalizedName)
   if (exactMatch) {
     return exactMatch
+  }
+
+  const canonicalName = resolveSkillAlias(normalizedName)
+  const aliasMatch =
+    canonicalName === normalizedName ? undefined : skills.find((skill) => skill.name.toLowerCase() === canonicalName)
+  if (aliasMatch) {
+    return aliasMatch
   }
 
   const shortNameMatches = skills.filter((skill) => {
