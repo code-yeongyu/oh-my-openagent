@@ -1,6 +1,7 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { describe, test, expect } from "bun:test"
+import { collectDisabledSkillAliases } from "../opencode-skill-loader/skill-disable-config"
 import { createBuiltinSkills } from "./skills"
 
 describe("createBuiltinSkills", () => {
@@ -58,7 +59,7 @@ describe("createBuiltinSkills", () => {
     })
   }
 
-  test("always includes frontend, git-master, review-work, shared skills, and runtime security skills", () => {
+  test("always includes frontend, git, review-work, shared skills, and runtime security skills", () => {
     // given - both provider options
 
     // when
@@ -69,7 +70,7 @@ describe("createBuiltinSkills", () => {
     // then
     for (const skills of [defaultSkills, cliSkills, devBrowserSkills]) {
       expect(skills.find((s) => s.name === "frontend")).toBeDefined()
-      expect(skills.find((s) => s.name === "git-master")).toBeDefined()
+      expect(skills.find((s) => s.name === "git")).toBeDefined()
       expect(skills.find((s) => s.name === "review-work")).toBeDefined()
       expect(skills.find((s) => s.name === "remove-ai-slops")).toBeDefined()
       expect(skills.find((s) => s.name === "init-deep")).toBeDefined()
@@ -80,15 +81,15 @@ describe("createBuiltinSkills", () => {
     }
   })
 
-  test("git-master skill keeps commit workflow phases in order", () => {
+  test("ships the git skill built in", () => {
     // #given
     const skills = createBuiltinSkills()
 
     // #when
-    const gitMaster = skills.find((skill) => skill.name === "git-master")
+    const git = skills.find((skill) => skill.name === "git")
 
     // #then
-    expect(gitMaster).toBeDefined()
+    expect(git).toBeDefined()
   })
 
   test("returns exactly 11 skills regardless of provider", () => {
@@ -115,7 +116,7 @@ describe("createBuiltinSkills", () => {
     // #then
     expect(skills.map((s) => s.name)).not.toContain("playwright")
     expect(skills.map((s) => s.name)).toContain("frontend")
-    expect(skills.map((s) => s.name)).toContain("git-master")
+    expect(skills.map((s) => s.name)).toContain("git")
     expect(skills.map((s) => s.name)).not.toContain("dev-browser")
     expect(skills.map((s) => s.name)).toContain("review-work")
     expect(skills.map((s) => s.name)).toContain("remove-ai-slops")
@@ -130,14 +131,14 @@ describe("createBuiltinSkills", () => {
 
   test("should exclude multiple skills when they are in disabledSkills", () => {
     // #given
-    const options = { disabledSkills: new Set(["playwright", "git-master"]) }
+    const options = { disabledSkills: collectDisabledSkillAliases({ disabled_skills: ["playwright", "git-master"] }) }
 
     // #when
     const skills = createBuiltinSkills(options)
 
     // #then
     expect(skills.map((s) => s.name)).not.toContain("playwright")
-    expect(skills.map((s) => s.name)).not.toContain("git-master")
+    expect(skills.map((s) => s.name)).not.toContain("git")
     expect(skills.map((s) => s.name)).toContain("frontend")
     expect(skills.map((s) => s.name)).not.toContain("dev-browser")
     expect(skills.map((s) => s.name)).toContain("review-work")
@@ -157,7 +158,7 @@ describe("createBuiltinSkills", () => {
       disabledSkills: new Set([
         "playwright",
         "frontend",
-        "git-master",
+        "git",
         "review-work",
         "remove-ai-slops",
         "init-deep",

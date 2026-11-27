@@ -68,6 +68,23 @@ describe("resolveSkillContent", () => {
     expect(result).toBeNull()
   })
 
+  it("should resolve the legacy git-master name to the git skill with the same settings applied", () => {
+    // given: custom git settings
+    const options = {
+      gitMasterConfig: { commit_footer: false, include_co_authored_by: true, git_env_prefix: "OMO_GIT=7" },
+    }
+
+    // when: resolving by the current name and by the legacy alias
+    const byName = resolveSkillContent("git", options)
+    const byAlias = resolveSkillContent("git-master", options)
+
+    // then: both return the same settings-applied content
+    expect(byName).not.toBeNull()
+    expect(byAlias).toBe(byName)
+    expect(byName).toContain("<commit_attribution>")
+    expect(byName).toContain('OMO_GIT: "7"')
+  })
+
   it("should return null for disabled skill", () => {
     // given: frontend skill disabled
     const options = { disabledSkills: new Set(["frontend"]) }
@@ -146,6 +163,16 @@ describe("resolveMultipleSkills", () => {
     // #then: frontend in notFound, playwright resolves to its source template
     expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
     expect(result.notFound).toEqual(["frontend"])
+  })
+
+  it("should resolve the legacy git-master name in a batch to the same content as git", () => {
+    // #when: resolving the alias and the current name in a batch
+    const result = resolveMultipleSkills(["git-master", "git"])
+
+    // #then: both resolve, keyed by the requested names, to the same content
+    expect(result.notFound).toEqual([])
+    expect(result.resolved.get("git-master")).toBeDefined()
+    expect(result.resolved.get("git-master")).toBe(result.resolved.get("git"))
   })
 
   it("should preserve skill order in resolved map", () => {
