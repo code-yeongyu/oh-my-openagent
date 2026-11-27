@@ -153,6 +153,18 @@ describe("thread_send / thread_handoff results", () => {
     ).toEqual(["-> planner  queued #3: no engine is running the thread; it starts to take the message"])
   })
 
+  test("#given a queued delivery whose host this caller could not prove #when it renders #then it names that refusal, never the running turn or offline", () => {
+    const [line] = result(
+      "thread_send",
+      sent({ kind: "queued", queue_position: 2, waiting_on: { kind: "host_identity_unproven" } }),
+      sendArgs,
+    )
+    expect(line).toContain("queued #2")
+    expect(line).toContain("host_identity_unproven")
+    expect(line).not.toContain("running turn")
+    expect(line).not.toContain("offline")
+  })
+
   test("#given an offline target #when it renders #then it says the message waits for the thread to start", () => {
     const offline = {
       kind: "ok",
