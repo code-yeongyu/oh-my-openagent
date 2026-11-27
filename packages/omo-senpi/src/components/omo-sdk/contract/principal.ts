@@ -1,5 +1,4 @@
 import { type Static, Type } from "typebox"
-import { Check } from "typebox/value"
 
 // The principals of the security design (#14945, docs/reference/omo-sdk-authority-and-custody.md, section 3). A root is
 // built for exactly one, fixed when the root is constructed: no call of the root takes a principal, a sender or a
@@ -39,6 +38,3 @@ export const PRINCIPAL_ID = {
   session: "session_id",
   service: undefined,
 } as const satisfies Readonly<Record<PrincipalKind, string | undefined>>
-
-/** Whether `value` is one of the five principals of the security design's section 3. */
-export const isPrincipal = (value: unknown): value is OmoPrincipal => Check(Principal, value)

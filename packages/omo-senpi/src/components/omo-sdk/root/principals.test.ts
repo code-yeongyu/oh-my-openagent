@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import type { OmoPrincipal } from "../contract"
 import { createOmoSdk } from ".."
+import { isPrincipal } from "../contract/validate"
 import { assembleThreadFacade } from "../thread-assembly"
 
 // Design lane ruling (P1b, point 4): a root built for a session or a connector serves no thread cell the matrix
@@ -49,6 +50,32 @@ describe("a root built for a value that is not one of the five principals", () =
     { kind: "person", uid: -5 },
     { kind: "service", extra: true },
   ]
+  // The construction check runs without the schema validator (size ruling); it must accept exactly what the schema does.
+  test("#given each principal and each near miss #when a root is built #then it accepts exactly what the Principal schema accepts", () => {
+    const candidates: readonly unknown[] = [
+      ...invalid,
+      { kind: "person", uid: 0 },
+      { kind: "script", uid: 501 },
+      { kind: "connector", binding: "b-1" },
+      { kind: "session", session_id: "s-1" },
+      { kind: "service" },
+      { kind: "script", uid: 1.5 },
+      { kind: "connector", binding: "" },
+      { kind: "session" },
+      { kind: "person", uid: 1, session_id: "s" },
+      ["kind"],
+      null,
+    ]
+    const accepts = (principal: unknown) => {
+      try {
+        assembleThreadFacade({ env: {}, cwd: tmpdir(), principal } as never)
+        return true
+      } catch {
+        return false
+      }
+    }
+    expect(candidates.filter((principal) => accepts(principal) !== isPrincipal(principal))).toEqual([])
+  })
   for (const principal of invalid)
     test(`#given ${JSON.stringify(principal)} #when either root is built #then it throws a TypeError`, () => {
       expect(() => createOmoSdk({ env: {}, cwd: tmpdir(), principal } as never)).toThrow(TypeError)
