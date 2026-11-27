@@ -74,6 +74,7 @@ export type SendInput = {
   readonly deliverAs?: SendDelivery
   readonly callerSessionId?: string
   readonly allScope?: boolean
+  readonly canonicalOnly?: boolean
   // Deliver only to the run a handle minted at this epoch names (fenceRun): any other run answers
   // `stale` and nothing is delivered. task_send never sets it.
   readonly expectedRunEpoch?: number

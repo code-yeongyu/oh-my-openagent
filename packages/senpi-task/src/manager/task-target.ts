@@ -8,8 +8,15 @@ export function resolveTaskTarget(
   callerSessionId?: string,
 ): TaskRecord | undefined {
   const canonical = records.find((record) => record.task_id === target) ?? records.find((record) => record.name === target)
-  if (canonical !== undefined || callerSessionId === undefined || target === "*") return canonical
+  return canonical ?? resolveTaskNickname(records, target, callerSessionId)
+}
 
+export function resolveTaskNickname(
+  records: readonly TaskRecord[],
+  target: string,
+  callerSessionId?: string,
+): TaskRecord | undefined {
+  if (callerSessionId === undefined || target === "*") return undefined
   const owned = records.filter((record) => record.parent_session_id === callerSessionId && record.nickname !== undefined)
   const exact = owned.filter((record) => record.nickname === target)
   if (exact.length > 0) return exact.length === 1 ? exact[0] : undefined

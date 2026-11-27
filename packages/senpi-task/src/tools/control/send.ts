@@ -127,19 +127,25 @@ async function sendNow(
   }
 
   if (typeof params.message === "string") {
-    const outcome = await manager.sendToTask({
+    const input = {
       idOrName: params.to,
       message: params.message,
-      deliverAs: "steer",
+      deliverAs: "steer" as const,
       ...(callerSessionId !== undefined ? { callerSessionId } : {}),
       ...(params.all_scope === true ? { allScope: true } : {}),
-    })
+    }
+    const outcome = await manager.sendToTask(teamRouting === undefined ? input : { ...input, canonicalOnly: true })
 
     if (outcome.kind !== "not_found") return withResolvedWorker(manager, mapSendOutcome(outcome))
     if (teamRouting === undefined) return notFound(manager, outcome.reason, callerSessionId)
 
     const resolution = await resolveSendTeamRunId(params, teamRouting)
-    if (resolution.kind === "none") return notFound(manager, outcome.reason, callerSessionId)
+    const sendAlias = async (): Promise<SendToolResult | undefined> => {
+      const alias = await manager.sendToTask(input)
+      return alias.kind === "not_found" ? undefined : withResolvedWorker(manager, mapSendOutcome(alias))
+    }
+    if (resolution.kind === "none")
+      return (await sendAlias()) ?? notFound(manager, outcome.reason, callerSessionId)
     if (resolution.kind === "error") return invalidArguments(resolution.reason)
 
     const teamResult = await runTeamSend(teamRouting.service, resolution.teamRunId, teamRouting.from, {
@@ -147,6 +153,11 @@ async function sendNow(
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),
     })
+    // This refusal happens before enqueue. A selected team or any other outcome is final.
+    if (teamResult.details.kind === "invalid_recipient" && params.team_run_id === undefined && teamRouting.teamRunId === undefined) {
+      const alias = await sendAlias()
+      if (alias !== undefined) return alias
+    }
     const wrapped: SendToolResult = toolResult(firstText(teamResult), {
       kind: "team_message",
       team: teamResult.details,

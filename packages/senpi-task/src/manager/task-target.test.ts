@@ -3,6 +3,13 @@ import { makeRecord } from "../tools/output/__fixtures__/records"
 import { resolveTaskTarget } from "./task-target"
 
 describe("worker nickname targets", () => {
+  test("a Roman suffix after a base ending in 'the' still accepts the other three spellings", () => {
+    const record = makeRecord({ nickname: "Plan the III", parent_session_id: "owner" })
+    for (const alias of ["Plan the #3", "Plan the the Third", "Plan the the 3rd"]) {
+      expect(resolveTaskTarget([record], alias, "owner")?.task_id).toBe(record.task_id)
+    }
+  })
+
   test.each(["Io XXII", "Io #22", "Io the Twenty-Second", "Io the 22nd"])(
     "#given stored nickname %s #when a coordinator uses a different occurrence style #then the task still resolves",
     (nickname) => {

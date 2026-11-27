@@ -24,6 +24,27 @@ function spyManager(outcome: SendOutcome): { manager: SendManager; sendCalls: Se
 }
 
 describe("runTaskSend team routing", () => {
+  test.each([{}, { team_run_id: "run-1" }])(
+    "a team recipient keeps its mailbox when a child nickname matches it",
+    async (selection) => {
+      const { manager, store, inProcess } = makeManager()
+      const child = await manager.start(baseSpec({ parent_session_id: "lead-session", name: "independent" }))
+      if (child.kind !== "started") throw new Error("expected child")
+      store.mutate(child.task_id, (record) => ({ ...record, nickname: "beta" }))
+      const service = createFakeTeamService({
+        sendMessage: async () => ({ kind: "to_members", messageId: "msg-1", recipients: ["beta"] }),
+      })
+      const result = await runTaskSend(manager, { to: "beta", message: "team update", ...selection }, "lead-session", {
+        service,
+        from: TEAM_LEAD_SENTINEL,
+        resolveDefaultTeamRunId: async () => ({ kind: "resolved", teamRunId: "run-1" }),
+      })
+      expect(result.details.kind).toBe("team_message")
+      expect(service.calls).toMatchObject([{ method: "sendMessage", args: ["run-1", { to: "beta" }] }])
+      expect(inProcess.handles.get(child.task_id)?.steerCalls).toEqual([])
+    },
+  )
+
   test("#given a string recipient that is not a child but is a team member #when team routing is present #then it sends a team message", async () => {
     const { manager } = spyManager({ kind: "not_found", reason: 'No task found for "beta".', suggestion: "unused" })
     const service = createFakeTeamService({

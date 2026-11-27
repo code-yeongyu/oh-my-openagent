@@ -1,5 +1,5 @@
 import type { TaskRecord } from "../state"
-import { resolveTaskTarget } from "../manager/task-target"
+import { resolveTaskNickname } from "../manager/task-target"
 import type { CallerScope } from "./types"
 
 export type TaskLookup = {
@@ -19,7 +19,7 @@ function within(lookup: TaskLookup, idOrName: string, sessionId: string | undefi
   if (sessionId === undefined) return undefined
   const byId = lookup.load(idOrName)
   if (byId !== undefined) return ownsTask(sessionId, byId) ? byId : undefined
-  return resolveTaskTarget(lookup.list().filter((record) => ownsTask(sessionId, record)), idOrName, sessionId)
+  return lookup.list().find((record) => record.name === idOrName && ownsTask(sessionId, record))
 }
 
 /**
@@ -27,13 +27,18 @@ function within(lookup: TaskLookup, idOrName: string, sessionId: string | undefi
  * resolves nothing. Without one (the engine's own callers), an id, else the first record carrying that name.
  */
 export function resolveTask(lookup: TaskLookup, idOrName: string, caller?: CallerScope): TaskRecord | undefined {
-  return caller === undefined ? anywhere(lookup, idOrName) : within(lookup, idOrName, caller.sessionId)
+  if (caller === undefined) return anywhere(lookup, idOrName)
+  const canonical = anywhere(lookup, idOrName)
+  return within(lookup, idOrName, caller.sessionId) ??
+    (canonical === undefined ? resolveTaskNickname(lookup.list(), idOrName, caller.sessionId) : undefined)
 }
 
 export function resolveTaskCallerFirst(
   lookup: TaskLookup,
   idOrName: string,
   callerSessionId: string | undefined,
+  canonicalOnly = false,
 ): TaskRecord | undefined {
-  return within(lookup, idOrName, callerSessionId) ?? anywhere(lookup, idOrName)
+  return within(lookup, idOrName, callerSessionId) ?? anywhere(lookup, idOrName) ??
+    (canonicalOnly || callerSessionId === undefined ? undefined : resolveTaskNickname(lookup.list(), idOrName, callerSessionId))
 }

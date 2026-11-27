@@ -173,6 +173,28 @@ describe("runTaskSend", () => {
     expect(inProcess.startedSpecs).toHaveLength(2)
   })
 
+  test("a foreign canonical name wins over a local nickname for send and redispatch", async () => {
+    const { manager, store, inProcess } = makeManager()
+    const local = await manager.start(baseSpec({ parent_session_id: "local", name: "worker" }))
+    const foreign = await manager.start(baseSpec({ parent_session_id: "foreign", name: "beta" }))
+    if (local.kind !== "started" || foreign.kind !== "started") throw new Error("expected both children")
+    store.mutate(local.task_id, (record) => ({ ...record, nickname: "beta" }))
+    const denied = await runTaskSend(manager, { to: "beta", message: "without scope" }, "local")
+    expect(denied.details).toMatchObject({ kind: "scope_denied", task_id: foreign.task_id })
+    const sent = await runTaskSend(manager, { to: "beta", message: "with scope", all_scope: true }, "local")
+    expect(sent.details).toMatchObject({ kind: "steered", task_id: foreign.task_id })
+    expect(inProcess.handles.get(local.task_id)?.steerCalls).toEqual([])
+    for (const { task_id } of [local, foreign]) {
+      store.mutate(task_id, (record) => ({
+        ...record,
+        awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() },
+      }))
+    }
+    const restarted = await runTaskSend(manager, { to: "beta", redispatch: true, all_scope: true }, "local")
+    expect(restarted.details).toMatchObject({ kind: "redispatched", task_id: foreign.task_id })
+    expect(manager.get(local.task_id)?.awaiting_input?.reason).toBe("resumed_turn_aborted")
+  })
+
   test("#given an unknown redispatch target #when sent #then not_found lists this session's task names", async () => {
     // given
     const { manager } = makeManager({})

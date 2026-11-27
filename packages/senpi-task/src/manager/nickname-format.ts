@@ -202,24 +202,28 @@ function splitOccurrence(label: string): { base: string; occurrence: number } | 
     occurrence = Number(numeric[2] ?? numeric[3])
     if (numeric[4] !== undefined && numeric[4].toLowerCase() !== ordinalSuffix(occurrence)) return undefined
   } else if (written !== null) {
-    base = written[1]
     const suffix = written[2].toLowerCase()
     occurrence = readEnglishOrdinal(suffix)
-    if (!Number.isSafeInteger(occurrence) || occurrence < 2 || toEnglishOrdinal(occurrence).toLowerCase() !== suffix)
-      return undefined
-  } else if (roman !== null) {
-    base = roman[1]
-    const suffix = roman[2].toUpperCase()
-    const amounts: Readonly<Record<string, number>> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }
-    occurrence = [...suffix].reduce(
-      (total, glyph, index) => total + amounts[glyph] * (amounts[glyph] < amounts[suffix[index + 1]] ? -1 : 1),
-      0,
-    )
-    if (occurrence > 3999 || toRoman(occurrence) !== suffix) return undefined
+    if (Number.isSafeInteger(occurrence) && occurrence >= 2 && toEnglishOrdinal(occurrence).toLowerCase() === suffix)
+      return { base: written[1], occurrence }
+    return readRomanOccurrence(roman)
   } else {
-    return undefined
+    return readRomanOccurrence(roman)
   }
   return Number.isSafeInteger(occurrence) && occurrence >= 2 ? { base, occurrence } : undefined
+}
+
+function readRomanOccurrence(roman: RegExpExecArray | null): { base: string; occurrence: number } | undefined {
+  if (roman === null) return undefined
+  const suffix = roman[2].toUpperCase()
+  const amounts: Readonly<Record<string, number>> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }
+  const occurrence = [...suffix].reduce(
+    (total, glyph, index) => total + amounts[glyph] * (amounts[glyph] < amounts[suffix[index + 1]] ? -1 : 1),
+    0,
+  )
+  return occurrence >= 2 && occurrence <= 3999 && toRoman(occurrence) === suffix
+    ? { base: roman[1], occurrence }
+    : undefined
 }
 
 function readEnglishOrdinal(suffix: string): number {
