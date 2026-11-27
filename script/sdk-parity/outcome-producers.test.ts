@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { gateChangeSet, OUTCOME_RUNNER, outcomeProducers, TIER_FILES } from "./outcome-producers"
+import { GATE_ENTRIES, gateChangeSet, OUTCOME_RUNNER, outcomeProducers } from "./outcome-producers"
 import { REPO_ROOT } from "./registry"
 
 // Security contract (limit 1 of #15208's gate-rule read): the files whose change is a gate change are computed from the
@@ -17,12 +17,15 @@ const tree = (files: Readonly<Record<string, string>>) => {
   const root = mkdtempSync(join(tmpdir(), "sdk-parity-producers-"))
   roots.push(root)
   mkdirSync(join(root, "script/sdk-parity"), { recursive: true })
-  for (const [name, text] of Object.entries(files)) writeFileSync(join(root, "script/sdk-parity", name), text)
+  // The two judging entries exist on every tree; a case that does not give them a body gets an empty module.
+  const withEntries = { "gate-cli.ts": "export {}\n", "verify-review.ts": "export {}\n", ...files }
+  for (const [name, text] of Object.entries(withEntries)) writeFileSync(join(root, "script/sdk-parity", name), text)
   return root
 }
 const at = (name: string) => `script/sdk-parity/${name}`
-// The producers reached from the runner, without the tier files every set carries by rule.
-const producersOnly = (root: string) => outcomeProducers(root).filter((file) => !TIER_FILES.includes(file))
+// The modules reached from the entries, without the two judging entries every tree here carries.
+const producersOnly = (root: string) =>
+  outcomeProducers(root).filter((file) => file === OUTCOME_RUNNER || !GATE_ENTRIES.includes(file))
 
 describe("the files that produce or normalize an outcome", () => {
   test("#given the runner's static, dynamic and transitive imports #then each is in the set and an unimported file is not", () => {
@@ -52,10 +55,27 @@ describe("the files that produce or normalize an outcome", () => {
     expect(producersOnly(root)).toEqual([OUTCOME_RUNNER])
   })
 
-  test("#given this repository #then the runner, its scenario table and the tool registry it discovers tools with are producers", () => {
-    const producers = outcomeProducers(REPO_ROOT)
-    expect(producers).toEqual(expect.arrayContaining([OUTCOME_RUNNER, at("scenarios.ts"), at("tool-registry.ts")]))
-    expect(producers).not.toContain(at("presentation.ts"))
+  // The set on this tree, named: the runner's modules and every module the gate's two judging entries reach. Dropping
+  // any of them from the set turns this red.
+  test("#given this repository #then the runner, the judging entries and every judging module they import are members", () => {
+    const members = [
+      "base-inputs.ts",
+      "base-tree.ts",
+      "baseline.ts",
+      "closures.ts",
+      "conformance.ts",
+      "declared-change.ts",
+      "gate-cli.ts",
+      "gate.ts",
+      "outcome-producers.ts",
+      "presentation.ts",
+      "scenario-run.ts",
+      "scenarios.ts",
+      "tool-registry.ts",
+      "verify-review.ts",
+      "version-mask.ts",
+    ].map(at)
+    expect(outcomeProducers(REPO_ROOT)).toEqual(expect.arrayContaining(members))
   })
 
   test("#given re-exports, a bare side-effect import, a .js specifier, require() and a JSON module #then each is followed", () => {
@@ -94,10 +114,19 @@ describe("the files that produce or normalize an outcome", () => {
     )
   })
 
-  test("#given any tree #then the files that compute and judge the tier are members by rule", () => {
-    expect(outcomeProducers(tree({ "scenario-run.ts": "export {}\n" }))).toEqual(
-      [...TIER_FILES, OUTCOME_RUNNER].toSorted(),
-    )
+  test("#given a judging module either judging entry newly imports #then it is a member with no list to edit", () => {
+    const files = {
+      "scenario-run.ts": "export {}\n",
+      "judge.ts": "export const judge = 1\n",
+      "review-rule.ts": "export {}\n",
+    }
+    expect(outcomeProducers(tree(files))).not.toContain(at("judge.ts"))
+    const judged = {
+      ...files,
+      "gate-cli.ts": 'import { judge } from "./judge"\n',
+      "verify-review.ts": 'import "./review-rule"\n',
+    }
+    expect(outcomeProducers(tree(judged))).toEqual(expect.arrayContaining([at("judge.ts"), at("review-rule.ts")]))
   })
 
   test("#given a module the head stops importing #then the pull request's set still holds it, from the merge base's tree", () => {

@@ -468,8 +468,8 @@ describe("a change to how outcomes are produced or normalized", () => {
       expect(verifyReview(output, "", verdictFor(renderReport(gateReport(input())))).decision).toBe("withheld")
     })
 
-  test("#given a diff touching no harness module #then there is no gate change and nothing to sign", () => {
-    const report = gateReport(input({ changedFiles: ["script/sdk-parity/presentation.ts"] }))
+  test("#given a diff touching only product code #then there is no gate change and nothing to sign", () => {
+    const report = gateReport(input({ changedFiles: ["packages/omo-native/bin/lib/thread.js"] }))
     expect(report.gateChanges).toEqual([])
     expect(verifyReview(renderReport(report), "", "").decision).toBe("accepted")
   })

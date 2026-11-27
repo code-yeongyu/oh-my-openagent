@@ -5,18 +5,11 @@ import { dirname, join, relative } from "node:path"
 export const OUTCOME_RUNNER = "script/sdk-parity/scenario-run.ts"
 
 /**
- * The files that compute and judge the gate-change tier itself. They are members by rule, so a change that empties or
- * bypasses the computed set is a gate change too (the gate-rule read of #15217, F1).
+ * The entries whose reach makes up the set: the runner, which produces and normalizes the outcomes, and the two that
+ * judge them (the gate's command-line entry and the review verifier). Every module either judge imports inside the
+ * folder is a member too, so the gate's own judging code is never outside the tier (the gate-rule read of #15217).
  */
-export const TIER_FILES = [
-  "script/sdk-parity/base-inputs.ts",
-  "script/sdk-parity/base-tree.ts",
-  "script/sdk-parity/declared-change.ts",
-  "script/sdk-parity/gate-cli.ts",
-  "script/sdk-parity/gate.ts",
-  "script/sdk-parity/outcome-producers.ts",
-  "script/sdk-parity/verify-review.ts",
-]
+export const GATE_ENTRIES = [OUTCOME_RUNNER, "script/sdk-parity/gate-cli.ts", "script/sdk-parity/verify-review.ts"]
 
 // Every way a module names another by a relative literal: an import (static, bare side-effect or dynamic), a re-export
 // (`export * from`, `export { x } from`), require(), and a template literal. A type-only import or re-export is left
@@ -63,14 +56,14 @@ function resolveModule(root: string, from: string, specifier: string): string {
 }
 
 /**
- * The files under script/sdk-parity that produce or normalize an outcome: the runner and every module it reaches there,
- * transitively, plus the files that compute and judge this tier. Computed from the source, so a module the runner newly
+ * The files under script/sdk-parity that produce, normalize or judge an outcome: the gate's entries and every module they
+ * reach there, transitively. Computed from the source, so a module the runner newly
  * imports is in the set without a list to edit. Imports outside the folder are not followed: the runner and the tool
  * registry load them from the tree under test (`import(join(tree, ...))`), which both sides run and compare.
  */
 export function outcomeProducers(root: string): string[] {
-  const seen = new Set([OUTCOME_RUNNER])
-  const queue = [OUTCOME_RUNNER]
+  const seen = new Set(GATE_ENTRIES)
+  const queue = [...GATE_ENTRIES]
   for (let file = queue.shift(); file !== undefined; file = queue.shift()) {
     if (!/\.[cm]?[jt]s$/.test(file)) continue
     for (const specifier of specifiersOf(file, readFileSync(join(root, file), "utf8"))) {
@@ -80,7 +73,7 @@ export function outcomeProducers(root: string): string[] {
       queue.push(target)
     }
   }
-  return [...new Set([...seen, ...TIER_FILES])].toSorted()
+  return [...seen].toSorted()
 }
 
 /**
