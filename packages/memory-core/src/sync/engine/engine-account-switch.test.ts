@@ -80,6 +80,7 @@ test("#given a note of the same name on both accounts #when the device switches 
   await settleWithin("the switch to account B", d, e)
   expect(await d.read("shared.md")).toBe(note("text only account b ever wrote\n"))
   expect(await d.read(NOT_SYNCED)).toBe("not a memory\n")
+  expect(d.store.keys()).not.toContain(NOT_SYNCED)
 
   await d.restart(undefined, undefined, { server: serverA, account: "acc_a" })
   await settleWithin("the switch back to account A", d, peerOnA)
@@ -87,6 +88,6 @@ test("#given a note of the same name on both accounts #when the device switches 
   expect(await peerOnA.read("shared.md")).toBe(note("text only account a ever wrote\n"))
   expect(await e.read("shared.md")).toBe(note("text only account b ever wrote\n"))
   expect(await d.read(NOT_SYNCED)).toBe("not a memory\n")
-  expect(await peerOnA.read(NOT_SYNCED)).toBeNull()
-  expect(await e.read(NOT_SYNCED)).toBeNull()
+  // A peer runs the same grammar before it writes a key, so only the capturing device's own store can show a leak.
+  expect(d.store.keys()).not.toContain(NOT_SYNCED)
 })
