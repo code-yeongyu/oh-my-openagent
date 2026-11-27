@@ -68,7 +68,7 @@ export async function stoppedChild(receipt: InputEffectStatus) {
     },
   }
   store.save(record)
-  const { manager } = makeManager({ project, store })
+  const { manager, inProcess } = makeManager({ project, store })
   const result = await respawnManagedTask({
     beforeLaunch: () => undefined,
     record,
@@ -94,7 +94,7 @@ export async function stoppedChild(receipt: InputEffectStatus) {
     if (active === undefined) throw new Error("missing continued session")
     host.emitRecord(active.routingId, { type: "agent_start" })
   }
-  return { host, result, record, manager, store, events, startContinuation, resumed: resumed.promise }
+  return { host, result, record, manager, inProcess, store, events, startContinuation, resumed: resumed.promise }
 }
 
 /** senpi's `rpc_client_message_admission` entry for one input receipt (admission states map queued/running/completed). */

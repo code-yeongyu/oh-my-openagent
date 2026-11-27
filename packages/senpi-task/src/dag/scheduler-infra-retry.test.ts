@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 import { journalFilesOnDisk } from "./__fixtures__/in-memory-store"
 import { dagNode, infraFixture, infrastructureFailure, success, RetryClock } from "./infra-retry-fixture"
 import { createDagScheduler } from "./scheduler"
+import { createDagRunReservations } from "./run-reservations"
 import { RunnerError } from "../runners/in-process/runner-error"
 
 const fixtures: ReturnType<typeof infraFixture>[] = []
@@ -156,6 +157,7 @@ test("preserves the infrastructure retry budget and backoff across scheduler re-
   await running
   const recoveredClock = new RetryClock()
   const recovered = createDagScheduler({
+    reservations: createDagRunReservations(),
     store: fixture.store,
     taskManager: fixture.taskManager,
     initialRecord: scheduler.snapshot(),
