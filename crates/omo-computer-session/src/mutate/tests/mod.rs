@@ -1,5 +1,6 @@
 //! The funnel's tests: a fake backend over a temp RUNTIME/STATE root, as the engine runs it.
 
+mod addressed;
 mod batch;
 mod lockless;
 mod logged;
@@ -42,7 +43,10 @@ pub(super) fn click(call_id: &str) -> omo_computer_core::params::ClickParams {
 }
 
 pub(super) fn wire(refused: &Refused) -> (&'static str, Option<&'static str>) {
-    (refused.refusal.code.wire(), refused.refusal.reason.map(Reason::wire))
+    (
+        refused.refusal.code.wire(),
+        refused.refusal.reason.map(Reason::wire),
+    )
 }
 
 /// One engine's roots in a temp dir, and the sink every backend of the test records into.
@@ -173,7 +177,10 @@ impl Backend for Probe {
         self.inner.platform()
     }
 
-    fn set_stop_chord(&mut self, chord: Option<&str>) -> omo_computer_core::backend::BackendResult<()> {
+    fn set_stop_chord(
+        &mut self,
+        chord: Option<&str>,
+    ) -> omo_computer_core::backend::BackendResult<()> {
         self.inner.set_stop_chord(chord)
     }
 

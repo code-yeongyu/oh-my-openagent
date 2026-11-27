@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { productPluginState } from "./host-launch.js"
 
 function readJson(path) {
   if (!existsSync(path)) return undefined
@@ -122,7 +123,9 @@ export function formatEndpointLines(endpoints) {
       lines.push(`${name}: not running (retained state kept; run omo daemon gc)`)
       continue
     }
-    lines.push(`${name}: ${runningDetails(endpoint, endpointKind(endpoint) !== "daemon")}`)
+    const primary = endpointKind(endpoint) === "daemon"
+    const profile = primary ? ` · product plugin: ${productPluginState(endpoint.launchProfile)}` : ""
+    lines.push(`${name}: ${runningDetails(endpoint, !primary)}${profile}`)
     if ((endpoint.generations?.length ?? 0) > 1) {
       for (const generation of endpoint.generations) lines.push(generationLine(generation, endpoint))
     }
