@@ -132,30 +132,52 @@ describe("OmO Native telemetry consent question", () => {
     })
   })
 
-  it("#given an RPC session whose UI forwards confirm #when it starts #then nothing is asked and nothing is recorded (#15213, #15196)", async () => {
-    const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
-    try {
-      const env = {
-        POSTHOG_API_KEY: "test-api-key",
-        SENPI_CODING_AGENT_DIR: stateDir,
-        HOME: stateDir,
-        OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+  // While open_session is pending no RPC client can answer a dialog: senpi's RpcClient holds the session's events until
+  // the open completes (#15213), and the senpi-task host client drops records whose routing id it does not know yet
+  // (#15196). The confirm below therefore never settles, and session_start must settle without asking.
+  for (const path of [
+    { name: "a senpi RpcClient open (#15213)", env: {} },
+    { name: "a senpi-task process child open (#15196)", env: { OMO_SENPI_TASK_RPC_CHILD: "1" } },
+  ]) {
+    it(`#given ${path.name} whose dialog is never answered #when session_start runs #then it settles without asking and records nothing`, async () => {
+      const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
+      try {
+        const env = {
+          POSTHOG_API_KEY: "test-api-key",
+          SENPI_CODING_AGENT_DIR: stateDir,
+          HOME: stateDir,
+          OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+          ...path.env,
+        }
+        const pi = new FakeExtensionAPI()
+        createOmoNativeNoticeRegistration({ env, stateDir }).register(pi, {
+          config: pi,
+          logger: createSilentLogger(),
+        })
+        const asked = Promise.withResolvers<"asked">()
+        const neverAnswered = {
+          mode: "rpc",
+          hasUI: true,
+          ui: {
+            confirm: () => {
+              asked.resolve("asked")
+              return new Promise<boolean>(() => {})
+            },
+          },
+        }
+
+        const outcome = await Promise.race([
+          pi.dispatch("session_start", {}, neverAnswered).then(() => "settled" as const),
+          asked.promise,
+        ])
+
+        expect(outcome).toBe("settled")
+        expect(existsSync(consentMarkerPath(stateDir))).toBe(false)
+      } finally {
+        rmSync(stateDir, { recursive: true, force: true })
       }
-      const pi = new FakeExtensionAPI()
-      createOmoNativeNoticeRegistration({ env, stateDir }).register(pi, {
-        config: pi,
-        logger: createSilentLogger(),
-      })
-      const questions: Question[] = []
-
-      await pi.dispatch("session_start", {}, { ...askOnceUi(true, questions), mode: "rpc", hasUI: true })
-
-      expect(questions).toEqual([])
-      expect(existsSync(consentMarkerPath(stateDir))).toBe(false)
-    } finally {
-      rmSync(stateDir, { recursive: true, force: true })
-    }
-  })
+    })
+  }
 
   it("#given a print session whose no-op UI declines every confirm #when it starts #then no decline is recorded", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
