@@ -1,15 +1,21 @@
 import { hostname } from "node:os"
 import path from "node:path"
 
-import { link, lstat, readdir, readFile, unlink } from "../fs/resilient"
+import { lstat, readdir, readFile, unlink } from "../fs/resilient"
 import { LockContentionError, acquireWithoutDirectorySweep } from "./acquire-core"
+import { CANDIDATE_STALE_AGE_MS } from "./candidate-sweep"
 import { releaseLock } from "./lock-owner"
 import { isLockOwnerProvenDead } from "./stale-owner"
 import { createLockRecord, parseLockRecord, type LockRecord } from "./lock-record"
 import { getPidLiveness } from "./process-identity"
 
 const LOCK_FILE_SUFFIX = ".lock"
-const REAPING_NAME = /^(.+\.lock(?:\.recovery)?)\.reaping-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
+// A reaper renames a lock file to `<lock>.reaping-<uuid>` only to inspect it, then hands it back or unlinks it
+// within the same acquisition, so a tombstone that outlives that was left by a reaper that crashed or failed.
+// Its record is never restored: once the file left the lock path its holder's fence refused, and that holder
+// has released since (#15273 review H1). The rename sets the tombstone's ctime, which its age is measured from.
+const REAPING_NAME = /\.lock(?:\.recovery)?\.reaping-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
+export const REAPING_STALE_AGE_MS = CANDIDATE_STALE_AGE_MS
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
@@ -36,6 +42,14 @@ export interface DeadOwnerSweepOptions {
   readonly onFailure?: (lockPath: string, error: unknown) => void
   /** Called with the proven-dead owner of each lock the sweep reclaimed. */
   readonly onReclaimed?: (lockPath: string, previousOwner: LockRecord) => void
+  /** The clock a leftover reaping tombstone's age is judged by; tests pass a fixed one. */
+  readonly now?: () => number
+}
+
+async function removeAbandonedTombstone(tombstonePath: string, now: number): Promise<void> {
+  const status = await lstat(tombstonePath)
+  if (!status.isFile() || now - status.ctimeMs <= REAPING_STALE_AGE_MS) return
+  await unlink(tombstonePath)
 }
 
 async function reclaimIfDeadOwner(lockPath: string, options: DeadOwnerSweepOptions): Promise<boolean> {
@@ -70,29 +84,18 @@ export async function sweepDeadOwnerLocks(lockDirectory: string, options: DeadOw
     if (errorCode(error) !== "ENOENT") options.onFailure?.(lockDirectory, error)
     return 0
   }
+  const now = options.now ?? Date.now
   let reclaimed = 0
   for (const name of names) {
-    const key = REAPING_NAME.exec(name)?.[1]
-    if (!key && !name.endsWith(LOCK_FILE_SUFFIX)) continue
+    const tombstone = REAPING_NAME.test(name)
+    if (!tombstone && !name.endsWith(LOCK_FILE_SUFFIX)) continue
     const lockPath = path.join(lockDirectory, name)
     try {
-      if (key) {
-        // Reaping names are unique, never reused. Never overwrite a successor or discard an
-        // unverified record. Only remove a live record's saved name after a successful put-back.
-        if (!(await lstat(lockPath)).isFile()) continue
-        const owner = parseLockRecord(await readFile(lockPath, "utf8"))
-        if (!owner) continue
-        if (!(await isLockOwnerProvenDead(owner))) {
-          if (owner.hostname !== hostname() || getPidLiveness(owner.pid) !== "alive") continue
-          await link(lockPath, path.join(lockDirectory, key))
-        }
-        await unlink(lockPath)
-        continue
-      }
-      if (await reclaimIfDeadOwner(lockPath, options)) reclaimed += 1
+      if (tombstone) await removeAbandonedTombstone(lockPath, now())
+      else if (await reclaimIfDeadOwner(lockPath, options)) reclaimed += 1
     } catch (error) {
-      if (key && (errorCode(error) === "ENOENT" || errorCode(error) === "EEXIST")) continue
-      options.onFailure?.(lockPath, error)
+      // A tombstone gone before this sweep reached it was collected by another sweep or its own reaper.
+      if (!(tombstone && errorCode(error) === "ENOENT")) options.onFailure?.(lockPath, error)
     }
   }
   return reclaimed
