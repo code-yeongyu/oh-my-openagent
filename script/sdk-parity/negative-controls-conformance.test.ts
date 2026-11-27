@@ -1,7 +1,17 @@
 import { describe, expect, test } from "bun:test"
 
 import { conformanceProblems } from "./conformance"
-import { built, builtRows, CONTEXT, open, pair, run, scenario } from "./conformance-fixture"
+import {
+  built,
+  builtRows,
+  CONTEXT,
+  open,
+  pair,
+  run,
+  scenario,
+  headEvidence,
+  headScenarios,
+} from "./conformance-fixture"
 import { runEffectScenarios, type ScenarioRun } from "./conformance-run"
 import type { ObservedCall, TableScenario } from "./expectation"
 import { rows } from "./gate-fixture"
@@ -13,7 +23,7 @@ import { rowProblems, type Row } from "./schema"
 // the scenario says, the stream terminal, the virtual-clock abort, and a table valid apart from a row being built.
 
 const problems = async (runs: readonly ScenarioRun[], target: readonly Row[] = builtRows) =>
-  conformanceProblems(target, open, await runEffectScenarios(target, runs), CONTEXT)
+  conformanceProblems(target, open, [...(await headEvidence()), ...(await runEffectScenarios(target, runs))], CONTEXT)
 const withLocate = (change: Partial<Row>): Row[] =>
   rows.map((row) => (row.id === "threads.locate" ? { ...built, ...change } : row))
 const custom = (table: TableScenario, member: (calls: ObservedCall[], input: unknown) => unknown): ScenarioRun =>
@@ -205,13 +215,13 @@ describe("the scenario table, valid apart from a row being built (design lane ru
     const target = withLocate({
       scenarios: { effect: ["threads.locate/by-id", "threads.locate/all-scope"], refusal: [] },
     })
-    expect(tableProblems(target, missing)).toEqual([
+    expect(tableProblems(target, [...missing, ...headScenarios])).toEqual([
       "row threads.locate: the table has no effect scenario on other_device; write the target contract, even before it can pass",
     ])
   })
 
   test("#given the other-device effect scenario present but failing #then the table is valid and the row is not built", async () => {
-    expect(tableProblems(builtRows, table())).toEqual([])
+    expect(tableProblems(builtRows, [...table(), ...headScenarios])).toEqual([])
     const failing = custom(scenario("other-device", undefined, "other_device"), () => ({
       kind: "error",
       error: { code: "local_only" },
@@ -222,7 +232,7 @@ describe("the scenario table, valid apart from a row being built (design lane ru
   })
 
   test("#given an aborting scenario that states no effect that must not happen #then the table names it", () => {
-    expect(tableProblems(builtRows, table([{ abort: { after_ms: 10 } }]))).toContainEqual(
+    expect(tableProblems(builtRows, [...table([{ abort: { after_ms: 10 } }]), ...headScenarios])).toContainEqual(
       "scenario threads.locate/extra: an aborting scenario states with count 0 the effect that must not have happened",
     )
   })

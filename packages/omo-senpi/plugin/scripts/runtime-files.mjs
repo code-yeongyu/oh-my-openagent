@@ -14,7 +14,10 @@ export const SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/sdk.js",
     specifier: "#omo-sdk",
     lazy: false,
-    ceiling: 612_554,
+    // 785,413 at the merge of car 2 (#15033, 9455617d21) and P1b's merge head 699c480398 (+172,859 B base-brought:
+    // train 14's devices.list imports the remote client statically, and revision 22's matrix lines and held cells;
+    // P1c's own code is unchanged; ruling (a): base bytes move the pin in the merge commit only).
+    ceiling: 785_413,
     staticSet: "omo-sdk-static-modules.json",
     packages: ["jsonc-parser", "typebox", "zod"],
   },
@@ -24,7 +27,9 @@ export const SDK_RUNTIME_FILES = [
     output: "runtime/omo-sdk/threads.js",
     specifier: "#omo-sdk-threads-runtime",
     lazy: true,
-    ceiling: 246_730,
+    // 246,735 with the thread client's refusal text reading 'omo installation' (thread/sdk-core/failures.ts +5 B,
+    // base-brought through P1b's merge head; ruling (a)).
+    ceiling: 246_735,
     staticSet: "omo-sdk-threads-static-modules.json",
     packages: ["typebox"],
   },

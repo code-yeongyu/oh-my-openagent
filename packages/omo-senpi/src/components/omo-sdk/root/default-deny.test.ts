@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { assembleOmoSdk } from "../assembly"
 import { PRINCIPAL_KINDS, PRINCIPAL_MATRIX, ROOT_CALLS, type OmoPrincipal, type RootCallKey } from "../contract"
 import { boundaryRefusals, UNLINED_CALLS } from "./authority"
+import { HELD_ALLOWS } from "./held-allows"
 import { PENDING_CELLS } from "./pending-cells"
 
 // Security design 4 is default deny (design lane ruling on 14996's custody review): a (call, principal) pair with no line
@@ -47,6 +48,33 @@ describe("default deny at the root's boundary", () => {
     expect(PENDING_CELLS.filter((cell) => cell.principal === "connector" || cell.principal === "service")).toEqual([])
   })
 
+  test("#given the held allows #then each holds a conditional allow or an n/a cell, no pair repeats, and each is refused with its own text", () => {
+    const cellOf = (call: RootCallKey, kind: (typeof PRINCIPAL_KINDS)[number]) =>
+      PRINCIPAL_MATRIX.find((line) => line.input === undefined && (line.rows as readonly string[]).includes(call))
+        ?.cells[kind]
+    // Without its entry each pair would be admitted: its line's cell is an allow on a condition its note states, or n/a.
+    expect(
+      HELD_ALLOWS.filter((entry) => {
+        const cell = cellOf(entry.call, entry.principal)
+        return cell?.outcome !== "n/a" && (cell?.outcome !== "allow" || cell.note === undefined)
+      }),
+    ).toEqual([])
+    const pairs = HELD_ALLOWS.map((entry) => `${entry.call} ${entry.principal}`)
+    expect(pairs.length).toBe(new Set(pairs).size)
+    expect(
+      HELD_ALLOWS.filter(
+        (entry) => entry.condition === "" || entry.owner === "" || entry.message === "" || entry.next_action === "",
+      ),
+    ).toEqual([])
+    for (const entry of HELD_ALLOWS)
+      expect(boundaryRefusals(PRINCIPALS[entry.principal], {}).get(entry.call)).toEqual({
+        code: "sender_not_allowed",
+        message: entry.message,
+        next_action: entry.next_action,
+        details: { principal: entry.principal, reason: "held" },
+      })
+  })
+
   test("#given a principal and a call with no cell #when the root is built #then the call is refused as no_matrix_cell before any port, and a pending pair is not", async () => {
     const touched: string[] = []
     const root = (principal: OmoPrincipal) =>
@@ -69,16 +97,55 @@ describe("default deny at the root's boundary", () => {
         },
         {},
       )
+    // The example pairs are generated: the first call with no line, and the first call with no line that a person may
+    // still reach through a pending cell.
+    const [unlined] = UNLINED_CALLS
+    const waiting = UNLINED_CALLS.find((call) => pending(call, "person"))
+    if (unlined === undefined || waiting === undefined) throw new Error("no unlined call left to probe")
+    const call = (sdk: ReturnType<typeof root>, key: RootCallKey) =>
+      key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], sdk) as (
+        input: unknown,
+      ) => Promise<unknown>
     for (const kind of ["connector", "service"] as const)
-      expect(await root(PRINCIPALS[kind]).account.show({})).toMatchObject({
+      expect(await call(root(PRINCIPALS[kind]), unlined)({})).toMatchObject({
         kind: "error",
         error: { code: "sender_not_allowed", details: { principal: kind, reason: "no_matrix_cell" } },
       })
     expect(touched).toEqual([])
-    expect(boundaryRefusals(PRINCIPALS.person, {}).has("account.show")).toBe(false)
+    expect(boundaryRefusals(PRINCIPALS.person, {}).has(waiting)).toBe(false)
     expect(boundaryRefusals(PRINCIPALS.script, {}).get("install.sdkRoot")).toMatchObject({
       code: "sender_not_allowed",
       details: { reason: "no_matrix_cell" },
     })
   })
+})
+
+// One case per held pair through a built root (design lane ruling on held cells' text): the call answers its entry's own
+// code, message, next_action and reason, generated from the entry, before any core or port.
+describe("a held pair answers its own refusal through the root", () => {
+  for (const entry of HELD_ALLOWS)
+    test(`#given a ${entry.principal} root #when ${entry.call} is called #then it answers the held refusal`, async () => {
+      const root = assembleOmoSdk(
+        {
+          env: { OMO_SERVICE_API_URL: "https://accounts.example.test" },
+          cwd: tmpdir(),
+          agentDir: tmpdir(),
+          principal: PRINCIPALS[entry.principal],
+        },
+        {},
+      )
+      const member = entry.call.split(".").reduce<unknown>((node, part) => Reflect.get(Object(node), part), root) as (
+        input: unknown,
+      ) => Promise<unknown>
+      expect(await member({})).toEqual({
+        kind: "error",
+        error: {
+          code: "sender_not_allowed",
+          message: entry.message,
+          next_action: entry.next_action,
+          details: { principal: entry.principal, reason: "held" },
+        },
+      })
+      await root.dispose()
+    })
 })

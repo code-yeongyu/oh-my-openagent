@@ -123,9 +123,11 @@ export async function staticModuleSet(entry, options = {}) {
   const first = entryKey ?? Object.keys(inputs).find((key) => entry.endsWith(key.replace(/^(\.\.\/)+/, "")))
   const reached = new Set([first])
   const builtins = new Set()
+  const edges = new Map()
   const queue = [first]
-  while (queue.length > 0)
-    for (const edge of inputs[queue.shift()]?.imports ?? []) {
+  while (queue.length > 0) {
+    const from = queue.shift()
+    for (const edge of inputs[from]?.imports ?? []) {
       if (edge.kind === "dynamic-import") continue
       const key = target(edge.path)
       if (key === undefined && edge.external === true) {
@@ -133,11 +135,13 @@ export async function staticModuleSet(entry, options = {}) {
         continue
       }
       for (const next of key === undefined ? throughBarrel(resolve(edge.path)) : [key]) {
+        edges.set(from, [...(edges.get(from) ?? []), next])
         if (reached.has(next)) continue
         reached.add(next)
         queue.push(next)
       }
     }
+  }
   const shipped = [...reached].filter(kept)
   const keptBuiltins = new Set(
     shipped.flatMap((key) =>
@@ -158,8 +162,45 @@ export async function staticModuleSet(entry, options = {}) {
         return SCHEMA_LIBRARIES.some((library) => target.startsWith(`node_modules/${library}/`))
       }),
   ).length
-  return { set, reached: [...reached].map(name), schemaUsers, dropped: reached.size - shipped.length }
+  // The static edges walked, by module name: a test can ask which path reaches a module, and whether another one does.
+  const staticEdges = Object.fromEntries([...edges].map(([from, to]) => [name(from), [...new Set(to.map(name))]]))
+  return {
+    set,
+    reached: [...reached].map(name),
+    entry: name(first),
+    staticEdges,
+    schemaUsers,
+    dropped: reached.size - shipped.length,
+  }
 }
+
+// Deferred by P1b's design, static on dev since train 14: its devices.list imports the remote client, whose session control
+// reaches the thread contracts (measured on train 14's tip alone too). Owner: omo#15190, which empties and deletes this list.
+export const TRAIN_14_LISTING = "packages/omo-senpi/src/components/omo-sdk/devices/index.ts"
+export const STATIC_SINCE_TRAIN_14 = [
+  "create-params",
+  "fields",
+  "index",
+  "params",
+  "parse",
+  "permission-presets",
+  "results",
+  "state",
+].map((module) => `packages/omo-senpi/src/components/thread/contracts/${module}.ts`)
+export const STATIC_SINCE_TRAIN_14_CHAIN = [
+  "packages/omo-senpi/src/extension/omo-sdk.ts",
+  "packages/omo-senpi/src/components/omo-sdk/index.ts",
+  "packages/omo-senpi/src/components/omo-sdk/assembly.ts",
+  "packages/omo-senpi/src/components/omo-sdk/root/shipped.ts",
+  TRAIN_14_LISTING,
+  "packages/omo-senpi/src/components/remote/index.ts",
+  "packages/omo-senpi/src/components/remote/factories.ts",
+  "packages/omo-senpi/src/components/remote/client.ts",
+  "packages/omo-senpi/src/components/remote/sessions.ts",
+  "packages/omo-senpi/src/components/thread/control/port.ts",
+  "packages/omo-senpi/src/components/thread/tools/thread-state.ts",
+  "packages/omo-senpi/src/components/thread/contracts/index.ts",
+]
 
 export const staticSetDefinition = (row) =>
   `modules of ${row.output} that keep bytes in its output and are reached from the entry by static edges only, plus the node builtins a kept module imports; named by real path, layout-independent`

@@ -3,12 +3,14 @@ import type { AccountApi, SignInProcess } from "./account"
 import type { ConfigApi } from "./config"
 import type { Endpoint, OmoPrincipal, OmoSdkRoot } from "./contract"
 import type { DeviceServiceApi, DeviceServiceStatusPort } from "./device-service"
-import type { DevicesApi } from "./devices"
+import type { DeviceListing, DevicesApi } from "./devices"
 import type { ThreadNamespaceOptions, ThreadPorts } from "./root/threads"
 
 export type OmoSdkPorts = AccessPorts &
   ThreadPorts & {
     readonly deviceServiceStatus?: DeviceServiceStatusPort
+    /** The clock of devices.list's device-service client; absent, real timers. */
+    readonly remoteTimers?: DeviceListing["timers"]
     /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
     readonly signInProcess?: SignInProcess
   }

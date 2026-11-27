@@ -2,26 +2,6 @@
   "version": 2,
   "rows": [
     {
-      "section": "4.1",
-      "row": "A send repeated under one idempotency key",
-      "slice": "T1b"
-    },
-    {
-      "section": "4.1",
-      "row": "A steer's turn guard",
-      "slice": "T1a"
-    },
-    {
-      "section": "4.2",
-      "row": "`account.show`, `account.signInCheck` (reads)",
-      "slice": "A1b"
-    },
-    {
-      "section": "4.3",
-      "row": "The conditions on `install.setup.apply`",
-      "slice": "C1c"
-    },
-    {
       "section": "4.6",
       "row": "threads.resolve",
       "slice": "T1a; T1c for the alias"

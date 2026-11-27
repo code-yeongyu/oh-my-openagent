@@ -11,7 +11,6 @@ import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegist
 import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
 import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "./store-worker-sidecar"
 // The omo CLI reaches the anchor through this module, the one gateway import its architecture rule allows (G2).
-export { storeWorkerAnchor } from "./store-worker-sidecar"
 export type {
   DeclaredSessionOp,
   SessionCallableOp,

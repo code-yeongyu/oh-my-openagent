@@ -6,7 +6,7 @@ export type { SignedIn, SignInOptions, SignInProcess, UserCode, WhoAmI } from ".
 export type { ConfigStatus } from "./config"
 export type { OmoSdkRoot } from "./contract"
 export type { DeviceServiceStatus, DeviceServiceStatusPort } from "./device-service"
-export type { LiveDevice } from "./devices"
+export type { ListedDevice, LiveDevice } from "./devices"
 export type { OmoSdk, OmoSdkOptions, OmoSdkPorts, ShippedOmoSdk } from "./options"
 export type { OmoError, OmoErrorCode, OmoResult } from "./result"
 export type { CoreContext, CoreLoader, CoreLoaders, LauncherNamespace, NamespaceCore } from "./root/members"

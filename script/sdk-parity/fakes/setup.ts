@@ -10,6 +10,7 @@ import type { ScenarioRun, ScenarioSetup } from "../conformance-run"
 import type { TableScenario } from "../expectation"
 import { loadScenarioTable } from "../scenario-table"
 import { accountPorts } from "./account"
+import { deviceServicePort } from "./device-service"
 import { hostPort } from "./host"
 import { type FakeFsPort, type FakeProcessPort, fsPort, processPort } from "./process-fs"
 import { createRecorder, type Recorder } from "./recorder"
@@ -50,23 +51,21 @@ async function* endingWith(stream: AsyncIterable<unknown>, end: () => Promise<vo
   }
 }
 
-function callScoped(target: unknown, begin: () => void, end: () => Promise<void>): unknown {
+function callScoped(target: unknown, begin: () => Promise<void>, end: () => Promise<void>): unknown {
   if (typeof target !== "object" || target === null) return target
   return new Proxy(target, {
     get: (object, key, receiver) => {
       const value = Reflect.get(object, key, receiver) as unknown
       if (typeof value !== "function") return callScoped(value, begin, end)
       return (...args: unknown[]) => {
-        begin()
-        let answer: unknown
-        try {
-          answer = Reflect.apply(value, object, args)
-        } catch (error) {
-          void end()
-          throw error
-        }
-        if (isStream(answer)) return endingWith(answer, end)
-        return Promise.resolve(answer).finally(end)
+        const started = begin().then(() => Reflect.apply(value, object, args) as unknown)
+        return started.then(
+          (answer) => (isStream(answer) ? endingWith(answer, end) : Promise.resolve(answer).finally(end)),
+          async (error: unknown) => {
+            await end()
+            throw error
+          },
+        )
       }
     },
   })
@@ -79,6 +78,9 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
   const elsewhere = join(scenarioRoot, "elsewhere")
   const agentDir = join(home, ".omo", "agent")
   const remote = remotePort(recorder)
+  const usesDeviceService =
+    scenario.row === "devices.list" || (scenario.given ?? []).some((entry) => entry.port === "deviceService")
+  const deviceService = deviceServicePort(recorder, usesDeviceService)
   const fakes: ScenarioFakes = {
     recorder,
     home,
@@ -87,7 +89,12 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     fs: fsPort(recorder, { home, agentDir }),
   }
   const sdkOptions: OmoSdkOptions = {
-    env: { HOME: home, OMO_SERVICE_API_URL: "https://accounts.example.test", OMO_CODING_AGENT_DIR: agentDir },
+    env: {
+      HOME: home,
+      OMO_SERVICE_API_URL: "https://accounts.example.test",
+      OMO_CODING_AGENT_DIR: agentDir,
+      OMO_DEVICE_SERVICE_STATE_DIR: deviceService.stateDir,
+    },
     cwd: home,
     home,
     agentDir,
@@ -101,18 +108,26 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
       store: storePort(recorder, () => FIXED_NOW),
       remote: remote.remote,
       now: () => FIXED_NOW,
+      remoteTimers: deviceService.clock,
     },
   }
   const root = assembleOmoSdk(sdkOptions, options.cores === undefined ? {} : { cores: options.cores(fakes) })
   if (recorder.given("session")["closed"] === true) root.close()
-  const begin = (): void => {
+  const begin = async (): Promise<void> => {
     mkdirSync(agentDir, { recursive: true })
+    await deviceService.start()
   }
   const end = async (): Promise<void> => {
     rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
+    await deviceService.stop()
   }
-  return { root: callScoped(root, begin, end), calls: recorder.calls, sandbox: scenarioRoot }
+  return {
+    root: callScoped(root, begin, end),
+    calls: recorder.calls,
+    sandbox: scenarioRoot,
+    ...(usesDeviceService ? { after: (ms: number, fire: () => void) => deviceService.clock.after(ms, fire) } : {}),
+  }
 }
 
 export function scenarioRuns(

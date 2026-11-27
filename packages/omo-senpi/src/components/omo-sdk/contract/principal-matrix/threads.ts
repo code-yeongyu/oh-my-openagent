@@ -42,6 +42,35 @@ export const THREAD_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.1",
+    capability:
+      "A send repeated under one idempotency key on one thread: one book in the core send operation, scoped by thread, key and principal class. A repeat delivers nothing and answers the delivery's identifiers (message id, turn id) and its kind, never message text; the kind is the one recorded when the first call was answered until the truthful-delivery slice (D1) merges, and the delivery's current kind from then on, as the first-party design's amendment 16 states; a different message under the same key answers the typed conflict with no text from either message",
+    slug: "send-idempotency",
+    rows: [],
+    noRow:
+      "a rule of the core send operation, not a permission: who may send is decided by the send lines of this section; the dedup slice (issue 15021) proves the rule on the three surfaces",
+    cells: columns({
+      people: allow("one class with session: a repeat through any surface is one delivery"),
+      session: allow("the same class as person and script"),
+      connector: allow("its own class"),
+      service: allow("its own class"),
+    }),
+  },
+  {
+    section: "4.1",
+    capability:
+      "A steer's turn guard (`expected_turn_id`): the id is a concurrency guard, not a permission, and who must supply it is decided once in the core, before any transport, the same on every leg",
+    slug: "steer-turn-guard",
+    rows: [],
+    noRow: "a concurrency guard, not a permission: decided in the core send operation; slices T1a and T1b prove it",
+    cells: columns({
+      people: allow("may omit it: the core steers the running turn"),
+      session: allow("must name the turn: a session that omits it is refused as the steer tool refuses today"),
+      connector: NA,
+      service: NA,
+    }),
+  },
+  {
+    section: "4.1",
     capability: "`self` as an address",
     slug: "self-address",
     rows: ["threads.read"],

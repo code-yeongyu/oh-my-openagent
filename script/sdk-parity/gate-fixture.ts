@@ -8,11 +8,24 @@ import type { Scenario } from "./scenarios"
 
 // The shared fixture of the gate's negative controls: the real rows and the original manifest, one scenario on
 // threads.send, and two fixed heads, so each control changes exactly one input of gateReport. A control judges only the
-// rows it names: every row's scenario list starts empty and every row starts unresolved, as in the original baseline, so
-// a row another slice clears or fills (with its own runs) never reaches a control's verdict. The live manifest and the
-// real scenario lists are judged by the gate itself, over every run (gate-cli).
+// rows it names, except the rows the tree really builds: every other row's scenario list starts empty and every row in
+// the original baseline starts unresolved, so a row another slice fills later never reaches a control's verdict. A row
+// built today (filled per scenario-fill-owners.json, not in the original baseline) keeps its real scenarios, and the
+// controls hand the gate its real run evidence (conformance-fixture.ts headEvidence), so they judge the tree that ships.
 
-export const rows = allRows(loadDomainFiles()).map((row) => ({ ...row, scenarios: { effect: [], refusal: [] } }))
+const FILLED = new Set(
+  Object.keys(
+    (
+      JSON.parse(readFileSync(join(REPO_ROOT, "script/sdk-parity/scenario-fill-owners.json"), "utf8")) as {
+        readonly rows: Readonly<Record<string, string>>
+      }
+    ).rows,
+  ),
+)
+export const rows = allRows(loadDomainFiles()).map((row) =>
+  FILLED.has(row.id) ? row : { ...row, scenarios: { effect: [], refusal: [] } },
+)
+export const filledRows = rows.filter((row) => FILLED.has(row.id))
 export const text = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8")
 export const original = text(ORIGINAL_PATH)
 export const unresolved = JSON.parse(original) as Baseline

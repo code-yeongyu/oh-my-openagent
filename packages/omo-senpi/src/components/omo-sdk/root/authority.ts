@@ -2,6 +2,7 @@ import type { OmoFailure, OmoPrincipal, RootCallKey } from "../contract"
 import { ROOT_CALL_ANSWERS } from "../contract/call-answers"
 import { OMO_CODE_REGISTRY, type OmoCode } from "../contract/codes"
 import { PRINCIPAL_MATRIX } from "../contract/principal-matrix"
+import { HELD_ALLOWS } from "./held-allows"
 import { PENDING_CELLS } from "./pending-cells"
 
 /** The facts of a root a matrix line may be conditioned on: the root options it was built with. */
@@ -45,7 +46,15 @@ export function boundaryRefusals(
           details: { principal: principal.kind },
         })
   }
+  for (const entry of HELD_ALLOWS.filter((held) => held.principal === principal.kind))
+    refusals.set(entry.call, {
+      code: "sender_not_allowed",
+      message: entry.message,
+      next_action: entry.next_action,
+      details: { principal: principal.kind, reason: "held" },
+    })
   for (const call of UNLINED_CALLS) {
+    if (refusals.has(call)) continue
     if (PENDING_CELLS.some((pending) => pending.call === call && pending.principal === principal.kind)) continue
     refusals.set(call, {
       code: "sender_not_allowed",

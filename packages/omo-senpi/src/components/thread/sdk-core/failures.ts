@@ -30,7 +30,7 @@ export function thrown(error: unknown): Failure {
   if (message === THREAD_CLIENT_UNAVAILABLE)
     return fail(
       "internal_error",
-      "The thread client of this omo install could not be loaded.",
+      "The thread client of this omo installation could not be loaded.",
       "Reinstall omo, then call it again.",
     )
   if (message.startsWith("host_unavailable:"))

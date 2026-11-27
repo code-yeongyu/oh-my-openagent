@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { type GitPort, offenderBaseProblems, probeBase, registryBaseProblems } from "./base-probe"
 import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
+import { headEvidence } from "./conformance-fixture"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 
 // The probe decides whether the base-tree checks run (design lane ruling on review 6064044043). Both directions are
@@ -17,7 +18,7 @@ const head = {
   originalText: file(ORIGINAL_PATH),
   pinText: file(PIN_PATH),
   unresolved,
-  evidence: [],
+  evidence: await headEvidence(),
 }
 
 // A checkout that has the base: merge-base answers it, its tree exists, and show answers the base's files.

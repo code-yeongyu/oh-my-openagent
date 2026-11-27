@@ -14,6 +14,7 @@ type Schema = {
   readonly maximum?: number
   readonly pattern?: string
   readonly required?: readonly string[]
+  readonly "x-callback"?: unknown
 }
 
 /**
@@ -37,6 +38,8 @@ const PATTERN_SAMPLES: Readonly<Record<string, string>> = { "^[a-z][a-z0-9_]{1,4
  * (a field with a const, an enum, a pattern or a format check gets a value of its own).
  */
 export function sampleOf(schema: Schema, text: string, field = "", optional = true): unknown {
+  // A callback field takes a function (contract/callback.ts): a string there is an input the core cannot call.
+  if (schema["x-callback"] !== undefined) return () => undefined
   if (schema.const !== undefined) return schema.const
   if (schema.enum !== undefined) return schema.enum[0]
   if (schema.anyOf !== undefined)

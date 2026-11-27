@@ -677,6 +677,38 @@
         "refusal": []
       },
       "modules": []
+    },
+    {
+      "id": "account.devices",
+      "kind": "capability",
+      "sdk": "account.devices",
+      "today": "yes",
+      "slices": [
+        "P1b"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "cli": "no verb of its own: `omo account devices` lists the account's devices on the device service (devices.list)",
+        "tool": "Tool omitted: a session reads it from the SDK in an eval cell"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [
+          "account.devices/lists-the-accounts-devices"
+        ],
+        "refusal": [
+          "account.devices/account-devices-refuses-connector",
+          "account.devices/account-devices-refuses-service"
+        ]
+      },
+      "modules": [],
+      "note": "Cancellation: the root answers the caller's signal (cancelled) and deadline_ms (timeout) at once; the account request itself is a read that the caller's signal does not abort at this head and that close() ends. Passing the signal into the account request is an acceptance row of the account slice (A1b)."
     }
   ],
   "tables": [

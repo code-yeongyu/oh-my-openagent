@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { conformanceProblems } from "./conformance"
-import { built, CONTEXT, open, pair, run, scenario } from "./conformance-fixture"
+import { built, CONTEXT, open, pair, run, scenario, headEvidence, headScenarios } from "./conformance-fixture"
 import { runEffectScenarios, type ScenarioRun } from "./conformance-run"
 import type { ObservedCall, TableScenario } from "./expectation"
 import { rows } from "./gate-fixture"
@@ -16,7 +16,7 @@ const host = (op: string, args: Record<string, unknown> = {}): ObservedCall => (
 const withLocate = (change: Partial<Row>): Row[] =>
   rows.map((row) => (row.id === "threads.locate" ? { ...built, ...change } : row))
 const problems = async (runs: readonly ScenarioRun[], target: readonly Row[]) =>
-  conformanceProblems(target, open, await runEffectScenarios(target, runs), CONTEXT)
+  conformanceProblems(target, open, [...(await headEvidence()), ...(await runEffectScenarios(target, runs))], CONTEXT)
 
 describe("sequences: a retry after a lost acknowledgement (H1)", () => {
   // A fake host that opens a session once per key: the retry under the same key answers the first thread and opens none.
@@ -98,9 +98,8 @@ describe("the success discriminator and step shapes (review 6062344773)", () => 
     }
     expect(
       tableProblems(withLocate({}), [
-        stepped,
-        scenario("all-scope", true),
-        scenario("other-device", undefined, "other_device"),
+        ...[stepped, scenario("all-scope", true), scenario("other-device", undefined, "other_device")],
+        ...headScenarios,
       ]),
     ).toEqual([
       "scenario threads.locate/by-id step 2: a refusal scenario names its code",

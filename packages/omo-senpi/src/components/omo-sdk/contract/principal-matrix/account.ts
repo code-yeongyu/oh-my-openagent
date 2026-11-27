@@ -3,6 +3,10 @@ import { allow, columns, type MatrixLine, NA, refuse } from "./types"
 // Section 4.2 of the security design (#14945): devices, account, device service, sync.
 const CREDENTIAL_CHECK = "once its output is shown to hold no credential"
 
+/** Revision 22's row for the account-service device read, which the remote SDK keeps apart from `devices.list`. */
+export const ACCOUNT_DEVICES_ROW =
+  "`account.devices` (a member the remote SDK adds to the shipped surface: the devices registered to the account, read from the account service, with revoked ones left out. It is the read the shipped SDK's `devices.list` makes today. The remote SDK (#14881) moves the shipped `devices.list` to the device service, where the root's `devices.list` of the row above already reads, and keeps the account-service read under this name, so the two are separate calls with a row each)"
+
 export const ACCOUNT_LINES: readonly MatrixLine[] = [
   {
     section: "4.2",
@@ -24,6 +28,30 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
     slug: "service-read",
     rows: ["deviceService.status", "deviceService.info", "deviceService.control", "deviceService.wake"],
     cells: columns({ people: allow(), session: allow(CREDENTIAL_CHECK), connector: allow(), service: allow() }),
+  },
+  {
+    section: "4.2",
+    capability: ACCOUNT_DEVICES_ROW,
+    slug: "account-devices",
+    rows: ["account.devices"],
+    cells: columns({
+      people: allow(),
+      session: allow("through the SDK in an eval cell, as for account.whoami; the answer holds no credential"),
+      connector: refuse("sender_not_allowed", { note: "new, as for the other account reads" }),
+      service: refuse("sender_not_allowed", { note: "as for the other account reads" }),
+    }),
+  },
+  {
+    section: "4.2",
+    capability: "`account.show`, `account.signInCheck` (reads)",
+    slug: "identity-read",
+    rows: ["account.show", "account.signInCheck"],
+    cells: columns({
+      people: allow(),
+      session: allow("once the non-disclosure test run for that principal shows the output holds no credential"),
+      connector: refuse("sender_not_allowed", { note: "new, decided by the security owner of record" }),
+      service: refuse("sender_not_allowed", { note: "new, decided by the security owner of record" }),
+    }),
   },
   {
     section: "4.2",

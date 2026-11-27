@@ -1,13 +1,16 @@
-import type { ConformanceContext } from "./conformance"
-import type { ScenarioRun } from "./conformance-run"
+import type { ConformanceContext, EffectEvidence } from "./conformance"
+import { loadScenarioRuns, PORT_CONTEXT, runEffectScenarios, type ScenarioRun } from "./conformance-run"
 import type { ObservedCall, TableScenario } from "./expectation"
-import { rows, unresolved } from "./gate-fixture"
+import { loadScenarioTable } from "./scenario-table"
+import { filledRows, rows, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"
 
 // The shared fixture of the conformance controls: threads.locate counted as built, a fake host whose listSessions read
 // is observed, and a context classifying the host's operations (listSessions a read, kill and spawn effects).
 
-export const CONTEXT: ConformanceContext = { effects: { host: ["kill", "spawn"] } }
+// The fixture's fake host classifies kill and spawn as effects; every other port keeps the real classification, so a row
+// the tree really builds is judged as the gate judges it.
+export const CONTEXT: ConformanceContext = { effects: { ...PORT_CONTEXT.effects, host: ["kill", "spawn"] } }
 
 const locate = rows.find((row) => row.id === "threads.locate")
 if (locate === undefined) throw new Error("no threads.locate row")
@@ -58,3 +61,18 @@ export const pair = [
   run(scenario("all-scope", true)),
   run(scenario("other-device", undefined, "other_device")),
 ]
+
+let headRuns: Promise<readonly EffectEvidence[]> | undefined
+/** The head's real run evidence for every row the tree builds today, run once per process through the real drivers. */
+export const headEvidence = (): Promise<readonly EffectEvidence[]> =>
+  (headRuns ??= loadScenarioRuns().then((runs) =>
+    runEffectScenarios(
+      filledRows,
+      runs.filter((run) => filledRows.some((row) => row.id === run.scenario.row)),
+    ),
+  ))
+
+/** The real table scenarios of the rows the tree builds today, for a control that passes a table of its own. */
+export const headScenarios: readonly TableScenario[] = loadScenarioTable()
+  .flatMap((file) => file.scenarios)
+  .filter((entry) => filledRows.some((row) => row.id === entry.row))

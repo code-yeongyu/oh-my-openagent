@@ -20,13 +20,13 @@
           }
         },
         {
-          "port": "session",
+          "port": "deviceService",
           "op": "devices.list"
         }
       ]
     },
     {
-      "id": "devices.list/signed-out",
+      "id": "devices.list/no-sdk-credential",
       "row": "devices.list",
       "kind": "refusal",
       "refusal": "signed_out",
@@ -46,11 +46,19 @@
       ]
     },
     {
-      "id": "devices.list/session-ended",
+      "id": "devices.list/device-service-signed-out",
       "row": "devices.list",
       "kind": "refusal",
-      "refusal": "session_ended",
+      "refusal": "signed_out",
       "input": {},
+      "given": [
+        {
+          "port": "deviceService",
+          "state": {
+            "service": "signed_out"
+          }
+        }
+      ],
       "expect": [
         {
           "port": "credentialStore",
@@ -64,14 +72,9 @@
           }
         },
         {
-          "port": "session",
+          "port": "deviceService",
           "op": "devices.list",
-          "count": 1,
-          "result": {
-            "error": {
-              "status": 401
-            }
-          }
+          "count": 1
         }
       ]
     },
@@ -95,11 +98,19 @@
       ]
     },
     {
-      "id": "devices.list/service-unreachable",
+      "id": "devices.list/no-device-service",
       "row": "devices.list",
       "kind": "refusal",
-      "refusal": "service_unreachable",
+      "refusal": "device_service_unavailable",
       "input": {},
+      "given": [
+        {
+          "port": "deviceService",
+          "state": {
+            "service": "absent"
+          }
+        }
+      ],
       "expect": [
         {
           "port": "credentialStore",
@@ -113,12 +124,42 @@
           }
         },
         {
-          "port": "session",
+          "port": "deviceService",
           "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.list/device-service-not-answering",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "device_service_unavailable",
+      "input": {},
+      "given": [
+        {
+          "port": "deviceService",
+          "state": {
+            "service": "silent"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
           "count": 1,
           "result": {
-            "error": "request_failed"
+            "device": {
+              "id": "dev-1",
+              "name": "laptop"
+            }
           }
+        },
+        {
+          "port": "deviceService",
+          "op": "devices.list",
+          "count": 0
         }
       ]
     },

@@ -1,3 +1,5 @@
+import { ACCOUNT_DEVICES_ROW } from "../../packages/omo-senpi/src/components/omo-sdk/contract/principal-matrix/account"
+import { SETUP_APPLY_CONDITIONS_ROW } from "../../packages/omo-senpi/src/components/omo-sdk/contract/principal-matrix/host"
 import type { AwaitingRevision, CallAlias } from "./authority-check"
 import type { Taken } from "./custody-check"
 
@@ -173,6 +175,18 @@ export const CALL_ALIASES: readonly CallAlias[] = [
     token: "account.keys.status",
     calls: [],
     why: "named as the row's exception, not as one of its calls",
+  },
+  {
+    docRow: ACCOUNT_DEVICES_ROW,
+    token: "devices.list",
+    calls: [],
+    why: "named as the separate read this row is told apart from; its own line is the account-read row above",
+  },
+  {
+    docRow: SETUP_APPLY_CONDITIONS_ROW,
+    token: "install.setup.plan",
+    calls: [],
+    why: "named as the call whose answer is the only plan apply takes; the conditions govern install.setup.apply alone",
   },
 ]
 

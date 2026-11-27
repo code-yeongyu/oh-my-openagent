@@ -51,6 +51,7 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
     ...(options.home === undefined ? {} : { home: options.home }),
     ...(ports.signInProcess === undefined ? {} : { signInProcess: ports.signInProcess }),
     ...(ports.deviceServiceStatus === undefined ? {} : { deviceServiceStatus: ports.deviceServiceStatus }),
+    ...(ports.remoteTimers === undefined ? {} : { remoteTimers: ports.remoteTimers }),
   })
   const threads = threadsServing(options, env, cwd, principal, true, assembly.loadThreadsRuntime)
   const root = assembleRoot(
