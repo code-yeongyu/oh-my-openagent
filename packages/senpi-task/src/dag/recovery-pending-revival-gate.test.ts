@@ -17,11 +17,19 @@ import {
   nodeStates,
   recoverRun,
   reopenOverCapacity,
+  hangSideAfter,
+  PARENT,
+  seedRun,
   seedStaleChildOfRemovedNode,
+  attachedTask,
 } from "./__fixtures__/pending-revival-run"
 import { runId } from "./__fixtures__/reattached-run"
 import { subscribeDagJournal } from "./journal"
+import { settled } from "../lifecycle/__fixtures__/deferred-revival-harness"
+import type { DagRunRecordV1 } from "./manager"
+import { isLiveTask } from "./scheduler-context"
 import type { DagFileStore } from "./store"
+import type { DagNodeId } from "./types"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
 function overCapacity() {
@@ -38,19 +46,30 @@ afterEach(() => {
 
 const WAITING = ["k-hang:running", "k-after:pending"]
 
-/** The real manager, except that a stop of `unconfirmed` is answered cancel_pending and changes nothing. */
-function withUnconfirmedStop(manager: TaskManager, unconfirmed: string): TaskManager {
+/** The real manager with some of its methods replaced. */
+function managerWith(manager: TaskManager, overrides: Partial<TaskManager>): TaskManager {
   return new Proxy(manager, {
     get(target, property) {
-      if (property === "cancelTask") {
-        return (taskId: string, ...rest: unknown[]) =>
-          taskId === unconfirmed
-            ? Promise.resolve({ kind: "cancel_pending", task_id: taskId, reason: "child unreachable" })
-            : (target.cancelTask as (...args: unknown[]) => unknown)(taskId, ...rest)
-      }
+      const override: unknown = Reflect.get(overrides, property)
+      if (override !== undefined) return override
       const value: unknown = Reflect.get(target, property, target)
       return typeof value === "function" ? value.bind(target) : value
     },
+  })
+}
+
+/** The real manager, except that a stop of `unconfirmed` is answered cancel_pending and changes nothing. */
+function withUnconfirmedStop(manager: TaskManager, unconfirmed: string): TaskManager {
+  return managerWith(manager, {
+    cancelTask: (taskId, ...rest) =>
+      taskId === unconfirmed
+        ? Promise.resolve({
+            kind: "cancel_pending" as const,
+            task_id: taskId,
+            previous_status: "running" as const,
+            reason: "child unreachable",
+          })
+        : manager.cancelTask(taskId, ...rest),
   })
 }
 
@@ -62,6 +81,17 @@ function nodeFlag(store: DagFileStore, nodeId: string): Promise<string> {
     if (event.diagnostic.nodeId !== nodeId) return
     stop()
     seen.resolve(event.diagnostic.message)
+  })
+  return seen.promise
+}
+
+/** Resolves on the run's next journal event of `type`, subscribed before the action. */
+function journalEvent(store: DagFileStore, type: string): Promise<undefined> {
+  const seen = Promise.withResolvers<undefined>()
+  const stop = subscribeDagJournal(store, runId, (event) => {
+    if (event.type !== type) return
+    stop()
+    seen.resolve(undefined)
   })
   return seen.promise
 }
@@ -96,7 +126,7 @@ describe("the child gate on a waiting node's revived child (#15150, stack review
     expect(nodeStates(store)).toEqual(["k-hang:completed", "k-after:completed"])
   })
 
-  test("#given a stale child whose stop is not confirmed #when the waiting node's child is revived #then the node keeps waiting, the survivor is flagged, and the node follows once the stale stop lands", async () => {
+  test("#given a stale child whose stop is not confirmed #when the waiting node's child is revived #then the node follows its own child to completion with the survivor flagged, and the dependent's admission is refused until the survivor stops", async () => {
     // given
     const f = overCapacity()
     const { hang, side, store } = await reopenOverCapacity(f)
@@ -107,20 +137,65 @@ describe("the child gate on a waiting node's revived child (#15150, stack review
     // when
     await freeSlot(f, side)
     await lifecycleRetryTick(f)
-    const outcome = await bounded(Promise.race([flagged, run.settled.then(() => "settled")]))
 
-    // then - nothing failed, nothing of the node's own was stopped, the survivor is named
-    expect(outcome).toContain(stale)
-    expect(nodeStates(store)).toEqual(WAITING)
-    expect(f.store.load(hang)?.status).toBe("running")
+    // then - the survivor is named on the node, and the node follows its own child either way
+    expect(await bounded(Promise.race([flagged, run.settled.then(() => "settled")]))).toContain(stale)
     expect(f.store.load(stale)?.status).toBe("running")
+    f.resumedHandles.get(hang)?.settle({ status: "completed", finalResponse: "hang done" })
+    expect((await bounded(run.settled)).record?.status).toBe("failed")
+    expect(nodeStates(store)).toEqual(["k-hang:completed", "k-after:failed:stale_attempt_alive"])
 
-    // when - the stale child's stop lands later (its host confirms the close)
+    // when - the survivor stops, and the refused dependent is retried
     f.store.mutate(stale, (record) => ({ ...record, status: "cancelled" }))
-    await finishRun(f, store, hang)
+    const afterTask = attachedTask(store, "k-after")
+    const reentry = run.scheduler.retryNode(runId, ["k-after" as DagNodeId])
+    f.runner.handles.get(await bounded(afterTask))?.settle({ status: "completed", finalResponse: "after done" })
 
     // then
-    expect((await bounded(run.settled)).record?.status).toBe("completed")
+    expect((await bounded(reentry.run)).status).toBe("completed")
+    expect(nodeStates(store)).toEqual(["k-hang:completed", "k-after:completed"])
+  })
+
+  test("#given a waiting node's stale-child fence while a sibling's owned start is in flight #when the run is cancelled #then the cancel waits for that start and stops the started child", async () => {
+    // given - k-side's start is held open; k-hang waits for its task host
+    const f = liveParentFixture("host-session", { default_concurrency: 3 })
+    fixtures.push(f)
+    const hang = await f.start()
+    const store = seedRun(f, { "k-hang": hang }, hangSideAfter)
+    f.host.daemon.alive = false
+    await f.restart().reconcileOnSessionStart(PARENT)
+    // An owned start in flight before its child exists (an admission-lease wait, a slow task host)
+    const startEntered = Promise.withResolvers<undefined>()
+    const startGate = Promise.withResolvers<undefined>()
+    const taskManager = managerWith(f.manager, {
+      startOwned: async (spec, owner) => {
+        startEntered.resolve(undefined)
+        await startGate.promise
+        return f.manager.startOwned(spec, owner)
+      },
+    })
+    const run = await recoverRun(f, store, { taskManager })
+    await bounded(startEntered.promise)
+    seedStaleChildOfRemovedNode(f)
+
+    // when - the waiting node's child is revived (the gate refuses stale_live), then a cancel arrives
+    f.host.daemon.alive = true
+    f.state.revivable = true
+    await lifecycleRetryTick(f)
+    await settled()
+    const cancelledEvent = journalEvent(store, "dag.run.cancelled")
+    const cancelling = run.scheduler.cancel(runId, "user cancel")
+    await bounded(Promise.race([cancelledEvent, settled().then(settled).then(settled)]))
+    startGate.resolve(undefined)
+    await bounded(cancelling)
+    await bounded(run.settled)
+
+    // then - nothing of the run is left live, the sibling's started child included
+    const owned = f.manager.findOwnedTasks({ kind: "dag", runId })
+    const sideTask = owned.find((task) => task.owner?.nodeId === "k-side")
+    expect(sideTask?.status).toBe("cancelled")
+    expect(owned.filter((task) => isLiveTask(task)).map((task) => task.task_id)).toEqual([])
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("cancelled")
   })
 
   test("#given the waiting node's own child is not its current attempt #when it is revived and its stop is confirmed #then it is stopped and the node fails stale_attempt_alive", async () => {

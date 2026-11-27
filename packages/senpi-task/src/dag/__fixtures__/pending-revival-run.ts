@@ -35,17 +35,28 @@ export const hangThenAfter: DagDefinition = {
   nodes: [node("k-hang"), node("k-after", ["k-hang"])],
 }
 
-export function seedRun(f: Fixture, children: Readonly<Record<string, string>>): DagFileStore {
+// k-hang -> k-after plus k-side, a root ready at recovery: admission starts it beside a waiting k-hang.
+export const hangSideAfter: DagDefinition = {
+  key: "pending-revival-side",
+  name: "pending revival with a ready sibling",
+  nodes: [node("k-hang"), node("k-side"), node("k-after", ["k-hang"])],
+}
+
+export function seedRun(
+  f: Fixture,
+  children: Readonly<Record<string, string>>,
+  definition: DagDefinition = hangThenAfter,
+): DagFileStore {
   const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-pending-revival-"))
   roots.push(directory)
   const store = createDagFileStore(ownedTaskState(directory))
   const states: Record<string, Partial<DagNode>> = {}
-  for (const entry of hangThenAfter.nodes) {
+  for (const entry of definition.nodes) {
     const taskId = children[entry.id]
     if (taskId !== undefined) f.store.mutate(taskId, (record) => ({ ...record, owner: owner(entry.id) }))
     states[entry.id] = taskId === undefined ? { state: "pending" } : { state: "running", taskId, attempt: 1 }
   }
-  const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(hangThenAfter, states)
+  const { previousLeaseHolderPid: _previous, ...paused } = pausedRecord(definition, states)
   store.writeCheckpoint(runId, {
     ...paused,
     parentSessionId: PARENT,
