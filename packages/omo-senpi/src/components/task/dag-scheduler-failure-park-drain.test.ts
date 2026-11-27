@@ -4,6 +4,7 @@ import * as fs from "node:fs"
 import { parentSessionId } from "../../../../senpi-task/src/dag/__fixtures__/controlled-dag-e2e"
 import { DEAD_HOST, THIS_HOST, unscheduledRun } from "../../../../senpi-task/src/dag/__fixtures__/stack-composition"
 import { DAG_SCHEDULER_FAILED_PAUSE_REASON } from "../../../../senpi-task/src/dag/events"
+import type { DagRecoveryOutcome } from "../../../../senpi-task/src/dag/recovery"
 import { endedChildClosure } from "./dag-paused-cancel"
 import { createSchedulerFailureHandler } from "./dag-scheduler-failure"
 
@@ -44,8 +45,9 @@ async function runLeftRunningByAFailedScheduler(
     children: taskManager,
     closure: endedChildClosure(taskManager),
     // This session's recovery takes the run; its scheduler then fails too (the second of one sequence).
-    recover: async () => {
+    recover: async (): Promise<readonly DagRecoveryOutcome[]> => {
       state.held = true
+      return [{ runId: run.runId, kind: "resumed" }]
     },
   })
   const failTwice = async () => {
