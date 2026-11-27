@@ -91,14 +91,25 @@ describe("#given <device>/<thread id> on B that B's listing does not show #when 
   })
 })
 
-describe("characterization of current behaviour: a closed copy of an id here while B lists it live", () => {
-  test("#given the closed copy here, its transcript absent #when thread_read names the id #then this device's copy answers not_found and B is never asked", async () => {
+describe("#given a closed copy of an id here while B lists it live #when a tool names the bare id #then B's live session is the target, never the copy", () => {
+  test("#given the closed copy here #when thread_read names the id #then B is asked and answers", async () => {
     const two = createTwoDevices()
     cleanups.push(two.cleanup)
-    expect(await two.run("thread_read", { thread: T.stale })).toMatchObject({
-      kind: "error",
-      error: { code: "not_found" },
+    expect(await two.run("thread_read", { thread: T.stale })).toMatchObject({ kind: "ok", device: B.id })
+    expect(two.account.sent.filter((entry) => entry.device === B.id).length).toBeGreaterThan(0)
+  })
+
+  test("#given the closed copy here #when thread_send names the id #then B admits the message and nothing is queued for the copy", async () => {
+    const two = createTwoDevices()
+    cleanups.push(two.cleanup)
+    expect(await two.run("thread_send", { thread: T.stale, message: "synthetic" })).toMatchObject({
+      kind: "ok",
+      device: B.id,
     })
-    expect(two.account.sent.filter((entry) => entry.device === B.id)).toEqual([])
+    const admits = two.account.sent.filter(
+      (entry) => entry.device === B.id && entry.rpc?.["type"] === "admit_external_message",
+    )
+    expect(admits.length).toBe(1)
+    expect(two.tools.enqueuedFor(T.stale)).toBe(0)
   })
 })

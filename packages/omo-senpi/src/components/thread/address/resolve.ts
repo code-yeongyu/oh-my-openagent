@@ -11,7 +11,7 @@ import { relayAddressEntry } from "../remote/address-book"
 import type { RemoteDevice, RemoteThreadSurface } from "../remote/ports"
 import { remoteReady } from "../remote/remote-ops"
 import { accountDevices, readAccount, readRoster, rosterAccount, type Account, type Ready } from "./account"
-import { deviceNameOf, resolveBare, type AccountAttempt } from "./bare"
+import { deviceNameOf, holdersRefusal, resolveBare, type AccountAttempt } from "./bare"
 import { deviceRows, resolveAccountDevice } from "./device"
 import { resolveOnDevice } from "./on-device"
 import { pinned } from "./probe"
@@ -146,35 +146,18 @@ async function otherHolder(
     )
   const account = attempt.account
   const thread = hit.entry.thread_id
-  const byDevice = new Map(
-    [
-      ...ctx.local.filter((entry) => entry.thread_id === thread),
-      ...account.rows
-        .filter((row) => row.device !== account.here && (row.durable_id ?? "") === thread)
-        .map((row) => relayAddressEntry(row)),
-    ].map((entry) => [entry.transport?.row.device ?? "here", entry] as const),
-  )
-  if (byDevice.size <= 1) return undefined
-  return withAddresses(
-    {
-      kind: "error",
-      ...threadToolFailure(
-        "ambiguous_target",
-        `Session ${thread} is listed on more than one device and nothing names which one sent it; none was picked.`,
-        "Address the session on one device with <device>/<session id>.",
-      ),
-      candidates: [...byDevice].map(([device, entry]) => ({
-        thread,
-        name: entry.name,
-        cwd: entry.cwd,
-        preview: entry.preview ?? "",
-        updatedAt: entry.updated_at,
-        state: entry.status,
-        device,
-      })),
-    },
-    account.here,
-    deviceNameOf(account),
+  const holders = [
+    ...ctx.local.filter((entry) => entry.thread_id === thread),
+    ...account.rows
+      .filter((row) => row.device !== account.here && (row.durable_id ?? "") === thread)
+      .map((row) => relayAddressEntry(row)),
+  ]
+  if (new Set(holders.map((entry) => entry.transport?.row.device ?? "here")).size <= 1) return undefined
+  return holdersRefusal(
+    thread,
+    holders,
+    account,
+    `Session ${thread} is listed on more than one device and nothing names which one sent it; none was picked.`,
   )
 }
 

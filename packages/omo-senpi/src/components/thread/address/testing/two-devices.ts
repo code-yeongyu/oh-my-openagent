@@ -160,6 +160,8 @@ export type TwoDeviceOptions = {
   readonly silent?: readonly string[]
   /** The device service state (default connected). */
   readonly plan?: string
+  /** B lists the stale copy's id as an ended session instead of a live one. */
+  readonly staleEndedOnB?: boolean
 }
 
 /**
@@ -175,7 +177,12 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.fix === true ? [{ device: FIX.id, label: FIX.name, online: true }] : []),
     ...(options.quietThird === true ? [{ device: QUIET.id, label: QUIET.name, online: true }] : []),
   ]
-  const rows = [...B_ROWS, ...(options.fix === true ? [FIX_ROW] : [])]
+  const rows = [
+    ...B_ROWS.map((entry) =>
+      options.staleEndedOnB === true && entry.durable_id === T.stale ? { ...entry, state: "ended" } : entry,
+    ),
+    ...(options.fix === true ? [FIX_ROW] : []),
+  ]
   const aliases = new Map<string, AliasHolder>([
     [ALIAS.onB, { session_id: T.bLive, device: B.id }],
     [ALIAS.here, { session_id: T.hereLive, device: HERE.id }],
