@@ -6,7 +6,7 @@ export type TaskLookup = {
   list(): readonly TaskRecord[]
 }
 
-export function ownsTask(sessionId: string, record: TaskRecord): boolean {
+function ownsTask(sessionId: string, record: TaskRecord): boolean {
   return sessionId === record.parent_session_id || sessionId === record.root_session_id
 }
 
