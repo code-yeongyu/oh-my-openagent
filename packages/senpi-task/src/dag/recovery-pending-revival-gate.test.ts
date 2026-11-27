@@ -1,0 +1,167 @@
+// #15150 stack review 1: when a waiting node's child is revived, the child gate may refuse to follow it.
+// A stale live child of the run (a superseded attempt or a removed node) is rule 1's: it is stopped by
+// the scheduler's own fence and the node follows its own child; a stale child whose stop is not confirmed
+// keeps the node waiting. Only a child in hand that is itself not the node's current attempt is stopped,
+// and the node's outcome is decided from whether that stop is confirmed.
+import { afterEach, describe, expect, test } from "bun:test"
+
+import { cleanupProjects } from "../lifecycle/__fixtures__/lifecycle-fakes"
+import { bounded, liveParentFixture } from "../lifecycle/__fixtures__/live-parent-fakes"
+import { cleanupProjects as cleanupManagers } from "../manager/__fixtures__/manager-fakes"
+import type { TaskManager } from "../manager/types"
+import {
+  cleanupPendingRevivalRuns,
+  finishRun,
+  freeSlot,
+  lifecycleRetryTick,
+  nodeStates,
+  recoverRun,
+  reopenOverCapacity,
+  seedStaleChildOfRemovedNode,
+} from "./__fixtures__/pending-revival-run"
+import { runId } from "./__fixtures__/reattached-run"
+import { subscribeDagJournal } from "./journal"
+import type { DagFileStore } from "./store"
+
+const fixtures: ReturnType<typeof liveParentFixture>[] = []
+function overCapacity() {
+  const f = liveParentFixture("in-process", { residency_max_children: 1, default_concurrency: 2 })
+  fixtures.push(f)
+  return f
+}
+afterEach(() => {
+  for (const f of fixtures.splice(0)) f.dispose()
+  cleanupPendingRevivalRuns()
+  cleanupProjects()
+  cleanupManagers()
+})
+
+const WAITING = ["k-hang:running", "k-after:pending"]
+
+/** The real manager, except that a stop of `unconfirmed` is answered cancel_pending and changes nothing. */
+function withUnconfirmedStop(manager: TaskManager, unconfirmed: string): TaskManager {
+  return new Proxy(manager, {
+    get(target, property) {
+      if (property === "cancelTask") {
+        return (taskId: string, ...rest: unknown[]) =>
+          taskId === unconfirmed
+            ? Promise.resolve({ kind: "cancel_pending", task_id: taskId, reason: "child unreachable" })
+            : (target.cancelTask as (...args: unknown[]) => unknown)(taskId, ...rest)
+      }
+      const value: unknown = Reflect.get(target, property, target)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
+}
+
+/** The message of the next node flag journaled for `nodeId`, subscribed before the action. */
+function nodeFlag(store: DagFileStore, nodeId: string): Promise<string> {
+  const seen = Promise.withResolvers<string>()
+  const stop = subscribeDagJournal(store, runId, (event) => {
+    if (event.type !== "dag.diagnostic.added" || event.diagnostic.kind !== "node_flag") return
+    if (event.diagnostic.nodeId !== nodeId) return
+    stop()
+    seen.resolve(event.diagnostic.message)
+  })
+  return seen.promise
+}
+
+/** Makes the node's own child a stale attempt of its node (its owner names an earlier attempt). */
+function makeNotCurrent(f: ReturnType<typeof liveParentFixture>, taskId: string): void {
+  f.store.mutate(taskId, (record) =>
+    record.owner === undefined ? record : { ...record, owner: { ...record.owner, execAttempt: -1 } },
+  )
+}
+
+describe("the child gate on a waiting node's revived child (#15150, stack review 1)", () => {
+  test("#given a live child of a node the run no longer has #when the waiting node's child is revived #then the stale child is stopped and the node follows its own child to completion", async () => {
+    // given
+    const f = overCapacity()
+    const { hang, side, store } = await reopenOverCapacity(f)
+    const run = await recoverRun(f, store)
+    const stale = seedStaleChildOfRemovedNode(f)
+    const staleStopped = f.until(() => f.store.load(stale)?.status === "cancelled")
+
+    // when
+    await freeSlot(f, side)
+    await lifecycleRetryTick(f)
+    await bounded(Promise.race([staleStopped, run.settled]))
+
+    // then - the stale child is the one stopped; the node's own revived child runs on and is followed
+    expect(f.store.load(stale)?.status).toBe("cancelled")
+    expect(f.store.load(hang)?.status).toBe("running")
+    expect(nodeStates(store)).toEqual(WAITING)
+    await finishRun(f, store, hang)
+    expect((await bounded(run.settled)).record?.status).toBe("completed")
+    expect(nodeStates(store)).toEqual(["k-hang:completed", "k-after:completed"])
+  })
+
+  test("#given a stale child whose stop is not confirmed #when the waiting node's child is revived #then the node keeps waiting, the survivor is flagged, and the node follows once the stale stop lands", async () => {
+    // given
+    const f = overCapacity()
+    const { hang, side, store } = await reopenOverCapacity(f)
+    const stale = seedStaleChildOfRemovedNode(f)
+    const run = await recoverRun(f, store, { taskManager: withUnconfirmedStop(f.manager, stale) })
+    const flagged = nodeFlag(store, "k-hang")
+
+    // when
+    await freeSlot(f, side)
+    await lifecycleRetryTick(f)
+    const outcome = await bounded(Promise.race([flagged, run.settled.then(() => "settled")]))
+
+    // then - nothing failed, nothing of the node's own was stopped, the survivor is named
+    expect(outcome).toContain(stale)
+    expect(nodeStates(store)).toEqual(WAITING)
+    expect(f.store.load(hang)?.status).toBe("running")
+    expect(f.store.load(stale)?.status).toBe("running")
+
+    // when - the stale child's stop lands later (its host confirms the close)
+    f.store.mutate(stale, (record) => ({ ...record, status: "cancelled" }))
+    await finishRun(f, store, hang)
+
+    // then
+    expect((await bounded(run.settled)).record?.status).toBe("completed")
+  })
+
+  test("#given the waiting node's own child is not its current attempt #when it is revived and its stop is confirmed #then it is stopped and the node fails stale_attempt_alive", async () => {
+    // given
+    const f = overCapacity()
+    const { hang, side, store } = await reopenOverCapacity(f)
+    const run = await recoverRun(f, store)
+    makeNotCurrent(f, hang)
+
+    // when
+    await freeSlot(f, side)
+    await lifecycleRetryTick(f)
+
+    // then
+    expect((await bounded(run.settled)).record?.status).toBe("failed")
+    expect(nodeStates(store)).toEqual(["k-hang:failed:stale_attempt_alive", "k-after:skipped"])
+    expect(f.store.load(hang)?.status).toBe("cancelled")
+  })
+
+  test("#given the waiting node's own child is not its current attempt #when it is revived and its stop is not confirmed #then the node stays active as a survivor until that stop lands", async () => {
+    // given
+    const f = overCapacity()
+    const { hang, side, store } = await reopenOverCapacity(f)
+    const run = await recoverRun(f, store, { taskManager: withUnconfirmedStop(f.manager, hang) })
+    makeNotCurrent(f, hang)
+    const flagged = nodeFlag(store, "k-hang")
+
+    // when
+    await freeSlot(f, side)
+    await lifecycleRetryTick(f)
+    const outcome = await bounded(Promise.race([flagged, run.settled.then(() => "settled")]))
+
+    // then - the child may still run, so its node is not failed
+    expect(outcome).toContain(hang)
+    expect(nodeStates(store)).toEqual(WAITING)
+
+    // when - the stop lands
+    f.store.mutate(hang, (record) => ({ ...record, status: "cancelled" }))
+
+    // then
+    expect((await bounded(run.settled)).record?.status).toBe("failed")
+    expect(nodeStates(store)).toEqual(["k-hang:failed:stale_attempt_alive", "k-after:skipped"])
+  })
+})

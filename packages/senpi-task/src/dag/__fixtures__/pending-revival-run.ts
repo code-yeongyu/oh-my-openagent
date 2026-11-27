@@ -7,13 +7,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { liveParentFixture } from "../../lifecycle/__fixtures__/live-parent-fakes"
+import { seedRecord } from "../../lifecycle/__fixtures__/lifecycle-fakes"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 import type { DagDefinition } from "../graph"
 import { subscribeDagJournal } from "../journal"
 import type { DagRunRecordV1 } from "../manager"
 import { createDagRecovery, type DagRecoveryOptions, type InstalledDagRun } from "../recovery"
 import { createDagFileStore, type DagFileStore } from "../store"
-import type { DagNode } from "../types"
+import type { DagNode, DagNodeId } from "../types"
 import { node, owner, pausedRecord, runId } from "./reattached-run"
 
 export const PARENT = "parent-1"
@@ -153,4 +154,19 @@ export async function finishRun(f: Fixture, store: DagFileStore, hang: string): 
   f.resumedHandles.get(hang)?.settle({ status: "completed", finalResponse: "hang done" })
   const afterTask = await after
   f.runner.handles.get(afterTask)?.settle({ status: "completed", finalResponse: "after done" })
+}
+
+/** A live child of this run (its owner names it) for a node the run no longer has, under another session. */
+export function seedStaleChildOfRemovedNode(f: Fixture): string {
+  seedRecord(f.store, {
+    task_id: "st_0000cafe",
+    parent_session_id: "another-session",
+    status: "running",
+    residency_state: "resident",
+  })
+  f.store.mutate("st_0000cafe", (record) => ({
+    ...record,
+    owner: { kind: "dag", runId, nodeId: "k-gone" as DagNodeId, fingerprint: "removed-node" },
+  }))
+  return "st_0000cafe"
 }
