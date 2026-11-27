@@ -415,10 +415,11 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "held" }
     }
     if (opened.view.waitingForPerson) {
+      // #15279: the person's wait it declined for, so a sender's answer can name what its delivery waits behind.
       await store.sessionWait.write({
         durable_id: durableId,
         wait: "waiting",
-        hold_kinds: [],
+        hold_kinds: opened.view.personWaitKinds,
         file_size: fileSize(target.session_path),
       })
       await releaseOwn(entry)

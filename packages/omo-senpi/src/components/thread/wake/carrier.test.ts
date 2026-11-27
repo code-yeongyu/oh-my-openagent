@@ -366,22 +366,58 @@ describe("the carrier lifts, reads finished, and hands back", () => {
   })
 })
 
-// Production case (2026-11-27): an interactive session whose engine paused its stale goal waits on human kinds
-// `goal_paused` and `stalled`, with no dialog open. A delivery is the input that resumes it; it is no person's wait.
-describe("a paused goal is not a person's wait", () => {
-  test("#given a session whose only waits are goal_paused and stalled, with no dialog #when a queued row wakes it #then it opens and the engine's wake is sent", async () => {
-    const { fake, store, carrier, path } = await setup()
-    fake.setSnapshot(path("s1"), {
-      ...STALLED,
-      lifecycle: {
-        state: "waiting_human",
-        waitingOn: { children: 0, background: [], human: [{ kind: "goal_paused" }, { kind: "stalled" }] },
-      },
-    })
+// #15279: which engine human wait keeps a queued delivery from the session. The engine's HumanWait kind is a closed union
+// (senpi session-lifecycle-types.ts): a person's question, approval or interrupted run (a person's Stop the engine holds
+// admissions under) blocks; the engine's own goal waits and a stalled turn do not (a delivery is the input that ends
+// them); a kind this table does not know blocks (fail closed).
+const humanWait = (...kinds: readonly string[]) => ({
+  ...STALLED,
+  lifecycle: {
+    state: "waiting_human",
+    waitingOn: { children: 0, background: [], human: kinds.map((kind) => ({ kind })) },
+  },
+})
 
+describe("which engine waits keep a queued delivery from the session (#15279)", () => {
+  test.each([
+    ["goal_paused", "open"],
+    ["goal_blocked", "open"],
+    ["stalled", "open"],
+    ["question", "waiting"],
+    ["approval", "waiting"],
+    ["interrupted_run", "waiting"],
+    ["a_kind_the_engine_adds_later", "waiting"],
+  ] as const)("#given the only human wait is %s, no dialog #when a queued row wakes it #then the carrier answers %s", async (kind, expected) => {
+    const { fake, store, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), humanWait(kind))
+
+    expect(await carrier.wake("s1")).toMatchObject({ kind: expected })
+    expect(sent(fake, "wake")).toHaveLength(expected === "open" ? 1 : 0)
+    // The carrier records the wait it declined for, so the sender's answer can name it; a drained session records none.
+    expect(await store.sessionWait.read({ durable_id: "s1" })).toEqual(
+      expected === "open" ? null : expect.objectContaining({ wait: "waiting", hold_kinds: [kind] }),
+    )
+  })
+
+  test("#given a goal wait beside a person's question #when a queued row wakes it #then the question blocks and only it is recorded", async () => {
+    const { fake, store, carrier, path } = await setup()
+    fake.setSnapshot(path("s1"), humanWait("goal_paused", "question"))
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "waiting" })
+    expect(await store.sessionWait.read({ durable_id: "s1" })).toMatchObject({ hold_kinds: ["question"] })
+  })
+
+  test("#given a goal-paused session #when two rows arrive one after the other #then each is woken for, the second after the first's turn parked it again", async () => {
+    const { fake, carrier, path, intakeRow } = await setup({ remoteWake: () => true, admitIntake: async () => "admitted" })
+    const file = path("s1")
+    fake.setSnapshot(file, humanWait("goal_paused", "stalled"))
+    await intakeRow("s1", "d-first")
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
-    expect(sent(fake, "wake")).toHaveLength(1)
-    expect(await store.sessionWait.read({ durable_id: "s1" })).toBeUndefined()
+    expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
+
+    fake.setSnapshot(file, humanWait("goal_paused", "stalled"))
+    await intakeRow("s1", "d-second")
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
+    expect(sent(fake, "wake")).toHaveLength(2)
   })
 })
 
