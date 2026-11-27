@@ -29,10 +29,12 @@ Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or 
 During a local engine handoff, a thread can be listed as `opening` before its successor can attach it. It stays visible with no available controls. A close during this state returns `host_unavailable` with reason `session_opening`; retry once it lists as idle or running. An evicted thread remains inactive.
 
 ```bash
-omo thread list [--all-scope] [--state opening|running|idle|inactive|archived[,...]] [--json]
+omo thread list [--all-scope] [--state opening|running|idle|held|unknown|inactive|archived[,...]] [--json]
 omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>] [--json]
 omo thread read <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>] [--json]
 ```
+
+`list` and `read` can return a `liveness` value from the holder. A paused session reports `kind: "held"` with `hold: { kind, key, since?, queue_depth }`. The engine calls the count `queueDepth`; omo and the relay call it `queue_depth`. A host that did not answer reports `kind: "unknown"`, its opaque host identifier and the reason, rather than claiming that its sessions stopped. A cached or older row that cannot establish liveness retains its legacy state with `verification: "unverified"`. It is not proof that a session is running or stopped. Per-device `host_counts` reports `answered` and `unanswered`, or `null` if the device did not supply counts.
 
 `omo thread list` lists this device's threads (in this directory's workspace, or every workspace with `--all-scope`)
 together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole

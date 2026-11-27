@@ -741,6 +741,7 @@ export function createLiveThreadSurface(
     try {
       // An rpc_host connection opens with get_protocol_info: this listing's own answer names the engine, at no extra call.
       let hostVersion: string | undefined
+      let rowHold = false
       const [listed, commands] = await Promise.all([
         callFrame(
           endpoint.socket,
@@ -752,6 +753,7 @@ export function createLiveThreadSurface(
           undefined,
           (protocol) => {
             hostVersion = engineVersionOf(protocol)
+            rowHold = Array.isArray(protocol.capabilities) && protocol.capabilities.includes("session_row_hold")
           },
         ),
         tui ? learnTuiCommands(endpoint.socket).catch(() => LEGACY_TUI_COMMANDS) : Promise.resolve(undefined),
@@ -761,6 +763,7 @@ export function createLiveThreadSurface(
       const controls = acceptedControls(endpoint.kind, commands)
       const tagged = sessions.map((session) => ({
         ...session,
+        row_evidence: engineEvidence(rowHold, session, Reflect.get(session, "hold")).row_evidence,
         socket: endpoint.socket,
         endpoint_kind: endpoint.kind,
         controls,
@@ -1069,3 +1072,4 @@ export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"
 export { answerWorktreeRequest } from "./worktree/worktree-rpc"
+import { engineEvidence } from "./tools/row-liveness"

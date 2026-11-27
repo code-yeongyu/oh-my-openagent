@@ -10,8 +10,10 @@ import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
 import { addressBook, degradedSummary, failure, rowNamed, sendAddressBook, summary } from "./internals"
 import { readItem } from "./read-item"
+import { readProof, withReadProof } from "./read-liveness"
 import { threadRow } from "./thread-row"
 import { listedStates } from "./thread-state"
+import { countHostAnswers } from "../remote/listing-liveness"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
@@ -86,6 +88,7 @@ export function listThreads(
     kind: "ok",
     threads,
     scope: allScope === true ? "all" : "workspace",
+    host_counts: countHostAnswers(current),
     ...(dropped > 0 ? { inactive_truncated: true as const, inactive_dropped: dropped } : {}),
     ...(unanswered > 0 ? { listing: "incomplete" as const, unanswered_endpoints: unanswered } : {}),
   }
@@ -142,14 +145,15 @@ export async function readThread(
 ): Promise<ThreadToolResult> {
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
+  const proof = readProof(options, current, located)
   if (located.kind === "not_live" && located.row !== undefined && options.remote !== undefined) {
     // omo#14799: a session another device parked is reopened there and read live, never answered not_resumable.
     const reopened = await reopenParkedRow(options.remote, located.row)
     if ("result" in reopened) return reopened.result
     return readLive(createRelayControl(options.remote, reopened.row), value, signal)
   }
-  if (located.kind === "not_live") return readDegraded(options, current, located.thread_id, value)
-  return readLive(located.control, value, signal)
+  if (located.kind === "not_live") return withReadProof(readDegraded(options, current, located.thread_id, value), proof)
+  return withReadProof(readLive(located.control, value, signal), proof)
 }
 
 /** `thread_read` of a live thread through its control: the optional wait, then one bounded slice. */

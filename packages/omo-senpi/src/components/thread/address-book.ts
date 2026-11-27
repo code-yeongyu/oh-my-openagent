@@ -112,6 +112,7 @@ export type AddressEntry = {
   readonly error_note?: string
   /** The refusal of the thread's endpoint, when its dial was refused for the host's identity: told, never acted on. */
   readonly identity_refusal?: Error
+  readonly host_unanswered?: boolean
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
   readonly endpoint: AddressEndpoint | null
   readonly surface: ThreadSurface | null
@@ -200,6 +201,7 @@ function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failu
     thread_id: session.durable_id,
     ...(failure === undefined ? {} : { error_note: failure }),
     ...(host?.reason === "identity_unproven" && host.error instanceof Error ? { identity_refusal: host.error } : {}),
+    ...(host && failure !== undefined && host.reason !== "dead" ? { host_unanswered: true } : {}),
     endpoint,
     surface: endpoint === null ? null : deriveSurface(endpoint.kind, undefined, endpoint.socket),
     alive: false,
