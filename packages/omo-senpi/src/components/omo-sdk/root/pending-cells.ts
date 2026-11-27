@@ -15,24 +15,6 @@ export type PendingCell = {
 
 export const PENDING_CELLS: readonly PendingCell[] = [
   {
-    call: "account.devices",
-    principal: "person",
-    served_by: "the shipped omo SDK's account.devices (omo-sdk/account/index.ts)",
-    owner: "#15033 (revision 22, section 4.2)",
-  },
-  {
-    call: "account.devices",
-    principal: "script",
-    served_by: "the shipped omo SDK's account.devices (omo-sdk/account/index.ts)",
-    owner: "#15033 (revision 22, section 4.2)",
-  },
-  {
-    call: "account.devices",
-    principal: "session",
-    served_by: "the shipped omo SDK's account.devices through an eval cell (omo-sdk/account/index.ts)",
-    owner: "#15033 (revision 22, section 4.2)",
-  },
-  {
     call: "threads.resolve",
     principal: "person",
     served_by: "the same OS user (security design 3): remote module factories sessions.resolve (remote/client.ts:460)",
@@ -134,25 +116,6 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     principal: "script",
     served_by: "remote module factories aliases.clear (remote/aliases.ts:189)",
     owner: "T1c",
-  },
-  { call: "account.show", principal: "person", served_by: "omo account show (account-cli.ts:137)", owner: "A1b" },
-  {
-    call: "account.show",
-    principal: "script",
-    served_by: "omo account show, JSON output (account-cli.ts:53)",
-    owner: "A1b",
-  },
-  {
-    call: "account.signInCheck",
-    principal: "person",
-    served_by: "omo account sign-in --check (account-sign-in.ts:175)",
-    owner: "A1b",
-  },
-  {
-    call: "account.signInCheck",
-    principal: "script",
-    served_by: "omo account sign-in --check, JSON output (account-sign-in.ts:176)",
-    owner: "A1b",
   },
   {
     call: "devices.resolve",

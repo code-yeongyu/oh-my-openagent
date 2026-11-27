@@ -44,6 +44,24 @@ export function matrixProblems(
   return problems
 }
 
+// Two lines on one registry row must not disagree, allow against refuse, for any principal, unless an input or a root
+// option tells them apart: a later reader of the matrix by row would otherwise find both answers.
+export function overlapProblems(lines: readonly MatrixLine[]): string[] {
+  const problems: string[] = []
+  const plain = lines.filter((line) => line.input === undefined && line.root === undefined)
+  for (const [index, first] of plain.entries())
+    for (const second of plain.slice(index + 1))
+      for (const row of first.rows.filter((id) => second.rows.includes(id)))
+        for (const kind of PRINCIPAL_KINDS) {
+          const outcomes = new Set([first.cells[kind].outcome, second.cells[kind].outcome])
+          if (outcomes.has("allow") && outcomes.has("refuse"))
+            problems.push(
+              `row ${row}: lines ${first.section} ${first.slug} and ${second.section} ${second.slug} disagree for ${kind}, and no input or root option tells them apart`,
+            )
+        }
+  return problems
+}
+
 type DocumentRow = {
   readonly section: string
   readonly capability: string

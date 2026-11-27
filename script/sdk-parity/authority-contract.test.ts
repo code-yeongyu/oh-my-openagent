@@ -27,6 +27,7 @@ import {
   documentRowProblems,
   inventoryProblems,
   matrixProblems,
+  overlapProblems,
   refusalScenarioProblems,
   sectionFourRows,
   withoutAwaited,
@@ -121,12 +122,8 @@ describe("principals of slice P1a-s (#14949)", () => {
     expect(principalInputProblems(calls)).toEqual([])
   })
 
-  // Run against the tree's document and against revision 22 (PR 15033) as a fixture, so the matrix holds before and after
-  // that document merges; awaiting entries are inert where their row is absent and validated exactly against the fixture.
-  test.each([
-    ["the tree's document", securityDesign, false],
-    ["revision 22", readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8"), true],
-  ] as const)(
+  // The tree's document is revision 22 (PR 15033), so awaiting entries are validated exactly against it.
+  test.each([["the tree's document", securityDesign, true]] as const)(
     "#given section 4 of %s #then every refused cell has its code and a scenario answering it before any side effect",
     (_name, document, exact) => {
       const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
@@ -140,6 +137,10 @@ describe("principals of slice P1a-s (#14949)", () => {
       expect(refusalScenarioProblems(REFUSALS, BEHAVIOUR_CHANGES, files)).toEqual([])
     },
   )
+
+  test("#given two lines on one registry row #then they never disagree, allow against refuse, unless an input or root option tells them apart", () => {
+    expect(overlapProblems(PRINCIPAL_MATRIX)).toEqual([])
+  })
 
   test("#given section 10 #then B1 to B6 are data and each scenario asserts what its evidence flag selects", () => {
     expect(behaviourChangeProblems(BEHAVIOUR_CHANGES, files)).toEqual([])

@@ -702,7 +702,10 @@
         "effect": [
           "account.devices/lists-the-accounts-devices"
         ],
-        "refusal": []
+        "refusal": [
+          "account.devices/account-devices-refuses-connector",
+          "account.devices/account-devices-refuses-service"
+        ]
       },
       "modules": [],
       "note": "Cancellation: the root answers the caller's signal (cancelled) and deadline_ms (timeout) at once; the account request itself is a read that the caller's signal does not abort at this head and that close() ends. Passing the signal into the account request is an acceptance row of the account slice (A1b)."

@@ -20,6 +20,7 @@ import {
   documentRowProblems,
   sectionFourRows,
   matrixProblems,
+  overlapProblems,
   refusalScenarioProblems,
   inventoryProblems,
 } from "./authority-check"
@@ -62,6 +63,19 @@ const refusal = REFUSALS.find((entry) => entry.change === undefined)
 const b4 = REFUSALS.find((entry) => entry.change === "B4")
 
 describe("negative controls of the principal matrix (#14949)", () => {
+  test("#given a second plain line on a row that allows what the first refuses #then the check names the pair", () => {
+    const unload = PRINCIPAL_MATRIX.find((line) => line.slug === "unload")
+    if (unload === undefined) throw new Error("no unload line")
+    const rival = {
+      ...unload,
+      slug: "unload-rival",
+      cells: { ...unload.cells, session: { outcome: "allow" as const } },
+    }
+    expect(overlapProblems([...PRINCIPAL_MATRIX, rival]).join("\n")).toContain(
+      "row threads.unload: lines 4.1 unload and 4.1 unload-rival disagree for session",
+    )
+  })
+
   test("#given a shared cell split without the document saying so #then the check names it", () => {
     if (SHARED === undefined) throw new Error("no shared line")
     const split = { ...SHARED, cells: { ...SHARED.cells, script: { outcome: "n/a" as const } } }
@@ -244,11 +258,11 @@ describe("negative controls of custody and the held table (#14949)", () => {
     )
   })
 
-  // The awaiting record against revision 22 as a fixture (design lane ruling): an entry needs its row and, where the
+  // The awaiting record against the tree's document, revision 22 (design lane ruling): an entry needs its row and, where the
   // table has an Owner slice column, that exact slice; it goes stale once a line covers the row; a row dropped from the
   // record without a line fails.
   test("#given revision 22 #then an awaiting entry needs its exact slice, fails once lined, and a listed row dropped from the list fails", () => {
-    const revision = readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8")
+    const revision = securityDesign
     const awaiting = (
       JSON.parse(readFileSync(join(import.meta.dir, "awaiting-owner-rows.json"), "utf8")) as {
         rows: AwaitingOwnerRow[]

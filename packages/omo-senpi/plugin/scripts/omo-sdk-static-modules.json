@@ -987,6 +987,7 @@
     "packages/omo-senpi/src/components/omo-sdk/root/assemble.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/authority.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/extension-codes.ts",
+    "packages/omo-senpi/src/components/omo-sdk/root/held-allows.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/members.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/not-implemented.ts",
     "packages/omo-senpi/src/components/omo-sdk/root/pending-cells.ts",
