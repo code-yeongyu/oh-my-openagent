@@ -7,9 +7,10 @@ export const UP_HOLD_TAG = "omo-pool-up-hold"
 // The pgrep -f pattern for a guest's live processes: an --up's hold, the clone that creates it and the run that boots
 // it (all end in its name). The run alternative is built from the same flags the --up spawn uses; the clipboard flag is
 // optional so a guest an earlier --up started with plain `run --no-graphics` is still counted (review L2 of #15142).
+// pgrep compiles POSIX ERE, so the pattern uses plain groups only: PCRE's `(?:` fails to compile there (review H1).
 export function guestProcessPattern(name: string): string {
   const run = GUEST_RUN_FLAGS.filter((flag) => flag !== "--no-clipboard").join(" ")
-  return `(${UP_HOLD_TAG}|clone [^ ]+|${run}(?: --no-clipboard)?) ${name}$`
+  return `(${UP_HOLD_TAG}|clone [^ ]+|${run}( --no-clipboard)?) ${name}$`
 }
 
 export type UpSteps = {
