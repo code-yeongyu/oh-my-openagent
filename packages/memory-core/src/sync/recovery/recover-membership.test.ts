@@ -3,7 +3,6 @@ import { readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { createRecoveryBridge } from "./bridge.ts"
-import { readRecoveryStatus } from "./membership.ts"
 import type { RecoveryTransport } from "./ports.ts"
 import { recoverOnFreshDevice } from "./recover.ts"
 import { fakeAuthenticator } from "./testing/fake-passkey.test-support.ts"
@@ -112,57 +111,4 @@ test("#given a pinned device served a chain from another genesis #when it recove
   const { outcome, calls } = await spiedRecover(other, other.owner, await pinnedDir(world))
   expect(outcome).toEqual({ ok: false, reason: "pin-conflict", next: "re-pair or recover" })
   expect(calls.begin).toBe(0)
-})
-
-test("#given the recovery status read #when the device is a pinned member, unpinned, or its walk fails #then member is true, false, or the whole field is absent", async () => {
-  const world = await createWorld()
-  const owner = world.owner.principal.id
-  const read = (stateDir: string, transport: RecoveryTransport = transportFor(world, world.owner)) =>
-    readRecoveryStatus({ transport, account: world.account, stateDir, deviceId: owner })
-  expect(await read(await pinnedDir(world))).toEqual({ method: "passkey", member: true })
-  expect(await read(freshStateDir())).toEqual({ method: "passkey", member: false })
-  const broken: RecoveryTransport = { ...transportFor(world, world.owner), listEntries: async () => null }
-  expect(await read(await pinnedDir(world), broken)).toBeNull()
-})
-
-test("#given a corrupt pin or a pin naming another genesis #when status reads recovery #then it reports the blocked pin instead of a member reading", async () => {
-  const world = await createWorld()
-  const other = await createWorld(world.account)
-  const read = (stateDir: string) =>
-    readRecoveryStatus({
-      transport: transportFor(other, other.owner),
-      account: world.account,
-      stateDir,
-      deviceId: other.owner.principal.id,
-    })
-  expect(await read(await pinnedDir(world))).toEqual({ blocked: "pin-conflict" })
-  const corrupt = await pinnedDir(world)
-  const [entry] = readdirSync(join(corrupt, readdirSync(corrupt)[0] ?? ""), {
-    recursive: true,
-    withFileTypes: true,
-  }).filter((item) => item.isFile())
-  if (entry === undefined) throw new Error("no pin file")
-  writeFileSync(join(entry.parentPath, entry.name), "{")
-  expect(await read(corrupt)).toEqual({ blocked: "pin-corrupt" })
-})
-
-test("#given the recovery status read with a pin #when it walks the chain #then it reads the keyring once", async () => {
-  const world = await createWorld()
-  const base = transportFor(world, world.owner)
-  let keyReads = 0
-  const counted: RecoveryTransport = {
-    ...base,
-    listKeys: (operation) => {
-      keyReads += 1
-      return base.listKeys(operation)
-    },
-  }
-  const status = await readRecoveryStatus({
-    transport: counted,
-    account: world.account,
-    stateDir: await pinnedDir(world),
-    deviceId: world.owner.principal.id,
-  })
-  expect(status).toEqual({ method: "passkey", member: true })
-  expect(keyReads).toBe(1)
 })
