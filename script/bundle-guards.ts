@@ -69,14 +69,24 @@ function trackedChanges(root: string): string[] {
   return lines(gitOut(root, ["status", "--porcelain", "--untracked-files=no"])).map((line) => line.slice(3))
 }
 
-export function failingTests(output: string): string[] {
+// bun test names a file in the OS-native form, relative or absolute; the gate's output is machine-read,
+// so every name becomes a repo-relative POSIX path (a drive letter compares case-insensitively)
+function repoPath(root: string, name: string): string {
+  const posix = (path: string) => path.replaceAll("\\", "/")
+  const file = posix(name)
+  const prefix = `${posix(root).replace(/\/+$/, "")}/`
+  if (file.startsWith(prefix)) return file.slice(prefix.length)
+  if (/^[A-Za-z]:\//.test(file) && file.toLowerCase().startsWith(prefix.toLowerCase())) return file.slice(prefix.length)
+  return file.replace(/^\.\//, "")
+}
+
+export function failingTests(root: string, output: string): string[] {
   const failures: string[] = []
   let file = ""
   for (const line of output.split("\n")) {
     if (/^\d+ tests? failed:$/.test(line.trim())) break
     const header = /^(\S+\.test\.ts):$/.exec(line.trim())
-    // bun test prints OS-native separators; the gate's output is machine-read, so name files as repo POSIX paths
-    if (header?.[1]) file = header[1].replaceAll("\\", "/")
+    if (header?.[1]) file = repoPath(root, header[1])
     const failed = /^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/.exec(line.trim())
     if (failed?.[1]) failures.push(`${file} > ${failed[1]}`)
   }
@@ -126,7 +136,7 @@ function runBundleGuards(root: string, base: string, head: string): Verdict {
   )
   const output = `${run.stdout.toString()}${run.stderr.toString()}`
   if (run.exitCode === 0) return { exitCode: 0, lines: [header, `BUNDLE_GUARDS_OK ${guards.join(" ")}`] }
-  const failures = failingTests(output)
+  const failures = failingTests(root, output)
   return {
     exitCode: 1,
     lines: [
