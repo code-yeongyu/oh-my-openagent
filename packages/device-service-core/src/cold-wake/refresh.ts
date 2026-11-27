@@ -30,9 +30,8 @@ const INSTALLED: ColdWakeOutcome = { kind: "installed", serviceRestarted: false 
 
 /**
  * omo#14191: a launch of a newer runtime brings an installed session host unit's program and shape forward - an older
- * omo's KeepAlive / Restart=always unit naming an older omo-managed runtime (`binary-runtime/<version>/omo`, or an
- * `omo-versions/<version>/...` launcher script, omo#14258) - and nothing else. The agent dir and PATH stay the
- * installed unit's, so the launching process's environment never reaches the unit (#14194 review H1/M1).
+ * omo's KeepAlive / Restart=always unit naming an older `binary-runtime/<version>/omo` - and nothing else. The agent dir
+ * and PATH stay the installed unit's, so the launching process's environment never reaches the unit (#14194 review H1/M1).
  * Undefined, after one file read and no service manager call, when there is nothing to do: no unit (a refresh never
  * installs one), a unit no omo-managed runtime owns (binary-runtime or omo-versions, omo#14258), or one `isOlder` does
  * not call older than this runtime.
