@@ -137,20 +137,25 @@ export async function runCapped(
 
   const person = "QA-TOKEN-x1a-capped-person"
   const lifted = await withinStep(
-    (signal) => cli.run({ op: "send", input: { thread, message: `x1a capped ${person}` } }, signal),
+    (signal) => cli.run({ op: "send", input: { thread, message: `x1a capped ${person}`, delivery: "auto" } }, signal),
     "cli send",
     DEADLINE_MS,
   )
   if ("stalled" in lifted) return skip(["lift"], "the person's send answered nothing (harness)")
-  const liftOk =
-    lifted.answered &&
-    (await settles(async () => (await texts(key, "assistant")).some((text) => text.includes(ackOf(person))), "B answers the person")) &&
-    capOf(await observer.engineState(key)) === undefined
+  // The fake model acks every token in the turn's context, so the person's turn names the parked message too.
+  const personTurn = async (): Promise<string | undefined> =>
+    (await texts(key, "assistant")).find((text) => text.startsWith("QA-ACK") && text.includes(person))
+  const ran = await settles(async () => (await personTurn()) !== undefined, "B answers the person")
+  const reply = (await personTurn()) ?? ""
+  const capAfter = capOf(await observer.engineState(key))
+  const liftOk = lifted.answered && ran && reply.includes(parked) && capAfter === undefined
   records.push({
     step: "lift",
-    raw: lifted.raw,
+    raw: { answer: lifted.raw, b_reply: reply, b_engine_turn_cap: capAfter ?? null },
     cell: liftOk ? "pass" : "fail",
-    why: liftOk ? "the person's message ran a turn and B's cap is gone" : "the person's message did not run, or B still names a cap",
+    why: liftOk
+      ? "the person's message ran a turn that answered the parked message, and B's cap is gone"
+      : `answered: ${lifted.answered}; B ran: ${ran}; parked message in that turn: ${reply.includes(parked)}; B engineTurnCap: ${JSON.stringify(capAfter ?? null)}`,
   })
   return records
 }
