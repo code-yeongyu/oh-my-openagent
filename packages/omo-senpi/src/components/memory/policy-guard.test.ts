@@ -9,7 +9,14 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryIdentityContext } from "./context"
 import { registerMemoryGuard } from "./guard"
-import { componentContext } from "./memory.test-support"
+import { createMemoryComponent, memoryModuleSupervisor } from "./index"
+import {
+  componentContext,
+  loadedMemoryConfig,
+  MemoryFakeExtensionAPI,
+  memorySettings,
+  sessionContext,
+} from "./memory.test-support"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
 import {
   type FilesystemOperation,
@@ -35,6 +42,47 @@ async function check(
 ): Promise<FilesystemPolicyDecision> {
   return policy.check({ operation, canonicalPath, toolName })
 }
+
+class PolicyCapturingMemoryFakeExtensionAPI extends MemoryFakeExtensionAPI {
+  readonly filesystemPolicies: FilesystemPolicy[] = []
+
+  registerFilesystemPolicy(policy: FilesystemPolicy): void {
+    this.filesystemPolicies.push(policy)
+  }
+}
+
+describe("memory filesystem policy registration in the memory component (#15251)", () => {
+  test("#given the memory component on a policy-capable host #when it registers #then its policy exists before any session starts and denies foreign identities once the session binds", async () => {
+    const memoryHome = join(policyFixture(roots).workspace, "memory")
+    const cwd = join(memoryHome, "..", "project")
+    const env = { OMO_MEMORY_HOME: memoryHome }
+    const pi = new PolicyCapturingMemoryFakeExtensionAPI()
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("policy registration test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+
+    // Senpi composes the policies its tools enforce here, before session_start.
+    expect(pi.filesystemPolicies).toHaveLength(1)
+    const policy = pi.filesystemPolicies[0]
+    if (policy === undefined) throw new Error("expected a registered filesystem policy")
+    const foreign = join(memoryHome, "agents", "late-id", "repo", "system", "persona.md")
+    expect(await check(policy, "read", foreign)).toEqual({ allow: true })
+
+    await pi.dispatch("session_start", {}, sessionContext({ notifications: [] }))
+
+    expect(pi.filesystemPolicies).toHaveLength(1)
+    expect(await check(policy, "read", foreign)).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${foreign}`,
+    })
+    memoryModuleSupervisor.release()
+  })
+})
 
 describe("memory filesystem policy guard", () => {
   test("#given a bound identity on a policy-capable host #when registration runs #then exactly one policy is registered with foreign-only denied roots", () => {
