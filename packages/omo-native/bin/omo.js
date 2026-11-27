@@ -7,8 +7,14 @@ import { runAttachTui, runLauncher } from "./lib/launcher.js"
 import { removeLegacyServiceCredentials } from "./lib/legacy-service-credentials.js"
 import { runRemoteAttachLaunch } from "./lib/remote-attach-launch.js"
 import { runSetup } from "./lib/setup-import.js"
+import { hostHelp } from "./lib/host-help.js"
 
-try {
+async function main() {
+  const help = hostHelp(process.argv.slice(2))
+  if (help !== undefined) {
+    console.log(help)
+    return
+  }
   // A machine that has bun runs omo on bun, whichever package manager installed it. A `bun add -g`
   // install is reached through a symlink in ~/.bun/bin, and node resolves the main module to its
   // real path, so this URL already points inside the bun global tree. Every bun is held to the
@@ -63,6 +69,10 @@ try {
       }
     } else await runLauncher()
   }
+}
+
+try {
+  await main()
 } catch (error) {
   console.error(`omo: ${error.message}`)
   process.exitCode = 1
