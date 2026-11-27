@@ -1,7 +1,7 @@
 import type { DeviceAccountSource } from "./device-session/account-source"
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 import { phraseGateFrom } from "./sync-phrase-gate"
-import { SYNC_RPC_VERBS, syncRpcHandlerFailure, syncRpcUntrusted, type SyncRpcVerb } from "./sync-rpc-contract"
+import { handleSyncVerbs, syncRpcHandlerFailure, syncRpcUntrusted, type SyncRpcVerb } from "./sync-rpc-contract"
 import type { SyncRpcAccount, SyncRpcContext, SyncRpcRegistration } from "./sync-rpc-ports"
 import type { createSyncRpcRuntime } from "./sync-rpc-runtime"
 
@@ -49,11 +49,9 @@ export function wireSyncRpc(options: SyncRpcWiringOptions) {
     // A request waiting on the import must not reach the next session binding.
     return acceptedBinding === binding ? loaded.dispatch(verb, data, context) : syncRpcUntrusted()
   }
-  for (const verb of SYNC_RPC_VERBS) {
-    options.rpc.handle(`omo.memory.sync.${verb}`, (data, context) =>
-      runtime === undefined ? dispatchCold(verb, data, context) : runtime.dispatch(verb, data, context),
-    )
-  }
+  handleSyncVerbs(options.rpc, (verb, data, context) =>
+    runtime === undefined ? dispatchCold(verb, data, context) : runtime.dispatch(verb, data, context),
+  )
   return {
     retireBinding() {
       binding++

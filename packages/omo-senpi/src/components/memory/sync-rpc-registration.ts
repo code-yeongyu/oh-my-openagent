@@ -1,9 +1,9 @@
 import { boundedServiceFloor } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { z } from "zod"
-import { SYNC_RPC_VERBS, syncRpcHandlerFailure, syncRpcUntrusted, type SyncRpcVerb } from "./sync-rpc-contract"
+import { syncRpcHandlerFailure, syncRpcUntrusted, type SyncRpcVerb } from "./sync-rpc-contract"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
 import { syncErrorFields } from "./sync-rpc-operation"
-import type { SyncRpcContext, SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
+import type { SyncRpcContext, SyncRpcOptions } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
 const enableRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
@@ -107,12 +107,4 @@ export function createSyncRpcDispatcher(options: SyncRpcOptions) {
       }
     },
   }
-}
-
-export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOptions) {
-  const { coordinator, dispatch } = createSyncRpcDispatcher(options)
-  for (const verb of SYNC_RPC_VERBS) {
-    rpc.handle(`omo.memory.sync.${verb}`, (data, context) => dispatch(verb, data, context))
-  }
-  return coordinator
 }

@@ -2,13 +2,19 @@ import { readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
 import type { SyncRpcRegistration } from "./sync-rpc-ports"
 
+const mode = process.argv[2] ?? "first-use"
 const rpcSidecar = /[/\\]extensions[/\\]omo-memory-sync-rpc\.js$/
 let loads = 0
+let refuseNextLoad = mode === "load-fails-once"
 Bun.plugin({
   name: "packaged-sync-rpc-load-probe",
   setup(build) {
     build.onLoad({ filter: rpcSidecar }, ({ path }) => {
       loads++
+      if (refuseNextLoad) {
+        refuseNextLoad = false
+        throw new Error("sync RPC sidecar load refused by the probe")
+      }
       return { contents: readFileSync(path, "utf8"), loader: "js" }
     })
   },
@@ -46,11 +52,29 @@ const context = {
     return dispatch()
   },
 }
-const reply = await features({}, context)
-const firstUseLoads = loads
-await features({}, context)
-const totalLoads = loads
+const firstUse = async () => {
+  const reply = await features({}, context)
+  const firstUseLoads = loads
+  await features({}, context)
+  return { registered, registrationLoads, startupLoads, firstUseLoads, totalLoads: loads, reply }
+}
+const concurrent = async () => {
+  const replies = await Promise.all([features({}, context), features({}, context)])
+  return { startupLoads, loads, replies }
+}
+const loadFailsOnce = async () => {
+  const failed = await features({}, context)
+  const loadsAfterFailure = loads
+  const retried = await features({}, context)
+  return { failed, loadsAfterFailure, retried, totalLoads: loads }
+}
+const runs: Record<string, () => Promise<unknown>> = {
+  "first-use": firstUse,
+  concurrent,
+  "load-fails-once": loadFailsOnce,
+}
+const run = runs[mode]
+if (run === undefined) throw new Error(`Unknown sync RPC probe mode ${mode}`)
+const result = await run()
 await host.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, session)
-console.log(
-  `SYNC_RPC_PROBE ${JSON.stringify({ registered, registrationLoads, startupLoads, firstUseLoads, totalLoads, reply })}`,
-)
+console.log(`SYNC_RPC_PROBE ${JSON.stringify(result)}`)

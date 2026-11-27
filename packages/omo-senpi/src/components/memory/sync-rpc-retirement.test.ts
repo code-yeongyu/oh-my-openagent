@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
+import { syncRpcUntrusted } from "./sync-rpc-contract"
 import type { SyncRpcRegistration } from "./sync-rpc-ports"
 import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
 import { wireSyncRpc } from "./sync-rpc-wiring"
@@ -26,7 +27,7 @@ test("#given a cold sync RPC dispatcher #when the binding retires during loading
   const retired = status({}, context)
   rpc.retireBinding()
 
-  expect(await retired).toMatchObject({ kind: "unavailable" })
+  expect(await retired).toEqual(syncRpcUntrusted())
   expect(sourceCalls).toBe(0)
   expect(await status({}, context)).toMatchObject({ kind: "unavailable", code: "no_account" })
   expect(sourceCalls).toBe(1)
