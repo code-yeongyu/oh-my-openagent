@@ -323,6 +323,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
 }
 
 async function observeProductHost(socket, timeout, options) {
-  const url = pathToFileURL(join(resolveSenpi().packageRoot, "dist/modes/rpc/host-probe.js"))
-  return (await import(url.href)).observeProtocolInfo(socket, timeout, options)
+  const { readHostStatus } = await import("@code-yeongyu/senpi")
+  const status = await readHostStatus({ socket, agentDir: options.keyRoot }, { prune: false, timeoutMs: timeout })
+  return { launch_profile: status.reachable ? status.launchProfile : undefined }
 }

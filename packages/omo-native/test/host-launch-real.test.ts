@@ -30,13 +30,15 @@ test.skipIf(process.platform === "win32")(
     let pid: number | undefined
     let client: RpcClient | undefined
     const stop = () => {
-      const result = call(engine, "host", "stop", "--socket", socket, "--force")
-      if (pid !== undefined && result.status !== 0) {
+      if (pid === undefined) return
+      const result = call(engine, "host", "stop", "--socket", socket, "--drain", "--wait-ms", "10000")
+      if (result.status !== 0 || JSON.parse(result.stdout).exited !== true) {
         try {
           process.kill(pid, "SIGTERM")
         } catch (e) {
           if ((e as NodeJS.ErrnoException).code !== "ESRCH") throw e
         }
+        throw new Error(`scratch host did not confirm exit: ${result.stdout}${result.stderr}`)
       }
       pid = undefined
     }
@@ -60,6 +62,7 @@ test.skipIf(process.platform === "win32")(
       await client.start()
       await client.openSession({ cwd: home })
       expect(await client.requestExtension("fixture.tools")).toContain("thread_send")
+      await client.closeSession()
       await client.stop()
       client = undefined
       stop()
@@ -88,5 +91,4 @@ test.skipIf(process.platform === "win32")(
       }
     }
   },
-  180_000,
 )
