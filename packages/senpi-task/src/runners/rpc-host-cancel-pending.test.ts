@@ -128,7 +128,10 @@ describe("a pending cancel always ends the run", () => {
 
     // when
     const interrupted = await bounded(parent.manager.interruptTask(child.task_id), "task interrupt")
-    const again = await bounded(runTaskCancel(parent.manager, { task_id: child.task_id }), "the second task_cancel")
+    const again = await bounded(
+      runTaskCancel(parent.manager, { task_id: child.task_id }, parent.sessionId),
+      "the second task_cancel",
+    )
     const pendingView = await runTaskOutput(
       { manager: parent.manager, stateDir: parent.store.stateDir },
       { task_id: child.task_id },
