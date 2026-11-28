@@ -49,6 +49,10 @@ type HooksWithRuntimeLifecycle = Hooks & {
   dispose?: () => Promise<void>
 }
 
+export type DualPluginModule = PluginModule & {
+  setup: (context: unknown) => void | Promise<void>
+}
+
 export type PluginModuleDeps = {
   initConfigContext: typeof initConfigContext
   installAgentSortShim: typeof installAgentSortShim
@@ -167,7 +171,7 @@ function startupToastBody(input: {
   return undefined
 }
 
-export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): PluginModule {
+export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): DualPluginModule {
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   let startupMigration: ReturnType<PluginModuleDeps["runOpenCodeStartupMigration"]> | undefined
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
@@ -361,6 +365,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
   return {
     id: "oh-my-openagent",
+    setup: () => {},
     server: serverPlugin,
   }
 }
