@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 
+import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type {
   AgentHome,
@@ -10,7 +11,11 @@ import type {
   SessionHistoryOptions,
   SessionHistoryScanner,
 } from "./session-history"
-import { loadSessionHistoryRuntime, type SessionHistoryRuntimeLoader } from "./session-history-runtime-loader"
+import {
+  loadSessionHistoryRuntime,
+  SessionHistoryRuntimeUnavailable,
+  type SessionHistoryRuntimeLoader,
+} from "./session-history-runtime-loader"
 
 /** Unary: answers the engine's project scan for the homes and projects the desktop names. */
 export const OMO_SESSION_PROJECTS_RPC_METHOD = "omo.onboarding.projects"
@@ -158,4 +163,6 @@ const isSource = (value: unknown): value is AgentSessionSource => value === "cla
 const isNumberOrNull = (value: unknown): value is number | null => value === null || typeof value === "number"
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
 const unavailable = (reason: string): Unavailable => ({ kind: "unavailable", reason })
-const reasonOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
+// The desktop shows these reasons; a scanner error's own text names local paths (#15358).
+const reasonOf = (cause: unknown): string =>
+  cause instanceof SessionHistoryRuntimeUnavailable ? cause.message : describeReadFailure(cause)

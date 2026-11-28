@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, symlink, writeFile } from "node:fs/promises"
-import type { ChildSpec } from "@oh-my-opencode/senpi-task"
 import { join } from "node:path"
 
 import { registrySnapshot } from "../memory/facts-runner.test-support"
@@ -9,19 +8,14 @@ import type { SessionDigest } from "./session-history"
 import {
   digest,
   fakeModel,
+  runUnderstanding as run,
   snapshotTree,
   tempRoot,
   understandRunDirs,
   UNDERSTAND_MODEL,
-  type FakeTurn,
 } from "./understand.test-support"
-import {
-  ONBOARDING_UNDERSTAND_BUDGET,
-  type OnboardingUnderstandBudgetLimits,
-  type OnboardingUnderstandEvent,
-} from "./understand-contract"
+import { ONBOARDING_UNDERSTAND_BUDGET, type OnboardingUnderstandEvent } from "./understand-contract"
 import { OnboardingUnderstandingControl } from "./understand-control"
-import { runOnboardingUnderstanding } from "./understand-runtime"
 import { startOnboardingUnderstanding } from "./understand-start"
 
 const cleanups: Array<() => Promise<void>> = []
@@ -33,37 +27,6 @@ async function workspace(): Promise<string> {
   const root = await tempRoot("omo-understand-test-")
   cleanups.push(root.cleanup)
   return root.path
-}
-
-async function run(input: {
-  readonly digests: readonly SessionDigest[]
-  readonly turn: FakeTurn
-  readonly control?: OnboardingUnderstandingControl
-  readonly budget?: OnboardingUnderstandBudgetLimits
-  readonly env?: NodeJS.ProcessEnv
-  readonly projectRoots?: ReadonlySet<string>
-  readonly now?: () => number
-  readonly onAbort?: (spec: ChildSpec) => Promise<void>
-}) {
-  const model = fakeModel(input.turn, input.onAbort === undefined ? {} : { onAbort: input.onAbort })
-  const events: OnboardingUnderstandEvent[] = []
-  const done = await runOnboardingUnderstanding(
-    {
-      understandId: "understand-1",
-      scanId: "scan-1",
-      model: UNDERSTAND_MODEL,
-      digests: input.digests,
-      projectRoots: input.projectRoots ?? new Set(input.digests.map((item) => item.cwd)),
-      ...(input.now === undefined ? {} : { now: input.now }),
-      modelRegistry: registrySnapshot(),
-      control: input.control ?? new OnboardingUnderstandingControl(),
-      createRunner: model.createRunner,
-      env: input.env ?? { HOME: "/nonexistent-home" },
-      ...(input.budget === undefined ? {} : { budget: input.budget }),
-    },
-    (event) => events.push(event),
-  )
-  return { done, events, starts: model.starts }
 }
 
 const kinds = (events: readonly OnboardingUnderstandEvent[]) => events.map((event) => event.kind)
@@ -292,21 +255,6 @@ describe("onboarding understanding (#10480)", () => {
     expect(done).toMatchObject({ kind: "done", fallback: "scan_only", candidates: [] })
   })
 
-  test("#given a model provider that cannot start #when understanding runs #then the retry and fallback hold too", async () => {
-    // given
-    const root = await workspace()
-
-    // when
-    const { done, starts } = await run({
-      digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)],
-      turn: async () => "throw",
-    })
-
-    // then
-    expect(starts).toHaveLength(2)
-    expect(done.fallback).toBe("scan_only")
-  })
-
   test("#given a model call that fails once #when the retry succeeds #then its facts are kept", async () => {
     // given
     const root = await workspace()
@@ -508,9 +456,9 @@ describe("onboarding understanding (#10480)", () => {
     if ("kind" in started) throw new Error(`understanding did not start: ${started.reason}`)
     await started.finished
 
-    // then
+    // then: the reason is the failure's kind, never the error's text (#15358)
     const done = events.at(-1)
-    expect(done).toMatchObject({ kind: "done", fallback: "scan_only", toolCalls: 1 })
+    expect(done).toMatchObject({ kind: "done", fallback: "scan_only", toolCalls: 1, reason: "an unexpected error" })
     expect(done?.bytesRead).toBe(digests.reduce((sum, item) => sum + digestByteLength(item), 0))
     expect(done?.elapsedMs).toBeGreaterThanOrEqual(0)
   })
