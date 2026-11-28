@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { access, mkdir, rm } from "node:fs/promises"
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { sendMessage } from "../team-mailbox/send"
@@ -209,6 +209,36 @@ describe("team-runtime shutdown", () => {
     )
   })
 
+  test("#given a member worktreePath the team did not create #when deleteTeam runs #then that directory and its files survive (#11072)", async () => {
+    // given
+    const fixture = await createFixture()
+    temporaryDirectories.push(fixture.baseDir)
+    const existing = path.join(fixture.baseDir, "user-checkout")
+    await mkdir(existing, { recursive: true })
+    await writeFile(path.join(existing, "work.txt"), "unpushed work")
+    await transitionRuntimeState(
+      fixture.teamRunId,
+      (runtimeState) => ({
+        ...runtimeState,
+        members: runtimeState.members.map((member) =>
+          member.name === "member-a" ? { ...member, worktreePath: existing } : member,
+        ),
+      }),
+      fixture.config,
+    )
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "shutdown_approved",
+    })
+
+    // when
+    const result = await deleteTeam(fixture.teamRunId, fixture.config)
+
+    // then
+    expect(result.removedWorktrees).not.toContain(existing)
+    expect(await readFile(path.join(existing, "work.txt"), "utf8")).toBe("unpushed work")
+  })
+
   test("#given a team run is tracked for session cleanup #when deleteTeam succeeds #then it unregisters the run", async () => {
     // given
     const fixture = await createFixture()
@@ -335,7 +365,9 @@ describe("team-runtime shutdown", () => {
       (runtimeState) => ({
         ...runtimeState,
         members: runtimeState.members.map((member) =>
-          member.name === "lead" ? { ...member, worktreePath: leadWorktreePath } : member,
+          member.name === "lead"
+            ? { ...member, worktreePath: leadWorktreePath, worktreeCreated: leadWorktreePath }
+            : member,
         ),
       }),
       fixture.config,

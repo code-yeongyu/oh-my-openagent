@@ -78,6 +78,7 @@ export async function createFixture(options?: { status?: RuntimeState["status"] 
         status: "pending",
         pendingInjectedMessageIds: [],
         worktreePath: path.join(worktreeRoot, "member-a"),
+        worktreeCreated: path.join(worktreeRoot, "member-a"),
       },
       {
         name: "member-b",
@@ -85,6 +86,7 @@ export async function createFixture(options?: { status?: RuntimeState["status"] 
         status: "pending",
         pendingInjectedMessageIds: [],
         worktreePath: path.join(worktreeRoot, "member-b"),
+        worktreeCreated: path.join(worktreeRoot, "member-b"),
       },
     ],
     shutdownRequests: [],
