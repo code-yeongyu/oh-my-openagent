@@ -234,7 +234,9 @@ describe("telemetry consent gate routes", () => {
     ).toBe(true)
     expect(
       violations.filter((line) => line.endsWith("(the fan-in it relies on does not read the consent gate)")).length,
-    ).toBe(REVIEWED_WRITERS.filter((entry) => entry.route?.kind === "fan-in").length)
+    ).toBe(
+      REVIEWED_WRITERS.reduce((sites, entry) => sites + (entry.route?.kind === "fan-in" ? (entry.count ?? 1) : 0), 0),
+    )
   })
 
   test("#given only the raw turn send stops reading consent #when routes are checked #then that one site fails", () => {
@@ -259,6 +261,29 @@ describe("telemetry consent gate routes", () => {
     const guarded = SINK.replace("  client.captureEvent", "  if (!isConsented()) return\n  client.captureEvent")
     const reviewed = [...REVIEWED_WRITERS, { ...SINK_ENTRY, route: { kind: "gate" } as const }]
     expect(bypasses([...realSources(), { name: "omo-native-new-writer.ts", source: guarded }], reviewed)).toEqual([])
+  })
+
+  test("#given a guard inverted to send only after opt-out #when routes are checked #then it fails (#10484)", () => {
+    // given
+    const inverted = SINK.replace("  client.captureEvent", "  if (isConsented()) return\n  client.captureEvent")
+    const reviewed = [...REVIEWED_WRITERS, { ...SINK_ENTRY, route: { kind: "gate" } as const }]
+
+    // when / then
+    expect(bypasses([...realSources(), { name: "omo-native-new-writer.ts", source: inverted }], reviewed)).toEqual([
+      'bypass omo-native-new-writer.ts: sink | unless(isConsented()) | client.captureEvent("x") (its guards do not read the consent gate)',
+    ])
+  })
+
+  test("#given the emitter reached through a local alias or Reflect.apply #when sites are scanned #then both are sites (#10484)", () => {
+    const source = [
+      SINK,
+      "const send = options.client.captureEvent",
+      'send("aliased")',
+      'Reflect.apply(options.client.captureEvent, null, ["reflected"])',
+    ].join("\n")
+    const calls = scanWriterSites("omo-native-alias.ts", source).map((site) => site.call)
+    expect(calls.filter((call) => call === 'send("aliased")')).toHaveLength(1)
+    expect(calls.filter((call) => call === "ref options.client.captureEvent")).toHaveLength(1)
   })
 
   test("#given the unregistered legacy component becomes registered #when routes are checked #then its ungated send fails", () => {
