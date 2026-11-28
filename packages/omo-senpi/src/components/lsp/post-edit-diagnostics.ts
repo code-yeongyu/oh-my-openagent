@@ -36,11 +36,6 @@ export interface PostEditDiagnosticsResult {
   widgetLines: readonly string[] | undefined
 }
 
-interface DiagnosticBlock {
-  filePath: string
-  diagnostics: string
-}
-
 export interface LspPostEditSessionState {
   getOrCreate(sessionId: string | undefined): PostEditNotConfiguredCache
   onSessionStart(sessionId: string | undefined): void
@@ -98,7 +93,7 @@ export async function appendPostEditDiagnostics(
     maxConcurrency: POST_EDIT_DIAGNOSTICS_CONCURRENCY,
     ...(locateFile === undefined ? {} : { locateFile }),
   })
-  const blocks: readonly DiagnosticBlock[] = result.blocks
+  const blocks = result.blocks
 
   if (blocks.length === 0) {
     return { widgetLines: undefined }
@@ -107,9 +102,11 @@ export async function appendPostEditDiagnostics(
   return {
     content: [
       ...event.content,
-      ...blocks.map(({ filePath, diagnostics }) => ({
+      ...blocks.map(({ filePath, diagnostics, blocking }) => ({
         type: "text" as const,
-        text: `\n\nLSP errors detected in ${filePath}, please fix:\n${diagnostics}`,
+        text: blocking
+          ? `\n\nLSP errors detected in ${filePath}, please fix:\n${diagnostics}`
+          : `\n\nLSP note for ${filePath} (the edit itself is not affected):\n${diagnostics}`,
       })),
     ],
     widgetLines: undefined,
