@@ -41,7 +41,7 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["open"],
-    text: `  open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
+    text: `  open <device> --project P [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
        [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]]
                                            start a session on another device; prints <device>/<session>; it runs
                                            in MODE (default: this device's own setting, else full-access), on the

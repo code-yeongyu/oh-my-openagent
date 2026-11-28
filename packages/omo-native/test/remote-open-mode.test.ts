@@ -23,7 +23,7 @@ afterEach(() => {
 async function open(args: readonly string[], localMode: () => string = () => "workspace", world = personWorld()) {
   const owner = await startFakeOwner({ stateDir: privateDir(), world })
   owners.push(owner)
-  const result = await run(["open", "studio", ...args], owner.stateDir, SIGNED_IN, testBootstrap(), {
+  const result = await run(["open", "studio", "--project", "/work/b", ...args], owner.stateDir, SIGNED_IN, testBootstrap(), {
     localPermissionPreset: localMode,
   })
   const frames = owner.state.commands.filter((rpc) => rpc["type"] === "open_session")
@@ -55,7 +55,7 @@ describe("omo remote open with create options", () => {
   })
 
   test("#given malformed create options #when parsed #then each is a usage error and nothing is opened", async () => {
-    for (const args of [["--model", "opus"], ["--thinking", "huge"], ["--branch", "x"], ["--worktree"], ["--steer"]]) {
+    for (const args of [["--model", "opus"], ["--thinking", "huge"], ["--branch", "x"], ["--steer"]]) {
       const result = await open(args)
       expect(result.code).toBe(REMOTE_EXIT.usage)
       expect(result.frames).toEqual([])
@@ -69,6 +69,10 @@ describe("omo remote open --worktree parsing", () => {
       parseSession("open", ["b", "--project", "/repo", "--worktree", "--branch", "feat/x", "--base", "main"]).session,
     ).toMatchObject({ verb: "open", project: "/repo", worktree: { branch: "feat/x", base: "main" } })
     expect(parseSession("open", ["b", "--project", "/repo", "--worktree"]).session).toMatchObject({ worktree: {} })
+  })
+
+  test("#given --worktree without --project #when parsed #then it is a usage error", () => {
+    expect(() => parseSession("open", ["b", "--worktree"])).toThrow(UsageError)
   })
 })
 

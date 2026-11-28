@@ -33,11 +33,21 @@ export async function openOn(
   }
   const device = await resolveTypedDevice(client, args.device)
   if (device.kind === "error") return answer.refuse(device.error, "")
+  // Without a folder the target engine would start the session in its service's working directory (#13401).
+  if (!args.project?.trim())
+    return answer.refuse(
+      {
+        code: "invalid_arguments",
+        message: "No target project folder was specified.",
+        next_action: "Pass --project with the project folder on the target device.",
+      },
+      "",
+    )
   const model = args.model === undefined ? undefined : `${args.model.provider}/${args.model.modelId}`
   const opened = await client.sessions.open({
     device: device.device,
     preset,
-    ...(args.project === undefined ? {} : { workspace: args.project }),
+    workspace: args.project,
     ...(model === undefined ? {} : { model }),
     ...(args.thinking === undefined ? {} : { reasoning: args.thinking }),
     ...(args.worktree === undefined ? {} : { worktree: args.worktree }),

@@ -36,9 +36,18 @@ describe("omo remote open", () => {
     expect(result.sent("open_session").map((rpc) => rpc["cwd"])).toEqual(["/work/b"])
   })
 
+  // #13401: without --project the target engine would start the session in its service's working directory.
+  test("#given no --project #when open runs #then it refuses as invalid_arguments naming --project and opens nothing", async () => {
+    const result = await onEngine(["open", "studio", "--json"])
+    expect(result.code).not.toBe(REMOTE_EXIT.ok)
+    expect(JSON.stringify(lastJson(result.out) ?? result.err)).toContain("invalid_arguments")
+    expect(JSON.stringify(lastJson(result.out) ?? result.err)).toContain("--project")
+    expect(result.sent("open_session")).toEqual([])
+  })
+
   // #13409: the model is the open's launch profile, never a set_model after it; --json still names it.
   test("#given --model #when open runs #then the model rides the one open_session and --json names it", async () => {
-    const result = await onEngine(["open", "studio", "--model", "openai/gpt-6", "--json"])
+    const result = await onEngine(["open", "studio", "--project", "/work/b", "--model", "openai/gpt-6", "--json"])
     expect(result.code).toBe(REMOTE_EXIT.ok)
     expect(lastJson(result.out)).toMatchObject({ model: { provider: "openai", id: "gpt-6" } })
     expect(result.sent("open_session").map((rpc) => [rpc["provider"], rpc["modelId"]])).toEqual([["openai", "gpt-6"]])
@@ -49,10 +58,10 @@ describe("omo remote open", () => {
     const refusing = {
       replies: { open_session: { refuse: "open_failed: model_unavailable: nope/none is not available" } },
     }
-    const human = await onEngine(["open", "studio", "--model", "nope/none"], refusing)
+    const human = await onEngine(["open", "studio", "--project", "/work/b", "--model", "nope/none"], refusing)
     expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, []])
     expect(human.err.join("\n")).toContain("nope/none")
-    const json = await onEngine(["open", "studio", "--model", "nope/none", "--json"], refusing)
+    const json = await onEngine(["open", "studio", "--project", "/work/b", "--model", "nope/none", "--json"], refusing)
     expect(json.code).toBe(REMOTE_EXIT.failed)
     expect(lastJson(json.out)).toMatchObject({
       kind: "error",
