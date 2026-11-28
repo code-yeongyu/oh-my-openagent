@@ -43,7 +43,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
     // given
     __setTimingConfig({
       POLL_INTERVAL_MS: 1,
-      MAX_POLL_TIME_MS: 50,
+      MAX_POLL_TIME_MS: 50_000,
     })
     const client = createClientForMessages([
       { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -67,7 +67,6 @@ describe("pollSyncSession internal all-complete wakes", () => {
         toastManager: null,
         taskId: undefined,
       },
-      50_000,
     )
 
     // then
@@ -78,7 +77,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
     // given
     __setTimingConfig({
       POLL_INTERVAL_MS: 1,
-      MAX_POLL_TIME_MS: 50,
+      MAX_POLL_TIME_MS: 50_000,
     })
     const client = createClientForMessages([
       { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -108,7 +107,6 @@ describe("pollSyncSession internal all-complete wakes", () => {
         toastManager: null,
         taskId: undefined,
       },
-      50,
     )
 
     // then
@@ -182,7 +180,6 @@ describe("pollSyncSession internal all-complete wakes", () => {
         toastManager: null,
         taskId: undefined,
       },
-      50,
     )
 
     // then
