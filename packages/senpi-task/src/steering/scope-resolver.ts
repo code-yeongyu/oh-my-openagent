@@ -6,7 +6,7 @@ export type TaskLookup = {
   list(): readonly TaskRecord[]
 }
 
-export function ownsTask(sessionId: string, record: TaskRecord): boolean {
+function ownsTask(sessionId: string, record: TaskRecord): boolean {
   return sessionId === record.parent_session_id || sessionId === record.root_session_id
 }
 
@@ -29,10 +29,14 @@ export function resolveTask(lookup: TaskLookup, idOrName: string, caller?: Calle
   return caller === undefined ? anywhere(lookup, idOrName) : within(lookup, idOrName, caller.sessionId)
 }
 
-export function resolveTaskCallerFirst(
-  lookup: TaskLookup,
-  idOrName: string,
-  callerSessionId: string | undefined,
-): TaskRecord | undefined {
-  return within(lookup, idOrName, callerSessionId) ?? anywhere(lookup, idOrName)
+export type SendScope = { readonly callerSessionId?: string; readonly allScope?: boolean }
+
+/**
+ * task_send and redispatch: with a caller, only that caller's tasks resolve unless all_scope asks for every
+ * session, which still tries the caller's own first. Without a caller (the engine's own callers), as resolveTask.
+ */
+export function resolveSendTarget(lookup: TaskLookup, idOrName: string, scope: SendScope): TaskRecord | undefined {
+  if (scope.callerSessionId === undefined) return anywhere(lookup, idOrName)
+  const own = within(lookup, idOrName, scope.callerSessionId)
+  return scope.allScope === true ? (own ?? anywhere(lookup, idOrName)) : own
 }

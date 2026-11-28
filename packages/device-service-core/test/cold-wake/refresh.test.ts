@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { type ColdWakeHost, installColdWake, refreshColdWake } from "../../src/cold-wake/index.ts"
+import {
+  type ColdWakeHost,
+  installColdWake,
+  installedSessionHostRuntimeVersion,
+  refreshColdWake,
+} from "../../src/cold-wake/index.ts"
 import { SessionHostLaunch } from "../../src/cold-wake/session-host-unit.ts"
 import { fakeLaunchd, fakeSystemd, LABEL_PLIST, removeTempHomes, UNIT_DIR } from "./cold-wake-fakes.ts"
 
@@ -16,7 +21,8 @@ afterEach(removeTempHomes)
 
 const RUNTIME = "/h/.omo/binary-runtime/5.1.77/omo"
 const olderThan5177 = (installed: string) => Bun.semver.order(installed, "5.1.77") < 0
-const refresh = (host: ColdWakeHost) => refreshColdWake(host, { runtime: RUNTIME, isOlder: olderThan5177 })
+const refresh = (host: ColdWakeHost, agentDir = "/srv/profile-b/agent") =>
+  refreshColdWake(host, { runtime: RUNTIME, isOlder: olderThan5177, agentDir })
 
 const launchOf = (version: string, agentDir = "/h/.omo/agent", path?: string) => {
   const omoBin = `/h/.omo/binary-runtime/${version}/omo`
@@ -201,6 +207,38 @@ describe("refreshing the session host unit on Linux", () => {
       expect(readFileSync(linuxUnit(home), "utf8")).toBe(before)
       expect(runs).toEqual([])
     }
+  })
+})
+
+// omo#15029 / #15264 review L1: a launch for another agent dir never touches the unit, on either service manager, and
+// the runtime the unit names is read whatever agent dir it serves, so a runtime prune can keep it (review M1).
+describe("a unit that serves another agent dir", () => {
+  for (const [platform, fake, unitOf, text] of [
+    ["linux", fakeSystemd, linuxUnit, SYSTEMD_5_1_75],
+    ["darwin", fakeLaunchd, (home: string) => LABEL_PLIST(home, "ai.omo.session-host"), LAUNCHD_5_1_75],
+  ] as const) {
+    test(`${platform}: is neither rewritten nor reloaded by an older-unit refresh, and its runtime is still read`, async () => {
+      const { host, home, runs } = fake()
+      await installColdWake(host, launchOf("5.1.75"))
+      writeFileSync(unitOf(home), text)
+      runs.length = 0
+
+      expect(await refresh(host, "/h/.omo/agent")).toBeUndefined()
+      expect(readFileSync(unitOf(home), "utf8")).toBe(text)
+      expect(runs).toEqual([])
+      expect(installedSessionHostRuntimeVersion(host)).toBe("5.1.75")
+    })
+
+    test(`${platform}: the same agent dir spelled with a trailing separator is the unit's own`, async () => {
+      const { host, home } = fake()
+      await installColdWake(host, launchOf("5.1.75"))
+      writeFileSync(unitOf(home), text)
+      expect(await refresh(host, "/srv/profile-b/agent/")).toEqual({ kind: "installed", serviceRestarted: false })
+    })
+  }
+
+  test("no installed unit names no runtime", () => {
+    expect(installedSessionHostRuntimeVersion(fakeSystemd().host)).toBeUndefined()
   })
 })
 

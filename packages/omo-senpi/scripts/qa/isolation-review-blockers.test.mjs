@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   opendirSync,
   openSync,
+  readFileSync,
   readSync,
   renameSync,
   rmSync,
@@ -19,6 +20,7 @@ import { join } from "node:path"
 import * as isolationState from "./isolation-state.mjs"
 
 const {
+  changedSnapshotPaths,
   classifyObservedChanges,
   credentialDigest,
   digestDirectory,
@@ -177,6 +179,59 @@ test("#given credential files are absent or inaccessible #when credentialDigest 
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test("#given secret-bearing credential files #when isolation is observed #then only their mode and size are compared and their contents are never read", () => {
+  // Given
+  const root = mkdtempSync(join(tmpdir(), "omo-senpi-secret-stat-"))
+  try {
+    writeFileSync(join(root, "auth.json"), "AAA")
+    writeFileSync(join(root, "models.json"), "{}")
+    const reads = []
+    const readFile = (path) => {
+      reads.push(path)
+      return readFileSync(path)
+    }
+    const before = credentialDigest(root, { readFile })
+    const protectedBefore = snapshotProtectedState(root, readFile)
+
+    // When
+    writeFileSync(join(root, "auth.json"), "BBB")
+    const sameSize = credentialDigest(root, { readFile })
+    writeFileSync(join(root, "auth.json"), "BBBB")
+
+    // Then
+    expect(sameSize).toBe(before)
+    expect(credentialDigest(root, { readFile })).not.toBe(before)
+    expect(changedSnapshotPaths(protectedBefore.snapshot, snapshotProtectedState(root, readFile).snapshot)).toEqual([
+      "auth.json",
+    ])
+    expect(reads.filter((path) => /(auth|models)\.json$/.test(path))).toEqual([])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+// The directory scan needs descriptor-bound traversal, which only Linux has here (Windows reports it unavailable).
+fdIt(
+  "#given secret-bearing credential files #when the directory is scanned #then they are recorded by mode and size and a size change is seen",
+  () => {
+    // Given
+    const root = mkdtempSync(join(tmpdir(), "omo-senpi-secret-scan-"))
+    try {
+      writeFileSync(join(root, "auth.json"), "AAA")
+      const scanBefore = snapshotDirectory(root, LIMITS)
+
+      // When
+      writeFileSync(join(root, "auth.json"), "BBBB")
+
+      // Then
+      expect(scanBefore.snapshot.get("auth.json")).toMatch(/^stat [0-7]+ 3$/)
+      expect(changedSnapshotPaths(scanBefore.snapshot, snapshotDirectory(root, LIMITS).snapshot)).toEqual(["auth.json"])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+)
 
 fdIt(
   "#given bounded observation root enumeration fails #when snapshotDirectory runs #then inaccessible IO is structured and incomplete while absence is empty-complete",
@@ -399,7 +454,7 @@ fdIt(
         for (const diagnosticCode of ["ENOENT", "EACCES"]) {
           // Given
           const root = mkdtempSync(join(tmpdir(), `omo-senpi-diagnostic-${kind}-`))
-          const name = kind === "observed" ? "state.json" : "auth.json"
+          const name = kind === "observed" ? "state.json" : "settings.json"
           const path = join(root, name)
           try {
             writeFileSync(path, "AAAA")
@@ -416,15 +471,13 @@ fdIt(
               ...(kind === "protected"
                 ? {
                     lstatSync(file, options) {
-                      statCalls += 1
-                      if (file === path && statCalls > 1) throw codedError(diagnosticCode)
+                      if (file === path && ++statCalls > 1) throw codedError(diagnosticCode)
                       return lstatSync(file, options)
                     },
                   }
                 : {
                     statSync(file, options) {
-                      statCalls += 1
-                      if (file === path && statCalls > 1) throw codedError(diagnosticCode)
+                      if (file === path && ++statCalls > 1) throw codedError(diagnosticCode)
                       return statSync(file, options)
                     },
                   }),

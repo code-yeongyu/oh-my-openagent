@@ -4,6 +4,7 @@ import {
   normalizeRendererText,
   rendererVisibleWidth,
 } from "@oh-my-opencode/senpi-task/renderer-text"
+import { isProcessAlive, pausedStatusText } from "./dag-status-paused"
 
 const MAX_NODE_ROWS = 12
 const LABEL_MIN = 16
@@ -16,6 +17,7 @@ const NARROW_ROW_WIDTH = 60
 // Ceiling when no terminal width is known; matches the task widget's LIVE_WIDGET_LINE_MAX.
 const NODE_ROW_WIDTH_MAX = 220
 const SEPARATOR = " · "
+const HELD_BADGE = "held while stopped: send to continue"
 
 // Structural mirrors of the dag domain contract (senpi-task/src/dag/types.ts). Declared locally so
 // the widget stays a read-only consumer of whatever DagManager instance the extension wires in.
@@ -36,6 +38,8 @@ export interface DagStatusNode {
   readonly createdAt?: string
   readonly startedAt?: string
   readonly completedAt?: string
+  // A turn its finished child started while the user had stopped the run, held and not yet answered.
+  readonly heldTrigger?: { readonly count: number }
 }
 
 export interface DagStatusWave {
@@ -52,6 +56,8 @@ export interface DagStatusRunSnapshot {
   // Resume lease owner, written by the dag recovery claim and cleared on shutdown pause. A paused
   // run still carrying a LIVE pid is mid-resume, not idle; absent on legacy records.
   readonly leaseHolderPid?: number
+  // A settled run that still owns a live child owes a stop (#11381); absent when it owes nothing.
+  readonly outstandingStop?: { readonly liveTaskIds: readonly string[] }
 }
 
 export interface DagRunRowsOptions {
@@ -151,27 +157,8 @@ function runHeaderRow(run: DagStatusRunSnapshot, isAlive: (pid: number) => boole
   const icon = paused ? PAUSED_RUN_ICON : (NODE_ICONS[run.status] ?? "○")
   const name = excerptRendererText(normalizeRendererText(run.name), LABEL_MAX)
   const status = paused ? pausedStatusText(run, isAlive) : normalizeRendererText(run.status)
-  return `${icon} ${name} ${status} ${waveLabel(run)} ${countsLabel(run)}`
-}
-
-// Priority is deliberate. A live lease means another process already claimed this run and is
-// reconciling it, so "paused" would be stale by the time it is painted. Without that lease, nodes
-// still recorded as running are stranded work the header must own rather than hide behind "paused".
-function pausedStatusText(run: DagStatusRunSnapshot, isAlive: (pid: number) => boolean): string {
-  if (run.leaseHolderPid !== undefined && isAlive(run.leaseHolderPid)) return "resuming"
-  const running = run.nodes.reduce((count, node) => count + (node.state === "running" ? 1 : 0), 0)
-  return running > 0 ? `suspended · ${running} active` : "paused"
-}
-
-// Signal 0 probes existence without delivering anything. ESRCH is the only "gone" answer: EPERM
-// means the pid exists under another uid, which still counts as a live lease holder.
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== "ESRCH"
-  }
+  const owed = run.outstandingStop === undefined ? "" : " stop owed"
+  return `${icon} ${name} ${status}${owed} ${waveLabel(run)} ${countsLabel(run)}`
 }
 
 // Current wave = the first wave still holding a nonterminal node; a fully settled run reads y/y.
@@ -241,6 +228,7 @@ function nodeRow(
   const route = routeLabel(node.route)
   // A re-run node is the exception worth a badge; a first attempt stays unmarked.
   const attempt = (node.attempt ?? 1) > 1 ? `x${node.attempt}` : undefined
+  const badges = [...(attempt === undefined ? [] : [attempt]), ...(node.heldTrigger === undefined ? [] : [HELD_BADGE])]
   const elapsed = elapsedLabel(node, now)
   // Activity is live telemetry: any node that has not settled may carry it, including one still
   // spawning its child. Settled nodes never do — their story is told by the terminal icon.
@@ -251,7 +239,7 @@ function nodeRow(
   const floorParts = [
     excerptRendererText(label, LABEL_MIN),
     excerptRendererText(route, ROUTE_MIN),
-    ...(attempt === undefined ? [] : [attempt]),
+    ...badges,
     ...(showActivity ? [excerptRendererText(activityText, ACTIVITY_MIN)] : []),
     ...(elapsed === undefined ? [] : [elapsed]),
   ]
@@ -267,7 +255,7 @@ function nodeRow(
   const parts = [
     excerptRendererText(label, labelWidth),
     excerptRendererText(route, routeWidth),
-    ...(attempt === undefined ? [] : [attempt]),
+    ...badges,
     ...(showActivity ? [excerptRendererText(activityText, activityWidth)] : []),
     ...(elapsed === undefined ? [] : [elapsed]),
   ]

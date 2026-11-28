@@ -204,7 +204,7 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
   })
 
   test.skipIf(process.platform === "win32")(
-    "#given no key record for an enforcing host #when a mutation is refused auth_required #then the typed error carries the key-root remedy",
+    "#given no key record for a challenging host #when a mutation runs #then it is refused as a missing record with the key-root remedy and never sent",
     async () => {
       await withContractHost(
         {
@@ -223,9 +223,11 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
               () => undefined,
               (error: unknown) => error,
             )
-            expect((refusal as Error).message).toStartWith("auth_required:")
-            expect((refusal as Error).message).toContain("SENPI_RPC_KEY_ROOT")
+            expect((refusal as Error).message).toBe(
+              `host_identity_unproven:${host.socket}: no key record ${host.recordPath}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+            )
             expect(host.mutations).toEqual([])
+            expect(host.frames.filter(({ frame }) => frame.type !== "get_protocol_info")).toEqual([])
           })
         },
       )
@@ -243,7 +245,7 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
   })
 
   test.skipIf(process.platform === "win32")(
-    "#given no key record for an enforcing host #when a read is refused auth_required #then the error names the endpoint and the key-root remedy",
+    "#given no key record for a challenging host #when a read runs #then it is refused as a missing record naming the record and the key-root remedy",
     async () => {
       await withContractHost(
         {
@@ -260,9 +262,10 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
                 () => undefined,
                 (error: unknown) => error,
               )
-            expect((refusal as Error).message).toStartWith("auth_required:")
-            expect((refusal as Error).message).toContain(host.socket)
-            expect((refusal as Error).message).toContain("SENPI_RPC_KEY_ROOT")
+            expect((refusal as Error).message).toBe(
+              `host_identity_unproven:${host.socket}: no key record ${host.recordPath}; set SENPI_RPC_KEY_ROOT to the host's agent dir`,
+            )
+            expect(host.frames.filter(({ frame }) => frame.type !== "get_protocol_info")).toEqual([])
           })
         },
       )

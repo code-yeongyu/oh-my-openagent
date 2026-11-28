@@ -122,12 +122,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
           record.parent_session_id !== input.callerSessionId &&
           input.allScope !== true
         ) {
-          return {
-            kind: "scope_denied" as const,
-            task_id: record.task_id,
-            owning_session_id: record.parent_session_id,
-            reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`,
-          }
+          return { kind: "not_found" as const, reason: `No task found for "${input.idOrName}".`, suggestion: "" }
         }
         return {
           kind: "steered" as const,
