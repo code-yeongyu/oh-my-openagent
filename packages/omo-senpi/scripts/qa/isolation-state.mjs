@@ -1,6 +1,6 @@
 // allow: SIZE_OK - bounded snapshots and their canonical verdict share one normalization contract.
 import { createHash } from "node:crypto"
-import { constants, readdirSync, readFileSync } from "node:fs"
+import { constants, lstatSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import {
   errorCode,
@@ -14,6 +14,35 @@ import {
 } from "./isolation-file-readers.mjs"
 
 const CREDENTIAL_FILES = ["auth.json", "models.json", "settings.json", "trust.json"]
+// Files that can hold secrets (sign-in tokens, provider API keys). Their contents are never read: every check
+// records only the mode and size (#15311). The other protected files are settings, compared by content.
+const SECRET_FILES = ["auth.json", "models.json"]
+const isSecretFile = (name) => SECRET_FILES.includes(name.split(/[\\/]/).pop())
+
+/** "absent", or the mode and size of a secret-bearing file; any lstat failure other than ENOENT throws. */
+function secretFileStat(path, lstat = lstatSync) {
+  try {
+    return secretStatText(lstat(path))
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return "absent"
+    throw error
+  }
+}
+
+function secretStatText(stat) {
+  return `stat ${Number(stat.mode).toString(8)} ${stat.size}`
+}
+
+/** A comparable fingerprint of one file: mode and size for a secret-bearing file, a content hash otherwise. */
+export function fileFingerprint(path) {
+  if (isSecretFile(path)) return secretFileStat(path)
+  try {
+    return createHash("sha256").update(readFileSync(path)).digest("hex")
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return "absent"
+    throw error
+  }
+}
 export const PROTECTED_STATE_FILES = [
   "auth.json",
   "settings.json",
@@ -34,11 +63,14 @@ export function credentialDigest(agentDir, { readFile = readFileSync } = {}) {
   const hash = createHash("sha256")
   for (const name of CREDENTIAL_FILES) {
     let content
-    try {
-      content = credentialBytes(readFile(join(agentDir, name)), name)
-    } catch (error) {
-      if (errorCode(error) !== "ENOENT") throw error
-      content = Buffer.from("absent")
+    if (isSecretFile(name)) content = Buffer.from(secretFileStat(join(agentDir, name)))
+    else {
+      try {
+        content = credentialBytes(readFile(join(agentDir, name)), name)
+      } catch (error) {
+        if (errorCode(error) !== "ENOENT") throw error
+        content = Buffer.from("absent")
+      }
     }
     hash.update(name)
     hash.update("\0")
@@ -53,6 +85,17 @@ export function snapshotProtectedState(root, readFileOrIo = FILE_IO) {
   const snapshot = new Map()
   const errors = []
   for (const name of PROTECTED_STATE_FILES) {
+    if (isSecretFile(name)) {
+      try {
+        const stat = io.lstatSync(join(root, name))
+        if (stat.isFile()) snapshot.set(name, secretStatText(stat))
+        else errors.push({ path: name, code: "UNSUPPORTED_ENTRY" })
+      } catch (error) {
+        if (errorCode(error) === "ENOENT") snapshot.set(name, "absent")
+        else errors.push({ path: name, code: errorCode(error) })
+      }
+      continue
+    }
     const result = readProtectedFileStable(join(root, name), io)
     if (result.error !== undefined) errors.push({ path: name, code: result.error })
     else if (result.absent) snapshot.set(name, "absent")
@@ -358,6 +401,10 @@ function collectFilesBounded(currentRoot, state, boundRoot = currentRoot) {
         kind: pathStat.isSymbolicLink() ? "symlink" : "file",
         size: boundedSize(metadata.size),
         metadata,
+      }
+      if (file.kind === "file" && isSecretFile(rel)) {
+        state.snapshot.set(rel, secretStatText(pathStat))
+        continue
       }
       const remainingBytes = limits.maxBytes - state.bytesRead
       if (file.size > remainingBytes) {
