@@ -37,7 +37,7 @@ export function upsertTaskSessionState(
   }
 
   state.task_sessions = taskSessions
-  return writeBoulderState(directory, state) ? state : null
+  return writeBoulderState(directory, state).ok ? state : null
 }
 
 export function upsertTaskSessionStateForWork(
@@ -102,7 +102,7 @@ export function upsertTaskSessionStateForWork(
     projectWorkToMirror(nextState, nextWork)
   }
 
-  return writeBoulderState(directory, nextState) ? nextState : null
+  return writeBoulderState(directory, nextState).ok ? nextState : null
 }
 
 export function startTaskTimer(
@@ -137,7 +137,7 @@ export function startTaskTimer(
   taskSession.status = "running"
   taskSession.updated_at = nowIsoString()
   work.updated_at = nowIsoString()
-  return writeBoulderState(directory, nextState) ? nextState : null
+  return writeBoulderState(directory, nextState).ok ? nextState : null
 }
 
 export function endTaskTimer(
@@ -168,5 +168,5 @@ export function endTaskTimer(
     projectWorkToMirror(state, work)
   }
 
-  return writeBoulderState(directory, state) ? state : null
+  return writeBoulderState(directory, state).ok ? state : null
 }
