@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { spawn } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, watch, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, watch, writeFileSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
@@ -73,11 +73,18 @@ export default function register(pi) {
   return path
 }
 
-function writeChildShim() {
+function writeChildShim(parentProvider) {
   const path = join(sandbox.root, "senpi-child-shim")
   writeFileSync(
     path,
     `#!/bin/sh
+# Simulate a catalog that still advertises the primary. Real reflection children
+# load only the mock fallback, so the engine, not this shim, reports the primary miss.
+for arg do
+  if [ "$arg" = "--list-models" ]; then
+    exec ${JSON.stringify(senpiBin)} -e ${JSON.stringify(parentProvider)} "$@"
+  fi
+done
 if [ -n "$TRANSCRIPT_PATH" ]; then
   printf '%s\n' "$*" >> "$(dirname "$TRANSCRIPT_PATH")/attempts.log"
 fi
@@ -88,25 +95,26 @@ exec ${JSON.stringify(senpiBin)} -e ${JSON.stringify(mockProviderEntry)} "$@"
   return path
 }
 
-function writeCompletionHold(completions) {
+function writeCompletionHold(completions, existing) {
   const path = join(sandbox.root, "completion-hold.js")
   writeFileSync(
     path,
     `
-import { mkdirSync, readdirSync, watch } from "node:fs"
+import { readdirSync, watch } from "node:fs"
 
 export default function holdUntilReflectionCompletes(pi) {
   pi.on("agent_settled", () => {
-    mkdirSync(${JSON.stringify(completions)}, { recursive: true })
-    const existing = new Set(readdirSync(${JSON.stringify(completions)}))
-    const subscription = watch(${JSON.stringify(completions)}, () => {
+    const existing = new Set(${JSON.stringify([...existing])})
+    function inspect() {
       const completed = readdirSync(${JSON.stringify(completions)})
         .some((name) => name.endsWith(".json") && !existing.has(name))
       if (!completed) return
       clearTimeout(timer)
       subscription.close()
-    })
+    }
+    const subscription = watch(${JSON.stringify(completions)}, inspect)
     const timer = setTimeout(() => subscription.close(), 90000)
+    inspect()
   })
 }
 `,
@@ -141,11 +149,14 @@ async function runParent(parentProvider, childShim, prompt, extraExtensions = []
       env: {
         ...isolatedChildEnv(process.env, sandbox.agentDir),
         SENPI_BIN: childShim,
-        SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+        HOME: sandbox.homeDir,
+        USERPROFILE: sandbox.homeDir,
         XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-        OMO_MEMORY_HOME: join(sandbox.root, "memory"),
+        XDG_DATA_HOME: sandbox.xdgDataHome,
+        XDG_CACHE_HOME: sandbox.xdgCacheHome,
+        XDG_STATE_HOME: join(sandbox.root, "xdg-state"),
       },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", "ignore", "pipe"],
     },
   )
   let stderr = ""
@@ -153,35 +164,68 @@ async function runParent(parentProvider, childShim, prompt, extraExtensions = []
   child.stderr.on("data", (chunk) => {
     stderr += chunk
   })
-  const code = await new Promise((resolve) => child.once("close", resolve))
+  const code = await new Promise((resolve, reject) => {
+    child.once("close", resolve)
+    child.once("error", reject)
+  })
   if (code !== 0) throw new Error(stderr.slice(-1000) || `parent exited ${code}`)
 }
 
-function memoryRepo() {
-  const agents = join(sandbox.root, "memory", "agents")
-  const identity = readdirSync(agents)[0]
-  if (identity === undefined) throw new Error("memory identity missing")
-  return {
-    identity,
-    repo: join(agents, identity, "repo"),
-    completions: join(agents, identity, "runtime", "reflection", "completions"),
+function stageSeedRepo() {
+  const memoryHome = join(sandbox.root, "memory")
+  const transient = join(memoryHome, "transient-runs")
+  const roots = [memoryHome]
+  if (existsSync(transient)) {
+    for (const token of readdirSync(transient)) roots.push(join(transient, token))
   }
+  const repos = roots.flatMap((root) => {
+    const agents = join(root, "agents")
+    if (!existsSync(agents)) return []
+    return readdirSync(agents)
+      .map((identity) => join(agents, identity, "repo"))
+      .filter((repo) => existsSync(join(repo, ".git")))
+  })
+  if (repos.length !== 1) throw new Error(`expected one seed repo under ${memoryHome}, found ${repos.length}`)
+  const [seedRepo] = repos
+  const identity = basename(dirname(seedRepo))
+  const repo = join(memoryHome, "agents", identity, "repo")
+  // This second run tests model fallback for existing memory, not visibility between fresh
+  // one-shots. Keep the first write under its real project identity without waiting for a sweep.
+  if (seedRepo !== repo) {
+    mkdirSync(dirname(repo), { recursive: true })
+    renameSync(seedRepo, repo)
+  }
+  return { identity, repo, completions: join(dirname(repo), "runtime", "reflection", "completions") }
 }
 
 function waitForCompletion(dir, existing) {
-  mkdirSync(dir, { recursive: true })
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      subscription.close()
-      reject(new Error("timed out waiting for reflection completion"))
-    }, 90_000)
-    const subscription = watch(dir, () => {
-      const file = readdirSync(dir).find((name) => name.endsWith(".json") && !existing.has(name))
-      if (file === undefined) return
+    function finish() {
       clearTimeout(timer)
       subscription.close()
-      resolve(JSON.parse(readFileSync(join(dir, file), "utf8")))
+    }
+    function inspect() {
+      try {
+        const file = readdirSync(dir).find((name) => name.endsWith(".json") && !existing.has(name))
+        if (file === undefined) return
+        const completion = JSON.parse(readFileSync(join(dir, file), "utf8"))
+        finish()
+        resolve(completion)
+      } catch (error) {
+        finish()
+        reject(error)
+      }
+    }
+    const subscription = watch(dir, inspect)
+    subscription.on("error", (error) => {
+      finish()
+      reject(error)
     })
+    const timer = setTimeout(() => {
+      finish()
+      reject(new Error(`timed out waiting for reflection completion in ${dir}`))
+    }, 90_000)
+    inspect()
   })
 }
 
@@ -201,7 +245,7 @@ async function main() {
     )}\n`,
   )
   const parentProvider = writeParentOnlyProvider()
-  const childShim = writeChildShim()
+  const childShim = writeChildShim(parentProvider)
 
   writeConfig(0)
   writeMockScript([
@@ -220,7 +264,7 @@ async function main() {
   ])
   await runParent(parentProvider, childShim, "seed memory")
 
-  const state = memoryRepo()
+  const state = stageSeedRepo()
   writeFileSync(
     join(state.repo, "mock-script.json"),
     `${JSON.stringify(
@@ -252,10 +296,13 @@ async function main() {
 
   writeConfig(1)
   writeMockScript([{ type: "text", text: "triggered" }])
-  const existing = new Set(existsSync(state.completions) ? readdirSync(state.completions) : [])
-  const completionPromise = waitForCompletion(state.completions, existing)
-  await runParent(parentProvider, childShim, "trigger reflection", [writeCompletionHold(state.completions)])
-  const completion = await completionPromise
+  mkdirSync(state.completions, { recursive: true })
+  const existing = new Set(readdirSync(state.completions))
+  await runParent(parentProvider, childShim, "trigger reflection", [writeCompletionHold(state.completions, existing)])
+  const completion = await waitForCompletion(state.completions, existing)
+  if (completion.identity !== state.identity || completion.outcome !== "merged") {
+    throw new Error(JSON.stringify(completion))
+  }
   const runDir = join(dirname(state.completions), "runs", completion.runId)
   const attempts = readFileSync(join(runDir, "attempts.log"), "utf8")
     .trim()
@@ -263,7 +310,6 @@ async function main() {
     .map((line) => line.match(/--model ([^ ]+)/)?.[1])
     .filter(Boolean)
 
-  if (completion.outcome !== "merged") throw new Error(JSON.stringify(completion))
   if (completion.model !== "omo-mock/mock-1") throw new Error(`wrong completion model: ${completion.model}`)
   if (attempts.join(",") !== "extension-only/primary,omo-mock/mock-1") {
     throw new Error(`wrong model attempts: ${attempts.join(",")}`)
@@ -271,6 +317,9 @@ async function main() {
   if (!readFileSync(join(state.repo, "system", "facts.md"), "utf8").includes("fallback reflection merged")) {
     throw new Error("fallback reflection did not merge")
   }
+  const defaultHomeUnused =
+    !existsSync(join(sandbox.homeDir, ".senpi", "agent")) && !existsSync(join(sandbox.homeDir, ".omo", "memory"))
+  if (!defaultHomeUnused) throw new Error(`driver wrote a default state path under ${sandbox.homeDir}`)
   console.log(
     JSON.stringify({
       result: "PASS",
@@ -278,6 +327,8 @@ async function main() {
       outcome: completion.outcome,
       model: completion.model,
       isolationRoot: sandbox.root,
+      isolatedAgentDir: sandbox.agentDir,
+      defaultHomeUnused,
     }),
   )
 }
