@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { createTempDirectories, encodeRecord, writeTranscript } from "./session-history/test-support"
 import { createOnboardingSessionHistoryTool, ONBOARDING_SESSION_HISTORY_TOOL_NAME } from "./session-history-tool"
-import { createSessionHistoryRuntimeLoader, SESSION_HISTORY_RUNTIME_ARTIFACT } from "./session-history-runtime-loader"
+import { SESSION_HISTORY_RUNTIME_ARTIFACT } from "./session-history-runtime-loader"
 import { createOnboardingHarness } from "./test-harness"
 
 const temp = createTempDirectories()
@@ -98,13 +98,13 @@ describe("onboarding session archaeology runs through the engine session-history
     const tool = createOnboardingSessionHistoryTool({
       stateDir,
       scanOptions: { homes, omoSessionsRoots: [], now: () => nowMs },
-      loadRuntime: createSessionHistoryRuntimeLoader(() =>
+      // The raw import error itself, not the loader's wrapped one, so this pins the tool's own boundary (#15381).
+      loadRuntime: () =>
         Promise.reject(
           new Error(
             "Cannot find module '#omo-session-history-runtime' from '/home/SYNTH-USER/plugin/extensions/omo.js'",
           ),
         ),
-      ),
     })
 
     // when

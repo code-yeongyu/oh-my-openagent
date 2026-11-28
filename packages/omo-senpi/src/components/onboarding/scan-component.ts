@@ -239,9 +239,14 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         }
         // Everything past the expiry check needs the runtime, so it ships there: the auth checks and the writers.
         // The scan was marked applied above, synchronously, so two applies racing on one scan never both run.
-        return await (
-          await loadRuntime()
-        ).applyRetainedScan(scanId, plans.plans, stages.filter(isApplyStage), authStore)
+        let runtime: OnboardingScanRuntime
+        try {
+          runtime = await loadRuntime()
+        } catch {
+          // no-excuse-ok: catch - the RPC boundary answers a failed load with the fixed sentence; the import error names local paths (#15381).
+          return { kind: "unavailable", reason: onboardingRuntimeUnavailable() }
+        }
+        return await runtime.applyRetainedScan(scanId, plans.plans, stages.filter(isApplyStage), authStore)
       })
     },
   }

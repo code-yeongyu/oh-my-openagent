@@ -10,6 +10,7 @@ import { remainingTestTime } from "../../../../../test-support/test-deadline"
 import {
   createOnboardingScanComponent,
   createOnboardingScanStore,
+  ONBOARDING_APPLY_RPC_METHOD,
   ONBOARDING_SCAN_RPC_EVENT,
   ONBOARDING_SCAN_RPC_METHOD,
   ONBOARDING_UNDERSTAND_RPC_METHOD,
@@ -35,6 +36,16 @@ async function rejectingScan(): Promise<OnboardingScanRuntime> {
       const path = `/home/${SECRET}/.claude/projects`
       throw Object.assign(new Error(`EACCES: permission denied, scandir '${path}'`), { code: "EACCES", path })
     },
+  }
+}
+
+/** A runtime that served the scan, then cannot load again when the apply asks for it (#15381). */
+function runtimeGoneAfterScan(): () => Promise<OnboardingScanRuntime> {
+  let loads = 0
+  return async () => {
+    loads += 1
+    if (loads === 1) return await loadOnboardingScanRuntime()
+    return await missingRuntime()
   }
 }
 
@@ -106,6 +117,23 @@ describe("onboarding runtime unavailable reasons (#15352)", () => {
 
     // when
     const reply = await host.handlers.get(ONBOARDING_UNDERSTAND_RPC_METHOD)?.({ scanId: "scan", consent: true })
+
+    // then
+    expect(reply).toEqual({
+      kind: "unavailable",
+      reason: expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`),
+    })
+    expect(JSON.stringify(reply)).not.toContain(SECRET)
+  })
+
+  test("#given a runtime that cannot load again after the scan #when apply runs #then it answers unavailable naming the runtime, never the load error", async () => {
+    // given
+    const host = scanComponentOnRpcHost(runtimeGoneAfterScan())
+    const done = await host.scan()
+    const scanId = isPlainRecord(done) ? done["scanId"] : undefined
+
+    // when
+    const reply = await host.handlers.get(ONBOARDING_APPLY_RPC_METHOD)?.({ scanId, stages: [] })
 
     // then
     expect(reply).toEqual({
