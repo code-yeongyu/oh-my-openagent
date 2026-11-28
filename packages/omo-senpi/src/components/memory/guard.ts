@@ -116,7 +116,8 @@ export function registerMemoryGuard(
     // The result is re-checked on tool_result; a call that cannot be matched to its result is not allowed.
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId) ?? new Map<string, PendingAncestorCheck>()
-    if (event.toolCallId === undefined || pending.size >= MAX_PENDING_ANCESTOR_CHECKS) {
+    const atCap = pending.size >= MAX_PENDING_ANCESTOR_CHECKS && !pending.has(event.toolCallId ?? "")
+    if (event.toolCallId === undefined || atCap) {
       return {
         block: true,
         reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, {
@@ -167,7 +168,8 @@ export function registerMemoryGuard(
   // also how a call blocked by a later handler, or aborted, which never gets a tool_result, frees it), anything else
   // is kept as the verdict for the result that follows. Such a kept verdict outlives a result that never comes (the
   // call was blocked by a later handler, or aborted) only for a call in flight when a foreign identity appeared; it
-  // then stays until session_shutdown, counts toward the 256-per-session cap, and errs toward withholding output.
+  // then stays until session_shutdown, counts toward the 256-per-session cap (a retry of a pending id only overwrites
+  // its own entry, so it is never refused by the cap), and errs toward withholding output.
   // Pending checks are never released on agent_end: a nested walk from a background cell can outlive a run.
   pi.on("tool_execution_end", (payload, eventContext) => {
     if (!isRecord(payload) || typeof payload.toolCallId !== "string") return
