@@ -94,6 +94,7 @@ describe("sealed box", () => {
         seal(sodium.crypto_box_keypair().publicKey, random(4), short);
         return "";
       } catch (e) {
+        if (!(e instanceof Error)) throw e;
         return String(e);
       }
     })();
