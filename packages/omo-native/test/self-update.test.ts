@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
 // manifest, so the expected spelling follows the package channel (`omo-ai` stable, `omo-ai@beta` prerelease).
 const SPEC = channelPackageSpec()
+import { NPM_PROBE_TIMEOUT_MS, npmMajorVersion, SAFE_INSTALL_SCRIPTS } from "../bin/lib/npm-allow-scripts.js"
 import { formatUpdateCommand, formatVersionChange, isPrintOnlyUpdate, runSelfUpdate } from "../bin/lib/self-update.js"
 
 // These cases cover the spawn mechanics on the registry-unreachable path, which keeps the unpinned
@@ -200,5 +201,69 @@ describe("omo self-update", () => {
         expect(errors).toEqual([`omo: update failed; retry with: npm i -g ${SPEC}`])
       })
     })
+  })
+})
+
+// #9281: npm >= 11 gets the safe install scripts allowed so its warning and its broken suggested
+// command never appear; an older npm must not receive an unknown option. The manager is chosen
+// first, so only an npm install ever asks npm for its version, and usage answers ask nothing.
+describe("self update npm allow-scripts", () => {
+  const NPM_ROOT = "/prefix/lib/node_modules/omo-ai"
+  const BUN_ROOT = `/home/someone${"/.bun/install/global/node_modules/omo-ai"}`
+  const update = async (args: string[], root: string, major: number) => {
+    const npmMajor = mock(() => major)
+    const run = mock((_command: string, _argv: string[]) => Promise.resolve({ status: 0, signal: null }))
+    let reads = 0
+    const exit = await runSelfUpdate(args, {
+      root,
+      platform: "linux",
+      npmMajor,
+      fetchDistTags: () => ({ latest: "5.0.1", beta: "5.0.1" }),
+      readInstalled: () => ({ omo: ++reads === 1 ? "5.0.0" : "5.0.1", engine: "1.0.0" }),
+      log: () => {},
+      error: () => {},
+      run,
+    })
+    return { exit, npmMajor, run, commands: run.mock.calls.map(([command, argv]) => [command, ...argv].join(" ")) }
+  }
+
+  test("#given npm 11 #when the update installs #then npm receives the spec followed by the allowed scripts", async () => {
+    const { exit, npmMajor, commands } = await update(["update"], NPM_ROOT, 11)
+    expect(exit).toBe(0)
+    expect(npmMajor).toHaveBeenCalledTimes(1)
+    expect(commands).toEqual([`npm i -g omo-ai@5.0.1 --allow-scripts=${SAFE_INSTALL_SCRIPTS.join(",")}`])
+  })
+
+  test("#given npm 9 #when the update installs #then no unknown option reaches npm", async () => {
+    const { exit, commands } = await update(["update"], NPM_ROOT, 9)
+    expect(exit).toBe(0)
+    expect(commands).toEqual(["npm i -g omo-ai@5.0.1"])
+  })
+
+  test("#given a bun global install #when the update installs #then npm is never asked for its version", async () => {
+    const { exit, npmMajor, commands } = await update(["update"], BUN_ROOT, 11)
+    expect(exit).toBe(0)
+    expect(npmMajor).not.toHaveBeenCalled()
+    expect(commands).toEqual(["bun add -g omo-ai@5.0.1"])
+  })
+
+  test.each([
+    [["update", "--help"], 0],
+    [["update", "--no-such-flag"], 2],
+  ])("#given %j #when update answers usage #then no package manager is called", async (args, code) => {
+    const { exit, npmMajor, run } = await update(args, NPM_ROOT, 11)
+    expect(exit).toBe(code)
+    expect(npmMajor).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  test("#given npm that never answers #when its version is probed #then the probe is bounded and reports 0", () => {
+    const exec = mock((_file: string, _args: string[], options: { timeout?: number }) => {
+      throw Object.assign(new Error("spawnSync npm ETIMEDOUT"), { code: "ETIMEDOUT", options })
+    })
+    expect(npmMajorVersion(exec)).toBe(0)
+    expect(exec.mock.calls[0]?.[2].timeout).toBe(NPM_PROBE_TIMEOUT_MS)
+    expect(NPM_PROBE_TIMEOUT_MS).toBeLessThanOrEqual(10_000)
+    expect(npmMajorVersion(() => "11.6.2\n")).toBe(11)
   })
 })

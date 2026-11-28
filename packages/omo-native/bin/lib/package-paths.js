@@ -55,6 +55,8 @@ function installedVersion(root) {
  * @param {string} [homeDir]
  * @param {(path: string) => boolean} [exists]
  * @param {string} [targetVersion]
+ * @param {readonly string[]} [allowScripts] npm >= 11 package names whose install scripts may run
+ *   (#9281); appended after the spec so the printed command is runnable as-is. Ignored for bun.
  */
 export function updateTarget(
   root = packageRoot,
@@ -63,6 +65,7 @@ export function updateTarget(
   homeDir = process.env.HOME || process.env.USERPROFILE || homedir(),
   exists = existsSync,
   targetVersion = undefined,
+  allowScripts = undefined,
 ) {
   // A resolved target installs that exact version; without one the channel spec is the only answer.
   const spec = targetVersion === undefined ? channelPackageSpec(version) : `omo-ai@${targetVersion}`
@@ -87,10 +90,12 @@ export function updateTarget(
       ...(bunInstall === undefined ? {} : { env: { BUN_INSTALL: bunInstall } }),
     }
   }
+  const scripts =
+    allowScripts === undefined || allowScripts.length === 0 ? "" : ` --allow-scripts=${allowScripts.join(",")}`
   return {
     manager: "npm",
-    command: `npm i -g ${spec}`,
-    argv: ["npm", "i", "-g", spec],
+    command: `npm i -g ${spec}${scripts}`,
+    argv: scripts === "" ? ["npm", "i", "-g", spec] : ["npm", "i", "-g", spec, scripts.trim()],
   }
 }
 

@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path"
 import { runChild } from "./child-process.js"
+import { createUpdateResolver } from "./npm-allow-scripts.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
 import {
   channelDistTagVersion,
@@ -9,7 +10,6 @@ import {
   readJson,
   releaseChannel,
   resolveSenpi,
-  updateTarget,
 } from "./package-paths.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 import { findHolders, heldTarget, isLockFailure, listWindowsProcesses, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
@@ -38,8 +38,8 @@ export function formatVersionChange(before, after) {
 /**
  * Resolves the version the running build's channel dist-tag names (the lookup `omo doctor` uses for
  * "Latest"), then prints and optionally runs the package-manager command that installs exactly that
- * version. `--help`/`-h` print the usage and an unknown flag exits 2, both before the registry lookup,
- * so neither can install anything (#9207). `--dry-run` and `--print` print the resolved command only.
+ * version. `--help`/`-h` print the usage and an unknown flag exits 2, both before the registry lookup
+ * and before any package manager is asked anything, so neither can install anything (#9207). `--dry-run` and `--print` print the resolved command only.
  * Already on the target, it says so and installs nothing. After a manager exit 0 it re-reads the installed version: one that did not
  * reach the target exits non-zero with the retry command, because the manager's own success does not
  * prove the install moved (#9198). An unreachable registry falls back to the unpinned channel spec.
@@ -60,6 +60,7 @@ export function formatVersionChange(before, after) {
  * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
  *   resolveUpdate?: (targetVersion?: string) => UpdateTarget,
+ *   npmMajor?: () => number,
  *   fetchDistTags?: () => Record<string, unknown> | null,
  *   log?: (line: string) => void,
  *   error?: (line: string) => void,
@@ -78,16 +79,15 @@ export function formatVersionChange(before, after) {
  * @returns {Promise<number>}
  */
 export async function runSelfUpdate(args, options = {}) {
+  const platform = options.platform ?? process.platform
   const resolveUpdate =
-    options.resolveUpdate ??
-    ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
+    options.resolveUpdate ?? createUpdateResolver({ root: options.root, platform, npmMajor: options.npmMajor })
   const fetchDistTags = options.fetchDistTags ?? fetchNpmDistTagsSync
   const log = options.log ?? ((line) => console.log(line))
   const error = options.error ?? ((line) => console.error(line))
   const run = options.run ?? runChild
   const readInstalled = options.readInstalled ?? readInstalledVersion
   const env = options.env ?? process.env
-  const platform = options.platform ?? process.platform
   const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
 
   const usage = updateUsageAnswer(args)
