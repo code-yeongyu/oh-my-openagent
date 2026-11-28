@@ -1,22 +1,32 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { removeTempRoot } from "./remove-temp-root.ts"
 import { CONFIG_DIR_NAME } from "../node_modules/@code-yeongyu/senpi/dist/config.js"
 import { FileHookStateStorage } from "../node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/hooks/trust-storage.js"
 
+const tempRoots: string[] = []
+// A timed-out or aborted test never reaches its finally block, and each creator writes setup after
+// the mkdtemp, so every root is registered the moment it exists and removed here on every path (#9766, #11564).
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) removeTempRoot(root)
+})
+
+const trackedMkdtemp = (prefix: string) => {
+  const root = mkdtempSync(join(tmpdir(), prefix))
+  tempRoots.push(root)
+  return root
+}
+
 function withStorage(run: (fixture: { root: string; statePath: string; storage: FileHookStateStorage }) => void): void {
-  const root = mkdtempSync(join(tmpdir(), "omo-hooks-state-"))
+  const root = trackedMkdtemp("omo-hooks-state-")
   const cwd = join(root, "project")
   const agentDir = join(root, "agent")
   const statePath = join(cwd, CONFIG_DIR_NAME, "hooks-state.json")
   mkdirSync(dirname(statePath), { recursive: true })
-  try {
-    run({ root, statePath, storage: new FileHookStateStorage({ cwd, agentDir }) })
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
+  run({ root, statePath, storage: new FileHookStateStorage({ cwd, agentDir }) })
 }
 
 function temporarySnapshots(statePath: string): string[] {

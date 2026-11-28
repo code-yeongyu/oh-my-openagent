@@ -1,8 +1,9 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { removeTempRoot } from "./remove-temp-root.ts"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -17,6 +18,19 @@ const helperMarker = "      - name: Build and sign Darwin capture helper\n"
 const engineMarker = "      - name: Build desktop engine\n"
 const signingMarker = "      - name: Sign and notarize Darwin desktop engine\n"
 const material = ["CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"] as const
+
+const tempRoots: string[] = []
+// A timed-out or aborted test never reaches its finally block, and each creator writes setup after
+// the mkdtemp, so every root is registered the moment it exists and removed here on every path (#9766, #11564).
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) removeTempRoot(root)
+})
+
+const trackedMkdtemp = (prefix: string) => {
+  const root = mkdtempSync(join(tmpdir(), prefix))
+  tempRoots.push(root)
+  return root
+}
 
 describe("embedded macOS capture helper release workflow", () => {
   test("compiles both Darwin architectures with the development helper flags", () => {
@@ -97,33 +111,29 @@ describe("embedded macOS capture helper release workflow", () => {
 
   for (const missing of material) {
     test(`refuses helper signing when ${missing} is missing`, () => {
-      const root = mkdtempSync(join(tmpdir(), "omo-helper-signing-"))
+      const root = trackedMkdtemp("omo-helper-signing-")
       const binary = join(root, "senpi-desktop-capture-helper")
       const env: NodeJS.ProcessEnv = { ...process.env, MACOS_SIGNING_REQUIRED: "true" }
       for (const name of material) env[name] = "synthetic"
       delete env[missing]
       writeFileSync(binary, "unsigned helper")
-      try {
-        const script = readFileSync(
-          new URL("../.github/scripts/macos-sign-and-notarize.sh", import.meta.url),
-          "utf8",
-        ).replace(/\r\n/g, "\n")
-        const result = spawnSync(
-          "bash",
-          ["-s", "--", "--sign-only", "--identifier", "ai.sisyphuslabs.senpi-desktop-engine", binary],
-          {
-            input: script,
-            env,
-            encoding: "utf8",
-          },
-        )
+      const script = readFileSync(
+        new URL("../.github/scripts/macos-sign-and-notarize.sh", import.meta.url),
+        "utf8",
+      ).replace(/\r\n/g, "\n")
+      const result = spawnSync(
+        "bash",
+        ["-s", "--", "--sign-only", "--identifier", "ai.sisyphuslabs.senpi-desktop-engine", binary],
+        {
+          input: script,
+          env,
+          encoding: "utf8",
+        },
+      )
 
-        expect(result.status, result.stderr).toBe(1)
-        expect(result.stderr).toContain(`signing material is missing: ${missing}`)
-        expect(readFileSync(binary, "utf8")).toBe("unsigned helper")
-      } finally {
-        rmSync(root, { recursive: true, force: true })
-      }
+      expect(result.status, result.stderr).toBe(1)
+      expect(result.stderr).toContain(`signing material is missing: ${missing}`)
+      expect(readFileSync(binary, "utf8")).toBe("unsigned helper")
     })
   }
 })
