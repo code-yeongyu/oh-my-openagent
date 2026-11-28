@@ -12,13 +12,14 @@ export interface MaintenanceGit {
  * never held up by a repack), so without this a long-lived repo collects tens of thousands of loose
  * objects and every history walk slows down. git's `loose-objects` task writes them into a new pack
  * (it deletes loose copies only of objects that were already packed before it ran), then
- * `prune-packed` deletes the loose copies of everything now in a pack. `repack -A -d -l` keeps
- * unreachable objects (as loose, never pruned) and deletes only redundant packs, so it is safe while
- * other processes keep committing. Overlapping passes are kept apart by the caller's lock, not by
- * git. (`incremental-repack` is left out: it needs a multi-pack-index and fails on a repo that never
- * had one.)
+ * `prune-packed` deletes the loose copies of everything now in a pack. The fold is a geometric
+ * repack (#15420): it rolls the packs that break a factor-2 size progression, so equal-sized
+ * duplicate transfer packs merge into one, and it carries every object of the packs it rolls
+ * (unreachable ones included, none loosened), so it is safe while other processes keep committing.
+ * Overlapping passes are kept apart by the caller's lock, not by git. (`incremental-repack` is left
+ * out: it needs a multi-pack-index and fails on a repo that never had one.)
  */
-const MAX_PACKS_BEFORE_REPACK = 64
+const MAX_PACKS_BEFORE_REPACK = 16
 
 export async function runMemoryRepoMaintenance(
   git: MaintenanceGit,
@@ -26,7 +27,7 @@ export async function runMemoryRepoMaintenance(
 ): Promise<GitMaintenanceResult> {
   const { looseObjects: looseObjectsBefore, packs } = await countObjects(git)
   if (packs >= MAX_PACKS_BEFORE_REPACK) {
-    await git(["repack", "-A", "-d", "-l", "--quiet"], options.timeoutMs, options.signal)
+    await git(["repack", "-d", "-l", "--geometric=2", "--quiet"], options.timeoutMs, options.signal)
     options.signal?.throwIfAborted()
   }
   if (looseObjectsBefore < options.minLooseObjects)
