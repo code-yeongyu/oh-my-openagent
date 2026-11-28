@@ -2,18 +2,22 @@ import { execFile } from "node:child_process"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fixture } from "../test-fixture"
+import { trackGitCall } from "../git-in-flight"
 
-export async function git(cwd: string, ...args: string[]) {
-  const [code, out, err] = await new Promise<[number, string, string]>((resolve, reject) => {
-    execFile("git", ["-C", cwd, ...args], { maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error && error.code === undefined) return reject(error)
-      // A missing executable reports a string code (ENOENT), not a number.
-      const code = typeof error?.code === "number" ? error.code : error ? 1 : 0
-      resolve([code, stdout.toString(), stderr.toString()])
+export function git(cwd: string, ...args: string[]) {
+  const run = (async () => {
+    const [code, out, err] = await new Promise<[number, string, string]>((resolve, reject) => {
+      execFile("git", ["-C", cwd, ...args], { maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error && error.code === undefined) return reject(error)
+        // A missing executable reports a string code (ENOENT), not a number.
+        const code = typeof error?.code === "number" ? error.code : error ? 1 : 0
+        resolve([code, stdout.toString(), stderr.toString()])
+      })
     })
-  })
-  if (code) throw new Error(`git ${args.join(" ")}: ${err}`)
-  return out.trim()
+    if (code) throw new Error(`git ${args.join(" ")}: ${err}`)
+    return out.trim()
+  })()
+  return trackGitCall(run)
 }
 export async function repo() {
   const f = await fixture()
