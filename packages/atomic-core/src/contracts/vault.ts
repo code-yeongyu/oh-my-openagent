@@ -1,8 +1,8 @@
 import * as z from "zod"
 
-const ATOMIC_INTENT_KINDS = ["feature", "review", "bug", "chore", "remediation"] as const
+export const ATOMIC_INTENT_KINDS = ["feature", "review", "bug", "chore", "remediation"] as const
 const ATOMIC_INTENT_STATUSES = ["backlog", "planned", "in_progress", "needs-review", "done", "icebox"] as const
-const ATOMIC_MEMORY_KINDS = ["decision", "lesson", "constraint", "preference", "context"] as const
+export const ATOMIC_MEMORY_KINDS = ["decision", "lesson", "constraint", "preference", "context"] as const
 
 export type AtomicIntentKind = (typeof ATOMIC_INTENT_KINDS)[number]
 export type AtomicIntentStatus = (typeof ATOMIC_INTENT_STATUSES)[number]
@@ -71,8 +71,8 @@ export type AtomicConformance = {
 }
 
 const CREATED_INTENT = /^Created intent: (\S+)$/m
-const CONFORMS_LINE = /^conforms: (yes|no)\b/m
-const VIOLATION_LINE = /^\s+\u2717 (.+)$/gm
+const CONFORMS_LINE = /^conforms: (yes|no)(?: \((\d+) violation\(s\)\))?$/m
+const VIOLATION_LINE = /^[ \t]+\u2717 (.+)$/gm
 
 export function parseCreatedIntentId(stdout: string): string | undefined {
   return CREATED_INTENT.exec(stdout)?.[1]
@@ -80,8 +80,10 @@ export function parseCreatedIntentId(stdout: string): string | undefined {
 
 /** Reads the `conforms:` verdict that validate and attest print; validate exits zero for either verdict. */
 export function parseConformance(stdout: string): AtomicConformance | undefined {
-  const verdict = CONFORMS_LINE.exec(stdout)?.[1]
-  if (verdict === undefined) return undefined
+  const report = CONFORMS_LINE.exec(stdout)
+  if (report === null) return undefined
+  const [, verdict, count] = report
   const violations = [...stdout.matchAll(VIOLATION_LINE)].map((match) => match[1] ?? "")
+  if (count !== undefined && violations.length !== Number(count)) return undefined
   return { conforms: verdict === "yes", violations }
 }
