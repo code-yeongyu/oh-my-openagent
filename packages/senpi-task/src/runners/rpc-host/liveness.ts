@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import { socketAcceptsConnection } from "./busy-host"
 import { askHost, isRecord, type HostReply } from "./host-request"
 import { probeWithEngine } from "./session-transport"
+import { resolveRpcSocketTransport } from "./socket-client"
 
 /**
  * The two questions the lifecycle asks a daemon once per pass: "are you there?" (`get_protocol_info`
@@ -27,11 +28,21 @@ export async function daemonReachable(socket: string, keyRoot: string | undefine
   }
   // A daemon whose loop is blocked still completes the connect from its listen backlog: it is busy,
   // not gone, and parking its children as daemon_unavailable strands live sessions (omo#9069).
-  if (process.platform !== "win32" && (await socketAcceptsConnection(socket, BUSY_CONNECT_TIMEOUT_MS))) {
+  if (await endpointAcceptsConnection(socket)) {
     log("senpi-task daemon probe unanswered but the socket accepts; treating the daemon as busy", { socket })
     return true
   }
   return false
+}
+
+/**
+ * Connects to the endpoint's transport and closes without sending anything: the socket itself on POSIX, the named
+ * pipe derived from `<socket>.secret` on win32. Win32 needs this as much as POSIX does: with no key root named, the
+ * engine probe is skipped, and this check is the only thing that tells a live host from a gone one.
+ */
+async function endpointAcceptsConnection(socket: string): Promise<boolean> {
+  const transport = await resolveRpcSocketTransport(socket)
+  return transport !== undefined && (await socketAcceptsConnection(transport.address, BUSY_CONNECT_TIMEOUT_MS))
 }
 
 /**
