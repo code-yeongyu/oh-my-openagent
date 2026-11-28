@@ -22,6 +22,10 @@ user-scoped `omo.json` (see `omo-config-core` `resolveOmoAtomicPolicy`).
 | `client*.ts` | Typed command groups (vcs, query, vault, intent, agent) assembled by `createAtomicClient` |
 | `executable.ts` | Executable resolution: `binary_path`, else PATH without empty, relative or repository-internal segments |
 | `probe.ts` | `probeAtomic`: `disabled`, `unauthorized`, `ready` or `unavailable` with a typed error |
+| `context.ts` | Validated reference retrieval, session diagnostics and repository-wide cache invalidation |
+| `recording*.ts` | Owner selection, native-hook admission, serialized dispatch through the adapter's checkout lock, and shutdown handoff |
+| `operation-input.ts`, `operations.ts`, `intent-workflow.ts` | Strict semantic tool inputs and vault workflows |
+| `assets/omo-atomic/SKILL.md` | Original opt-in guide, exported via `OMO_ATOMIC_SKILL_PATH`; not in the shared skill inventory |
 
 ## Contracts
 
@@ -36,8 +40,11 @@ user-scoped `omo.json` (see `omo-config-core` `resolveOmoAtomicPolicy`).
   verdicts, so its `conforms:` line is parsed into a typed result.
 - Hook dispatch sends the payload on stdin; every OpenCode verb and the Codex `stop` verb add
   `--foreground`, as Atomic's own integrations do.
+- Adapters latch recording ownership against the session's cwd, and identify native hook
+  events using durable turn and tool IDs. They persist the bounded drain handoff and never
+  replay an in-flight hook without reconciling the graph.
 - Lifecycle begin/renew/end, sandbox creation, view deletion and `insert` arrive with the workspace
-  modules after Gate B; context and recording services arrive in the next PR.
+  modules after Gate B.
 
 ## Fixtures
 
