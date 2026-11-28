@@ -858,6 +858,20 @@ describe("memory guard when a host reports the end before the result (#12466)", 
     expect(await enumerate(setup, "grep", setup.memoryRoot, "call-next")).toBeUndefined()
     expect(await finish(setup, "grep", setup.memoryRoot, "call-0")).toEqual([])
   })
+
+  test("#given a session at the pending cap #when a call already pending is retried with its own id #then the retry is allowed and a new id is still refused", async () => {
+    const setup = ancestorFixture()
+    let allowed = 0
+    while (allowed < 10_000 && (await enumerate(setup, "grep", setup.memoryRoot, `call-${allowed}`)) === undefined)
+      allowed += 1
+    expect(allowed).toBeLessThan(10_000)
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-0")).toBeUndefined()
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-new")).toEqual(
+      expect.objectContaining({ block: true }),
+    )
+  })
 })
 
 describe("memory guard pending checks across calls and sessions (#12466)", () => {
