@@ -23,6 +23,7 @@ const MODEL_IDENTITY_FILES = new Map<string, string>([
   ],
   ["packages/omo-codex/src/install/managed-agent-model-defaults.ts", "models LazyCodex once bundled"],
   ["packages/omo-codex/src/install/codex-model-catalog.ts", "the Astra id the Codex edition ships"],
+  ["packages/omo-codex/plugin/components/rules/src/post-compact-budget.ts", "per-model context-window budgets"],
   ["packages/utils/src/migration/agent-category.ts", "each known id's migration category"],
   ["packages/prompts-core/src/atlas-prompts.ts", "prompts written for one model"],
   ["packages/prompts-core/src/variant-resolver.ts", "prompts written for one model"],
@@ -45,7 +46,10 @@ const LATEST_MODEL_LITERAL = latestModelLiteralPattern(Object.values(LATEST_MODE
 
 async function trackedSourceFiles(): Promise<string[]> {
   // :(glob) makes `**/` match zero directories too; the plain pathspec skipped every file directly under src/.
-  const proc = Bun.spawn(["git", "ls-files", "-z", "--", ":(glob)packages/*/src/**/*.ts"], {
+  // Coverage (#11033): package TypeScript sources and the Codex plugin components' TypeScript sources. The Codex
+  // edition's data files (agent TOMLs, catalog.mjs, model-catalog.json) are not TypeScript and stay out of scope.
+  const sources = [":(glob)packages/*/src/**/*.ts", ":(glob)packages/omo-codex/plugin/components/*/src/**/*.ts"]
+  const proc = Bun.spawn(["git", "ls-files", "-z", "--", ...sources], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
   })
@@ -68,7 +72,7 @@ describe("latest model id audit", () => {
     expect(`model: "gpt-6.1-sol-fast"`.match(pattern)).toBeNull()
     expect(`model: "gpt-601-sol"`.match(pattern)).toBeNull()
     expect(`export { buildPrompt } from "./claude-opus-5-5"`.match(pattern)).toBeNull()
-    expect("model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`".match(pattern)).toBeNull()
+    expect(`model: \`anthropic/\${LATEST_MODEL_BY_FAMILY.claudeOpus}\``.match(pattern)).toBeNull()
   })
 
   test("#given shipped source #when scanning for a latest family id #then only model-identity files spell one", async () => {
@@ -76,6 +80,7 @@ describe("latest model id audit", () => {
     expect(files.length).toBeGreaterThan(100)
     // Architecture contract: files directly under a package's src/ are scanned too (a fallback-chain table lives there).
     expect(files).toContain("packages/model-core/src/category-model-requirements.ts")
+    expect(files).toContain("packages/omo-codex/plugin/components/ulw-loop/src/steering.ts")
 
     const offenders: string[] = []
     for (const file of files) {
