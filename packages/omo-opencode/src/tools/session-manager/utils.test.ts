@@ -4,10 +4,10 @@ import {
   formatSessionMessages,
   formatSessionInfo,
   formatSearchResults,
-  filterSessionsByDate,
+  filterSessionsByUpdatedDate,
   searchInSession,
 } from "./session-formatter"
-import type { SessionInfo, SessionMessage, SearchResult } from "./types"
+import type { SessionInfo, SessionMessage, SearchResult, SessionMetadata } from "./types"
 
 describe("session-manager utils", () => {
   test("formatSessionList handles empty array", async () => {
@@ -134,15 +134,27 @@ describe("session-manager utils", () => {
     expect(result).toContain("Matches: 3")
   })
 
-  test("filterSessionsByDate filters correctly", async () => {
+  test("filterSessionsByUpdatedDate filters on metadata time.updated without reading messages", () => {
     // given
-    const sessionIDs = ["ses_001", "ses_002", "ses_003"]
+    const sessions: SessionMetadata[] = [
+      { id: "ses_old", projectID: "p", directory: "/x", time: { created: 1, updated: Date.parse("2025-11-15T00:00:00Z") } },
+      { id: "ses_mid", projectID: "p", directory: "/x", time: { created: 1, updated: Date.parse("2025-12-01T00:00:00Z") } },
+      { id: "ses_new", projectID: "p", directory: "/x", time: { created: 1, updated: Date.parse("2025-12-15T00:00:00Z") } },
+    ]
 
     // when
-    const result = await filterSessionsByDate(sessionIDs)
+    const window = filterSessionsByUpdatedDate(sessions, "2025-12-01T00:00:00Z", "2025-12-31T23:59:59Z")
+    const fromOnly = filterSessionsByUpdatedDate(sessions, "2025-12-01T00:00:00Z", undefined)
+    const toOnly = filterSessionsByUpdatedDate(sessions, undefined, "2025-12-01T00:00:00Z")
+    const unset = filterSessionsByUpdatedDate(sessions, undefined, undefined)
+    const empty = filterSessionsByUpdatedDate([], "2025-12-01T00:00:00Z", undefined)
 
     // then
-    expect(Array.isArray(result)).toBe(true)
+    expect(window.map((s) => s.id)).toEqual(["ses_mid", "ses_new"])
+    expect(fromOnly.map((s) => s.id)).toEqual(["ses_mid", "ses_new"])
+    expect(toOnly.map((s) => s.id)).toEqual(["ses_old", "ses_mid"])
+    expect(unset.map((s) => s.id)).toEqual(["ses_old", "ses_mid", "ses_new"])
+    expect(empty).toEqual([])
   })
 
   test("searchInSession finds matches case-insensitively", async () => {
