@@ -12,7 +12,7 @@
  */
 
 import type { MonitorConfig as SchemaMonitorConfig } from "../../config/schema/monitor"
-import { tokenizeCommand } from "../../tools/interactive-bash/tools"
+import { commandsForPermission, programsForAllowlist } from "./allowlist-programs"
 
 export type MonitorConfig = Pick<SchemaMonitorConfig, "enabled" | "allowed_commands"> & Partial<SchemaMonitorConfig>
 
@@ -50,19 +50,32 @@ function getErrorReason(error: unknown): string {
   return "bash permission denied"
 }
 
-function getProgram(command: string): string | undefined {
-  return tokenizeCommand(command)[0]
-}
-
 async function checkBashEquivalentPermission(
   command: string,
   bashPermissionAsk: (input: BashPermissionAskInput) => Promise<void>,
 ): Promise<MonitorPermissionResult> {
+  const commands = commandsForPermission(command)
+  if (commands === null) {
+    return {
+      allowed: false,
+      reason:
+        "command hides commands bash permission cannot check (command substitution, subshell, case or function); run it from a script",
+      via: "bash-equivalent",
+    }
+  }
+  if (commands.length === 0) {
+    return {
+      allowed: false,
+      reason: "command runs nothing",
+      via: "bash-equivalent",
+    }
+  }
+
   try {
     await bashPermissionAsk({
       permission: "bash",
-      patterns: [command],
-      always: [command],
+      patterns: commands,
+      always: commands,
       metadata: { command },
     })
   } catch (error) {
@@ -81,10 +94,18 @@ async function checkBashEquivalentPermission(
 }
 
 function checkAllowlistPermission(command: string, config: MonitorConfig): MonitorPermissionResult {
-  const program = getProgram(command)
+  const programs = programsForAllowlist(command)
   const allowedCommands = config.allowed_commands ?? []
 
-  if (program && allowedCommands.includes(program)) {
+  if (programs === null) {
+    return {
+      allowed: false,
+      reason: "command uses shell syntax the allowlist cannot check",
+      via: "allowlist",
+    }
+  }
+
+  if (programs.length > 0 && programs.every((program) => allowedCommands.includes(program))) {
     return {
       allowed: true,
       reason: "command allowed by allowed_commands",

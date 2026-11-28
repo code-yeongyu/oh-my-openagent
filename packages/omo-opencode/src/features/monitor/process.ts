@@ -1,10 +1,12 @@
-import { tokenizeCommand } from "../../tools/interactive-bash/tools"
 import { spawn as runtimeSpawn } from "../../shared/bun-spawn-shim"
+import { openCodeShellArgv, openCodeShellTypeResolver } from "../../shared/opencode-shell"
 
 export type TimerHandle = ReturnType<typeof setTimeout> | number
 
 export interface SpawnDeps {
   spawn?: SpawnFunction
+  /** Shell that runs the command; defaults to the one OpenCode's bash tool runs. */
+  shell?: string
   setTimer: (fn: () => void, ms: number) => TimerHandle
   clearTimer: (handle: TimerHandle) => void
 }
@@ -66,10 +68,11 @@ export function spawnMonitoredProcess(
   opts: { command: string; cwd?: string; env?: Record<string, string>; maxRuntimeMs: number },
   deps: SpawnDeps,
 ): MonitoredProcess {
-  const argv = tokenizeCommand(opts.command)
-  if (argv.length === 0) {
+  if (opts.command.trim() === "") {
     throw new Error("Cannot spawn an empty monitor command")
   }
+  // A monitor command is shell code (pipes, loops, `&&`), so it runs through a shell, the one bash runs.
+  const argv = openCodeShellArgv(deps.shell ?? openCodeShellTypeResolver.resolveShellPath(), opts.command)
 
   const subprocess = spawnDetachedProcess(argv, opts, deps.spawn ?? runtimeSpawn)
   let actualExited = false
