@@ -46,6 +46,17 @@ describe("classifyRetryableModelMiss", () => {
     })
   })
 
+  // omo#13243: a child started with --model is pinned, so senpi reports its rate limit as a typed pinned failure line
+  // instead of falling back itself; reflection must still read it as an outage and move to its next candidate.
+  test("#given a pinned child's rate-limit report #when classified #then the next candidate may serve it", () => {
+    const line =
+      "Pinned model failed: anthropic/claude-opus-5 (anthropic/claude-opus-5: 429 rate_limit_error: This request would exceed your rate limit)"
+    expect(classifyRetryableModelMiss(result(`${line}\nError: 429 rate_limit_error`))).toEqual({
+      kind: "provider_unavailable",
+      detail: line,
+    })
+  })
+
   test("#given a quota exhaustion child failure #when classified #then the next candidate may serve it (#6808)", () => {
     expect(classifyRetryableModelMiss(result("Error: quota exceeded for this organization"))).toEqual({
       kind: "provider_unavailable",
