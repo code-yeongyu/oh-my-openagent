@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { expect, spyOn, test } from "bun:test"
+import fs, { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -159,6 +159,20 @@ const facts = (passwd: () => string): PlatformFacts => ({
   run: () => {
     throw new Error("no tool")
   },
+})
+
+test.skipIf(process.platform !== "linux")("a missing path under a symlinked /home uses its canonical Linux spelling", () => {
+  const resolvePath = new Proxy(fs.realpathSync, {
+    apply(target, receiver, args) {
+      return args[0] === "/home" ? "/srv/homes" : Reflect.apply(target, receiver, args)
+    },
+  })
+  const spy = spyOn(fs, "realpathSync").mockImplementation(resolvePath)
+  try {
+    expect(isSharedAgentDir("/srv/homes/missing-fixture/.omo/agent", { homes: ["/home/missing-fixture"] })).toBe(true)
+  } finally {
+    spy.mockRestore()
+  }
 })
 
 test("#given a missing candidate under a literal /home #when the spellings are compared #then it answers without resolving /home", () => {
