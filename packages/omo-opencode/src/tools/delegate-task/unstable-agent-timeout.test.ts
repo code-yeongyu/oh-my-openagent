@@ -60,7 +60,7 @@ describe("executeUnstableAgentTask timeout handling", () => {
       {
         manager: mockManager,
         client: mockClient,
-        syncPollTimeoutMs: 0,
+        syncPollTimeoutMs: 1,
       },
       {
         sessionID: "parent-session",
