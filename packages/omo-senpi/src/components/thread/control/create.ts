@@ -17,7 +17,8 @@ import { createdDeviceRow } from "../remote/address-book"
 import type { LocalExisting } from "../remote/cross-device"
 import { claimCreatedAlias, planCreate, withAlias } from "../remote/lazy-ops"
 import { threadLink } from "../thread-link"
-import { recordThreadCreator } from "../tools/extension-tools"
+import { recordThreadCreator, resolveCallerDurableId } from "../tools/extension-tools"
+import { thisDeviceId } from "../remote/this-device"
 import { resolveAddress } from "../address/lazy"
 import {
   addressBook,
@@ -215,9 +216,11 @@ export async function createThread(
       outcome = found
     } else
       try {
+        const openedBy = plan.creates ? await openerOf(options, current, callerId) : undefined
         outcome = await plan.host.open(
           {
             ...plan.request,
+            ...(openedBy === undefined ? {} : { openedBy }),
             ...(openName === undefined ? {} : { name: openName }),
             ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
             ...(preset === undefined ? {} : { permissionPreset: preset }),
@@ -537,4 +540,16 @@ function keptWorktree(note: string | null | undefined): ThreadWorktree | undefin
     typeof repository === "string"
     ? (kept as ThreadWorktree)
     : undefined
+}
+
+/** The session making a create and its device, carried on the open so the hosting device records the opener (#15221 row 25). */
+async function openerOf(
+  options: ThreadToolSurfaceOptions,
+  view: ThreadHostView,
+  callerId: string,
+): Promise<{ readonly thread: string; readonly device: string } | undefined> {
+  const thread = resolveCallerDurableId(options, view, callerId)
+  if (thread === undefined) return undefined
+  const here = await thisDeviceId(options.remote)
+  return "device" in here ? { thread, device: here.device } : undefined
 }

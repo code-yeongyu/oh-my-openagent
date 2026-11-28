@@ -853,8 +853,6 @@
     "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
     "packages/omo-senpi/src/components/thread/thread-link.ts": ["THREAD_LINK_SCHEME"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) resolveCallerDurableId
-    "packages/omo-senpi/src/components/thread/tools/extension-tools.ts": ["resolveCallerDurableId"],
     // pre-existing at origin dev 4686e425b5: unused export(s) canContinueAfterAgentEnd
     "packages/omo-senpi/src/components/ulw-execute-continuation/agent-end-eligibility.ts": ["canContinueAfterAgentEnd"],
     // pre-existing at origin dev 4686e425b5: unused export(s) __testInternals

@@ -50,6 +50,9 @@ const DELIVERY_COLUMNS = [
   "verbatim_display_text",
 ].join(", ")
 
+/** The columns v17 adds to `thread_creations` (#15221 row 25): the devices of both ends and the opener it was handed from. */
+export const LEDGER_COLUMNS = ["creator_device", "created_device", "handed_over_from"] as const
+
 export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   [
     `CREATE TABLE deliveries (
@@ -447,6 +450,21 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE deliveries ADD COLUMN collapse_key TEXT",
     "CREATE INDEX deliveries_collapse ON deliveries (target_durable_id, sender, collapse_key) WHERE collapse_key IS NOT NULL",
   ],
+
+  // v17 (#15221 row 25): the sub-session ledger. A creation row names the devices of both ends (hints only: rows are
+  // keyed by durable ids, so a store restored under a new device id still resolves) and the opener it was handed over
+  // from; the opener's device and the hosting device each hold the row. `thread_metadata` is one opaque JSON value per
+  // thread, at most 4 KB, which the product stores and never reads.
+  [
+    ...LEDGER_COLUMNS.map((column) => `ALTER TABLE thread_creations ADD COLUMN ${column} TEXT`),
+    "CREATE INDEX IF NOT EXISTS thread_creations_created ON thread_creations (created_durable_id, created_at)",
+    `CREATE TABLE IF NOT EXISTS thread_metadata (
+      durable_id TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL CHECK (length(CAST(value_json AS BLOB)) <= 4096),
+      updated_by TEXT,
+      updated_at INTEGER NOT NULL
+    )`,
+  ],
 ]
 
 /**
@@ -464,11 +482,12 @@ export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
  * or widens a CHECK to a value older code passes through as data keeps the floor; a step that changes what a column older
  * code uses means sets it to its own version. Steps up to v14 predate the floor and claim nothing.
  * v15 widens `deliveries.mode_effective` with `start`, which a v14 reader reports as the lane name it is; v16 adds the
- * nullable `collapse_key`, which v14 writers leave NULL (no collapse).
+ * nullable `collapse_key`, which v14 writers leave NULL (no collapse). v17 adds nullable creation columns and a table
+ * older code never reads.
  * Only a binary that reads the floor relies on it (#14622 review M6): binaries released before it, schema 14 included,
  * refuse every store newer than their own schema whatever floor it carries.
  */
-const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
+const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14, 14]
 
 export const GATEWAY_READER_FLOOR_KEY = "reader_floor"
 
@@ -499,6 +518,7 @@ export const GATEWAY_TABLES = [
   "extension_schema",
   "extension_objects",
   "thread_creations",
+  "thread_metadata",
   "extension_registrations",
   "toolkit_replay_receipts",
   "woken_sessions",

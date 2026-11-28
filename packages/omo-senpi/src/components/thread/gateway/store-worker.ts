@@ -22,6 +22,7 @@ import * as receipts from "./store-tool-receipts"
 import * as ownership from "./store-ownership"
 import { StoreExtensions } from "./store-extension-ops"
 import * as sessions from "./store-extension-session-ops"
+import * as ledger from "./store-ledger-ops"
 import { listSessionOps } from "./extension-registrations"
 import { ExtensionTransactionEndedError } from "./extension-transaction"
 import type { StoreExtensionRegistration } from "./store-extensions"
@@ -917,7 +918,19 @@ async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Pro
     case "session_callable_ops":
       return listSessionOps(ctx)
     case "record_thread_creation":
-      return await sessions.recordThreadCreation(ctx, args as Parameters<typeof sessions.recordThreadCreation>[1])
+      return await ledger.recordThreadCreation(ctx, args as Parameters<typeof ledger.recordThreadCreation>[1])
+    case "thread_opener":
+      return ledger.threadOpener(ctx, (args as { readonly created: string }).created)
+    case "thread_openers":
+      return ledger.threadOpeners(ctx, (args as { readonly created: readonly string[] }).created)
+    case "thread_children":
+      return ledger.threadChildren(ctx, (args as { readonly creator: string }).creator)
+    case "hand_over_thread":
+      return await ledger.handOverThread(ctx, args as Parameters<typeof ledger.handOverThread>[1])
+    case "set_thread_metadata":
+      return await ledger.setThreadMetadata(ctx, args as Parameters<typeof ledger.setThreadMetadata>[1])
+    case "thread_metadata":
+      return ledger.threadMetadata(ctx, (args as { readonly durable_id: string }).durable_id)
     case "enqueue":
       return await ops.enqueue(ctx, args as Parameters<typeof ops.enqueue>[1])
     case "intake":

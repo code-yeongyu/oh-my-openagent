@@ -1,7 +1,8 @@
 {
   "domain": "threads",
   "inert": {
-    "threads.create.fork_from": "every value is refused unsupported (details.reason fork_unsupported) until the engine forks on open (#13031); scenario threads.create/fork pins that refusal"
+    "threads.create.fork_from": "every value is refused unsupported (details.reason fork_unsupported) until the engine forks on open (#13031); scenario threads.create/fork pins that refusal",
+    "threads.list.children_of": "a filter over the listed rows: it changes which rows answer, not which ports are called (the store is read for created_by on every listing, with or without it); tools/parentage.test.ts pins the filtering"
   },
   "scenarios": [
     {

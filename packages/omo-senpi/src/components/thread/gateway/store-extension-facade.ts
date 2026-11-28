@@ -6,6 +6,13 @@ import { AWAIT_REQUEST_ID } from "./extension-registrations"
 import { gatewayDatabasePath } from "./paths"
 import type { SessionCallReply, SessionCallRequest } from "./store-extension-session-ops"
 import type {
+  HandOverResult,
+  SetMetadataResult,
+  ThreadChild,
+  ThreadMetadata,
+  ThreadOpener,
+} from "./store-ledger-ops"
+import type {
   SessionCaller,
   StoreExtensionApi,
   StoreExtensionRefusal,
@@ -23,12 +30,32 @@ export type ExtensionRegisterReply = {
 /** A registration the current worker holds, with the time it was made: a restarted worker replays it as of then. */
 export type RetainedRegistration = { readonly extension: StoreExtensionRegistration; readonly registeredAt: number }
 
-export type ThreadCreationRecord = { readonly creator_durable_id: string; readonly created_durable_id: string }
+export type ThreadCreationRecord = {
+  readonly creator_durable_id: string
+  readonly created_durable_id: string
+  readonly creator_device?: string
+  readonly created_device?: string
+}
 
 export type ExtensionFacade = StoreExtensionApi &
   StoreExtensionSessionApi & {
     /** The durable record that `creator` thread_create'd `created`; a session op's `caller_created_target` reads it. */
     readonly recordThreadCreation: (record: ThreadCreationRecord) => Promise<void>
+    readonly threadOpener: (created: string) => Promise<ThreadOpener | undefined>
+    readonly threadOpeners: (created: readonly string[]) => Promise<Record<string, ThreadOpener>>
+    readonly threadChildren: (creator: string) => Promise<readonly ThreadChild[]>
+    readonly handOverThread: (request: {
+      readonly created_durable_id: string
+      readonly from_durable_id: string
+      readonly to_durable_id: string
+      readonly to_device?: string
+    }) => Promise<HandOverResult>
+    readonly setThreadMetadata: (request: {
+      readonly durable_id: string
+      readonly value: unknown
+      readonly updated_by?: string
+    }) => Promise<SetMetadataResult>
+    readonly threadMetadata: (durableId: string) => Promise<ThreadMetadata | undefined>
   }
 
 type FacadeDeps = {
@@ -150,5 +177,11 @@ export function createExtensionFacade(deps: FacadeDeps): ExtensionFacade {
       })) as StoreExtensionResult<T>
     },
     recordThreadCreation: (record) => call("record_thread_creation", { ...record, now: now() }),
+    threadOpener: (created) => call("thread_opener", { created }),
+    threadOpeners: (created) => call("thread_openers", { created }),
+    threadChildren: (creator) => call("thread_children", { creator }),
+    handOverThread: (request) => call("hand_over_thread", { ...request, now: now() }),
+    setThreadMetadata: (request) => call("set_thread_metadata", { ...request, now: now() }),
+    threadMetadata: (durableId) => call("thread_metadata", { durable_id: durableId }),
   }
 }

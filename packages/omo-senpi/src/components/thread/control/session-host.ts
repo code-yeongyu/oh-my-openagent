@@ -18,6 +18,8 @@ export type SessionOpenRequest = {
   readonly forkFrom?: string
   readonly name?: string
   readonly initialSkills?: readonly string[]
+  /** The session that opened a new thread and its device (#15221 row 25), carried on the context like `initialSkills`. */
+  readonly openedBy?: { readonly thread: string; readonly device: string }
   readonly permissionPreset?: string
   readonly provider?: string
   readonly modelId?: string

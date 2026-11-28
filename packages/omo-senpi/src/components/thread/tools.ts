@@ -41,6 +41,7 @@ import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
+import { withParentage, withReadParentage } from "./tools/parentage"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { threadToolPermission } from "./tools/local-permission"
@@ -436,11 +437,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         args,
         ectx,
         async (current, value) =>
-          await listAcross(
-            options.remote,
-            await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
-            value.all_scope === true,
-            value.state,
+          await withParentage(
+            options.store,
+            await listAcross(
+              options.remote,
+              await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
+              value.all_scope === true,
+              value.state,
+            ),
+            value.children_of,
           ),
       ),
   }
@@ -449,7 +454,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_read,
     execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
       execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
-        readThread(options, current, value, callerId, signal),
+        withReadParentage(options.store, await readThread(options, current, value, callerId, signal)),
       ),
   }
   const send: AnyTool = {

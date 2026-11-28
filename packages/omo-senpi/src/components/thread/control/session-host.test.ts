@@ -296,6 +296,34 @@ describe("SessionHost: the creator record and the alias follow the open on both 
     ])
   })
 
+  // #15221 row 25: the hosting device records the opener too, so the opener rides on the open itself on both legs.
+  test("#given a listed caller #when it creates here and on b #then both opens name it and its device as the opener; an opened existing thread names none", async () => {
+    const a = account({ rows: [ENDED_ROW] })
+    const { run, openSession } = surface(a.remote, { sessions: [caller, local] })
+    await run("thread_create", { name: "ledger here" })
+    await run("thread_create", { device: "studio", name: "ledger there" })
+    await run("thread_create", { thread: "dur-on-b" })
+    const opener = { thread: "dur-caller", device: "here" }
+    expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ openedBy: opener })])
+    const [created, reopened] = openFrames(a.sent)
+    expect(created?.["context"]).toMatchObject({ opened_by: JSON.stringify(opener) })
+    expect((reopened?.["context"] as Record<string, unknown> | undefined)?.["opened_by"]).toBeUndefined()
+  })
+
+  // #15221 row 25: a create always says who opened the new thread; null when no session made the call (a script, the CLI).
+  test("#given a listed caller and a caller no session resolves #when each creates #then the first answer names the opener and the second says created_by null", async () => {
+    const listed = surface(account().remote, { sessions: [caller, local] })
+    expect(await listed.run("thread_create", { name: "opened by caller" })).toMatchObject({
+      kind: "ok",
+      created_by: { thread: "dur-caller" },
+    })
+    const unknown = surface(account().remote)
+    expect(await unknown.run("thread_create", { name: "opened by nobody" })).toMatchObject({
+      kind: "ok",
+      created_by: null,
+    })
+  })
+
   test("#given a free alias #when a create on b claims it #then the alias is held by the new thread on b, as a local create's is held here", async () => {
     const a = account()
     const { run } = surface(a.remote)
