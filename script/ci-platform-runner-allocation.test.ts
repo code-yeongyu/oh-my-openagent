@@ -240,12 +240,15 @@ describe("#given the path-filtered workflows that also run macOS/Windows on dev 
 
 describe("#given the label-triggered full-matrix run", () => {
   test.each([
-    [OPT_IN_LABEL, true],
-    ["run-full-ci", false],
-    ["bug", false],
-  ])("#then the %s label starts it: %p", (label, starts) => {
-    const condition = job("ci-full-matrix-label.yml", "full-matrix")["if"]
-    const github = { event: { pull_request: { labels: [{ name: label }] } } }
-    expect(evaluate(condition, { github })).toBe(starts)
+    ["labeled", OPT_IN_LABEL, [OPT_IN_LABEL], true],
+    ["labeled", "bug", [OPT_IN_LABEL, "bug"], false],
+    ["edited", undefined, [OPT_IN_LABEL], true],
+    ["synchronize", undefined, [OPT_IN_LABEL], true],
+    ["opened", undefined, [OPT_IN_LABEL], true],
+    ["reopened", undefined, [OPT_IN_LABEL], true],
+    ["edited", undefined, ["bug"], false],
+  ] as const)("#then %s with new label %s and PR labels %p starts the matrix: %p", (action, added, names, starts) => {
+    const event = { action, label: added && { name: added }, pull_request: { labels: names.map((name) => ({ name })) } }
+    expect(evaluate(job("ci-full-matrix-label.yml", "gate")["if"], { github: { event } })).toBe(starts)
   })
 })

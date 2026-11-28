@@ -21,7 +21,7 @@ jobs:
   # full matrix schedules anything. These checks are optional; required CI is untouched.
   gate:
     name: Full-matrix label gate
-    if: contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
+    if: (github.event.action != 'labeled' || github.event.label.name == 'ci:full-matrix') && contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     permissions:
       contents: read
       pull-requests: read
@@ -31,7 +31,6 @@ jobs:
 
   full-matrix:
     needs: gate
-    if: contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     # Only matching labels enter this group; bot labels cannot cancel it.
     concurrency:
       group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}-full-matrix

@@ -71,7 +71,7 @@ describe("#given required CI and an optional full-matrix label run", () => {
 
     // then: GitHub evaluates the job gate before job-level concurrency.
     expect(caller["concurrency"]).toBeUndefined()
-    expect(job["if"]).toBe("contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')")
+    expect(job["needs"]).toBe("gate")
     expect(job["uses"]).toBe("./.github/workflows/ci.yml")
     const concurrency = record(job["concurrency"])
     expect(concurrency["cancel-in-progress"]).toBe(true)
@@ -96,7 +96,7 @@ describe("#given required CI and an optional full-matrix label run", () => {
     // then: the label gate is the shared platform decision, failing on a refusal before the reusable full matrix.
     expect(gate["uses"]).toBe("./.github/workflows/pr-platform-decision.yml")
     expect(record(gate["with"])["fail-on-refusal"]).toBe(true)
-    expect(gate["if"]).toBe("contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')")
+    expect(gate["if"]).toContain("contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')")
     expect(fullMatrix["needs"]).toBe("gate")
     expect(String(decide["runs-on"])).toStartWith("ubuntu-")
     expect(Number(decide["timeout-minutes"])).toBeLessThanOrEqual(5)
