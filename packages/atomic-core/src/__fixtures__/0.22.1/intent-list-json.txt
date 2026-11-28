@@ -1,0 +1,10 @@
+[
+  {
+    "attested": "none",
+    "id": "FIXT::fixture-author::1",
+    "kind": "feature",
+    "status": "backlog",
+    "title": "Fixture intent",
+    "verifies": "na"
+  }
+]

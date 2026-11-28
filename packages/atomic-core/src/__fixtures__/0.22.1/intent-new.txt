@@ -1,0 +1,4 @@
+Created intent: FIXT::fixture-author::1
+  file: .vault/intents/01M8FWC7MS3J240JVJQMHSKSVC/intent.md
+  template: feature
+  kind: feature

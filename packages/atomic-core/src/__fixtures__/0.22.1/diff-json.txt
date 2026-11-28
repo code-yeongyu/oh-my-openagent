@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "view": "dev",
+  "change": null,
+  "files": [
+    {
+      "path": "baseline.txt",
+      "old_path": "baseline.txt",
+      "new_path": "baseline.txt",
+      "status": "modified",
+      "code": "M",
+      "binary": false,
+      "insertions": 1,
+      "deletions": 0,
+      "hunks": [
+        {
+          "old_start": 1,
+          "old_count": 1,
+          "new_start": 1,
+          "new_count": 2,
+          "lines": [
+            {
+              "status": "context",
+              "content": "baseline",
+              "old_line": 1,
+              "new_line": 1
+            },
+            {
+              "status": "added",
+              "content": "changed",
+              "old_line": null,
+              "new_line": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "files": 1,
+    "insertions": 1,
+    "deletions": 0
+  }
+}

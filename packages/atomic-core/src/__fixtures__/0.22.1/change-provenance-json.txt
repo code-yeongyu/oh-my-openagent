@@ -1,0 +1,192 @@
+{
+  "hash": "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q",
+  "message": "Write the synthetic alpha.txt fixture.",
+  "authors": [
+    {
+      "name": "opencode+sesg",
+      "email": "gate-a@example.invalid"
+    }
+  ],
+  "timestamp": "2026-11-28T00:59:11.318122+00:00",
+  "dependencies": [],
+  "hunks": [
+    {
+      "hunk_type": "FileAdd",
+      "path": "alpha.txt"
+    },
+    {
+      "hunk_type": "FileAdd",
+      "path": "bravo.txt"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "alpha.txt"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "alpha.txt"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "bravo.txt"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "bravo.txt"
+    }
+  ],
+  "has_provenance": true,
+  "provenance": {
+    "vendor": "OpenAI",
+    "model": "gate-a-model",
+    "tool": "Cli(\"opencode\")",
+    "suggestion_type": "Complete",
+    "tokens": {
+      "input": 10,
+      "output": 8,
+      "total": 20
+    },
+    "cost": {
+      "amount_micros": 10,
+      "currency": "USD"
+    },
+    "timestamp": 1795827547050,
+    "session_id": "ses_gate_a_alpha",
+    "prompt_hash": "VT2PUEXUMRYNONTZP2RRBWP3MPJDIMDOEOIEMHFJ2CRX2RTMD5ZQ",
+    "metadata": [
+      {
+        "key": "turn_number",
+        "value": "1"
+      },
+      {
+        "key": "agent_name",
+        "value": "opencode"
+      },
+      {
+        "key": "finish_reason",
+        "value": "stop"
+      },
+      {
+        "key": "step_count",
+        "value": "1"
+      }
+    ],
+    "finish_reason": "stop",
+    "step_count": 1,
+    "reasoning_text": "Synthetic reasoning."
+  },
+  "ledger": [
+    {
+      "graph_hash": "6TM62QB3HZLZZYSGUCSWPVQX73SINSMWEHHJN3I2MWLF7GPEIZSA",
+      "session_id": "ses_gate_a_alpha",
+      "agent_name": "opencode",
+      "agent_display_name": "OpenCode",
+      "agent_vendor": "openai",
+      "timestamp": 1795827547050,
+      "node_count": 5,
+      "edge_count": 6,
+      "change_count": 1,
+      "changes_explained": [
+        "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q"
+      ],
+      "nodes": [
+        {
+          "id": "ses_gate-1",
+          "kind": "goal",
+          "timestamp": 1795827547050,
+          "summary": "Write the synthetic alpha.txt fixture.",
+          "classified": false
+        },
+        {
+          "id": "ses_gate-2",
+          "kind": "patch_proposal",
+          "timestamp": 1795827547050,
+          "summary": "Change B4YLWD77: 2 files",
+          "detail": {
+            "change_hash": "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q",
+            "files": [
+              "alpha.txt",
+              "bravo.txt"
+            ]
+          },
+          "change_hash": "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q",
+          "classified": false
+        },
+        {
+          "id": "ses_gate-3",
+          "kind": "decision",
+          "timestamp": 1795827547050,
+          "summary": "Synthetic reasoning.",
+          "detail": {
+            "reasoning_duration_ms": 5,
+            "reasoning_text": "Synthetic reasoning.",
+            "text_length": 20
+          },
+          "duration_ms": 5,
+          "classified": true,
+          "confidence": 1.0
+        },
+        {
+          "id": "ses_gate-4",
+          "kind": "llm_response",
+          "timestamp": 1795827547050,
+          "summary": "Wrote alpha.txt",
+          "detail": {
+            "response_text": "Wrote alpha.txt",
+            "text_length": 15
+          },
+          "classified": true,
+          "confidence": 1.0
+        },
+        {
+          "id": "ses_gate-5",
+          "kind": "commitment",
+          "timestamp": 1795827547050,
+          "summary": "Create alpha.txt",
+          "detail": {
+            "file": "alpha.txt",
+            "file_path": "alpha.txt",
+            "operation": "create",
+            "tool": "write"
+          },
+          "tool_name": "write",
+          "tool_call_id": "write-1795827600000",
+          "duration_ms": 5,
+          "classified": false
+        }
+      ],
+      "edges": [
+        {
+          "from": "ses_gate-1",
+          "to": "ses_gate-2",
+          "kind": "led_to"
+        },
+        {
+          "from": "ses_gate-1",
+          "to": "ses_gate-3",
+          "kind": "led_to"
+        },
+        {
+          "from": "ses_gate-2",
+          "to": "ses_gate-3",
+          "kind": "led_to"
+        },
+        {
+          "from": "ses_gate-1",
+          "to": "ses_gate-4",
+          "kind": "led_to"
+        },
+        {
+          "from": "ses_gate-3",
+          "to": "ses_gate-4",
+          "kind": "led_to"
+        },
+        {
+          "from": "ses_gate-1",
+          "to": "ses_gate-5",
+          "kind": "led_to"
+        }
+      ]
+    }
+  ]
+}

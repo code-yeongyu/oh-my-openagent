@@ -1,0 +1,1 @@
+{"session_id":"019ab35a-dc0b-7d6f-8a12-123456789abc","transcript_path":null,"cwd":"/tmp/atomic-fixture/probe-codex","model":"gate-a-model","permission_mode":"default","turn_id":"gate-a-turn-019ab35a-dc0b-7d6f-8a12-123456789abc","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"Wrote turn.txt"}

@@ -1,0 +1,6 @@
+Attested memory: 01m8fwc819a63rxvcdfjxhpf4y
+  vault:     .vault/attestations/memory/01m8fwc819a63rxvcdfjxhpf4y/attested.md
+  sidecar:   /tmp/atomic-fixture/fixture-repo/.atomic/canonical/memory/01m8fwc819a63rxvcdfjxhpf4y/attested.jsonld
+  author:    did:atomic:FIXTUREAUTHORAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+conforms: yes
+note: signing keys are stored unencrypted on disk; treat this attestation as a non-production dev signature until key-at-rest encryption lands.

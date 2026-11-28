@@ -1,0 +1,10 @@
+error: invalid-value
+cmd: atomic log
+arg: --format <FORMAT>
+got: bogus
+usage: atomic log [OPTIONS]
+value: default
+value: short
+value: oneline
+value: json
+help: atomic log --help

@@ -1,0 +1,3 @@
+✗ Not in an Atomic repository: '/tmp/atomic-fixture/plain' (no repository found in this directory or its parents). Run 'atomic init' here, or cd into an Atomic repository.
+
+Hint: Vault searches and other repository commands require an Atomic repository. Run 'atomic init' to create one, or change to a directory inside an existing Atomic repository.

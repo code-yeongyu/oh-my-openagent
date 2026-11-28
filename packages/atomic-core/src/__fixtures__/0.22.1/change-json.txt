@@ -1,0 +1,51 @@
+{
+  "hash": "YY7TTP2NVOHSJV3H6STXX3ACP3QM65FVSAGJLPIHSM7CAJFVOPRA",
+  "message": "Adopt the fixture baseline",
+  "authors": [
+    {
+      "name": "Fixture Author",
+      "email": "fixture@example.invalid"
+    }
+  ],
+  "timestamp": "2026-11-28T01:30:05.974008+00:00",
+  "dependencies": [],
+  "hunks": [
+    {
+      "hunk_type": "FileAdd",
+      "path": "baseline.txt"
+    },
+    {
+      "hunk_type": "DirAdd",
+      "path": "src"
+    },
+    {
+      "hunk_type": "FileAdd",
+      "path": "src/greet.ts"
+    },
+    {
+      "hunk_type": "Edit",
+      "path": "src/greet.ts"
+    },
+    {
+      "hunk_type": "Edit",
+      "path": "src/greet.ts"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "baseline.txt"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "baseline.txt"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "src/greet.ts"
+    },
+    {
+      "hunk_type": "SetAttr",
+      "path": "src/greet.ts"
+    }
+  ],
+  "has_provenance": false
+}

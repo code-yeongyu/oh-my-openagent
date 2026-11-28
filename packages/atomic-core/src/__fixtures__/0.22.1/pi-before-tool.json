@@ -1,0 +1,1 @@
+{"session_id":"mwzpbeyx","cwd":"/tmp/atomic-fixture/probe-pi","timestamp":"2026-11-28T00:58:04.041Z","tool_name":"write","tool_call_id":"write-1795827600000","tool_input":{"path":"turn.txt","content":"synthetic fixture\n"}}

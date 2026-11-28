@@ -1,0 +1,1 @@
+{"session_id":"ses_gate_a_opencode","cwd":"/tmp/atomic-fixture/probe-opencode","timestamp":"2026-11-28T00:58:04.041Z","tool_name":"write","tool_call_id":"write-1795827600000","tool_input":{"filePath":"turn.txt","content":"synthetic fixture\n"},"tool_output":"Wrote turn.txt","title":"Write fixture","file_path":"turn.txt","exit_code":0,"status":"completed","duration":5}

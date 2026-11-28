@@ -1,0 +1,6 @@
+error: unknown-arg
+cmd: atomic status
+got: --bogus-flag
+usage: atomic status [OPTIONS] [PATH]
+suggestion: to pass '--bogus-flag' as a value, use '-- --bogus-flag'
+help: atomic status --help

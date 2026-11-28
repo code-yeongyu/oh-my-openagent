@@ -1,0 +1,5 @@
+Attested intent: FIXT::fixture-author::1
+  vault:     .vault/attestations/FIXT__fixture-author__1/attested.md
+  sidecar:   /tmp/atomic-fixture/fixture-repo/.atomic/canonical/intents/FIXT__fixture-author__1/attested.jsonld
+  author:    did:atomic:FIXTUREAUTHORAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+conforms: yes

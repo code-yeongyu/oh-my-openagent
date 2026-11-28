@@ -1,0 +1,3 @@
+Updated intent: INTE::gate-a-fixture::1
+  status: needs-review
+  priority: medium

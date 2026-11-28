@@ -1,0 +1,3 @@
+conforms: no (2 violation(s))
+  ✗ [IntentShape] urn:atomic:intent:01M8FWC7MS3J240JVJQMHSKSVC (attributedTo): author (attributedTo) must be present as a DID
+  ✗ [IntentShape] urn:atomic:intent:01M8FWC7MS3J240JVJQMHSKSVC (proof): intent must carry a Data Integrity proof

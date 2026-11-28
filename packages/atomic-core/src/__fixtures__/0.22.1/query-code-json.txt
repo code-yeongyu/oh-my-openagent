@@ -1,0 +1,19 @@
+{
+  "matches": [
+    {
+      "path": "src/greet.ts",
+      "line_number": 1,
+      "line_content": "export function greet(name: string) {",
+      "byte_offset": 16,
+      "submatch_start": 16,
+      "submatch_end": 21
+    }
+  ],
+  "total_matches": 1,
+  "dir_facets": [
+    [
+      "src/greet.ts",
+      1
+    ]
+  ]
+}

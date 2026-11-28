@@ -1,0 +1,3 @@
+✗ Internal error: Failed to save session state for 'ses_fixture': unknown session
+
+Hint: This appears to be a bug. Please report it at: https://github.com/atomicdotdev/atomic/issues

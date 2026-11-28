@@ -1,0 +1,3 @@
+✗ Invalid argument: Unknown hook verb 'session-idle' for agent 'opencode'. Known verbs: session-start, session-end, user-prompt, stop, before-tool, after-tool
+
+Hint: Run 'atomic <command> --help' for usage information.

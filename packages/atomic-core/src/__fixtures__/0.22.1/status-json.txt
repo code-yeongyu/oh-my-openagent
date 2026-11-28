@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "repository_root": "/tmp/atomic-fixture/shared-opencode",
+  "view": "lingering-forest-6f46",
+  "state": "FJDK4QU6ZM4G5QC7AXJL6HWH5RIH5AASOHGWFKPZNHXI7EX4ENWQ",
+  "clean": false,
+  "needs_reindex": false,
+  "stale_index_count": 0,
+  "entries": [
+    {
+      "path": ".vault/memory/01m8ftn3zh35e1evsx9qj5jkzm.md",
+      "status": "untracked",
+      "code": "?",
+      "details": null
+    }
+  ]
+}

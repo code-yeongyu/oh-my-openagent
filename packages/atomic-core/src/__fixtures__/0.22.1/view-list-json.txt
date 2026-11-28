@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "source": "local",
+  "repository_root": "/tmp/atomic-fixture/fixture-repo",
+  "remote": null,
+  "current_view": "dev",
+  "views": [
+    {
+      "name": "dev",
+      "current": true,
+      "scope": "shared",
+      "parent": null,
+      "change_count": 3,
+      "own_change_count": 3,
+      "inherited_change_count": 0,
+      "state": "NJUUNRT4QXI46XI2R6DFEZX3U2JZBEPSUQO4AMRIFWKK27LTM5CQ",
+      "set_id": null
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+
+Create a new identity with: atomic identity new <name> --email <email>
+Set a default with: atomic identity default <name>

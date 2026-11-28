@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "id": "urn:atomic:change:blake3-256:YY7TTP2NVOHSJV3H6STXX3ACP3QM65FVSAGJLPIHSM7CAJFVOPRA",
+      "types": [
+        "https://atomic.dev/ns/workflow#Change"
+      ],
+      "label": "YY7TTP2NVOHS",
+      "summary": "Adopt the fixture baseline",
+      "source": "vcs",
+      "metadata": {
+        "ai_usage": {
+          "basis": "change_provenance",
+          "change_set_hash": "5FQFJRT3KC5FAOLR6KTYEFTHXENK73OSTQ7JOAIA7NJ6G5I2AKWA",
+          "contributors": [],
+          "cost": null,
+          "coverage": {
+            "changes": 1,
+            "conflicting_usage_records": 0,
+            "duplicate_usage_records": 0,
+            "records_without_cost": 0,
+            "records_without_tokens": 0,
+            "unavailable": 0,
+            "unique_usage_records": 0,
+            "with_provenance": 0,
+            "without_provenance": 1
+          },
+          "notes": [
+            "Recorded AI usage only, not total development cost. Missing provenance is not zero usage.",
+            "Token totals are preserved as recorded. Cache and reasoning categories may overlap provider totals; do not add rows to reconstruct total.",
+            "Zero token fields are stored values; older captures may default unreported fields to zero. All-zero token records and unmarked zero costs are treated as unreported, not free.",
+            "Shared request/session-turn usage is counted once; conflicting copies are excluded rather than guessed."
+          ],
+          "schema_version": 1,
+          "scope_complete": true,
+          "tokens": null
+        },
+        "ai_usage_record_version": 1,
+        "ai_usage_records": [],
+        "ai_usage_state": "not_recorded",
+        "created_at": "2026-11-28T01:30:05.974008+00:00",
+        "hash": "YY7TTP2NVOHSJV3H6STXX3ACP3QM65FVSAGJLPIHSM7CAJFVOPRA",
+        "object_availability": "available",
+        "projection_completeness": "projected"
+      }
+    },
+    {
+      "id": "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:src/greet.ts",
+      "types": [
+        "https://atomic.dev/ns/workflow#File"
+      ],
+      "label": "greet.ts",
+      "source": "vcs",
+      "metadata": {
+        "path": "src/greet.ts"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from_id": "urn:atomic:change:blake3-256:YY7TTP2NVOHSJV3H6STXX3ACP3QM65FVSAGJLPIHSM7CAJFVOPRA",
+      "to_id": "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:src/greet.ts",
+      "kind": "https://atomic.dev/ns/workflow#modifiesFile"
+    }
+  ]
+}

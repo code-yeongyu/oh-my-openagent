@@ -1,0 +1,12 @@
+[
+  {
+    "name": "greet",
+    "kind": "function",
+    "file": "src/greet.ts",
+    "line": 1,
+    "end_line": 3,
+    "column": 7,
+    "signature": "function greet(name: string)",
+    "exported": true
+  }
+]

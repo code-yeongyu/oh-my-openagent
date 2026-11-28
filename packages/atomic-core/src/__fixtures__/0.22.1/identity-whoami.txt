@@ -1,0 +1,6 @@
+Current identity: Fixture Author
+
+  Email:       fixture@example.invalid
+  Type:        user
+  Usage:       personal
+  Public Key:  FIXTUREPUBLICKEY...

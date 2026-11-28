@@ -1,0 +1,14 @@
+[
+  {
+    "id": "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:src/greet.ts",
+    "types": [
+      "https://atomic.dev/ns/workflow#File"
+    ],
+    "label": "greet.ts",
+    "source": "vcs",
+    "metadata": {
+      "content_matches": 1,
+      "path": "src/greet.ts"
+    }
+  }
+]

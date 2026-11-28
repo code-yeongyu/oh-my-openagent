@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "repository_root": "/tmp/atomic-fixture/fixture-repo",
+  "view": "dev",
+  "state": "NJUUNRT4QXI46XI2R6DFEZX3U2JZBEPSUQO4AMRIFWKK27LTM5CQ",
+  "clean": false,
+  "needs_reindex": false,
+  "stale_index_count": 0,
+  "entries": [
+    {
+      "path": "baseline.txt",
+      "status": "modified",
+      "code": "M",
+      "details": null
+    }
+  ]
+}

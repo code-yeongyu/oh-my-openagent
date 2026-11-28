@@ -1,0 +1,137 @@
+{
+  "reference": "urn:atomic:triage:ae9eb49977ac630c12e47f408d3c96ac92f43e57e4a29a73e339340ed61130b3",
+  "verdict": "blocked",
+  "inputs": {
+    "feature": "lingering-forest-6f46",
+    "target": "dev",
+    "view_merkle": "FJDK4QU6ZM4G5QC7AXJL6HWH5RIH5AASOHGWFKPZNHXI7EX4ENWQ",
+    "candidate_changes": [
+      "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q"
+    ],
+    "closure_additions": [],
+    "intent_substance_hashes": {}
+  },
+  "summary": {
+    "changes": 1,
+    "files": 2,
+    "criteria_met": 0,
+    "criteria_unmet": 0,
+    "findings_block": 2,
+    "findings_warn": 0,
+    "findings_info": 0
+  },
+  "intents": [],
+  "changes": [
+    {
+      "id": "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q",
+      "message": "Write the synthetic alpha.txt fixture.",
+      "modifies": [
+        "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:alpha.txt",
+        "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:bravo.txt"
+      ],
+      "coverage": "uncovered",
+      "files": [
+        {
+          "symbol": "+",
+          "path": "alpha.txt",
+          "summary": "(3 hunks: 1x +3 vertices: name, inode, content; 1x attribute: Kind(Regular); 1x attribute: Mode(420))"
+        },
+        {
+          "symbol": "+",
+          "path": "bravo.txt",
+          "summary": "(3 hunks: 1x +3 vertices: name, inode, content; 1x attribute: Kind(Regular); 1x attribute: Mode(420))"
+        }
+      ],
+      "diff": [
+        {
+          "path": "alpha.txt",
+          "status": "added",
+          "hunks": [
+            {
+              "header": "@@ -0,0 +1,1 @@",
+              "lines": [
+                {
+                  "tag": "+",
+                  "content": "Session A wrote this file"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "bravo.txt",
+          "status": "added",
+          "hunks": [
+            {
+              "header": "@@ -0,0 +1,1 @@",
+              "lines": [
+                {
+                  "tag": "+",
+                  "content": "Session B wrote this file"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "alpha.txt",
+          "status": "modified",
+          "hunks": []
+        },
+        {
+          "path": "alpha.txt",
+          "status": "modified",
+          "hunks": []
+        },
+        {
+          "path": "bravo.txt",
+          "status": "modified",
+          "hunks": []
+        },
+        {
+          "path": "bravo.txt",
+          "status": "modified",
+          "hunks": []
+        }
+      ],
+      "review_command": "atomic change B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q --show-hunks",
+      "provenance": {
+        "agent": "OpenCode",
+        "plan_id": null,
+        "session_id": "ses_gate_a_alpha",
+        "timestamp": 1795827547050
+      }
+    }
+  ],
+  "findings": [
+    {
+      "code": "ORPHAN_CHANGE",
+      "severity": "block",
+      "focus": "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q",
+      "message": "candidate change modifies [alpha.txt, bravo.txt] but no intent's task touches those files — nothing explains why it exists",
+      "suggested_query": "atomic vault query neighbors change:B4YLWD77U2LH -d 2 --json",
+      "remedy": "add a ::file-ref{path=<one of the paths above>} to a task on the owning intent (path must match exactly), then run 'atomic vault sync' and re-triage"
+    },
+    {
+      "code": "PUBLICATION_GATE",
+      "severity": "block",
+      "focus": "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q",
+      "message": "publication gate refused: change B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q: no same-session attestation for session ses_gate_a_alpha",
+      "remedy": "repair or review the named managed session; do not erase incomplete markers or downgrade trust to pass"
+    }
+  ],
+  "walkthrough": [
+    {
+      "id": "layer:(root)",
+      "title": "(root)",
+      "rationale": "2 file(s) in (root) modified by 1 change(s). No intent task touches this layer's files.",
+      "files": [
+        "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:alpha.txt",
+        "urn:atomic:project:FIXTUREPROJECTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:file:bravo.txt"
+      ],
+      "changes": [
+        "B4YLWD77U2LHRN7FPH7RNDIN6QS3LZIGXJL7SUVW3ZTUP4XUW23Q"
+      ]
+    }
+  ]
+}

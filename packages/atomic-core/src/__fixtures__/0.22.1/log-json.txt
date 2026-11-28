@@ -1,0 +1,32 @@
+[
+  {
+    "sequence": 2,
+    "hash": "YY7TTP2NVOHSJV3H6STXX3ACP3QM65FVSAGJLPIHSM7CAJFVOPRA",
+    "state": "NJUUNRT4QXI46XI2R6DFEZX3U2JZBEPSUQO4AMRIFWKK27LTM5CQ",
+    "message": "Adopt the fixture baseline",
+    "authors": [
+      {
+        "name": "Fixture Author",
+        "email": "fixture@example.invalid"
+      }
+    ],
+    "timestamp": "2026-11-28T01:30:05.974008+00:00",
+    "is_tagged": false
+  },
+  {
+    "sequence": 1,
+    "hash": "VR22527P5PSKUQ35DWUUFE3T4XYBMF5TXKYPCHH7UN562YVH3APQ",
+    "state": "MZLVVCRAGSFV72646SCOZR7EKRELJ2QCSW7PBKWZ3JWPGQONRW2Q",
+    "message": "Initialize vault",
+    "timestamp": "2026-11-28T01:30:05.477518+00:00",
+    "is_tagged": false
+  },
+  {
+    "sequence": 0,
+    "hash": "YIKLHFWH54UM6IYRP2SMDGUOEUBOFSURRZKNL7N4ZQHRTEJ5VQ6Q",
+    "state": "7JVCUBW2U7RGC7A2F2MCQ4M72TGNY4FLFW25MAFVVE3ZI55AD2XQ",
+    "message": "Initialize repository",
+    "timestamp": "2026-11-28T01:30:04.998898+00:00",
+    "is_tagged": false
+  }
+]

@@ -1,0 +1,55 @@
+{
+  "@context": "https://atomic.dev/ns/ctx.jsonld",
+  "@id": "urn:atomic:intent:01M8FWC7MS3J240JVJQMHSKSVC",
+  "@type": "Intent",
+  "createdAt": "",
+  "hasAcceptanceCriterion": [
+    {
+      "@id": "urn:atomic:ac:01M8FWC7MS3J240JVJQMHSKSVC-ac-1",
+      "@type": "AcceptanceCriterion",
+      "acStatus": "unmet",
+      "text": "<!-- A single, checkable outcome that means this intent is done. -->"
+    }
+  ],
+  "hasConstraint": [
+    {
+      "@id": "urn:atomic:constraint:01m8fwc7ms3j240jvjqmhsksvc-constraint-1",
+      "@type": "Constraint",
+      "text": "<!-- A rule the implementation must respect. -->"
+    }
+  ],
+  "hasScopeIn": [
+    {
+      "@id": "urn:atomic:scope:01m8fwc7ms3j240jvjqmhsksvc-scope-in-1",
+      "@type": "ScopeItem",
+      "text": "<!-- What this intent will change. -->"
+    }
+  ],
+  "hasScopeOut": [
+    {
+      "@id": "urn:atomic:scope:01m8fwc7ms3j240jvjqmhsksvc-scope-out-1",
+      "@type": "ScopeItem",
+      "text": "<!-- What this intent will deliberately NOT change (the boundaries the agent\n     must respect). -->"
+    }
+  ],
+  "hasTask": [
+    {
+      "@id": "urn:atomic:task:01M8FWC7MS3J240JVJQMHSKSVC-1",
+      "@type": "Task",
+      "satisfies": [
+        "urn:atomic:ac:01M8FWC7MS3J240JVJQMHSKSVC-ac-1"
+      ],
+      "taskStatus": "open",
+      "text": "<!-- A concrete work item toward the criterion above. Name the file(s) it\n     touches with one or more ::file-ref leaves. -->",
+      "touchesFile": [
+        "path/to/file"
+      ]
+    }
+  ],
+  "humanKey": "FIXT::fixture-author::1",
+  "priority": "medium",
+  "status": "backlog",
+  "title": "Fixture intent",
+  "view": "dev",
+  "why": "<!-- Why does this intent exist? State the reason this work matters. The\n     content is never graded — but it must be present. Replace this stub. -->"
+}
