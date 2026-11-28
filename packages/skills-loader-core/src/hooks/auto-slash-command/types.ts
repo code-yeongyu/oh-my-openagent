@@ -14,7 +14,11 @@ export interface ParsedSlashCommand {
   command: string
   args: string
   raw: string
+  start: number
+  end: number
 }
+
+export type SlashCommandInvocation = Pick<ParsedSlashCommand, "command" | "args" | "raw">
 
 export interface AutoSlashCommandResult {
   detected: boolean
