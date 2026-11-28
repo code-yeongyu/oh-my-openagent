@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { TRANSIENT_RUN_MAX_AGE_MS } from "./transient-sweep"
 import { scheduleTransientSweepOnce } from "./transient-sweep-once"
@@ -86,5 +89,66 @@ describe("scheduleTransientSweepOnce", () => {
     expect(newer).toBeDefined()
     expect(afterOldShutdown).toBeUndefined()
     newer?.cancel()
+  })
+
+  test("#given two registrations on one root #when the claimer shuts down before the deferred sweep #then exactly one sweep still runs while the second session stays open", async () => {
+    // given (#12900 item 1: the claim hands over to the remaining registration)
+    const memoryRoot = uniqueRoot()
+    let sweeps = 0
+    let swept: () => void = () => undefined
+    const sweptOnce = new Promise<void>((resolve) => {
+      swept = resolve
+    })
+    const start = () => {
+      sweeps += 1
+      swept()
+    }
+    const claimer = scheduleTransientSweepOnce({ memoryRoot, deferMs: 0, now: () => 1_000_000, start })
+    // B registers on the same root before the deferred sweep starts: no claim, no cancel handle.
+    const second = scheduleTransientSweepOnce({ memoryRoot, deferMs: 0, now: () => 1_000_000, start })
+
+    // when: A, the claimer, shuts down before the 0 ms deferred sweep fired.
+    claimer?.cancel()
+    await sweptOnce
+
+    // then: exactly one sweep runs while B stays open.
+    expect(second).toBeUndefined()
+    expect(sweeps).toBe(1)
+    second?.cancel()
+  })
+
+  test("#given one memory root spelled twice #when both spellings register #then exactly one sweep runs", async () => {
+    // given (#12900 item 2: the claim keys on the root's real path, so a trailing-separator or
+    // symlinked spelling of the same directory is still the same root)
+    const root = await mkdtemp(join(tmpdir(), "omo-sweep-key-"))
+    let sweeps = 0
+    let swept: () => void = () => undefined
+    const sweptOnce = new Promise<void>((resolve) => {
+      swept = resolve
+    })
+    const start = () => {
+      sweeps += 1
+      swept()
+    }
+    try {
+      const first = scheduleTransientSweepOnce({ memoryRoot: root, deferMs: 0, now: () => 1_000_000, start })
+      const respelled = scheduleTransientSweepOnce({
+        memoryRoot: `${root}/`,
+        deferMs: 0,
+        now: () => 1_000_000,
+        start,
+      })
+
+      // when
+      await sweptOnce
+      first?.cancel()
+      respelled?.cancel()
+
+      // then
+      expect(respelled).toBeUndefined()
+      expect(sweeps).toBe(1)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
