@@ -34,10 +34,22 @@ const isRecord = (value: unknown): value is RpcRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined)
 
+// The answer goes to an integration, so it names no local path: the transport's own messages carry the endpoint and key
+// record paths (and chmod hints) for a person at this machine, and the code says what failed.
+const IDENTITY_MESSAGES: Readonly<Record<RpcIdentityError["code"], string>> = {
+  unsafe_key_record: "a key record of the host is not safe to use (its owner, mode or file type)",
+  host_identity_unproven: "the host did not prove its identity",
+  auth_failed: "the host refused this client's proof",
+  auth_required: "the host requires authentication and no key record proves this client",
+}
+
 /** A failure reaching or speaking to the host, as data. */
 function failureOf(error: unknown): RpcSessionFailure {
-  if (error instanceof RpcIdentityError || error instanceof RpcStreamError) return failure(error.code, error.message)
-  return failure("unreachable", error instanceof Error ? error.message : String(error))
+  if (error instanceof RpcIdentityError) return failure(error.code, IDENTITY_MESSAGES[error.code])
+  if (error instanceof RpcStreamError)
+    return failure(error.code, error.code === "not_running" ? "no host serves the endpoint" : error.message)
+  const cause = error instanceof Error ? ("code" in error ? String(error.code) : error.name) : typeof error
+  return failure("unreachable", `the host endpoint could not be used (${cause})`)
 }
 
 /** A host answer's data, or its refusal as data. */
@@ -159,6 +171,11 @@ export async function attachRpcSession(options: AttachRpcSessionOptions): Promis
     host.close()
     return begun
   }
+  // A session the host ended leaves nothing to stream, so its connection goes too: a consumer that reacts to `ended`
+  // without detaching keeps no authenticated socket receiving other sessions' broadcasts.
+  void session.ended.then((why) => {
+    if (why === "session_closed" || why === "session_released") host.close()
+  })
   session.bind(begun.sessionId)
   return { kind: "ok", stream: streamOf(host, session, begun, timeoutMs) }
 }

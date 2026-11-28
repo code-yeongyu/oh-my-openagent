@@ -98,6 +98,8 @@ export type ContractHost = {
   readonly publish: (records: readonly Frame[]) => void
   /** Ends every subscribed connection from the host's side. */
   readonly dropSubscribers: () => void
+  /** Settles once no client connection is open: every admitted connection closed, from either side. */
+  readonly disconnected: () => Promise<void>
 }
 
 /**
@@ -172,6 +174,7 @@ export async function withContractHost(
   const frames: ContractHost["frames"] = []
   const mutations: Frame[] = []
   const sockets = new Set<Socket>()
+  const idle: (() => void)[] = []
   const attachedClients = new Set<Socket>()
   const firstSnapshot = Promise.withResolvers<void>()
   const firstSubscribe = Promise.withResolvers<void>()
@@ -198,7 +201,10 @@ export async function withContractHost(
       }
       const connection = nextConnection++
       sockets.add(client)
-      client.once("close", () => sockets.delete(client))
+      client.once("close", () => {
+        sockets.delete(client)
+        if (sockets.size === 0) for (const settle of idle.splice(0)) settle()
+      })
       let buffer = ""
       let authenticated = process.platform === "win32" || options.auth !== true
       let attached = false
@@ -543,6 +549,7 @@ export async function withContractHost(
         for (const client of attachedClients)
           for (const record of records) client.write(`${JSON.stringify({ ...record, sessionId: "rpc-1" })}\n`)
       },
+      disconnected: () => (sockets.size === 0 ? Promise.resolve() : new Promise<void>((settle) => idle.push(settle))),
     })
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })

@@ -392,7 +392,8 @@ await relay
   `sessionPath` to reopen a saved session, `provider` and `modelId`, `thinkingLevel`, `retain_on_disconnect`,
   `context`, ...). `{ attach: { durableSessionId } }` attaches to a session the host already holds.
 - **Records out.** `records` yields this session's records in host order, with the host's routing `sessionId`
-  removed. Records the host wrote before `open_session` answered come first. Untagged answers to commands sent through
+  removed. Records the host wrote before `open_session` answered come first; while the open waits, at most 1,024 tagged
+  frames are held, and a running session's broadcast past that is dropped. Untagged answers to commands sent through
   this stream are included. Another session's records never arrive. It ends once, when `ended` settles.
 - **Records in.** `send(record)` sends one command and tags it for the session. It returns false once the stream has
   ended. `write(chunk)` splits raw JSONL bytes with the host's strict framing: only `\n` ends a record, and a trailing
@@ -401,9 +402,12 @@ await relay
 - **Detaching.** `detach()` sends `release_attachment`, so the session keeps running and can be attached again.
   `detach({ close: true })` sends `close_session` instead. Either way the connection then closes.
 - **Why it ended.** `ended` settles with `detached`, `session_closed`, `session_released` or `connection_closed`.
+  When the host ends the session (`session_closed`, `session_released`) the connection closes with it, so a consumer
+  that stops on `ended` without calling `detach()` holds no socket.
 - **Failures.** Every failure is answered as `{ kind: "error", error: { code, message } }` and never thrown. The codes
   are `not_running`, `unreachable`, `auth_required`, `auth_failed`, `host_identity_unproven`, `unsafe_key_record`,
-  `session_not_found`, `refused` (the host's own code is in `message`), `request_timeout` and `closed`.
+  `session_not_found`, `refused` (the host's own code is in `message`), `request_timeout` and `closed`. A `message`
+  names no local path or key material; the code says what failed.
 
 ### Diagnose a local read RPC failure
 

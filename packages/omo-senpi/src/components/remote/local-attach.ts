@@ -35,12 +35,15 @@ const READ_TAIL = 50
  * A failure reaching this device's engine, as the engine's own: nothing serves the endpoint (no socket there, or a stale
  * one its engine left behind), or anything else that stops this client using it (another connect error such as EACCES,
  * the endpoint's RpcIdentityError). Never the device service's. The local API errors this file raises already say what
- * failed.
+ * failed, and a handshake request that timed out or lost its connection fails as any request does (`request_timeout`,
+ * `closed`).
  */
 function engineFailure(error: unknown): unknown {
   if (error instanceof LocalApiError) return error
-  if (error instanceof RpcStreamError && error.code === "not_running")
-    return new LocalEngineUnavailable("not_running", error.message)
+  if (error instanceof RpcStreamError)
+    return error.code === "not_running"
+      ? new LocalEngineUnavailable("not_running", error.message)
+      : requestFailure(error)
   return new LocalEngineUnavailable("unreachable", error instanceof Error ? error.message : String(error))
 }
 

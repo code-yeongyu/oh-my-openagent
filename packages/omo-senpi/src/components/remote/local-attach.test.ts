@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomBytes } from "node:crypto"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { Socket } from "node:net"
+import { createServer, Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { LocalApiError } from "@oh-my-opencode/device-service-core/device-service"
 import { withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { defaultWorld, type World } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { reader } from "./attach.test-support"
@@ -305,6 +306,32 @@ describe("a session on this device (local watch)", () => {
         expectEngineFailure(createLocalAttach({ socket: host.socket, keyRoot: host.root }), "unreachable"),
       )
     },
+  )
+
+  // win32's secret transport sends no handshake request that could lose its connection.
+  test.skipIf(process.platform === "win32")(
+    "#given an engine that drops the connection during the handshake #when attach opens a self session #then closed, as any request that lost its connection",
+    () =>
+      withDir(async (dir) => {
+        // given
+        const socket = join(dir, "rpc.sock")
+        const engine = createServer((client) => client.once("data", () => client.destroy()))
+        await new Promise<void>((listening) => engine.listen(socket, listening))
+        try {
+          // when
+          const failed = await createLocalAttach({ socket, keyRoot: dir })({
+            device: SELF,
+            session: KEY,
+            durableId: "dur-selected",
+          }).catch((error: unknown) => error)
+
+          // then
+          expect(failed).toBeInstanceOf(LocalApiError)
+          expect(failed).toMatchObject({ code: "closed" })
+        } finally {
+          await new Promise<void>((closed) => engine.close(() => closed()))
+        }
+      }),
   )
 
   test("#given a client built without a local attach #when it follows a self session #then unsupported{local_attach}, not the relay's peer_not_found", async () => {

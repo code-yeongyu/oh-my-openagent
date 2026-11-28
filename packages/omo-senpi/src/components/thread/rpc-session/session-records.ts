@@ -19,12 +19,22 @@ export type SessionRecords = {
   readonly ended: Promise<RpcSessionEnd>
 }
 
+/**
+ * How many tagged frames wait for the handle at most. An open can wait out its whole request timeout while other
+ * sessions keep broadcasting; a session being opened writes only its start-up records before the answer, so when the
+ * held frames pass this bound the handle holding the most is a running session's, and its frames are dropped for good.
+ */
+export const EARLY_FRAMES_MAX = 1_024
+
 export function createSessionRecords(): SessionRecords {
   let handle: string | undefined
   let reason: RpcSessionEnd | undefined
   let wake: (() => void) | undefined
-  // Accumulators: tagged records seen before the handle; ids of commands sent here; records not yet read.
-  const early: RpcRecord[] = []
+  // Accumulators: tagged frames held per handle until the handle is known, and the handles no longer held; ids of
+  // commands sent here; records not yet read.
+  const early = new Map<string, RpcRecord[]>()
+  const dropped = new Set<string>()
+  let held = 0
   const forwarded = new Set<string>()
   const queue: RpcRecord[] = []
   const ended = Promise.withResolvers<RpcSessionEnd>()
@@ -54,6 +64,19 @@ export function createSessionRecords(): SessionRecords {
     )
       deliver(frame)
   }
+  const hold = (owner: string, frame: RpcRecord): void => {
+    if (dropped.has(owner)) return
+    const frames = early.get(owner) ?? []
+    frames.push(frame)
+    early.set(owner, frames)
+    held += 1
+    if (held <= EARLY_FRAMES_MAX) return
+    let largest = owner
+    for (const [other, its] of early) if (its.length > (early.get(largest)?.length ?? 0)) largest = other
+    held -= early.get(largest)?.length ?? 0
+    early.delete(largest)
+    dropped.add(largest)
+  }
   async function* drain(): AsyncGenerator<RpcRecord> {
     for (;;) {
       const record = queue.shift()
@@ -73,16 +96,19 @@ export function createSessionRecords(): SessionRecords {
     accept: (frame) => {
       if (reason !== undefined) return
       if (handle !== undefined) return route(frame)
-      if (typeof frame.sessionId === "string") early.push(frame)
+      if (typeof frame.sessionId === "string") hold(frame.sessionId, frame)
     },
     openedDurableId: (sessionId) => {
-      const opened = early.find((frame) => frame.type === "session_opened" && frame.sessionId === sessionId)
+      const opened = early.get(sessionId)?.find((frame) => frame.type === "session_opened")
       const durable = opened?.durableSessionId
       return typeof durable === "string" && durable !== "" ? durable : undefined
     },
     bind: (sessionId) => {
       handle = sessionId
-      for (const frame of early.splice(0)) if (reason === undefined) route(frame)
+      const own = early.get(sessionId) ?? []
+      early.clear()
+      dropped.clear()
+      for (const frame of own) if (reason === undefined) route(frame)
     },
     tag: (record) => {
       if (typeof record.id === "string") forwarded.add(record.id)

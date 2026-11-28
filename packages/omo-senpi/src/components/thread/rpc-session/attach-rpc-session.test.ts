@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -46,6 +46,19 @@ const reader = (stream: RpcSessionStream) => {
     } finally {
       clearTimeout(timer)
     }
+  }
+}
+
+/** Settles with `settling`, or fails the test by name once NEXT_RECORD_MS passed. */
+const within = async (settling: Promise<void>, what: string): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`waited ${NEXT_RECORD_MS} ms for ${what}`)), NEXT_RECORD_MS)
+  })
+  try {
+    await Promise.race([settling, late])
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -135,19 +148,23 @@ describe("attachRpcSession", () => {
     },
   )
 
-  test("#given an open stream #when the host closes the session #then the stream ends session_closed", async () => {
-    await withStream({}, OPEN, async (stream, host) => {
-      // given
-      const next = reader(stream)
+  test.each(["session_closed", "session_released"] as const)(
+    "#given an open stream that is never detached #when the host ends the session (%s) #then the stream ends with that reason and its connection closes",
+    async (end) => {
+      await withStream({}, OPEN, async (stream, host) => {
+        // given
+        const next = reader(stream)
 
-      // when
-      host.push([{ type: "session_closed" }])
+        // when
+        host.push([{ type: end }])
 
-      // then
-      expect(await stream.ended).toBe("session_closed")
-      expect(await next("the end of the records")).toBe("done")
-    })
-  })
+        // then
+        expect(await stream.ended).toBe(end)
+        expect(await next("the end of the records")).toBe("done")
+        await within(host.disconnected(), "the attach's connection to close")
+      })
+    },
+  )
 
   test("#given a session on the host #when attached by its durable id #then it attaches by the listed handle and streams its records", async () => {
     await withStream({}, { attach: { durableSessionId: "dur-selected" } }, async (stream, host) => {
@@ -190,6 +207,7 @@ describe("attachRpcSession", () => {
         env: {},
       })
       expect(attached).toMatchObject({ kind: "error", error: { code: "not_running" } })
+      expect(JSON.stringify(attached)).not.toContain(root)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -212,6 +230,15 @@ describe.skipIf(process.platform === "win32")("attachRpcSession on a challenging
     await withContractHost({ auth: true, badProof: true }, async (host) => {
       const attached = await attachRpcSession({ agentDir: host.root, socket: host.socket, session: OPEN, env: {} })
       expect(attached).toMatchObject({ kind: "error", error: { code: "host_identity_unproven" } })
+      expect(JSON.stringify(attached)).not.toContain(host.root)
+    })
+  })
+
+  test("#given a key record other users may read #when attached #then unsafe_key_record, as data that names no local path", async () => {
+    await withContractHost({ auth: true, prepareRecord: (record) => chmodSync(record, 0o644) }, async (host) => {
+      const attached = await attachRpcSession({ agentDir: host.root, socket: host.socket, session: OPEN, env: {} })
+      expect(attached).toMatchObject({ kind: "error", error: { code: "unsafe_key_record" } })
+      expect(JSON.stringify(attached)).not.toContain(host.root)
     })
   })
 })
