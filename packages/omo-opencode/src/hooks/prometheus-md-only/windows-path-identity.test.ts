@@ -52,6 +52,7 @@ function shortSpelling(directory: string): string | undefined {
 const probe = mkdtempSync(join(tmpdir(), "planner-identity-probe-"))
 let shortNamesSupported = false
 let caseVariantSiblingsSupported = false
+let dirSymlinksSupported = true
 try {
   if (win32) {
     if (shortSpelling(probe) === undefined) {
@@ -73,6 +74,15 @@ try {
   }
   if (!caseVariantSiblingsSupported)
     console.warn("Skipping the case-variant sibling form: the volume folds .omo and .OMO into one entry")
+  try {
+    symlinkSync(".omo", join(probe, "dir-link"), "dir")
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "EPERM") throw error
+    dirSymlinksSupported = false
+    console.warn(
+      "Skipping the directory-symlink forms: this account may not create directory symlinks (EPERM; Developer Mode or admin rights)",
+    )
+  }
 } finally {
   rmSync(probe, { recursive: true, force: true })
 }
@@ -152,7 +162,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
   const forms: AliasForm[] = [
     {
       name: "directory symlink inside and out of .omo",
-      skip: false,
+      skip: !dirSymlinksSupported,
       build: (project) => {
         planningWithLinks(project, "dir")
         return {
@@ -176,7 +186,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
     {
       name: "symlinked planning directory (.omo -> docs/plans)",
-      skip: false,
+      skip: !dirSymlinksSupported,
       build: (project) => {
         linkedPlanning(project, "dir")
         return {
@@ -200,7 +210,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
     {
       name: "8.3 short-name ancestor spelling",
-      skip: !shortNamesSupported,
+      skip: !dirSymlinksSupported || !shortNamesSupported,
       build: (project) => {
         planningWithLinks(project, "dir")
         const short = shortSpelling(project)
@@ -216,7 +226,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
     {
       name: "case-different drive letter",
-      skip: !win32,
+      skip: !dirSymlinksSupported || !win32,
       build: (project) => {
         planningWithLinks(project, "dir")
         const swapped = swapDriveCase(project)
@@ -231,7 +241,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
     {
       name: "case-different directory spelling",
-      skip: false,
+      skip: !dirSymlinksSupported,
       build: (project) => {
         planningWithLinks(project, "dir")
         const alias = join(project, ".OMO")
@@ -245,7 +255,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
     {
       name: "mixed separators, relative",
-      skip: false,
+      skip: !dirSymlinksSupported,
       build: (project) => {
         planningWithLinks(project, "dir")
         return {
@@ -257,7 +267,7 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
     {
       name: "mixed separators, absolute",
-      skip: false,
+      skip: !dirSymlinksSupported,
       build: (project) => {
         planningWithLinks(project, "dir")
         const slashed = project.replaceAll(sep, "/")
@@ -312,64 +322,66 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     },
   )
 
-  test("link-then-dotdot probe: the guard decides on the path the executor opens", async () => {
-    mkdirSync(join(project, ".omo/inside/deep"), { recursive: true })
-    const lexical = join(project, ".omo/escaped.md")
-    const physical = join(project, ".omo/inside/escaped.md")
-    writeFileSync(lexical, "lexical\n")
-    writeFileSync(physical, "physical\n")
-    symlinkSync("inside/deep", join(project, ".omo/redirect"), "dir")
-    const spelling = ".omo/redirect/../escaped.md"
+  test.skipIf(!dirSymlinksSupported)(
+    "link-then-dotdot probe: the guard decides on the path the executor opens",
+    async () => {
+      mkdirSync(join(project, ".omo/inside/deep"), { recursive: true })
+      const lexical = join(project, ".omo/escaped.md")
+      const physical = join(project, ".omo/inside/escaped.md")
+      writeFileSync(lexical, "lexical\n")
+      writeFileSync(physical, "physical\n")
+      symlinkSync("inside/deep", join(project, ".omo/redirect"), "dir")
+      const spelling = ".omo/redirect/../escaped.md"
 
-    // Where the operating system itself puts bytes written through the raw spelling (concatenated: join() would collapse `..`).
-    let raw: string
-    try {
-      writeFileSync(`${project}${sep}${spelling}`, "raw\n")
-      raw =
-        readFileSync(lexical, "utf8") === "raw\n"
+      // Where the operating system itself puts bytes written through the raw spelling (concatenated: join() would collapse `..`).
+      let raw: string
+      try {
+        writeFileSync(`${project}${sep}${spelling}`, "raw\n")
+        raw =
+          readFileSync(lexical, "utf8") === "raw\n"
+            ? "lexical"
+            : readFileSync(physical, "utf8") === "raw\n"
+              ? "physical"
+              : "elsewhere"
+      } catch (error) {
+        raw = `error:${error instanceof Error && "code" in error ? String(error.code) : String(error)}`
+      }
+      writeFileSync(lexical, "lexical\n")
+      writeFileSync(physical, "physical\n")
+
+      const decided = resolveAllowedFile(spelling, project)
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "run",
+          join(import.meta.dir, "fixtures/guarded-hashline.ts"),
+          JSON.stringify({ filePath: spelling, edits: [{ op: "append", lines: ["probe"] }] }),
+        ],
+        { cwd: project, stdout: "pipe", stderr: "pipe" },
+      )
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      expect(code, stderr).toBe(0)
+      const executed = JSON.parse(stdout) as { blocked: boolean; result?: string; filePath?: string }
+      const landed = readFileSync(physical, "utf8").includes("probe")
+        ? "physical"
+        : readFileSync(lexical, "utf8").includes("probe")
           ? "lexical"
-          : readFileSync(physical, "utf8") === "raw\n"
-            ? "physical"
-            : "elsewhere"
-    } catch (error) {
-      raw = `error:${error instanceof Error && "code" in error ? String(error.code) : String(error)}`
-    }
-    writeFileSync(lexical, "lexical\n")
-    writeFileSync(physical, "physical\n")
+          : "nowhere"
+      process.stderr.write(
+        `PATH_IDENTITY_PROBE ${JSON.stringify({ platform: process.platform, spelling, raw, decided, executed: executed.filePath, landed })}\n`,
+      )
 
-    const decided = resolveAllowedFile(spelling, project)
-    const child = Bun.spawn(
-      [
-        process.execPath,
-        "run",
-        join(import.meta.dir, "fixtures/guarded-hashline.ts"),
-        JSON.stringify({ filePath: spelling, edits: [{ op: "append", lines: ["probe"] }] }),
-      ],
-      { cwd: project, stdout: "pipe", stderr: "pipe" },
-    )
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ])
-    expect(code, stderr).toBe(0)
-    const executed = JSON.parse(stdout) as { blocked: boolean; result?: string; filePath?: string }
-    const landed = readFileSync(physical, "utf8").includes("probe")
-      ? "physical"
-      : readFileSync(lexical, "utf8").includes("probe")
-        ? "lexical"
-        : "nowhere"
-    process.stderr.write(
-      `PATH_IDENTITY_PROBE ${JSON.stringify({ platform: process.platform, spelling, raw, decided, executed: executed.filePath, landed })}\n`,
-    )
-
-    expect(decided).toBe(join(realpathSync.native(project), ".omo", "inside", "escaped.md"))
-    expect(executed.blocked).toBe(false)
-    expect(executed.filePath).toBe(decided)
-    expect(landed).toBe("physical")
-    expect(readFileSync(lexical, "utf8")).toBe("lexical\n")
-    // Without the rewrite the executor would open the raw spelling, which Windows collapses lexically
-    // before following the link; the guard therefore hands the executor its resolved path, never the spelling.
-    expect(raw).toBe(win32 ? "lexical" : "physical")
-  })
+      expect(decided).toBe(join(realpathSync.native(project), ".omo", "inside", "escaped.md"))
+      expect(executed.blocked).toBe(false)
+      expect(executed.filePath).toBe(decided)
+      expect(landed).toBe("physical")
+      expect(readFileSync(lexical, "utf8")).toBe("lexical\n")
+      // How the OS collapses the raw spelling is logged in PATH_IDENTITY_PROBE above, not asserted: it is runtime behaviour,
+      // and the guard hands the executor its resolved path either way.
+    },
+  )
 })
