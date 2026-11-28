@@ -27,10 +27,13 @@ const runTool: ToolRunner = (command, args) => {
 
 export function designatedRequirement(codesignOutput: string): string | undefined {
   const line = codesignOutput.split("\n").find((candidate) => candidate.startsWith("designated => "))
+  if (line === undefined) return undefined
   // codesign -d -r- annotates field-existence clauses with /* exists */; the requirement itself is unchanged.
+  // The annotation is stripped only outside quoted strings: a quoted identifier may legitimately contain
+  // comment-like text, and the comparison must stay exact on that value (#11987).
   return line
-    ?.slice("designated => ".length)
-    .replace(/\/\*.*?\*\//g, "")
+    .slice("designated => ".length)
+    .replace(/"[^"]*"|\/\*.*?\*\//g, (token) => (token.startsWith('"') ? token : ""))
     .replace(/\s+/g, " ")
     .trim()
 }
