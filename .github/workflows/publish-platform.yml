@@ -643,38 +643,17 @@ jobs:
         env:
           VERSION: ${{ steps.validate.outputs.version }}
         run: |
-          PLATFORM_KEY="${{ matrix.platform }}"
-          PLATFORM_KEY="${PLATFORM_KEY//-/_}"
-          
-          # Check oh-my-opencode
+          # Only the oh-my-opencode-<platform> family is published: the oh-my-openagent wrapper resolves its
+          # platform binary through its oh-my-opencode payload, so oh-my-openagent-<platform> gets no new versions.
           OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
-          # Check oh-my-openagent
-          OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
-          
           echo "oh-my-opencode-${{ matrix.platform }}@${VERSION}: ${OC_STATUS}"
-          echo "oh-my-openagent-${{ matrix.platform }}@${VERSION}: ${OA_STATUS}"
-          
+
           if [ "$OC_STATUS" = "200" ]; then
-            echo "skip_opencode=true" >> "$GITHUB_OUTPUT"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
           else
-            echo "skip_opencode=false" >> "$GITHUB_OUTPUT"
-            echo "→ oh-my-opencode-${{ matrix.platform }}@${VERSION} needs publishing"
-          fi
-          
-          if [ "$OA_STATUS" = "200" ]; then
-            echo "skip_openagent=true" >> "$GITHUB_OUTPUT"
-            echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
-          else
-            echo "skip_openagent=false" >> "$GITHUB_OUTPUT"
-            echo "→ oh-my-openagent-${{ matrix.platform }}@${VERSION} needs publishing"
-          fi
-          
-          # Skip build only if BOTH are already published
-          if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "→ oh-my-opencode-${{ matrix.platform }}@${VERSION} needs publishing"
           fi
 
       - name: Update version in package.json
@@ -1198,25 +1177,10 @@ jobs:
           VERSION: ${{ steps.validate.outputs.version }}
         run: |
           OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
-          OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
-          
+
           if [ "$OC_STATUS" = "200" ]; then
-            echo "skip_opencode=true" >> "$GITHUB_OUTPUT"
-            echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
-          else
-            echo "skip_opencode=false" >> "$GITHUB_OUTPUT"
-          fi
-          
-          if [ "$OA_STATUS" = "200" ]; then
-            echo "skip_openagent=true" >> "$GITHUB_OUTPUT"
-            echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
-          else
-            echo "skip_openagent=false" >> "$GITHUB_OUTPUT"
-          fi
-          
-          # Need artifact if either package needs publishing
-          if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
             echo "skip_all=true" >> "$GITHUB_OUTPUT"
+            echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
           else
             echo "skip_all=false" >> "$GITHUB_OUTPUT"
           fi
@@ -1324,27 +1288,11 @@ jobs:
           HELPER
 
       - name: Publish oh-my-opencode-${{ matrix.platform }}
-        if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
         run: |
           cd "packages/oh-my-opencode-${{ matrix.platform }}"
-          bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"
-        timeout-minutes: 15
-
-      - name: Publish oh-my-openagent-${{ matrix.platform }}
-        if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
-        env:
-          DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-        run: |
-          cd "packages/oh-my-opencode-${{ matrix.platform }}"
-
-          # Rename package for oh-my-openagent
-          jq --arg name "oh-my-openagent-${{ matrix.platform }}" \
-             --arg desc "Platform-specific binary for oh-my-openagent (${{ matrix.platform }})" \
-             '.name = $name | .description = $desc' \
-             package.json > tmp.json && mv tmp.json package.json
-
           bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"
         timeout-minutes: 15
 
@@ -1367,7 +1315,7 @@ jobs:
             echo
             echo "- Rechecks whether platform packages are already published."
             echo "- Downloads the matching build artifact only when needed."
-            echo "- Publishes legacy and renamed platform packages with trusted publishing."
+            echo "- Publishes the oh-my-opencode platform package with trusted publishing."
             echo
             echo "### If this fails"
             echo

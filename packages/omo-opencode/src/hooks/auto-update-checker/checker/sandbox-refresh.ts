@@ -1,6 +1,3 @@
-import { basename, dirname } from "node:path"
-import { fileURLToPath } from "node:url"
-
 import { log } from "../../../shared/logger"
 import { getOpenCodeCacheDir } from "../../../shared/data-path"
 import {
@@ -13,7 +10,7 @@ import {
   releasePluginSandboxLease,
   removePluginSandbox,
 } from "../../../shared/opencode-plugin-sandbox"
-import { findPackageJsonUp } from "./package-json-locator"
+import { findModuleHostingWorkspace } from "./module-hosting-workspace"
 
 /**
  * Makes "restart to apply" true for a plugin running from an OpenCode-managed
@@ -60,12 +57,8 @@ const trackedSandboxDirs = new Set<string>()
  * source tree).
  */
 export function getLoadedPluginSandboxDir(moduleUrl: string, cacheDir: string = getOpenCodeCacheDir()): string | null {
-  const packageJsonPath = findPackageJsonUp(dirname(fileURLToPath(moduleUrl)))
-  if (!packageJsonPath) return null
-  const nodeModulesDir = dirname(dirname(packageJsonPath))
-  if (basename(nodeModulesDir) !== "node_modules") return null
-  const workspace = dirname(nodeModulesDir)
-  return isPluginSandboxDir(workspace, cacheDir) ? workspace : null
+  const workspace = findModuleHostingWorkspace(moduleUrl)
+  return workspace !== null && isPluginSandboxDir(workspace, cacheDir) ? workspace : null
 }
 
 function refreshMarkedSandbox(sandboxDir: string, cacheDir: string, pid: number): void {

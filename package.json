@@ -123,7 +123,9 @@
     },
     "./server": "./dist/index.js",
     "./tui": "./dist/tui.js",
-    "./schema.json": "./dist/oh-my-opencode.schema.json"
+    "./schema.json": "./dist/oh-my-opencode.schema.json",
+    "./package.json": "./package.json",
+    "./bin/oh-my-opencode.js": "./bin/oh-my-opencode.js"
   },
   "scripts": {
     "build": "bun run script/build.ts",

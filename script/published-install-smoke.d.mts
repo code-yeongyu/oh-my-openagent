@@ -30,3 +30,8 @@ export declare function parseSmokeArgs(argv: readonly string[]): {
   tarballPath: string | null
   keep: boolean
 }
+
+export declare function wrappedPayloadSpec(manifest: {
+  readonly name?: string
+  readonly dependencies?: Readonly<Record<string, string>>
+}): string | null

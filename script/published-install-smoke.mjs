@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, mkdir, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -125,7 +125,17 @@ export function registryWaitFromEnv(env) {
   }
 }
 
-function packPublishedTarball(packageSpec, workingDirectory) {
+// oh-my-openagent is a thin wrapper that ships no Codex installer of its own: it pins the oh-my-opencode payload
+// exactly, and that payload is what a wrapper install runs. Null for a package that carries its own payload.
+export function wrappedPayloadSpec(manifest) {
+  const pin = manifest?.dependencies?.["oh-my-opencode"]
+  if (manifest?.name === "oh-my-opencode" || typeof pin !== "string") return null
+  const spec = `oh-my-opencode@${pin}`
+  return /^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(pin) && isSupportedPackageSpec(spec) ? spec : null
+}
+
+/** Packs `packageSpec` into `workingDirectory` and returns the path of the one tarball it wrote. */
+async function packPublishedTarball(packageSpec, workingDirectory) {
   if (!isSupportedPackageSpec(packageSpec)) {
     throw new Error(`refusing to pack an unrecognized package spec: ${packageSpec}`)
   }
@@ -134,6 +144,10 @@ function packPublishedTarball(packageSpec, workingDirectory) {
     stdio: ["ignore", "inherit", "inherit"],
     shell: process.platform === "win32",
   })
+  const packed = (await readdir(workingDirectory)).filter((entry) => entry.endsWith(".tgz"))
+  if (packed.length !== 1)
+    throw new Error(`npm pack ${packageSpec} produced ${packed.length} tarballs; expected exactly 1`)
+  return join(workingDirectory, packed[0])
 }
 
 async function extractTarball(tarballPath, workingDirectory) {
@@ -162,16 +176,17 @@ async function runSmoke(argv) {
     let tarballPath = args.tarballPath === null ? null : resolve(args.tarballPath)
     if (tarballPath === null) {
       const packageSpec = await resolveCommittedLatestSpec(args.packageSpec, registryWaitFromEnv(process.env))
-      packPublishedTarball(packageSpec, sandbox)
-      const packed = (await readdir(sandbox)).filter((entry) => entry.endsWith(".tgz"))
-      if (packed.length !== 1) {
-        console.error(`npm pack ${args.packageSpec} produced ${packed.length} tarballs; expected exactly 1`)
-        return 1
-      }
-      tarballPath = join(sandbox, packed[0])
+      tarballPath = await packPublishedTarball(packageSpec, sandbox)
     }
 
-    const packageRoot = await extractTarball(tarballPath, sandbox)
+    let packageRoot = await extractTarball(tarballPath, sandbox)
+    const payloadSpec = wrappedPayloadSpec(JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")))
+    if (payloadSpec !== null) {
+      console.log(`[smoke] ${args.packageSpec ?? tarballPath} wraps ${payloadSpec}; smoking that payload`)
+      const payloadDir = join(sandbox, "payload")
+      await mkdir(payloadDir, { recursive: true })
+      packageRoot = await extractTarball(await packPublishedTarball(payloadSpec, payloadDir), payloadDir)
+    }
     const installerPath = join(packageRoot, "packages", "omo-codex", "scripts", "install-dist", "install-local.mjs")
     if (!existsSync(installerPath)) {
       console.error(`published payload has no Codex installer at ${installerPath}`)

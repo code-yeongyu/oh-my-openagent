@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
 import { runBunInstallWithDetails } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
 import { getOpenCodeCacheDir, getOpenCodeConfigPaths } from "../../../shared"
@@ -9,7 +8,7 @@ import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
 import { findPluginEntry, getCachedVersion, getLatestVersion, syncCachePackageJsonToIntent } from "../checker"
-import { findPackageJsonUp } from "../checker/package-json-locator"
+import { findModuleHostingWorkspace } from "../checker/module-hosting-workspace"
 import { scheduleOpenCodeSandboxRefreshOnExit } from "../checker/sandbox-refresh"
 import { isStrictlyNewerVersion } from "../checker/semver-compare"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
@@ -27,13 +26,7 @@ import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
  */
 function defaultGetModuleHostingWorkspace(): string | null {
   try {
-    const currentDir = dirname(fileURLToPath(import.meta.url))
-    const pkgJsonPath = findPackageJsonUp(currentDir)
-    if (!pkgJsonPath) return null
-    const pkgDir = dirname(pkgJsonPath)
-    const nodeModulesDir = dirname(pkgDir)
-    if (nodeModulesDir.split(/[\\/]/).pop() !== "node_modules") return null
-    return dirname(nodeModulesDir)
+    return findModuleHostingWorkspace(import.meta.url)
   } catch (error) {
     if (error instanceof Error) {
       return null

@@ -110,7 +110,7 @@ describe("wait-registry-versions overall deadline", () => {
 })
 
 describe("platformPackageNames", () => {
-  test("#given the root manifest #when platform packages are derived #then both families come from optionalDependencies", () => {
+  test("#given the root manifest #when platform packages are derived #then the oh-my-opencode family comes from optionalDependencies", () => {
     expect(
       platformPackageNames({
         optionalDependencies: {
@@ -119,12 +119,7 @@ describe("platformPackageNames", () => {
           "left-pad": "1.0.0",
         },
       }),
-    ).toEqual([
-      "oh-my-opencode-linux-x64",
-      "oh-my-openagent-linux-x64",
-      "oh-my-opencode-windows-arm64",
-      "oh-my-openagent-windows-arm64",
-    ])
+    ).toEqual(["oh-my-opencode-linux-x64", "oh-my-opencode-windows-arm64"])
   })
 
   test("#given a manifest with no platform packages #when derived #then it fails closed", () => {

@@ -17,6 +17,7 @@ const VERSION_STAMPED_PATHS = [
   /^bun\.lock$/,
   /^packages\/omo-native\/package\.json$/,
   /^packages\/oh-my-opencode-[^/]+\/package\.json$/,
+  /^packages\/oh-my-openagent-wrapper\/package\.json$/,
   /^packages\/omo-senpi\/package\.json$/,
   /^packages\/omo-senpi\/plugin\/package\.json$/,
   /^packages\/omo-codex\/package\.json$/,
@@ -87,6 +88,22 @@ export function versionRefusals(pin, stamp, version, nativeVersion) {
     JSON.parse(git(["show", `${stamp}:package.json`])).optionalDependencies ?? {},
   )) {
     if (value !== version) errors.push(`package.json: expected optional dependency ${name} at ${version}`)
+  }
+  if (git(["ls-tree", "--name-only", stamp, "--", WRAPPER_MANIFEST]).trim() === WRAPPER_MANIFEST) {
+    errors.push(...wrapperPinRefusals(JSON.parse(git(["show", `${stamp}:${WRAPPER_MANIFEST}`])), version))
+  }
+  return errors
+}
+
+const WRAPPER_MANIFEST = "packages/oh-my-openagent-wrapper/package.json"
+
+// oh-my-openagent pins its payload exactly: a wrapper at the release version whose pin names another version would
+// install a payload from a different release.
+export function wrapperPinRefusals(manifest, version) {
+  const errors = []
+  if (manifest.version !== version) errors.push(`${WRAPPER_MANIFEST}: expected release version ${version}`)
+  if (manifest.dependencies?.["oh-my-opencode"] !== version) {
+    errors.push(`${WRAPPER_MANIFEST}: expected dependency oh-my-opencode at exactly ${version}`)
   }
   return errors
 }

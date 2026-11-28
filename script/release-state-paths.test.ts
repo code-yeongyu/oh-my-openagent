@@ -11,6 +11,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { load } from "js-yaml"
+import { wrapperPinRefusals } from "./release-state-paths.mjs"
 
 const checker = fileURLToPath(new URL("./release-state-paths.mjs", import.meta.url))
 const probe = fileURLToPath(new URL("../.github/scripts/base-platform-green.sh", import.meta.url))
@@ -29,6 +30,7 @@ describe("#given the release stamp's path check", () => {
     const run = check([
       "CHANGELOG.md",
       "packages/oh-my-opencode-linux-x64/package.json",
+      "packages/oh-my-openagent-wrapper/package.json",
       "packages/omo-senpi/plugin/extensions/a.mjs",
     ])
     expect(run.status).toBe(0)
@@ -58,6 +60,17 @@ describe("#given the release stamp's path check", () => {
     )
     expect(checkAt).toBeGreaterThan(-1)
     expect(checkAt).toBeLessThan(run.indexOf('git commit -m "release: v${VERSION}"'))
+  })
+})
+
+describe("#given the stamped oh-my-openagent wrapper", () => {
+  test.each([
+    ["version and pin at the release", { version: "1.0.1", dependencies: { "oh-my-opencode": "1.0.1" } }, 0],
+    ["a pin left at the previous release", { version: "1.0.1", dependencies: { "oh-my-opencode": "1.0.0" } }, 1],
+    ["a range instead of an exact pin", { version: "1.0.1", dependencies: { "oh-my-opencode": "^1.0.1" } }, 1],
+    ["an unstamped version", { version: "1.0.0", dependencies: { "oh-my-opencode": "1.0.1" } }, 1],
+  ])("#when it has %s #then the version check reports %i refusal(s)", (_name, manifest, count) => {
+    expect(wrapperPinRefusals(manifest, "1.0.1")).toHaveLength(count)
   })
 })
 

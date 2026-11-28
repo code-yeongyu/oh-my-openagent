@@ -228,20 +228,22 @@ function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {
   return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : []
 }
 
+// oh-my-openagent carried the plugin tree before it became a thin wrapper over oh-my-opencode, which carries it now.
+const CODEX_PLUGIN_CARRIER_PACKAGES = ["oh-my-openagent", "oh-my-opencode"] as const
+
 export function findRepoRootFromImporter(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current)) return current
-    for (const wrapperPackageRoot of [
-      join(current, "node_modules", "oh-my-openagent"),
-      join(current, "oh-my-openagent"),
-    ]) {
-      if (isRepoRootWithCodexPlugin(wrapperPackageRoot)) return wrapperPackageRoot
+    for (const packageName of CODEX_PLUGIN_CARRIER_PACKAGES) {
+      for (const packageRoot of [join(current, "node_modules", packageName), join(current, packageName)]) {
+        if (isRepoRootWithCodexPlugin(packageRoot)) return packageRoot
+      }
     }
     current = resolve(current, "..")
   }
   throw new Error(
-    "Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 7 parent levels",
+    "Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or a sibling oh-my-openagent or oh-my-opencode package within 7 parent levels",
   )
 }
 

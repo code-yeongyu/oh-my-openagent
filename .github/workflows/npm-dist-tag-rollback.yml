@@ -56,14 +56,19 @@ jobs:
             npm dist-tag add "$pkg@$ver" "$DIST_TAG"
             echo "$pkg $DIST_TAG -> $(npm view "$pkg" "dist-tags.$DIST_TAG")"
           }
+          # The oh-my-openagent wrapper pins oh-my-opencode exactly, so the payload and its platform packages move first:
+          # the tag never points at a wrapper whose payload tag names another version.
           retag oh-my-opencode "$VERSION"
+          for plat in "${PLATFORMS[@]}"; do
+            retag "oh-my-opencode-$plat" "$VERSION"
+            # Releases before the thin wrapper also published oh-my-openagent-<platform>; later ones do not.
+            if [ "$(npm view "oh-my-openagent-$plat@$VERSION" version 2>/dev/null || true)" = "$VERSION" ]; then
+              retag "oh-my-openagent-$plat" "$VERSION"
+            fi
+          done
           retag oh-my-openagent "$VERSION"
           retag lazycodex-ai "$VERSION"
           retag omo-ai "$OMO_AI_VERSION"
-          for plat in "${PLATFORMS[@]}"; do
-            retag "oh-my-opencode-$plat" "$VERSION"
-            retag "oh-my-openagent-$plat" "$VERSION"
-          done
 
       - name: Write job summary
         if: always()

@@ -159,7 +159,7 @@ If you already used Bun global install or update and Bun reports blocked lifecyc
 bun pm -g untrusted
 ```
 
-Do not run a blanket trust command. Trust only packages you recognize from this install path, such as `oh-my-openagent` or legacy `oh-my-opencode`, then rerun the supported `bunx oh-my-openagent install` or `npx lazycodex-ai doctor` check.
+Do not run a blanket trust command. Trust only packages you recognize from this install path: `oh-my-openagent` installs `oh-my-opencode` as its payload, and the install-time script belongs to `oh-my-opencode`. Then rerun the supported `bunx oh-my-openagent install` or `npx lazycodex-ai doctor` check.
 
 The OpenCode comment-checker hook downloads its pinned binary directly from [GitHub releases](https://github.com/code-yeongyu/go-claude-code-comment-checker/releases) on first use and caches it locally. No comment-checker npm package or lifecycle-script trust is required. If the download fails, comment checking is disabled for that process; allow GitHub access and restart OpenCode to retry.
 

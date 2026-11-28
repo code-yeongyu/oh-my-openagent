@@ -11,6 +11,7 @@ import {
   registryTarballUrl,
   registryWaitFromEnv,
   resolveCommittedLatestSpec,
+  wrappedPayloadSpec,
 } from "./published-install-smoke.mjs"
 
 const TARBALL = "https://registry.npmjs.org/oh-my-openagent/-/oh-my-openagent-5.1.78.tgz"
@@ -212,6 +213,24 @@ describe("published install smoke", () => {
     // given / when / then
     expect(registryTarballUrl("oh-my-openagent", "5.1.78")).toBe(TARBALL)
     expect(registryTarballUrl("@scope/name", "1.2.3")).toBe("https://registry.npmjs.org/@scope/name/-/name-1.2.3.tgz")
+  })
+
+  test.each([
+    [
+      "the oh-my-openagent wrapper",
+      { name: "oh-my-openagent", dependencies: { "oh-my-opencode": "5.1.86" } },
+      "oh-my-opencode@5.1.86",
+    ],
+    [
+      "a beta wrapper",
+      { name: "oh-my-openagent", dependencies: { "oh-my-opencode": "5.2.0-beta.3" } },
+      "oh-my-opencode@5.2.0-beta.3",
+    ],
+    ["the payload itself", { name: "oh-my-opencode", dependencies: {} }, null],
+    ["a package with no payload pin", { name: "lazycodex-ai", dependencies: {} }, null],
+    ["a range pin", { name: "oh-my-openagent", dependencies: { "oh-my-opencode": "^5.1.86" } }, null],
+  ])("#given %s #when its manifest is read #then the payload to smoke is %p", (_name, manifest, expected) => {
+    expect(wrappedPayloadSpec(manifest)).toBe(expected)
   })
 
   test("#given plain dist-tag and exact-version specs #when they are checked #then both are accepted", () => {

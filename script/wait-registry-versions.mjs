@@ -75,8 +75,8 @@ export async function waitForRegistryVersions({
 }
 
 /** Every platform package the release publishes, from the root manifest's optionalDependencies: the
- * one list `publish-release-platform-workflow.test.ts` holds equal to build-binaries PLATFORMS, in both
- * the oh-my-opencode-<platform> and oh-my-openagent-<platform> families. */
+ * one list `publish-release-platform-workflow.test.ts` holds equal to build-binaries PLATFORMS. Only the
+ * oh-my-opencode-<platform> family is published: the oh-my-openagent wrapper reaches its binary through the payload. */
 export function platformPackageNames(rootManifest) {
   const prefix = "oh-my-opencode-"
   const platforms = Object.keys(rootManifest.optionalDependencies ?? {})
@@ -84,7 +84,7 @@ export function platformPackageNames(rootManifest) {
     .map((name) => name.slice(prefix.length))
   if (platforms.length === 0)
     throw new Error("root package.json optionalDependencies lists no oh-my-opencode-<platform> package")
-  return platforms.flatMap((platform) => [`oh-my-opencode-${platform}`, `oh-my-openagent-${platform}`])
+  return platforms.map((platform) => `oh-my-opencode-${platform}`)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -157,6 +157,23 @@ describe("omo doctor migration checks", () => {
     })
   })
 
+  describe("#given a bun global oh-my-openagent with its oh-my-opencode payload hoisted beside it", () => {
+    test("#then only the package the user added is reported as a legacy install", () => {
+      const sandbox = createSandbox()
+      const globalRoot = join(sandbox.bunRoot, "install", "global")
+      installPackage(join(globalRoot, "node_modules"), sandbox.bunBin, "oh-my-openagent", "5.1.86", false)
+      installPackage(join(globalRoot, "node_modules"), sandbox.bunBin, "oh-my-opencode", "5.1.86", false)
+      writeFile(join(globalRoot, "package.json"), JSON.stringify({ dependencies: { "oh-my-openagent": "5.1.86" } }))
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [sandbox.bunBin])
+
+      const legacy = lines.filter((line) => line.startsWith("WARN legacy package"))
+      expect(legacy).toHaveLength(1)
+      expect(legacy[0]).toStartWith("WARN legacy package oh-my-openagent@5.1.86")
+    })
+  })
+
   describe("#given omo-ai's bin comes first on PATH", () => {
     test("#then no PATH warning is printed while the installed legacy package is still reported", () => {
       const sandbox = createSandbox()

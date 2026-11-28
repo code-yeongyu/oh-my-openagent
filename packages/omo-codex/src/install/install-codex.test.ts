@@ -40,21 +40,27 @@ function formatTomlString(value: string): string {
 }
 
 describe("install-codex", () => {
-  test("#given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package", async () => {
-    // given
-    const nodeModules = await mkdtemp(join(tmpdir(), "omo-codex-node-modules-"))
-    const importerDir = join(nodeModules, "oh-my-openagent-darwin-arm64", "bin")
-    const wrapperRoot = join(nodeModules, "oh-my-openagent")
-    await mkdir(join(importerDir), { recursive: true })
-    await mkdir(join(wrapperRoot, "packages", "omo-codex", "plugin", ".codex-plugin"), { recursive: true })
-    await writeFile(join(wrapperRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"), "{}")
+  test.each([
+    ["oh-my-openagent-darwin-arm64", "oh-my-openagent"],
+    ["oh-my-opencode-darwin-arm64", "oh-my-opencode"],
+  ])(
+    "#given npm platform binary package %s #when resolving vendored repo root #then finds sibling %s carrying the plugin",
+    async (platformPackage, carrierPackage) => {
+      // given
+      const nodeModules = await mkdtemp(join(tmpdir(), "omo-codex-node-modules-"))
+      const importerDir = join(nodeModules, platformPackage, "bin")
+      const carrierRoot = join(nodeModules, carrierPackage)
+      await mkdir(join(importerDir), { recursive: true })
+      await mkdir(join(carrierRoot, "packages", "omo-codex", "plugin", ".codex-plugin"), { recursive: true })
+      await writeFile(join(carrierRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"), "{}")
 
-    // when
-    const repoRoot = findRepoRootFromImporter(importerDir)
+      // when
+      const repoRoot = findRepoRootFromImporter(importerDir)
 
-    // then
-    expect(repoRoot).toBe(wrapperRoot)
-  })
+      // then
+      expect(repoRoot).toBe(carrierRoot)
+    },
+  )
 
   test("#given wrapper root env #when resolving vendored repo root #then prefers wrapper package root", async () => {
     // given

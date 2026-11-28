@@ -718,7 +718,6 @@ jobs:
             fi
             for plat in "${PLATFORMS[@]}"; do
               ALL_PACKAGES+=("oh-my-opencode-${plat}")
-              ALL_PACKAGES+=("oh-my-openagent-${plat}")
             done
           fi
 
@@ -1025,6 +1024,8 @@ jobs:
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+          # The oh-my-openagent wrapper pins its payload exactly, so both move to the release version together.
+          jq --arg v "$VERSION" '.version = $v | .dependencies["oh-my-opencode"] = $v' packages/oh-my-openagent-wrapper/package.json > tmp.json && mv tmp.json packages/oh-my-openagent-wrapper/package.json
 
           node packages/omo-codex/plugin/scripts/sync-version.mjs
           jq --arg v "$VERSION" '.version = $v' packages/omo-senpi/package.json > tmp.json && mv tmp.json packages/omo-senpi/package.json
@@ -1058,7 +1059,7 @@ jobs:
 
           git config --global user.email "code.yeon.gyu@gmail.com"
           git config --global user.name "YeonGyu-Kim"
-          git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add CHANGELOG.md package.json packages/omo-native/package.json packages/oh-my-opencode-*/package.json packages/oh-my-openagent-wrapper/package.json packages/omo-senpi/package.json packages/omo-senpi/plugin/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           # build-extension.mjs also rewrites the committed bundles under plugin/runtime (the
           # agent-toolkit SDK, the rollback migrator); commit every tracked one it touched or the
           # freshness check rejects the release commit as stale-output (#8329, v5.1.1). `-u` stages
@@ -1633,25 +1634,6 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if oh-my-openagent already published
-        id: check-openagent
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
-        run: |
-          if [ "$LAZYCODEX_ONLY" = "true" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "LazyCodex-only release: oh-my-openagent is not published"
-            exit 0
-          fi
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
-          if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ oh-my-openagent@${VERSION} already published"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Check if lazycodex-ai already published
         id: check-lazycodex
         if: inputs.publish_lazycodex == true
@@ -1669,7 +1651,6 @@ jobs:
       - name: Update version
         if: >-
           steps.check.outputs.skip != 'true' ||
-          steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
@@ -1694,15 +1675,13 @@ jobs:
       - name: Build main package
         if: >-
           steps.check.outputs.skip != 'true' ||
-          steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build
 
-      # Must run before every publish below: all three packages ship the plugin tree (lazycodex#45).
+      # Must run before every publish below: oh-my-opencode and lazycodex-ai ship the plugin tree (lazycodex#45).
       - name: Build Codex plugin components
         if: >-
           steps.check.outputs.skip != 'true' ||
-          steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
@@ -1726,7 +1705,6 @@ jobs:
       - name: Verify npm payload containment
         if: >-
           steps.check.outputs.skip != 'true' ||
-          steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: node script/verify-npm-payload.mjs
 
@@ -1792,9 +1770,7 @@ jobs:
 
           PENDING=()
           for platform in "${PLATFORMS[@]}"; do
-            for family in oh-my-opencode oh-my-openagent; do
-              PENDING+=("${family}-${platform}")
-            done
+            PENDING+=("oh-my-opencode-${platform}")
           done
 
           # The platform publish jobs have already succeeded when this runs, but the registry read
@@ -1836,7 +1812,6 @@ jobs:
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
-          steps.check-openagent.outputs.skip != 'true' ||
           (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: |
           for f in .npmrc "$HOME/.npmrc"; do
@@ -1858,35 +1833,6 @@ jobs:
           else
             npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
-
-      - name: Publish oh-my-openagent
-        if: steps.check-openagent.outputs.skip != 'true'
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
-          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
-          NPM_CONFIG_PROVENANCE: true
-        run: |
-          # Update package name, version, and optionalDependencies for oh-my-openagent
-          jq --arg v "$VERSION" '
-            .name = "oh-my-openagent" |
-            .version = $v |
-            .optionalDependencies = (
-              .optionalDependencies | to_entries |
-              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $v) |
-              from_entries
-            )
-          ' package.json > tmp.json && mv tmp.json package.json
-
-          if [ -n "$DIST_TAG" ]; then
-            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
-          else
-            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
-          fi
-
-      - name: Restore package.json
-        if: always() && steps.check-openagent.outputs.skip != 'true'
-        run: |
-          git checkout -- package.json
 
       - name: Publish lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
@@ -1946,11 +1892,106 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Verifies platform packages exist before wrapper publish.
-            - Publishes `oh-my-opencode`, `oh-my-openagent`, and optionally `lazycodex-ai`.
+            - Publishes `oh-my-opencode` and optionally `lazycodex-ai`; the `oh-my-openagent` wrapper follows in publish-wrapper.
             - omo-ai mapped version: `${{ needs.release-metadata.outputs.omo_ai_version }}` (already published before this run: `${{ needs.release-metadata.outputs.already_published }}`).
             - omo-ai beta publish, registry readiness, dist-tag guard, and live-install gates: `${{ job.status }}`.
             - Smoke-tests the published LazyCodex package when it was published.
           JOB_SUMMARY_NEXT: Check package existence probes first, then npm publish logs and the LazyCodex smoke section.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  publish-wrapper:
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9937.
+    runs-on: ubuntu-24.04
+    # oh-my-openagent is a thin wrapper that pins oh-my-opencode exactly, so it is uninstallable until npm serves that
+    # payload, which took up to ~55 minutes (#15400). The wait runs here, beside the release job, so it never holds
+    # publish-main or the GitHub release, installer channel and omo-ai checks that follow it. One 90-minute deadline
+    # inside the job timeout, as in registry-wait.
+    timeout-minutes: 105
+    needs: [release-metadata, prepare-release-state, publish-main]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      inputs.prepared_release_sha != '' &&
+      inputs.lazycodex_only != true &&
+      needs.release-metadata.result == 'success' &&
+      needs.publish-main.result == 'success'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        run: npm install -g npm@11.18.0
+
+      - name: Check if oh-my-openagent already published
+        id: check
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "✓ oh-my-openagent@${VERSION} already published"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for the oh-my-opencode payload on the registry
+        if: steps.check.outputs.skip != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          REGISTRY_WAIT_DEADLINE_SECONDS: "5400"
+        run: node script/wait-registry-versions.mjs "oh-my-opencode@$VERSION"
+
+      # The wrapper cannot export a file of its payload, so it ships a copy of the payload's schema, taken from the
+      # published tarball the wrapper pins.
+      - name: Stage the wrapper
+        if: steps.check.outputs.skip != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq --arg v "$VERSION" '.version = $v | .dependencies["oh-my-opencode"] = $v' packages/oh-my-openagent-wrapper/package.json > tmp.json && mv tmp.json packages/oh-my-openagent-wrapper/package.json
+          payload="$(mktemp -d)"
+          (cd "$payload" && npm pack "oh-my-opencode@$VERSION" --silent && tar -xzf ./*.tgz package/dist/oh-my-opencode.schema.json)
+          cp "$payload/package/dist/oh-my-opencode.schema.json" packages/oh-my-openagent-wrapper/
+          rm -rf "$payload"
+          node script/verify-openagent-wrapper.mjs
+
+      - name: Strip token auth from .npmrc to force OIDC
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          for f in .npmrc "$HOME/.npmrc"; do
+            if [ -f "$f" ]; then
+              sed -i.bak '/_authToken/d' "$f"
+              rm -f "$f.bak"
+              echo "Cleaned $f"
+            fi
+          done
+
+      - name: Publish oh-my-openagent
+        if: steps.check.outputs.skip != 'true'
+        working-directory: packages/oh-my-openagent-wrapper
+        env:
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
+          NPM_CONFIG_PROVENANCE: true
+        run: npm publish --ignore-scripts --access public --provenance --tag "${DIST_TAG:-latest}" --loglevel verbose
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: oh-my-openagent wrapper publish
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Waits until npm serves `oh-my-opencode@${{ needs.release-metadata.outputs.version }}`, the payload the wrapper pins.
+            - Checks the wrapper is a thin forwarder, then publishes `oh-my-openagent` from `packages/oh-my-openagent-wrapper`.
+          JOB_SUMMARY_NEXT: Check the payload wait first, then the wrapper shape check and the npm publish log.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   verify-release-notes:
@@ -2473,15 +2514,16 @@ jobs:
     runs-on: ubuntu-24.04
     # The wait below has one 90-minute deadline; the margin covers checkout and setup.
     timeout-minutes: 105
-    needs: [release-metadata, prepare-release-state, publish-main]
-    # A pure registry read that needs only publish-main, so it runs beside the release job instead of after it.
+    needs: [release-metadata, prepare-release-state, publish-main, publish-wrapper]
+    # A pure registry read that needs only the publish jobs, so it runs beside the release job instead of after it.
     # Only release-announce waits on it: the GitHub release, post-publish-verify and the installer channel do not, so a
     # slow wrapper package on npm (#15400) no longer holds back get.omo.dev.
     if: >-
       always() &&
       inputs.prepared_release_sha != '' &&
       needs.release-metadata.result == 'success' &&
-      needs.publish-main.result == 'success'
+      needs.publish-main.result == 'success' &&
+      (inputs.lazycodex_only == true || needs.publish-wrapper.result == 'success')
     steps:
       - uses: actions/checkout@v7
         with:

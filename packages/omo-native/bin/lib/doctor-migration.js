@@ -278,17 +278,32 @@ function readFileHead(path, limit) {
   }
 }
 
+/** The dependency names a manifest declares, or undefined when it cannot be read. */
+function readDependencyNames(packageRoot) {
+  const text = readWholeFile(join(packageRoot, "package.json"))
+  if (text === undefined) return undefined
+  try {
+    const dependencies = JSON.parse(text)?.dependencies
+    return new Set(dependencies !== null && typeof dependencies === "object" ? Object.keys(dependencies) : [])
+  } catch {
+    return undefined
+  }
+}
+
 /** oh-my-openagent / oh-my-opencode installs in any npm global prefix and in the bun global tree. */
 export function findLegacyPackages(environment) {
   const npmModules = environment.isWindows ? ["node_modules"] : ["lib", "node_modules"]
+  const bunGlobal = join(environment.bunRoot, "install", "global")
   const roots = [
     ...environment.npmPrefixes.map((prefix) => ({ manager: "npm", modules: join(prefix, ...npmModules) })),
-    { manager: "bun", modules: join(environment.bunRoot, "install", "global", "node_modules") },
+    { manager: "bun", modules: join(bunGlobal, "node_modules"), added: readDependencyNames(bunGlobal) },
   ]
   const seen = new Set()
   const found = []
-  for (const { manager, modules } of roots) {
+  for (const { manager, modules, added } of roots) {
     for (const name of LEGACY_PACKAGES) {
+      // bun hoists oh-my-openagent's oh-my-opencode payload beside it; only what the user added is theirs to remove.
+      if (added !== undefined && !added.has(name)) continue
       const packageDir = join(modules, name)
       const owner = readManifest(join(packageDir, "package.json"))
       if (owner?.name !== name) continue

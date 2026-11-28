@@ -136,16 +136,20 @@ describe("platform publish helper", () => {
     expect(calls()).toHaveLength(1)
   })
 
-  test("#given the two publish steps #when the workflow is read #then neither may continue on error and both use the helper", () => {
-    for (const name of [
+  test("#given the platform publish step #when the workflow is read #then it may not continue on error and uses the helper", () => {
+    const step = publishSteps().find((candidate) => candidate.name === "Publish oh-my-opencode-${{ matrix.platform }}")
+    expect(step?.["continue-on-error"]).toBeUndefined()
+    expect(step?.run).toContain('bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"')
+    expect(step?.run).not.toContain("npm publish")
+    expect(isRecord(step) ? step.env : undefined).not.toHaveProperty("NPM_CONFIG_PROVENANCE")
+  })
+
+  // Release contract: the oh-my-openagent wrapper resolves its binary through the oh-my-opencode payload, so the
+  // oh-my-openagent-<platform> family gets no new versions (old versions stay published).
+  test("#given the publish job #when the workflow is read #then only the oh-my-opencode platform family is published", () => {
+    const names = publishSteps().map((step) => step.name)
+    expect(names.filter((name) => typeof name === "string" && name.startsWith("Publish "))).toEqual([
       "Publish oh-my-opencode-${{ matrix.platform }}",
-      "Publish oh-my-openagent-${{ matrix.platform }}",
-    ]) {
-      const step = publishSteps().find((candidate) => candidate.name === name)
-      expect(step?.["continue-on-error"]).toBeUndefined()
-      expect(step?.run).toContain('bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"')
-      expect(step?.run).not.toContain("npm publish")
-      expect(isRecord(step) ? step.env : undefined).not.toHaveProperty("NPM_CONFIG_PROVENANCE")
-    }
+    ])
   })
 })

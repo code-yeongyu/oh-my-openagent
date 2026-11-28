@@ -10,6 +10,7 @@ node_modules/
 
 # Build output
 dist/
+packages/oh-my-openagent-wrapper/oh-my-opencode.schema.json
 .vitest/
 packages/omo-codex/plugin/skills/
 

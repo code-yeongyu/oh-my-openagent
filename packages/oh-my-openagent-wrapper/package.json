@@ -1,0 +1,55 @@
+{
+  "name": "oh-my-openagent",
+  "version": "5.1.85",
+  "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "bin": {
+    "oh-my-opencode": "bin/oh-my-opencode.js",
+    "oh-my-openagent": "bin/oh-my-openagent.js",
+    "omo-agent-toolkit": "bin/omo-agent-toolkit.js",
+    "lazycodex": "bin/lazycodex.js",
+    "lazycodex-ai": "bin/lazycodex-ai.js"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "server.js",
+    "tui.js",
+    "bin",
+    "oh-my-opencode.schema.json"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./server": "./server.js",
+    "./tui": "./tui.js",
+    "./schema.json": "./oh-my-opencode.schema.json",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "oh-my-opencode": "5.1.85"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "oracle",
+    "librarian",
+    "agents",
+    "ai",
+    "llm"
+  ],
+  "author": "YeonGyu-Kim",
+  "license": "SUL-1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-yeongyu/oh-my-openagent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/code-yeongyu/oh-my-openagent/issues"
+  },
+  "homepage": "https://github.com/code-yeongyu/oh-my-openagent#readme"
+}

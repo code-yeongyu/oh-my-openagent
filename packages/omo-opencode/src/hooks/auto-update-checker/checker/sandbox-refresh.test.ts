@@ -235,13 +235,36 @@ describe("sandbox refresh that did not complete", () => {
 })
 
 describe("getLoadedPluginSandboxDir", () => {
-  function installPackage(workspace: string): string {
-    const pkgDir = join(workspace, "node_modules", "oh-my-openagent")
+  function installPackage(workspace: string, packagePath = ["oh-my-openagent"]): string {
+    const pkgDir = join(workspace, "node_modules", ...packagePath)
+    const name = packagePath.at(-1) ?? "oh-my-openagent"
     mkdirSync(join(pkgDir, "dist"), { recursive: true })
-    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "oh-my-openagent", version: "4.19.4" }))
+    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name, version: "4.19.4" }))
     writeFileSync(join(pkgDir, "dist", "tui.js"), "")
     return pathToFileURL(join(pkgDir, "dist", "tui.js")).href
   }
+
+  test("#given the wrapper's payload hoisted beside it in the sandbox #when resolving #then it returns the sandbox dir", () => {
+    // given
+    const cacheDir = tempDir()
+    const sandboxDir = join(getPluginSandboxRoot(cacheDir), "oh-my-openagent@latest")
+    installPackage(sandboxDir)
+    const moduleUrl = installPackage(sandboxDir, ["oh-my-opencode"])
+
+    // when / then
+    expect(getLoadedPluginSandboxDir(moduleUrl, cacheDir)).toBe(sandboxDir)
+  })
+
+  test("#given the wrapper's payload nested under the wrapper in the sandbox #when resolving #then it returns the sandbox dir", () => {
+    // given
+    const cacheDir = tempDir()
+    const sandboxDir = join(getPluginSandboxRoot(cacheDir), "oh-my-openagent@latest")
+    installPackage(sandboxDir)
+    const moduleUrl = installPackage(sandboxDir, ["oh-my-openagent", "node_modules", "oh-my-opencode"])
+
+    // when / then
+    expect(getLoadedPluginSandboxDir(moduleUrl, cacheDir)).toBe(sandboxDir)
+  })
 
   test("#given a bundle loaded from an OpenCode sandbox #when resolving #then it returns the sandbox dir", () => {
     // given

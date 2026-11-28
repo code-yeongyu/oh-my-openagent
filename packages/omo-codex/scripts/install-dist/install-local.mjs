@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:61c15d83ff04bf639e1d60762380a5cc08af2760144f5ea767559d11672d9571:1374d59c66f04224775aaa25ff25460febb127d3627ac064466e2da18ac57bec
+// omo-codex-install:edb67c6de85816650fba60dea0933f4d5ef3389c471c21977961b15ec9229bf8:7b13d42f7bc0b8809f0de100dbcdb9ea0a359874f3812dc75cace89a02f57509
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -24758,21 +24758,21 @@ async function runCodexInstaller(options = {}) {
 function legacyCacheMarketplaces(marketplaceName) {
   return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : [];
 }
+var CODEX_PLUGIN_CARRIER_PACKAGES = ["oh-my-openagent", "oh-my-opencode"];
 function findRepoRootFromImporter(importerDir) {
   let current = importerDir;
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [
-      join39(current, "node_modules", "oh-my-openagent"),
-      join39(current, "oh-my-openagent")
-    ]) {
-      if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
-        return wrapperPackageRoot;
+    for (const packageName of CODEX_PLUGIN_CARRIER_PACKAGES) {
+      for (const packageRoot of [join39(current, "node_modules", packageName), join39(current, packageName)]) {
+        if (isRepoRootWithCodexPlugin(packageRoot))
+          return packageRoot;
+      }
     }
     current = resolve10(current, "..");
   }
-  throw new Error("Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 7 parent levels");
+  throw new Error("Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or a sibling oh-my-openagent or oh-my-opencode package within 7 parent levels");
 }
 function findRepoRoot(input) {
   const wrapperPackageRoot = input.env?.OMO_WRAPPER_PACKAGE_ROOT;
