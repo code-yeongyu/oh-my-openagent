@@ -178,7 +178,9 @@ function canonicalizeFromNearestExisting(target: string): string | undefined {
   while (true) {
     try {
       lstatSync(candidate)
-      return resolve(realpathSync(candidate), ...missingSegments.reverse())
+      // Native, like senpi's own canonicalization of the request path: on Windows the JS realpath keeps an 8.3
+      // short name (RUNNER~1) that the native one expands, so the roots would never contain the target (#15251).
+      return resolve(realpathSync.native(candidate), ...missingSegments.reverse())
     } catch (error) {
       if (!isMissingPathError(error)) return undefined
       const parent = dirname(candidate)
