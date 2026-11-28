@@ -57,8 +57,10 @@ describe("finalizeCachedPluginPayload", () => {
     // when
     const finalized = finalizeCachedPluginPayload(pluginRoot)
 
-    // then
-    await expect(finalized).rejects.toThrow("Codex plugin contains unsupported entry types: node_modules/lsp-daemon")
+    // then: the link is named by its path under the plugin root, in the platform's own separators
+    await expect(finalized).rejects.toThrow(
+      `Codex plugin contains unsupported entry types: ${join("node_modules", "lsp-daemon")}`,
+    )
   })
 
   test("#given a link inside the plugin's own node_modules/.bin #when the payload is finalized #then it is pruned", async () => {
