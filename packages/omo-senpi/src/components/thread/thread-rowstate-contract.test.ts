@@ -105,8 +105,21 @@ test("one host missing the listing deadline cannot turn its claimed session inac
       state: "running",
       liveness: { kind: "running", activity: "running" },
     })
-    // The slow host exits and its socket file goes with it: a host that is gone holds nothing (row 29), so the session
-    // it still claims lists inactive, never unknown as a host that did not answer.
+    // The slow host exits: a host that is gone holds nothing (row 29), so the session it still claims lists inactive,
+    // never unknown as a host that did not answer. First as Windows sees it, where a pipe is no file: the socket still
+    // "exists" and only the refused dial says the host is gone.
+    await new Promise<void>((resolve) => recovering.close(() => resolve()))
+    const refused = (await list.execute("refused", { all_scope: true }, undefined, undefined, undefined as never))
+      .details.result
+    if (!("threads" in refused)) throw new Error("no rows after the slow host stopped answering its dials")
+    expect(refused).toHaveProperty("host_counts", { answered: 1, unanswered: 0 })
+    expect(refused).not.toHaveProperty("listing")
+    expect(refused.threads.find((item: { thread: string }) => item.thread === "slow")).toMatchObject({
+      state: "inactive",
+      liveness: { kind: "not_running" },
+      error_note: `host_unavailable:${slow}`,
+    })
+    // Then as POSIX sees it: its socket file goes with it.
     slowSocket = false
     const gone = (await list.execute("gone", { all_scope: true }, undefined, undefined, undefined as never)).details
       .result
