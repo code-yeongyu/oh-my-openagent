@@ -15,6 +15,7 @@ import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host"
 
 // Two generations of one task coexist while runtime fallback finishes closing an old rung: a revived
 // newer run, or a second revival racing the first. Each generation owns only its own lease, handle and
@@ -211,7 +212,7 @@ describe("generations of one task during a runtime-fallback close", () => {
           closeEntered.resolve()
           await finishClose.promise
         }
-        await defaultHostSessionCloser(request)
+        await defaultHostSessionCloser(FAKE_HOST_KEY_ROOT)(request)
       },
     })
 

@@ -197,14 +197,14 @@ async function hostEngine(
   const { socket, pid, stop } = await startSocketHost(root, engineEnv)
   const clients: HostSessionClient[] = []
   const runner = new RpcHostRunner({
-    createClient: (socketPath) => {
-      // The host runs in the engine's agent dir, not in this runner's, so its key record is there (senpi#7568).
-      const client = new HostSessionClient({ socketPath, keyRoot: agentDir })
+    createClient: (socketPath, _taskId, keyRoot) => {
+      const client = new HostSessionClient({ socketPath, keyRoot })
       clients.push(client)
       return client
     },
     policy: "upgrade",
-    agentDir: join(root, "host-index"),
+    // As in production, the runner's agent dir is the one its host was launched in (and wrote its launch key to).
+    agentDir,
     env: {},
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,

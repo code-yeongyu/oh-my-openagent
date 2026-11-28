@@ -15,7 +15,7 @@ import { HostSessionDetachedError, toOpenFailure } from "./session-wire"
 
 interface SessionOpeningPorts {
   readonly socketPath: string
-  readonly keyRoot?: string
+  readonly keyRoot: string
   readonly createClient: HostRpcClientFactory
   readonly probeProtocolInfo: HostProtocolProbe
   readonly socketAccepts: (socketPath: string) => Promise<boolean>
@@ -38,7 +38,7 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
   const client = await ports.createClient({
     socketPath: ports.socketPath,
     onDisconnect: ports.onDisconnect,
-    ...(ports.keyRoot === undefined ? {} : { keyRoot: ports.keyRoot }),
+    keyRoot: ports.keyRoot,
   })
   client.onEvent(ports.onEvent)
   await client.start()

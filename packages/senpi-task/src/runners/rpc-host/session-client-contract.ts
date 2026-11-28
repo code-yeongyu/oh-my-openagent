@@ -72,8 +72,8 @@ export interface HostSessionClientPorts {
 
 export interface HostSessionClientOptions {
   readonly socketPath: string
-  /** Where the host's key record lives (`hostKeyRoot`): the agent dir the host was ensured in. */
-  readonly keyRoot?: string
+  /** The agent dir the host was launched in, where it wrote its launch key record (senpi#7568). */
+  readonly keyRoot: string
   readonly ports?: HostSessionClientPorts
   // The parent session this child answers dialogs on and follows the approval mode of (#6189 F2d/F2e).
   readonly parent?: ChildParentLink

@@ -6,6 +6,7 @@ import { HostSessionClient } from "./rpc-host/session-client"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import type { RpcRunnerSpec } from "./types"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host"
 
 // omo#8563: the runner owns the two recoveries a daemon child needs. A lost transport is
 // re-ensured and the same session path reopened (bounded backoff), and a host that is above its
@@ -55,6 +56,7 @@ describe("RpcHostRunner transport recovery", () => {
       ...NO_WAIT,
       createClient: (socketPath) => {
         const client = new HostSessionClient({
+          keyRoot: FAKE_HOST_KEY_ROOT,
           socketPath,
           ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
         })
@@ -103,6 +105,7 @@ describe("RpcHostRunner transport recovery", () => {
       ...NO_WAIT,
       createClient: (socketPath) => {
         const client = new HostSessionClient({
+          keyRoot: FAKE_HOST_KEY_ROOT,
           socketPath,
           ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
         })

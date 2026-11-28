@@ -8,7 +8,7 @@ export function hostClientPorts(options: HostSessionClientOptions): PermissionPu
   const { keyRoot } = options
   return {
     socketPath: options.socketPath,
-    ...(keyRoot === undefined ? {} : { keyRoot }),
+    keyRoot,
     createClient: options.ports?.createClient ?? createSenpiRpcClient,
     probeProtocolInfo: options.ports?.probeProtocolInfo ?? ((socket) => probeWithEngine(socket, keyRoot)),
     socketAccepts: options.ports?.socketAccepts ?? socketAcceptsConnection,

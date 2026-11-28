@@ -4,7 +4,6 @@ import { join } from "node:path"
 
 import { askHost } from "./host-request"
 import { classifyWarmReply } from "./host-warm-reply"
-import { hostKeyRoot } from "./key-root"
 import { HOST_WARMUP_CONTEXT } from "./session-role"
 import { HostSessionClient, type HostSessionClientPorts } from "./session-client"
 
@@ -31,8 +30,8 @@ export interface WarmHostSessionInput {
   readonly ports?: HostSessionClientPorts
   /** Where the throwaway state directory is created; the OS temp dir by default. */
   readonly tempRoot?: string
-  /** The agent dir whose key records authenticate the host; resolved like the thread client when absent. */
-  readonly agentDir?: string
+  /** The agent dir the host was launched in: its launch key record is there, and every dial proves the host under it. */
+  readonly agentDir: string
 }
 
 export const HOST_WARMUP_TASK_ID = "host-warmup"
@@ -61,14 +60,7 @@ export async function warmTaskHost(input: WarmHostSessionInput): Promise<TaskHos
   const context = { role: "child", task_id: HOST_WARMUP_TASK_ID, state_dir: stateDir, [HOST_WARMUP_CONTEXT]: "1" }
   try {
     const request = { id: WARM_REQUEST_ID, type: "warm", cwd: input.cwd, kind: "worker", context }
-    const answer = classifyWarmReply(
-      await askHost(
-        input.socket,
-        request,
-        WARM_TIMEOUT_MS,
-        input.agentDir === undefined ? {} : { agentDir: input.agentDir },
-      ),
-    )
+    const answer = classifyWarmReply(await askHost(input.socket, request, WARM_TIMEOUT_MS, { keyRoot: input.agentDir }))
     switch (answer.kind) {
       case "warm":
         return answer.state
@@ -92,7 +84,7 @@ async function openAndCloseWarmUpSession(
 ): Promise<void> {
   const client = new HostSessionClient({
     socketPath: input.socket,
-    keyRoot: hostKeyRoot(input.agentDir),
+    keyRoot: input.agentDir,
     ...(input.ports === undefined ? {} : { ports: input.ports }),
   })
   try {

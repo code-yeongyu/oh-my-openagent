@@ -1,4 +1,4 @@
-import { hostKeyRoot } from "./key-root"
+import { resolveAgentHome } from "../../agent-home"
 import {
   authenticateRpcHost,
   authRequiredError,
@@ -24,7 +24,8 @@ export async function askHost(
 ): Promise<HostReply | undefined> {
   const transport = await resolveRpcSocketTransport(socket)
   if (transport === undefined) return undefined
-  const keyRoot = options.keyRoot ?? hostKeyRoot(options.agentDir)
+  const agentDir = options.agentDir ?? resolveAgentHome({ env: process.env })
+  const keyRoot = options.keyRoot ?? (process.env.SENPI_RPC_KEY_ROOT?.trim() || agentDir)
   try {
     return await withRpcSocket(transport.address, { timeoutMs, secret: transport.secret }, async (send) => {
       if (process.platform !== "win32") {

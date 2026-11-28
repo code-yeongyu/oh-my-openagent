@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { RunnerError } from "./in-process/runner-error"
-import type { FakeHost } from "./rpc-host/__fixtures__/fake-host"
 import { HostUnavailableError } from "./rpc-host/daemon"
 import { HostSessionClient } from "./rpc-host/session-client"
 import type { HostSessionOpenInput } from "./rpc-host/session-transport"
 import { isHostSessionHandle, type HostSessionChannel } from "./rpc-host"
 import { childSpec, ensuredDaemon, fakeFallbackRunner, hostRunnerHarness, stubChannel } from "./rpc-host.test-support"
+import { FAKE_HOST_KEY_ROOT, type FakeHost } from "./rpc-host/__fixtures__/fake-host"
 
 const { fakeHost, runnerOver, runnerWithout, release } = hostRunnerHarness()
 const opened: HostSessionClient[] = []
@@ -30,6 +30,7 @@ function timedOutChannel(paths: string[]): HostSessionChannel {
 
 function realClient(host: FakeHost): HostSessionClient {
   const client = new HostSessionClient({
+    keyRoot: FAKE_HOST_KEY_ROOT,
     socketPath: host.socketPath,
     ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
   })
@@ -62,6 +63,7 @@ describe("RpcHostRunner busy host (omo#9067)", () => {
       },
       createClient: (socketPath) => {
         const client = new HostSessionClient({
+          keyRoot: FAKE_HOST_KEY_ROOT,
           socketPath,
           ports: {
             probeProtocolInfo: async (path) => {
@@ -249,6 +251,7 @@ describe("HostSessionClient silent probe (omo#9067)", () => {
   test("#given a daemon that accepts connections but does not answer its probe #when a child opens #then the open reports host_busy, not host_unreachable", async () => {
     // given
     const client = new HostSessionClient({
+      keyRoot: FAKE_HOST_KEY_ROOT,
       socketPath: "/tmp/omo-9067-busy.sock",
       ports: { probeProtocolInfo: () => Promise.resolve(undefined), socketAccepts: () => Promise.resolve(true) },
     })
@@ -265,6 +268,7 @@ describe("HostSessionClient silent probe (omo#9067)", () => {
   test("#given a daemon socket that refuses #when a child opens #then the open still reports host_unreachable", async () => {
     // given
     const client = new HostSessionClient({
+      keyRoot: FAKE_HOST_KEY_ROOT,
       socketPath: "/tmp/omo-9067-dead.sock",
       ports: { probeProtocolInfo: () => Promise.resolve(undefined), socketAccepts: () => Promise.resolve(false) },
     })

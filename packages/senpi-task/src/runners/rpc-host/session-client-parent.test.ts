@@ -5,7 +5,7 @@ import type { ForwardableDialog, ForwardedAnswer } from "../child-dialogs/forwar
 import { ChildParentLink, type ParentPermissionMode } from "../parent-link"
 import { HostSessionClient } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
-import type { FakeHost } from "./__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT, type FakeHost } from "./__fixtures__/fake-host"
 
 // #6189 F2d/F2e on the task-host runner's connection: a child's dialog is answered on the parent's UI, and the child
 // opens in, then follows, its parent's approval mode.
@@ -58,7 +58,12 @@ function linkedClient(
   parent: ChildParentLink,
   probe = () => host.probeProtocolInfo(),
 ): HostSessionClient {
-  const client = new HostSessionClient({ socketPath: host.socketPath, ports: { probeProtocolInfo: probe }, parent })
+  const client = new HostSessionClient({
+    keyRoot: FAKE_HOST_KEY_ROOT,
+    socketPath: host.socketPath,
+    ports: { probeProtocolInfo: probe },
+    parent,
+  })
   clients.push(client)
   return client
 }

@@ -27,7 +27,6 @@ import {
 import { daemonLaunchOptions, daemonLaunchProfileId } from "./launch-options"
 import { DAEMON_LAUNCH_SPEC_FILENAME, DaemonLaunchSpecError, readDaemonLaunchSpec } from "./launch-spec"
 import { shareDaemonEnsure } from "./daemon-single-flight"
-import { hostKeyRoot } from "./key-root"
 import { classifyEnsureFailure } from "./ensure-failure"
 import { ensureHostClaimingOwner } from "./owner-claim"
 import { writeStartedShardSidecar } from "./shard-sidecar"
@@ -120,8 +119,9 @@ async function ensureTaskDaemonOnce(
     policy: input.policy,
   })
 
-  // The host is ensured in input.agentDir, so its key record is looked up there, as the ensure itself does.
-  const keyRoot = hostKeyRoot(input.agentDir)
+  // The host is launched in input.agentDir and writes its launch key record there (senpi#7568): every probe of it, and
+  // the engine's own ensure, prove it under that dir and no other.
+  const keyRoot = input.agentDir
   const running = await host.probeHost({ socket, keyRoot })
   const decision = host.decideHostAction(
     {
@@ -152,6 +152,7 @@ async function ensureTaskDaemonOnce(
   const request: EnsureHostInput = {
     socket,
     agentDir: input.agentDir,
+    keyRoot,
     ...(input.owner === undefined ? {} : { owner: "caller" }),
     hostArgs: launch.hostArgs,
     env: launch.env,

@@ -8,6 +8,7 @@ import { adaptRpcHandle } from "../manager/child-handle"
 import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { RpcRequestTimeout } from "./rpc/errors"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host"
 
 afterEach(cleanupSteering)
 
@@ -86,7 +87,11 @@ for (const conflict of [false, true]) {
     const runner = hostHarness.runnerOver(host, {
       storeDir: h.store.stateDir,
       createClient: (socketPath) =>
-        new DeadlineClient({ socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() } }),
+        new DeadlineClient({
+          keyRoot: FAKE_HOST_KEY_ROOT,
+          socketPath,
+          ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
+        }),
     })
     const handle = await runner.start(
       childSpec({
