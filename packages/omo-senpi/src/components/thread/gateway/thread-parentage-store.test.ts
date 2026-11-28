@@ -97,6 +97,16 @@ test("#given a child #when its opener hands it to another thread #then the new o
   expect(await store.threadChildren("heir")).toEqual([expect.objectContaining({ created_durable_id: "child" })])
 })
 
+test("#given a handed-over child #when its session restarts and records its first opener again #then the new opener stays the only one", async () => {
+  const h = (harness = createGatewayHarness())
+  const store = h.store()
+  await store.recordThreadCreation({ creator_durable_id: "lead", created_durable_id: "child", creator_device: "dev-a" })
+  await store.handOverThread({ created_durable_id: "child", from_durable_id: "lead", to_durable_id: "heir" })
+  await store.recordThreadCreation({ creator_durable_id: "lead", created_durable_id: "child", creator_device: "dev-a" })
+  expect(await store.threadOpener("child")).toMatchObject({ creator_durable_id: "heir" })
+  expect(await store.threadChildren("lead")).toEqual([])
+})
+
 test("#given a child #when a thread that did not open it hands it over #then the store refuses not_creator and the opener stays", async () => {
   const h = (harness = createGatewayHarness())
   const store = h.store()

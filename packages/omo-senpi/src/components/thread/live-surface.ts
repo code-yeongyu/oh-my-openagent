@@ -1035,7 +1035,7 @@ export function createLiveThreadSurface(
       // goes straight to `closing` and every later call answers `session_closing`.
       // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field; `cwd`,
       // `sessionPath`, `forkFrom` and `permissionPreset` (the mode the session starts in, #12884) are wire fields.
-      const { initialSkills, openedBy, name, ...openParams } = params
+      const { initialSkills, openedBy, metadata, name, ...openParams } = params
       const result = dataRecord(
         await callFrame(
           legacy,
@@ -1043,7 +1043,7 @@ export function createLiveThreadSurface(
           {
             ...openParams,
             retain_on_disconnect: true,
-            ...openContext(initialSkills, openedBy),
+            ...openContext(initialSkills, openedBy, metadata),
           },
           undefined,
           undefined,

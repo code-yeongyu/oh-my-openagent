@@ -249,6 +249,8 @@ describe("thread error taxonomy", () => {
       "relay_requires_paid_plan",
       "alias_taken",
       "gateway_schema_too_new",
+      "not_creator",
+      "metadata_too_large",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

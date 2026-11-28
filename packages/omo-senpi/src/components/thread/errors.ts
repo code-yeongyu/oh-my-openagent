@@ -44,6 +44,8 @@ export const THREAD_ERROR_CODES = [
   "relay_requires_paid_plan",
   "alias_taken",
   "gateway_schema_too_new",
+  "not_creator",
+  "metadata_too_large",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]

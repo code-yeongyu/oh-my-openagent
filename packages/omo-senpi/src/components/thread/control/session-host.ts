@@ -20,6 +20,8 @@ export type SessionOpenRequest = {
   readonly initialSkills?: readonly string[]
   /** The session that opened a new thread and its device (#15221 row 25), carried on the context like `initialSkills`. */
   readonly openedBy?: { readonly thread: string; readonly device: string }
+  /** The new thread's metadata value (#15221 row 25), carried on the context so its hosting device stores it too. */
+  readonly metadata?: unknown
   readonly permissionPreset?: string
   readonly provider?: string
   readonly modelId?: string

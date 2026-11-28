@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import { OPENED_BY_CONTEXT_KEY, OPENED_BY_ENTRY, registerOpenedBy } from "./opened-by"
+import { METADATA_CONTEXT_KEY, OPENED_BY_CONTEXT_KEY, OPENED_BY_ENTRY, registerOpenedBy } from "./opened-by"
 
 // #15221 row 25: the hosting device's half of the creation record. The opener rides on the open_session context; the
 // new session copies it into a durable entry on its first start and records it in its own device's store, so a thread
@@ -47,6 +47,16 @@ function sessionSide(store: GatewayStore, context: Record<string, string>, entri
 }
 
 const OPENER = { thread: "dur-lead", device: "dev-a" }
+
+test("#given a session opened with metadata #when it starts and later restarts #then its device stores the value once and a later change stays", async () => {
+  const store = hostingDevice()
+  const context = { [OPENED_BY_CONTEXT_KEY]: JSON.stringify(OPENER), [METADATA_CONTEXT_KEY]: JSON.stringify({ role: "worker" }) }
+  await sessionSide(store, context).start()
+  expect(await store.threadMetadata("dur-child")).toMatchObject({ value: { role: "worker" }, updated_by: "dur-lead" })
+  await store.setThreadMetadata({ durable_id: "dur-child", value: { role: "reviewer" } })
+  await sessionSide(store, context).start()
+  expect(await store.threadMetadata("dur-child")).toMatchObject({ value: { role: "reviewer" } })
+})
 
 test("#given a session opened by another thread #when it starts #then its device records the opener and the session keeps it in an entry", async () => {
   const store = hostingDevice()

@@ -48,10 +48,18 @@ export async function recordThreadCreator(
   view: ThreadHostView,
   runtimeId: string,
   created: ThreadToolResult,
+  metadata?: unknown,
 ): Promise<ThreadToolResult> {
   if (created.kind !== "ok" || !("thread" in created) || typeof created.thread !== "string") return created
   const createdId = created.thread
   const creator = resolveCallerDurableId(options, view, runtimeId)
+  // The size was checked before the open; the hosting device stores the same value from the open's context.
+  if (metadata !== undefined)
+    await options.store.setThreadMetadata({
+      durable_id: createdId,
+      value: metadata,
+      ...(creator === undefined ? {} : { updated_by: creator }),
+    })
   if (creator === undefined || creator === createdId) return { ...created, created_by: null }
   await options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId })
   return { ...created, created_by: { thread: creator } }

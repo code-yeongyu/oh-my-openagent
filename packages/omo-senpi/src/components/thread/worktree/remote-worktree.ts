@@ -1,11 +1,7 @@
 import type { ThreadDataError } from "../contracts"
-import { closeLadder, SESSION_GONE, type RecordAnswer } from "../control/close-ladder"
-import { openedEngineId, openRefusal } from "../control/open-reply"
-import { ControlRefusal } from "../control/port"
 import { isThreadErrorCode, threadToolFailure } from "../errors"
-import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
+import { farExtensionRequest, type FarAnswer } from "../remote/far-request"
 import type { JsonObject, RemoteThreadSurface } from "../remote/ports"
-import { replyData } from "../remote/remote-ops"
 import type { ThreadWorktree, WorktreeOutcome, WorktreeRequest } from "./thread-worktree"
 import { folderFailure } from "./failures"
 import { THREAD_WORKTREE_RPC } from "./worktree-rpc-name"
@@ -41,73 +37,17 @@ function farOutcome(data: JsonObject, device: string): WorktreeOutcome {
   )
 }
 
-type FarAnswer = { readonly kind: "answered"; readonly data: JsonObject; readonly leftOpen?: string } | ThreadDataError
-
-/**
- * One worktree request to another device. The relay carries only engine records, so the device's own omo does the work:
- * a short-lived session opens in `cwd` there, its `extension_request` (`omo.thread.worktree`, `worktree-rpc.ts`) runs,
- * and the session is closed again (`leftOpen` names it when it would not close). A device whose omo predates the
- * request answers `unsupported` naming the update; a folder that is not there answers `folder_missing`.
- */
-async function farWorktreeRequest(
+/** One worktree request to another device's omo (`farExtensionRequest`, `omo.thread.worktree`, `worktree-rpc.ts`). */
+const farWorktreeRequest = (
   remote: RemoteThreadSurface,
   device: string,
   cwd: string,
   request: JsonObject,
-): Promise<FarAnswer> {
-  const opened = await remote.sessions.endpointCommand(
-    device,
-    { type: "open_session", retain_on_disconnect: true, cwd },
-    { locate: true },
-  )
-  if (opened.kind !== "ok") return openRefusal(opened, device, cwd)
-  const data = replyData(opened.response)
-  const engineId = openedEngineId(data, isObject(data["state"]) ? data["state"] : {})
-  if (engineId === undefined)
-    return unsupported(
-      device,
-      `Device ${device} opened no session for the worktree request.`,
-      "Update omo on that device.",
-    )
-  const located = await remote.sessions.locate(device, engineId, opened.located)
-  if (located.kind !== "ok")
-    return (
-      notSignedInFailure(located.reason, device) ??
-      unsupported(
-        device,
-        `Device ${device} could not address its worktree session (${located.reason}).`,
-        "Update omo on that device.",
-      )
-    )
-  const key = located.sessionId
-  const answered = await remote.sessions.sessionCommand(device, key, {
-    type: "extension_request",
-    sessionId: key,
-    name: THREAD_WORKTREE_RPC,
-    data: request,
+): Promise<FarAnswer> =>
+  farExtensionRequest(remote, device, cwd, THREAD_WORKTREE_RPC, request, {
+    message: `omo on device ${device} cannot create worktrees yet.`,
+    next: "Update omo on that device, then retry.",
   })
-  const result: FarAnswer =
-    answered.kind === "ok"
-      ? { kind: "answered", data: replyData(answered.response) }
-      : answered.kind === "refused" && answered.reason.includes(THREAD_WORKTREE_RPC)
-        ? unsupported(
-            device,
-            `omo on device ${device} cannot create worktrees yet.`,
-            "Update omo on that device, then retry.",
-          )
-        : outcomeFailure(answered, device)
-  const closed = await closeLadder(key, async (rpc): Promise<RecordAnswer> => {
-    const outcome = await remote.sessions.sessionCommand(device, key, rpc)
-    if (outcome.kind === "refused" && SESSION_GONE.has(outcome.reason)) return { kind: "gone", reason: outcome.reason }
-    if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
-    return { kind: "ok", data: replyData(outcome.response) }
-  }).then(
-    (answer) => answer.outcome,
-    (error: unknown) => (error instanceof ControlRefusal ? error.failure.code : String(error)),
-  )
-  if (result.kind !== "answered" || closed === "closed" || closed === "not_live") return result
-  return { ...result, leftOpen: `${key} (${closed})` }
-}
 
 /** Creates a thread's worktree on another device (`farWorktreeRequest`). */
 export async function prepareRemoteWorktree(

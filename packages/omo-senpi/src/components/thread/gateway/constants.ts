@@ -65,3 +65,6 @@ export const GATEWAY_PEER_REPLY_SENTENCE =
 export const SESSION_CONTROL_DELIVERY_TYPE = "session_control_delivery"
 
 export const SESSION_RELEASED_ENTRY_TYPE = "session_released"
+
+/** One thread's metadata value, as JSON in UTF-8 bytes (#15221 row 25): a larger value is refused, never cut. */
+export const THREAD_METADATA_MAX_BYTES = 4096

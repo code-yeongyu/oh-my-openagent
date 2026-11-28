@@ -155,6 +155,11 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["threads"],
     next_action: "Send less in one call.",
   },
+  metadata_too_large: {
+    namespaces: ["threads"],
+    next_action:
+      "Store a value of at most 4096 bytes as JSON (details.limit) and keep the rest in a file the thread can read; nothing was created or changed.",
+  },
   model_ambiguous: {
     namespaces: ["threads"],
     next_action: "Pick one model from details.candidates, or pass provider.",
@@ -170,6 +175,11 @@ export const OMO_CODE_REGISTRY = {
   no_transport: {
     namespaces: ["threads"],
     next_action: "Call deviceService.status to see why this device has no relay transport, then retry.",
+  },
+  not_creator: {
+    namespaces: ["threads"],
+    next_action:
+      "Only the thread's opener (its created_by in threads.list) can do this; act without mine, or from the thread that opened it.",
   },
   not_found: {
     namespaces: ["boulder", "daemon", "devices", "diagnostics", "engine", "sync", "threads", "worktrees"],

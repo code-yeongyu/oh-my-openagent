@@ -310,6 +310,25 @@ describe("SessionHost: the creator record and the alias follow the open on both 
     expect((reopened?.["context"] as Record<string, unknown> | undefined)?.["opened_by"]).toBeUndefined()
   })
 
+  // #15221 row 25 (slice B): metadata given at create is stored here and rides the open to the hosting device.
+  test("#given metadata #when a caller creates here and on b #then thread_read shows it and both opens carry it; over 4 KB opens nothing", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote, { sessions: [caller, local] })
+    const metadata = { role: "worker", waits_on: ["build"] }
+    const here = (await run("thread_create", { name: "meta here", metadata })) as { thread: string }
+    await run("thread_create", { device: "studio", name: "meta there", metadata })
+    expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ metadata })])
+    expect(openFrames(a.sent)[0]?.["context"]).toMatchObject({ metadata: JSON.stringify(metadata) })
+    expect(await run("thread_read", { thread: here.thread })).toMatchObject({ kind: "ok", metadata })
+
+    const opens = openSession.mock.calls.length
+    expect(await run("thread_create", { name: "meta too big", metadata: "x".repeat(4096) })).toMatchObject({
+      kind: "error",
+      error: { code: "metadata_too_large", details: { limit: 4096 } },
+    })
+    expect(openSession.mock.calls.length).toBe(opens)
+  })
+
   // #15221 row 25: a create always says who opened the new thread; null when no session made the call (a script, the CLI).
   test("#given a listed caller and a caller no session resolves #when each creates #then the first answer names the opener and the second says created_by null", async () => {
     const listed = surface(account().remote, { sessions: [caller, local] })
@@ -321,6 +340,17 @@ describe("SessionHost: the creator record and the alias follow the open on both 
     expect(await unknown.run("thread_create", { name: "opened by nobody" })).toMatchObject({
       kind: "ok",
       created_by: null,
+    })
+  })
+
+  // #15221 row 25 (slice B): close what I opened. With mine, a thread the caller did not open is refused, nothing closed.
+  test("#given a thread the caller opened and one it did not #when it closes each with mine #then the first is closed and the second is refused not_creator", async () => {
+    const { run } = surface(account().remote, { sessions: [caller, local] })
+    const made = (await run("thread_create", { name: "mine to close" })) as { thread: string }
+    expect(await run("thread_close", { thread: made.thread, mine: true })).toMatchObject({ kind: "ok", thread: made.thread })
+    expect(await run("thread_close", { thread: "dur-local", mine: true })).toMatchObject({
+      kind: "error",
+      error: { code: "not_creator", details: { thread: "dur-local" } },
     })
   })
 

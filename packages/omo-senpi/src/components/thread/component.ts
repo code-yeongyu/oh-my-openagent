@@ -12,6 +12,7 @@ import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { registerCreateReceivers } from "./create-receivers"
 import { registerOpenedBy } from "./opened-by"
+import { answerLedgerRequest, THREAD_LEDGER_RPC } from "./ledger-change"
 import {
   controlSessionOf,
   createControlEndpointRegistrant,
@@ -338,6 +339,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         },
         log: (line) => ctx.logger.warn(line),
       })
+      pi.rpc?.handle?.(THREAD_LEDGER_RPC, async (data) => await answerLedgerRequest(store, data))
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()

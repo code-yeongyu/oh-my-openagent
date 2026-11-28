@@ -323,6 +323,9 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 600000
+          },
+          "mine": {
+            "type": "boolean"
           }
         },
         "required": []
@@ -395,7 +398,8 @@
             "all_scope",
             "force",
             "graceful",
-            "wait_ms"
+            "wait_ms",
+            "mine"
           ]
         }
       ],
@@ -664,7 +668,8 @@
           "launch_spec": {
             "type": "string",
             "minLength": 1
-          }
+          },
+          "metadata": {}
         },
         "required": []
       },
@@ -735,7 +740,8 @@
             "permission_preset",
             "prompt",
             "delivery",
-            "idempotency_key"
+            "idempotency_key",
+            "metadata"
           ]
         }
       ],
