@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { readEvents } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import type { TaskRecord, TaskRecordInput } from "../state"
 import { runTaskCancel } from "../tools/control/cancel"
 import type { CancelManager, CancelToolResult } from "../tools/control/types"
-import { cleanupSteering, makeFakeHandle, makeHarness, type SteeringHarness } from "./__fixtures__/steering-fakes"
+import {
+  cleanupSteering,
+  makeFakeHandle,
+  makeHarness,
+  type FakeHandle,
+  type SteeringHarness,
+} from "./__fixtures__/steering-fakes"
 
 afterEach(cleanupSteering)
 
@@ -27,9 +34,13 @@ function running(h: SteeringHarness, overrides: Partial<TaskRecordInput>, childS
     timestamp: AT,
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
   })
-  h.setLive(seeded.task_id, makeFakeHandle(seeded.task_id, "in-process").handle)
+  const fake = makeFakeHandle(seeded.task_id, "in-process")
+  fakes.set(seeded.task_id, fake)
+  h.setLive(seeded.task_id, fake.handle)
   return load(h, seeded.task_id)
 }
+
+const fakes = new Map<string, FakeHandle>()
 
 function completed(h: SteeringHarness, overrides: Partial<TaskRecordInput>): TaskRecord {
   const started = running(h, overrides)
@@ -192,25 +203,66 @@ describe("interruptTask applies the caller's scope", () => {
   })
 })
 
-describe("task_send looks a name up among the caller's tasks first", () => {
-  test("#given two sessions each owning a task with the same name #when each sends to that name #then each reaches its own task", async () => {
+function send(h: SteeringHarness, caller: string, idOrName: string, allScope = false) {
+  return h.engine.sendToTask({ idOrName, message: "hi", callerSessionId: caller, ...(allScope ? { allScope } : {}) })
+}
+
+function sendFootprint(h: SteeringHarness, record: TaskRecord) {
+  const fresh = load(h, record.task_id)
+  return {
+    status: fresh.status,
+    run_epoch: fresh.notification.run_epoch,
+    pending_steering: fresh.pending_steering,
+    updated_at: fresh.updated_at,
+    events: readEvents(h.store, record.task_id),
+    steered: fakes.get(record.task_id)?.steerCalls.length,
+    followedUp: fakes.get(record.task_id)?.followUpCalls.length,
+  }
+}
+
+function swapped<T>(missing: T, input: string): T {
+  return JSON.parse(JSON.stringify(missing).replaceAll(MISSING, input)) as T
+}
+
+describe("task_send resolves in the caller's scope", () => {
+  test("#given two sessions each owning a task with the same name #when one sends to it, and its child that owns none sends to it #then the first reaches its own task and the child reads not found", async () => {
     const h = makeHarness()
     const otherWorker = running(h, { ...session("sess-B"), name: "worker" })
-    const ownWorker = running(h, { ...session("sess-A"), name: "worker" })
+    const ownWorker = running(h, { ...session("sess-A"), name: "worker" }, "child-A")
+    const before = sendFootprint(h, otherWorker)
 
-    const fromA = await h.engine.sendToTask({ idOrName: "worker", message: "hi", callerSessionId: "sess-A" })
-    const fromB = await h.engine.sendToTask({ idOrName: "worker", message: "hi", callerSessionId: "sess-B" })
+    const fromA = await send(h, "sess-A", "worker")
+    const missing = await send(h, "child-A", MISSING)
+    const fromChild = await send(h, "child-A", "worker")
 
     expect(fromA).toMatchObject({ kind: "steered", task_id: ownWorker.task_id })
-    expect(fromB).toMatchObject({ kind: "steered", task_id: otherWorker.task_id })
+    expect(fromChild).toEqual(swapped(missing, "worker"))
+    expect(sendFootprint(h, otherWorker)).toEqual(before)
   })
 
-  test("#given another session's task #when sent to by id #then the existing refusal is kept", async () => {
+  test("#given another session's name, running task, finished task and a missing id #when sent to #then each answer equals the missing-id answer and the other session's records are untouched", async () => {
     const h = makeHarness()
-    const other = running(h, session("sess-B"))
+    const named = running(h, { ...session("sess-B"), name: "review" })
+    const live = running(h, session("sess-B"))
+    const done = completed(h, session("sess-B"))
+    const before = [named, live, done].map((record) => sendFootprint(h, record))
 
-    const answer = await h.engine.sendToTask({ idOrName: other.task_id, message: "hi", callerSessionId: "sess-A" })
+    const missing = await send(h, "sess-A", MISSING)
 
-    expect(answer).toMatchObject({ kind: "scope_denied", task_id: other.task_id, owning_session_id: "sess-B" })
+    expect(missing.kind).toBe("not_found")
+    for (const input of ["review", live.task_id, done.task_id]) {
+      expect(await send(h, "sess-A", input)).toEqual(swapped(missing, input))
+    }
+    expect([named, live, done].map((record) => sendFootprint(h, record))).toEqual(before)
+    expect(h.reviveCalls).toEqual([])
+  })
+
+  test("#given all_scope #when one session sends to another session's task by id and by its name #then each is delivered", async () => {
+    const h = makeHarness()
+    const named = running(h, { ...session("sess-B"), name: "review" })
+    const live = running(h, session("sess-B"))
+
+    expect(await send(h, "sess-A", live.task_id, true)).toMatchObject({ kind: "steered", task_id: live.task_id })
+    expect(await send(h, "sess-A", "review", true)).toMatchObject({ kind: "steered", task_id: named.task_id })
   })
 })

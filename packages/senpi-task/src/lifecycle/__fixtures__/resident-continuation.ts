@@ -61,7 +61,7 @@ export async function acknowledgedResidentContinuation(status: Terminal) {
           message: "DISTINCT_NEXT_MESSAGE",
         })
       ).kind,
-      "scope_denied",
+      "not_found",
     )
 
     // Explicit resolution after inspecting the accepted output removes both the delivery marker
