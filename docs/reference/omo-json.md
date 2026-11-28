@@ -596,6 +596,28 @@ curated read-only agent "plan-reviewer" cannot be a team member; delegate via th
 
 Team members always spawn in `process` mode, which cannot carry the curated persona or tool policy, so delegate to these agents through the task tool instead of naming them as team members.
 
+#### Agent files
+
+An agent can also live in its own markdown file instead of an `agents.<name>` entry. The file name (without `.md`) is the agent name, the YAML frontmatter takes the same fields as an `agents.<name>` entry (`description`, `model`, `models`, `tools`, `execution_mode`, `max_turns`, ...), and the body is the agent's prompt:
+
+```markdown
+---
+description: Writes and edits pull requests.
+model: anthropic/claude-sonnet-5-5
+---
+
+You handle all PR creation and editing. ...
+```
+
+The task engine reads `*.md` files from an `agents/` or `agent/` folder (subfolders included) under each of these locations, later ones overriding earlier ones field by field:
+
+| Scope | Location |
+|-------|----------|
+| User | `~/.pi/agent`, `~/.senpi/agent`, `~/.senpi/agents`, then the engine's agent directory (`~/.omo/agent`, or `OMO_CODING_AGENT_DIR` when set) |
+| Project | `.pi`, `.senpi`, `.senpi/agents`, then `.omo` |
+
+So `~/.omo/agent/agents/pr-writer.md` defines `pr-writer` for every project, and `<project>/.omo/agents/pr-writer.md` overrides it in that project. An `agents.<name>` entry in omo.json still wins over a file of the same name, field by field, and a file named after a builtin overlays that builtin the same way an `agents` entry does. Symlinked files and folders are skipped, and a file that fails to parse is skipped and logged without affecting the others.
+
 ### `task`
 
 Task engine settings. The whole object is optional, but `provider_concurrency`, `model_concurrency`, `state_dir`, `host_idle_exit_ms`, and `reattach_on_reconcile` are optional and remain unset when omitted (`schema/task.ts`).

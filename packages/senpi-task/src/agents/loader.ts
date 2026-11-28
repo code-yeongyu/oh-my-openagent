@@ -2,6 +2,7 @@ import { resolve } from "node:path"
 
 import { MERGED_OMO_CONFIG_PATH } from "@oh-my-opencode/omo-config-core"
 
+import { resolveAgentHome } from "../agent-home"
 import { categoryShadowedAgentNames, categoryShadowMessage } from "./category-shadow"
 import { loadMarkdownAgent } from "./markdown"
 import { loadOmoAgentOverlays } from "./omo-overlay"
@@ -19,31 +20,19 @@ import type { AgentDefinition, AgentLoaderDiagnostic, LoadAgentsOptions, LoadAge
  * defaults without code changes.
  */
 export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
-  const resolvedOptions = {
-    env: options.env ?? {},
-    homeDir: resolve(options.homeDir ?? process.env.HOME ?? process.cwd()),
-    projectDir: resolve(options.projectDir ?? process.cwd()),
-  }
-  const agents = new Map<string, AgentDefinition>()
-  const diagnostics: AgentLoaderDiagnostic[] = []
+  const resolvedOptions = resolveLoadAgentsOptions(options)
+  const markdown = loadMarkdownAgents(resolvedOptions)
+  const agents = new Map<string, AgentDefinition>(Object.entries(markdown.agents))
+  const diagnostics: AgentLoaderDiagnostic[] = [...markdown.diagnostics]
   // A user's markdown agent that declares its own model already has a chain, so a same-named category
   // shadows nothing it relies on (same rule as an omo.json agent entry with model/models). The startup
   // notice and the doctor command read config only and do not see markdown agents, so for a markdown
   // agent named after a builtin they can still warn where this loader does not.
-  const markdownAgentsWithOwnModel = new Set<string>()
-
-  for (const location of resolveAgentDefinitionLocations(resolvedOptions)) {
-    const listed = listMarkdownAgentFiles(location)
-    diagnostics.push(...listed.diagnostics)
-    for (const path of listed.files) {
-      const loaded = loadMarkdownAgent(path)
-      if (loaded.ok) {
-        overlayAgent(agents, loaded.agent)
-        if (loaded.agent.model !== undefined || loaded.agent.models !== undefined)
-          markdownAgentsWithOwnModel.add(loaded.agent.name)
-      } else diagnostics.push(loaded.diagnostic)
-    }
-  }
+  const markdownAgentsWithOwnModel = new Set(
+    Object.values(markdown.agents)
+      .filter((agent) => agent.model !== undefined || agent.models !== undefined)
+      .map((agent) => agent.name),
+  )
 
   for (const definition of registeredAgentDefinitions()) {
     overlayAgent(agents, definition)
@@ -66,6 +55,41 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   }
 
   return { agents: Object.fromEntries(agents), diagnostics }
+}
+
+/**
+ * The markdown half of `loadAgents`: `agent/` and `agents/` under each pi, Senpi and omo location
+ * (the engine's agent dir and the project's `.omo` included), later locations overriding earlier
+ * names field by field. The task engine layers these between the builtins and `omo.json` agents.
+ */
+export function loadMarkdownAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
+  const resolvedOptions = resolveLoadAgentsOptions(options)
+  const agents = new Map<string, AgentDefinition>()
+  const diagnostics: AgentLoaderDiagnostic[] = []
+  const locations = resolveAgentDefinitionLocations({
+    ...resolvedOptions,
+    agentHome: resolveAgentHome({ env: resolvedOptions.env, homeDir: resolvedOptions.homeDir }),
+  })
+
+  for (const location of locations) {
+    const listed = listMarkdownAgentFiles(location)
+    diagnostics.push(...listed.diagnostics)
+    for (const path of listed.files) {
+      const loaded = loadMarkdownAgent(path)
+      if (loaded.ok) overlayAgent(agents, loaded.agent)
+      else diagnostics.push(loaded.diagnostic)
+    }
+  }
+
+  return { agents: Object.fromEntries(agents), diagnostics }
+}
+
+function resolveLoadAgentsOptions(options: LoadAgentsOptions): Required<LoadAgentsOptions> {
+  return {
+    env: options.env ?? {},
+    homeDir: resolve(options.homeDir ?? process.env.HOME ?? process.cwd()),
+    projectDir: resolve(options.projectDir ?? process.cwd()),
+  }
 }
 
 function overlayAgent(agents: Map<string, AgentDefinition>, definition: AgentDefinition): void {

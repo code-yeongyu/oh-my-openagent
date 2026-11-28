@@ -46,6 +46,7 @@ import { createEngineLiveness } from "./engine-liveness"
 import {
   DEFAULT_RUNNER_FACTORIES,
   buildRespawnRunner,
+  loadMarkdownAgents,
   resolveTaskAgents,
   type TaskRunnerFactories,
 } from "./engine-runners"
@@ -162,7 +163,20 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     stateDir,
     settings,
   })
-  const agents = resolveTaskAgents(deps.omoConfig)
+  const env = deps.env ?? process.env
+  const markdownAgents = loadMarkdownAgents({
+    env,
+    ...(env.HOME === undefined ? {} : { homeDir: env.HOME }),
+    projectDir: deps.cwd,
+  })
+  for (const diagnostic of markdownAgents.diagnostics) {
+    log("omo-senpi markdown agent skipped", {
+      kind: diagnostic.kind,
+      path: diagnostic.path,
+      message: diagnostic.message,
+    })
+  }
+  const agents = resolveTaskAgents(deps.omoConfig, markdownAgents.agents)
 
   // The coordinator's async receipt closes the loop on batched delivery: a completion the coordinator
   // accepted but never delivered (failed flush, or a batch window dropped when /reload retires it)

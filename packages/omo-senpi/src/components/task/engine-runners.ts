@@ -71,7 +71,7 @@ export const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
   process: buildProcessRunner,
 }
 
-export { resolveTaskAgents } from "@oh-my-opencode/senpi-task"
+export { loadMarkdownAgents, resolveTaskAgents } from "@oh-my-opencode/senpi-task"
 
 function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const inProcess = new InProcessRunner({

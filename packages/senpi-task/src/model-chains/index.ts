@@ -1,6 +1,7 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { resolveTaskAgents } from "../agents/task-agents"
+import type { AgentDefinition } from "../agents/types"
 import { DEFAULT_CATEGORIES } from "../category/builtins"
 import { parseAvailableModels } from "../category/registry-models"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category/types"
@@ -18,6 +19,7 @@ export type { ChainRung, ChainRungSource, ChainRungState, ModelChainEntry, Model
 export function describeModelChains<TModel extends SenpiModelPort>(
   config: OmoConfig,
   registry: SenpiModelRegistryPort<TModel>,
+  markdownAgents: Readonly<Record<string, AgentDefinition>> = {},
 ): ModelChainsReport {
   const parsed = parseAvailableModels(registry.getAvailable())
   if (!parsed.validContainer) throw new Error("the model registry did not return a model list")
@@ -25,7 +27,7 @@ export function describeModelChains<TModel extends SenpiModelPort>(
   const categoryNames = Array.from(
     new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})]),
   ).sort()
-  const agents = resolveTaskAgents(config)
+  const agents = resolveTaskAgents(config, markdownAgents)
   return {
     excludeModels: config.exclude_models ?? [],
     categories: categoryNames.map((name) => describeCategoryChain(name, config, registry, available)),

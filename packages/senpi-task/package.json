@@ -33,6 +33,10 @@
       "types": "./src/senpi/model-decorators.ts",
       "import": "./src/senpi/model-decorators.ts"
     },
+    "./agent-loader": {
+      "types": "./src/agents/loader.ts",
+      "import": "./src/agents/loader.ts"
+    },
     "./category-shadow": {
       "types": "./src/agents/category-shadow.ts",
       "import": "./src/agents/category-shadow.ts"

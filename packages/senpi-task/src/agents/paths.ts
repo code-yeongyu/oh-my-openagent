@@ -6,6 +6,8 @@ import type { AgentLoaderDiagnostic } from "./types"
 type ResolveAgentPathsOptions = {
   readonly homeDir: string
   readonly projectDir: string
+  // The engine's resolved agent dir (`~/.omo/agent` under omo, or an `*_CODING_AGENT_DIR` override).
+  readonly agentHome: string
 }
 
 type ListMarkdownAgentFilesResult = {
@@ -16,14 +18,17 @@ type ListMarkdownAgentFilesResult = {
 const AGENT_SUBDIRECTORIES = ["agent", "agents"] as const
 
 export function resolveAgentDefinitionLocations(options: ResolveAgentPathsOptions): readonly string[] {
-  return [
+  const locations = [
     join(options.homeDir, ".pi", "agent"),
     join(options.homeDir, ".senpi", "agent"),
     join(options.homeDir, ".senpi", "agents"),
+    options.agentHome,
     join(options.projectDir, ".pi"),
     join(options.projectDir, ".senpi"),
     join(options.projectDir, ".senpi", "agents"),
+    join(options.projectDir, ".omo"),
   ]
+  return [...new Set(locations)]
 }
 
 export function listMarkdownAgentFiles(location: string): ListMarkdownAgentFilesResult {
