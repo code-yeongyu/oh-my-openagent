@@ -32,14 +32,15 @@ export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
 // the legacy suite as not run.
 const requiredRoot = (name) => {
   const value = process.env[name]
-  if (value === undefined || value === "")
-    throw new Error(
+  if (value === undefined || value === "") {
+    console.error(
       `thread-tools QA: set ${name} to the checkout path this scenario needs (run-all.mjs skips the legacy suite without it)`,
     )
+    process.exit(1)
+  }
   return value
 }
 export const SENPI_ROOT = requiredRoot("THREAD_QA_SENPI_ROOT")
-export const DESKTOP_ROOT = requiredRoot("THREAD_QA_DESKTOP_ROOT")
 
 const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-shared", "lib")
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")
@@ -111,13 +112,12 @@ export function threadComponent(name) {
 
 /** Load a desktop module by absolute path; its own bare imports resolve at its location. */
 export function desktopModule(relativePath) {
-  return import(join(DESKTOP_ROOT, relativePath))
+  return import(join(requiredRoot("THREAD_QA_DESKTOP_ROOT"), relativePath))
 }
-
-const desktopRequire = createRequire(join(DESKTOP_ROOT, "apps", "server", "package.json"))
 
 /** Load a desktop workspace dependency (effect, @effect/platform-node, ...). */
 export function desktopDependency(specifier) {
+  const desktopRequire = createRequire(join(requiredRoot("THREAD_QA_DESKTOP_ROOT"), "apps", "server", "package.json"))
   return import(desktopRequire.resolve(specifier))
 }
 
