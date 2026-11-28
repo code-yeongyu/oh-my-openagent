@@ -54,6 +54,19 @@ describe("resolveModelProfile", () => {
     })
   })
 
+  it("resolves geeky-normal's gpt-6.1-sol rung on a Copilot-only or OpenCode-Zen-only registry (#9225)", () => {
+    for (const available of [["github-copilot/gpt-6.1-sol"], ["opencode/gpt-6.1-sol"]]) {
+      const result = resolveModelProfile({ active: "geeky-normal", availableModels: available })
+
+      expect(result).toMatchObject({
+        kind: "resolved",
+        provider: available[0].slice(0, available[0].indexOf("/")),
+        modelId: "gpt-6.1-sol",
+        reasoning: "medium",
+      })
+    }
+  })
+
   it("treats a value carrying a slash as a literal pin", () => {
     const result = resolveModelProfile({ active: OPUS, availableModels: [FABLE, OPUS] })
 
