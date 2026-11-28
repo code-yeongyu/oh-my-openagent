@@ -6,7 +6,8 @@ import { HostSessionClient } from "./rpc-host/session-client"
 import type { HostSessionOpenInput } from "./rpc-host/session-transport"
 import { isHostSessionHandle, type HostSessionChannel } from "./rpc-host"
 import { childSpec, ensuredDaemon, fakeFallbackRunner, hostRunnerHarness, stubChannel } from "./rpc-host.test-support"
-import { FAKE_HOST_KEY_ROOT, type FakeHost } from "./rpc-host/__fixtures__/fake-host"
+import { type FakeHost } from "./rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 
 const { fakeHost, runnerOver, runnerWithout, release } = hostRunnerHarness()
 const opened: HostSessionClient[] = []

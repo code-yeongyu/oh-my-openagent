@@ -27,9 +27,6 @@ import { FakeInputAdmissions } from "./fake-input-admissions"
 export type { FakeHostCommand, FakeHostOpenFailure, FakeHostWarmAnswer } from "./fake-host-wire"
 export type { FakeHostSession } from "./fake-host-sessions"
 
-/** A fake host publishes no launch key and never challenges; clients of one name this root, which holds no record. */
-export const FAKE_HOST_KEY_ROOT = "/nonexistent/omo-fake-host-key-root"
-
 export interface FakeHostOptions extends FakeHostIdentityOptions {
   readonly openFailure?: FakeHostOpenFailure
   /** Refuse open_session for a path whose directory does not exist, as the real host does. */

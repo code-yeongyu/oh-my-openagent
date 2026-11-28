@@ -8,7 +8,7 @@ import { RpcProtocolClient } from "../rpc/protocol-client"
 import { createHostSessionHandle } from "./handle"
 import { FAKE_SESSION, fakeSessionPort } from "./handle.test-support"
 import { HostSessionClient, HostSessionDetachedError } from "./session-client"
-import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 
 /**
  * Run outside bun:test so its own exception handlers cannot hide the process-level failure.

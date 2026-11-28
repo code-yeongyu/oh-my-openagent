@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { daemonReachable } from "./liveness"
-import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 
 const cleanups: Array<() => Promise<void> | void> = []
 

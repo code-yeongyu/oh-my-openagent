@@ -16,7 +16,7 @@ import type { HostRpcClient } from "./session-transport"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 import { FAKE_HOST_CAPABILITIES } from "./__fixtures__/fake-host-probe"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
-import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 
 const harness = sessionClientHarness()
 const clients: HostSessionClient[] = []

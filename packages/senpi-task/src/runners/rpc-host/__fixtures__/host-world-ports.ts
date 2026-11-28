@@ -2,7 +2,7 @@ import type { RpcChildHandle, RpcRunnerSpec } from "../../types"
 import type { HostSessionCloseChannel } from "../close"
 import { HostSessionClient } from "../session-client"
 import { probeFakeHost } from "./fake-host-probe"
-import { FAKE_HOST_KEY_ROOT } from "./fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./fake-host-key-root"
 
 /**
  * The two seams a parent session injects around the fake daemon: the channel the single close

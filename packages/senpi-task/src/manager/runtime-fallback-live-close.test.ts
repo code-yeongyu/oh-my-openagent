@@ -12,7 +12,7 @@ import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
-import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host-key-root"
 
 // The failed rung's live handle closes its daemon session best-effort and gives up after a bounded
 // wait. Runtime fallback must not take that as proof the session is gone: the next model starts only

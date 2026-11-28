@@ -6,7 +6,7 @@ import { HostSessionClient } from "./rpc-host/session-client"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import type { RpcRunnerSpec } from "./types"
-import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 
 // omo#8563: the runner owns the two recoveries a daemon child needs. A lost transport is
 // re-ensured and the same session path reopened (bounded backoff), and a host that is above its

@@ -8,7 +8,7 @@ import { adaptRpcHandle } from "../manager/child-handle"
 import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { RpcRequestTimeout } from "./rpc/errors"
-import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 
 afterEach(cleanupSteering)
 

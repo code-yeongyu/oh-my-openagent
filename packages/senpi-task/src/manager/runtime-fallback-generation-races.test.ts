@@ -15,7 +15,7 @@ import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
-import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host-key-root"
 
 // Two generations of one task coexist while runtime fallback finishes closing an old rung: a revived
 // newer run, or a second revival racing the first. Each generation owns only its own lease, handle and

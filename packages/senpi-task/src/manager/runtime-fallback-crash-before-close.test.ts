@@ -18,7 +18,7 @@ import {
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
-import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host-key-root"
 
 // The parent dies after the handoff is committed but before the failed rung's daemon session closed.
 // Revival must close that retained session before it opens the next rung, on the real daemon wire.

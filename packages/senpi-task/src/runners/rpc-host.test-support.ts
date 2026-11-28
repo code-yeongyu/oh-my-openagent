@@ -3,12 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  startFakeHost,
-  type FakeHost,
-  type FakeHostOptions,
-  FAKE_HOST_KEY_ROOT,
-} from "./rpc-host/__fixtures__/fake-host"
+import { startFakeHost, type FakeHost, type FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 import type { EnsuredTaskDaemon } from "./rpc-host/daemon"
 import type { ShardResolution } from "./rpc-host/shard-socket"
 import { HostSessionClient } from "./rpc-host/session-client"

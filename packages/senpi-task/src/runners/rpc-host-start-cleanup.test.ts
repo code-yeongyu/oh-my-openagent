@@ -5,7 +5,7 @@ import { baseSpec, cleanupProjects, launchSettled, makeManager } from "../manage
 import { createRpcManagedRunner } from "../manager/runner"
 import { hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
-import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host"
+import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 
 const harness = hostRunnerHarness()
 
