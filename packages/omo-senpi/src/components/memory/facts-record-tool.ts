@@ -117,7 +117,7 @@ export function createFactsRecordTool(input: FactsRecordToolInput): FactsRecordT
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error)
         if (!(error instanceof FactsExtractionValidationError)) return reject(reason)
-        const call = JSON.stringify(params)
+        const call = canonicalCall(params)
         if (!refused.has(call)) {
           refused.add(call)
           return reject(`${reason}. Fix this call or skip this fact; the same call will not be accepted`)
@@ -162,4 +162,13 @@ function errorResult(reason: string): FactsRecordToolResult {
     details: undefined,
     isError: true,
   }
+}
+
+/** A call's arguments with every object's keys sorted, so a resend that only reorders keys is the same call (#10929). */
+function canonicalCall(value: unknown): string {
+  return JSON.stringify(value, (_key, entry: unknown) =>
+    entry !== null && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)))
+      : entry,
+  )
 }

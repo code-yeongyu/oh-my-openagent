@@ -195,6 +195,38 @@ describe("facts record tool", () => {
     }
   })
 
+  test("#given a rejected call #when the model resends it with its keys reordered #then it counts as the same call and the run ends (#10929)", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
+    try {
+      const path = join(root, "extraction.jsonl")
+      await Bun.write(path, "")
+      const tool = createFactsRecordTool({ exchanges: [], extractionPath: path })
+      const first = await tool.execute("first", {
+        scope: "project",
+        person: { name: "Mina", aliases: [] },
+        text: "Mina reviews releases.",
+        date: "2026-10-22",
+      })
+
+      // when: the same arguments, every object's keys in another order
+      const resend = await tool.execute("resend", {
+        date: "2026-10-22",
+        text: "Mina reviews releases.",
+        person: { aliases: [], name: "Mina" },
+        scope: "project",
+      })
+
+      // then
+      expect(first.isError).toBe(true)
+      expect(first.terminate).toBeUndefined()
+      expect(resend.isError).toBe(true)
+      expect(resend.terminate).toBe(true)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given an inactive facts run #when a late call arrives #then it returns an error without appending", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
