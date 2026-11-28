@@ -7,15 +7,20 @@ import { loadOmoConfig } from "./model-resolution-config"
 
 describe("model-resolution-config", () => {
   let originalHome: string | undefined
+  let originalCwd = ""
   let temporaryDirectory = ""
 
   beforeEach(() => {
     originalHome = process.env.HOME
+    originalCwd = process.cwd()
     temporaryDirectory = mkdtempSync(join(tmpdir(), "omo-model-resolution-config-"))
     process.env.HOME = temporaryDirectory
+    // loadOmoConfig() walks .omo project layers up from the cwd; starting at the scratch HOME keeps the checkout's ancestors out.
+    process.chdir(temporaryDirectory)
   })
 
   afterEach(() => {
+    process.chdir(originalCwd)
     rmSync(temporaryDirectory, { recursive: true, force: true })
     if (originalHome === undefined) delete process.env.HOME
     else process.env.HOME = originalHome
