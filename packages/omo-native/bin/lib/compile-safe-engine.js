@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
+import { replaceFile } from "./replace-file.js"
 
 /**
  * Inlines the css-tree data that a compiled binary cannot resolve.
@@ -46,7 +47,7 @@ function serializeJsonFile(path) {
 function writeIfChanged(path, contents) {
   if (!existsSync(path)) return
   if (readFileSync(path, "utf8") === contents) return
-  writeFileSync(path, contents)
+  replaceFile(path, contents)
 }
 
 /**
@@ -59,7 +60,7 @@ function inlineOnce(path, pattern, replacement, inlinedMarker, relativeName) {
   const source = readFileSync(path, "utf8")
   const inlined = source.replace(pattern, () => replacement)
   if (inlined !== source) {
-    writeFileSync(path, inlined)
+    replaceFile(path, inlined)
     return
   }
   if (!source.includes(inlinedMarker)) throw new Error(`omo-ai: unsupported Senpi ${relativeName}`)

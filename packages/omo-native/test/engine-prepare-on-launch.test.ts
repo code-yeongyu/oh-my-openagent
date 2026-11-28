@@ -1,8 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { ENGINE_PREPARED_STAMP, ensureEnginePrepared } from "../bin/lib/engine-prepare.js"
+import { guardedSerialization, serialization } from "../bin/lib/rpc-stream-errors.js"
 
 const RPC_MODE = "dist/modes/rpc/rpc-mode.js"
 const OMO_VERSION = "5.0.0-0.beta.86"
@@ -19,9 +31,14 @@ function createEngine(): string {
   )
   const rpcPath = join(root, RPC_MODE)
   mkdirSync(dirname(rpcPath), { recursive: true })
+  // An install with prepare has already guarded the installed engine; start from the unguarded serializer so
+  // every preparation here really rewrites the file.
   writeFileSync(
     rpcPath,
-    readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"),
+    readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8").replace(
+      guardedSerialization,
+      serialization,
+    ),
   )
   return root
 }
@@ -49,6 +66,43 @@ describe("launcher engine preparation (#8713)", () => {
       prepareOnce(root)
       expect(readRpc(root)).toContain("invalid_stream_event")
       expect(readStamp(root)).toBe(OMO_VERSION)
+    })
+  })
+
+  describe("#given an engine whose files are hardlinks into a shared package cache (#13819)", () => {
+    test("#then preparing it rewrites only this install's files and leaves the cache copies as they were", () => {
+      const root = createEngine()
+      const cache = mkdtempSync(join(tmpdir(), "omo-engine-cache-"))
+      roots.push(cache)
+      const cachedRpc = join(cache, "rpc-mode.js")
+      const cachedStamp = join(cache, ENGINE_PREPARED_STAMP)
+      renameSync(join(root, RPC_MODE), cachedRpc)
+      linkSync(cachedRpc, join(root, RPC_MODE))
+      writeFileSync(cachedStamp, "5.0.0-0.beta.85\n")
+      linkSync(cachedStamp, join(root, ENGINE_PREPARED_STAMP))
+      const pristineRpc = readFileSync(cachedRpc, "utf8")
+
+      prepareOnce(root)
+
+      expect(readRpc(root)).toContain("invalid_stream_event")
+      expect(readStamp(root)).toBe(OMO_VERSION)
+      expect(readFileSync(cachedRpc, "utf8")).toBe(pristineRpc)
+      expect(readFileSync(cachedStamp, "utf8")).toBe("5.0.0-0.beta.85\n")
+    })
+  })
+
+  describe("#given an executable engine file and a restrictive umask", () => {
+    test.skipIf(process.platform === "win32")("#then the prepared file keeps its exact permission bits", () => {
+      const root = createEngine()
+      chmodSync(join(root, RPC_MODE), 0o755)
+      const previous = process.umask(0o077)
+      try {
+        prepareOnce(root)
+      } finally {
+        process.umask(previous)
+      }
+      expect(readRpc(root)).toContain("invalid_stream_event")
+      expect(statSync(join(root, RPC_MODE)).mode & 0o777).toBe(0o755)
     })
   })
 
