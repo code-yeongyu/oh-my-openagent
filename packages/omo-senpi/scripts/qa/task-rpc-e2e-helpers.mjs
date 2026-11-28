@@ -5,6 +5,8 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
+import { fileFingerprint } from "./isolation-state.mjs"
+
 // The isolation guarantee the driver GATES on (plan-consultant #7/#8): the real agent dir's credential/config files
 // are never read or rewritten - a child must resolve auth/models from the SANDBOX agent dir. These are
 // byte-stable across a run, unlike the whole-dir digest which a live dev machine churns through ambient
@@ -18,7 +20,7 @@ export function digestCredentialFiles(root) {
     const path = join(root, name)
     hash.update(name)
     hash.update("\0")
-    hash.update(existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : "absent")
+    hash.update(fileFingerprint(path))
     hash.update("\0")
   }
   return hash.digest("hex")

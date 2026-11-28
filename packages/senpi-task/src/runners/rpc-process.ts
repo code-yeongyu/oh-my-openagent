@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
 import { RunnerError } from "./in-process/runner-error"
+import { withProbeRequestExtension } from "./probe-request"
 import { DesignatedChainNotHeldError, type DesignatedChainNotHeldReason } from "./designated-chain-error"
 import { designatedChainText } from "./designated-fallback-profile"
 import { childRetryFallbackProfile } from "./retry-fallback-profile"
@@ -100,10 +101,11 @@ export class RpcProcessRunner {
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
-    const spec =
+    const spec = withProbeRequestExtension(
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }
-        : specInput
+        : specInput,
+    )
     await this.modelAdmission(spec)
     const parent = new ChildParentLink(
       spec.task_id,

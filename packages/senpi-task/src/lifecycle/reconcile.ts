@@ -5,9 +5,9 @@ import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { isFallbackHandoff } from "./fallback-handoff"
-import { isHostSessionRecord } from "./host-session"
+import { hostSessionResumePath, isHostSessionRecord } from "./host-session"
 import { reconcileHostSessionOrphan } from "./host-session-revive"
-import { reviveClaimed } from "./reconcile-reclamation"
+import { reviveClaimed, settlePausedOrphan } from "./reconcile-reclamation"
 import { reclaimIsolations } from "./reclaim-isolations"
 import { getLifecycleReattachPorts } from "./port"
 import { beginLocalReclamation, reconcileScopedRevival } from "./reconcile-revival"
@@ -216,6 +216,15 @@ async function reconcileLegacyRecordExclusive(
   }
 
   if (TERMINAL_STATUSES.has(record.status)) return reconcileLegacyTerminal(context, record)
+  // The sweep of other sessions' children claims a paused orphan exactly as the scoped sweep does, so it gets the
+  // same disposition: parked for its run's Resume, never marked lost (the run would read lost as failed).
+  if (record.status === "paused" && observed.residency_state === "resident") {
+    return settlePausedOrphan(
+      context,
+      record,
+      hostSessionResumePath(record) ?? newestSessionPath(context, record.task_id),
+    )
+  }
   if (record.provisional_exit !== undefined) return settleProvisionalExitLoss(context, record)
 
   // A daemon-hosted child has no pid at all. Its liveness is the daemon plus its session path, and

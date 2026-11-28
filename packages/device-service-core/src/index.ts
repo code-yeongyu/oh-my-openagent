@@ -18,6 +18,7 @@ export {
   type ColdWakeStatus,
   ColdWakeUnitError,
   installColdWake,
+  installedSessionHostRuntimeVersion,
   readColdWake,
   refreshColdWake,
   type UnitState,

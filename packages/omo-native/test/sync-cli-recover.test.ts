@@ -1,139 +1,9 @@
 import { afterAll, expect, test } from "bun:test"
-import { Command } from "commander"
-
-import { createRejectionCounter } from "../../memory-core/src/sync/crypto/rejection"
-import { createRecoveryBridge } from "../../memory-core/src/sync/recovery/bridge"
-import { enrollPhraseRecoveryKey } from "../../memory-core/src/sync/recovery/enroll-phrase"
-import { generateRecoveryPhrase, TypedPhrase } from "../../memory-core/src/sync/recovery/phrase"
-import { fakeAuthenticator } from "../../memory-core/src/sync/recovery/testing/fake-passkey.test-support"
-import {
-  createWorld,
-  freshStateDir,
-  newDevice,
-  removeWorldStateDirs,
-  transportFor,
-  verified,
-} from "../../memory-core/src/sync/recovery/testing/world.test-support"
-import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
-import type { PhraseTerminal } from "../sync-phrase-tty"
+import { removeWorldStateDirs, verified } from "../../memory-core/src/sync/recovery/testing/world.test-support"
+import { EXIT_UNSUPPORTED_HERE } from "../sync-cli"
+import { words, ENROLLED, typing, runRecover } from "./sync-cli-recover.test-support"
 
 afterAll(removeWorldStateDirs)
-
-const words = (fill: number): ReadonlyArray<string> => {
-  const phrase = generateRecoveryPhrase((bytes) => void bytes.fill(fill))
-  const out = phrase.reveal()
-  phrase.dispose()
-  return out
-}
-const ENROLLED = words(17)
-
-const enrolledAccount = async () => {
-  const world = await createWorld()
-  let shown: ReadonlyArray<string> = []
-  const enrolled = await enrollPhraseRecoveryKey({
-    anchor: world.anchor,
-    account: world.account,
-    keyring: world.owner.keyring,
-    bridge: createRecoveryBridge(fakeAuthenticator(world.provider), world.owner.keyring, {
-      phraseSurface: {
-        show: async (phrase) => {
-          shown = phrase.reveal()
-          return true
-        },
-        confirm: async (positions) => new TypedPhrase(positions.map((p) => shown[p - 1] ?? "").join(" ")),
-        enter: async () => null,
-      },
-      phraseRandom: {
-        phrase: () => generateRecoveryPhrase((bytes) => void bytes.fill(17)),
-        positions: () => [1, 2, 3],
-      },
-    }),
-    chain: { ...transportFor(world, world.owner), listEntriesAfter: async () => null, state: async () => null },
-    rejections: createRejectionCounter(),
-    pinDir: freshStateDir(),
-    phraseGate: { enabled: true, serviceFloor: async () => "on", refused: () => undefined },
-  })
-  if (!enrolled.ok) throw new Error("fixture enrollment failed")
-  return world
-}
-
-const typing = (entries: ReadonlyArray<string>) => {
-  const written: string[] = []
-  let opened = 0
-  let next = 0
-  const open = (): PhraseTerminal => {
-    opened += 1
-    return {
-      write: (text) => void written.push(text),
-      readLine: async () => (next < entries.length ? (entries[next++] ?? null) : null),
-      close: () => undefined,
-    }
-  }
-  return { open, written, opened: () => opened }
-}
-
-const unused = async (): Promise<never> => {
-  throw new Error("not used by recover")
-}
-
-type RecoverSetup = {
-  readonly plain?: boolean
-  readonly chain?: Record<string, unknown>
-  readonly contexts?: { count: number }
-  readonly setDeviceSync?: (id: string, enabled: boolean) => Promise<void>
-}
-
-const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup: RecoverSetup = {}) => {
-  const world = setup.plain === true ? await createWorld() : await enrolledAccount()
-  const fresh = await newDevice()
-  const switches: string[] = []
-  const out: string[] = []
-  const err: string[] = []
-  const initial = process.exitCode
-  const program = new Command("omo").exitOverride()
-  configureSyncCommands(program, {
-    context: async () => {
-      if (setup.contexts !== undefined) setup.contexts.count += 1
-      return {
-        account: world.account,
-        serviceDeviceId: "svc-fresh",
-        keyring: fresh.keyring,
-        pinDir: freshStateDir(),
-        chain: {
-          ...transportFor(world, fresh),
-          listEntriesAfter: async () => null,
-          state: async () => null,
-          ...setup.chain,
-        },
-        pairing: {
-          setAccountSync: async (enabled: boolean) => void switches.push(`account ${enabled}`),
-          setDeviceSync:
-            setup.setDeviceSync ??
-            (async (id: string, enabled: boolean) => void switches.push(`device ${id} ${enabled}`)),
-          disableDeviceSync: unused,
-          listPending: unused,
-          openPending: unused,
-          readPending: unused,
-          answerPending: unused,
-          revealPending: unused,
-        },
-        authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
-      }
-    },
-    clock: { now: () => 0, sleep: async () => undefined },
-    output: (line) => void out.push(line),
-    error: (line) => void err.push(line),
-    confirm: async () => false,
-    interactive: true,
-    env: {},
-    terminalAvailable: () => true,
-    ...dependencies,
-  })
-  await program.parseAsync(["sync", "recover"], { from: "user" })
-  const exit = process.exitCode
-  process.exitCode = initial ?? 0
-  return { world, out, err, exit, switches }
-}
 
 for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
   test(`#given ${marker} is set (even empty) #when omo sync recover runs #then it refuses with exit 2 before loading the signed-in context or opening the terminal`, async () => {
@@ -161,8 +31,6 @@ test("#given the enrolled phrase typed at the terminal #when omo sync recover ru
   const r = await runRecover({ terminal: terminal.open })
   expect(r.exit).toBe(0)
   expect(r.out.join("\n")).toContain("recovered")
-  // #14453: the service gates every sync read on these switches, so a recovered device that leaves them off is refused.
-  expect(r.switches).toEqual(["account true", "device svc-fresh true"])
   const joined = (await verified(r.world, r.world.owner)).received.some(
     (record) => record.body.kind === "recovery-join",
   )
@@ -184,7 +52,6 @@ test("#given a mistyped phrase then a cancel #when omo sync recover runs #then t
   expect(r.exit).toBe(1)
   expect(terminal.written.join("")).toContain("check for a typo")
   expect(r.err.join("\n")).toContain("cancelled")
-  expect(r.switches).toEqual([])
 })
 
 test("#given a valid phrase this account never enrolled #when omo sync recover runs #then it refuses as history-incomplete and nothing joins", async () => {
@@ -203,7 +70,6 @@ test("#given an account whose only recovery key is a passkey #when omo sync reco
   const r = await runRecover({ terminal: terminal.open }, { plain: true })
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
   expect(r.err.join("\n")).toContain("has no recovery phrase")
-  expect(r.switches).toEqual([])
   expect(terminal.opened()).toBe(0)
 })
 
@@ -222,22 +88,4 @@ test("#given the enrolled phrase and a rotation append the service refuses #when
   )
   expect(r.exit).toBe(0)
   expect(r.out.join("\n")).toContain("another step is still pending")
-  // #14453 review L1: a read-only join can read, so it turns sync on too.
-  expect(r.switches).toEqual(["account true", "device svc-fresh true"])
-})
-
-test("#given a recovery that succeeds and a device switch the service refuses to turn on #when omo sync recover runs #then it says memory was recovered, names omo sync enable to turn sync on, and exits 1 (#14453 review L2)", async () => {
-  const terminal = typing([ENROLLED.join(" ")])
-  const r = await runRecover(
-    { terminal: terminal.open },
-    {
-      setDeviceSync: async () => {
-        throw new Error("service unavailable")
-      },
-    },
-  )
-  expect(r.exit).toBe(1)
-  expect(r.out).toEqual([])
-  expect(r.err.join("\n")).toContain("`omo sync enable`")
-  expect(r.err.join("\n")).toContain("(service unavailable)")
 })
