@@ -5,6 +5,7 @@ import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { PreparedLimitRevival } from "../manager/usage-limit-revival"
+import type { SendScope } from "./scope-resolver"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
@@ -127,12 +128,6 @@ export type SendOutcome =
   // One-shot agents (see agents/interaction-policy.ts) refuse task_send in EVERY state; message is
   // the registry's sendDenialReminder, surfaced to the caller verbatim.
   | { readonly kind: "one_shot_agent"; readonly task_id: string; readonly agent: string; readonly message: string }
-  | {
-      readonly kind: "scope_denied"
-      readonly task_id: string
-      readonly owning_session_id: string
-      readonly reason: string
-    }
   | { readonly kind: "not_found"; readonly reason: string; readonly suggestion: string }
 
 export type InterruptOutcome =
@@ -195,22 +190,13 @@ export type RedispatchOutcome =
   | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
-  | {
-      readonly kind: "scope_denied"
-      readonly task_id: string
-      readonly owning_session_id: string
-      readonly reason: string
-    }
   | { readonly kind: "not_found"; readonly reason: string }
 
 export type SteeringEngine = {
-  // The task a cancel acts on, resolved in the caller's scope by steering/scope-resolver.ts: undefined when nothing in
-  // that scope matches, so the entry answers as the engine does for a missing id.
+  // The task a cancel or a send acts on, resolved in the caller's scope by steering/scope-resolver.ts: undefined
+  // when nothing in that scope matches, so the entry answers as the engine does for a missing id.
   resolveCancelTarget(idOrName: string, caller?: CallerScope): TaskRecord | undefined
-  // The task a send addresses: the caller's own first, then any session; scopeDenial then decides.
-  resolveSendTarget(idOrName: string, callerSessionId: string | undefined): TaskRecord | undefined
-  // The one scope decision for a send: the refusal an out-of-scope caller gets, or undefined.
-  scopeDenial(record: TaskRecord, input: SendInput): SendOutcome | undefined
+  resolveSendTarget(idOrName: string, scope: SendScope): TaskRecord | undefined
   hasPendingSends(taskId: string): boolean
   hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.

@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TSchema } from "typebox"
 
 import { settledWithin } from "../../manager/settled-within"
+import { redispatchNotFound, sendNotFound } from "../../steering"
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
@@ -27,7 +28,7 @@ const DESCRIPTION = [
   "message is required (except with redispatch:true) and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
   "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Messages to team members and '*' are capped by the team payload limit (default 32 KB; split larger payloads or send a file path); messages to a child task have no such cap.",
-  "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
+  "Cross-session: a child owned by another session is not found unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
   "One-shot agents (plan-reviewer) always refuse task_send in every state; spawn a new plan-reviewer instead.",
 ].join(" ")
@@ -118,28 +119,34 @@ async function sendNow(
 ): Promise<SendToolResult> {
   const validation = validateParams(params)
   if (validation !== undefined) return validation
+  const scope = { callerSessionId, allScope: params.all_scope === true }
+  // A call without a caller session reaches a task only with all_scope.
+  const resolvable = callerSessionId !== undefined || scope.allScope
 
   if (params.redispatch === true) {
     if (manager.redispatchTask === undefined) return invalidArguments("this manager does not support redispatch")
-    const scopedCaller = params.all_scope === true ? undefined : callerSessionId
-    const outcome = await manager.redispatchTask(params.to, scopedCaller)
-    return mapRedispatchOutcome(manager, outcome, callerSessionId)
+    const outcome = resolvable
+      ? await manager.redispatchTask(params.to, callerSessionId, scope.allScope)
+      : redispatchNotFound(params.to)
+    return mapRedispatchOutcome(manager, outcome, scope)
   }
 
   if (typeof params.message === "string") {
-    const outcome = await manager.sendToTask({
-      idOrName: params.to,
-      message: params.message,
-      deliverAs: "steer",
-      ...(callerSessionId !== undefined ? { callerSessionId } : {}),
-      ...(params.all_scope === true ? { allScope: true } : {}),
-    })
+    const outcome = resolvable
+      ? await manager.sendToTask({
+          idOrName: params.to,
+          message: params.message,
+          deliverAs: "steer",
+          ...(callerSessionId !== undefined ? { callerSessionId } : {}),
+          ...(scope.allScope ? { allScope: true } : {}),
+        })
+      : sendNotFound(params.to)
 
     if (outcome.kind !== "not_found") return mapSendOutcome(outcome)
-    if (teamRouting === undefined) return notFound(manager, outcome.reason, callerSessionId)
+    if (teamRouting === undefined) return notFound(manager, outcome.reason, scope)
 
     const resolution = await resolveSendTeamRunId(params, teamRouting)
-    if (resolution.kind === "none") return notFound(manager, outcome.reason, callerSessionId)
+    if (resolution.kind === "none") return notFound(manager, outcome.reason, scope)
     if (resolution.kind === "error") return invalidArguments(resolution.reason)
 
     const teamResult = await runTeamSend(teamRouting.service, resolution.teamRunId, teamRouting.from, {
