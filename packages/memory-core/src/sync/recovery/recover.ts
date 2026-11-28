@@ -5,25 +5,25 @@ import { loadTrustAnchor, type RootChangeNotice } from "../crypto/trust-pin.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { openBridgeSealedWrap } from "./key-material.ts"
 import { rotationAppend } from "./keyring-append.ts"
+import { pinnedMembership } from "./membership.ts"
 import type {
   KeyringAppendRequest,
   RecoverBeginResult,
   RecoverRefusal,
-  RecoveryBridge,
+  RecoverySessionBridge,
   RecoveryEvent,
   RecoveryTransport,
   TransportRefusal,
 } from "./ports.ts"
+import { beginWithPasskey, beginWithPhrase } from "./recover-begin.ts"
 import { appendAndConfirmJoin, pinRecoveredRoot, rotationStored } from "./recover-join.ts"
-import { servedSaltInputs } from "./salt-inputs.ts"
-import { servedPhraseHints } from "./phrase-hints.ts"
 import { loadServedChain, recoveryCandidates } from "./served-chain.ts"
 import { holdWrites, releaseWriteHold } from "./write-hold.ts"
 
 export type RecoverRefusalReason =
   | RecoverRefusal
   | "approval-required"
-  | "unavailable"
+  | "already-member"
   | "unverified"
   | "no-recovery-key"
   | "too-many-recovery-keys"
@@ -55,7 +55,7 @@ export type RecoverInput = {
   readonly account: string
   readonly rpId: string
   readonly keyring: DeviceKeyring
-  readonly bridge: RecoveryBridge | null
+  readonly bridge: RecoverySessionBridge | null
   readonly transport: RecoveryTransport
   readonly rejections: RejectionCounter
   /** Where this device keeps its trust pin and write hold; recovery sets the pin from the anchored walk. */
@@ -103,6 +103,12 @@ export const recoverOnFreshDevice = async (input: RecoverInput): Promise<Recover
   const existing = await loadTrustAnchor(input.stateDir, input.account)
   if (!existing.ok && existing.reason === "corrupt_pin") return refusePin("pin-corrupt")
   const pinned = existing.ok ? existing.anchor.genesisDigest : null
+  // D12 membership guard: a member that recovered would rotate every other device out of the account.
+  if (existing.ok) {
+    const held = await pinnedMembership(input.transport, input.account, input.rejections, existing.anchor, id)
+    if (!held.ok) return held.reason === "pin-conflict" ? refusePin("pin-conflict") : refuse(held.reason)
+    if (held.member) return refuse("already-member")
+  }
   const begun = phrase ? await beginWithPhrase(input, bridge) : await beginWithPasskey(input, bridge)
   if (begun === "no-recovery-key" || begun === "unavailable" || begun === "too-many-recovery-keys") return refuse(begun)
   if (!begun.ok) return refuse(begun.reason)
@@ -126,40 +132,9 @@ export const recoverOnFreshDevice = async (input: RecoverInput): Promise<Recover
   }
 }
 
-type BeginRefusal = "no-recovery-key" | "unavailable" | "too-many-recovery-keys"
-
-const beginWithPasskey = async (
-  input: RecoverInput,
-  bridge: RecoveryBridge,
-): Promise<RecoverBeginResult | BeginRefusal> => {
-  const served = await servedSaltInputs(input.transport)
-  if (!served.ok) return served.reason
-  if (served.salts.length === 0) return "no-recovery-key"
-  return bridge.recoverBegin({
-    account: input.account,
-    rpId: input.rpId,
-    salts: served.salts,
-    knownCredentialIds: served.salts.map((salt) => salt.credentialId),
-    acknowledgeUnknown: input.acknowledgeUnknownCredential === true,
-  })
-}
-
-/** The phrase is derived only against served phrase-kind hints; the anchored walk below decides (contract 6, DI). */
-const beginWithPhrase = async (
-  input: RecoverInput,
-  bridge: RecoveryBridge,
-): Promise<RecoverBeginResult | BeginRefusal> => {
-  const begin = bridge.recoverBeginWithPhrase
-  if (begin === undefined) return "unavailable"
-  const served = await servedPhraseHints(input.transport)
-  if (!served.ok) return served.reason
-  if (served.hints.length === 0) return "no-recovery-key"
-  return begin({ account: input.account, hints: served.hints })
-}
-
 const recoverWithHandle = async (
   input: RecoverInput,
-  bridge: RecoveryBridge,
+  bridge: RecoverySessionBridge,
   begun: Begun,
   pinned: string | null,
   device: Device,
@@ -181,6 +156,7 @@ const recoverWithHandle = async (
   const { authority, head, pin } = served.state
   if (authority === null || head === null || pin === null) return refuse("unverified")
   if (pinned !== null && pin.genesisDigest !== pinned) return refusePin("pin-conflict")
+  if (authority.members.has(device.id)) return refuse("already-member")
   const candidate = recoveryCandidates(served.state, wrapRows).find(
     (entry) => entry.key.credential_id === begun.credentialId,
   )

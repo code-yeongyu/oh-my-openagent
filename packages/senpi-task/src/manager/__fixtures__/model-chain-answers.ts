@@ -11,9 +11,14 @@ const REFUSAL_ERROR =
   "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
 const AUTH_ERROR = "401: Unauthorized - invalid api key"
 
-const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR } as const
+// A limit whose wording names neither a model family nor the account (#11383).
+const WEEKLY_LIMIT_ERROR =
+  '{"type":"error","error":{"type":"rate_limit_error","message":"Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z."}}'
 
-export type Step = keyof typeof ERRORS | "complete" | { readonly tool: string } | { readonly partialTool: string }
+const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR, weekly: WEEKLY_LIMIT_ERROR } as const
+
+export type Step =
+  keyof typeof ERRORS | "complete" | "silent" | { readonly tool: string } | { readonly partialTool: string }
 
 // `claude-opus-5-5` and `claude-fable-5-2` are the ids senpi's shipped default chain names
 // (`claude-opus-5-5` -> `claude-fable-5-2:medium`, senpi 2026.11.15-2). The rung lives on another account, so a usage limit on the
@@ -55,6 +60,12 @@ export function answer(provider: string, model: string, step: Step) {
     timestamp: Date.now(),
   }
   const toolCall = (name: string) => ({ type: "toolCall" as const, id: `call-${name}`, name, arguments: {} })
+  // The provider accepted the call and never answers.
+  if (step === "silent")
+    return {
+      result: () => new Promise<never>(() => {}),
+      [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
+    }
   if (typeof step === "string" && step !== "complete")
     return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: ERRORS[step] })
   if (step === "complete") {

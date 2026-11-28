@@ -156,6 +156,7 @@ export type RecoverRefusal =
   | "wrap-refused"
   | "wrap-unbound"
   | "recovery-expired"
+  | "unavailable"
 
 export type SignedJoin = {
   readonly body: KeyringBody
@@ -192,6 +193,12 @@ export interface RecoveryBridge {
   /** Phrase enrollment with the engine-drawn credential id (M3); absent where no phrase surface exists. */
   enrollPhrase?(request: PhraseEnrollBridgeRequest): Promise<EnrollBridgeResult>
 }
+
+/** The bridge members recovery on a fresh device drives. */
+export type RecoverySessionBridge = Pick<
+  RecoveryBridge,
+  "prfSupported" | "recoverBegin" | "recoverFinish" | "recoverAbort" | "recoverBeginWithPhrase"
+>
 
 /** A row of `GET /v1/sync/entries`: ciphertext-free chain metadata. */
 export type ChainRow = {

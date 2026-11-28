@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { getLifecycleDetachedRevival } from "../lifecycle/port"
-import type { TaskRecord } from "../state"
+import { acceptedStopOwnsRun, burnUndoneRun, type TaskRecord } from "../state"
 import {
   buildRevived,
   deliveryUncertain,
@@ -28,6 +28,25 @@ export async function reviveTerminal(
 ): Promise<SendOutcome> {
   if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
   try {
+    const prepared = await port.prepareRevival?.(record, handle)
+    if (prepared !== undefined) {
+      if ("refused" in prepared) {
+        if (granted?.ok) granted.release()
+        return {
+          kind: "not_continuable",
+          task_id: record.task_id,
+          reason: prepared.refused,
+          failure_kind: prepared.failure_kind,
+          suggestion: "Retry after the limit resets or select another provider.",
+        }
+      }
+      if (prepared.record.model !== record.model && granted?.ok) {
+        granted.release()
+        granted = undefined
+      }
+      record = prepared.record
+      handle = prepared.handle
+    }
     return await deliverRevivedTerminal(
       port,
       record,
@@ -106,6 +125,7 @@ async function deliverRevivedTerminal(
     return { kind: "capacity_deferred", task_id: record.task_id, reason: "Task capacity is full; retry explicitly." }
   }
   let revived: TaskRecord | undefined
+  let terminalBeforeRevival: TaskRecord | undefined
   let deliveryAcknowledged = false
   let poolDeliveryStarted = false
   try {
@@ -136,6 +156,7 @@ async function deliverRevivedTerminal(
       uncertain = uncertainDeliveryDenial(current, message)
       if (uncertain !== undefined) return current
       applied = true
+      terminalBeforeRevival = current
       return buildDeliveryRecord(current, nowIso(), message)
     })
     if (uncertain !== undefined || !applied || updated === null) {
@@ -254,8 +275,42 @@ async function deliverRevivedTerminal(
       return lazyRevivalFailure(record, "the revived run was terminalized before the message was acknowledged")
     }
     if (rollbackOnFailure && priorRecord !== undefined) await bestEffortRollback(port, priorRecord)
+    else if (revived !== undefined && terminalBeforeRevival !== undefined)
+      restoreRefusedWarmRevival(port, terminalBeforeRevival, revived)
     reservation.release()
     return lazyRevivalFailure(record, error instanceof Error ? error.message : String(error))
+  }
+}
+
+// A resident child refused the revival prompt, so the new epoch never started and nothing tracks it.
+// Leaving it running strands the record forever: a later send steers the child as if it were live and
+// its outcome is never settled. Put the finished run back, fenced on the epoch this revival wrote and on
+// the same rollback rule the cold path keeps: a stop accepted meanwhile owns the run's ending. Messages
+// queued while the prompt was in flight are still owed to the child, so the current queue is kept.
+function restoreRefusedWarmRevival(port: SteeringPort, terminal: TaskRecord, revived: TaskRecord): void {
+  try {
+    port.store.mutate(terminal.task_id, (fresh) => {
+      if (
+        fresh.status !== "running" ||
+        fresh.notification.run_epoch !== revived.notification.run_epoch ||
+        fresh.host_pid !== revived.host_pid ||
+        fresh.residency_state !== "resident" ||
+        fresh.killed === true ||
+        acceptedStopOwnsRun(fresh)
+      )
+        return fresh
+      const { pending_steering: _queueAtRevival, ...finished } = terminal
+      // The undone epoch was issued (the revived event names it), so it is burnt exactly as the cold rollback burns it.
+      return burnUndoneRun(
+        fresh.pending_steering === undefined ? finished : { ...finished, pending_steering: fresh.pending_steering },
+        fresh,
+      )
+    })
+  } catch (error) {
+    log("senpi-task warm revival restore failed", {
+      taskId: terminal.task_id,
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 }
 

@@ -22,7 +22,7 @@ export function createSessionHistoryRuntimeLoader(
   return () => {
     pending ??= importRuntime().catch((error: unknown) => {
       pending = undefined
-      throw new Error(sessionHistoryRuntimeLoadFailure(error), { cause: error })
+      throw new Error(sessionHistoryRuntimeLoadFailure(), { cause: error })
     })
     return pending
   }
@@ -32,7 +32,7 @@ export const loadSessionHistoryRuntime: SessionHistoryRuntimeLoader = createSess
   () => import("#omo-session-history-runtime"),
 )
 
-export function sessionHistoryRuntimeLoadFailure(error: unknown): string {
-  const cause = error instanceof Error ? error.message : String(error)
-  return `The session history scan is unavailable: its runtime (${SESSION_HISTORY_RUNTIME_ARTIFACT}) failed to load: ${cause}. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
+/** Names the missing artifact and the remedy. The import error stays in `cause`: it names local paths (#15352). */
+export function sessionHistoryRuntimeLoadFailure(): string {
+  return `The session history scan is unavailable: its runtime (${SESSION_HISTORY_RUNTIME_ARTIFACT}) failed to load. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
 }

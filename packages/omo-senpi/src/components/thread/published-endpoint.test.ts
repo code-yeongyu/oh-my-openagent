@@ -280,7 +280,7 @@ test("a slow reused socket with a different identity never receives the target's
   expect(w.discovery()).toBe(0)
 }, 15000)
 
-test("a terminal the engine still reports dead is offline to thread_list, send and steer alike inside the verdict window, and nothing is admitted", async () => {
+test("a terminal the engine reports live_unresponsive lists unknown, naming it as the host that did not answer, inside the verdict window; a send stays offline and nothing is admitted", async () => {
   useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a", undefined, "target", true)
@@ -307,11 +307,17 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
   const after = await listed()
-  expect(before).toMatchObject({ state: "inactive", error_note: "live_unresponsive" })
-  expect(after).toMatchObject({ state: "inactive", error_note: "live_unresponsive" })
+  // Row 29 (#15221): the terminal still holds the session and did not answer, so its row is unknown, never inactive.
+  const unanswered = {
+    state: "unknown",
+    liveness: { kind: "unknown", reason: "host_not_answering" },
+    error_note: "live_unresponsive",
+  }
+  expect(before).toMatchObject(unanswered)
+  expect(after).toMatchObject(unanswered)
   expect(send).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
   expect(steer).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
   expect(target.runtime.enqueueCalls).toHaveLength(0)
-  // The verdict stands: a cached-dead terminal is never re-dialed inside the window, even to send.
+  // The verdict stands: a terminal the engine reported not answering is never re-dialed inside the window, even to send.
   expect(target.frames.filter((frame) => frame === "list_sessions")).toHaveLength(0)
 }, 15000)

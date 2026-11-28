@@ -13,7 +13,10 @@ import { describe, expect, test } from "bun:test"
 // handle; only lifecycle INVOKES them") and each contains only delegation bodies, never an
 // autonomous post-admission destruction trigger. `start-cleanup.ts` is the one pre-admission
 // exception: prompt preflight can reject before the manager/lifecycle ever owns the new handle, so
-// the constructor must discard that unowned process. Test files and __fixtures__ carry no-op fake
+// the constructor must discard that unowned process. `in-process/child-session-shutdown.ts` is the
+// in-process handle's own teardown body (session_shutdown, then dispose), split out of
+// `in-process/child-handle.ts`: the handle's dispose and the pre-admission discard are its only
+// callers. Test files and __fixtures__ carry no-op fake
 // handles and are exempt. Steering/completion/tools/team/manager business code stays fully audited.
 const INVOCATION_ALLOWLIST = [
   "src/lifecycle/",
@@ -21,6 +24,7 @@ const INVOCATION_ALLOWLIST = [
   "src/runners/rpc/handle.ts",
   "src/runners/rpc/start-cleanup.ts",
   "src/runners/in-process/child-handle.ts",
+  "src/runners/in-process/child-session-shutdown.ts",
   "src/manager/child-handle.ts",
 ]
 

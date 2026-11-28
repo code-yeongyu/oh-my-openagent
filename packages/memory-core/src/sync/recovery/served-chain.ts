@@ -10,6 +10,8 @@ export type ServedChain =
   | {
       readonly ok: false
       readonly reason: "unavailable" | "unverified" | "anchor-mismatch"
+      /** The digest of the first served keyring row, when the service answered one; it only labels the refusal. */
+      readonly servedGenesis?: string
     }
 
 /** A hostile response can put anything in a list; only plain objects reach field reads. */
@@ -34,6 +36,9 @@ export const loadServedChain = async (
   const [rows, keys] = await Promise.all([transport.listEntries(), transport.listKeys()])
   if (!Array.isArray(rows) || !Array.isArray(keys)) return { ok: false, reason: "unavailable" }
   if (!rows.every(isPlainObject) || !keys.every(isPlainObject)) return { ok: false, reason: "unverified" }
+  const genesisDigest = keys[0]?.digest
+  const refuse = (reason: "unverified" | "anchor-mismatch"): ServedChain =>
+    typeof genesisDigest === "string" ? { ok: false, reason, servedGenesis: genesisDigest } : { ok: false, reason }
   const bySeq = new Map(keys.map((entry) => [entry.seq, entry]))
   const entries: SyncEntry[] = []
   for (const row of rows) {
@@ -44,17 +49,13 @@ export const loadServedChain = async (
     }
     const keyring = bySeq.get(row.seq)
     if (keyring === undefined || keyring.digest !== row.digest || keyring.keyring_link !== row.keyring_link) {
-      return { ok: false, reason: "unverified" }
+      return refuse("unverified")
     }
     entries.push(keyring)
   }
   const appended = await appendEntries(emptyChain(account, anchor), entries, rejections)
-  if (!appended.ok)
-    return {
-      ok: false,
-      reason: appended.reason === "anchor_mismatch" ? "anchor-mismatch" : "unverified",
-    }
-  if (appended.state.authority === null) return { ok: false, reason: "unverified" }
+  if (!appended.ok) return refuse(appended.reason === "anchor_mismatch" ? "anchor-mismatch" : "unverified")
+  if (appended.state.authority === null) return refuse("unverified")
   return { ok: true, state: appended.state }
 }
 

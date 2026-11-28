@@ -1,3 +1,5 @@
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
+
 import type {
   EffectiveModelChange,
   EffectiveModelChangeKind,
@@ -31,8 +33,53 @@ export function storedStatus(
   return status === "paused" ? { status: "running", paused: true } : { status }
 }
 
+// Only the owner itself can say which process took a record: a write naming this process as host
+// stamps it once with this process's own start identity, bound to this pid. The identity is read
+// once, off the write path; a write before it is known stamps without it (no evidence either way)
+// and the next write adds it. A stamp under this pid from before this process began came from an
+// earlier holder of the pid, so it is replaced.
+let ownStart: string | undefined
+let ownStartRequested = false
+
+function ownStartIdentity(): string | undefined {
+  if (!ownStartRequested) {
+    ownStartRequested = true
+    void getProcessStartIdentity(process.pid).then(
+      (identity) => {
+        ownStart = identity ?? undefined
+      },
+      () => {
+        ownStartRequested = false
+      },
+    )
+  }
+  return ownStart
+}
+
+// The claim is its owner's stamp, so a record that names no host stores none: whatever releases
+// `host_pid` releases the claim with it, and a finished record keeps no pid or start of a process
+// that no longer owns it.
+function withoutHostClaim(record: TaskRecord): TaskRecord {
+  if (record.host_claim === undefined) return record
+  const { host_claim: _released, ...unowned } = record
+  return unowned
+}
+
+function withHostClaim(record: TaskRecord): TaskRecord {
+  if (record.host_pid === undefined) return withoutHostClaim(record)
+  if (record.host_pid !== process.pid) return record
+  const start = ownStartIdentity()
+  const claim = record.host_claim
+  if (claim?.pid === process.pid && Date.parse(claim.at) >= performance.timeOrigin && claim.start === start)
+    return record
+  return {
+    ...record,
+    host_claim: { pid: process.pid, at: new Date().toISOString(), ...(start === undefined ? {} : { start }) },
+  }
+}
+
 export function toStorableTaskRecord(record: TaskRecord): TaskRecord & StoredPausedMarker {
-  const stored = storableEffectiveModel(record)
+  const stored = storableEffectiveModel(withHostClaim(record))
   return stored.status === "paused" ? { ...stored, ...storedStatus(stored.status) } : stored
 }
 

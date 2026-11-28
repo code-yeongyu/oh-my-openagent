@@ -18,6 +18,8 @@ import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import { credentialDigest } from "./isolation-state.mjs"
+
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
 const repoRoot = resolve(packageRoot, "..", "..")
@@ -53,16 +55,6 @@ function findOnPath(bin) {
 
 function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex")
-}
-
-function credentialDigest(agentDir) {
-  const hash = createHash("sha256")
-  for (const name of ["auth.json", "models.json", "settings.json", "trust.json"]) {
-    const path = join(agentDir, name)
-    hash.update(name).update("\0")
-    hash.update(existsSync(path) ? readFileSync(path) : Buffer.from("absent")).update("\0")
-  }
-  return hash.digest("hex")
 }
 
 function isolatedEnv(workRoot, homeDir, agentDir) {

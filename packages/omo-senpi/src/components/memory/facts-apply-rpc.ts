@@ -1,7 +1,7 @@
 import type { FactsExtractionRecord, FactsPeopleRouting } from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger } from "../../extension/types"
-import { loadOnboardingScanRuntime } from "../onboarding/scan-component"
+import { loadOnboardingScanRuntime, onboardingRuntimeUnavailable } from "../onboarding/scan-runtime-loader"
 import type { MemoryIdentityContext } from "./context"
 import type { applyMemoryFacts } from "./facts-apply-runtime"
 import { resolveFactsPeopleRouting } from "./facts-batch-apply"
@@ -55,8 +55,10 @@ export function createSessionFactsApplier(deps: {
     let applyMemoryFacts: Awaited<ReturnType<typeof loadApply>>
     try {
       applyMemoryFacts = await loadApply()
-    } catch (error) {
-      return { kind: "unavailable", reason: `The memory apply runtime could not load: ${describe(error)}` }
+    } catch {
+      // no-excuse-ok: catch - the RPC boundary: any load failure answers unavailable. The reason reaches the desktop
+      // and, through onboarding_memory_apply, the model, so it is the fixed sentence (#15352).
+      return { kind: "unavailable", reason: onboardingRuntimeUnavailable() }
     }
     return applyMemoryFacts({
       context,
@@ -91,8 +93,4 @@ export function publishSessionFactsApplier(applier: MemoryFactsApplier | undefin
 
 export function sessionFactsApplier(): MemoryFactsApplier | undefined {
   return slot[APPLIER_KEY]
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { registerSyncRpc } from "./sync-rpc-registration"
+import { registerSyncRpcForTest } from "./sync-rpc-test-support"
 import type { SyncRpcContext, SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const verbs = ["enable", "pending", "approve", "status", "devices", "disable"] as const
@@ -41,7 +41,7 @@ function fixture() {
       return undefined
     },
   }
-  const coordinator = registerSyncRpc(
+  const coordinator = registerSyncRpcForTest(
     {
       handle: (name, handler) => {
         handlers.set(name, handler)

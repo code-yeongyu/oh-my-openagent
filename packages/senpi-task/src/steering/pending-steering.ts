@@ -7,10 +7,10 @@ import {
   HostSessionUnresponsiveError,
   SessionHeldElsewhereError,
 } from "../runners/rpc-host/session-wire"
+import { sendNotFound } from "./engine-policy"
 import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
-const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 // A drain re-reads the queue after each delivered batch, so a child whose deliveries keep queueing
 // more messages could drain forever. Each pass yields to the event loop (timers and teardown still
 // run), and a drain stops after this many passes. Nothing is stranded (#9861): a drain requested
@@ -24,7 +24,6 @@ const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(reso
 export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: string) => TaskRecord | undefined) {
   const draining = new Map<string, Promise<void>>()
   const requestedAgain = new Set<string>()
-  const nowIso = () => new Date(port.now()).toISOString()
 
   function enqueuePending(record: TaskRecord, message: string, deliverAs: SendDelivery): SendOutcome {
     let position = 0
@@ -46,9 +45,7 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       position = queue.length
       return { ...fresh, pending_steering: queue }
     })
-    if (updated === null) {
-      return { kind: "not_found", reason: `No task found for "${record.task_id}".`, suggestion: NOT_FOUND_SUGGESTION }
-    }
+    if (updated === null) return sendNotFound(record.task_id)
     if (position === 0) {
       return {
         kind: "not_continuable",
