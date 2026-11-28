@@ -1128,6 +1128,8 @@ async function openStore(agentDir) {
   // connection is read-write at the file level but `query_only`, so it can never write the store.
   const db = new sqlite.Database(path)
   db.exec("PRAGMA query_only = 1")
+  // Like the product's store readers (#14900): wait out a writer's transient lock instead of failing at once.
+  db.exec("PRAGMA busy_timeout = 5000")
   return db
 }
 
@@ -1292,6 +1294,14 @@ export async function awaitToolResult(fake, tool, from, { timeoutMs = 60_000, la
  * assertion (the receipt included) passed.
  */
 export async function runScenario(label, body, { patches = [], installName } = {}) {
+  // Scenarios run repo source in-process (the SDK, test senders), so workspace packages must resolve; without an
+  // install every such step fails on module resolution and reads like a product failure.
+  if (!existsSync(join(OMO_ROOT, "node_modules", "@oh-my-opencode", "omo-opencode"))) {
+    console.error(
+      `${label}: NOT RUN: no workspace install at ${OMO_ROOT}; run \`bun install --frozen-lockfile\` there first`,
+    )
+    process.exit(2)
+  }
   installCleanupHooks()
   const report = createReport(label)
   const evidence = evidenceDir(label)
