@@ -184,9 +184,12 @@ host.openWindow {
                 DispatchQueue.global().async {
                     let outcome = WebKitTempCleanup.run(bound: 20)
                     DispatchQueue.main.async {
-                        if case .failed(let reason) = outcome {
+                        switch outcome {
+                        case .failed(let reason):
                             FileHandle.standardError.write(Data("HERMETIC_CLEANUP_FAILED \(reason)\n".utf8))
                             exit(4)
+                        case .clean(let owned, let holders):
+                            FileHandle.standardError.write(Data("WEBKIT_HELPERS_WAITED owned=\(owned) holders=\(holders)\n".utf8))
                         }
                         NSApp.terminate(nil)
                     }

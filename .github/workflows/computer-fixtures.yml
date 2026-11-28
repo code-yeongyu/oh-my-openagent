@@ -1,8 +1,8 @@
 name: Computer conformance fixtures
 
 on:
-  # A pull request runs the macOS/Windows jobs only with ci:full-matrix (#13802), so the push run on dev is where
-  # they run for every merge; platform-red-tracker.yml watches it.
+  # A pull request runs the macOS/Windows jobs only when the shared platform decision (pr-platform-decision.yml)
+  # allows it, so the push run on dev is where they run for every merge; platform-red-tracker.yml watches it.
   push:
     branches: [master, dev]
     paths:
@@ -576,6 +576,16 @@ jobs:
       - name: Build with the image's swiftc
         id: build
         run: echo "binary=$(bash script/qa/computer/conformance/fixtures/webview-macos/build.sh "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      # The temp-folder cleanup must fail closed (delete nothing) when it cannot tell its own WebKit helpers apart;
+      # checked against a scratch directory passed as its argument (TMPDIR is left unset).
+      - name: Temp cleanup fails closed without the fixture's start time
+        shell: bash
+        run: |
+          here=script/qa/computer/conformance/fixtures/webview-macos
+          swiftc -swift-version 5 -O -warnings-as-errors -o "$RUNNER_TEMP/cleanup-check" "$here/cleanup-check/main.swift" "$here/webkit-temp-cleanup.swift"
+          scratch=$(mktemp -d "$RUNNER_TEMP/cleanup-check.XXXXXX")
+          "$RUNNER_TEMP/cleanup-check" "$scratch"
 
       # The a11y leg reads the AX tree of another process, which needs accessibility trust: build the
       # probe, ad-hoc sign it and grant it in TCC. A runner that refuses the grant makes the probe exit 3

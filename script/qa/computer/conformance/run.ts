@@ -4,6 +4,7 @@ import { join, resolve } from "node:path"
 
 import { catalogFor, SESSIONS } from "./catalog.ts"
 import { type Driver, isDriver } from "./driver.ts"
+import { type ObserverStatus, observerCheck } from "./observer.ts"
 import { type Check, executable, fakeStdio, preflight, type Probe, repoPath } from "./preflight.ts"
 import { buildReport, summaryLine } from "./report.ts"
 import { taskFailure } from "./taskset/judge.ts"
@@ -61,24 +62,39 @@ function parse(argv: readonly string[]): Options | string {
   }
 }
 
-function probes(options: Options, slot: DriverSlot): Probe[] {
+function probes(options: Options, slot: DriverSlot, observed: { check: Check }): Probe[] {
   const driverCheck: Probe = async () =>
     "driver" in slot
       ? { name: `driver-${options.driver}`, ok: true, detail: "cell runner present" }
       : { name: `driver-${options.driver}`, ok: false, detail: slot.unavailable }
-  const observer: Probe = async (): Promise<Check> =>
-    existsSync(SENTINEL)
-      ? { name: "desktop-observer", ok: true, detail: SENTINEL }
-      : { name: "desktop-observer", ok: false, detail: `${SENTINEL} (row 3) is not on this checkout` }
+  const observer: Probe = async () => observed.check
   if (options.driver === "legacy") return [driverCheck, observer]
   const engine = [executable(options.engine), fakeStdio(options.engine)]
   return options.os === "fake" ? [...engine, driverCheck] : [...engine, driverCheck, observer]
 }
 
-async function runCatalog(options: Options, driver: Driver): Promise<number> {
+function unobserved(result: CellResult, reason: string): CellResult {
+  const blind = { signal: "not_observed" as const, firstAt: null, count: 0 }
+  const journal = {
+    key_focus: blind,
+    window_raised: blind,
+    typing: blind,
+    pointer: blind,
+    clipboard: blind,
+    space: blind,
+    dialog: blind,
+    activation: blind,
+  }
+  return { ...result, journal, observerUnavailable: reason }
+}
+
+async function runCatalog(options: Options, driver: Driver, status: ObserverStatus): Promise<number> {
   const catalog = catalogFor(options.os, options.session)
   const results: CellResult[] = []
-  for (const cell of catalog) results.push(await driver.runCell(cell))
+  for (const cell of catalog) {
+    const result = await driver.runCell(cell)
+    results.push(status.kind === "unavailable" && options.os !== "fake" ? unobserved(result, status.reason) : result)
+  }
   const run = { schema: RUN_SCHEMA, driver: options.driver, os: options.os, session: options.session, results }
   writeFileSync(join(options.out, "run.json"), JSON.stringify(run, null, 2))
   const report = buildReport(catalog, results)
@@ -110,7 +126,8 @@ async function main(argv: readonly string[]): Promise<number> {
   mkdirSync(options.out, { recursive: true })
   rmSync(join(options.out, "run.json"), { force: true })
   const slot = await loadDriver(options.driver)
-  const environment = await preflight(options, probes(options, slot))
+  const observed = await observerCheck(SENTINEL, options.os)
+  const environment = await preflight(options, probes(options, slot, observed))
   writeFileSync(join(options.out, "environment.json"), JSON.stringify(environment, null, 2))
   if (environment.status === "ENVIRONMENT_ERROR" || !("driver" in slot)) {
     for (const check of environment.checks.filter((entry) => !entry.ok)) {
@@ -121,7 +138,9 @@ async function main(argv: readonly string[]): Promise<number> {
     )
     return 3
   }
-  return options.mode === "catalog" ? runCatalog(options, slot.driver) : runTaskset(options, slot.driver)
+  return options.mode === "catalog"
+    ? runCatalog(options, slot.driver, observed.status)
+    : runTaskset(options, slot.driver)
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)))
