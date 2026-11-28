@@ -1,27 +1,34 @@
-import { cp, lstat, mkdtemp, readdir, rename, rm } from "node:fs/promises"
+import { cp, lstat, mkdtemp, readdir, rename, rm, stat } from "node:fs/promises"
 import { join, relative, sep } from "node:path"
 
 // Codex fingerprints every plugin entry with symlink_metadata, including node_modules.
 // Hooks use component CLIs directly; third-party regular npm shims must remain.
 const NPM_BIN_PATH_SEGMENT = `${sep}node_modules${sep}.bin${sep}`
 
+// Classified by the path under the plugin root, so a CODEX_HOME that itself sits under node_modules/.bin keeps its payload.
+const isNpmBinEntry = (pluginRoot: string, path: string): boolean =>
+  `${sep}${relative(pluginRoot, path)}`.includes(NPM_BIN_PATH_SEGMENT)
+
 export async function finalizeCachedPluginPayload(pluginRoot: string): Promise<void> {
-  await materializeDirectory(pluginRoot)
+  await materializeDirectory(pluginRoot, pluginRoot)
   const unsupported = await unsupportedEntries(pluginRoot, pluginRoot)
-  if (unsupported.length > 0) {
-    throw new Error(`Codex plugin contains unsupported entry types: ${unsupported.sort().join(", ")}`)
-  }
+  if (unsupported.length > 0) throw unsupportedEntryError(unsupported)
 }
 
-async function materializeDirectory(directory: string): Promise<void> {
+const unsupportedEntryError = (paths: readonly string[]): Error =>
+  new Error(`Codex plugin contains unsupported entry types: ${[...paths].sort().join(", ")}`)
+
+async function materializeDirectory(pluginRoot: string, directory: string): Promise<void> {
   for (const name of await readdir(directory)) {
     const path = join(directory, name)
     let entry = await lstat(path)
-    if (path.includes(NPM_BIN_PATH_SEGMENT) && !entry.isFile() && !entry.isDirectory()) {
+    if (isNpmBinEntry(pluginRoot, path) && !entry.isFile() && !entry.isDirectory()) {
       await rm(path, { recursive: true, force: true })
       continue
     }
     if (entry.isSymbolicLink()) {
+      if ((await stat(path).catch(() => undefined)) === undefined)
+        throw unsupportedEntryError([relative(pluginRoot, path)])
       const staging = await mkdtemp(join(directory, ".omo-materialize-"))
       try {
         const copyPath = join(staging, "entry")
@@ -29,7 +36,7 @@ async function materializeDirectory(directory: string): Promise<void> {
           recursive: true,
           dereference: true,
           filter: async (source) => {
-            if (!source.includes(NPM_BIN_PATH_SEGMENT)) return true
+            if (!isNpmBinEntry(pluginRoot, source)) return true
             const sourceEntry = await lstat(source)
             return sourceEntry.isFile() || sourceEntry.isDirectory()
           },
@@ -41,7 +48,7 @@ async function materializeDirectory(directory: string): Promise<void> {
       }
       entry = await lstat(path)
     }
-    if (entry.isDirectory()) await materializeDirectory(path)
+    if (entry.isDirectory()) await materializeDirectory(pluginRoot, path)
   }
 }
 
