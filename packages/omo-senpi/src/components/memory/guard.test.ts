@@ -876,8 +876,12 @@ describe("memory guard pending checks across calls and sessions (#12466)", () =>
 
     await end(setup, "call-a")
 
-    expect(await finish(setup, "grep", setup.memoryRoot, "call-a")).toEqual([expect.objectContaining({ isError: true })])
-    expect(await finish(setup, "grep", setup.memoryRoot, "call-b")).toEqual([expect.objectContaining({ isError: true })])
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-a")).toEqual([
+      expect.objectContaining({ isError: true }),
+    ])
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-b")).toEqual([
+      expect.objectContaining({ isError: true }),
+    ])
   })
 
   test("#given a call whose end kept a deny #when the same toolCallId is retried after the identity is gone #then the retry is scanned afresh and passes", async () => {
@@ -901,7 +905,15 @@ describe("memory guard pending checks across calls and sessions (#12466)", () =>
 
     const other = await setup.pi.dispatch(
       "tool_result",
-      { type: "tool_result", toolCallId: "call-shared", toolName: "grep", input: { path: setup.memoryRoot }, content: [], details: {}, isError: false },
+      {
+        type: "tool_result",
+        toolCallId: "call-shared",
+        toolName: "grep",
+        input: { path: setup.memoryRoot },
+        content: [],
+        details: {},
+        isError: false,
+      },
       { sessionManager: { getSessionId: () => "session-2" } },
     )
 
