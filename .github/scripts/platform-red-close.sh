@@ -7,7 +7,8 @@
 # the run, hence the workflow, it belongs to. One issue can name jobs from several workflows (CI and Computer engine for
 # #14801), and a run of one workflow never contains another workflow's jobs, so each job is judged on the latest
 # completed dev push run of its OWN workflow in which that job concluded (success, failure, timed_out, action_required or
-# startup_failure). The issue closes only when, for every named job, that run:
+# startup_failure). A job that hit its own timeout-minutes reports cancelled with a check-run annotation naming the
+# exceeded time; that cancel counts as red (#14873). The issue closes only when, for every named job, that run:
 #   - ran the job's tests and it succeeded (platform-jobs.jq; a skipped-test leg proves nothing), and
 #   - is at or after the job's red commit, so a run that has not re-run since the red cannot close it.
 # Anything short of that leaves the issue open and says why in the step log.
@@ -65,6 +66,20 @@ while IFS=$'\t' read -r job red_run red_sha; do
     if [ -z "$candidate_result" ] && [ "$(cat "$jobs.total")" -gt 100 ]; then
       echo "#$issue tracks '$job', which is not among the first 100 of run $candidate's $(cat "$jobs.total") jobs; leaving it open."
       exit 0
+    fi
+    # A job cancelled by GitHub Actions because it hit its own timeout-minutes is reported cancelled, and the only
+    # distinguishing signal is its check-run annotation (#14873). That cancel is red; any other cancel is no evidence
+    # either way and is passed over for an older run.
+    if [ "$candidate_result" = cancelled ]; then
+      candidate_id="$(awk -F '\t' -v n="$job" '$1 == n && !found { print $5; found = 1 }' "$jobs")"
+      annotations="$OUT_DIR/annotations-$candidate_id"
+      if [ -n "$candidate_id" ]; then
+        gh api "repos/$GH_REPO/check-runs/$candidate_id/annotations" --paginate \
+          --jq '.[] | select(.message | contains("exceeded the maximum execution time")) | .message' > "$annotations"
+        if [ -s "$annotations" ]; then
+          candidate_result="timed_out"
+        fi
+      fi
     fi
     # A timed-out, approval-blocked or never-started job is red; only a run where the job did not conclude (cancelled,
     # skipped, neutral, still running, absent or without tests) is passed over for an older one.

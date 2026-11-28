@@ -36,6 +36,8 @@ interface TrackedWorkflow {
   readonly newer?: NewerOutcome
   // latestRun cancelled the tracked job, so no listed run concluded it.
   readonly latestCancelled?: boolean
+  // A cancelled job carries the check-run annotation naming its own exceeded time (#14873).
+  readonly newerTimeout?: boolean | "later-page"
 }
 
 type NewerOutcome =
@@ -130,6 +132,7 @@ function runClose(
                   name: each.job,
                   conclusion: each.newer === "none" ? null : each.newer,
                   html_url: `https://job/${newerRun}`,
+                  id: 1234,
                   labels: ["windows-latest"],
                   steps: [
                     {
@@ -140,12 +143,30 @@ function runClose(
                 },
               ],
       })
+    answer(
+      `repos/${REPO}/check-runs/1234/annotations`,
+      each.newerTimeout === true
+        ? [
+            {
+              message:
+                "The job running on agent windows-latest has exceeded the maximum execution time of 60 minutes, and execution was stopped. The operation was canceled.",
+            },
+          ]
+        : [{ message: "Canceling since a higher priority waiting request exists" }],
+    )
+    if (each.newerTimeout === "later-page") {
+      answer(`repos/${REPO}/check-runs/1234/annotations-page2`, [
+        { message: "The job has exceeded the maximum execution time of 1m0s" },
+        { message: "The operation was canceled." },
+      ])
+    }
     answer(`repos/${REPO}/actions/runs/${each.latestRun}/jobs?filter=latest&per_page=100`, {
       total_count: 1,
       jobs: [
         {
           name: each.job,
           conclusion: each.latestCancelled ? "cancelled" : each.tests === "failure" ? "failure" : "success",
+          id: 1234,
           html_url: `https://job/${each.latestRun}`,
           labels: ["windows-latest"],
           steps: [
@@ -171,7 +192,9 @@ function runClose(
       '  *"/runs?branch=dev"*) [ "$RUN_LIST" = error ] && { echo "gh: HTTP 502" >&2; exit 1; } ;;',
       "esac",
       'for ((i = 1; i <= $#; i++)); do [ "${!i}" = --jq ] && { j=$((i + 1)); filter="${!j}"; }; done',
-      'jq -r "$filter" "$FAKE_DIR/api/$(printf %s "$key" | tr -c "A-Za-z0-9" _)"',
+      'file="$FAKE_DIR/api/$(printf %s "$key" | tr -c "A-Za-z0-9" _)"',
+      'jq -r "$filter" "$file" || exit 1',
+      'if [[ " $* " == *" --paginate "* && -f "${file}_page2" ]]; then jq -r "$filter" "${file}_page2"; fi',
       "",
     ].join("\n"),
   )
@@ -229,6 +252,16 @@ describe("#given the newest completed dev push run did not conclude the tracked 
     "#when it was cancelled and the run before passed the job #then the issue is closed on that run",
     () => {
       expect(closed(runClose("newest-cancelled", [17], [ci({ newer: "cancelled" })]))).toBe(true)
+    },
+  )
+
+  // #14873: a cancel that names its own exceeded time is the job hitting timeout-minutes, not a supersede.
+  posixBashTest(
+    "#when its cancel carries the exceeded-time annotation and the run before passed #then the issue stays open",
+    () => {
+      expect(closed(runClose("newest-cancelled-timeout", [17], [ci({ newer: "cancelled", newerTimeout: true })]))).toBe(
+        false,
+      )
     },
   )
 
@@ -338,4 +371,8 @@ describe("#given no open platform-red issue", () => {
       "issue list --label ci:platform-red --state open --json number --jq map(.number) | min // empty",
     ])
   })
+})
+
+posixBashTest("a timeout annotation on a later page still prevents closure", () => {
+  expect(closed(runClose("later-timeout", [17], [ci({ newer: "cancelled", newerTimeout: "later-page" })]))).toBe(false)
 })

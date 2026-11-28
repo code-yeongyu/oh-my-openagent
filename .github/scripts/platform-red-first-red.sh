@@ -42,7 +42,7 @@ platform_jobs "$RUN_ID"
 earlier="$(gh api "repos/$GH_REPO/actions/workflows/$workflow_id/runs?branch=dev&event=push&status=completed&per_page=$lookback" \
   --jq ".workflow_runs[] | select(.created_at < \"$created_at\") | [.id, .head_sha, .html_url] | @tsv")"
 
-while IFS=$'\t' read -r name conclusion url labels; do
+cut -f1-4 "$cache/$RUN_ID" | while IFS=$'\t' read -r name conclusion url labels; do
   [ "$conclusion" = failure ] || continue
   first_sha="$run_sha" first_url="$run_url" green_sha="" gap=0
   while IFS=$'\t' read -r id sha html; do
@@ -64,4 +64,4 @@ while IFS=$'\t' read -r name conclusion url labels; do
     line="$line; green at the commit before (\`${green_sha:0:10}\`)"
   fi
   echo "$line" >> "$OUT_DIR/failed.md"
-done < "$cache/$RUN_ID"
+done
