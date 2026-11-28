@@ -221,7 +221,7 @@ test("a busy RPC owner that lists after 1.8 s is live to thread_list, send and s
   expect(target.runtime.enqueueCalls.map((call) => call.lane).sort()).toEqual(["followUp", "steer"])
 }, 15000)
 
-test("a published listener that never answers is not live to thread_list, send or steer, and nothing is delivered", async () => {
+test("a published listener that never answers is not live to thread_list; a send and a steer to it are refused host_unavailable, and nothing is stored or delivered", async () => {
   useTestTimeout(30000)
   const w = await world()
   const target = await w.owner("a")
@@ -229,8 +229,14 @@ test("a published listener that never answers is not live to thread_list, send o
   target.listing.answer = false
   const { listed, send, steer } = await listSendSteer(w, target)
   expect(listed === undefined || listed.state === "inactive").toBe(true)
-  expect(send).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
-  expect(steer).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
+  // Row 29: the owner's own socket did not answer within the listing budget, so its thread is unknown to a send.
+  const refused = {
+    kind: "error",
+    error: { code: "host_unavailable", details: { reason: "host_not_answering", thread: "target", retry: true } },
+  }
+  expect(send).toMatchObject(refused)
+  expect(steer).toMatchObject(refused)
+  expect(await w.store.list()).toHaveLength(0)
   expect(target.runtime.enqueueCalls).toHaveLength(0)
 }, 30000)
 
@@ -280,7 +286,7 @@ test("a slow reused socket with a different identity never receives the target's
   expect(w.discovery()).toBe(0)
 }, 15000)
 
-test("a terminal the engine reports live_unresponsive lists unknown, naming it as the host that did not answer, inside the verdict window; a send stays offline and nothing is admitted", async () => {
+test("a terminal the engine reports live_unresponsive lists unknown, naming it as the host that did not answer, inside the verdict window; a send and a steer to it are refused host_unavailable and nothing is stored or admitted", async () => {
   useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a", undefined, "target", true)
@@ -315,8 +321,14 @@ test("a terminal the engine reports live_unresponsive lists unknown, naming it a
   }
   expect(before).toMatchObject(unanswered)
   expect(after).toMatchObject(unanswered)
-  expect(send).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
-  expect(steer).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
+  // Row 29: the published owner's own socket did not answer, so the send path refuses as the listing reads it.
+  const refused = {
+    kind: "error",
+    error: { code: "host_unavailable", details: { reason: "host_not_answering", thread: "target", retry: true } },
+  }
+  expect(send).toMatchObject(refused)
+  expect(steer).toMatchObject(refused)
+  expect(await w.store.list()).toHaveLength(0)
   expect(target.runtime.enqueueCalls).toHaveLength(0)
   // The verdict stands: a terminal the engine reported not answering is never re-dialed inside the window, even to send.
   expect(target.frames.filter((frame) => frame === "list_sessions")).toHaveLength(0)

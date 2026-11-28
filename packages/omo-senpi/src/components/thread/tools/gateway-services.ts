@@ -71,7 +71,7 @@ export function createGatewayServices(
   // The SDK and tools send through a fresh `list_sessions` on only the target's socket (#9222's
   // single-lookup rule); the extension path shares the plain live-and-disk resolver (no store).
   const resolve: GatewayResolve = async (address, request) => {
-    const current = await sendView(options, address, view)
+    const { view: current, owner } = await sendView(options, address, view)
     const book = sendAddressBook(options, current, address, request.all_scope)
     return refuseUnanswered(
       book,
@@ -79,6 +79,7 @@ export function createGatewayServices(
         () => toGatewayAddressEntries(withOwnerRefusal(book, current, address)),
         options.callerWorkspaceRoot,
       )(address, request),
+      owner,
     )
   }
   const store = options.store
