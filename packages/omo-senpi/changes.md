@@ -1,3 +1,23 @@
+## 2026-11-27 - The DAG runtime takes a run only through the shared acquisition and reservation (#15125)
+
+`ensureScheduled` (`dag-scheduler-registry.ts`) acquires a run only while it is still `pending` and builds the scheduler from the acquired record; a `running` run it does not hold goes to recovery. One reservation per run is shared by every entry and held for its whole operation: recovery from claim until adoption, retry, send, amend, guidance and node cancel (`dag-runtime-controls.ts`, refusing a reserved run with `run_busy`), cancel (`dag-run-cancel.ts`: it reserves first, waiting if needed, and only then decides whether there is anything to cancel), the user Stop (from retirement through its pause write, `dag-runtime-pause-wiring.ts`), the Resume's guidance dispatch, and the committed shutdown (every run it retires or pauses, `dag-runtime-shutdown.ts`). `pauseForShutdown` also closes recovery and lease watches first (`dag-recovery-sweeps.ts`). Only a running or installed scheduler means the runtime holds a run (`holdsRun`), and control verbs build no scheduler for a run it does not hold.
+
+## 2026-11-27 - Workflow recovery asks the lifecycle about pending revivals (#15150)
+
+The runtime's workflow recovery (`dag-runtime-recovery.ts`, split out of `dag-runtime.ts`) receives the engine lifecycle's `pendingRevivals`. The DAG widget row and the workflow tool's snapshot and detach text name a node whose unfinished child is suspended as waiting for its child to be revived (`dag-quiet-nodes.ts`).
+
+## 2026-11-27 - ps-lstart start identity is read in UTC under its own scheme (#15260)
+
+On darwin/freebsd without `bun:ffi` (a Node runtime), the memory-core process-start identity falls back to `ps -o lstart=`, which prints local time in the reader's timezone and locale. Two processes with different `TZ` (or `LC_ALL`) settings read the same pid as the same scheme with different bytes, `startIdentitiesConflict` counted that as pid reuse, and a live owner read as dead, breaking memory-core stale-lock recovery and the memory run-liveness check. `readPsLstartIdentity` now runs `ps` with `TZ=UTC`, `LC_ALL=C` and `LANG=C` through an injected exec seam and records `ps-lstart-utc:`; a record an older reader wrote as `ps-lstart:` is judged against it by the zone bound (`legacyPsLstartConflict`): any real offset that maps it onto the live start keeps the owner, so a mixed-version upgrade never steals a live lock, and a wall time no offset can reach proves the pid was reused, so a legacy lock does not survive a reused pid. An unreadable legacy rendering (another locale) keeps its owner. The bundled extensions and the omo-native reflection-lock and service-auth bundles are regenerated. Covered by `process-identity.ps-lstart.test.ts`, which reads the same live pid with the real `/bin/ps` under two timezones and against a legacy local-time record, checks that the `ps` stand-in is called with both `TZ=UTC` and `LC_ALL=C`, and tables the legacy-record cases on both sides of the zone bound. Supersedes #12531.
+
+## 2026-11-26 - github skill ships as a built-in (#15060)
+
+The plugin ships the shared `github` skill (29 skills), and its telemetry skill-name list includes it.
+
+## 2026-11-13 - v3 X11 capture, monitors, displays and the Linux live driver (#13354)
+
+`omo-computer-backend-x11`: `capture/window.rs` reads a redirected window pixmap (Composite) instead of cropping the root, `capture/mod.rs` blends the XFixes cursor image in device pixels, `monitors.rs` derives the scale from `Xft.dpi` (no constant 1.0), and `displays.rs` ids no longer come from the name atom. Core `FrameBytes` gains optional `route`, `occluders_visible` and `cursor`; `Reason::NoDisplayServer` maps to `Unavailable`, `not_delivered/after_user`, recovery `ask_user`, next call `computer.diagnose`. The engine adds one `cfg(target_os = "linux")` route arm. `script/qa/computer/linux.ts` runs the `xvfb`, `xvfb-nobus`, `none` and `xorg` sessions and the `xft-dpi-scale`, `occluder-oracle` and `no-display` scenarios.
+
 ## 2026-11-26 - What requesting `ulw` changes (#14870)
 
 In both Senpi variants, requesting `ulw` asks the agent to read even indirectly related skills and consult every source that may bear on the task before planning. The agent registers each edit and check as a separate todo. For work that changes the repository, `ulw` explicitly requests a local commit per verified increment unless the user says not to commit. LIGHT and HEAVY size the proof, not the initial investigation.
