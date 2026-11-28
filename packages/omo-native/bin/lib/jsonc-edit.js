@@ -8,6 +8,13 @@
 import { isDeepStrictEqual } from "node:util"
 import { parseJsonc } from "./jsonc.js"
 
+/**
+ * A document `insertJsoncMember` declines to edit, for a reason it states itself. The message is
+ * built from key paths and fixed words only, never from the document's values, so a caller may
+ * show it (unlike a parser's error, which can quote the text).
+ */
+export class JsoncEditRefusal extends Error {}
+
 function skipBlank(text, index) {
   while (index < text.length) {
     if (/[\s\uFEFF]/.test(text[index])) index += 1
@@ -124,23 +131,24 @@ function setIn(document, path, key, value) {
  */
 export function insertJsoncMember(text, path, key, value) {
   const start = skipBlank(text, 0)
-  if (text[start] !== "{") throw new SyntaxError("the document is not an object")
+  if (text[start] !== "{") throw new JsoncEditRefusal("the document is not an object")
   let node = scanObject(text, start).object
   let depth = 0
   for (; depth < path.length; depth += 1) {
     const member = node.members.find((candidate) => candidate.key === path[depth])
     if (member === undefined) break
-    if (member.object === undefined) throw new TypeError(`${path.slice(0, depth + 1).join(".")} is not an object`)
+    if (member.object === undefined)
+      throw new JsoncEditRefusal(`${path.slice(0, depth + 1).join(".")} is not an object`)
     node = member.object
   }
   if (depth === path.length && node.members.some((member) => member.key === key))
-    throw new TypeError(`${[...path, key].join(".")} already exists`)
+    throw new JsoncEditRefusal(`${[...path, key].join(".")} already exists`)
   const next =
     depth === path.length
       ? insertInto(text, node, key, value)
       : insertInto(text, node, path[depth], nest(path.slice(depth + 1), key, value))
   if (!isDeepStrictEqual(parseJsonc(next), setIn(parseJsonc(text), path, key, value))) {
-    throw new SyntaxError("the edited document does not parse back to the intended value")
+    throw new JsoncEditRefusal("the edited document does not parse back to the intended value")
   }
   return next
 }
