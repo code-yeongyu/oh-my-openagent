@@ -95,8 +95,9 @@ describe("root test CI partition", () => {
     expect(matrix).toContain("- os: windows-latest")
     expect(matrix).not.toContain("- os: ubuntu-latest")
     expect(matrix).not.toContain("- os: macos-latest")
-    expect(matrix).toContain('shard: "1/2"')
-    expect(matrix).toContain('shard: "2/2"')
+    expect(matrix).toContain('shard: "1/3"')
+    expect(matrix).toContain('shard: "2/3"')
+    expect(matrix).toContain('shard: "3/3"')
     expect(matrix).not.toContain("config:")
     expect(matrix).not.toContain("test_args:")
     expect(matrix).not.toContain("parallel_args:")
@@ -113,7 +114,10 @@ describe("root test CI partition", () => {
 
     expect(job).toContain('-TestArguments @("test", "packages/omo-opencode", "packages/memory-core")')
     expect(linuxTestJobs()).toContain("run: bun test --timeout 20000 packages/omo-opencode\n")
-    expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")')
+    expect(job).toContain(
+      '-TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel", "./script", "packages/device-service-core", "packages/omo-codex")',
+    )
+    expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows.rest.toml", "test", "--parallel")')
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
     expect(existsSync(win2WindowsParallelConfigPath)).toBe(true)
@@ -230,10 +234,10 @@ describe("root test CI partition", () => {
     const runBlock = job.slice(job.indexOf("      - name: Run tests"))
 
     expect(runBlock).toContain(
-      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2'",
+      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/3'",
     )
     expect(runBlock).toContain(
-      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2'",
+      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/3'",
     )
     expect(runBlock).not.toContain("shell: bash\n        run: |")
     expect(job).toContain("timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}")
@@ -280,11 +284,13 @@ describe("root test CI partition", () => {
   test("#given both Windows shards #when root tests run #then telemetry wraps every Bun invocation", () => {
     const job = rootTestJob()
 
-    expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(4)
+    expect([...job.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)]).toHaveLength(5)
     expect(job).toContain('-Invocation "shard-1"')
     expect(job).toContain('-Invocation "shard-2-quarantine"')
     expect(job).toContain('-Invocation "shard-2-rpc-host"')
-    expect(job).toContain('-Invocation "shard-2-remainder"')
+    expect(job).toContain('-Invocation "shard-2-remainder-a"')
+    expect(job).toContain('-Invocation "shard-2-remainder-b"')
+    expect(job).not.toContain('-Invocation "shard-2-remainder"')
     expect(job).toContain("WINDOWS_TEST_SHARD: ${{ matrix.shard }}")
   })
 

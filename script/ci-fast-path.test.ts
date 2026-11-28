@@ -201,8 +201,9 @@ describe("CI fast-path workflow wiring", () => {
     expect(gate["permissions"]).toEqual({ contents: "read", "pull-requests": "read" })
     contexts.push(String(gate["name"]))
     for (const required of [
-      "test (windows-latest, 1/2)",
-      "test (windows-latest, 2/2)",
+      "test (windows-latest, 1/3)",
+      "test (windows-latest, 2/3)",
+      "test (windows-latest, 3/3)",
       "test (ubuntu-latest, 1/2)",
       "test (ubuntu-latest, 2/2)",
       "test (macos-latest, 1/2)",

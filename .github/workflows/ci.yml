@@ -266,9 +266,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            shard: "1/2"
+            shard: "1/3"
           - os: windows-latest
-            shard: "2/2"
+            shard: "2/3"
+          - os: windows-latest
+            shard: "3/3"
     steps:
       - uses: actions/checkout@v7
 
@@ -333,7 +335,7 @@ jobs:
       # the four test-linux parts below.
       - name: Run tests with Windows telemetry
         id: root-tests-windows-1
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/3' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
@@ -353,7 +355,7 @@ jobs:
       # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
         id: root-tests-windows-2
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/3' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
@@ -373,10 +375,27 @@ jobs:
             -Invocation "shard-2-rpc-host" `
             -TestArguments @("script/bun-panic-retry.ts", "--config=bunfig.win2.parallel.toml", "test", "--parallel", "./packages/senpi-task/src/runners/rpc-host")
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # #15096: the old single remainder (34 min wall) is split by measured per-file junit time.
+          # Part A carries ./script plus the smaller packages; shard 3/3 runs the rest.
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
-            -Invocation "shard-2-remainder" `
-            -TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")
+            -Invocation "shard-2-remainder-a" `
+            -TestArguments @("--config=bunfig.win2.parallel.toml", "test", "--parallel", "./script", "packages/device-service-core", "packages/omo-codex")
+          exit $LASTEXITCODE
+
+      # #15096: shard 2/3's remainder part B — everything the old remainder ran that part A does not.
+      - name: Run tests
+        id: root-tests-windows-3
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '3/3' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: ${{ matrix.shard }}
+        run: |
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-2-remainder-b" `
+            -TestArguments @("--config=bunfig.win2.parallel.windows.rest.toml", "test", "--parallel")
           exit $LASTEXITCODE
 
       - name: Upload Windows post-test telemetry
@@ -384,7 +403,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
+          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/3' && 'shard-1' || (matrix.shard == '2/3' && 'shard-2' || 'shard-3') }}
           path: |
             ${{ runner.temp }}/windows-root-test-telemetry/*.json
             ${{ runner.temp }}/windows-root-test-telemetry/*.junit.xml
@@ -394,7 +413,7 @@ jobs:
       # #10821: keep the evidence of any git that timed out: the recorded process tables and the
       # trace2 logs of every git that never reached its exit event (killed or still stuck).
       - name: Collect timed-out git evidence
-        if: always() && runner.os == 'Windows' && matrix.shard == '1/2' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: always() && runner.os == 'Windows' && matrix.shard == '1/3' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         continue-on-error: true
         shell: pwsh
         run: |
@@ -418,7 +437,7 @@ jobs:
           }
 
       - name: Upload timed-out git evidence
-        if: always() && runner.os == 'Windows' && matrix.shard == '1/2' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: always() && runner.os == 'Windows' && matrix.shard == '1/3' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
@@ -434,7 +453,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ job.status }}
-          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-windows-2.outcome }}
+          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-windows-2.outcome }} ${{ steps.root-tests-windows-3.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
         run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
@@ -448,7 +467,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs all non-Senpi root tests on Windows sharded two ways: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine first and then the remainder with `--parallel`.
+            - Runs all non-Senpi root tests on Windows sharded three ways: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine, the rpc-host suite and remainder part A (`./script` + the smaller packages), shard 3 runs the rest of the remainder with `--parallel`.
             - Splits by the same package groups as the Linux parts so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
