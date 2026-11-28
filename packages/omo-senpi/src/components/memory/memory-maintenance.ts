@@ -222,6 +222,13 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
                 looseObjectsBefore: result.looseObjectsBefore,
                 looseObjectsAfter: result.looseObjectsAfter,
               })
+            } else if (result.packsBefore !== result.packsAfter) {
+              // The pack fold ran (#15139): a long-lived sync repo's transfer packs are gone.
+              options.logger?.info("omo-senpi memory repo packs folded", {
+                identity: context.identity,
+                packsBefore: result.packsBefore,
+                packsAfter: result.packsAfter,
+              })
             }
           }
           if (await retentionDue(context, repo)) await retain(context, repo, signal)

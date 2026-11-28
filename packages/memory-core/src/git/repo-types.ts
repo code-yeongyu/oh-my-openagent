@@ -77,7 +77,12 @@ export interface GitMaintenanceOptions {
 }
 
 export type GitMaintenanceResult =
-  | { readonly status: "skipped"; readonly looseObjects: number }
+  | {
+      readonly status: "skipped"
+      readonly looseObjects: number
+      readonly packsBefore: number
+      readonly packsAfter: number
+    }
   | { readonly status: "packed"; readonly looseObjectsBefore: number; readonly looseObjectsAfter: number }
 
 export interface GitTreeSizedEntry {

@@ -169,6 +169,7 @@ describe("/doctor", () => {
 
     // then
     expect(text).toContain("[ok] repository")
+    expect(text).toMatch(/git packs: \d+/)
     expect(text).toContain("[ok] frontmatter")
     expect(text).toContain("[ok] locks")
     expect(text).toContain("[ok] worktrees")

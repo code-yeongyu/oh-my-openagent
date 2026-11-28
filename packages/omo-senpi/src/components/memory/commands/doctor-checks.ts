@@ -70,7 +70,7 @@ async function listMarkdown(root: string, prefix: string): Promise<string[]> {
   return files
 }
 
-export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {
+export async function checkRepository(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): Promise<DoctorCheck> {
   if (!existsSync(join(identity.identityPaths.repo, ".git"))) {
     return {
       name: "repository",
@@ -78,7 +78,12 @@ export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {
       detail: `missing at ${identity.identityPaths.repo}; run /memfs init to create it`,
     }
   }
-  return { name: "repository", level: "ok", detail: identity.identityPaths.repo }
+  const repo = identity.identityPaths.repo
+  const counts = await runGit(deps, repo, ["count-objects", "-v"])
+  const packs = /^packs: (\d+)$/m.exec(counts.stdout)?.[1]
+  return counts.code === 0 && packs !== undefined
+    ? { name: "repository", level: "ok", detail: `${repo} (git packs: ${packs})` }
+    : { name: "repository", level: "ok", detail: `${repo} (git pack count unavailable)` }
 }
 
 export async function checkFrontmatter(repoDir: string, audit?: MemoryAuditReport): Promise<DoctorCheck[]> {

@@ -101,7 +101,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       : []
 
   const repoDir = identity.identityPaths.repo
-  const repository = checkRepository(identity)
+  const repository = await checkRepository(deps, identity)
   const checks: DoctorCheck[] = [repository]
   const extra: string[] = fixLines.map((line) => `[fix] ${line}`)
   let audit: MemoryAuditReport | null = null
