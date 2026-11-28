@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { ONBOARDING_SCAN_RUNTIME_FILE } from "./scan-component"
 import { createOnboardingMemoryTools } from "./tui-memory-tools"
 
 describe("TUI onboarding memory tools: lazy runtime", () => {
@@ -24,7 +25,7 @@ describe("TUI onboarding memory tools: lazy runtime", () => {
     const tools = createOnboardingMemoryTools({
       scan: async () => undefined,
       loadRuntime: async () => {
-        throw new Error("Cannot find module '/home/SYNTH-USER/plugin/extensions/omo-onboarding-scan.js'")
+        throw new Error("Cannot find package 'x' imported from '/home/SYNTH-USER/plugin/extensions/omo.js'")
       },
     })
 
@@ -32,7 +33,8 @@ describe("TUI onboarding memory tools: lazy runtime", () => {
 
     expect(unavailable.isError).toBe(true)
     expect(unavailable.content).toEqual([
-      { type: "text", text: "The onboarding runtime could not load; continue with the scan rows only." },
+      { type: "text", text: expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`) },
     ])
+    expect(JSON.stringify(unavailable.content)).not.toContain("SYNTH-USER")
   })
 })

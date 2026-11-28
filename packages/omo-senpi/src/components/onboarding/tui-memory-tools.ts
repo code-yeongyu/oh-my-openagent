@@ -2,6 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static, Type } from "typebox"
 
 import { sessionFactsApplier, type MemoryFactsApplyResponse } from "../memory/facts-apply-rpc"
+import { onboardingRuntimeUnavailable } from "./scan-component"
 import type { SessionDigest } from "./session-history"
 import type { OnboardingFactCandidate } from "./understand-contract"
 import type { OnboardingUnderstandingSeams } from "./understand-start"
@@ -66,8 +67,7 @@ export function createOnboardingMemoryTools(options: TuiMemoryToolsOptions): {
     try {
       return await options.loadRuntime()
     } catch {
-      // This text reaches the model, and the import error names local paths (#15352).
-      return "The onboarding runtime could not load; continue with the scan rows only."
+      return `${onboardingRuntimeUnavailable()} Continue with the scan rows only.`
     }
   }
 

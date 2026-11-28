@@ -130,9 +130,11 @@ describe("onboarding session archaeology runs through the engine session-history
     // when
     const result = await tool.execute("call-3", {}, undefined, undefined, {} as never)
 
-    // then
+    // then: the failure kind, never the runtime's own text for it
+    const text = result.content.map((part) => (part.type === "text" ? part.text : "")).join("")
     expect(result.isError).toBe(true)
-    expect(result.content).toEqual([{ type: "text", text: "The session history scan failed: EISDIR" }])
+    expect(text).toContain("EISDIR")
+    expect(text).not.toContain("illegal operation")
   })
 
   // Tool-name contract: the runtime dispatches on the name lane 3 tells the agent to call.

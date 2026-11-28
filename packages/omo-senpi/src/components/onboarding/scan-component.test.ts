@@ -19,6 +19,7 @@ import {
   createOnboardingScanComponent,
   createOnboardingScanStore,
   loadOnboardingScanRuntime,
+  ONBOARDING_SCAN_RUNTIME_FILE,
   type OnboardingApplyResponse,
   type OnboardingScanEvent,
   type OnboardingScanResponse,
@@ -154,9 +155,9 @@ function fakeHost() {
   return { pi, handlers, events, modelAccess, scan, apply, waitForDone: doneOf, dispatchEvent: api.dispatchEvent }
 }
 
-/** A load failure as the runtime import reports it: an absolute path under the user's home. */
+/** A load failure as the runtime import reports it: an absolute path under the user's home, not the sidecar's name. */
 async function missingRuntime(): Promise<OnboardingScanRuntime> {
-  throw new Error(`Cannot find module '/home/${SECRET}/plugin/extensions/omo-onboarding-scan.js'`)
+  throw new Error(`Cannot find package 'x' imported from '/home/${SECRET}/plugin/extensions/omo.js'`)
 }
 
 interface RegisterOptions {
@@ -420,7 +421,11 @@ describe("onboarding scan RPC", () => {
   // #15352: a scan that cannot run still ends with `done`, and its reason comes from a fixed vocabulary:
   // the error's own text names local paths and can quote what the scan read.
   test.each([
-    ["the onboarding runtime cannot load", missingRuntime, "The onboarding runtime could not load."],
+    [
+      "the onboarding runtime cannot load",
+      missingRuntime,
+      expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`),
+    ],
     [
       "the scan rejects",
       async (): Promise<OnboardingScanRuntime> => ({
@@ -446,17 +451,6 @@ describe("onboarding scan RPC", () => {
       expect(JSON.stringify(events)).not.toContain(SECRET)
     },
   )
-
-  test("#given the onboarding runtime cannot load #when understanding is requested #then it answers unavailable without the load error's text", async () => {
-    // given
-    const host = register(emptyProfile(), { loadRuntime: missingRuntime })
-
-    // when
-    const reply = await host.handlers.get(ONBOARDING_UNDERSTAND_RPC_METHOD)?.({ scanId: "scan", consent: true })
-
-    // then
-    expect(reply).toEqual({ kind: "unavailable", reason: "The onboarding runtime could not load." })
-  })
 
   test("#given a scan id the engine does not hold #when apply runs #then it answers unavailable and writes nothing", async () => {
     const profile = openCodeProfile()

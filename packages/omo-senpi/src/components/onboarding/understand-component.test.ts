@@ -8,6 +8,7 @@ import {
   ONBOARDING_APPLY_RPC_METHOD,
   ONBOARDING_SCAN_RPC_EVENT,
   ONBOARDING_SCAN_RPC_METHOD,
+  ONBOARDING_SCAN_RUNTIME_FILE,
   ONBOARDING_SCAN_TTL_MS,
   createOnboardingScanComponent,
   createOnboardingScanStore,
@@ -344,7 +345,8 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     expect(rpc.starts).toHaveLength(0)
   })
 
-  test("#given the onboarding runtime fails to load #when understanding is requested #then it answers unavailable with the reason and no model runs", async () => {
+  // #15352: the reason names the missing sidecar and the remedy; the import error itself names local paths.
+  test("#given the onboarding runtime fails to load #when understanding is requested #then it answers unavailable naming the sidecar, never the import error, and no model runs", async () => {
     // given
     const { environment } = await profile()
     let loads = 0
@@ -353,7 +355,8 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
       turn: async () => "completed",
       loadRuntime: async () => {
         loads += 1
-        if (loads > 1) throw new Error("omo-onboarding-scan.js is missing")
+        if (loads > 1)
+          throw new Error("Cannot find package 'x' imported from '/home/SYNTH-USER/plugin/extensions/omo.js'")
         return await loadOnboardingScanRuntime()
       },
     })
@@ -369,8 +372,9 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     // then
     expect(response).toEqual({
       kind: "unavailable",
-      reason: expect.stringContaining("omo-onboarding-scan.js is missing"),
+      reason: expect.stringContaining(`extensions/${ONBOARDING_SCAN_RUNTIME_FILE}`),
     })
+    expect(JSON.stringify(response)).not.toContain("SYNTH-USER")
     expect(rpc.starts).toHaveLength(0)
   })
 

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveMemoryModelRegistry, type ChildModelRegistry } from "../memory/model-registry-resolver"
+import { reinstallStep } from "../reinstall/reinstall-step"
 import {
   ONBOARDING_APPLY_RPC_METHOD,
   ONBOARDING_APPLY_STAGES,
@@ -44,8 +45,16 @@ declare const OMO_SENPI_BUNDLED: boolean
 export const ONBOARDING_SCAN_RUNTIME_FILE = "omo-onboarding-scan.js"
 /** Finished scans an apply can still use; older ones answer `unavailable`. */
 const RETAINED_SCANS = 8
-/** The reason a client gets when the lazy runtime does not load; the import error names local paths (#15352). */
-const RUNTIME_UNAVAILABLE = "The onboarding runtime could not load."
+
+/**
+ * Why the lazy onboarding runtime is unavailable: the missing artifact and the remedy, from fixed words. The import
+ * error is never shown, because it names local paths (#15352); clients and the model read this text.
+ * The artifact is spelled out instead of reusing ONBOARDING_SCAN_RUNTIME_FILE: a single use lets the bundler inline
+ * that name into `new URL(...)` below, which is how the dead-file check sees the sidecar as reachable.
+ */
+export function onboardingRuntimeUnavailable(): string {
+  return `The onboarding runtime (extensions/omo-onboarding-scan.js) could not load. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
+}
 /** A scan describes the machine only briefly; after this, an apply answers stale instead of writing. */
 export const ONBOARDING_SCAN_TTL_MS = 10 * 60_000
 
@@ -157,7 +166,7 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
           return await pending
         } catch {
           if (understandingHandlers === pending) understandingHandlers = undefined
-          return RUNTIME_UNAVAILABLE
+          return onboardingRuntimeUnavailable()
         }
       }
       const understandingDeps: Parameters<typeof createOnboardingUnderstandingHandlers>[1] = {
@@ -220,7 +229,7 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
               return fail(describeReadFailure(error))
             }
           },
-          () => fail(RUNTIME_UNAVAILABLE),
+          () => fail(onboardingRuntimeUnavailable()),
         )
         scans.set(scanId, held)
         for (const [id, entry] of scans) {
