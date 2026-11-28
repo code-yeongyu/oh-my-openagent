@@ -28,6 +28,12 @@ export { createDelegateTask } from "./delegate-task"
 export { createTaskCreateTool, createTaskGetTool, createTaskList, createTaskUpdateTool } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
 export { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
+export {
+  createSecurityMissionStartTool,
+  createSecurityFindingAddTool,
+  createSecurityFindingVerifyTool,
+  createSecurityMissionReportTool,
+} from "./security-mission"
 
 export function createBackgroundTools(
   manager: BackgroundManager,
