@@ -7,6 +7,8 @@ export interface R2Store {
   stream(key: string): ReadableStream<Uint8Array>
   readText(key: string): Promise<string | null>
   write(key: string, body: string, contentType: string): Promise<void>
+  /** One PUT attempt, no retry: for callers that must re-check state before every attempt. */
+  writeOnce(key: string, body: string, contentType: string): Promise<void>
   listReleaseVersions(): Promise<string[]>
   deletePrefix(prefix: string): Promise<void>
   countObjects(prefix: string): Promise<number>
@@ -38,18 +40,21 @@ export function createR2Store(credentials: R2Credentials, prefix: string): R2Sto
     return keys
   }
 
+  async function writeOnce(key: string, body: string, contentType: string): Promise<void> {
+    const file = new Blob([body], { type: contentType })
+    const hash = new Bun.CryptoHasher("sha256").update(body).digest("hex")
+    await putVerified(credentials, full(key), file, hash, { "content-type": contentType })
+  }
+
   return {
     exists: (key) => client.exists(full(key)),
     stream: (key) => client.file(full(key)).stream(),
     async readText(key) {
       return (await client.exists(full(key))) ? client.file(full(key)).text() : null
     },
+    writeOnce,
     async write(key, body, contentType) {
-      const file = new Blob([body], { type: contentType })
-      const hash = new Bun.CryptoHasher("sha256").update(body).digest("hex")
-      await withRetry(`write ${full(key)}`, () =>
-        putVerified(credentials, full(key), file, hash, { "content-type": contentType }),
-      )
+      await withRetry(`write ${full(key)}`, () => writeOnce(key, body, contentType))
     },
     async listReleaseVersions() {
       const versions = new Set<string>()
