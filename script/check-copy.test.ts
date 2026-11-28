@@ -116,6 +116,13 @@ describe("no-em-dash-copy", () => {
     expect(findEmDashCopy(data, path)).toEqual([])
     expect(findEmDashCopy(`${data}\nconsole.log("Unavailable \\u2014 retry");`, path)).toHaveLength(1)
   })
+
+  test("allows the oracle's banned-opener data but checks other copy in that file", () => {
+    const path = "packages/omo-opencode/src/agents/oracle.ts"
+    const data = 'Never open with filler: "Great question!", "Done \\u2014", "Got it".'
+    expect(findEmDashCopy(data, path)).toEqual([])
+    expect(findEmDashCopy(`${data}\nconsole.log("Unavailable \\u2014 retry");`, path)).toHaveLength(1)
+  })
 })
 
 describe("require-suppression-reason", () => {

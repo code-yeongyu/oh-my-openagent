@@ -18,6 +18,8 @@ const SENPI_SYNC_HEADING_MATCHERS = new Set([
   "## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER",
   "## ABSOLUTE RULE (root session): YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER",
 ])
+// The oracle's output-verbosity directive quotes the banned "Done —" opener as data.
+const ORACLE_BANNED_OPENER = "Done \u2014"
 
 export function isProductSource(path: string): boolean {
   return (
@@ -49,6 +51,15 @@ export function findEmDashCopy(content: string, path: string): { line: number; c
       path === "packages/omo-senpi/plugin/scripts/sync-skills.mjs" &&
       ts.isStringLiteralLike(node) &&
       SENPI_SYNC_HEADING_MATCHERS.has(node.text)
+    )
+      return
+    if (
+      path === "packages/omo-opencode/src/agents/oracle.ts" &&
+      (ts.isStringLiteralLike(node) ||
+        ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) ||
+        ts.isTemplateTail(node)) &&
+      node.text.includes(ORACLE_BANNED_OPENER)
     )
       return
     if (
