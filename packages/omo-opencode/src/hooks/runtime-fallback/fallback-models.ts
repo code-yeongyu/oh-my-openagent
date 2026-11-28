@@ -3,6 +3,7 @@ import type { FallbackModelObject } from "../../config/schema/fallback-models"
 import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { getDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
@@ -43,6 +44,10 @@ function getRawFallbackModelsForSession(
   agent: string | undefined,
   pluginConfig: OhMyOpenCodeConfig,
 ): (string | FallbackModelObject)[] | undefined {
+  if (ProviderPinRegistry.has(sessionID)) {
+    log(`[${HOOK_NAME}] Session is pinned to a provider; no fallback models`, { sessionID })
+    return []
+  }
   const sessionCategory = SessionCategoryRegistry.get(sessionID)
   const categoryConfig = sessionCategory ? pluginConfig.categories?.[sessionCategory] : undefined
   const agentKey = agent ? getAgentConfigKey(agent) : undefined

@@ -1,5 +1,7 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
-import { LOOK_AT_DESCRIPTION } from "./constants"
+import { MODEL_PROVIDERS, type ProviderModelsConfig } from "../../config/schema/provider-models"
+import { hasProviderModelPins, parseProviderArgument, resolveProviderModelPin } from "../../shared/provider-model-pin"
+import { LOOK_AT_DESCRIPTION, LOOK_AT_PROVIDER_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log } from "../../shared"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
@@ -10,10 +12,28 @@ import { getMissingLookAtFilePath } from "./missing-file-error"
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
-export function createLookAt(ctx: PluginInput): ToolDefinition {
+export type LookAtOptions = {
+  /** `provider_models` at tool creation: present pin sets expose the `provider` argument. */
+  readonly providerModels?: ProviderModelsConfig
+  /** Reload `provider_models` per call so config edits apply without rebuilding tools. */
+  readonly loadProviderModels?: () => ProviderModelsConfig | undefined
+}
+
+const providerArgSchema = {
+  provider: tool.schema
+    .enum(MODEL_PROVIDERS)
+    .optional()
+    .describe(
+      "Run multimodal-looker on this provider's configured pin, bypassing default model routing. Fails when that provider has no multimodal-looker pin. Omit for default routing.",
+    ),
+}
+
+export function createLookAt(ctx: PluginInput, options: LookAtOptions = {}): ToolDefinition {
+  const providerPinsConfigured = hasProviderModelPins(options.providerModels)
   return tool({
-    description: LOOK_AT_DESCRIPTION,
+    description: providerPinsConfigured ? LOOK_AT_DESCRIPTION + LOOK_AT_PROVIDER_DESCRIPTION : LOOK_AT_DESCRIPTION,
     args: {
+      ...(providerPinsConfigured ? providerArgSchema : {}),
       file_path: tool.schema.string().optional().describe("Absolute path to the file to analyze"),
       file_paths: tool.schema.array(tool.schema.string()).optional().describe("Absolute paths to the files to analyze"),
       image_data: tool.schema.string().optional().describe("Base64 encoded image data (for clipboard/pasted images)"),
@@ -31,6 +51,20 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
         return validationError
       }
 
+      const provider = parseProviderArgument(rawArgs.provider)
+      const pinned = provider
+        ? resolveProviderModelPin(
+            options.loadProviderModels?.() ?? options.providerModels,
+            provider,
+            "agents",
+            MULTIMODAL_LOOKER_AGENT,
+          )
+        : undefined
+      if (pinned && "error" in pinned) {
+        log(`[look_at] Provider pin missing: ${pinned.error}`)
+        return `Error: ${pinned.error}`
+      }
+
       const preparedInputResult = prepareLookAtInput(args)
       if (!preparedInputResult.ok) {
         return preparedInputResult.error
@@ -46,6 +80,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           toolContext,
           goal: args.goal,
           inputParts: preparedInput.inputParts,
+          ...(provider && pinned ? { providerPin: { provider, model: pinned.model } } : {}),
         })
       } catch (error) {
         const missingFilePath = getMissingLookAtFilePath(error, args)

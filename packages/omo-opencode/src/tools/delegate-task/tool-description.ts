@@ -1,5 +1,6 @@
 import type { AvailableCategory, AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeCategories } from "../../shared/merge-categories"
+import { hasProviderModelPins } from "../../shared/provider-model-pin"
 import { CATEGORY_CALLER_GUIDANCE } from "./builtin-categories"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import type { DelegateTaskToolOptions } from "./types"
@@ -13,7 +14,7 @@ export interface DelegateTaskPresentation {
 
 type DelegateTaskPresentationOptions = Pick<
   DelegateTaskToolOptions,
-  "availableCategories" | "availableSkills" | "userCategories"
+  "availableCategories" | "availableSkills" | "userCategories" | "providerModels"
 >
 
 export function createDelegateTaskPresentation(options: DelegateTaskPresentationOptions): DelegateTaskPresentation {
@@ -48,6 +49,10 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
     })
     .join("\n")
 
+  const providerLine = hasProviderModelPins(options.providerModels)
+    ? `\n  - provider: "openai" or "anthropic". Runs the child on that provider's configured model for the category or subagent_type instead of default routing, with no fallback to another provider; the call fails if no model is configured for it. Omit for default routing.`
+    : ""
+
   const description = `Spawn agent task with category-based or direct agent selection.
 
   ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.
@@ -79,7 +84,7 @@ export function createDelegateTaskPresentation(options: DelegateTaskPresentation
   ${categoryList}
   - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
   - run_in_background: true is the standard spawn: returns a background task ID like \`bg_...\` at once and the completion notification delivers the result. false blocks this response until the child finishes (a 30-minute inactivity window, reset by OpenCode busy/retry/running status, not a total wall-clock limit); use it only for a short child whose result gates your very next call. Omitted counts as false.
-  - task_id: Continuation session id (\`ses_...\`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (\`bg_...\`).
+  - task_id: Continuation session id (\`ses_...\`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (\`bg_...\`).${providerLine}
   - command: The command that triggered this task (optional, for slash command tracking).
 
   **WHEN TO USE task_id:**

@@ -1,3 +1,4 @@
+import type { ModelProvider } from "../../config/schema/provider-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
@@ -127,6 +128,8 @@ export interface LaunchInput {
   skills?: string[]
   skillContent?: string
   category?: string
+  /** Set when task was called with provider: the model came from that provider's pin set and must not be swapped. */
+  providerPin?: ModelProvider
   sessionPermission?: SessionPermissionRule[]
   /** Directory the child session is created and prompted in; defaults to the parent session directory */
   cwd?: string

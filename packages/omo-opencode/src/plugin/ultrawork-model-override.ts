@@ -4,6 +4,7 @@ import { getSessionAgent } from "../features/claude-code-session-state"
 import { ULTRAWORK_PATTERN } from "../hooks/keyword-detector/constants"
 import { log } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
+import { ProviderPinRegistry } from "../shared/provider-pin-registry"
 import { scheduleDeferredModelOverride } from "./ultrawork-db-model-override"
 import { resolveValidUltraworkVariant } from "./ultrawork-variant-availability"
 
@@ -71,6 +72,7 @@ export function resolveUltraworkOverride(
   },
   sessionID?: string,
 ): UltraworkOverrideResult | null {
+  if (sessionID && ProviderPinRegistry.has(sessionID)) return null
   const promptText = extractPromptText(output.parts)
   if (!detectUltrawork(promptText)) return null
 

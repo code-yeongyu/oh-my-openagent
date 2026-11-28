@@ -1,3 +1,4 @@
+import { parseProviderArgument } from "../../shared/provider-model-pin"
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { log } from "../../shared/logger"
@@ -84,6 +85,7 @@ export async function prepareDelegateTaskArgs(
     ? loadSkills.filter((value): value is string => typeof value === "string")
     : []
 
+  const provider = parseProviderArgument(args.provider)
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
 
@@ -98,5 +100,6 @@ export async function prepareDelegateTaskArgs(
     task_id: taskID,
     command,
     load_skills: normalizedLoadSkills,
+    ...(provider ? { provider } : {}),
   }
 }

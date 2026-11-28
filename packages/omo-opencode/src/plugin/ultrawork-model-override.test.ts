@@ -7,6 +7,7 @@ setDefaultTimeout(30_000)
 import * as sharedModule from "../shared"
 import * as dbOverrideModule from "./ultrawork-db-model-override"
 import * as sessionStateModule from "../features/claude-code-session-state"
+import { ProviderPinRegistry } from "../shared/provider-pin-registry"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 let resolveUltraworkOverride: (typeof import("./ultrawork-model-override"))["resolveUltraworkOverride"]
@@ -102,6 +103,20 @@ describe("resolveUltraworkOverride", () => {
 
     //#then
     expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" })
+  })
+
+  test("should return null for a session pinned to a provider by look_at or task", () => {
+    //#given
+    const config = createConfig("sisyphus-junior", { model: "anthropic/claude-opus-4-7", variant: "max" })
+    const output = createOutput("ultrawork do something")
+    ProviderPinRegistry.register("ses_provider_pinned", "openai")
+
+    //#when
+    const result = resolveUltraworkOverride(config, "sisyphus-junior", output, "ses_provider_pinned")
+    ProviderPinRegistry.remove("ses_provider_pinned")
+
+    //#then
+    expect(result).toBeNull()
   })
 
   test("should return null when no keyword detected", () => {

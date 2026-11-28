@@ -7,18 +7,29 @@ import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"
 import type { LookAtFilePart, LookAtInputPart } from "./look-at-input-preparer"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
 import { waitForLookAtSessionResult } from "./session-poller"
+import type { ModelProvider } from "../../config/schema/provider-models"
+import type { PinnedModel } from "../../shared/provider-model-pin"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 
 interface RunLookAtSessionInput {
   ctx: PluginInput
   toolContext: ToolContext
   goal: string
   inputParts: LookAtInputPart[]
+  /** look_at(provider): the provider's multimodal-looker pin, used instead of the registered or dynamic model. */
+  providerPin?: { readonly provider: ModelProvider; readonly model: PinnedModel }
 }
 
-export async function runLookAtSession({ ctx, toolContext, goal, inputParts }: RunLookAtSessionInput): Promise<string> {
+export async function runLookAtSession(input: RunLookAtSessionInput): Promise<string> {
+  const { ctx, toolContext, goal, inputParts, providerPin } = input
   const fileParts = inputParts.filter((part): part is LookAtFilePart => part.type === "file")
   const prompt = buildLookAtPrompt(goal, fileParts)
-  const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
+  const { agentModel, agentVariant } = providerPin
+    ? {
+        agentModel: { providerID: providerPin.model.providerID, modelID: providerPin.model.modelID },
+        agentVariant: providerPin.model.variant,
+      }
+    : await resolveMultimodalLookerAgentMetadata(ctx)
 
   log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
   const parentSession = await ctx.client.session
@@ -55,8 +66,32 @@ Original error: ${createResult.error}`
 
   const sessionID = createResult.data.id
   log(`[look_at] Created session: ${sessionID}`)
+  const dispatch = { ctx, sessionID, prompt, fileCount: fileParts.length, inputParts, agentModel, agentVariant }
+  if (!providerPin) {
+    return collectLookAtResult(dispatch)
+  }
+  ProviderPinRegistry.register(sessionID, providerPin.provider)
+  try {
+    return await collectLookAtResult(dispatch)
+  } finally {
+    ProviderPinRegistry.remove(sessionID)
+  }
+}
 
-  log(`[look_at] Sending prompt with ${fileParts.length} file(s) to session ${sessionID}`)
+type LookAtDispatch = {
+  readonly ctx: PluginInput
+  readonly sessionID: string
+  readonly prompt: string
+  readonly fileCount: number
+  readonly inputParts: LookAtInputPart[]
+  readonly agentModel: { providerID: string; modelID: string } | undefined
+  readonly agentVariant: string | undefined
+}
+
+async function collectLookAtResult(dispatch: LookAtDispatch): Promise<string> {
+  const { ctx, sessionID, prompt, fileCount, inputParts, agentModel, agentVariant } = dispatch
+
+  log(`[look_at] Sending prompt with ${fileCount} file(s) to session ${sessionID}`)
   let shouldWaitForStatus = true
   try {
     await promptSyncWithModelSuggestionRetry(

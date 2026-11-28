@@ -2,6 +2,7 @@ import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import { log } from "../../shared/logger"
 import { resolveSubagentAgentMatch } from "./subagent-agent-match"
+import { resolvePinnedSubagentModel } from "./provider-pinned-resolution"
 import { resolveSubagentModel } from "./subagent-model-resolution"
 import { validateSubagentRequest } from "./subagent-request-preflight"
 import type { ResolveSubagentExecutionOptions, ResolveSubagentExecutionResult } from "./subagent-resolution-types"
@@ -29,6 +30,13 @@ export async function resolveSubagentExecution(
     }
 
     agentToUse = agentMatch.agentToUse
+    if (args.provider) {
+      const pinned = resolvePinnedSubagentModel(agentToUse, executorCtx, args.provider)
+      if ("error" in pinned) {
+        return { agentToUse: "", categoryModel: undefined, error: pinned.error }
+      }
+      return { agentToUse, categoryModel: pinned.categoryModel }
+    }
     const { categoryModel, fallbackChain } = await resolveSubagentModel(
       agentToUse,
       agentMatch.matchedAgent,

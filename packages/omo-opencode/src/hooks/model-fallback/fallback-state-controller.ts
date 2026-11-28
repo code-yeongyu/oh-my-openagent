@@ -2,6 +2,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 import { getNextReachableFallback } from "./next-fallback"
 
 type ModelFallbackStateLike = {
@@ -68,6 +69,10 @@ export function createModelFallbackStateController(input: {
     currentProviderID: string,
     currentModelID: string,
   ): boolean {
+    if (ProviderPinRegistry.has(sessionID)) {
+      log(`[model-fallback] Session is pinned to a provider; no fallback: ${sessionID}`)
+      return false
+    }
     const agentKey = getAgentConfigKey(agentName)
     const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
     const fallbackChain = sessionFallbackChains.get(sessionID) ?? requirements?.fallbackChain
