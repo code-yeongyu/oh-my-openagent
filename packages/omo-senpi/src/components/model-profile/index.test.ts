@@ -596,6 +596,24 @@ describe("createModelProfileComponent", () => {
     expect(pi.entries).toEqual([])
   })
 
+  test.each(["print", "json"])(
+    "#given an active profile and --thinking low #when a %s session starts #then the CLI effort is applied",
+    async (mode) => {
+      const { pi, start } = harness({ model_profile: "geeky-heavy" }, [API_ASTRA])
+      const argv = process.argv
+      try {
+        process.argv = [...argv.slice(0, 2), "--thinking", "low", "Say hello"]
+        await start(STARTUP, "session-1", mode)
+      } finally {
+        process.argv = argv
+      }
+
+      expect(pi.sessionModels).toEqual([API_ASTRA])
+      expect(pi.sessionThinkingLevels).toEqual(["low"])
+      expect(recordedOutcome(pi)).toMatchObject({ details: { reasoning: "low" } })
+    },
+  )
+
   test("#given a --model flag or a scoped model #when session_start fires #then the profile yields to it", async () => {
     const { pi, start } = harness({ model_profile: "daily-normal" })
 

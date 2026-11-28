@@ -151,6 +151,15 @@ function isTuiSession(eventCtx: unknown): boolean {
   return extractMode(eventCtx) === "tui"
 }
 
+async function readCliThinking(mode: string | undefined, payload: unknown): Promise<string | undefined> {
+  if (mode !== "print" && mode !== "json") return undefined
+  if (!isRecord(payload) || payload["reason"] !== "startup") return undefined
+  const args = process.argv.slice(2)
+  if (!args.includes("--thinking")) return undefined
+  const { parseArgs } = await import("@code-yeongyu/senpi")
+  return parseArgs(args).thinking
+}
+
 function extractCwd(pi: SenpiExtensionAPI, eventCtx: unknown): string {
   if (pi.cwd !== undefined) return pi.cwd
   if (isRecord(eventCtx) && typeof eventCtx["cwd"] === "string") return eventCtx["cwd"]
@@ -315,8 +324,16 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
             config.exclude_models,
             probes,
           )
-        const { resolution, model, failures } =
-          explicit === undefined ? await resolveDefaultModelProfile(resolveFor) : await resolveFor(explicit)
+        const {
+          resolution: profileResolution,
+          model,
+          failures,
+        } = explicit === undefined ? await resolveDefaultModelProfile(resolveFor) : await resolveFor(explicit)
+        const cliThinking = profileResolution.kind === "resolved" ? await readCliThinking(mode, payload) : undefined
+        const resolution =
+          profileResolution.kind === "resolved" && cliThinking !== undefined
+            ? { ...profileResolution, reasoning: cliThinking }
+            : profileResolution
         const content = noticeContent(resolution, failures, mode)
 
         if (resolution.kind !== "resolved") {

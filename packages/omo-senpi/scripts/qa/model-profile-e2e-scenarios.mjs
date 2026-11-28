@@ -264,6 +264,17 @@ export const SCENARIOS = {
       label: "(Daily · Normal)",
     },
   },
+  "cli-thinking-wins-with-profile": {
+    omoConfig: {
+      model_profile: "custom-heavy",
+      model_profiles: {
+        "custom-heavy": { display_name: "Custom heavy", models: [{ model: "omo-mock/mock-1", reasoning: "high" }] },
+      },
+    },
+    mockModels: ["mock-1"],
+    cliThinking: "low",
+    expect: { model: "mock-1", notice: APPLIED_TYPE, thinking: "low" },
+  },
   "cli-model-wins": {
     omoConfig: { model_profile: "daily-normal" },
     mockModels: ["mock-1", "claude-opus-5-5"],
