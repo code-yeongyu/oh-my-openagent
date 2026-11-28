@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { threadToolParamSchemas } from "./contracts"
 
@@ -99,7 +99,7 @@ describe("model-facing thread text names the eval cell", () => {
 
   test("#given every thread source file #when its sentences are scanned #then each thread tool is named as a tool.thread_* form the tool accepts", () => {
     const files = [...new Bun.Glob("**/*.ts").scanSync(import.meta.dir)]
-      .map((file) => file.replaceAll("\\", "/"))
+      .map((file) => file.split(sep).join("/"))
       .filter((file) => !NOT_SCANNED.test(file))
       .sort()
     const problems: string[] = []

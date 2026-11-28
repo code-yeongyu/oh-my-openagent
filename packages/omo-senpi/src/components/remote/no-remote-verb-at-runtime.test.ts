@@ -4,7 +4,7 @@
 // (components/remote/tui/command.ts, PR 5), which runs the CLI as the person at that terminal.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join, relative, sep } from "node:path"
+import { join, sep } from "node:path"
 import { parseSync } from "oxc-parser"
 
 const SRC = join(import.meta.dir, "..", "..")
@@ -49,9 +49,7 @@ describe("no `omo remote` verb at runtime (G4)", () => {
       .filter((file) => !EXEMPT.test(`/${file}`) && !EXCEPTIONS.has(file))
     expect(files).toContain("components/device-service/runner.ts")
     const offenders = files.flatMap((file) =>
-      remoteVerbArgvs(file, readFileSync(join(SRC, file), "utf8")).map(
-        (argv) => `${relative(SRC, join(SRC, file))}: ${argv}`,
-      ),
+      remoteVerbArgvs(file, readFileSync(join(SRC, file), "utf8")).map((argv) => `${file}: ${argv}`),
     )
     expect(offenders).toEqual([])
   })
