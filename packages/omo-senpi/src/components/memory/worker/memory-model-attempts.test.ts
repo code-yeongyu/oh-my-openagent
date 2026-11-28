@@ -25,6 +25,16 @@ function child(overrides: Partial<ReflectionChildResult>): ReflectionChildResult
 }
 
 describe("runMemoryModelAttempts", () => {
+  test("an invalid_grant on the primary admits a working fallback", async () => {
+    const result = await runMemoryModelAttempts(candidates, async (candidate) =>
+      candidate === candidates[0]
+        ? child({ stderr: "OAuth refresh failed for google: invalid_grant" })
+        : child({ code: 0 }),
+    )
+    expect(result.candidate).toEqual(candidates[1])
+    expect(result.child.code).toBe(0)
+  })
+
   test("#given every candidate ran with extensions and none was visible #when the chain is exhausted #then the detail is marked unreachable", async () => {
     // given
     const loaded: MemoryModelChain = [

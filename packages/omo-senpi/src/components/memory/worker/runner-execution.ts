@@ -137,9 +137,16 @@ async function finalizeExecutionFailure(
   const runDir = join(input.options.identity.paths.reflection, "runs", input.run.runId)
   if (existsSync(join(runDir, "ledger.json"))) {
     const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
+    const category = input.resolution.category
+    const field = input.loaded.config.categories?.[category]?.models?.length ? "models" : "model"
     const finalized =
       error instanceof MemoryModelExhaustedError
-        ? await overrideFailedReservationRun(input.finalizationContext(), runDir, ledger, error.message)
+        ? await overrideFailedReservationRun(
+            input.finalizationContext(),
+            runDir,
+            ledger,
+            error.reflectionDetail(`categories.${category}.${field}`),
+          )
         : await failReservationRun(input.finalizationContext(), runDir, ledger, "failed", errorMessage(error), {
             recoverWorktreeTip: isSupervisorDeathWithoutOutcome(error),
           })

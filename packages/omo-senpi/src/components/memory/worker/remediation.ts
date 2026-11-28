@@ -1,7 +1,7 @@
 import { shellQuote } from "@oh-my-opencode/utils/shell-quote"
 
 import { homeRelativePath, type ReflectionChildLog } from "./child-log"
-import { isModelUnreachableDetail } from "./memory-model-attempts"
+import { isModelUnreachableDetail, REFLECTION_AUTH_EXHAUSTED } from "./memory-model-attempts"
 
 /**
  * Marks a detail built by `formatMemoryModelExhaustion`, which always closes with the roster of
@@ -18,6 +18,11 @@ export function reflectionRemediation(
 ): string {
   if (isModelUnreachableDetail(detail)) {
     return "no memory child can see the reflection model, not even with extensions loaded; set categories.<category>.model (or memory.reflection.category) in omo.json to a model from a core provider, or set memory.reflection.enabled to false"
+  }
+  const auth = REFLECTION_AUTH_EXHAUSTED.exec(detail ?? "")
+  if (auth) {
+    const provider = auth[1]!.split(",")[0]
+    return `no working fallback for ${auth[2]}; run /login ${provider} or change ${auth[2]} in omo.json`
   }
   const combined = `${reason ?? ""} ${detail ?? ""}`.toLowerCase()
   if (combined.includes("budget_not_met")) {

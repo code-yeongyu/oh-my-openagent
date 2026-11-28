@@ -16,6 +16,10 @@ export type ExhaustedMemoryModelAttempt = {
 }
 
 export class MemoryModelExhaustedError extends Error {
+  reflectionDetail(configKey: string): string {
+    return formatMemoryModelExhaustion(this.attempts, configKey)
+  }
+
   constructor(readonly attempts: readonly ExhaustedMemoryModelAttempt[]) {
     super(formatMemoryModelExhaustion(attempts))
     this.name = "MemoryModelExhaustedError"
@@ -57,11 +61,14 @@ export async function runMemoryModelAttempts(
  */
 export const MODEL_UNREACHABLE_MARKER = "model_unreachable_with_extensions"
 
+// A config key is attached only when every reflection candidate had a dead or missing login.
+export const REFLECTION_AUTH_EXHAUSTED = /^auth_missing:([^;]+); config:(categories\.[^;]+\.models?); attempted:/
+
 export function isModelUnreachableDetail(detail: string | undefined): boolean {
   return detail?.startsWith(MODEL_UNREACHABLE_MARKER) === true
 }
 
-function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAttempt[]): string {
+function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAttempt[], configKey?: string): string {
   const unreachable = attempts.every(
     ({ candidate, miss }) => miss.kind === "model_not_visible" && candidate.loadExtensions === true,
   )
@@ -75,6 +82,7 @@ function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAtte
     overflows.length === 0 ? undefined : `context_overflow:${overflows.join(" | ")}`,
     providers.length === 0 ? undefined : `auth_missing:${providers.join(",")}`,
     outages.length === 0 ? undefined : `provider_unavailable:${outages.join(" | ")}`,
+    configKey !== undefined && providers.length === attempts.length ? `config:${configKey}` : undefined,
     `attempted:${attempts.map(({ candidate }) => candidate.model).join(",")}`,
   ]
     .filter((part): part is string => part !== undefined)

@@ -17,7 +17,7 @@ const MODEL_NOT_FOUND_PATTERN = /^Error: Model "([^"]+)" not found\. Use --list-
 const API_KEY_NOT_FOUND_PATTERN = /^(?:Error:\s*)?No API key found for\s+([^\s.]+)/m
 // A revoked or expired OAuth login: the credential exists but is dead, so this provider's models
 // cannot serve anything until the user logs in again (#15227). Same consequence as a missing key.
-const OAUTH_REFRESH_FAILED_PATTERN = /^OAuth refresh failed for\s+([^\s:]+)/m
+const OAUTH_REFRESH_FAILED_PATTERN = /^(?:Error:\s*)?OAuth refresh failed for[ \t]+([^\s:]+):[^\n]*\binvalid_grant\b/im
 const HTTP_STATUS_PATTERN = /(?:^|\s)(\d{3})\s*:/
 const PROVIDER_DETAIL_MAX_CHARS = 200
 

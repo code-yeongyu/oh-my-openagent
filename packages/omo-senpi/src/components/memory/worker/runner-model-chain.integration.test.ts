@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
+import { classifyReflectionFailure } from "./failure-policy"
+import { reflectionRemediation } from "./remediation"
 import { harness, assertWorktreesClean, cleanupRunnerHarnesses } from "./runner-integration.test-support"
 import { resolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import { readRunJson } from "./run-artifacts"
@@ -126,3 +128,32 @@ describe("reflection model-chain integration", () => {
     expect(item.spawnCalls).toHaveLength(2)
   }, 60_000)
 })
+
+test.each([
+  ["commit", "model"],
+  ["model-fallback", "models"],
+] as const)(
+  "%s child names categories.quick.%s and parks on the first exhausted revoked login",
+  async (childMode, field) => {
+    const item = await harness({
+      childMode,
+      resolveAndPreflightLaunch: (input) =>
+        resolveAndPreflightMemoryLaunch({
+          ...input,
+          attempt: async (...args) => ({
+            ...(await input.attempt(...args)),
+            code: 1,
+            stderr: "OAuth refresh failed for google: invalid_grant",
+          }),
+        }),
+    })
+    const result = await item.runner.launch(item.run)
+    expect(result.outcome).toBe("failed")
+    const notice = reflectionRemediation(result.reason, result.detail)
+    expect(notice).toContain("/login google")
+    expect(notice).toContain(`categories.quick.${field};`)
+    expect(notice).toContain("no working fallback")
+    expect(classifyReflectionFailure(result)).toMatchObject({ definitive: true, retryable: false })
+  },
+  60_000,
+)

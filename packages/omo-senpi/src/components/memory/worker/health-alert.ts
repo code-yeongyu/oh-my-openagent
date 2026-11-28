@@ -13,7 +13,7 @@ import {
 } from "./entry-renderers"
 import { childFailureCause } from "./failure-detail"
 import { readReflectionHealth } from "./health"
-import { isModelUnreachableDetail } from "./memory-model-attempts"
+import { isModelUnreachableDetail, REFLECTION_AUTH_EXHAUSTED } from "./memory-model-attempts"
 import { reflectionRemediation } from "./remediation"
 import type { ReflectionLauncher } from "./launcher-identity"
 
@@ -103,7 +103,11 @@ export async function emitReflectionHealthAlert(
   if (context !== undefined && !context.observedRunIds.some((runId) => (health.streakRunIds ?? []).includes(runId)))
     return false
   // A definitive model miss parks on its first failure; the park alert is its one notice.
-  if (isModelUnreachableDetail(health.lastFailure?.detail)) return false
+  if (
+    isModelUnreachableDetail(health.lastFailure?.detail) ||
+    REFLECTION_AUTH_EXHAUSTED.test(health.lastFailure?.detail ?? "")
+  )
+    return false
   if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
   const failure = health.lastFailure
   // Completion records live in `<reflectionDir>/completions`, next to the `runs` directories.

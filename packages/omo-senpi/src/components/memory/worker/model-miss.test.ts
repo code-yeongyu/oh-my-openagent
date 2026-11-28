@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { classifyReflectionFailure } from "./failure-policy"
 import { classifyRetryableModelMiss } from "./model-miss"
 
 function result(stderr: string) {
@@ -19,7 +20,7 @@ describe("classifyRetryableModelMiss", () => {
 
   test("#given a revoked OAuth refresh token child failure #when classified #then it is a dead credential on that provider, so the chain moves on (#15227)", () => {
     const child = result(
-      "OAuth refresh failed for google: body={\"error\":\"invalid_grant\"} (Token has been expired or revoked)",
+      'OAuth refresh failed for google: body={"error":"invalid_grant"} (Token has been expired or revoked)',
     )
     expect(classifyRetryableModelMiss(child)).toEqual({ kind: "auth_missing", provider: "google" })
   })
@@ -142,3 +143,12 @@ describe("runtime advisories before the child's real failure (#9553)", () => {
     expect(miss).toEqual({ kind: "provider_unavailable", detail: "The model is temporarily unavailable" })
   })
 })
+
+test.each(["network error: ECONNRESET", "503: Service Unavailable"])(
+  "an OAuth refresh outage (%s) does not invalidate credentials",
+  (cause) => {
+    const miss = classifyRetryableModelMiss(result(`OAuth refresh failed for google: ${cause}`))
+    expect(miss?.kind).not.toBe("auth_missing")
+    expect(classifyReflectionFailure({ outcome: "failed", reason: "child_exit", detail: cause })?.retryable).toBe(true)
+  },
+)
