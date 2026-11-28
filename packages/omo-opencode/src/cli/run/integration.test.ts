@@ -85,6 +85,7 @@ describe("integration: --json mode", () => {
       durationMs: 1234,
       messageCount: 42,
       summary: "Test summary",
+      output: { status: "completed" },
     }
     const manager = createJsonOutputManager({
       stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
@@ -104,6 +105,7 @@ describe("integration: --json mode", () => {
     expect(parsed.durationMs).toBe(1234)
     expect(parsed.messageCount).toBe(42)
     expect(parsed.summary).toBe("Test summary")
+    expect(parsed.output).toEqual({ status: "completed" })
   })
 
   it("redirects stdout to stderr when active", () => {
