@@ -29,6 +29,15 @@ try {
 process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to the DevTools endpoint
 of a browser something else launched; attaches to the same browser in one process share one
 connection, and `close()` releases only your handle (the last release disconnects).
+
+When loaded through OmO's browser skill, an owned headless `connectPipe()` or unnamed
+`connectCloakProfile()` session closes automatically after two minutes with no pending DevTools
+commands, navigation, or active waits such as `page.waitForResponse()` and `snoop.waitFor()`.
+Unsolicited page background activity does not keep it open. The timeout closes the browser, not
+its profile directory. Use `idleTimeoutMs` to extend the pause, or `idleTimeoutMs: 0` to disable
+it for intentional long gaps between browser operations. Still call `close()` in `finally`.
+Named, headful, attached, and built-in browsers are not affected.
+
 `connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
 fingerprint seed — the stealth path for WAF and bot-scored targets, where the attached engine's
 console capture would be a signal.

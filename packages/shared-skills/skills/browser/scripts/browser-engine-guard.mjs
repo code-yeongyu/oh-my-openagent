@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises"
+import { trackOwnedBrowserHelper, withOwnedBrowserIdleTimeout } from "./owned-browser-idle.mjs"
 
 export const BROWSER_ENGINE_ENV = "OMO_BROWSER_ENGINE"
 
@@ -24,12 +25,20 @@ export class BuiltinBrowserUnavailableError extends Error {
 }
 
 /**
- * Inside OmO Desktop (`OMO_BROWSER_ENGINE` set) the library is the terminal's own, unchanged, plus
- * `connectBuiltinBrowser()`: the app's built-in browser for this thread, the tab the user sees beside the chat.
+ * Apply the owned headless browser lifecycle policy in both terminal and desktop sessions.
+ * OmO Desktop also supplies `connectBuiltinBrowser()` for the tab beside the chat.
  */
 export function guardOmowright(raw, { env = process.env, host } = {}) {
+  const engines = {
+    ...raw,
+    connectPipe: withOwnedBrowserIdleTimeout(raw.connectPipe),
+    connectCloakProfile: withOwnedBrowserIdleTimeout(raw.connectCloakProfile, { skipNamed: true }),
+    createNetworkSnoop: trackOwnedBrowserHelper(raw.createNetworkSnoop, "waitFor"),
+    createTrace: trackOwnedBrowserHelper(raw.createTrace, "step"),
+    createEvents: trackOwnedBrowserHelper(raw.createEvents, "waitForEvent"),
+  }
   const engine = env[BROWSER_ENGINE_ENV]
-  if (engine === undefined || engine === "") return raw
+  if (engine === undefined || engine === "") return engines
 
   const acquireBuiltinBrowser = async () => {
     let details
@@ -79,5 +88,5 @@ export function guardOmowright(raw, { env = process.env, host } = {}) {
     return await new raw.BrowserConnection(client, options).initialize()
   }
 
-  return { ...raw, connectBuiltinBrowser }
+  return { ...engines, connectBuiltinBrowser }
 }
