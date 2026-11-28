@@ -14,6 +14,7 @@ import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
 import { holderVersion, retryWait, rowState, threadModel } from "../tools/thread-state"
+import { listingProof } from "../remote/listing-liveness"
 import {
   OPEN_SESSION_FORK,
   openedThread,
@@ -56,7 +57,7 @@ function listedThread(row: RemoteSessionRow): HostedThread {
     name,
     ...(unnamed ? { unnamed: true as const } : {}),
     status: rowStatus(row),
-    state: rowState(row),
+    ...listingProof(row),
     ...threadModel(row.model),
     // Only a row its device answered this round names a live holder: a cached snapshot shows neither field (#14278).
     ...(row.source === "cache"

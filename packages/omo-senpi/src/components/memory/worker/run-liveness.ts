@@ -1,7 +1,7 @@
 import {
   getPidLiveness as readPidLiveness,
   getProcessStartIdentity as readProcessStartIdentity,
-  startIdentitiesComparable,
+  startIdentitiesProveReuse,
   type ProcessLiveness,
 } from "@oh-my-opencode/memory-core"
 
@@ -12,15 +12,10 @@ export interface RunLivenessSeams {
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
 }
 
-/**
- * A live pid is dead only when its recorded start identity provably belongs to another process.
- * Two identities prove reuse only inside one scheme: a ledger written as `ps-lstart:` by a
- * supervisor and read back as `proc-start-epoch:` by this runtime describes the same instant
- * in different words, and treating that as reuse tore live worktrees down mid-run (#8304).
- */
-function recordedStartWasReused(recorded: string, actual: string): boolean {
-  return startIdentitiesComparable(recorded, actual) && recorded !== actual
-}
+// A live pid is dead only when its recorded start identity provably belongs to another process (`startIdentitiesProveReuse`):
+// a ledger written as `ps-lstart:` by a supervisor and read back as `proc-start-epoch:` describes the same instant in
+// different words, and treating that as reuse tore live worktrees down mid-run (#8304), while a legacy `ps-lstart:` record
+// against a `ps-lstart-utc:` reading is judged by the zone bound (#15362).
 
 export async function classifyRunProcess(
   pid: number | undefined,
@@ -34,7 +29,7 @@ export async function classifyRunProcess(
   if (liveness === "unknown") return "unknown"
   const actualStart = await (seams.getProcessStartIdentity ?? readProcessStartIdentity)(pid)
   if (recordedStart === null || actualStart === null) return "unknown"
-  return recordedStartWasReused(recordedStart, actualStart) ? "dead" : "alive"
+  return startIdentitiesProveReuse(recordedStart, actualStart) ? "dead" : "alive"
 }
 
 /** Launcher liveness: dead on ESRCH, or on a live pid whose recorded start identity proves reuse. */
@@ -47,7 +42,7 @@ export async function isLauncherDead(
   if (liveness === "dead") return true
   if (liveness === "alive" && recordedStart !== null && recordedStart !== undefined) {
     const actualStart = await (seams.getProcessStartIdentity ?? readProcessStartIdentity)(pid)
-    return actualStart !== null && recordedStartWasReused(recordedStart, actualStart)
+    return actualStart !== null && startIdentitiesProveReuse(recordedStart, actualStart)
   }
   return false
 }

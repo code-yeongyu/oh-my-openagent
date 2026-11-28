@@ -11,7 +11,7 @@ import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
 
 export type LocatedControl =
-  | { readonly kind: "control"; readonly control: SessionControl }
+  | { readonly kind: "control"; readonly control: SessionControl; readonly row?: RemoteSessionRow }
   /** The address names a thread no engine holds live: its session file here, or an ended session on another device. */
   | {
       readonly kind: "not_live"
@@ -51,7 +51,7 @@ export async function locateControl(
     const row = resolved.where.row
     if (row.state === "ended")
       return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device, row }
-    return { kind: "control", control: createRelayControl(options.remote, row) }
+    return { kind: "control", control: createRelayControl(options.remote, row), row }
   }
   const session = targetSession(current, resolved.thread)
   if (session === undefined) {

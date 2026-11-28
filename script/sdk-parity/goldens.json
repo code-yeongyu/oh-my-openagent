@@ -12,7 +12,7 @@
   "native-thread-list-bad-state": {
     "exit": 2,
     "stdout": "",
-    "stderr": "omo thread list: --state must be one of opening, running, idle, inactive, archived, got 'bogus'\n"
+    "stderr": "omo thread list: --state must be one of opening, running, idle, inactive, archived, held, unknown, got 'bogus'\n"
   },
   "native-thread-send-arity": {
     "exit": 2,
@@ -171,7 +171,11 @@
     "result": {
       "kind": "ok",
       "threads": [],
-      "scope": "workspace"
+      "scope": "workspace",
+      "host_counts": {
+        "answered": 1,
+        "unanswered": 0
+      }
     }
   },
   "tool-read-missing": {

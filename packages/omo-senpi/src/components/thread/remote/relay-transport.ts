@@ -136,6 +136,15 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
+/** The id a prompt's reply names it by (senpi client-input admission, #15093): its clientMessageId, top level or admission. */
+function promptIdOf(reply: JsonObject): string | undefined {
+  const admission = reply["admission"]
+  const nested =
+    typeof admission === "object" && admission !== null ? (admission as JsonObject)["clientMessageId"] : undefined
+  const id = reply["clientMessageId"] ?? nested
+  return typeof id === "string" && id.length > 0 ? id : undefined
+}
+
 type SteerRefusal = "turn_conflict" | "not_steerable"
 
 /** A steer the receiving engine refused as a command because no running turn could take it (#14320). */
@@ -791,12 +800,15 @@ export function createRelayTransport(
   ): Promise<SendOutcome> => {
     const online = await resolveTypedDevice(remote.client, row.device, { exactId: true })
     if (online.kind === "error") return online
+    // #15093: the id the engine keeps the prompt under (the one sent, else the one it minted), once its reply names it.
+    let promptId: string | undefined
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
       kind: "ok",
       thread_id: rowKey(row),
       delivery: kind,
       deduplicated: false,
       device: row.device,
+      ...(promptId === undefined ? {} : { delivery_id: promptId }),
       effective_mode: kind.kind === "steered" ? "steer" : kind.kind === "started" ? "start" : "follow_up",
     })
     if (delivery.mode === "steer") {
@@ -868,6 +880,7 @@ export function createRelayTransport(
     )
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
+    promptId = promptIdOf(reply) ?? delivery.client_message_id
     const turnId = reply["turnId"]
     if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0)
       return ok({ kind: "started", turn_id: turnId })
@@ -882,12 +895,21 @@ export function createRelayTransport(
     // An engine whose prompt reply names no turn (engines through 2026.11.5-1) reports the running turn in get_state.
     if (reply["disposition"] === "started" && settled.turnEpoch !== null)
       return ok({ kind: "started", turn_id: String(settled.turnEpoch) })
+    // #15093: a session its engine holds (a paused goal, a person's Stop) queues the prompt and starts nothing; the
+    // engine counts no pending input for it, so the hold is the answer, as the gateway path gives it.
+    if ("held" in settled && settled.held)
+      return ok({
+        kind: "queued",
+        queue_position: settled.pending ?? 1,
+        waiting_on: { kind: "hold", device: row.device },
+      })
+    if (settled.pending === null && reply["disposition"] === "queued") return ok({ kind: "queued", queue_position: 1 })
     if (settled.pending === null)
       return fail(
         "idempotency_uncertain",
         `Device ${row.device} accepted the message but did not report where it waits.`,
         "Read the thread before deciding whether to send again.",
-        { device: row.device },
+        { device: row.device, ...(promptId === undefined ? {} : { delivery_id: promptId }) },
       )
     return ok({ kind: "queued", queue_position: settled.pending })
   }
