@@ -27,10 +27,14 @@ type Report = {
   launch: { provision: boolean; handOff: boolean; launcher?: string }
 }
 
-async function run(command: string[]): Promise<Run> {
+function fixtureEnvironment(): NodeJS.ProcessEnv {
   const env: Record<string, string | undefined> = { ...process.env, HOME: home, USERPROFILE: home }
   delete env.OMO_PROVISIONED_HANDOFF
   delete env.OMO_PROVISIONED_LAUNCHER
+  return env
+}
+
+async function run(command: string[], env = fixtureEnvironment()): Promise<Run> {
   const child = Bun.spawn(command, { cwd: root, env, stdout: "pipe", stderr: "pipe" })
   const [stdout, stderr, code] = await Promise.all([
     new Response(child.stdout).text(),
@@ -165,7 +169,7 @@ describe("provisioned launch plan", () => {
 describe("a compiled omo launched from an empty download directory (#7485)", () => {
   test("#given a bare download #when it runs first, again, and from the provisioned runtime #then the engine always resolves package.json beside the provisioned runtime", async () => {
     // when: first launch provisions, then the engine runs
-    const first = await run([download, "7", "two words"])
+    const first = await run([download, "7", "two words"], { ...fixtureEnvironment(), HERDR_ENV: "1" })
     // then
     const firstBody = report(first)
     expect(firstBody.version).toBe("0.0.0-handoff-fixture")
@@ -191,3 +195,77 @@ describe("a compiled omo launched from an empty download directory (#7485)", () 
     expect(direct.code).toBe(0)
   }, 180_000)
 })
+
+if (process.platform === "win32") {
+  const cases = [
+    { args: ["--no-session"], kind: "interactive" },
+    { args: ["--mode", "text"], kind: "interactive" },
+    { args: ["--mode", "json", "--mode", "text"], kind: "interactive" },
+    { args: ["--headless"], kind: "machine" },
+    { args: ["--hand"], kind: "machine" },
+    { args: ["--mode", "json"], kind: "machine" },
+    { args: ["--print"], kind: "machine" },
+    { args: ["--list-models", ""], kind: "machine" },
+    { args: ["--internal-rpc-host-supervisor"], kind: "machine" },
+  ] as const
+  test.each(cases)("#given herdr and $args #when the runtime is stopped #then only an interactive handoff emits resets", async ({ args, kind }) => {
+    const runtime = Promise.withResolvers<number>()
+    const handback = Promise.withResolvers<string>()
+    let stdout = ""
+    const shell = Bun.spawn([
+      "powershell.exe", "-NoProfile", "-NoLogo", "-Command",
+      '$child = Start-Process -FilePath $env:OMO_TEST_HANDOFF_LAUNCHER -ArgumentList $env:OMO_TEST_HANDOFF_ARGV -NoNewWindow -PassThru -Wait; [Console]::WriteLine("HANDOFF_RETURN_" + $child.ExitCode); [Console]::ReadLine() | Out-Null',
+    ], {
+      cwd: root,
+      env: {
+        ...fixtureEnvironment(), HERDR_ENV: "1", OMO_TEST_HANDOFF_LAUNCHER: download,
+        // PowerShell's native argument binder drops empty strings.
+        OMO_TEST_HANDOFF_TERMINAL: kind, OMO_TEST_HANDOFF_ARGV: args.map((arg) => `"${arg}"`).join(" "),
+      },
+      timeout: 20_000,
+      terminal: {
+        cols: 100,
+        rows: 25,
+        data(_, bytes) {
+          stdout += Buffer.from(bytes).toString("utf8")
+          const ready = /HANDOFF_TERMINAL_READY_(\d+)\r?\n/.exec(stdout)
+          if (ready) runtime.resolve(Number(ready[1]))
+          if (/HANDOFF_RETURN_-?\d+\r?\n/.test(stdout)) handback.resolve(stdout)
+        },
+      },
+    })
+    const terminal = shell.terminal
+    if (!terminal) {
+      shell.kill()
+      await shell.exited
+      throw new Error("PowerShell did not get a pseudo terminal")
+    }
+    try {
+      const earlyExit = shell.exited.then((code) => {
+        throw new Error(`PowerShell exited before handback (${code}): ${JSON.stringify(stdout)}`)
+      })
+      const pid = await Promise.race([runtime.promise, earlyExit])
+      const expectedPath = canonical(provisioned).replaceAll("'", "''")
+      const stopped = await run([
+        "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+        `$p=Get-Process -Id ${pid} -ErrorAction Stop; if ($p.Path -ne '${expectedPath}') {exit 42}; Stop-Process -InputObject $p -Force -ErrorAction Stop`,
+      ])
+      expect(stopped.code, stopped.stderr).toBe(0)
+      const output = await Promise.race([handback.promise, earlyExit])
+      expect(output).toContain("HANDOFF_RETURN_255")
+      const beforeHandback = output.split("HANDOFF_RETURN_")[0]
+      if (kind === "interactive") {
+        expect(beforeHandback).toContain("\x1b[?1003h")
+        expect(beforeHandback).toContain("\x1b[?1004h")
+        expect(beforeHandback).toContain("\x1b[?1003l")
+        expect(beforeHandback).toContain("\x1b[?1004l")
+      } else {
+        expect(beforeHandback).not.toMatch(/\x1b\[\?100[02346]l/)
+      }
+    } finally {
+      if (shell.exitCode === null) shell.kill()
+      await shell.exited
+      terminal.close()
+    }
+  }, 25_000)
+}

@@ -17,6 +17,13 @@ if (launch.provision) {
 }
 if (launch.handOff) {
   await handOffToProvisionedRuntime(expected, { launcher: launch.launcher })
+} else if (process.env.OMO_TEST_HANDOFF_TERMINAL) {
+  if (process.env.OMO_TEST_HANDOFF_TERMINAL === "interactive") {
+    process.stdin.setRawMode(true)
+    process.stdout.write("\x1b[?1003h\x1b[?1004h\x1b[?1006h")
+  }
+  process.stdout.write(`HANDOFF_TERMINAL_READY_${process.pid}\n`)
+  process.stdin.resume()
 } else {
   const { version } = JSON.parse(readFileSync(join(dirname(process.execPath), "package.json"), "utf8")) as { version: string }
   console.log(JSON.stringify({ version, execPath: process.execPath, args: process.argv.slice(2), launch }))
