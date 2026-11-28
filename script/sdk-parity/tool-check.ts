@@ -16,19 +16,43 @@ export type DiscoveredTool = {
 // Names a run-time declaration fills (`ext_<extension>_<tool>`): checked where they are declared, not here.
 const isPattern = (name: string): boolean => name.includes("<")
 
+// Every JSON Schema keyword here changes the accepted set, so a base/head change to any of them must be
+// reported (#15178). A keyword that changes acceptance but is not listed below is refused by the unknown-keyword
+// check instead of being ignored silently.
 const COMPARED = [
   "type",
   "const",
   "enum",
   "minimum",
   "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "pattern",
+  "patternProperties",
   "minLength",
   "maxLength",
   "minItems",
   "maxItems",
+  "minProperties",
+  "maxProperties",
   "default",
   "additionalProperties",
+  "oneOf",
+  "allOf",
+  "if",
+  "then",
+  "else",
+  "not",
+  "dependentRequired",
+  "dependentSchemas",
 ] as const
+
+// Descriptions are prose and are deliberately not compared; no other key outside COMPARED is accepted (#15178).
+const PROSE = new Set(["description"])
+
+// The keys schemaDifferences handles structurally rather than as flat COMPARED values.
+const STRUCTURAL = new Set(["required", "properties", "items", "anyOf", ...COMPARED, ...PROSE])
 
 export function schemaDifferences(tool: unknown, sdk: unknown, path: string): string[] {
   if (typeof tool !== "object" || tool === null || typeof sdk !== "object" || sdk === null)
@@ -54,6 +78,12 @@ export function schemaDifferences(tool: unknown, sdk: unknown, path: string): st
   if (left.length !== right.length)
     out.push(`${path}: ${left.length} variants in the tool and ${right.length} in the SDK`)
   else for (const [i, variant] of left.entries()) out.push(...schemaDifferences(variant, right[i], `${path}|${i}`))
+  // A keyword this function does not model may still narrow the accepted set, so it is refused, never ignored (#15178).
+  const unmodeled = [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((key) => !STRUCTURAL.has(key))
+    .toSorted()
+  for (const key of unmodeled)
+    out.push(`${path}: keyword ${key} is not modeled by the parity gate (${JSON.stringify(a[key])} vs ${JSON.stringify(b[key])}); model it or remove it`)
   return out
 }
 
