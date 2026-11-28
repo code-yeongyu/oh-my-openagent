@@ -24,7 +24,6 @@ import type { RevivePolicyPort } from "./revive-policy"
 // children through the port, under the "cancel" deliberate-stop family.
 export type DestroyCause =
   | "cancel"
-  | "cancel_without_abort"
   | "evict"
   | "ttl"
   | "reconcile_lost"

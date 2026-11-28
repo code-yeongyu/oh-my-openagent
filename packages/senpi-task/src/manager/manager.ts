@@ -836,9 +836,8 @@ class TaskManagerImpl implements TaskManager {
       this.#removeCapacityWaiter(outcome.task_id)
       this.#releaseSlotForTask(outcome.task_id)
       // A cancelled task never runs again, so no epoch of it may keep a lane slot - including a run
-      // whose live handle this manager already let go of, or never had (still launching). Only a live
-      // handle whose abort was skipped keeps its slot until its settled outcome releases it.
-      if (options?.abort !== "skip" || !this.#live.has(outcome.task_id)) this.#concurrency.releaseTask(outcome.task_id)
+      // whose live handle this manager already let go of, or never had (still launching).
+      this.#concurrency.releaseTask(outcome.task_id)
       this.#settleWaiters(outcome.task_id)
     }
     return outcome

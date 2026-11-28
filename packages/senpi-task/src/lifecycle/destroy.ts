@@ -76,7 +76,7 @@ export async function destroyResidentTask(
     const handle = context.registry.get(taskId)
     if (handle !== undefined) {
       try {
-        await teardownHandle(context, handle, cause === "cancel_without_abort")
+        await teardownHandle(context, handle)
         context.failedTeardowns.delete(taskId)
       } catch (error) {
         context.failedTeardowns.add(taskId)
@@ -94,11 +94,7 @@ export async function destroyResidentTask(
       // A daemon child whose stop could not reach its host (the transport was down, or crash recovery
       // gave up) may still hold its session there: the cancel ends it once the host answers.
       // A close the host answered over the handle's own connection already ended the session (omo#11765).
-      if (
-        handle.kind !== "in-process" &&
-        (cause === "cancel" || cause === "cancel_without_abort") &&
-        handle.hostEndAnswered?.() !== true
-      ) {
+      if (handle.kind !== "in-process" && cause === "cancel" && handle.hostEndAnswered?.() !== true) {
         await closeParkedSession(context, taskId)
       }
     } else if (cause === "reconcile_lost" || cause === "ttl" || cause === "revive_failure" || cause === "target_gone") {
@@ -122,7 +118,7 @@ export async function destroyResidentTask(
         return
       }
       if (cause !== "revive_failure") context.registry.forget(taskId, { path: "end", reason: "target_gone" })
-    } else if (cause === "cancel" || cause === "cancel_without_abort") {
+    } else if (cause === "cancel") {
       await closeParkedSession(context, taskId)
       context.registry.forget(taskId, { path: "end" })
     }
@@ -145,7 +141,7 @@ async function tearDownForRedispatch(context: LifecycleContext, taskId: string):
   const handle = context.registry.get(taskId)
   if (handle === undefined) return
   try {
-    await teardownHandle(context, handle, false)
+    await teardownHandle(context, handle)
     context.failedTeardowns.delete(taskId)
   } catch (error) {
     context.failedTeardowns.add(taskId)
@@ -162,20 +158,16 @@ async function confirmClosingChildGone(context: LifecycleContext, taskId: string
 
 // A host-session handle's terminate() IS `abort` then `close_session` (runners/rpc-host/handle.ts),
 // so the rpc branch below is exactly right for it: no pid is involved on either side.
-async function teardownHandle(
-  context: LifecycleContext,
-  handle: ResidentHandle,
-  skipInProcessAbort: boolean,
-): Promise<void> {
+async function teardownHandle(context: LifecycleContext, handle: ResidentHandle): Promise<void> {
   // The pre-dispose step (in-process abort / rpc terminate) is best-effort: an already-exited child
-  // rejects it. DAG cancellation skips in-process abort only after the child's outcome has settled,
-  // because Senpi can float retry rejections from both abort() and active-session dispose(). Dispose
-  // must always run at that safe boundary so teardown cannot leave a resident zombie occupying a slot.
+  // rejects it. An in-process child is always aborted first, also when its turn is active: a dispose
+  // alone does not end that turn (omo#15191). Dispose must always run, so teardown cannot leave a
+  // resident zombie occupying a slot.
   const target = { taskId: handle.task_id, pid: handle.pid }
   const bounded = (step: "abort" | "terminate" | "dispose", run: () => Promise<void>) =>
     withinTeardownBudget(context.teardownStepDeadline, target, step, run)
   if (handle.kind === "in-process") {
-    if (!skipInProcessAbort) await bestEffort(handle.task_id, "abort", () => bounded("abort", () => handle.abort()))
+    await bestEffort(handle.task_id, "abort", () => bounded("abort", () => handle.abort()))
   } else {
     await bestEffort(handle.task_id, "terminate", () => bounded("terminate", () => handle.terminate()))
   }

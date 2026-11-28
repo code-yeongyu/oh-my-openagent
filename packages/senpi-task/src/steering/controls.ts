@@ -73,7 +73,6 @@ export function createSteeringControls(
 
   async function cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome> {
     const record = resolve(idOrName, options?.caller)
-    const destructionCause = options?.abort === "skip" ? "cancel_without_abort" : "cancel"
     if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
     const expected = options?.expectedRunEpoch
     if (runMoved(record, expected)) return staleCancel(record)
@@ -102,7 +101,7 @@ export function createSteeringControls(
         type: "cancelled",
         payload: { previous_status: "pending", ...(reason !== undefined ? { reason } : {}) },
       })
-      await port.destruction.destroyResidentTask(record.task_id, destructionCause)
+      await port.destruction.destroyResidentTask(record.task_id, "cancel")
       return {
         kind: "cancelled",
         task_id: record.task_id,
@@ -182,13 +181,9 @@ export function createSteeringControls(
       type: "cancelled",
       payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) },
     })
-    // Active in-process sessions reach their exact outcome boundary before deferred DAG disposal;
-    // RPC children still terminate immediately. Lifecycle remains the sole destruction writer.
-    if (options?.abort === "skip" && handle !== undefined && handle.terminate === undefined) {
-      destroyAfterSettlement(handle, record.task_id)
-    } else {
-      await port.destruction.destroyResidentTask(record.task_id, destructionCause)
-    }
+    // The child is torn down inside this call, whatever its turn is doing (omo#15191): the lifecycle,
+    // the sole destruction writer, terminates a process child and aborts then disposes an in-process one.
+    await port.destruction.destroyResidentTask(record.task_id, "cancel")
     return {
       kind: "cancelled",
       task_id: record.task_id,
@@ -275,16 +270,6 @@ export function createSteeringControls(
       reason,
       ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}),
     }
-  }
-
-  function destroyAfterSettlement(handle: ManagedChildHandle, taskId: string): void {
-    const destroy = (): Promise<void> => port.destruction.destroyResidentTask(taskId, "cancel_without_abort")
-    void handle
-      .waitForOutcome()
-      .then(destroy, destroy)
-      .catch((error: unknown) => {
-        log("senpi-task deferred cancel destruction rejected", { taskId, error: String(error) })
-      })
   }
 
   return { interruptTask, cancelTask }
