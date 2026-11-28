@@ -17,6 +17,28 @@ import {
 } from "./ultrawork.test-support"
 
 describe("omo-senpi ultrawork once-per-session arming", () => {
+  it("#given input the host attributes to an agent #when it mentions ulw #then no directive arms; the same words from the user still arm (#10096)", async () => {
+    const relay = "Lane report: the review lane ran ulw-loop on the fix and is waiting for the next step"
+    for (const [attribution, armed] of [
+      ["agent", false],
+      ["user", true],
+      [undefined, true],
+    ] as const) {
+      const pi = new FakeExtensionAPI()
+      const arming = createSessionArming()
+      await createUltraworkComponent(arming).register(pi, createTestContext(pi))
+      const sessionId = `session-${attribution ?? "legacy"}`
+      const result = await dispatchInput(pi, relay, "rpc", undefined, sessionEventCtx(sessionId), attribution)
+      if (armed) {
+        expectHiddenInjection(pi, result)
+      } else {
+        expect(result).toEqual({ action: "continue" })
+        expect(pi.messages).toHaveLength(0)
+      }
+      expect(arming.isArmed(sessionId)).toBe(armed)
+    }
+  })
+
   it("#given delegated daemon sessions #when a worker brief mentions the ledger or ultrawork #then no directive or reminder arms", async () => {
     const pi = new FakeExtensionAPI()
     const arming = createSessionArming()
