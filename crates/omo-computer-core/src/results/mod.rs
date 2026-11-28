@@ -1,6 +1,7 @@
 //! Method replies and notification params.
 
 mod diagnosis;
+mod cursor_trace;
 mod exec;
 mod notifications;
 mod reads;
@@ -11,6 +12,7 @@ pub use diagnosis::{
     PermissionReport, PermissionState, SpawnPath,
 };
 pub use exec::ExecReply;
+pub use cursor_trace::{CursorTrace, CursorTraceAction, CursorTraceFrame};
 pub use notifications::{AuditLine, EpochChanged, ForegroundConsent, HandConsent, HandStatus};
 pub use reads::{
     CaptureReply, ClipboardContent, ConcealedReason, DisplayInfo, MenuItems, NotificationMatch,

@@ -136,6 +136,7 @@ const ALLOWLIST: &[(&str, Effect, Exposure)] = &[
     ("display.release", X, S),
     ("display.resume", X, S),
     ("preview.subscribe", R, S),
+    ("presence.cursorTrace", R, S),
     ("stopPath.start", X, A),
     ("stopPath.status", R, P),
     ("stopPath.heartbeat", R, S),
@@ -189,7 +190,7 @@ fn host_only_methods_are_split_by_peer_kind() {
         "display.release",
         "display.resume",
     ];
-    session.extend(["control.release", "preview.subscribe"]);
+    session.extend(["control.release", "preview.subscribe", "presence.cursorTrace"]);
     session.sort_unstable();
     let mut authority = vec![
         "control.grant",

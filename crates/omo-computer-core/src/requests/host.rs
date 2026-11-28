@@ -2,13 +2,17 @@
 //! the fake clock.
 
 use crate::params::{
-    AdvanceClockParams, CancelParams, ControlGrantParams, RequestId, StopPathResumeParams,
+    AdvanceClockParams, CancelParams, ControlGrantParams, CursorTraceParams, RequestId, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams,
 };
 
 /// A host or protocol call, as the supervisor, the stop path and the call table consume it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostRequest {
+    CursorTrace {
+        session: String,
+        since: Option<u64>,
+    },
     ControlGrant {
         reason: String,
         confirmation_id: Option<String>,
@@ -28,6 +32,12 @@ pub enum HostRequest {
     AdvanceClock {
         ms: u64,
     },
+}
+
+#[must_use]
+pub fn read_cursor_trace(params: CursorTraceParams) -> HostRequest {
+    let CursorTraceParams { session, since } = params;
+    HostRequest::CursorTrace { session, since }
 }
 
 #[must_use]

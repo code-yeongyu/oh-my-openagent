@@ -20,7 +20,7 @@ pub use exec::{
     read_window_frame, CallAuthority, ExecRequest, SendPolicy, Verb, WindowVerb,
 };
 pub use host::{
-    read_advance_clock, read_cancel, read_control_grant, read_stop_path_resume,
+    read_advance_clock, read_cancel, read_control_grant, read_cursor_trace, read_stop_path_resume,
     read_stop_path_start, read_stop_path_stop, HostRequest,
 };
 pub use legacy::{

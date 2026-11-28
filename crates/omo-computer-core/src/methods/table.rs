@@ -12,7 +12,7 @@ use crate::params::{
     AdvanceClockParams, AppsOpenParams, AppsQuitParams, AxPerformParams, AxRefParams,
     AxSetValueParams, AxTargetParams, AxTypeTextParams, CancelParams, CaptureParams, ClickParams,
     ClipboardWriteParams, ControlGrantParams, DragParams, DrillParams, ElementAtParams,
-    EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, KeyDownParams, KeyUpParams,
+    CursorTraceParams, EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, KeyDownParams, KeyUpParams,
     MenuItemsParams, MenuSelectParams, MouseDownParams, MouseUpParams, MoveParams, ObserveParams,
     OpenSystemSurfaceParams, PasteParams, PressParams, RaiseWindowParams, ScrollParams,
     SelectTextParams, SessionOpenParams, StopPathResumeParams, StopPathStartParams,
@@ -21,7 +21,7 @@ use crate::params::{
 };
 use crate::results::{
     AxNode, AxSnapshotText, AxTypeTextReply, CapabilitiesReply, CaptureReply, ClipboardContent,
-    ControlState, Diagnosis, DisplayInfo, ExecReply, MenuItems, ObserveReply, PointerPosition,
+    ControlState, CursorTrace, Diagnosis, DisplayInfo, ExecReply, MenuItems, ObserveReply, PointerPosition,
     SessionOpened, StopPathStatus, WaitResult, WindowsReply,
 };
 
@@ -132,6 +132,7 @@ method_table! {
     DisplayRelease = "display.release", Exec, SESSION, EmptyParams => ();
     DisplayResume = "display.resume", Exec, SESSION, EmptyParams => ();
     PreviewSubscribe = "preview.subscribe", Read, SESSION, EmptyParams => ();
+    PresenceCursorTrace = "presence.cursorTrace", Read, SESSION, CursorTraceParams => CursorTrace;
     StopPathStart = "stopPath.start", Exec, AUTHORITY, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, PUBLIC, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, SESSION, EmptyParams => ();

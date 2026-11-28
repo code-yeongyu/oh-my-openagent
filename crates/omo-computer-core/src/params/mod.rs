@@ -41,6 +41,8 @@ mod v1;
 mod verbs;
 mod wait;
 
+params!(CursorTraceParams { session: String; since: u64 });
+
 pub use common::{
     Button, CaptureCaps, Delivery, EmptyParams, ObserveOptions, ObserveRequest, OcrMode, Point,
     RequestId, SettleOptions,

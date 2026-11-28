@@ -633,6 +633,16 @@
         "type": "null"
       }
     },
+    "presence.cursorTrace": {
+      "effect": "read",
+      "exposure": "hostOnly(session)",
+      "params": {
+        "$ref": "#/$defs/CursorTraceParams"
+      },
+      "result": {
+        "$ref": "#/$defs/CursorTrace"
+      }
+    },
     "stopPath.start": {
       "effect": "exec",
       "exposure": "hostOnly(authority)",
@@ -2601,6 +2611,93 @@
         "none"
       ],
       "description": "Whose pointer the pixels carry: the OS one, one the engine composited, or none."
+    },
+    "CursorTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CursorTraceFrame"
+          },
+          "description": "Drawn frames in chronological order, newest last.",
+          "maxItems": 2000
+        },
+        "dropped": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "frames",
+        "dropped"
+      ]
+    },
+    "CursorTraceAction": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "navigate",
+        "click",
+        "drag",
+        "scroll",
+        "text",
+        "key"
+      ]
+    },
+    "CursorTraceFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "t_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "x": {
+          "type": "number",
+          "format": "double"
+        },
+        "y": {
+          "type": "number",
+          "format": "double"
+        },
+        "display": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/CursorTraceAction"
+        }
+      },
+      "required": [
+        "t_ms",
+        "x",
+        "y",
+        "display",
+        "action"
+      ]
+    },
+    "CursorTraceParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "type": "string"
+        },
+        "since": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "session"
+      ]
     },
     "Cut": {
       "type": "object",

@@ -73,6 +73,7 @@ The one-shot `desktop.stop` calls `stopPath.stop`.
 | `display.release` | exec | hostOnly(session) | `EmptyParams` | `()` |
 | `display.resume` | exec | hostOnly(session) | `EmptyParams` | `()` |
 | `preview.subscribe` | read | hostOnly(session) | `EmptyParams` | `()` |
+| `presence.cursorTrace` | read | hostOnly(session) | `CursorTraceParams` | `CursorTrace` |
 | `stopPath.start` | exec | hostOnly(authority) | `StopPathStartParams` | `StopPathStatus` |
 | `stopPath.status` | read | public | `EmptyParams` | `StopPathStatus` |
 | `stopPath.heartbeat` | read | hostOnly(session) | `EmptyParams` | `()` |
