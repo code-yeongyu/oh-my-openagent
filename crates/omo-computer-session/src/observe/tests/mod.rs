@@ -15,7 +15,9 @@ use super::{observe, Request};
 use crate::refs::RefRegistry;
 
 fn fixture(name: &str) -> FakeBackend {
-    FakeBackend::new(FakeScenario::load(&fixtures_dir().join(name)).unwrap_or_else(|e| panic!("{name}: {e}")))
+    FakeBackend::new(
+        FakeScenario::load(&fixtures_dir().join(name)).unwrap_or_else(|e| panic!("{name}: {e}")),
+    )
 }
 
 /// The request the wire params read into.

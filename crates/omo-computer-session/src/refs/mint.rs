@@ -25,7 +25,10 @@ impl RefRegistry {
         let window_id = root.window.id.clone();
         let mut identity_changed = false;
         if drilled.is_none() {
-            let known = self.windows.get(&window_id).and_then(|window| window.key.clone());
+            let known = self
+                .windows
+                .get(&window_id)
+                .and_then(|window| window.key.clone());
             if known.is_some_and(|key| key != root.window) {
                 self.expire(&window_id, Expiry::IdentityChanged);
                 identity_changed = true;
@@ -52,14 +55,20 @@ impl RefRegistry {
                 parent: node.parent,
                 depth: node.depth,
                 logical: node.logical,
-                left_out: node.is_cut().then(|| node.read.child_count - node.children_read),
+                left_out: node
+                    .is_cut()
+                    .then(|| node.read.child_count - node.children_read),
             })
             .collect();
         for node_n in &numbers {
             self.owner.insert(*node_n, window_id.clone());
         }
         self.tick += 1;
-        let index = entries.iter().enumerate().map(|(i, entry)| (entry.n, i)).collect();
+        let index = entries
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| (entry.n, i))
+            .collect();
         self.retained += entries.len();
         let window = self.windows.entry(window_id.clone()).or_default();
         window.generations.insert(
@@ -71,7 +80,10 @@ impl RefRegistry {
                 app: root.app.clone(),
                 window_focused: root.focused,
                 complete: walk.complete,
-                menu_root: walk.nodes.first().is_some_and(|node| node.read.role == "menu"),
+                menu_root: walk
+                    .nodes
+                    .first()
+                    .is_some_and(|node| node.read.role == "menu"),
                 entries,
                 index,
                 last_used: self.tick,
@@ -84,13 +96,23 @@ impl RefRegistry {
             self.age_out(&window_id);
         }
         self.prune(&window_id, drilled.map_or(number, |d| d.top));
-        Minted { generation: number, identity_changed }
+        Minted {
+            generation: number,
+            identity_changed,
+        }
     }
 
     /// Keeps the newest eight full observations of the window and their drills.
     fn age_out(&mut self, window_id: &str) {
-        let Some(window) = self.windows.get_mut(window_id) else { return };
-        let tops: Vec<u64> = window.generations.values().filter(|g| g.parent.is_none()).map(|g| g.number).collect();
+        let Some(window) = self.windows.get_mut(window_id) else {
+            return;
+        };
+        let tops: Vec<u64> = window
+            .generations
+            .values()
+            .filter(|g| g.parent.is_none())
+            .map(|g| g.number)
+            .collect();
         let keep_from = tops.len().saturating_sub(GENERATIONS_PER_WINDOW);
         let mut removed = Vec::new();
         for old in tops.into_iter().take(keep_from) {
@@ -109,7 +131,13 @@ impl RefRegistry {
         let held: std::collections::HashSet<u64> = self
             .windows
             .get(window_id)
-            .map(|window| window.generations.values().flat_map(|g| g.entries.iter().map(|entry| entry.n)).collect())
+            .map(|window| {
+                window
+                    .generations
+                    .values()
+                    .flat_map(|g| g.entries.iter().map(|entry| entry.n))
+                    .collect()
+            })
             .unwrap_or_default();
         for n in removed {
             if !held.contains(n) && self.owner.get(n).is_some_and(|owner| owner == window_id) {
@@ -125,12 +153,19 @@ impl RefRegistry {
             let oldest = self
                 .windows
                 .iter()
-                .flat_map(|(id, window)| window.generations.values().map(move |g| (g.last_used, id.clone(), g.number, g.parent)))
+                .flat_map(|(id, window)| {
+                    window
+                        .generations
+                        .values()
+                        .map(move |g| (g.last_used, id.clone(), g.number, g.parent))
+                })
                 .filter(|(_, id, number, parent)| {
                     parent.is_none() && !(id == fresh_window && (*number == fresh))
                 })
                 .min();
-            let Some((_, id, number, _)) = oldest else { break };
+            let Some((_, id, number, _)) = oldest else {
+                break;
+            };
             let mut removed = Vec::new();
             if let Some(window) = self.windows.get_mut(&id) {
                 removed = numbers_with_drills(window, number);
@@ -171,8 +206,11 @@ fn remove_with_drills(window: &mut WindowRefs, number: u64) -> usize {
 /// Drops the per-window map entries of numbers no kept generation holds: the maps shrink with
 /// the generations they index, so element churn cannot grow them past the retained cap.
 fn forget_unheld(window: &mut WindowRefs) {
-    let held: std::collections::HashSet<u64> =
-        window.generations.values().flat_map(|g| g.entries.iter().map(|entry| entry.n)).collect();
+    let held: std::collections::HashSet<u64> = window
+        .generations
+        .values()
+        .flat_map(|g| g.entries.iter().map(|entry| entry.n))
+        .collect();
     window.last_entry.retain(|n, _| held.contains(n));
     window.by_object.retain(|_, n| held.contains(n));
     window.by_native_id.retain(|_, numbers| {

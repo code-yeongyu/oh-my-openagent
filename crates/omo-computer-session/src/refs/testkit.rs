@@ -3,7 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use omo_computer_core::ax::{AxHandle, AxReader, Evidence, NativeObject, NodeRead, RootRead, Seen, Slice, WindowKey};
+use omo_computer_core::ax::{
+    AxHandle, AxReader, Evidence, NativeObject, NodeRead, RootRead, Seen, Slice, WindowKey,
+};
 use omo_computer_core::backend::{BackendResult, Refusal};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::listing::Rect;
@@ -49,7 +51,12 @@ impl Node {
     }
 
     pub fn at(mut self, x: f64, y: f64) -> Self {
-        self.read.bounds = Some(Rect { x, y, width: 10.0, height: 10.0 });
+        self.read.bounds = Some(Rect {
+            x,
+            y,
+            width: 10.0,
+            height: 10.0,
+        });
         self
     }
 
@@ -82,8 +89,19 @@ pub struct Tree {
 
 impl Tree {
     pub fn window(mut self, id: &str, pid: u32, versions: Vec<Node>) -> Self {
-        let key = WindowKey { id: id.to_owned(), pid, process_start: 1 };
-        self.windows.insert(id.to_owned(), Window { key, versions, current: 0 });
+        let key = WindowKey {
+            id: id.to_owned(),
+            pid,
+            process_start: 1,
+        };
+        self.windows.insert(
+            id.to_owned(),
+            Window {
+                key,
+                versions,
+                current: 0,
+            },
+        );
         self
     }
 
@@ -105,7 +123,9 @@ impl Tree {
         node.object.unwrap_or_else(|| {
             let mut handle = 1_u64 << 40 | u64::try_from(version).unwrap_or(0) << 32;
             for step in path {
-                handle = handle.wrapping_mul(31).wrapping_add(u64::try_from(*step).unwrap_or(0) + 1);
+                handle = handle
+                    .wrapping_mul(31)
+                    .wrapping_add(u64::try_from(*step).unwrap_or(0) + 1);
             }
             handle | 1 << 40
         })
@@ -121,7 +141,12 @@ impl Tree {
 
     /// Every live element: (handle, its path, the node) in the current versions.
     fn find(&self, handle: u64) -> Option<(usize, Vec<usize>, &Node)> {
-        fn visit<'a>(version: usize, path: &mut Vec<usize>, node: &'a Node, handle: u64) -> Option<(usize, Vec<usize>, &'a Node)> {
+        fn visit<'a>(
+            version: usize,
+            path: &mut Vec<usize>,
+            node: &'a Node,
+            handle: u64,
+        ) -> Option<(usize, Vec<usize>, &'a Node)> {
             if Tree::handle_of(version, path, node) == handle {
                 return Some((version, path.clone(), node));
             }
@@ -135,9 +160,14 @@ impl Tree {
             }
             None
         }
-        self.windows
-            .values()
-            .find_map(|window| visit(window.current, &mut Vec::new(), &window.versions[window.current], handle))
+        self.windows.values().find_map(|window| {
+            visit(
+                window.current,
+                &mut Vec::new(),
+                &window.versions[window.current],
+                handle,
+            )
+        })
     }
 }
 
@@ -148,7 +178,10 @@ impl AxReader for Tree {
 
     fn root(&mut self, window: &str) -> BackendResult<RootRead> {
         self.reads += 1;
-        let window = self.windows.get(window).ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
+        let window = self
+            .windows
+            .get(window)
+            .ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
         let root = &window.versions[window.current];
         Ok(RootRead {
             window: window.key.clone(),
@@ -165,7 +198,9 @@ impl AxReader for Tree {
             return Slice::Hung;
         }
         self.now += 1;
-        let Some((version, path, node)) = self.find(parent.0) else { return Slice::Read(Vec::new()) };
+        let Some((version, path, node)) = self.find(parent.0) else {
+            return Slice::Read(Vec::new());
+        };
         let from = usize::try_from(from).unwrap_or(usize::MAX);
         let read = node
             .children
@@ -187,6 +222,9 @@ impl AxReader for Tree {
             self.now += slice_ms;
             return Slice::Hung;
         }
-        Slice::Read(self.find(handle.0).map(|(version, path, node)| Self::served(version, &path, node)))
+        Slice::Read(
+            self.find(handle.0)
+                .map(|(version, path, node)| Self::served(version, &path, node)),
+        )
     }
 }

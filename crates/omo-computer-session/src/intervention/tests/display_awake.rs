@@ -7,7 +7,10 @@ fn a_foreground_lease_ending_releases_the_display_awake_hold_and_nothing_reacqui
     let (backend, _sink) = fake("");
     let mut session = object_session(Box::new(backend));
     assert!(session.framed_click(None).is_ok(), "the click delivered");
-    assert!(session.display_awake.get().holds_display_awake(), "an exec acquires the hold");
+    assert!(
+        session.display_awake.get().holds_display_awake(),
+        "an exec acquires the hold"
+    );
     // Row 21's foreground lease, then the lease ends under the user.
     session.control_grant(params(json!({ "reason": "test" })));
     session.control_release();
@@ -16,7 +19,10 @@ fn a_foreground_lease_ending_releases_the_display_awake_hold_and_nothing_reacqui
         crate::intervention::DisplayAwakeHold::Released,
         "the lease ending releases the hold"
     );
-    assert!(session.framed_click(None).is_ok(), "background click still delivers");
+    assert!(
+        session.framed_click(None).is_ok(),
+        "background click still delivers"
+    );
     assert!(
         !session.display_awake.get().holds_display_awake(),
         "nothing re-acquires the hold after the lease ended"
@@ -33,7 +39,10 @@ fn an_exec_after_session_open_acquires_the_display_awake_hold() {
         "session.open leaves the hold idle, not parked"
     );
     assert!(session.framed_click(None).is_ok(), "the click delivered");
-    assert!(session.display_awake.get().holds_display_awake(), "the exec acquires the hold");
+    assert!(
+        session.display_awake.get().holds_display_awake(),
+        "the exec acquires the hold"
+    );
 }
 
 /// Review L1 of #13355: the grace lapses a held hold between execs, so an exec after an idle gap
@@ -43,9 +52,15 @@ fn an_exec_after_the_grace_lapsed_acquires_a_fresh_hold_not_the_cap() {
     let (backend, _sink) = fake("");
     let clock = backend.clock();
     let mut session = object_session(Box::new(backend));
-    assert!(session.framed_click(None).is_ok(), "the first click delivered");
+    assert!(
+        session.framed_click(None).is_ok(),
+        "the first click delivered"
+    );
     clock.advance(crate::intervention::DEFAULT_DISPLAY_AWAKE_SESSION_CAP_MS);
-    assert!(session.framed_click(None).is_ok(), "the second click delivered");
+    assert!(
+        session.framed_click(None).is_ok(),
+        "the second click delivered"
+    );
     assert!(
         session.display_awake.get().holds_display_awake(),
         "the idle gap lapsed the first hold: {:?}",

@@ -2,8 +2,8 @@
 //! takeover gate and the mid-send watch silently off.
 
 use omo_computer_core::backend::{
-    Backend, BackendResult, Delivered, PermissionProbe, Refusal, Route, StopListener, TaggedInput, WindowFilter,
-    WindowList,
+    Backend, BackendResult, Delivered, PermissionProbe, Refusal, Route, StopListener, TaggedInput,
+    WindowFilter, WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
 use omo_computer_core::error::{EngineCode, Reason};
@@ -23,7 +23,10 @@ impl Backend for ListingFails {
     }
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
         if self.fail {
-            return Err(Refusal::new(EngineCode::Internal, Reason::WindowsUnsupported));
+            return Err(Refusal::new(
+                EngineCode::Internal,
+                Reason::WindowsUnsupported,
+            ));
         }
         self.inner.windows(filter)
     }
@@ -67,7 +70,14 @@ fn an_object_mode_exec_whose_listing_fails_is_refused_with_nothing_sent() {
     let (inner, sink) = fake("");
     let mut session = object_session(Box::new(ListingFails { inner, fail: false }));
     let outcome = session.framed_click(None);
-    let posts: Vec<String> = sink.lines().into_iter().filter(|l| l.starts_with("post_input")).collect();
-    assert!(outcome.is_err(), "sent with the takeover gate off: {posts:?}");
+    let posts: Vec<String> = sink
+        .lines()
+        .into_iter()
+        .filter(|l| l.starts_with("post_input"))
+        .collect();
+    assert!(
+        outcome.is_err(),
+        "sent with the takeover gate off: {posts:?}"
+    );
     assert!(posts.is_empty(), "{posts:?}");
 }

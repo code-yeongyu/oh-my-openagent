@@ -1,8 +1,8 @@
 //! The reads the session's intervention, pause and liveness stages take from the fake: the
 //! scripted session state, the last physical input per pid, and the exited targets.
 
-use omo_computer_core::intervention::{InterventionSource, TargetLiveness, TargetState};
 use omo_computer_core::capabilities::Capabilities;
+use omo_computer_core::intervention::{InterventionSource, TargetLiveness, TargetState};
 use omo_computer_core::session_state::SessionState;
 
 use crate::backend::FakeBackend;
@@ -121,7 +121,10 @@ mod tests {
     #[test]
     fn the_capability_vector_carries_the_scripted_session_for_the_gate() {
         let backend = fake(r#","session_timeline":[{"t_ms":0,"screen_locked":true}]"#);
-        assert_eq!(backend.capabilities().session.screen_locked, Tristate::Known(true));
+        assert_eq!(
+            backend.capabilities().session.screen_locked,
+            Tristate::Known(true)
+        );
         let unscripted = fake("");
         assert_eq!(
             unscripted.capabilities().session,
@@ -157,7 +160,14 @@ mod tests {
             event: InputEvent::Text("a".to_owned()),
             tag: 1,
         };
-        assert!(backend.post_input(&text, Route::BackgroundWindow { window: "101".to_owned() }).is_ok());
+        assert!(backend
+            .post_input(
+                &text,
+                Route::BackgroundWindow {
+                    window: "101".to_owned()
+                }
+            )
+            .is_ok());
         let liveness = reads(&backend).target_liveness("101").expect("exited");
         assert_eq!((liveness.pid, liveness.exit_code), (4242, Some(3)));
     }

@@ -67,8 +67,8 @@ mod tests {
     fn fake(unit: &str) -> (FakeBackend, RecordingSink) {
         let sink = RecordingSink::default();
         let sep = if unit.is_empty() { "" } else { "," };
-        let scenario = FakeScenario::from_json(&format!("{{{WINDOW_101}{sep}{unit}}}"))
-            .expect("scenario");
+        let scenario =
+            FakeScenario::from_json(&format!("{{{WINDOW_101}{sep}{unit}}}")).expect("scenario");
         (
             FakeBackend::with_parts(scenario, FakeClock::default(), sink.clone()),
             sink,
@@ -78,8 +78,18 @@ mod tests {
     #[test]
     fn an_uninterrupted_text_leaves_the_same_single_sink_line_as_post_input() {
         let (mut backend, sink) = fake("");
-        let delivery = backend.post_text("hunter2", Route::BackgroundWindow { window: "101".to_owned() }, 9, &mut |_| false);
-        assert_eq!((delivery.sent, delivery.of, delivery.interrupted), (7, 7, false));
+        let delivery = backend.post_text(
+            "hunter2",
+            Route::BackgroundWindow {
+                window: "101".to_owned(),
+            },
+            9,
+            &mut |_| false,
+        );
+        assert_eq!(
+            (delivery.sent, delivery.of, delivery.interrupted),
+            (7, 7, false)
+        );
         assert_eq!(
             sink.lines(),
             vec![r#"post_input route=backgroundwindow tag=9 text "hunter2""#.to_owned()]
@@ -93,14 +103,19 @@ mod tests {
         let asked = Cell::new(0);
         let delivery = backend.post_text(
             "abcdefghij",
-            Route::BackgroundWindow { window: "101".to_owned() },
+            Route::BackgroundWindow {
+                window: "101".to_owned(),
+            },
             1,
             &mut |b: &mut dyn Backend| {
                 asked.set(asked.get() + 1);
                 b.clock().is_some_and(|clock| clock.now_ms() >= start + 30)
             },
         );
-        assert_eq!((delivery.sent, delivery.of, delivery.interrupted), (3, 10, true));
+        assert_eq!(
+            (delivery.sent, delivery.of, delivery.interrupted),
+            (3, 10, true)
+        );
         assert_eq!(asked.get(), 3);
         assert_eq!(
             sink.lines(),

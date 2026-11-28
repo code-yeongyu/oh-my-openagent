@@ -17,7 +17,11 @@ impl Tier {
     /// The tier of a method, from its row of the method table; an unknown chain is exec.
     #[must_use]
     pub fn of(method: Method) -> Self {
-        match METHODS.iter().find(|spec| spec.method == method).map(|spec| spec.effect) {
+        match METHODS
+            .iter()
+            .find(|spec| spec.method == method)
+            .map(|spec| spec.effect)
+        {
             Some(Effect::Read) => Self::Read,
             Some(Effect::Exec) | None => Self::Exec,
         }

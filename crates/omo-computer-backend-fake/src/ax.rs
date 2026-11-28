@@ -27,10 +27,7 @@ fn lookup<'a>(
         .ok_or_else(|| Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified))?;
     let window = state.snapshots.get(&generation).ok_or_else(stale)?;
     if state.exited.contains(window) {
-        return Err(Refusal::new(
-            EngineCode::StaleRef,
-            Reason::IdentityChanged,
-        ));
+        return Err(Refusal::new(EngineCode::StaleRef, Reason::IdentityChanged));
     }
     let root = state.scenario.ax.get(window).ok_or_else(stale)?;
     let (_, node) = flatten(root).get(index).copied().ok_or_else(stale)?;

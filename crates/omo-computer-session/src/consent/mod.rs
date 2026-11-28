@@ -108,12 +108,14 @@ impl Consent {
 
     /// The host's prompt for `part` was denied (on `app`, for the app-scope and per-app parts).
     pub fn record_denial(&mut self, part: Part, app: Option<&AppTarget>) {
-        self.memory.deny(part, &app.map(AppTarget::key).unwrap_or_default());
+        self.memory
+            .deny(part, &app.map(AppTarget::key).unwrap_or_default());
     }
 
     #[must_use]
     pub fn is_denied(&self, part: Part, app: Option<&AppTarget>) -> bool {
-        self.memory.is_denied(part, &app.map(AppTarget::key).unwrap_or_default())
+        self.memory
+            .is_denied(part, &app.map(AppTarget::key).unwrap_or_default())
     }
 
     /// The presence surface's "Stop computer use in <app>".
@@ -128,7 +130,8 @@ impl Consent {
 
     /// The user approved `app` (again) in the host: the entry is re-bound to what it reads now.
     pub fn approve_app(&mut self, app: &AppTarget) {
-        self.approvals.retain(|entry| !entry.app_key.eq_ignore_ascii_case(&app.app_key));
+        self.approvals
+            .retain(|entry| !entry.app_key.eq_ignore_ascii_case(&app.app_key));
         self.approvals.push(AppEntry {
             app_key: app.app_key.clone(),
             bound: app.bound.clone(),
@@ -178,7 +181,13 @@ impl Consent {
         if is_denied_app(self.os, &app.app_key) && self.view.approved(&app.app_key).is_none() {
             return Err(Denial::on(ConsentRefusal::DeniedApp, app));
         }
-        if self.view.apps.deny.iter().any(|key| key.eq_ignore_ascii_case(&app.app_key)) {
+        if self
+            .view
+            .apps
+            .deny
+            .iter()
+            .any(|key| key.eq_ignore_ascii_case(&app.app_key))
+        {
             return Err(Denial::on(ConsentRefusal::DeniedApp, app));
         }
         if self.memory.is_stopped(&app.key()) {
@@ -186,7 +195,10 @@ impl Consent {
         }
         let binding = self.check_identity(app)?;
         if let Some(scope) = &self.view.scope {
-            if !scope.iter().any(|key| key.eq_ignore_ascii_case(&app.app_key)) {
+            if !scope
+                .iter()
+                .any(|key| key.eq_ignore_ascii_case(&app.app_key))
+            {
                 let denied = self.is_denied(Part::AppScope, Some(app));
                 return Err(Denial::on(
                     if denied {

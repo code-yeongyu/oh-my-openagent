@@ -28,7 +28,8 @@ pub const NOTIFICATION_UNNAMED: Refusal = Refusal::bare(EngineCode::InvalidTarge
 const NO_READER: Refusal = Refusal::new(EngineCode::AxUnsupported, Reason::SnapshotUnsupported);
 
 /// A null-mode session has no `waitFor`.
-const NO_CAPTURE: Refusal = Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported);
+const NO_CAPTURE: Refusal =
+    Refusal::new(EngineCode::CaptureUnavailable, Reason::CaptureUnsupported);
 
 const fn settle_outcome(outcome: SettleOutcome) -> WaitOutcome {
     match outcome {

@@ -26,11 +26,11 @@ pub(crate) use route::{key_event, route_for};
 use std::path::{Path, PathBuf};
 
 use omo_computer_core::backend::{Delivered, Refusal};
-use omo_computer_core::intervention::{Pause, TargetLiveness};
-use omo_computer_core::session_state::SessionState;
 use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::intervention::{Pause, TargetLiveness};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
+use omo_computer_core::session_state::SessionState;
 use serde_json::Value;
 
 use crate::audit::gc::{ArtifactStore, GcLimits};
@@ -42,15 +42,11 @@ use crate::Session;
 use poison::Poisoned;
 
 /// A marker that cannot be persisted: the input is not sent.
-pub const MARKER_UNAVAILABLE: Refusal = Refusal::new(
-    EngineCode::TransactionFailed,
-    Reason::MarkerUnavailable,
-);
+pub const MARKER_UNAVAILABLE: Refusal =
+    Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable);
 /// A marker of this `(issuer, scope)` is outstanding: completion of that call is unknown.
-pub const RECOVERY_REQUIRED: Refusal = Refusal::new(
-    EngineCode::TransactionFailed,
-    Reason::RecoveryRequired,
-);
+pub const RECOVERY_REQUIRED: Refusal =
+    Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired);
 /// The `callId` already completed: its stored receipt answers, nothing is sent.
 pub const REPLAYED: Refusal = Refusal::new(EngineCode::TransactionFailed, Reason::Replayed);
 /// The interaction lock could not be taken.

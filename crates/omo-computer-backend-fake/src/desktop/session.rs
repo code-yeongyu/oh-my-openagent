@@ -69,7 +69,10 @@ impl FakeBackend {
                 .unwrap_or_else(|| serde_json::json!({ "stopHotkey": null })),
         );
         if state.scenario.full_access_preset {
-            if let Some(map) = view.get_or_insert_with(|| serde_json::json!({})).as_object_mut() {
+            if let Some(map) = view
+                .get_or_insert_with(|| serde_json::json!({}))
+                .as_object_mut()
+            {
                 map.insert("fullAccess".to_owned(), serde_json::Value::Bool(true));
             }
         }

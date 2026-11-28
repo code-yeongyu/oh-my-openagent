@@ -164,7 +164,11 @@ pub struct FakeConsentHandle(Arc<Mutex<FakeState>>);
 impl FakeConsentHandle {
     /// The view the next `session.open` reads.
     pub fn set(&self, view: serde_json::Value) {
-        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).scenario.consent = Some(view);
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .scenario
+            .consent = Some(view);
     }
 }
 

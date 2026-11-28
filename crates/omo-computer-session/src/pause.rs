@@ -102,7 +102,8 @@ impl Session {
             waited = waited.saturating_add(step);
             pauses.add(reason, step);
             let backend = &mut self.backend;
-            self.guard.observe(&mut || backend.stop_listener(), &mut NoHolds);
+            self.guard
+                .observe(&mut || backend.stop_listener(), &mut NoHolds);
         }
     }
 }

@@ -16,7 +16,12 @@ impl Session {
     }
 
     /// Writes the refusal's audit line and answers it.
-    pub(super) fn refuse(&mut self, record: Record, stage: Option<String>, refused: Refused) -> Refused {
+    pub(super) fn refuse(
+        &mut self,
+        record: Record,
+        stage: Option<String>,
+        refused: Refused,
+    ) -> Refused {
         let mut record = record;
         record.refused(stage, &refused.refusal);
         let warning = self.append_or_warn(record.event);
@@ -45,7 +50,12 @@ impl Session {
     }
 
     /// A marker refusal: its audit line, then (on a re-drive) the marker cleared by it.
-    pub(super) fn refuse_and_clear(&mut self, record: Record, refused: Refused, clear: bool) -> Refused {
+    pub(super) fn refuse_and_clear(
+        &mut self,
+        record: Record,
+        refused: Refused,
+        clear: bool,
+    ) -> Refused {
         let mut record = record;
         record.refused(Some("Marker".to_owned()), &refused.refusal);
         if let Some(interrupted) = refused.interrupted {

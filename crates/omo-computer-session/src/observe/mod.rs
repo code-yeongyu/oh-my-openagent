@@ -46,7 +46,11 @@ impl Request {
             target,
             since: spec.since,
             query: spec.query.filter(|query| !query.trim().is_empty()),
-            style: Style { skeleton: spec.skeleton.unwrap_or(true), depth: spec.depth, actions: spec.actions.unwrap_or(false) },
+            style: Style {
+                skeleton: spec.skeleton.unwrap_or(true),
+                depth: spec.depth,
+                actions: spec.actions.unwrap_or(false),
+            },
             settle: spec.settle,
         }
     }
@@ -54,7 +58,13 @@ impl Request {
     /// The default read of `target`.
     #[must_use]
     pub fn of(target: &str) -> Self {
-        Self { target: target.to_owned(), since: None, query: None, style: Style::default(), settle: None }
+        Self {
+            target: target.to_owned(),
+            since: None,
+            query: None,
+            style: Style::default(),
+            settle: None,
+        }
     }
 }
 
@@ -70,7 +80,8 @@ fn side(generation: &Generation, outline: Outline) -> Side {
 }
 
 fn minted<'a>(refs: &'a RefRegistry, window: &str, number: u64) -> Result<&'a Generation, Refusal> {
-    refs.generation(window, number).ok_or(Refusal::bare(EngineCode::StaleRef))
+    refs.generation(window, number)
+        .ok_or(Refusal::bare(EngineCode::StaleRef))
 }
 
 fn packet(generation: &Generation, nodes_observed: u32, cuts: Vec<Cut>) -> Observation {
@@ -101,14 +112,20 @@ fn packet(generation: &Generation, nodes_observed: u32, cuts: Vec<Cut>) -> Obser
 ///
 /// # Errors
 /// The reader's refusal of the window root (`WindowNotFound`, ...).
-pub fn observe(refs: &mut RefRegistry, reader: &mut dyn AxReader, request: &Request) -> Result<Observation, Unresolved> {
+pub fn observe(
+    refs: &mut RefRegistry,
+    reader: &mut dyn AxReader,
+    request: &Request,
+) -> Result<Observation, Unresolved> {
     let root = reader.root(&request.target)?;
     let limits = Limits::of(reader);
     let read = walk(reader, root.node.clone(), &limits);
     let nodes = u32::try_from(read.nodes.len()).unwrap_or(u32::MAX);
     // The baseline is taken before the mint: the ninth observe ages the oldest one out.
     let baseline = request.since.and_then(|since| {
-        let generation = refs.generation(&request.target, since).filter(|g| g.parent.is_none())?;
+        let generation = refs
+            .generation(&request.target, since)
+            .filter(|g| g.parent.is_none())?;
         Some(side(generation, generation.outline.clone()?))
     });
     let number = refs.mint(&root, &read, None).generation;
@@ -120,7 +137,10 @@ pub fn observe(refs: &mut RefRegistry, reader: &mut dyn AxReader, request: &Requ
     let mut current = side(generation, outline.clone());
     current.projection = request.query.is_some();
     let mut packet = packet(generation, nodes, cuts);
-    match request.since.map(|_| decide(baseline.as_ref(), &current, nodes)) {
+    match request
+        .since
+        .map(|_| decide(baseline.as_ref(), &current, nodes))
+    {
         Some(Decision::Diff(diff)) => {
             packet.diff = Some(diff);
             packet.baseline = request.since;
@@ -140,22 +160,42 @@ pub fn observe(refs: &mut RefRegistry, reader: &mut dyn AxReader, request: &Requ
 ///
 /// # Errors
 /// The resolution refusals of the token.
-pub fn drill(refs: &mut RefRegistry, reader: &mut dyn AxReader, token: &str, depth: Option<u32>, object_mode: bool) -> Result<Observation, Unresolved> {
+pub fn drill(
+    refs: &mut RefRegistry,
+    reader: &mut dyn AxReader,
+    token: &str,
+    depth: Option<u32>,
+    object_mode: bool,
+) -> Result<Observation, Unresolved> {
     let resolved = refs.resolve(token, object_mode, reader)?;
     let from = minted(refs, &resolved.window, resolved.generation)?;
     let identity = from.entries[resolved.index].identity.clone();
     let top = from.parent.unwrap_or(from.number);
-    let root = RootRead { window: from.window.clone(), app: from.app.clone(), focused: from.window_focused, node: resolved.live.clone() };
+    let root = RootRead {
+        window: from.window.clone(),
+        app: from.app.clone(),
+        focused: from.window_focused,
+        node: resolved.live.clone(),
+    };
     let mut limits = Limits::of(reader);
     if let Some(depth) = depth {
         limits.max_logical_depth = limits.max_logical_depth.min(depth);
     }
     let read = walk(reader, resolved.live, &limits);
     let nodes = u32::try_from(read.nodes.len()).unwrap_or(u32::MAX);
-    let drilled = Drilled { top, from: resolved.generation, index: resolved.index, identity: &identity };
+    let drilled = Drilled {
+        top,
+        from: resolved.generation,
+        index: resolved.index,
+        identity: &identity,
+    };
     let number = refs.mint(&root, &read, Some(drilled)).generation;
     let generation = minted(refs, &resolved.window, number)?;
-    let style = Style { skeleton: false, depth, actions: false };
+    let style = Style {
+        skeleton: false,
+        depth,
+        actions: false,
+    };
     let (outline, cuts) = project::render(generation, style, nodes);
     let mut packet = packet(generation, nodes, cuts);
     packet.tree = Some(outline.text());
@@ -167,5 +207,7 @@ pub fn drill(refs: &mut RefRegistry, reader: &mut dyn AxReader, token: &str, dep
 /// snapshot, not only the rendered lines, and no read of the backend.
 #[must_use]
 pub fn find(refs: &RefRegistry, window: &str, criteria: &Criteria) -> Vec<ElementInfo> {
-    refs.latest(window).map(|generation| query::find(generation, criteria)).unwrap_or_default()
+    refs.latest(window)
+        .map(|generation| query::find(generation, criteria))
+        .unwrap_or_default()
 }

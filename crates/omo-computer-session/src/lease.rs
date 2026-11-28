@@ -215,7 +215,10 @@ mod race_tests {
                 .map(|i| {
                     let (root, barrier) = (dir.path().to_owned(), barrier.clone());
                     std::thread::spawn(move || {
-                        let holder = Holder { session_id: format!("s{round}-{i}"), agent: "a".to_owned() };
+                        let holder = Holder {
+                            session_id: format!("s{round}-{i}"),
+                            agent: "a".to_owned(),
+                        };
                         let token = SessionToken::under(&root, holder).expect("token");
                         barrier.wait();
                         let won = ControlSlot::default().acquire(&token).is_ok();
@@ -231,7 +234,11 @@ mod race_tests {
                 .into_iter()
                 .map(|(won, _token)| won)
                 .collect();
-            assert_eq!(winners.iter().filter(|w| **w).count(), 1, "round {round}: {winners:?}");
+            assert_eq!(
+                winners.iter().filter(|w| **w).count(),
+                1,
+                "round {round}: {winners:?}"
+            );
         }
     }
 
@@ -245,10 +252,15 @@ mod race_tests {
                 .map(|i| {
                     let (root, barrier) = (dir.path().to_owned(), barrier.clone());
                     std::thread::spawn(move || {
-                        let holder = Holder { session_id: format!("w{round}-{i}"), agent: "a".to_owned() };
+                        let holder = Holder {
+                            session_id: format!("w{round}-{i}"),
+                            agent: "a".to_owned(),
+                        };
                         let token = SessionToken::under(&root, holder).expect("token");
                         barrier.wait();
-                        let won = crate::reservation::Reservations::default().admit(&token, &["7".to_owned()], 0).is_ok();
+                        let won = crate::reservation::Reservations::default()
+                            .admit(&token, &["7".to_owned()], 0)
+                            .is_ok();
                         (won, token)
                     })
                 })
@@ -257,7 +269,11 @@ mod race_tests {
                 .map(|handle| handle.join().expect("thread"))
                 .collect::<Vec<_>>();
             let winners: Vec<bool> = results.iter().map(|(won, _)| *won).collect();
-            assert_eq!(winners.iter().filter(|w| **w).count(), 1, "round {round}: {winners:?}");
+            assert_eq!(
+                winners.iter().filter(|w| **w).count(),
+                1,
+                "round {round}: {winners:?}"
+            );
         }
     }
 
@@ -266,11 +282,16 @@ mod race_tests {
     #[test]
     fn a_window_admit_whose_lock_cannot_be_taken_is_refused() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let holder = Holder { session_id: "l4".to_owned(), agent: "a".to_owned() };
+        let holder = Holder {
+            session_id: "l4".to_owned(),
+            agent: "a".to_owned(),
+        };
         let token = SessionToken::under(dir.path(), holder).expect("token");
         let runtime = token.dir().expect("a machine-wide token").to_owned();
-        std::fs::create_dir_all(runtime.join("records.lock")).expect("a lock path that cannot be opened");
-        let refused = crate::reservation::Reservations::default().admit(&token, &["7".to_owned()], 0);
+        std::fs::create_dir_all(runtime.join("records.lock"))
+            .expect("a lock path that cannot be opened");
+        let refused =
+            crate::reservation::Reservations::default().admit(&token, &["7".to_owned()], 0);
         assert!(refused.is_err(), "no reservation is taken without the lock");
     }
 
@@ -279,11 +300,17 @@ mod race_tests {
     #[test]
     fn an_admit_that_reserves_no_window_takes_no_lock() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let holder = Holder { session_id: "l10".to_owned(), agent: "a".to_owned() };
+        let holder = Holder {
+            session_id: "l10".to_owned(),
+            agent: "a".to_owned(),
+        };
         let token = SessionToken::under(dir.path(), holder).expect("token");
         let runtime = token.dir().expect("a machine-wide token").to_owned();
-        std::fs::create_dir_all(runtime.join("records.lock")).expect("a lock path that cannot be opened");
-        assert!(crate::reservation::Reservations::default().admit(&token, &[], 0).is_ok());
+        std::fs::create_dir_all(runtime.join("records.lock"))
+            .expect("a lock path that cannot be opened");
+        assert!(crate::reservation::Reservations::default()
+            .admit(&token, &[], 0)
+            .is_ok());
     }
 
     /// Review L10 (R70ct; A-IS-65 L2): a records.lock that cannot be taken is its own refusal, never
@@ -292,14 +319,24 @@ mod race_tests {
     fn a_records_lock_that_cannot_be_taken_is_not_a_busy_window_or_a_held_slot() {
         use crate::reservation::{AdmitRefusal, Reservations};
         let dir = tempfile::tempdir().expect("tempdir");
-        let holder = Holder { session_id: "l10b".to_owned(), agent: "a".to_owned() };
+        let holder = Holder {
+            session_id: "l10b".to_owned(),
+            agent: "a".to_owned(),
+        };
         let token = SessionToken::under(dir.path(), holder).expect("token");
         let runtime = token.dir().expect("a machine-wide token").to_owned();
-        std::fs::create_dir_all(runtime.join("records.lock")).expect("a lock path that cannot be opened");
+        std::fs::create_dir_all(runtime.join("records.lock"))
+            .expect("a lock path that cannot be opened");
         let window = Reservations::default().admit(&token, &["7".to_owned()], 0);
-        assert!(matches!(window, Err(AdmitRefusal::LockUnavailable)), "{window:?}");
+        assert!(
+            matches!(window, Err(AdmitRefusal::LockUnavailable)),
+            "{window:?}"
+        );
         let slot = ControlSlot::default().acquire(&token);
-        assert!(matches!(slot, Err(crate::lease::SlotRefusal::LockUnavailable)), "{slot:?}");
+        assert!(
+            matches!(slot, Err(crate::lease::SlotRefusal::LockUnavailable)),
+            "{slot:?}"
+        );
     }
 
     /// Review L4: release and report run under the same lock as admit, so a session whose
@@ -311,7 +348,14 @@ mod race_tests {
         for round in 0..300 {
             let dir = tempfile::tempdir().expect("tempdir");
             let make = |name: &str| {
-                SessionToken::under(dir.path(), Holder { session_id: format!("{name}{round}"), agent: "a".to_owned() }).expect("token")
+                SessionToken::under(
+                    dir.path(),
+                    Holder {
+                        session_id: format!("{name}{round}"),
+                        agent: "a".to_owned(),
+                    },
+                )
+                .expect("token")
             };
             let (a, b, c) = (make("a"), make("b"), make("c"));
             let mut mine = Reservations::default();
@@ -338,8 +382,15 @@ mod race_tests {
                 new.join().expect("new")
             });
             if ended {
-                let holder = Reservations::default().check(&c, &window, after).err().map(|busy| busy.holder.session_id);
-                assert_eq!(holder, Some(format!("b{round}")), "round {round}: b's fresh record survives");
+                let holder = Reservations::default()
+                    .check(&c, &window, after)
+                    .err()
+                    .map(|busy| busy.holder.session_id);
+                assert_eq!(
+                    holder,
+                    Some(format!("b{round}")),
+                    "round {round}: b's fresh record survives"
+                );
             }
         }
     }

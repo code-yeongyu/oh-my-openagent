@@ -71,7 +71,10 @@ impl RefRegistry {
         let Some(refs) = drilled.and(self.windows.get(window)) else {
             return Reserved::default();
         };
-        let Some(root) = drilled.and_then(|d| refs.generations.get(&d.from)?.entries.get(d.index)).map(|entry| entry.n) else {
+        let Some(root) = drilled
+            .and_then(|d| refs.generations.get(&d.from)?.entries.get(d.index))
+            .map(|entry| entry.n)
+        else {
             return Reserved::default();
         };
         let mut reserved = Reserved::default();
@@ -87,21 +90,40 @@ impl RefRegistry {
     }
 
     /// The number of every node of `walk`, by the verdict above.
-    pub(crate) fn number(&mut self, window_id: &str, walk: &Walk, reserved: &Reserved, drill: bool) -> Vec<u64> {
+    pub(crate) fn number(
+        &mut self,
+        window_id: &str,
+        walk: &Walk,
+        reserved: &Reserved,
+        drill: bool,
+    ) -> Vec<u64> {
         let window = self.windows.entry(window_id.to_owned()).or_default();
-        let present: HashSet<NativeObject> = walk.nodes.iter().filter_map(|node| node.read.object).collect();
+        let present: HashSet<NativeObject> = walk
+            .nodes
+            .iter()
+            .filter_map(|node| node.read.object)
+            .collect();
         let mut numbers: Vec<Option<u64>> = walk
             .nodes
             .iter()
             .map(|node| {
                 let object = node.read.object?;
                 let n = *window.by_object.get(&object)?;
-                (window.last_entry.get(&n).is_some_and(|(holder, _)| *holder == Some(object))).then_some(n)
+                (window
+                    .last_entry
+                    .get(&n)
+                    .is_some_and(|(holder, _)| *holder == Some(object)))
+                .then_some(n)
             })
             .collect();
         let mut matched: HashSet<u64> = numbers.iter().flatten().copied().collect();
         let mut waiting: BTreeMap<Tuple, Vec<usize>> = BTreeMap::new();
-        for (index, node) in walk.nodes.iter().enumerate().filter(|(i, _)| numbers[*i].is_none()) {
+        for (index, node) in walk
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| numbers[*i].is_none())
+        {
             if let Some(tuple) = tuple(&node.read) {
                 waiting.entry(tuple).or_default().push(index);
             }
@@ -116,7 +138,10 @@ impl RefRegistry {
                 .filter(|n| !matched.contains(n) && !reserved.numbers.contains(n))
                 .filter(|n| {
                     window.last_entry.get(n).is_some_and(|(holder, last)| {
-                        last.as_ref() == Some(&tuple) && holder.is_none_or(|o| !present.contains(&o) && !reserved.objects.contains(&o))
+                        last.as_ref() == Some(&tuple)
+                            && holder.is_none_or(|o| {
+                                !present.contains(&o) && !reserved.objects.contains(&o)
+                            })
                     })
                 })
                 .collect();
@@ -142,7 +167,9 @@ impl RefRegistry {
                 window.by_object.insert(object, *n);
             }
             let tuple = tuple(&node.read);
-            window.last_entry.insert(*n, (node.read.object, tuple.clone()));
+            window
+                .last_entry
+                .insert(*n, (node.read.object, tuple.clone()));
             if let Some(tuple) = tuple {
                 by_tuple.entry(tuple).or_default().push(*n);
             }

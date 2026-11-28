@@ -1,15 +1,16 @@
 //! Row 22 on the fake: the exact `delivered{count, of}` of an interrupted text, the takeover
 //! pause before a send, and a target that exits mid-text.
 
-use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript};
+use omo_computer_backend_fake::{
+    FakeBackend, FakeClock, FakeScenario, RecordingSink, StopPathScript,
+};
 use omo_computer_core::backend::{
     Backend, BackendResult, Delivered, PermissionProbe, Route, StopListener, TaggedInput,
     WindowFilter, WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
 use omo_computer_core::intervention::{
-    BackendClock, InterventionSource, Pause, PauseReason, TargetLiveness, TargetState,
-    TextDelivery,
+    BackendClock, InterventionSource, Pause, PauseReason, TargetLiveness, TargetState, TextDelivery,
 };
 use omo_computer_core::report::Disposition;
 use omo_computer_core::results::ExecReply;
@@ -42,11 +43,19 @@ pub(crate) fn object_session(backend: Box<dyn Backend>) -> Session {
 }
 
 pub(crate) fn wire(refused: &Refused) -> (&'static str, Option<&'static str>) {
-    (refused.refusal.code.wire(), refused.refusal.reason.map(omo_computer_core::error::Reason::wire))
+    (
+        refused.refusal.code.wire(),
+        refused
+            .refusal
+            .reason
+            .map(omo_computer_core::error::Reason::wire),
+    )
 }
 
 pub(crate) fn report(reply: ExecReply) -> omo_computer_core::report::ActionReport {
-    reply.0.expect("an object-mode reply carries the ActionReport")
+    reply
+        .0
+        .expect("an object-mode reply carries the ActionReport")
 }
 
 /// A click on window 101 that names a frame of it captured first (row 20's frame rule, R25);

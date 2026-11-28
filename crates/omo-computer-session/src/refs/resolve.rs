@@ -6,7 +6,9 @@
 //! unread label on the only candidate is `Timeout{resolution_identity_unknown}`. No rung
 //! takes a first match.
 
-use omo_computer_core::ax::{walk, AxReader, Limits, NodeRead, RootRead, Slice, Walk, MAX_LOGICAL_DEPTH, SLICE_MS};
+use omo_computer_core::ax::{
+    walk, AxReader, Limits, NodeRead, RootRead, Slice, Walk, MAX_LOGICAL_DEPTH, SLICE_MS,
+};
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::ElementInfo;
@@ -33,7 +35,10 @@ pub struct Unresolved {
 
 impl From<Refusal> for Unresolved {
     fn from(refusal: Refusal) -> Self {
-        Self { refusal, candidates: Vec::new() }
+        Self {
+            refusal,
+            candidates: Vec::new(),
+        }
     }
 }
 
@@ -58,19 +63,33 @@ impl RefRegistry {
     /// The refusals of [`RefRegistry::locate`], `StaleRef{not_unique_at_capture}`,
     /// `StaleRef{saved_ref_absent}`, `AmbiguousTarget` with candidates,
     /// `Timeout{resolution_identity_unknown}`.
-    pub fn resolve(&mut self, token: &str, object_mode: bool, reader: &mut dyn AxReader) -> Result<Resolved, Unresolved> {
+    pub fn resolve(
+        &mut self,
+        token: &str,
+        object_mode: bool,
+        reader: &mut dyn AxReader,
+    ) -> Result<Resolved, Unresolved> {
         let (window, number, index) = self.locate(token, object_mode)?;
-        let generation = self.generation(&window, number).ok_or(Refusal::bare(EngineCode::StaleRef))?;
+        let generation = self
+            .generation(&window, number)
+            .ok_or(Refusal::bare(EngineCode::StaleRef))?;
         let entry = generation.entries[index].clone();
         let top = generation.parent.unwrap_or(number);
         if let Some(handle) = entry.handle {
             match reader.node(handle, SLICE_MS) {
                 Slice::Hung => return Err(identity_unknown().into()),
-                Slice::Read(Some(live)) if live.stable_text_unknown() && live.role == entry.identity.role => {
+                Slice::Read(Some(live))
+                    if live.stable_text_unknown() && live.role == entry.identity.role =>
+                {
                     return Err(identity_unknown().into())
                 }
                 Slice::Read(Some(live)) if same_element(&entry.identity, &live) => {
-                    return Ok(Resolved { window, generation: number, index, live });
+                    return Ok(Resolved {
+                        window,
+                        generation: number,
+                        index,
+                        live,
+                    });
                 }
                 Slice::Read(_) => {}
             }
@@ -78,7 +97,10 @@ impl RefRegistry {
         if !entry.identity.unique_at_capture {
             return Err(Refusal::new(EngineCode::StaleRef, Reason::NotUniqueAtCapture).into());
         }
-        let newer = self.latest(&window).filter(|latest| latest.number > top).map(|latest| latest.number);
+        let newer = self
+            .latest(&window)
+            .filter(|latest| latest.number > top)
+            .map(|latest| latest.number);
         let mut read = None;
         let mut candidates = match newer {
             Some(latest) => self.cached(&window, latest, &entry.identity),
@@ -102,10 +124,20 @@ impl RefRegistry {
             [only] => {
                 let live = only.read.clone();
                 let (found_in, found_at) = only.at.unwrap_or((number, index));
-                if let Some(entry) = self.windows.get_mut(&window).and_then(|w| w.generations.get_mut(&number)).map(|g| &mut g.entries[index]) {
+                if let Some(entry) = self
+                    .windows
+                    .get_mut(&window)
+                    .and_then(|w| w.generations.get_mut(&number))
+                    .map(|g| &mut g.entries[index])
+                {
                     entry.handle = live.handle;
                 }
-                Ok(Resolved { window, generation: found_in, index: found_at, live })
+                Ok(Resolved {
+                    window,
+                    generation: found_in,
+                    index: found_at,
+                    live,
+                })
             }
             _ => {
                 // Live candidates get fresh tokens: rung 3's read is minted as a sub-generation
@@ -118,32 +150,53 @@ impl RefRegistry {
                         .generation(&window, top)
                         .map(|g| (g.entries[0].identity.clone(), g.window.clone()));
                     if let Some((anchor, stored)) = started {
-                        let drilled = Drilled { top, from: top, index: 0, identity: &anchor };
-                        let root = RootRead { window: stored, ..root };
+                        let drilled = Drilled {
+                            top,
+                            from: top,
+                            index: 0,
+                            identity: &anchor,
+                        };
+                        let root = RootRead {
+                            window: stored,
+                            ..root
+                        };
                         let sub = self.mint(&root, &walk, Some(drilled)).generation;
                         for candidate in &mut candidates {
                             candidate.at = candidate.node.map(|node| (sub, node));
                         }
                     }
                 }
-                let candidates = candidates.iter().map(|c| self.describe(&window, c, token)).collect();
+                let candidates = candidates
+                    .iter()
+                    .map(|c| self.describe(&window, c, token))
+                    .collect();
                 // The fresh tokens identify; they do not license an act. The error marks the
                 // window needs_observe, and the sub-generation minted above, a drill, does not
                 // lift it: only a new full observation does.
                 self.after_error(&window);
-                Err(Unresolved { refusal: Refusal::bare(EngineCode::AmbiguousTarget), candidates })
+                Err(Unresolved {
+                    refusal: Refusal::bare(EngineCode::AmbiguousTarget),
+                    candidates,
+                })
             }
         }
     }
 
     fn cached(&self, window: &str, number: u64, wanted: &Identity) -> Vec<Candidate> {
-        let Some(generation) = self.generation(window, number) else { return Vec::new() };
+        let Some(generation) = self.generation(window, number) else {
+            return Vec::new();
+        };
         generation
             .entries
             .iter()
             .enumerate()
             .filter(|(_, entry)| entry.identity.may_match(wanted))
-            .map(|(index, entry)| Candidate { at: Some((number, index)), node: None, identity: entry.identity.clone(), read: entry.read.clone() })
+            .map(|(index, entry)| Candidate {
+                at: Some((number, index)),
+                node: None,
+                identity: entry.identity.clone(),
+                read: entry.read.clone(),
+            })
             .collect()
     }
 
@@ -152,7 +205,11 @@ impl RefRegistry {
             if let Some(generation) = self.generation(window, number) {
                 let info = generation.element_info(index);
                 // A secure candidate carries role + ref only.
-                return if candidate.read.secure { role_and_ref(info) } else { info };
+                return if candidate.read.secure {
+                    role_and_ref(info)
+                } else {
+                    info
+                };
             }
         }
         ElementInfo {
@@ -200,10 +257,17 @@ fn same_element(identity: &Identity, live: &NodeRead) -> bool {
 }
 
 /// Rung 3: a bounded read of the window, at most 8 levels below the ref's ancestors.
-fn live(reader: &mut dyn AxReader, window: &str, wanted: &Identity) -> Result<(RootRead, Walk, Vec<Candidate>), Unresolved> {
+fn live(
+    reader: &mut dyn AxReader,
+    window: &str,
+    wanted: &Identity,
+) -> Result<(RootRead, Walk, Vec<Candidate>), Unresolved> {
     let root = reader.root(window)?;
     let depth = u32::try_from(wanted.ancestor_path.split('/').count()).unwrap_or(u32::MAX);
-    let limits = Limits { max_logical_depth: depth.saturating_add(8).min(MAX_LOGICAL_DEPTH), ..Limits::of(reader) };
+    let limits = Limits {
+        max_logical_depth: depth.saturating_add(8).min(MAX_LOGICAL_DEPTH),
+        ..Limits::of(reader)
+    };
     let read = walk(reader, root.node.clone(), &limits);
     let ids = identities(&read, None);
     let found = read
@@ -212,7 +276,12 @@ fn live(reader: &mut dyn AxReader, window: &str, wanted: &Identity) -> Result<(R
         .zip(ids)
         .enumerate()
         .filter(|(_, (_, identity))| identity.may_match(wanted))
-        .map(|(node, (walked, identity))| Candidate { at: None, node: Some(node), identity, read: walked.read.clone() })
+        .map(|(node, (walked, identity))| Candidate {
+            at: None,
+            node: Some(node),
+            identity,
+            read: walked.read.clone(),
+        })
         .collect();
     Ok((root, read, found))
 }

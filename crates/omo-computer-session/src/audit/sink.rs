@@ -11,8 +11,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 use super::line::AuditEvent;
 
 /// `Unavailable{reason:"audit_unavailable"}`: the `Internal` row keyed by its reason.
-pub const AUDIT_UNAVAILABLE: Refusal =
-    Refusal::new(EngineCode::Internal, Reason::AuditUnavailable);
+pub const AUDIT_UNAVAILABLE: Refusal = Refusal::new(EngineCode::Internal, Reason::AuditUnavailable);
 
 pub trait AuditSink: Send {
     /// Admission: `Ok` while the next line can be written.

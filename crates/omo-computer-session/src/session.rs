@@ -3,15 +3,15 @@
 //! funnel (`crate::mutate`); consent, receipts and settle policy are added there by later rows.
 
 use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal};
-use omo_computer_core::error::EngineCode;
 use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilities};
+use omo_computer_core::error::EngineCode;
+use omo_computer_core::methods::Method;
 use omo_computer_core::params::{
     Button, ClickParams, ReportMode, SessionOpenParams, TypeTextParams,
 };
 use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::requests::{read_click, read_session_open, read_type_text, V1Request, Verb};
-use omo_computer_core::methods::Method;
 use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
@@ -87,7 +87,10 @@ impl Session {
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
         // Row 21 (A-IS-62, R70ai): the open request's stop_hotkey is compared with the consent file's.
-        let stop_hotkey = request.config.as_ref().and_then(|config| config.stop.stop_hotkey.as_deref());
+        let stop_hotkey = request
+            .config
+            .as_ref()
+            .and_then(|config| config.stop.stop_hotkey.as_deref());
         self.open_control(&resume_token[..16], stop_hotkey)?;
         self.funnel.sweep(SweepTrigger::Open);
         self.open_trace(request.trace, &resume_token[..16]);
@@ -111,7 +114,10 @@ impl Session {
     /// # Errors
     /// Row 21 (A-IS-62 rev 5, R70aq): a carried chord that differs from the consent file's or does
     /// not parse: the call is refused, nothing is disarmed, and the hand reads tampered.
-    pub fn stop_path_start_checked(&mut self, params: StopPathStartParams) -> Result<StopPathStatus, Refusal> {
+    pub fn stop_path_start_checked(
+        &mut self,
+        params: StopPathStartParams,
+    ) -> Result<StopPathStatus, Refusal> {
         let StopPathStartParams { chord } = params;
         // R70as(3): an unreadable configured chord arms NOTHING and refuses.
         self.refuse_unreadable_chord()?;
@@ -141,10 +147,9 @@ impl Session {
         let capabilities = self.sampled_capabilities();
         match self.opened.as_ref().map(|opened| opened.report_mode) {
             Some(ReportMode::Object) => CapabilitiesReply::Object(Box::new(capabilities)),
-            Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(legacy_capabilities(
-                &capabilities,
-                &self.backend.probe_permissions(),
-            ))),
+            Some(ReportMode::Null) | None => CapabilitiesReply::Legacy(Box::new(
+                legacy_capabilities(&capabilities, &self.backend.probe_permissions()),
+            )),
         }
     }
 
@@ -176,8 +181,12 @@ impl Session {
             unreachable!("read_click always reads a click");
         };
         let at = at.ok_or(POINT_REQUIRED)?;
-        let (key, point, check) =
-            self.frame_for(request.target.as_deref(), request.frame_id.as_deref(), at, consume);
+        let (key, point, check) = self.frame_for(
+            request.target.as_deref(),
+            request.frame_id.as_deref(),
+            at,
+            consume,
+        );
         let call = Call {
             verb: VerbKind::Pointer,
             target: TargetRef::read(request.target.as_deref()),
@@ -191,7 +200,10 @@ impl Session {
         events.extend(modifiers.iter().map(|key| key_event(key, true)));
         for _ in 0..count.unwrap_or(1) {
             events.push(InputEvent::Button { button, down: true });
-            events.push(InputEvent::Button { button, down: false });
+            events.push(InputEvent::Button {
+                button,
+                down: false,
+            });
         }
         events.extend(modifiers.iter().rev().map(|key| key_event(key, false)));
         let mutation = Mutation::exec(Method::Click, call, events, route, &request.authority)
@@ -216,7 +228,11 @@ impl Session {
             force: false,
         };
         let route = route_for(Some(target.as_str()), None);
-        self.traced(dispatched, &target, Mutation::typed(Method::TypeText, call, route, text))
+        self.traced(
+            dispatched,
+            &target,
+            Mutation::typed(Method::TypeText, call, route, text),
+        )
     }
 }
 
@@ -297,22 +313,32 @@ mod tests {
         let mut session = session(&sink);
         session.open(params(json!({}))).expect("open");
         start(&mut session);
-        session.capture_frame("1", true, None).expect("a frame of 1");
+        session
+            .capture_frame("1", true, None)
+            .expect("a frame of 1");
         let reply = session.click(params(json!({"target": "1", "x": 3, "y": 4})));
         assert_eq!(reply, Ok(ExecReply(None)));
         assert_eq!(sink.len(), 3, "move, down, up: {:?}", sink.lines());
-        assert!(sink.lines().iter().all(|line| line.contains("route=backgroundwindow")));
+        assert!(sink
+            .lines()
+            .iter()
+            .all(|line| line.contains("route=backgroundwindow")));
     }
 
     #[test]
     fn object_mode_reads_object_capabilities_and_close_ends_the_session() {
         let sink = RecordingSink::default();
         let mut session = session(&sink);
-        let opened = session.open(params(json!({"reportMode": "object"}))).expect("open");
+        let opened = session
+            .open(params(json!({"reportMode": "object"})))
+            .expect("open");
         assert!(matches!(opened.capabilities, CapabilitiesReply::Object(_)));
         assert_eq!(opened.resume_token.len(), 32);
         session.close();
-        assert!(matches!(session.capabilities(), CapabilitiesReply::Legacy(_)));
+        assert!(matches!(
+            session.capabilities(),
+            CapabilitiesReply::Legacy(_)
+        ));
         let after = session.type_text(params(json!({"target": "1", "text": "x"})));
         assert_eq!(after, Err(NOT_OPEN.into()));
     }
