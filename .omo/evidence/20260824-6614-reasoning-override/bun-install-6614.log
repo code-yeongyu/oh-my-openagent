@@ -1,0 +1,30 @@
+bun install v1.3.14 (0d9b296a)
+
+$ node postinstall.mjs
+oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).
+⚠ oh-my-opencode: No platform binary package installed. Tried: oh-my-opencode-linux-x64, oh-my-opencode-linux-x64-baseline
+  The CLI may not work on this platform.
+$ bun run build
+$ bun run script/build.ts
+build:materialize
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+Cloning into '/home/viprix/projects/oom-wt-6614/packages/shared-skills/upstreams/taste-skill'...
+Cloning into '/home/viprix/projects/oom-wt-6614/packages/shared-skills/upstreams/ui-ux-pro-max'...
+fatal: Unable to find current revision in submodule path 'packages/shared-skills/upstreams/open-design'
+file:///home/viprix/projects/oom-wt-6614/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28
+		if (strict) throw new Error(message);
+		                  ^
+
+Error: [materialize-shared-upstreams] git submodule init failed: Command failed: git submodule update --init --recursive packages/shared-skills/upstreams/open-design packages/shared-skills/upstreams/taste-skill packages/shared-skills/upstreams/ui-ux-pro-max packages/shared-skills/upstreams/designpowers
+    at initSubmodules (file:///home/viprix/projects/oom-wt-6614/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:28:21)
+    at materializeSharedUpstreams (file:///home/viprix/projects/oom-wt-6614/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:35:2)
+    at file:///home/viprix/projects/oom-wt-6614/packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:48:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:633:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.16.0
+error: script "build:materialize-frontend" exited with code 1
+build: FAILED: build:materialize failed with exit code 1
+error: script "build" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
