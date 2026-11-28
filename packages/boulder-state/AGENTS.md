@@ -17,6 +17,7 @@ Every `BoulderState` carries `active_work_id` + a `works` map. The root-level fi
 | **Read** (`storage/read-state.ts`) | `readBoulderState`, `getBoulderWorks`, `getActiveWorks`, `getWorkById/ByPlanName/ForSession`, `getWorkResumeOptions`, `getTaskSessionState` |
 | **Write** (`storage/write-state.ts`) | `writeBoulderState`, `clearBoulderState`, `createBoulderState`, `addBoulderWork`, `completeBoulder`, `selectActiveWork`, `generateWorkId` |
 | **Sessions/tasks** (`storage/{session,task}.ts`) | `appendSessionId(ForWork)`, `upsertTaskSessionState(ForWork)`, `startTaskTimer`, `endTaskTimer` |
+| **Completion nudge** (`storage/completion-nudge.ts`) | `markCompletionNudged` stamps `completion_nudged_at` on a work so Atlas sends its completion nudge once per work, across restarts |
 | **Stale works** (`storage/stale-work.ts`) | `reconcileStaleWorks`, `isWorkStale`, `resolveStaleWorkThresholdMs`, `DEFAULT_STALE_WORK_THRESHOLD_MS`, `STALE_WORK_THRESHOLD_ENV_KEY` |
 | **Plans** (`plan-checklist.ts`, `top-level-task.ts`, `storage/plan-progress.ts`) | `getPlanChecklist`, `parsePlanChecklist`, `readCurrentTopLevelTask`, `findPrometheusPlans`, `getPlanProgress`, `getPlanName` |
 | **Paths** (`storage/path.ts`) | `getBoulderFilePath`, `resolveBoulderPlanPath(ForWork)` |

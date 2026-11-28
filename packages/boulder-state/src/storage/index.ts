@@ -1,3 +1,4 @@
+export { markCompletionNudged } from "./completion-nudge"
 export { getBoulderFilePath, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "./path"
 export { findPrometheusPlans, getPlanName, getPlanProgress } from "./plan-progress"
 export {
@@ -30,6 +31,8 @@ export {
 export { endTaskTimer, startTaskTimer, upsertTaskSessionState, upsertTaskSessionStateForWork } from "./task"
 export {
   addBoulderWork,
+  BoulderStateWriteError,
+  type BoulderWriteResult,
   clearBoulderState,
   completeBoulder,
   createBoulderState,

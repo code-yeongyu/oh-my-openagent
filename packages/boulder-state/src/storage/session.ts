@@ -32,7 +32,7 @@ export function appendSessionId(
     const originalSessionOrigins = { ...state.session_origins }
     state.session_ids.push(normalizedSessionId)
     state.session_origins[normalizedSessionId] = origin
-    if (writeBoulderState(directory, state)) {
+    if (writeBoulderState(directory, state).ok) {
       return state
     }
 
@@ -43,7 +43,7 @@ export function appendSessionId(
 
   if (!state.session_origins[normalizedSessionId]) {
     state.session_origins[normalizedSessionId] = origin
-    if (!writeBoulderState(directory, state)) {
+    if (!writeBoulderState(directory, state).ok) {
       return null
     }
   }
@@ -91,5 +91,5 @@ export function appendSessionIdForWork(
     projectWorkToMirror(nextState, updatedWork)
   }
 
-  return writeBoulderState(directory, nextState) ? nextState : null
+  return writeBoulderState(directory, nextState).ok ? nextState : null
 }

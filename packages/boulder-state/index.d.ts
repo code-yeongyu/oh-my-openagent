@@ -37,6 +37,7 @@ export interface BoulderWorkState {
   elapsed_ms?: number
   updated_at?: string
   stale_since?: string
+  completion_nudged_at?: string
   session_ids: string[]
   session_origins?: Record<string, BoulderSessionOrigin>
   agent?: string
@@ -150,6 +151,7 @@ export declare function appendSessionIdForWork(
 ): BoulderState | null
 export declare function clearBoulderState(directory: string): boolean
 export declare function completeBoulder(directory: string, workId?: string, endedAt?: string): BoulderState | null
+export declare function markCompletionNudged(directory: string, workId: string, nudgedAt?: string): boolean
 export declare function createBoulderState(
   planPath: string,
   sessionId: string,
@@ -208,7 +210,13 @@ export declare function upsertTaskSessionStateForWork(
   workId: string,
   input: TaskSessionInput,
 ): BoulderState | null
-export declare function writeBoulderState(directory: string, state: BoulderState): boolean
+export declare class BoulderStateWriteError extends Error {
+  readonly code: string | undefined
+  readonly path: string
+  constructor(path: string, cause: unknown)
+}
+export type BoulderWriteResult = { readonly ok: true } | { readonly ok: false; readonly error: BoulderStateWriteError }
+export declare function writeBoulderState(directory: string, state: BoulderState): BoulderWriteResult
 
 export type MomusReviewVerdict = "okay" | "reject"
 

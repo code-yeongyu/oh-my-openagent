@@ -31,6 +31,8 @@ export interface BoulderWorkState {
   updated_at?: string
   /** When a stale-work reconcile demoted this work to `paused`; cleared when a session resumes it. */
   stale_since?: string
+  /** When the boulder-completion nudge was sent for this work; it is sent at most once per work. */
+  completion_nudged_at?: string
   session_ids: string[]
   session_origins?: Record<string, BoulderSessionOrigin>
   agent?: string

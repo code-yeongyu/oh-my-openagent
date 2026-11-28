@@ -11,6 +11,8 @@ export { readCurrentTopLevelTask } from "./top-level-task"
 export {
   addBoulderWork,
   appendSessionId,
+  BoulderStateWriteError,
+  type BoulderWriteResult,
   appendSessionIdForWork,
   clearBoulderState,
   completeBoulder,
@@ -34,6 +36,7 @@ export {
   hashPlanContent,
   isContainedPlanPath,
   isWorkStale,
+  markCompletionNudged,
   normalizeSessionId,
   readBoulderState,
   reconcileStaleWorks,
