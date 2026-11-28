@@ -207,6 +207,95 @@ describe("validatePluginConfig", () => {
     })
   })
 
+  it("#given the user enables atomic in the opencode block #when validating #then the authorized settings reach the plugin config", () => {
+    withOmoConfig("atomic-user", (fixture) => {
+      writeUserConfig(fixture, { "[opencode]": { atomic: { enabled: true, context: { limit: 8 } } } })
+      writeProjectConfig(fixture, { atomic: { context: { limit: 2 } } })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.messages).toEqual([])
+      expect(result.valid).toBe(true)
+      expect(result.config.atomic).toEqual({
+        enabled: true,
+        context: { enabled: true, limit: 2, budget_chars: 8000, timeout_ms: 1000, cache_ttl_ms: 15_000 },
+        recording: { enabled: true, owner: "auto", timeout_ms: 30_000 },
+      })
+    })
+  })
+
+  it("#given a project that enables atomic and sets binary_path #when validating #then both are ignored with a warning and the config stays valid", () => {
+    withOmoConfig("atomic-project", (fixture) => {
+      writeProjectConfig(fixture, {
+        atomic: { enabled: true },
+        "[opencode]": { atomic: { binary_path: "/tmp/evil/atomic" } },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.valid).toBe(true)
+      expect(result.config.atomic).toBeUndefined()
+      expect(result.warnings).toEqual([
+        "config: ~/project/.omo/omo.jsonc: atomic.enabled ignored (user config only)",
+        "config: ~/project/.omo/omo.jsonc: [opencode].atomic.binary_path ignored (user config only)",
+      ])
+    })
+  })
+
+  it("#given an invalid [opencode].atomic value #when validating #then the value is dropped and the rest of atomic still applies", () => {
+    withOmoConfig("atomic-invalid", (fixture) => {
+      writeUserConfig(fixture, { "[opencode]": { atomic: { enabled: true, recording: { owner: "nobody" } } } })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.atomic?.enabled).toBe(true)
+      expect(result.config.atomic?.recording?.owner).toBe("auto")
+      expect(result.warnings).toContain(
+        "config: ~/.omo/omo.jsonc: [opencode].atomic.recording.owner ignored (invalid value)",
+      )
+    })
+  })
+
+  it("#given atomic absent, false, or enabled only by the project #when validating #then the plugin config equals the origin/dev capture", () => {
+    // Plugin config for this user block, captured from origin/dev eb6f16df59 before `atomic` existed.
+    const originDevConfig = {
+      git_master: { commit_footer: false, include_co_authored_by: true, git_env_prefix: "GIT_MASTER=1" },
+      tui: { sidebar: { enabled: false } },
+      agent_definitions: [],
+      disabled_agents: [],
+      disabled_mcps: [],
+      disabled_hooks: ["comment-checker"],
+      disabled_commands: [],
+      disabled_skills: [],
+      disabled_tools: [],
+      disabled_providers: [],
+      mcp_env_allowlist: [],
+    }
+    const user = { "[opencode]": { tui: { sidebar: { enabled: false } }, disabled_hooks: ["comment-checker"] } }
+    const variants = [
+      { user, project: undefined },
+      { user: { ...user, atomic: { enabled: false, context: { limit: 3 } } }, project: undefined },
+      {
+        user,
+        project: {
+          atomic: { enabled: true, binary_path: "/tmp/evil/atomic" },
+          "[opencode]": { atomic: { enabled: true } },
+        },
+      },
+    ]
+
+    for (const [index, variant] of variants.entries()) {
+      withOmoConfig(`atomic-off-${index}`, (fixture) => {
+        writeUserConfig(fixture, variant.user)
+        if (variant.project !== undefined) writeProjectConfig(fixture, variant.project)
+
+        const result = validatePluginConfig(fixture.project)
+
+        expect(result.config).toEqual(originDevConfig)
+      })
+    }
+  })
+
   it("#given unknown opencode keys #when validating #then reports and strips every unknown path without losing known values", () => {
     withOmoConfig("unknown-keys", (fixture) => {
       writeProjectConfig(fixture, {

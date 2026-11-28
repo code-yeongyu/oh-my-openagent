@@ -8,7 +8,9 @@ import {
   type OmoConfigEnv,
   type OmoModelReferenceDiagnostic,
   resolveModelReferences,
+  resolveOmoAtomicPolicy,
   resolveOmoConfigView,
+  type ResolvedOmoAtomicPolicy,
 } from "@oh-my-opencode/omo-config-core"
 
 export type OmoOpenCodeConfigView = {
@@ -20,6 +22,7 @@ export type OmoOpenCodeConfigView = {
 }
 
 export type OmoOpenCodeConfigChain = {
+  readonly atomic: ResolvedOmoAtomicPolicy
   readonly diagnostics: readonly (OmoConfigDiagnostic | OmoModelReferenceDiagnostic)[]
   readonly protectedUserView: Record<string, unknown>
   readonly views: readonly OmoOpenCodeConfigView[]
@@ -193,8 +196,17 @@ export function loadOmoOpenCodeConfigChain(
     protectedUserView = mergeOmoConfigRecords(protectedUserView, block(profile(layer.config, selectedProfile)))
   }
 
+  // The loader resolved its policy without a harness; the OpenCode view also folds `[opencode].atomic`.
+  const atomic = resolveOmoAtomicPolicy({
+    layers: loaded.layers,
+    harness: "opencode",
+    ...(selectedProfile === undefined ? {} : { profile: selectedProfile }),
+  })
+  const loaderDiagnostics = loaded.diagnostics.filter((diagnostic) => diagnostic.kind !== "unauthorized-setting")
+
   return {
-    diagnostics: [...loaded.diagnostics, ...resolvedModels.diagnostics],
+    atomic,
+    diagnostics: [...loaderDiagnostics, ...atomic.diagnostics, ...resolvedModels.diagnostics],
     protectedUserView,
     views,
   }

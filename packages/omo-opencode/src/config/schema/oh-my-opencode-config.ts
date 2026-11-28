@@ -1,3 +1,4 @@
+import { OmoAtomicSettingsLayerSchema } from "@oh-my-opencode/omo-config-core"
 import { z } from "zod"
 import { AnyMcpNameSchema } from "../../mcp/types"
 import { AgentDefinitionsConfigSchema } from "./agent-definitions"
@@ -106,6 +107,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: UlwExecuteConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
+  /** Atomic CLI integration; validatePluginConfig replaces it with the user-authorized settings. */
+  atomic: OmoAtomicSettingsLayerSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

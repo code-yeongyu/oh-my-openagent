@@ -3,7 +3,7 @@ import { setSkillSourceProvenance } from "@oh-my-opencode/skills-loader-core/ope
 import { knownUserSkillRoots } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
 import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
-import { omoConfigDiagnosticLines, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { applyOmoAtomicPolicy, omoConfigDiagnosticLines, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 import type * as z from "zod"
 
 import { applyDisabledProviders } from "../shared/disabled-providers"
@@ -206,13 +206,18 @@ export function validatePluginConfig(
   // counting it here would make `valid` false and report a working config as invalid in doctor.
   // An ignored invalid value is the same: the rest of its file loads, so it is a warning.
   const failing = chain.diagnostics.filter(
-    (diagnostic) => diagnostic.kind !== "deprecated-keys" && diagnostic.kind !== "invalid-value",
+    (diagnostic) =>
+      diagnostic.kind !== "deprecated-keys" &&
+      diagnostic.kind !== "invalid-value" &&
+      diagnostic.kind !== "unauthorized-setting",
   )
   const chainMessages = failing.map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
   const messages = [...chainMessages, ...views.flatMap((view) => view.messages)]
   const warnings = [
     ...omoConfigDiagnosticLines(
-      chain.diagnostics.flatMap((diagnostic) => (diagnostic.kind === "invalid-value" ? [diagnostic] : [])),
+      chain.diagnostics.flatMap((diagnostic) =>
+        diagnostic.kind === "invalid-value" || diagnostic.kind === "unauthorized-setting" ? [diagnostic] : [],
+      ),
       { homeDir },
     ),
     ...views.flatMap((view) => view.warnings),
@@ -222,7 +227,9 @@ export function validatePluginConfig(
   const userConfig = parseConfig(
     prunePluginView({ config: chain.protectedUserView, homeDir, keyPrefix: "", path: "" }).config,
   )
-  const config = applyDisabledProviders(materializeAgentModelChains(protectUserFields(mergeViews(views), userConfig)))
+  const config = applyDisabledProviders(
+    materializeAgentModelChains(applyOmoAtomicPolicy(protectUserFields(mergeViews(views), userConfig), chain.atomic)),
+  )
   warnLegacyUlwExecuteKey(chain.views)
   if (config.skills) {
     const owner = chain.views.findLast((view) => Object.hasOwn(view.config, "skills"))
