@@ -42,8 +42,9 @@ It writes `<artifact>.sha256` files and `operator-darwin-manifest.json`, then up
 Dispatch `publish.yml` with these inputs:
 - `prepared_release_sha`;
 - `operator_darwin_artifacts=operator-darwin-<sha12>`;
-- `operator_darwin_manifest_sha256=<sha256 of the staged operator-darwin-manifest.json>`. The run trusts the draft's files only through that manifest, so editing the draft after dispatch cannot swap an artifact;
 - if hosted CI is also waived, the `ci_basis_receipt` inputs.
+
+The `operator_darwin_manifest_sha256` dispatch input was removed from `publish.yml` to keep the workflow within GitHub's 10-input `workflow_dispatch` limit, so `gate-reuse` currently refuses any run that sets `operator_darwin_artifacts` (the manifest pin is always empty). The operator-built darwin path stays available in `publish-platform.yml` for a caller that passes the manifest; restoring the dispatch input (or combining the two darwin inputs into one) re-enables it.
 
 `gate-reuse` refuses the input in any of these cases:
 - `prepared_release_sha` is not a 40-hex SHA;
