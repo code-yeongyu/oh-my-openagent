@@ -1679,6 +1679,9 @@
   "packages/omo-senpi/src/components/thread/component.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-senpi/src/components/thread/gateway/backlog-admission.test.ts": {
+    "omo-testing/no-flake-masking": 1
+  },
   "packages/omo-senpi/src/components/thread/gateway/cross-process.test.ts": {
     "omo-testing/no-flake-masking": 1
   },

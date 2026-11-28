@@ -64,14 +64,16 @@ function pagingAccount(entries: ThreadTranscriptEntry[], leaf?: string) {
       },
     },
   }
-  const run = (args: JsonObject) => fixture.surface(remote, {}).run("thread_read", { thread: "dur-on-b", ...args })
-  const localAt = (at: string | null, args: JsonObject) =>
-    fixture
-      .surface(remote, { sessions: [LOCAL], engine: { ...ENGINE, messages: senpiContext(log.entries, at) } })
-      .run("thread_read", { thread: "dur-local", ...args })
+  const remoteSurface = fixture.surface(remote, {})
+  const run = (args: JsonObject) => remoteSurface.run("thread_read", { thread: "dur-on-b", ...args })
+  const localReader = (at: string | null) => {
+    const surface = fixture.surface(remote, { sessions: [LOCAL], engine: { ...ENGINE, messages: senpiContext(log.entries, at) } })
+    return (args: JsonObject) => surface.run("thread_read", { thread: "dur-local", ...args })
+  }
+  const localAt = (at: string | null, args: JsonObject) => localReader(at)(args)
   const reads = () =>
     replies.filter((reply) => reply.rpc["type"] === "get_entries" || reply.rpc["type"] === "get_messages")
-  return { run, localAt, log, reads }
+  return { run, localAt, localReader, log, reads }
 }
 
 const cursorOf = (result: ThreadToolResult) => (result as { next_cursor?: string }).next_cursor
@@ -121,7 +123,8 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
   ] as const)(
     "#given %s on b #when thread_read walks every page #then it reads exactly what this device's engine reads for that session",
     async (_label, entries, leaf) => {
-      const { run, localAt } = pagingAccount([...entries], leaf)
+      const { run, localReader } = pagingAccount([...entries], leaf)
+      const readLocal = localReader(leaf)
       const walk = async (read: (args: JsonObject) => Promise<ThreadToolResult>) => {
         const items: unknown[] = []
         for (let cursor: string | undefined, page = 0; page < 100; page += 1) {
@@ -134,12 +137,9 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
         throw new Error("the walk did not end")
       }
       const there = await walk(run)
-      expect(there).toEqual(await walk((args) => localAt(leaf, args)))
+      expect(there).toEqual(await walk(readLocal))
       expect(there.length).toBe(Math.min(60, senpiContext([...entries], leaf).length))
     },
-    // The branched walk pages up to 100 times over real harness calls; under CPU contention the
-    // 5 s default kills the case and its cleanup (#15037). The bound matches the work.
-    30_000,
   )
 
   test("#given a session with more than a window of messages since its compaction #when thread_read runs cold #then one page of b's newest entries answers it (the compaction's kept entries are never fetched), as this device's engine reads it", async () => {
