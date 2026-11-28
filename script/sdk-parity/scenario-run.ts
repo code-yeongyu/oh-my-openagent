@@ -72,8 +72,8 @@ const SDK_ENTRY = "packages/omo-senpi/src/components/omo-sdk/index.ts"
 
 // The child imports the tree's own SDK entry, so the merge base answers with the merge base's code.
 const SDK_DRIVER = `
-const [entry, member, home, cwd] = process.argv.slice(1)
-const sdk = (await import(entry)).createOmoSdk({ env: { HOME: home }, cwd })
+const [entry, member, home, cwd, environment] = process.argv.slice(1)
+const sdk = (await import(entry)).createOmoSdk({ env: environment === "process" ? {} : { HOME: home }, cwd })
 const call = member.split(".").reduce((node, key) => node[key], sdk)
 process.stdout.write(JSON.stringify(await call()))
 `
@@ -88,15 +88,27 @@ async function runSdk(tree: string, scenario: SdkScenario): Promise<Outcome> {
       mkdirSync(dirname(join(home, path)), { recursive: true })
       writeFileSync(join(home, path), content)
     }
-    const child = Bun.spawn([process.execPath, "-e", SDK_DRIVER, join(tree, SDK_ENTRY), scenario.member, home, cwd], {
-      cwd,
-      env: { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, TMPDIR: sandbox, NO_COLOR: "1" },
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: CLI_BUDGET_MS,
-      killSignal: "SIGKILL",
-    })
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        SDK_DRIVER,
+        join(tree, SDK_ENTRY),
+        scenario.member,
+        home,
+        cwd,
+        ...(scenario.environment === undefined ? [] : [scenario.environment]),
+      ],
+      {
+        cwd,
+        env: { PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, HOME: home, TMPDIR: sandbox, NO_COLOR: "1" },
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: CLI_BUDGET_MS,
+        killSignal: "SIGKILL",
+      },
+    )
     const [stdout, stderr, exit] = await Promise.all([
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
@@ -143,7 +155,7 @@ async function runLoopParse(tree: string, scenario: LoopParseScenario): Promise<
   return { brief: parser.positionalText(scenario.argv) }
 }
 
-async function runScenarios(
+export async function runScenarios(
   tree: string,
   scenarios: readonly Scenario[] = SCENARIOS,
 ): Promise<Record<string, Outcome>> {

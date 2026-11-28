@@ -77,6 +77,22 @@ const KINDS: Readonly<Record<string, { readonly args: number; readonly check: Ki
         : "the outcomes differ outside the answer's value"
     },
   },
+  // A security ruling turns a formerly answering scenario into a refusal: the base answers, the head refuses with an
+  // error object, and the outcome envelope is otherwise byte-equal. The single argument names the public tracking
+  // issue of the ruling (#15220); it is bound into the exemption detail like any other argument.
+  "refusal-by-ruling": {
+    args: 1,
+    check: (declaration, _scenario, before, after) => {
+      if (!/^#?[1-9]\d*$/.test(declaration.args[0] ?? "")) return "its argument must name a public issue number"
+      if (!answers(before)) return "the kind refusal-by-ruling needs the merge base to answer"
+      if (!refuses(after) || Array.isArray(resultOf(after)?.error))
+        return "the kind refusal-by-ruling needs the head to refuse"
+      if (resultOf(before)?.kind !== "ok") return "the merge base's answer is not ok"
+      const oldEnvelope = without(before, ({ kind: _kind, value: _value, ...rest }) => rest)
+      const newEnvelope = without(after, ({ kind: _kind, error: _error, ...rest }) => rest)
+      return oldEnvelope === newEnvelope ? undefined : "the outcomes differ outside the answer becoming a refusal"
+    },
+  },
   // Both trees refuse with an error object, and the outcomes are byte-equal apart from error.next_action and
   // error.details. A refusal the host throws before the call runs has no result, so this kind cannot reach it.
   refusal: {
@@ -151,7 +167,8 @@ function judgeDeclaration(
   const where = `SDK-Parity-Changed: ${declaration.scenario}`
   if (JSON.stringify(before) === JSON.stringify(after))
     return `${where}: its outcome is equal on the merge base and the head; there is nothing to declare`
-  if (refuses(before) !== refuses(after))
+  // A security ruling is the one declared change that crosses the answer/refusal line; its kind judges the direction.
+  if (refuses(before) !== refuses(after) && declaration.kind !== "refusal-by-ruling")
     return `${where}: it answers on one tree and refuses on the other, which is not admitted by a declaration; its route is the authority matrix`
   const problem = KINDS[declaration.kind]?.check(declaration, scenario, before, after, context)
   if (problem !== undefined) return `${where} ${declaration.kind}: ${problem}`
