@@ -584,9 +584,38 @@ printf 'finished\\n' >&3
           env: { ...process.env, CLAUDE_PROJECT_DIR: fixture.repo, TMPDIR: sibling } as HookEnv,
         })
         expect(result.exitCode).toBe(0)
-        expect(result.stdout.toString().trim()).toBe(join(realpathSync(sibling), "oh-my-openagent-cleanup.log"))
+        // The caller's own spelling, not the resolved physical path (#11647): containment is
+        // still decided on identities, the display mirrors what the caller passed.
+        expect(result.stdout.toString().trim()).toBe(join(sibling, "oh-my-openagent-cleanup.log"))
         expect(result.stderr.toString()).toBe("")
       } finally {
+        rmSync(sibling, { recursive: true, force: true })
+        removeFixture(fixture)
+      }
+    },
+  )
+
+  posixBashTest(
+    "#given a symlinked temp directory beside the project #when the launcher resolves its log #then it reports the symlink spelling",
+    () => {
+      const fixture = createFixture("#!/usr/bin/env bash\nprintf 'safe-log\\n'\n")
+      const sibling = `${fixture.repo}-sibling`
+      const link = `${fixture.repo}-link`
+      mkdirSync(sibling, { recursive: true })
+      symlinkSync(sibling, link)
+      try {
+        const result = Bun.spawnSync({
+          cmd: ["bash", "./cleanup-hook.sh", "--print-log-file"],
+          cwd: fixture.agentDir,
+          stdout: "pipe",
+          stderr: "pipe",
+          env: { ...process.env, CLAUDE_PROJECT_DIR: fixture.repo, TMPDIR: link } as HookEnv,
+        })
+        expect(result.exitCode).toBe(0)
+        expect(result.stdout.toString().trim()).toBe(join(link, "oh-my-openagent-cleanup.log"))
+        expect(result.stderr.toString()).toBe("")
+      } finally {
+        rmSync(link, { force: true })
         rmSync(sibling, { recursive: true, force: true })
         removeFixture(fixture)
       }

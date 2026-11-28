@@ -120,10 +120,14 @@ resolve_log_dir() {
     printf '%s\n' "$fallback"
     return 0
   fi
-  printf '%s\n' "${physical_candidate%/}"
+  if [ "${1:-}" = "--print-log-file" ]; then
+    printf '%s\n' "${candidate%/}"
+  else
+    printf '%s\n' "${physical_candidate%/}"
+  fi
 }
 
-LOG_DIR="$(resolve_log_dir)"
+LOG_DIR="$(resolve_log_dir "${1:-}")"
 if [ -n "$LOG_DIR" ]; then
   LOG_FILE="${LOG_DIR%/}/oh-my-openagent-cleanup.log"
 else

@@ -8,7 +8,7 @@
 // rather than passes. The pinned sets below are the detector's own output; update them only with a security review.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { join, relative } from "node:path"
+import { join, relative, resolve } from "node:path"
 import { parseSync } from "oxc-parser"
 import { spawnCallSites } from "./spawn-call-sites"
 
@@ -144,8 +144,18 @@ async function graph(root: string): Promise<Record<string, Input>> {
   const inputs = built.metafile?.inputs
   if (inputs === undefined || Object.keys(inputs).length === 0)
     throw new Error(`the bundler returned no module graph for ${root}`)
+  // Bun.build's metafile paths (input keys and their import entries) are relative to process.cwd(),
+  // not to the `root` option, so normalize every file path to repo-root-relative; scheme-prefixed
+  // and bare specifiers stay as written. The pinned sets below then match from any cwd (#15090).
+  const toRepoPath = (path: string): string =>
+    path.startsWith("node:") || path.startsWith("bun:") || !path.includes("/")
+      ? path
+      : relative(repoRoot, resolve(process.cwd(), path)).replaceAll("\\", "/")
   return Object.fromEntries(
-    Object.entries(inputs).map(([file, input]) => [relative(repoRoot, at(file)).replaceAll("\\", "/"), input]),
+    Object.entries(inputs).map(([file, input]) => [
+      toRepoPath(resolve(process.cwd(), file)),
+      { ...input, imports: input.imports.map((entry) => ({ ...entry, path: toRepoPath(entry.path) })) },
+    ]),
   )
 }
 
