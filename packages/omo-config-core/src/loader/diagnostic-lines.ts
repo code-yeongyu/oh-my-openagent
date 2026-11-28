@@ -47,6 +47,8 @@ export function omoConfigDiagnosticLines(
         return (diagnostic.issuePaths ?? []).map((key) => `config: ${file}: ${key} ignored (invalid value)`)
       case "unknown-keys":
         return (diagnostic.issuePaths ?? []).map((key) => `config: ${file}: ${key} ignored (unknown key)`)
+      case "unauthorized-setting":
+        return (diagnostic.issuePaths ?? []).map((key) => `config: ${file}: ${key} ignored (user config only)`)
       case "parse":
       case "read":
       case "validation":

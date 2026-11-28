@@ -32,6 +32,7 @@ function isErrorDiagnostic(diagnostic: SenpiConfigDiagnostic, result: SenpiOmoCo
     case "deprecated-keys":
     case "invalid-value":
     case "profile":
+    case "unauthorized-setting":
     case "unknown-keys":
       return false
   }

@@ -68,17 +68,21 @@ function withoutControlKeys(config: Readonly<Record<string, unknown>>): Record<s
 
 // The legacy block is folded in FIRST so the canonical `[native]` block wins every key it also
 // sets, while a config that only ever named `[senpi]` keeps applying in full.
-function harnessLayer(
-  config: Readonly<Record<string, unknown>>,
-  harness?: OmoHarnessId | OmoLegacyHarnessId | HarnessId,
-): Record<string, unknown> {
-  if (harness === undefined) return {}
+export function harnessBlockKeys(harness?: OmoHarnessId | OmoLegacyHarnessId | HarnessId): readonly string[] {
+  if (harness === undefined) return []
   const canonical = canonicalHarnessName(harness)
   const legacyKeys = Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES)
     .filter(([, target]) => target === canonical)
     .map(([legacy]) => harnessBlockKey(legacy))
+  return [...legacyKeys, harnessBlockKey(canonical)]
+}
+
+function harnessLayer(
+  config: Readonly<Record<string, unknown>>,
+  harness?: OmoHarnessId | OmoLegacyHarnessId | HarnessId,
+): Record<string, unknown> {
   let layer: Record<string, unknown> = {}
-  for (const key of [...legacyKeys, harnessBlockKey(canonical)]) {
+  for (const key of harnessBlockKeys(harness)) {
     layer = mergeOmoConfigRecords(layer, toRecord(config[key]) ?? {})
   }
   return layer

@@ -2,7 +2,14 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs"
 import type { OmoConfig, OmoHarnessId, OmoLegacyHarnessId } from "../schema"
 
 export type OmoConfigDiagnosticKind =
-  "deprecated-keys" | "invalid-value" | "parse" | "profile" | "read" | "unknown-keys" | "validation"
+  | "deprecated-keys"
+  | "invalid-value"
+  | "parse"
+  | "profile"
+  | "read"
+  | "unauthorized-setting"
+  | "unknown-keys"
+  | "validation"
 
 /** The `path` of a diagnostic about the merged config rather than one file. */
 export const MERGED_OMO_CONFIG_PATH = "(merged omo config)"

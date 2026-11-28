@@ -9,6 +9,7 @@ import {
   type LegacyHarnessRename,
   type OmoConfig,
 } from "../schema"
+import { applyOmoAtomicPolicy, resolveOmoAtomicPolicy } from "./atomic-policy"
 import { collectExcludedModels } from "./disabled-skills"
 import { invalidValueDiagnostics, validateConfigLayer, validationDiagnostic } from "./layer-validation"
 import { mergeOmoConfigRecords } from "./merge"
@@ -185,7 +186,9 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     ...(options.harness === undefined ? {} : { harness: options.harness }),
     ...(requestedProfile === undefined ? {} : { profile: requestedProfile }),
   })
-  const finalInput = mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolved.config)
+  // `atomic` is resolved from user-scoped layers by the policy below, never from the merged view.
+  const { atomic: _mergedAtomic, ...resolvedConfig } = resolved.config
+  const finalInput = mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolvedConfig)
   const finalConfig = OmoConfigSchema.safeParse(finalInput)
   // The generic merge lets a later array replace an earlier one; the model denylist is a union.
   const excludeModels = collectExcludedModels({
@@ -193,12 +196,19 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
     ...(options.harness === undefined ? {} : { harness: options.harness }),
     ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
   })
-  const withExcludedModels = (config: OmoConfig): OmoConfig =>
-    excludeModels.length === 0 ? config : { ...config, exclude_models: [...excludeModels] }
+  const atomicPolicy = resolveOmoAtomicPolicy({
+    layers,
+    ...(options.harness === undefined ? {} : { harness: options.harness }),
+    ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
+  })
+  const withExcludedModels = (config: OmoConfig): OmoConfig => {
+    const authorized = applyOmoAtomicPolicy(config, atomicPolicy)
+    return excludeModels.length === 0 ? authorized : { ...authorized, exclude_models: [...excludeModels] }
+  }
   if (finalConfig.success) {
     return {
       config: withExcludedModels(stripResolutionControlKeys(finalConfig.data)),
-      diagnostics: [...diagnostics, ...resolved.diagnostics],
+      diagnostics: [...diagnostics, ...resolved.diagnostics, ...atomicPolicy.diagnostics],
       layers,
       ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
       sources,
@@ -217,6 +227,7 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
       diagnostics: [
         ...diagnostics,
         ...resolved.diagnostics,
+        ...atomicPolicy.diagnostics,
         ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped),
       ],
       layers,
@@ -226,10 +237,14 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
   }
 
   return {
-    config: stripResolutionControlKeys(OmoConfigSchema.parse(DEFAULT_RAW_CONFIG)) satisfies OmoConfig,
+    config: applyOmoAtomicPolicy(
+      stripResolutionControlKeys(OmoConfigSchema.parse(DEFAULT_RAW_CONFIG)),
+      atomicPolicy,
+    ) satisfies OmoConfig,
     diagnostics: [
       ...diagnostics,
       ...resolved.diagnostics,
+      ...atomicPolicy.diagnostics,
       validationDiagnostic(MERGED_OMO_CONFIG_PATH, finalConfig.error.issues),
     ],
     layers,
