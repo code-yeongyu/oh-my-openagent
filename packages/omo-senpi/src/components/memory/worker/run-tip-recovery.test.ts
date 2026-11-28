@@ -102,6 +102,8 @@ describe("tip recovery after a dead supervisor", () => {
     ["a clean exit the bootstrap marked timed out", { ...CLEAN_EXIT, timedOut: true }],
     ["a finish time before the run started", { ...CLEAN_EXIT, finishedAt: "2000-01-01T00:00:00.000Z" }],
     ["a numeric finish time", { ...CLEAN_EXIT, finishedAt: 5 }],
+    // Date.parse reads a one-element array as its string, inside the run window: only the string-type guard refuses it.
+    ["an array finish time", { ...CLEAN_EXIT, finishedAt: [CLEAN_EXIT.finishedAt] }],
     ["a non-zero exit", { ...CLEAN_EXIT, code: 1 }],
   ] as const)(
     "#given %s #when reconciled #then nothing is recovered and the run fails without merging",
