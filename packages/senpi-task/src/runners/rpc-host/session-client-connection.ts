@@ -14,16 +14,10 @@ import type { AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
 import { ChildParentLink } from "../parent-link"
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { createChildExtensionEvents } from "../child-extension-events"
-import { socketAcceptsConnection } from "./busy-host"
 import { SESSION_PARKED_CAUSE } from "./exit-mapping"
 import { dispatchHostCommand } from "./host-command-dispatch"
-import {
-  createSenpiRpcClient,
-  probeWithEngine,
-  type HostPendingInputs,
-  type HostRpcClient,
-  type HostSessionOpenInput,
-} from "./session-transport"
+import { hostClientPorts } from "./session-client-ports"
+import type { HostPendingInputs, HostRpcClient, HostSessionOpenInput } from "./session-transport"
 import {
   HostSessionDetachedError,
   isAgentSessionEvent,
@@ -71,12 +65,7 @@ export class HostSessionClient {
   constructor(options: HostSessionClientOptions) {
     this.socketPath = options.socketPath
     this.parent = options.parent ?? new ChildParentLink("host-child")
-    this.ports = {
-      socketPath: options.socketPath,
-      createClient: options.ports?.createClient ?? createSenpiRpcClient,
-      probeProtocolInfo: options.ports?.probeProtocolInfo ?? probeWithEngine,
-      socketAccepts: options.ports?.socketAccepts ?? socketAcceptsConnection,
-    }
+    this.ports = hostClientPorts(options)
     this.transportGone = this.transportLoss.promise
   }
 

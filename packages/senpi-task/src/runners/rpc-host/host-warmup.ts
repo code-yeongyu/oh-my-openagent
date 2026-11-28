@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { askHost } from "./host-request"
 import { classifyWarmReply } from "./host-warm-reply"
+import { hostKeyRoot } from "./key-root"
 import { HOST_WARMUP_CONTEXT } from "./session-role"
 import { HostSessionClient, type HostSessionClientPorts } from "./session-client"
 
@@ -91,6 +92,7 @@ async function openAndCloseWarmUpSession(
 ): Promise<void> {
   const client = new HostSessionClient({
     socketPath: input.socket,
+    keyRoot: hostKeyRoot(input.agentDir),
     ...(input.ports === undefined ? {} : { ports: input.ports }),
   })
   try {

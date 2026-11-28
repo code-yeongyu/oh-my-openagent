@@ -166,7 +166,10 @@ export interface EnsuredSenpiHost {
   readonly release?: () => void
 }
 
-export type ProbeHostFn = (input: { readonly socket: string }) => Promise<SenpiHostProtocolInfo | undefined>
+export type ProbeHostFn = (input: {
+  readonly socket: string
+  readonly keyRoot?: string
+}) => Promise<SenpiHostProtocolInfo | undefined>
 export type EnsureHostFn = (input: EnsureHostInput) => Promise<EnsuredSenpiHost>
 export type StopHostFn = (input: {
   readonly socket: string

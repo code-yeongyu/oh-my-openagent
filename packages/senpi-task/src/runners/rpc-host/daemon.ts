@@ -27,6 +27,7 @@ import {
 import { daemonLaunchOptions, daemonLaunchProfileId } from "./launch-options"
 import { DAEMON_LAUNCH_SPEC_FILENAME, DaemonLaunchSpecError, readDaemonLaunchSpec } from "./launch-spec"
 import { shareDaemonEnsure } from "./daemon-single-flight"
+import { hostKeyRoot } from "./key-root"
 import { classifyEnsureFailure } from "./ensure-failure"
 import { ensureHostClaimingOwner } from "./owner-claim"
 import { writeStartedShardSidecar } from "./shard-sidecar"
@@ -119,7 +120,9 @@ async function ensureTaskDaemonOnce(
     policy: input.policy,
   })
 
-  const running = await host.probeHost({ socket })
+  // The host is ensured in input.agentDir, so its key record is looked up there, as the ensure itself does.
+  const keyRoot = hostKeyRoot(input.agentDir)
+  const running = await host.probeHost({ socket, keyRoot })
   const decision = host.decideHostAction(
     {
       protocolVersion: TASK_DAEMON_PROTOCOL_VERSION,
@@ -170,7 +173,7 @@ async function ensureTaskDaemonOnce(
   // quiescence grace (seconds), so a non-owner ensuring after that exit may find the host gone.
   let answered: SenpiHostProtocolInfo | undefined = running
   try {
-    answered ??= await host.probeHost({ socket: ensured.socket })
+    answered ??= await host.probeHost({ socket: ensured.socket, keyRoot })
   } finally {
     ensured.release?.()
   }

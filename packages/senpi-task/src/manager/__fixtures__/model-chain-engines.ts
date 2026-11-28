@@ -72,7 +72,9 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   }
   try {
     const engine =
-      kind === "process" ? processEngine(env, input.hiddenCapabilities ?? []) : await hostEngine(input.root, env)
+      kind === "process"
+        ? processEngine(env, input.hiddenCapabilities ?? [])
+        : await hostEngine(input.root, env, agentDir)
     return {
       runner: engine.runner,
       calls: providers.calls,
@@ -187,12 +189,17 @@ export async function startSocketHost(root: string, engineEnv: Readonly<Record<s
   return { socket, pid: host.pid ?? 0, stop }
 }
 
-async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
+async function hostEngine(
+  root: string,
+  engineEnv: Readonly<Record<string, string>>,
+  agentDir: string,
+): Promise<Engine> {
   const { socket, pid, stop } = await startSocketHost(root, engineEnv)
   const clients: HostSessionClient[] = []
   const runner = new RpcHostRunner({
     createClient: (socketPath) => {
-      const client = new HostSessionClient({ socketPath })
+      // The host runs in the engine's agent dir, not in this runner's, so its key record is there (senpi#7568).
+      const client = new HostSessionClient({ socketPath, keyRoot: agentDir })
       clients.push(client)
       return client
     },

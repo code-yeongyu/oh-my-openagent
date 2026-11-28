@@ -21,6 +21,7 @@ import type { HostShardEvents } from "./rpc-host/handle-reattach"
 import { createLiveHostChildren, type LiveHostChildren } from "./rpc-host/live-children"
 import type { HostSessionChildHandle, HostSessionPort } from "./rpc-host/handle-port"
 import { HostSessionClient, type OpenedHostSession } from "./rpc-host/session-client"
+import { hostKeyRoot } from "./rpc-host/key-root"
 import { probeWithEngine, type HostProtocolProbe } from "./rpc-host/session-transport"
 import { waitOutBusyHost } from "./rpc-host/busy-host"
 import { resolveChildSessionPath } from "./rpc-host/session-context"
@@ -141,11 +142,15 @@ export class RpcHostRunner {
 
   constructor(options: RpcHostRunnerOptions) {
     this.options = options
+    // A host this runner ensures runs in its agent dir, so every engine dial to it authenticates the host there; read
+    // per dial, as omo's own dial reads SENPI_RPC_KEY_ROOT.
+    const keyRoot = () => hostKeyRoot(options.agentDir)
     this.createClient =
       options.createClient ??
       ((socketPath, taskId) =>
         new HostSessionClient({
           socketPath,
+          keyRoot: keyRoot(),
           ...(taskId === undefined
             ? {}
             : {
@@ -171,7 +176,7 @@ export class RpcHostRunner {
       shardResolver: options.shardResolver,
       ownHostSocket: options.ownHostSocket,
       insideHost: options.insideHost,
-      probeHost: options.probeHost ?? probeWithEngine,
+      probeHost: options.probeHost ?? ((socket) => probeWithEngine(socket, keyRoot())),
       notice: onceNoticeSink(options.onNotice),
       now: this.now,
     }

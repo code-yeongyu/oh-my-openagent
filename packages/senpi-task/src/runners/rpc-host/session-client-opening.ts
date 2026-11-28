@@ -15,6 +15,7 @@ import { HostSessionDetachedError, toOpenFailure } from "./session-wire"
 
 interface SessionOpeningPorts {
   readonly socketPath: string
+  readonly keyRoot?: string
   readonly createClient: HostRpcClientFactory
   readonly probeProtocolInfo: HostProtocolProbe
   readonly socketAccepts: (socketPath: string) => Promise<boolean>
@@ -34,7 +35,11 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
     })
   }
   const identity = assertHostUsable(probed, input.retryFallback)
-  const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
+  const client = await ports.createClient({
+    socketPath: ports.socketPath,
+    onDisconnect: ports.onDisconnect,
+    ...(ports.keyRoot === undefined ? {} : { keyRoot: ports.keyRoot }),
+  })
   client.onEvent(ports.onEvent)
   await client.start()
   // A release during the probe or the dial found no client to stop; this connection is the one it meant to end.

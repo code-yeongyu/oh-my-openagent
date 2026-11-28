@@ -9,6 +9,7 @@ import type {
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
 import { designatedChainOf } from "../designated-fallback-profile"
+import { hostKeyRoot } from "./key-root"
 import type { RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { HostUnavailableError, TASK_DAEMON_PROTOCOL_VERSION, TASK_DAEMON_REQUIRED_CAPABILITIES } from "./daemon"
 import type { HostRunHoldClient } from "./task-parent-wire"
@@ -104,6 +105,8 @@ export interface HostSessionOpenInput {
 export interface HostRpcClientOptions {
   readonly socketPath: string
   readonly onDisconnect: (error: RpcTransportGoneError) => void
+  /** Where the host's key record lives; `hostKeyRoot()` when absent. */
+  readonly keyRoot?: string
 }
 
 export type HostRpcClientFactory = (options: HostRpcClientOptions) => Promise<HostRpcClient>
@@ -113,12 +116,19 @@ export type HostProtocolProbe = (socketPath: string) => Promise<SenpiHostProtoco
 export async function createSenpiRpcClient(options: HostRpcClientOptions): Promise<HostRpcClient> {
   await loadSenpiBarrel()
   const RpcClient = senpiRpcClient()
-  return new RpcClient({ socketPath: options.socketPath, onDisconnect: options.onDisconnect })
+  return new RpcClient({
+    socketPath: options.socketPath,
+    onDisconnect: options.onDisconnect,
+    keyRoot: options.keyRoot ?? hostKeyRoot(),
+  })
 }
 
-export async function probeWithEngine(socketPath: string): Promise<SenpiHostProtocolInfo | undefined> {
+export async function probeWithEngine(
+  socketPath: string,
+  keyRoot = hostKeyRoot(),
+): Promise<SenpiHostProtocolInfo | undefined> {
   await loadSenpiBarrel()
-  return senpiProbeHost()({ socket: socketPath })
+  return senpiProbeHost()({ socket: socketPath, keyRoot })
 }
 
 export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
