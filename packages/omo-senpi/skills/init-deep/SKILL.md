@@ -283,9 +283,9 @@ Committed mode is self-contained: it never requires a skill outside the shipped 
 
 - If the current environment provides a `work-with-pr` skill (some repositories define one project-locally), run the handoff through it: it knows that repository's branch, review, and merge conventions.
 - Otherwise run the generic handoff:
-  1. Create a dedicated branch for the guidance change. Follow the repository's branch naming if it defines one; otherwise use `docs/init-deep`. Never commit generated guidance straight to the default branch.
+  1. Create a dedicated branch for the guidance change, cut from the repository's up-to-date default branch (or the integration branch its contribution docs name) so the branch carries only the generated AGENTS.md changes - never cut from the current feature branch. Follow the repository's branch naming if it defines one; otherwise use `docs/init-deep`. Never commit generated guidance straight to the default branch.
   2. Commit only the AGENTS.md files this run generated or updated.
-  3. Push the branch and open a pull request against the repository's default branch (or the integration branch its contribution docs name). The PR body lists every file written, with its score and one-line role, matching the final report below.
+  3. Push the branch and open a pull request against the repository's default branch (or the integration branch its contribution docs name). The PR body lists every file written with its line count, matching the final report's Files list below.
   4. Stop there. Merging follows the repository's own review process: never merge the guidance PR yourself, and never treat a hosting tool's defaults as the repository's conventions.
 - If no PR route exists (no remote, no hosting CLI or credentials, offline checkout), leave the change committed on the local branch and say so in the final report: name the branch, state that the PR could not be opened, and give the exact push and PR-open commands for the user to run. Never fall back to committing on the default branch, and never silently downgrade to local mode.
 
@@ -305,6 +305,7 @@ After the snapshot: `rm -rf .omo/init-deep` - reports and digests are ephemeral 
 Mode: {update | create-new}
 Sizing: S={MB} source -> {N_quick} scanners, {N_high} writers ({dag | inline} path)
 Cleanup: .omo/init-deep removed
+Delivery: {local | committed: <branch> + <PR URL> | committed: <branch>, PR not opened: <exact push and PR-open commands>}
 
 Files:
   [OK] ./AGENTS.md (root, {N} lines)
