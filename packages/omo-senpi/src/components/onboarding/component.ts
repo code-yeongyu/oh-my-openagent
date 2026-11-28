@@ -5,7 +5,7 @@ import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../
 import { getBuiltinSkillsRoot, getOmoNativeStateDir } from "../telemetry/product-identity"
 import { readDisabledSkills, resolveBundledSkillProvenance } from "../bundled-skills/contributed-skill"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
-import { loadOnboardingScanRuntime } from "./scan-component"
+import { loadOnboardingScanRuntime } from "./scan-runtime-loader"
 import type { OnboardingScanEnvironment } from "./scan-runtime"
 import { registerSessionHistoryRpc } from "./session-history-rpc"
 import { createOnboardingSessionHistoryTool } from "./session-history-tool"
