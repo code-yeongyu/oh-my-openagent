@@ -139,6 +139,34 @@ describe("facts path-state recovery ownership", () => {
     )
   }, 30_000)
 
+  test("names the foreign path in the detail when an untracked file blocks recovery", async () => {
+    const { dir, repo } = await fixture()
+    const recovery = await planFactsMutation(repo, batch(), undefined)
+    await mkdir(join(dir, "notes", "facts"), { recursive: true })
+    await writeFile(join(dir, "notes", "facts", "foreign-draft.md"), "foreign draft\n")
+
+    const result = await applyFactsRecovery(repo, recovery, 1, AUTHOR)
+
+    expect(result.outcome).toBe("parent_dirty")
+    if (result.outcome !== "parent_dirty") throw new Error("expected parent_dirty")
+    expect(result.detail).toContain("notes/facts/foreign-draft.md")
+  }, 30_000)
+
+  test("truncates detail to 5 paths and notes remaining count when many untracked files block recovery", async () => {
+    const { dir, repo } = await fixture()
+    const recovery = await planFactsMutation(repo, batch(), undefined)
+    await mkdir(join(dir, "notes", "facts"), { recursive: true })
+    for (let i = 1; i <= 7; i++) {
+      await writeFile(join(dir, "notes", "facts", `foreign-${i}.md`), `draft ${i}\n`)
+    }
+
+    const result = await applyFactsRecovery(repo, recovery, 1, AUTHOR)
+
+    expect(result.outcome).toBe("parent_dirty")
+    if (result.outcome !== "parent_dirty") throw new Error("expected parent_dirty")
+    expect(result.detail).toContain("; +2 more")
+  }, 30_000)
+
   test("preserves every path when one member of a multi-path batch is foreign", async () => {
     const { dir, repo } = await fixture()
     const recovery = await planFactsMutation(

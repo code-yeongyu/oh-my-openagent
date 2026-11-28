@@ -2,6 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
+import { describePorcelainPaths, formatParentDirtyDetail } from "../git"
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
@@ -105,8 +106,9 @@ export async function integrateValidatedReflection(
       return { outcome: "parent_dirty", detail: "Parent repository contains another interrupted merge" }
     }
 
-    if ((await worktree.parent.status()).trim()) {
-      return { outcome: "parent_dirty" }
+    const parentStatus = await worktree.parent.status()
+    if (parentStatus.trim()) {
+      return { outcome: "parent_dirty", detail: formatParentDirtyDetail(describePorcelainPaths(parentStatus)) }
     }
 
     const merge = await run(worktree.exec, worktree.parent.dir, [
