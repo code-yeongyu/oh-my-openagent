@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util"
 import type { BaselineEntry } from "./baseline"
 import { sha256 } from "./baseline"
 import type { Outcome } from "./scenario-run"
@@ -61,7 +62,126 @@ const without = (outcome: Outcome, strip: (result: Record<string, unknown>) => R
   return JSON.stringify(result === undefined ? outcome : { ...outcome, [key]: strip(result) })
 }
 
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
+/** Read the alternatives at a scalar field or its array items without dropping nonliteral branches. */
+function fieldVariants(tool: DiscoveredTool, field: string) {
+  const property = asRecord(tool.parameters.properties?.[field])
+  if (property === undefined) return undefined
+  const schema = property.type === "array" ? asRecord(property.items) : property
+  if (schema === undefined) return undefined
+  const key = Array.isArray(schema.enum) ? "enum" : "anyOf"
+  const variants = schema[key]
+  if (!Array.isArray(variants)) return undefined
+  const values: unknown[] = key === "enum" ? variants : variants.map((item: unknown) => asRecord(item)?.const)
+  if (
+    !values.length ||
+    !values.every((value): value is string => typeof value === "string") ||
+    new Set(values).size !== values.length
+  )
+    return undefined
+  // Removing the new variants must restore the entire old schema, including constraints on existing branches.
+  const retain = (old: readonly string[]) => {
+    const restored = { ...schema, [key]: variants.filter((_variant, i) => old.includes(values[i] ?? "")) }
+    return {
+      ...tool.parameters,
+      properties: {
+        ...tool.parameters.properties,
+        [field]: property.type === "array" ? { ...property, items: restored } : restored,
+      },
+    }
+  }
+  return { values, retain }
+}
+
+/** The registered variants are the base's, in order, with new alternatives and the old order preserved (a widening, never a reorder). */
+const widensInOrder = (base: readonly string[], head: readonly string[]): boolean =>
+  head.length > base.length &&
+  isDeepStrictEqual(
+    head.filter((value) => base.includes(value)),
+    base,
+  )
+
+/** `<tool>.<field>`: the tool a declaration names and the field it widens or adds. */
+function namedField(declaration: Declaration): { readonly tool: string; readonly field: string } | undefined {
+  const arg = declaration.args[0]
+  const split = arg?.lastIndexOf(".") ?? -1
+  if (arg === undefined || split <= 0 || split === arg.length - 1) return undefined
+  return { tool: arg.slice(0, split), field: arg.slice(split + 1) }
+}
+
 const KINDS: Readonly<Record<string, { readonly args: number; readonly check: KindCheck }>> = {
+  // An additive input change: the named tool field's variants are the base's plus new ones appended, nothing else in
+  // that tool's schema moved, and the scenario's outcome differs only by the new variants appearing in it (#15345).
+  "input-enum-widened": {
+    args: 1,
+    check: (declaration, scenario, before, after, context) => {
+      const named = namedField(declaration)
+      if (named === undefined) return "its argument must be <tool>.<field>"
+      const row = context.rows.head.find((entry) => entry.id === scenario.capability)
+      if (
+        row === undefined ||
+        !row.tool.some((entry) => entry.name === named.tool) ||
+        (scenario.surface === "tool" && scenario.tool !== named.tool)
+      )
+        return `${named.tool} is not a tool of ${scenario.capability}`
+      const baseTool = context.tools.base.find((tool) => tool.name === named.tool)
+      const headTool = context.tools.head.find((tool) => tool.name === named.tool)
+      if (baseTool === undefined || headTool === undefined)
+        return `the tool ${named.tool} is not discovered on both trees`
+      const baseVariants = fieldVariants(baseTool, named.field)
+      const headVariants = fieldVariants(headTool, named.field)
+      if (baseVariants === undefined || headVariants === undefined)
+        return `${named.tool}.${named.field} is not a literal input field on both trees`
+      if (!widensInOrder(baseVariants.values, headVariants.values))
+        return `${named.tool}.${named.field} does not widen in order (${baseVariants.values.length} to ${headVariants.values.length} variants)`
+      if (!isDeepStrictEqual(baseTool.parameters, headVariants.retain(baseVariants.values)))
+        return "the tool's schema differs outside the widened field"
+      const original = JSON.stringify(before)
+      const printed = JSON.stringify(after)
+      const baseList = baseVariants.values.join(", ")
+      const start = original.indexOf(baseList)
+      if (start < 0) return "the original outcome does not list the base variants"
+      const prefix = original.slice(0, start)
+      const suffix = original.slice(start + baseList.length)
+      const visible = printed.slice(prefix.length, printed.length - suffix.length).split(", ")
+      return printed.startsWith(prefix) &&
+        printed.endsWith(suffix) &&
+        widensInOrder(baseVariants.values, visible) &&
+        isDeepStrictEqual(visible.toSorted(), headVariants.values.toSorted())
+        ? undefined
+        : "the outcomes differ outside the newly listed variants"
+    },
+  },
+  // An additive result field: the head's result carries the named field and is byte-equal to the base once it is
+  // removed, and the base result does not carry it (#15345).
+  "result-field-added": {
+    args: 1,
+    check: (declaration, scenario, before, after, context) => {
+      const named = namedField(declaration)
+      if (named === undefined) return "its argument must be <tool>.<field>"
+      const row = context.rows.head.find((entry) => entry.id === scenario.capability)
+      if (
+        row === undefined ||
+        !row.tool.some((entry) => entry.name === named.tool) ||
+        (scenario.surface === "tool" && scenario.tool !== named.tool)
+      )
+        return `${named.tool} is not a tool of ${scenario.capability}`
+      if (!answers(before) || !answers(after)) return "the kind result-field-added needs both trees to answer"
+      const beforeResult = resultOf(before)
+      const afterResult = resultOf(after)
+      if (beforeResult === undefined || afterResult === undefined) return "neither tree answers with a result object"
+      if (Object.hasOwn(beforeResult, named.field)) return `the base result already carries ${named.field}`
+      if (!Object.hasOwn(afterResult, named.field)) return `the head result does not carry ${named.field}`
+      const rest = (result: Record<string, unknown>) => {
+        const { [named.field]: _added, ...kept } = result
+        return kept
+      }
+      return without(after, rest) === without(before, (result) => result)
+        ? undefined
+        : "the outcomes differ outside the added result field"
+    },
+  },
   // Both trees answer, with the same result kind, and the outcomes are byte-equal once the answer's value is removed.
   answer: {
     args: 0,
