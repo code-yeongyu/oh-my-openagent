@@ -7,12 +7,15 @@ export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
   /^PNPM_/i,
   /^NO_UPDATE_NOTIFIER$/i,
 
-  // Specific high-risk secret env vars (explicit blocks)
+  // Specific high-risk secret env vars (explicit blocks).
+  // NOTE: GOOGLE_CLOUD_PROJECT is intentionally NOT blocked: it carries no secret
+  // material, and Vertex/ADC-backed skills need the ambient project to resolve
+  // billing. Project-shaped variables like GCP_PROJECT stay blocked by the /^GCP_/
+  // pattern below.
   /^ANTHROPIC_API_KEY$/i,
   /^AWS_ACCESS_KEY_ID$/i,
   /^AWS_SECRET_ACCESS_KEY$/i,
   /^GOOGLE_APPLICATION_CREDENTIALS$/i,
-  /^GOOGLE_CLOUD_PROJECT$/i,
   /^GITHUB_TOKEN$/i,
   /^DATABASE_URL$/i,
   /^OPENAI_API_KEY$/i,
