@@ -16,6 +16,7 @@ import {
 } from "./memory-rpc-bridge"
 import { registerJournalSettleDelivery } from "./journal-settle-delivery"
 import * as journalState from "./memory-rpc-journal-state"
+import * as snapshotState from "./memory-rpc-snapshot-state"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { createMemoryWiring, type MemoryWiring } from "./wiring"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
@@ -258,3 +259,189 @@ test.each(["reflection", "journal"] as const)(
     }
   },
 )
+
+// omo.memory.updated is level-triggered (#12276): the bind-time full build races the first settle, so the publish
+// count and the intermediate journal-only snapshot vary by order. The latest snapshot and monotone totals do not.
+const LATCH_TIMEOUT_MS = 10_000
+
+/** Awaits one fixture latch, failing with its name instead of hanging the test if it never resolves. */
+async function latch<T>(promise: Promise<T>, name: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`waited ${LATCH_TIMEOUT_MS}ms for ${name}, it never resolved`)),
+      LATCH_TIMEOUT_MS,
+    )
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function publishBindAndOneTurn(order: "bind-first" | "settle-first"): Promise<MemoryRpcSnapshot[]> {
+  const root = await mkdtemp(join(tmpdir(), "memory-rpc-level-"))
+  const sessionId = "level-session"
+  const identity = createMemoryIdentityContext({
+    identity: "level-agent",
+    identityPaths: buildIdentityPaths(root, "level-agent"),
+    binding: { identity: "level-agent", repoPathHash: "fixture", boundAt: 1 },
+  })
+  const entries: unknown[] = []
+  const eventCtx = {
+    sessionManager: { getSessionId: () => sessionId, getEntries: () => entries, getBranch: () => entries },
+  }
+  const bindHeld = Promise.withResolvers<undefined>()
+  const bindJournalRead = Promise.withResolvers<undefined>()
+  const releaseBind = Promise.withResolvers<undefined>()
+  const firstPublished = Promise.withResolvers<undefined>()
+  const observerHeld = Promise.withResolvers<undefined>()
+  const releaseObserver = Promise.withResolvers<undefined>()
+  const delayedBindPublished = Promise.withResolvers<MemoryRpcSnapshot>()
+  const realJournal = journalState.readMemoryRpcJournalState
+  // The bind build's journal read finishes before the turn exists, so its journal fields are the stale pre-turn ones.
+  const journalSpy = spyOn(journalState, "readMemoryRpcJournalState").mockImplementation(async (...args) => {
+    const state = await realJournal(...args)
+    bindJournalRead.resolve(undefined)
+    return state
+  })
+  let firstHead = true
+  const repoSpy = spyOn(snapshotState, "createMemoryRpcGitRepo").mockImplementation(() => ({
+    head: async () => {
+      if (firstHead && order === "settle-first") {
+        firstHead = false
+        bindHeld.resolve(undefined)
+        await releaseBind.promise
+      }
+      return null
+    },
+    headCommitTimestamp: async () => null,
+    headSubject: async () => null,
+    status: async () => "",
+    lsTree: async () => [],
+    lsTreeSized: async () => [],
+    show: async () => "",
+  }))
+  const published: MemoryRpcSnapshot[] = []
+  const pi = new MemoryFakeExtensionAPI()
+  pi.rpc = {
+    emit(name, data) {
+      if (name !== MEMORY_UPDATED_RPC_EVENT) return
+      const snapshot = data as MemoryRpcSnapshot
+      published.push(snapshot)
+      firstPublished.resolve(undefined)
+      if (snapshot.nonJournalState === undefined) delayedBindPublished.resolve(snapshot)
+    },
+  }
+  const runtime = {
+    async reconcile() {
+      if (order === "settle-first") {
+        observerHeld.resolve(undefined)
+        await releaseObserver.promise
+      }
+    },
+  } as unknown as MemoryIdentityRuntime
+  const context = componentContext()
+  let wiring: MemoryWiring | undefined
+  let bound: Promise<void> | undefined
+  let settling: Promise<unknown> | undefined
+  let restoreObserverTimer: (() => void) | undefined
+  try {
+    await composeOmoSenpiExtension(
+      [
+        {
+          name: "memory",
+          register(api, ctx) {
+            wiring = createMemoryWiring({
+              sessions: new Map([[sessionId, { context: identity }]]),
+              loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: false, debounce_settles: 4 } })),
+              cwd: () => root,
+              env: {},
+              logger: ctx.logger,
+              createRuntime: () => runtime,
+            })
+            wiring.registerStatic(api, ctx)
+          },
+        },
+      ],
+      { logger: context.logger },
+    )(pi)
+    if (wiring === undefined) throw new Error("memory wiring was not registered")
+    bound = wiring.afterBind(pi, sessionId, identity, eventCtx)
+    if (order === "settle-first")
+      await latch(Promise.all([bindHeld.promise, bindJournalRead.promise]), "the held bind build")
+    else await latch(bound, "the bind build")
+    await pi.dispatch("input", { source: "rpc", inputId: "accepted", text: "Work." }, eventCtx)
+    await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
+    entries.push({
+      type: "message",
+      id: "answer-1",
+      message: { role: "assistant", content: [{ type: "text", text: "Done." }] },
+    })
+    // Neutralize the settle observer's 2 s budget, not the real failure deadlines for fixture latches.
+    const realSetTimeout = globalThis.setTimeout
+    const timerSpy = spyOn(globalThis, "setTimeout").mockImplementation(
+      new Proxy(realSetTimeout, {
+        apply(target, receiver, [callback, delay, ...args]) {
+          return Reflect.apply(target, receiver, [delay === 2_000 ? () => {} : callback, delay, ...args])
+        },
+      }),
+    )
+    restoreObserverTimer = () => timerSpy.mockRestore()
+    settling = pi.dispatch("agent_settled", {}, eventCtx)
+    if (order === "settle-first") {
+      await latch(Promise.all([firstPublished.promise, observerHeld.promise]), "journal delivery and the held observer")
+      releaseBind.resolve(undefined)
+      // The observer cannot start its own full build until its reconciliation is released.
+      const delayedBind = await latch(delayedBindPublished.promise, "the delayed bind full snapshot to publish")
+      expect(delayedBind, "the delayed bind publish retains the newer journal overlay").toMatchObject({
+        journal: { totalSteps: 1 },
+        reflection: { backlogSteps: 1 },
+      })
+      releaseObserver.resolve(undefined)
+    }
+    await latch(Promise.all([bound, settling]), "the bind build and the settle")
+    expect(context.logs).not.toContainEqual(expect.objectContaining({ message: "extension_handler_stalled" }))
+    return published
+  } finally {
+    journalSpy.mockRestore()
+    repoSpy.mockRestore()
+    restoreObserverTimer?.()
+    releaseBind.resolve(undefined)
+    releaseObserver.resolve(undefined)
+    try {
+      await latch(Promise.allSettled([bound, settling]), "bind and settle teardown")
+    } finally {
+      try {
+        await latch(
+          wiring?.onSessionShutdown({ reason: "reload", sessionId, deadlineAt: Date.now() + 5_000 }) ??
+            Promise.resolve(),
+          "memory session shutdown",
+        )
+      } finally {
+        await latch(rm(root, { recursive: true, force: true }), "fixture directory removal")
+      }
+    }
+  }
+}
+
+test("#given the bind build finishing before or after the first settle #when one turn completes #then omo.memory.updated ends at the same snapshot and its journal step total never decreases", async () => {
+  const bindFirst = await publishBindAndOneTurn("bind-first")
+  const settleFirst = await publishBindAndOneTurn("settle-first")
+
+  // Both interleavings really ran: only the held bind lets the journal-only delivery publish first.
+  expect(bindFirst[0]).toMatchObject({ journal: { totalSteps: 0 } })
+  expect(bindFirst[0]?.nonJournalState).toBeUndefined()
+  expect(settleFirst[0]).toMatchObject({ nonJournalState: "unknown", journal: { totalSteps: 1 } })
+  expect(settleFirst.at(-1)).toEqual(bindFirst.at(-1))
+  expect(bindFirst.at(-1)).toMatchObject({ journal: { totalSteps: 1 }, reflection: { backlogSteps: 1 } })
+  expect(bindFirst.at(-1)?.nonJournalState).toBeUndefined()
+  for (const published of [bindFirst, settleFirst]) {
+    for (const [index, snapshot] of published.entries()) {
+      if (index === 0) continue
+      const previous = published[index - 1] as MemoryRpcSnapshot
+      expect(snapshot.journal.totalSteps).toBeGreaterThanOrEqual(previous.journal.totalSteps)
+    }
+  }
+})
