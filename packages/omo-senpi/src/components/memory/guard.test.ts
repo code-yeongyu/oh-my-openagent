@@ -821,3 +821,116 @@ describe("memory guard combined tool_result handler (#12594)", () => {
     ])
   })
 })
+
+describe("memory guard when a host reports the end before the result (#12466)", () => {
+  test("#given an allowed ancestor enumeration on a host that reports the end first #when a foreign identity appears before its result #then the result is replaced by the deny", async () => {
+    const setup = ancestorFixture()
+    const session = { sessionManager: { getSessionId: () => "session-1" } }
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-cursor")).toBeUndefined()
+    // A synthetic second identity, created while the walk runs.
+    mkdirSync(join(setup.agentsRoot, "late-id", "runtime"), { recursive: true })
+    // This host reports the end of the execution before the tool_result hook runs.
+    await setup.pi.dispatch(
+      "tool_execution_end",
+      { type: "tool_execution_end", toolCallId: "call-cursor", toolName: "grep", result: {}, isError: false },
+      session,
+    )
+    const replaced = await finish(setup, "grep", setup.memoryRoot, "call-cursor")
+
+    expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: {} }])
+  })
+
+  test("#given an allowed ancestor enumeration whose end is reported first #when nothing foreign appeared #then its slot is released and its result passes through", async () => {
+    const setup = ancestorFixture()
+    const session = { sessionManager: { getSessionId: () => "session-1" } }
+    let allowed = 0
+    while (allowed < 10_000 && (await enumerate(setup, "grep", setup.memoryRoot, `call-${allowed}`)) === undefined)
+      allowed += 1
+    expect(allowed).toBeLessThan(10_000)
+
+    await setup.pi.dispatch(
+      "tool_execution_end",
+      { type: "tool_execution_end", toolCallId: "call-0", toolName: "grep", result: {}, isError: false },
+      session,
+    )
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-next")).toBeUndefined()
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-0")).toEqual([])
+  })
+
+  test("#given a session at the pending cap #when a call already pending is retried with its own id #then the retry is allowed and a new id is still refused", async () => {
+    const setup = ancestorFixture()
+    let allowed = 0
+    while (allowed < 10_000 && (await enumerate(setup, "grep", setup.memoryRoot, `call-${allowed}`)) === undefined)
+      allowed += 1
+    expect(allowed).toBeLessThan(10_000)
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-0")).toBeUndefined()
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-new")).toEqual(
+      expect.objectContaining({ block: true }),
+    )
+  })
+})
+
+describe("memory guard pending checks across calls and sessions (#12466)", () => {
+  const end = (setup: AncestorSetup, toolCallId: string, sessionId = "session-1") =>
+    setup.pi.dispatch(
+      "tool_execution_end",
+      { type: "tool_execution_end", toolCallId, toolName: "grep", result: {}, isError: false },
+      { sessionManager: { getSessionId: () => sessionId } },
+    )
+
+  test("#given two concurrent ancestor calls #when an identity appears and only the first one's end arrives first #then each call gets its own verdict", async () => {
+    const setup = ancestorFixture()
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-a")).toBeUndefined()
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-b")).toBeUndefined()
+    mkdirSync(join(setup.agentsRoot, "late-id", "runtime"), { recursive: true })
+
+    await end(setup, "call-a")
+
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-a")).toEqual([
+      expect.objectContaining({ isError: true }),
+    ])
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-b")).toEqual([
+      expect.objectContaining({ isError: true }),
+    ])
+  })
+
+  test("#given a call whose end kept a deny #when the same toolCallId is retried after the identity is gone #then the retry is scanned afresh and passes", async () => {
+    const setup = ancestorFixture()
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-retry")).toBeUndefined()
+    const late = join(setup.agentsRoot, "late-id")
+    mkdirSync(join(late, "runtime"), { recursive: true })
+    await end(setup, "call-retry")
+    rmSyncEfaultTolerant(late, { recursive: true, force: true })
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-retry")).toBeUndefined()
+
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-retry")).toEqual([])
+  })
+
+  test("#given a kept deny in one session #when another session reports a result for the same toolCallId #then that session's result is untouched", async () => {
+    const setup = ancestorFixture()
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-shared")).toBeUndefined()
+    mkdirSync(join(setup.agentsRoot, "late-id", "runtime"), { recursive: true })
+    await end(setup, "call-shared")
+
+    const other = await setup.pi.dispatch(
+      "tool_result",
+      {
+        type: "tool_result",
+        toolCallId: "call-shared",
+        toolName: "grep",
+        input: { path: setup.memoryRoot },
+        content: [],
+        details: {},
+        isError: false,
+      },
+      { sessionManager: { getSessionId: () => "session-2" } },
+    )
+
+    expect(other.filter((result) => result !== undefined)).toEqual([])
+  })
+})

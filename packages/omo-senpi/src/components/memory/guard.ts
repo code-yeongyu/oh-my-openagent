@@ -42,6 +42,8 @@ type AncestorCheck = {
 type PendingAncestorCheck = AncestorCheck & {
   readonly toolName: string
   readonly rawPath: string
+  /** Set when the end of the execution was reported first and found something: the deny awaiting the result. */
+  readonly endVerdict?: Exclude<ForeignRootScan, { readonly kind: "clear" }>
 }
 
 type TargetVerdict = { readonly kind: "inside" } | ({ readonly kind: "ancestor" } & AncestorCheck)
@@ -114,7 +116,8 @@ export function registerMemoryGuard(
     // The result is re-checked on tool_result; a call that cannot be matched to its result is not allowed.
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId) ?? new Map<string, PendingAncestorCheck>()
-    if (event.toolCallId === undefined || pending.size >= MAX_PENDING_ANCESTOR_CHECKS) {
+    const atCap = pending.size >= MAX_PENDING_ANCESTOR_CHECKS && !pending.has(event.toolCallId ?? "")
+    if (event.toolCallId === undefined || atCap) {
       return {
         block: true,
         reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, {
@@ -147,7 +150,7 @@ export function registerMemoryGuard(
     pending.delete(payload.toolCallId)
     if (pending.size === 0) pendingAncestorChecks.delete(sessionId)
 
-    const scan = listForeignRoots(check)
+    const scan = check.endVerdict ?? listForeignRoots(check)
     if (scan.kind === "clear") return undefined
     // An empty object, not null or undefined: every host merge takes `override.details ?? result.details`,
     // so only a non-nullish value drops the tool's own details (grep's matches and file paths). `{}` is what
@@ -159,16 +162,28 @@ export function registerMemoryGuard(
     }
   }
 
-  // A call blocked by a later handler, or aborted before it ran, ends without a tool_result. On the agent loop
-  // an executed call reaches tool_result before tool_execution_end; the Cursor exec bridge emits
-  // tool_execution_end first, so its result skips the re-check, but that path discards a tool_result override
-  // anyway. Pending checks are never released on agent_end: a nested walk from a background cell can outlive a run.
+  // The re-check must not depend on which of tool_result and tool_execution_end the host reports first (#12466).
+  // Senpi's agent loop and Cursor exec bridge both run tool_result first; then this finds nothing pending. If the
+  // end comes first, the walk is over and its output fixed, so the check runs here: clear releases the slot (this is
+  // also how a call blocked by a later handler, or aborted, which never gets a tool_result, frees it), anything else
+  // is kept as the verdict for the result that follows. Such a kept verdict outlives a result that never comes (the
+  // call was blocked by a later handler, or aborted) only for a call in flight when a foreign identity appeared; it
+  // then stays until session_shutdown, counts toward the 256-per-session cap (a retry of a pending id only overwrites
+  // its own entry, so it is never refused by the cap), and errs toward withholding output.
+  // Pending checks are never released on agent_end: a nested walk from a background cell can outlive a run.
   pi.on("tool_execution_end", (payload, eventContext) => {
     if (!isRecord(payload) || typeof payload.toolCallId !== "string") return
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId)
-    pending?.delete(payload.toolCallId)
-    if (pending?.size === 0) pendingAncestorChecks.delete(sessionId)
+    const check = pending?.get(payload.toolCallId)
+    if (pending === undefined || check === undefined || check.endVerdict !== undefined) return
+    const scan = listForeignRoots(check)
+    if (scan.kind !== "clear") {
+      pending.set(payload.toolCallId, { ...check, endVerdict: scan })
+      return
+    }
+    pending.delete(payload.toolCallId)
+    if (pending.size === 0) pendingAncestorChecks.delete(sessionId)
   })
   pi.on("session_shutdown", (_payload, eventContext) => {
     pendingAncestorChecks.delete(readSessionId(eventContext))
