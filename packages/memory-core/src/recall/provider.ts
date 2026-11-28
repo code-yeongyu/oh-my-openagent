@@ -183,11 +183,21 @@ export interface RecallMemoryFigures {
   readonly vocabularyTerms: number
 }
 
-export function recallMemoryFigures(): RecallMemoryFigures {
+/**
+ * The recall layer's figures in the on-demand memory report. Without `of`, every live cache in the
+ * process counts (the memory report's process-wide view). With `of`, only those caches - and the
+ * shared per-repository caches they keep alive - count, so an owner reading its own figures is
+ * unaffected by unrelated caches being created or collected around it (#12539).
+ */
+export function recallMemoryFigures(of?: ReadonlySet<RecallCorpusCache>): RecallMemoryFigures {
+  const scope = of === undefined ? undefined : withHeldCaches(of)
   const documents = new Set<RecallDocument>()
   let corpusCaches = 0
   for (const ref of liveCaches) {
-    const held = ref.deref()?.heldDocuments()
+    const cache = ref.deref()
+    if (cache === undefined) continue
+    if (scope !== undefined && !scope.has(cache)) continue
+    const held = cache.heldDocuments()
     if (held === undefined) continue
     corpusCaches += 1
     for (const document of held) documents.add(document)
@@ -197,6 +207,13 @@ export function recallMemoryFigures(): RecallMemoryFigures {
     documentTextBytes += 2 * (document.path.length + document.description.length + document.body.length)
   }
   return { corpusCaches, documents: documents.size, documentTextBytes, ...recallTermFigures(documents) }
+}
+
+/** A caller's own caches plus the shared per-repository caches they keep alive. */
+function withHeldCaches(of: ReadonlySet<RecallCorpusCache>): ReadonlySet<RecallCorpusCache> {
+  const all = new Set(of)
+  for (const cache of of) for (const held of cache.heldCaches()) all.add(held)
+  return all
 }
 
 /**
@@ -230,6 +247,11 @@ export class RecallCorpusCache {
   heldDocuments(): Iterable<RecallDocument> | undefined {
     if (this.blobs === undefined) return undefined
     return [...this.blobs.loaded.values()].flatMap((blob) => (blob.document === undefined ? [] : [blob.document]))
+  }
+
+  /** The shared per-repository caches this cache keeps alive (memory-report scoping only). */
+  heldCaches(): Iterable<RecallCorpusCache> {
+    return this.held.values()
   }
 
   load(repo: GitMemoryRepo): Promise<RecallCorpus> {

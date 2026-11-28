@@ -38,24 +38,29 @@ function textBytes(documents: readonly RecallDocument[]): number {
 // recall corpus (oh-my-openagent#9442). A shared corpus counts once however many sessions hold it.
 describe("recallMemoryFigures", () => {
   it("#given two shared caches over one repository #when a report reads the figures #then the corpus counts once", async () => {
-    // given
+    // given: this test's two shared caches, plus another test's live loaded cache that would move the
+    // old process-wide delta across the two reads (#12539: a cache made or freed by a concurrently
+    // scheduled test shifts the global count).
     const repo = await createRepo()
-    Bun.gc(true)
-    const before = recallMemoryFigures()
     const first = new RecallCorpusCache({ shared: true })
     const second = new RecallCorpusCache({ shared: true })
     const corpus = await first.load(repo)
     await second.load(repo)
-
-    // when
+    const otherRepo = await createRepo()
+    const bystander = new RecallCorpusCache()
+    const bystanderCorpus = await bystander.load(otherRepo)
     Bun.gc(true)
-    const after = recallMemoryFigures()
+
+    // when: the report reads only the caches this test owns, so unrelated caches in the process
+    // cannot move the count.
+    const figures = recallMemoryFigures(new Set([first, second]))
 
     // then
     expect(corpus.documents.length).toBe(2)
-    expect(after.corpusCaches - before.corpusCaches).toBe(1)
-    expect(after.documents - before.documents).toBe(2)
-    expect(after.documentTextBytes - before.documentTextBytes).toBe(textBytes(corpus.documents))
+    expect(bystanderCorpus.documents.length).toBe(2)
+    expect(figures.corpusCaches).toBe(1)
+    expect(figures.documents).toBe(2)
+    expect(figures.documentTextBytes).toBe(textBytes(corpus.documents))
   })
 })
 
