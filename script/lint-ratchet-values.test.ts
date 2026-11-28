@@ -52,28 +52,10 @@ describe("no-flake-masking value ratchet (#15114)", () => {
     expect(sites(CASE("BUDGET + 60_000"))).toEqual([65_000])
   })
 
-  test("#given a value from an imported or dynamic expression #when extracted #then it is unresolvable and pinned by count", () => {
-    const source = `import { BUDGET } from "./budget"\ntest("slow", () => {}, BUDGET)\n`
-    expect(sites(source)).toEqual([null])
-    const raises = compareValues(
-      { "a.test.ts": flakeMaskingSites("a.test.ts", source) },
-      { "a.test.ts": flakeMaskingSites("a.test.ts", source) },
-    )
-    expect(raises).toEqual([])
-    // One more unresolvable site than the baseline holds: fail, even though the count rule alone
-    // would also see it. One fewer (a literal became an import): fail too - the raise could hide there.
-    const second = `${source}test("other", () => {}, BUDGET)\n`
-    expect(compareValues({ "a.test.ts": flakeMaskingSites("a.test.ts", source) }, { "a.test.ts": flakeMaskingSites("a.test.ts", second) })).toEqual([
-      { file: "a.test.ts", before: 0, after: 0, line: expect.any(Number), unresolvable: true },
-    ])
-    // A resolvable value that becomes unresolvable is the same dead angle: the null count changes.
-    const becameImport = `import { BUDGET } from "./budget"\ntest("slow", () => {}, BUDGET)\ntest("other", () => {}, BUDGET)\n`
-    expect(
-      compareValues(
-        { "a.test.ts": flakeMaskingSites("a.test.ts", `test("slow", () => {}, BUDGET)\ntest("other", () => {}, 60_000)\n`) },
-        { "a.test.ts": flakeMaskingSites("a.test.ts", becameImport) },
-      ).at(0)?.unresolvable,
-    ).toBe(true)
+  test("an unresolved value fails even when the baseline has the same number of unresolved values", () => {
+    const entries = flakeMaskingSites("a.test.ts", CASE("readBudget()"))
+    expect(entries[0]?.value).toBeNull()
+    expect(compareValues({ "a.test.ts": entries }, { "a.test.ts": entries })[0]?.unresolvable).toBe(true)
   })
 
   test("#given a new argument added #when the count ratchet compares #then it fails as today (control: counts alone miss a raise)", () => {
@@ -82,11 +64,16 @@ describe("no-flake-masking value ratchet (#15114)", () => {
     // The control from the acceptance: with the value comparison removed, the raised timeout passes
     // the count ratchet - counts are identical, so compare() reports nothing.
     expect(compare(baseCounts, raisedCounts).increases).toEqual([])
-    expect(compareValues({ "a.test.ts": flakeMaskingSites("a.test.ts", CASE("60_000")) }, { "a.test.ts": flakeMaskingSites("a.test.ts", CASE("216_000")) })).not.toEqual([])
-    // A new finding still fails through the count rule.
     expect(
-      compare(baseCounts, { "a.test.ts": { "omo-testing/no-flake-masking": 2 } }).increases,
-    ).toEqual([{ file: "a.test.ts", rule: "omo-testing/no-flake-masking", before: 1, after: 2 }])
+      compareValues(
+        { "a.test.ts": flakeMaskingSites("a.test.ts", CASE("60_000")) },
+        { "a.test.ts": flakeMaskingSites("a.test.ts", CASE("216_000")) },
+      ),
+    ).not.toEqual([])
+    // A new finding still fails through the count rule.
+    expect(compare(baseCounts, { "a.test.ts": { "omo-testing/no-flake-masking": 2 } }).increases).toEqual([
+      { file: "a.test.ts", rule: "omo-testing/no-flake-masking", before: 1, after: 2 },
+    ])
   })
 
   test("#given a config-object timeout or a retry property #when extracted #then its value is tracked too", () => {
@@ -95,4 +82,42 @@ describe("no-flake-masking value ratchet (#15114)", () => {
     const retry = `const suite = { test: { retry: 3 } }\n`
     expect(flakeMaskingSites("a.test.ts", retry).map((s) => s.value)).toEqual([3])
   })
+})
+
+test("a raise in one named case is still a raise when another case lowers its budget", () => {
+  const source = (a: number, b: number) => `test("a", () => {}, ${a}); test("b", () => {}, ${b})`
+  const base = flakeMaskingSites("a.test.ts", source(100, 200))
+  const current = flakeMaskingSites("a.test.ts", source(200, 100))
+  expect(compareValues({ "a.test.ts": base }, { "a.test.ts": current })).toContainEqual({
+    file: "a.test.ts",
+    line: 1,
+    before: 100,
+    after: 200,
+  })
+})
+
+test("a dynamic budget fails even when two expressions are equally unresolved", () => {
+  const source = (arg: string) => flakeMaskingSites("a.test.ts", `test("a", () => {}, ${arg})`)
+  const raises = compareValues({ "a.test.ts": source("one()") }, { "a.test.ts": source("two()") })
+  expect(raises[0]?.unresolvable).toBe(true)
+})
+
+test("per-platform values detect either branch rising while the other stays steady", () => {
+  const values = (posix: number, win: number) =>
+    flakeMaskingSites("a.test.ts", CASE(`process.platform === "win32" ? ${win} : ${posix}`))
+  const base = { "a.test.ts": values(5000, 15000) }
+  expect(compareValues(base, { "a.test.ts": values(6000, 15000) })[0]).toMatchObject({ before: 5000, after: 6000 })
+  expect(compareValues(base, { "a.test.ts": values(5000, 16000) })[0]).toMatchObject({ before: 15000, after: 16000 })
+})
+
+test("constants respect lexical scope and mutable variables are unresolved", () => {
+  const source = `const T = 200; describe("outer", () => { const T = 100; test("inner", () => {}, T) }); test("outer", () => {}, T)`
+  expect(sites(source)).toEqual([100, 200])
+  expect(sites("let T = 100; T *= 5; test('changed', () => {}, T)")).toEqual([null])
+})
+
+test("local functions and fixture objects that share test API names have no budget", () => {
+  const source = `function describe(name: string, label: string, now: number) {return label}; describe("a", "b", clock());
+    const test = { pi: { dispatch: (...args: unknown[]) => args } }; test.pi.dispatch("event", {}, context())`
+  expect(sites(source)).toEqual([])
 })

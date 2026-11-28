@@ -4,6 +4,7 @@ import * as NodePath from "node:path"
 import * as NodeProcess from "node:process"
 
 import { parseSync } from "oxc-parser"
+import { sourceBudgets } from "./lint-ratchet-budget"
 
 import {
   argumentsOf,
@@ -83,9 +84,7 @@ export const compare = (baseline: Counts, current: Counts) => {
   const increases: Change[] = []
   const decreases: Change[] = []
   // "#flake-values" is the #15114 value section, not a file: counts and values compare separately.
-  const files = new Set(
-    [...Object.keys(baseline), ...Object.keys(current)].filter((key) => !key.startsWith("#")),
-  )
+  const files = new Set([...Object.keys(baseline), ...Object.keys(current)].filter((key) => !key.startsWith("#")))
   for (const file of [...files].toSorted()) {
     for (const rule of [...RATCHET_RULES, SUPPRESSION]) {
       const before = baseline[file]?.[rule] ?? 0
@@ -102,91 +101,71 @@ export const compare = (baseline: Counts, current: Counts) => {
 // already tracks, the value of every reported argument is compared against the baseline: any
 // raise fails with the file, the line, the old value and the new one; lowering passes.
 
-export type Site = { readonly line: number; readonly value: number | null }
-
-const walk = (node: unknown, visit: (node: Node) => void): void => {
-  if (!isNodeLike(node)) return
-  visit(node)
-  for (const value of Object.values(node as Record<string, unknown>)) {
-    if (Array.isArray(value)) for (const entry of value) walk(entry, visit)
-    else walk(value, visit)
-  }
+export type Site = {
+  readonly key: string
+  readonly line: number
+  readonly value: number | null
+  readonly windows?: number
 }
+
 const isNodeLike = (value: unknown): value is Node =>
   typeof value === "object" && value !== null && typeof (value as Record<string, unknown>)["type"] === "string"
 
-const resolveValue = (node: Node, constants: ReadonlyMap<string, number>): number | null => {
-  if (node.type === "Literal" && typeof node["value"] === "number") return node["value"] as number
-  if (node.type === "Identifier") {
-    const resolved = constants.get(String(node["name"]))
-    return resolved ?? null
-  }
-  // Sums of resolvable operands (`2 * BUDGET + 10_000`): statically known values. Only the two
-  // shapes the repo's existing timeouts use are resolved; anything else stays unresolvable.
-  if (node.type === "BinaryExpression" && (node["operator"] === "+" || node["operator"] === "*")) {
-    const left = resolveValue(child(node, "left") as Node, constants)
-    const right = resolveValue(child(node, "right") as Node, constants)
-    if (left !== null && right !== null) return node["operator"] === "+" ? left + right : left * right
-  }
-  return null
-}
-
-const lineOf = (source: string, node: Node): number => source.slice(0, Number(node["start"] ?? 0)).split("\n").length
-
 export const flakeMaskingSites = (file: string, source: string): readonly Site[] => {
-  const program = parseSync(file, source).program as unknown as Node
-  const constants = new Map<string, number>()
-  walk(program, (node) => {
-    // A constant that resolves to a literal in the same file: `const X = 60_000`.
-    if (
-      node.type === "VariableDeclarator" &&
-      child(node, "id")?.type === "Identifier" &&
-      child(node, "init")?.type === "Literal" &&
-      typeof child(node, "init")?.["value"] === "number"
-    )
-      constants.set(String(child(node, "id")?.["name"]), child(node, "init")?.["value"] as number)
-  })
   const sites: Site[] = []
-  const propertyValue = (property: Node, keys: ReadonlySet<string>): void => {
-    const key = keyName(property)
-    if (key === "retry" || (key !== null && keys.has(key))) {
+  const budget = sourceBudgets(file, source)
+  const slice = (node: Node) => source.slice(Number(node["start"]), Number(node["end"]))
+  const add = (key: string, node: Node, call?: Node): void => {
+    const start = Number(node["start"])
+    const value =
+      node.type === "Literal" && typeof node["value"] === "number"
+        ? { value: node["value"] }
+        : budget(
+            start,
+            Number(node["end"]),
+            call === undefined ? undefined : Number(call["start"]),
+            call === undefined ? undefined : Number(call["end"]),
+          )
+    if (value === undefined) return
+    sites.push({ key, line: source.slice(0, start).split("\n").length, ...value })
+  }
+  const inspect = (key: string, object: Node, keys: ReadonlySet<string>): void => {
+    for (const property of propertiesOf(object)) {
+      const name = keyName(property)
       const value = child(property, "value")
-      if (value !== undefined) sites.push({ line: lineOf(source, property), value: resolveValue(value, constants) })
+      if (value !== undefined && name !== null && (name === "retry" || keys.has(name))) add(key + "/" + name, value)
     }
   }
-  walk(program, (node) => {
+  const visit = (node: Node, parent: string): void => {
+    let key = parent
     if (node.type === "CallExpression" && configCall(node)) {
-      const argument = argumentsOf(node)[0]
-      if (argument?.type === "ObjectExpression")
-        for (const property of propertiesOf(argument)) propertyValue(property, configTimeoutKeys)
-      return
-    }
-    if (node.type !== "CallExpression" || !testCall(node)) {
-      if (node.type === "Property" && keyName(node) === "test") {
-        const value = child(node, "value")
-        if (value?.type === "ObjectExpression")
-          for (const property of propertiesOf(value))
-            if (keyName(property) === "retry") {
-              const inner = child(property, "value")
-              if (inner !== undefined) sites.push({ line: lineOf(source, property), value: resolveValue(inner, constants) })
-            }
+      const [arg] = argumentsOf(node)
+      if (arg?.type === "ObjectExpression") inspect(parent + "/vi.setConfig", arg, configTimeoutKeys)
+    } else if (node.type === "CallExpression" && testCall(node)) {
+      const [name, second, third] = argumentsOf(node)
+      const callee = child(node, "callee")
+      if (name !== undefined && callee !== undefined) {
+        key = parent + "/" + JSON.stringify(name.type === "Literal" ? name["value"] : slice(name))
+        for (const arg of [second, third]) if (arg?.type === "ObjectExpression") inspect(key, arg, timeoutKeys)
+        if (
+          third !== undefined &&
+          second?.type !== "ObjectExpression" &&
+          third.type !== "ObjectExpression" &&
+          third.type !== "ArrowFunctionExpression" &&
+          third.type !== "FunctionExpression"
+        )
+          add(key + "/timeout", third, node)
       }
-      return
+    } else if (node.type === "Property" && keyName(node) === "test") {
+      const value = child(node, "value")
+      if (value?.type === "ObjectExpression") inspect(parent + "/test", value, new Set())
     }
-    const [, second, third] = argumentsOf(node)
-    for (const argument of [second, third]) {
-      if (argument?.type !== "ObjectExpression") continue
-      for (const property of propertiesOf(argument)) propertyValue(property, timeoutKeys)
+    for (const value of Object.values(node)) {
+      if (isNodeLike(value)) visit(value, key)
+      else if (Array.isArray(value)) for (const item of value) if (isNodeLike(item)) visit(item, key)
     }
-    if (
-      third !== undefined &&
-      second?.type !== "ObjectExpression" &&
-      third.type !== "ObjectExpression" &&
-      third.type !== "ArrowFunctionExpression" &&
-      third.type !== "FunctionExpression"
-    )
-      sites.push({ line: lineOf(source, third), value: resolveValue(third, constants) })
-  })
+  }
+  visit(parseSync(file, source).program as unknown as Node, "")
   return sites
 }
 
@@ -203,27 +182,24 @@ export const compareValues = (
   current: Readonly<Record<string, readonly Site[]>>,
 ): ValueChange[] => {
   const raises: ValueChange[] = []
-  for (const file of [...new Set([...Object.keys(baseline), ...Object.keys(current)])].toSorted()) {
-    const base = baseline[file] ?? []
-    const cur = current[file] ?? []
-    // An unresolvable value is recorded as null and pinned by COUNT: any change in how many sites
-    // are unresolvable (one appeared, or one became resolvable) fails, so neither direction can
-    // hide a raise behind a shape the resolver does not understand.
-    if (base.filter((site) => site.value === null).length !== cur.filter((site) => site.value === null).length) {
-      raises.push({ file, line: (cur.find((site) => site.value === null) ?? cur[0])?.line ?? 0, before: 0, after: 0, unresolvable: true })
-      continue
-    }
-    const before = base.flatMap((site) => (site.value === null ? [] : [site.value])).toSorted((a, b) => a - b)
-    const after = cur.flatMap((site) => (site.value === null ? [] : [site.value])).toSorted((a, b) => a - b)
-    for (const [index, value] of after.entries()) {
-      const previous = before[index]
-      if (previous !== undefined && value > previous)
-        raises.push({
-          file,
-          before: previous,
-          after: value,
-          line: (cur.find((site) => site.value === value) ?? cur[0])?.line ?? 0,
-        })
+  for (const [file, sites] of Object.entries(current)) {
+    const previous = Map.groupBy(baseline[file] ?? [], (site) => site.key)
+    for (const site of sites) {
+      if (site.value === null) {
+        raises.push({ file, line: site.line, before: 0, after: 0, unresolvable: true })
+        continue
+      }
+      const old = previous.get(site.key)?.shift()
+      if (old === undefined) {
+        raises.push({ file, line: site.line, before: 0, after: site.value })
+        continue
+      }
+      if (old.value === null) continue
+      const windowsBefore = old.windows ?? old.value
+      const windowsAfter = site.windows ?? site.value
+      if (site.value > old.value) raises.push({ file, line: site.line, before: old.value, after: site.value })
+      else if (windowsAfter > windowsBefore)
+        raises.push({ file, line: site.line, before: windowsBefore, after: windowsAfter })
     }
   }
   return raises
@@ -327,9 +303,7 @@ const main = () => {
     NodeProcess.exit(1)
   }
   const storedBaseline: Counts & { readonly "#flake-values"?: Readonly<Record<string, readonly Site[]>> } =
-    NodeFS.existsSync(baselinePath)
-      ? JSON.parse(NodeFS.readFileSync(baselinePath, "utf8"))
-      : {}
+    NodeFS.existsSync(baselinePath) ? JSON.parse(NodeFS.readFileSync(baselinePath, "utf8")) : {}
   // First adoption: a baseline without the values section records whatever the tree holds.
   const valuesAdopted = NodeFS.existsSync(baselinePath) && "#flake-values" in storedBaseline
   const baseValues = storedBaseline["#flake-values"] ?? {}
@@ -339,13 +313,19 @@ const main = () => {
   const currentValues: Record<string, readonly Site[]> = {}
   const unresolved: string[] = []
   for (const file of [...watched].toSorted()) {
-    const sites = flakeMaskingSites(file, NodeFS.readFileSync(NodePath.join(root, file), "utf8"))
+    const path = NodePath.join(root, file)
+    if (!NodeFS.existsSync(path)) continue
+    const sites = flakeMaskingSites(file, NodeFS.readFileSync(path, "utf8"))
     currentValues[file] = sites
     for (const site of sites)
       if (site.value === null)
         unresolved.push(
-          `${file}:${site.line}: no-flake-masking value cannot be resolved statically; use a literal or a same-file const`,
+          `${file}:${site.line}: no-flake-masking value cannot be resolved statically; use a statically known numeric budget`,
         )
+  }
+  if (unresolved.length > 0) {
+    for (const message of unresolved) console.error(message)
+    NodeProcess.exit(1)
   }
   if (NodeProcess.argv.includes("--update")) {
     // Lowering is the only routine update: raising a count needs the explicit flag, so following
@@ -358,7 +338,9 @@ const main = () => {
       for (const { file, line, before, after } of raises)
         console.error(`${file}:${line}: no-flake-masking value went up from ${before} to ${after}`)
       if (increases.length > 0 || raises.length > 0) {
-        console.error("lint-ratchet: --update only lowers counts and values; fix the findings (or pass --allow-increase).")
+        console.error(
+          "lint-ratchet: --update only lowers counts and values; fix the findings (or pass --allow-increase).",
+        )
         NodeProcess.exit(1)
       }
     }
@@ -370,14 +352,11 @@ const main = () => {
     return
   }
   const { increases, decreases } = compare(storedBaseline, current)
-  // Unresolvable values are visible but pinned by count (compareValues): the repo ships 240 of them,
-  // so failing on their mere presence would brick the ratchet; only a CHANGE fails.
-  for (const line of unresolved) console.error(line)
   const valueRaises = valuesAdopted ? compareValues(baseValues, currentValues) : []
   for (const { file, line, before, after, unresolvable } of valueRaises)
     console.error(
       unresolvable === true
-        ? `${file}:${line}: the count of statically unresolvable no-flake-masking values changed; resolve it to a literal or same-file const`
+        ? `${file}:${line}: no-flake-masking value cannot be resolved statically`
         : `${file}:${line}: no-flake-masking value went up from ${before} to ${after}`,
     )
   if (increases.length > 0 || valueRaises.length > 0) {
