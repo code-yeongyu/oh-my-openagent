@@ -18,7 +18,7 @@ export interface PendingItem {
   readonly key: string
   /** sha256 of the key and the ops: the item's identity. */
   readonly digest: string
-  /** Plaintext size of the ops, what the batch bound counts. */
+  /** Plaintext size of the ops, what the batch bound counts with the record framing around them. */
   readonly bytes: number
   /** The segment file in `pending/` holding the ops, and their offset in it. */
   readonly segment: string
