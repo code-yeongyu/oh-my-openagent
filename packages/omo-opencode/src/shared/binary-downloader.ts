@@ -42,6 +42,7 @@ export async function extractTarGz(
   const args = options?.args ?? ["tar", "-xzf", archivePath, "-C", destDir]
   const proc = spawn(args, {
     cwd: options?.cwd,
+    env: tarSpawnEnv(),
     stdout: "pipe",
     stderr: "pipe",
   })
@@ -115,16 +116,26 @@ function parseTarEntry(line: string): ArchiveEntry | null {
   }
 }
 
-async function listTarEntries(archivePath: string, cwd?: string): Promise<ArchiveEntry[]> {
-  // GNU tar reads extra options from TAR_OPTIONS (--block-number prefixes every line) and translates
-  // " link to " in the message locale, so the listing runs in the C locale without them. bsdtar ignores
-  // both; Windows bsdtar keeps the system locale regardless, hence the localized date forms above.
-  const env: NodeJS.ProcessEnv = { ...process.env, LC_ALL: "C" }
+function tarSpawnEnv(): NodeJS.ProcessEnv {
+  // GNU tar reads extra options from TAR_OPTIONS (--block-number prefixes every listing line) and
+  // translates " link to " in the message locale, so both tar spawns pin only the categories the
+  // listing parser depends on (LC_TIME for the date column, LC_MESSAGES for GNU's wording) and drop
+  // TAR_OPTIONS. LC_ALL is deliberately not pinned: under it bsdtar prints non-ASCII entry names as
+  // backslash escapes, which the validator reads as path separators, so a valid archive with an
+  // entry like 한.txt is refused (#9790). bsdtar ignores these variables; Windows bsdtar keeps the
+  // system locale regardless, hence the localized date forms parsed above. The extraction must run
+  // under exactly the environment that produced the validated listing, so it builds the same env
+  // instead of inheriting the startup one.
+  const env: NodeJS.ProcessEnv = { ...process.env, LC_TIME: "C", LC_MESSAGES: "C" }
   delete env.TAR_OPTIONS
+  return env
+}
+
+async function listTarEntries(archivePath: string, cwd?: string): Promise<ArchiveEntry[]> {
   // Owner and group names are stored as-is and can contain spaces, so both tars list them as numbers.
   const proc = spawn(["tar", "--numeric-owner", "-tvzf", archivePath], {
     cwd,
-    env,
+    env: tarSpawnEnv(),
     stdout: "pipe",
     stderr: "pipe",
   })
