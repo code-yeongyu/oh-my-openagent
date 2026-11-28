@@ -63,6 +63,12 @@ export const ThreadCreateParams = Type.Object({
       },
     ),
   ),
+  metadata: Type.Optional(
+    Type.Unknown({
+      description:
+        "One JSON value stored with the new thread and shown by thread_read (tool.thread_read() in an eval cell); omo never reads it. At most 4096 bytes as JSON; a larger value is refused metadata_too_large and nothing is created. Only for a new thread.",
+    }),
+  ),
   fork_from: Type.Optional(
     Type.String({
       description:

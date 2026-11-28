@@ -65,7 +65,7 @@ import {
 import { renameThread } from "./control/rename"
 import { sessionErrorText } from "./tools/session-error"
 import { controlIdentity, controlRefusalOf } from "./control/port"
-import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
+import { registerExtensionTools, resolveCallerDurableId, type ExtensionToolHost } from "./tools/extension-tools"
 import { createMonitorTargetResolver, installMonitorTargetResolution } from "./tools/monitor-target"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -494,6 +494,11 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       execute("thread_close", id, args, ectx, async (current, value, _operationId, callerId) => {
         const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
         if (located.kind === "error") return located.result
+        if (value.mine === true) {
+          const target = located.kind === "control" ? located.control.thread_id : located.thread_id
+          const refused = await notOpenedBy(options, current, callerId, target)
+          if (refused !== undefined) return refused
+        }
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (located.kind === "not_live")
           return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
@@ -856,6 +861,27 @@ type ConsumedSender = { readonly session_id: string; readonly device?: string }
  * A failed read is a typed host_unavailable, never undefined: without the id a sender on this device cannot be told from
  * one on another device, and guessing "another device" would route a local reply through the relay (#13218 review).
  */
+/** `thread_close` with `mine` (#15221 row 25): a thread the calling session did not open is refused, and nothing is closed. */
+async function notOpenedBy(
+  options: ThreadToolSurfaceOptions,
+  view: ThreadHostView,
+  callerId: string,
+  thread: string,
+): Promise<ThreadToolResult | undefined> {
+  const caller = resolveCallerDurableId(options, view, callerId)
+  const opener = await options.store.threadOpener(thread)
+  if (caller !== undefined && opener?.creator_durable_id === caller) return undefined
+  return {
+    kind: "error",
+    error: threadToolFailure(
+      "not_creator",
+      `This session did not open thread ${thread}, so a close limited to its own threads leaves it open.`,
+      "Close it without mine, or ask the session that opened it (its created_by in tool.thread_list() in an eval cell).",
+      { thread, ...(opener === undefined ? {} : { opened_by: opener.creator_durable_id }) },
+    ),
+  }
+}
+
 async function thisDeviceOf(
   options: ThreadToolSurfaceOptions,
   senders: readonly ConsumedSender[],

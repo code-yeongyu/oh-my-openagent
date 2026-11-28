@@ -371,7 +371,7 @@ export function createRelaySessionHost(
           "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
           { device },
         )
-      const { name, initialSkills, openedBy, permissionPreset, worktree, ...asked } = request
+      const { name, initialSkills, openedBy, metadata, permissionPreset, worktree, ...asked } = request
       const made =
         worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)
       if (made?.kind === "error") return made
@@ -380,7 +380,7 @@ export function createRelaySessionHost(
         type: "open_session",
         retain_on_disconnect: true,
         ...open,
-        ...openContext(initialSkills, openedBy),
+        ...openContext(initialSkills, openedBy, metadata),
         ...(permissionPreset === undefined ? {} : { permissionPreset }),
       }
       const reopens = request.sessionPath !== undefined

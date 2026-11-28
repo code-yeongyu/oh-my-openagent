@@ -124,6 +124,12 @@ const ThreadCloseParams = Type.Object({
   thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
+  mine: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close only a thread this session opened (its created_by); any other is refused not_creator and nothing is closed.",
+    }),
+  ),
   force: Type.Optional(
     Type.Boolean({
       description:

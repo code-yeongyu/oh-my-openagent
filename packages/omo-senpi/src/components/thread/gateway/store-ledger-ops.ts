@@ -4,9 +4,8 @@
  * restored under a new device id still resolves. The opener's device and the hosting device each record a creation, and
  * a second record of the same pair only fills a device it did not know.
  */
+import { THREAD_METADATA_MAX_BYTES } from "./constants"
 import { transaction, type StoreContext } from "./store-ops"
-
-export const THREAD_METADATA_MAX_BYTES = 4096
 
 export type ThreadCreationRequest = {
   readonly now: number
@@ -75,6 +74,9 @@ export function createdBy(ctx: StoreContext, creator: string, created: string): 
 
 export async function recordThreadCreation(ctx: StoreContext, request: ThreadCreationRequest): Promise<void> {
   await transaction(ctx, "record_thread_creation", () => {
+    // A thread has one opener. A child re-records its first opener on every start; after a hand-over that is stale.
+    const opener = openerOf(ctx, request.created_durable_id)
+    if (opener !== undefined && opener.creator_durable_id !== request.creator_durable_id) return
     ctx.sql.run(
       `INSERT INTO thread_creations (creator_durable_id, created_durable_id, created_at, creator_device, created_device)
        VALUES (?, ?, ?, ?, ?)

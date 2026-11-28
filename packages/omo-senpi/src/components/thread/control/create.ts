@@ -1,5 +1,6 @@
 import { isAbsolute } from "node:path"
 
+import { THREAD_METADATA_MAX_BYTES } from "../gateway/constants"
 import { toThreadAddressEntries } from "../address-book"
 import { checkNameConflict } from "../addressing"
 import type {
@@ -95,6 +96,8 @@ export async function createThread(
       "Pass the new thread's first message as prompt, or drop prompt and pass name to open an empty named thread.",
       { field: "prompt" },
     )
+  const metadataRefused = metadataRefusal(value)
+  if (metadataRefused !== undefined) return metadataRefused
   // #14050: a new thread with no first prompt and no name is an empty session nobody asked for; refuse it as data.
   const named = (value.name?.trim() ?? "") !== "" || (value.alias?.trim() ?? "") !== ""
   if (value.thread === undefined && value.fork_from === undefined && value.prompt === undefined && !named)
@@ -221,6 +224,7 @@ export async function createThread(
           {
             ...plan.request,
             ...(openedBy === undefined ? {} : { openedBy }),
+            ...(plan.creates && value.metadata !== undefined ? { metadata: value.metadata } : {}),
             ...(openName === undefined ? {} : { name: openName }),
             ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
             ...(preset === undefined ? {} : { permissionPreset: preset }),
@@ -243,7 +247,7 @@ export async function createThread(
       ...workspaceNote(outcome.thread, callerCwd),
     }
     const recorded = plan.creates
-      ? await recordThreadCreator(options, current, callerId, created)
+      ? await recordThreadCreator(options, current, callerId, created, value.metadata)
       : plan.host.device === undefined
         ? await keepName(options, created, kept, outcome.thread, await plan.host.visible(), callerId, view)
         : created
@@ -540,6 +544,31 @@ function keptWorktree(note: string | null | undefined): ThreadWorktree | undefin
     typeof repository === "string"
     ? (kept as ThreadWorktree)
     : undefined
+}
+
+/** `metadata` only for a new thread, at most 4 KB as JSON: refused before anything opens (#15221 row 25). */
+function metadataRefusal(value: ThreadCreateInput): ThreadToolResult | undefined {
+  if (value.metadata === undefined) return undefined
+  if (value.thread !== undefined)
+    return failure(
+      "invalid_arguments",
+      "metadata applies only to a new thread; nothing was opened.",
+      "Drop metadata to open an existing thread, or leave thread unset to create one.",
+      { field: "metadata" },
+    )
+  const json = JSON.stringify(value.metadata)
+  const bytes = json === undefined ? 0 : Buffer.byteLength(json, "utf8")
+  if (json !== undefined && bytes <= THREAD_METADATA_MAX_BYTES) return undefined
+  return json === undefined
+    ? failure("invalid_arguments", "metadata must be a JSON value.", "Pass a JSON value as metadata.", {
+        field: "metadata",
+      })
+    : failure(
+        "metadata_too_large",
+        `metadata is ${bytes} bytes as JSON; the limit is ${THREAD_METADATA_MAX_BYTES}. Nothing was created.`,
+        "Store a smaller value and keep the rest in a file the thread can read.",
+        { field: "metadata", bytes, limit: THREAD_METADATA_MAX_BYTES },
+      )
 }
 
 /** The session making a create and its device, carried on the open so the hosting device records the opener (#15221 row 25). */

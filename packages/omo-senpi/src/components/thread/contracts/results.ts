@@ -449,7 +449,26 @@ export type ThreadSetReasoningResult =
     }
   | ThreadDataError
 
+/** Where a hand-over or a metadata change was recorded (#15221 row 25); a device it did not reach is named, never dropped. */
+export type ThreadLedgerSpread = {
+  readonly recorded_on: readonly string[]
+  readonly not_recorded: readonly { readonly device: string; readonly code: string; readonly message: string }[]
+}
+
+export type ThreadHandOverResult =
+  | (ThreadLedgerSpread & {
+      readonly kind: "ok"
+      readonly thread: string
+      readonly created_by: { readonly thread: string; readonly device?: string }
+      readonly handed_over_from: string
+    })
+  | ThreadDataError
+
+export type ThreadSetMetadataResult = (ThreadLedgerSpread & { readonly kind: "ok"; readonly thread: string }) | ThreadDataError
+
 export type ThreadToolResult =
+  | ThreadHandOverResult
+  | ThreadSetMetadataResult
   | ThreadCreateResult
   | ThreadListResult
   | ThreadReadResult

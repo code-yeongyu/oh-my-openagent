@@ -842,6 +842,7 @@ describe("thread SDK: session controls (#13413)", () => {
       await sdk.interrupt({ thread: "self" }),
       await sdk.close({ thread: "self" }),
       await sdk.close({}),
+      await sdk.close({ thread: "dur-local", mine: true }),
       await sdk.rename({ thread: "self", name: "mine" }),
       await sdk.rename({ name: "mine" }),
       await sdk.set_model({ thread: "self", model: "opus" }),

@@ -22,6 +22,7 @@ import {
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
+import { handOverThreadOp, setThreadMetadataOp } from "./control/ledger-ops"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
@@ -154,6 +155,10 @@ export type ThreadSdk = StoreExtensionApi & {
   readonly close: (request: ThreadCloseInput) => Promise<ThreadToolResult>
   readonly rename: (request: ThreadRenameInput) => Promise<ThreadToolResult>
   readonly set_model: (request: ThreadSetModelInput) => Promise<ThreadToolResult>
+  /** Hands `thread` to the thread `to` as its new opener, recorded on the old opener's, the new one's and the child's devices. */
+  readonly handOver: (request: Scoped & { readonly thread: string; readonly to: string }) => Promise<ThreadToolResult>
+  /** Sets `thread`'s one JSON metadata value (at most 4 KB, refused `metadata_too_large` above, never cut). */
+  readonly setMetadata: (request: Scoped & { readonly thread: string; readonly value: unknown }) => Promise<ThreadToolResult>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
   readonly release: (
     thread: LocatedThread,
@@ -224,8 +229,27 @@ function unknownKeys(request: unknown, known: readonly string[]): Failure | unde
   )
 }
 
+const MINE_WITHOUT_SESSION: ThreadToolResult = {
+  kind: "error",
+  error: threadToolFailure(
+    "caller_context_missing",
+    "mine closes only threads the calling session opened, and a script is no session, so it has opened none.",
+    "Close the thread without mine, or close it with mine from the session that opened it (tool.thread_close() in an eval cell).",
+    { field: "mine" },
+  ),
+}
+
 const LIST_KEYS = ["all_scope", "state", "children_of"] as const
 const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
+const HAND_OVER_KEYS = ["thread", "to", "all_scope"] as const
+const METADATA_KEYS = ["thread", "value", "all_scope"] as const
+
+function missingText(request: Readonly<Record<string, unknown>>, fields: readonly string[]): Failure | undefined {
+  const missing = fields.find((field) => typeof request[field] !== "string" || request[field] === "")
+  return missing === undefined
+    ? undefined
+    : fail("invalid_arguments", `${missing} must be a non-empty string.`, `Pass ${missing}.`, { field: missing })
+}
 const SEND_KEYS = [
   "thread",
   "text",
@@ -507,6 +531,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       }),
     close: (request) =>
       control(threadToolParamSchemas.thread_close, request, async (value) => {
+        // mine limits a close to the caller's own threads; a script acts as itself, opened none, and has no such set.
+        if (value.mine === true) return MINE_WITHOUT_SESSION
         const found = await located(value.thread ?? "self", value.all_scope)
         if (found.kind === "error") return found.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
@@ -514,6 +540,22 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
         return await closeThread(found.control, closeOptions(value))
       }),
+    handOver: (request) =>
+      guarded(
+        async () =>
+          unknownKeys(request, HAND_OVER_KEYS) ??
+          missingText(request, ["thread", "to"]) ??
+          handOverThreadOp(controls, await view(), request, UNKNOWN_CALLER),
+      ),
+    setMetadata: (request) =>
+      guarded(
+        async () =>
+          unknownKeys(request, METADATA_KEYS) ??
+          missingText(request, ["thread"]) ??
+          ("value" in request
+            ? setThreadMetadataOp(controls, await view(), request, UNKNOWN_CALLER)
+            : fail("invalid_arguments", "value is required.", "Pass value (any JSON value).", { field: "value" })),
+      ),
     rename: (request) =>
       control(threadToolParamSchemas.thread_rename, request, async (value) =>
         renameThread(controls, await view(), value, value.idempotency_key ?? `auto:${randomUUID()}`, UNKNOWN_CALLER),
