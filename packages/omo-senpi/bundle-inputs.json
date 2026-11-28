@@ -1842,6 +1842,7 @@
     "packages/omo-senpi/src/components/thread/tools/session-error.ts",
     "packages/omo-senpi/src/components/thread/tools/thread-row.ts",
     "packages/omo-senpi/src/components/thread/tools/thread-state.ts",
+    "packages/omo-senpi/src/components/thread/tools/unknown-send.ts",
     "packages/omo-senpi/src/components/thread/wake/carrier-connection.ts",
     "packages/omo-senpi/src/components/thread/wake/carrier.ts",
     "packages/omo-senpi/src/components/thread/wake/closed-intake.ts",
