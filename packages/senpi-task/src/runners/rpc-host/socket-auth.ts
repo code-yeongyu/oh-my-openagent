@@ -207,6 +207,9 @@ export async function authenticateRpcHost(
   const data = object(reply.data) ? reply.data : undefined
   const root = typeof keyRoot === "function" ? keyRoot() : keyRoot
   if (data?.auth === undefined) {
+    // Windows pipes prove no host (senpi#7571) and their key root has no POSIX modes to check, so a host that sent no
+    // challenge there is served as before; the record lookup below is POSIX-only like the challenge itself.
+    if (process.platform === "win32") return reply
     const named = recordNaming(root, endpoint)
     if (named !== undefined)
       throw new RpcIdentityError(

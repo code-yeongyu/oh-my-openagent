@@ -349,6 +349,32 @@ describe.skipIf(process.platform === "win32")("authenticateRpcHost dial outcomes
     }
   })
 
+  // Platform contract (senpi#7571): Windows pipes prove no host, so a host that sends no challenge there is served as it
+  // was before the key-record lookup; on POSIX the same scene is refused (rows C and N).
+  test("W no challenge on win32 skips the key-root lookup and serves the host", async () => {
+    const root = mkdtempSync(join(tmpdir(), "dial-"))
+    roots.push(root)
+    const keys = join(root, "rpc", "keys")
+    mkdirSync(keys, { recursive: true, mode: 0o700 })
+    mkdirSync(join(root, "sock"))
+    const scene = { keys, root, socket: join(root, "sock", "h.sock") }
+    named(scene)
+    chmodSync(keys, 0o755)
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")
+    if (platform === undefined) throw new Error("process.platform has no descriptor")
+    Object.defineProperty(process, "platform", { ...platform, value: "win32" })
+    try {
+      const host = scriptedHost("no-challenge", FIRST, KEY)
+      expect(await authenticateRpcHost(host.request as never, scene.socket, root)).toEqual({
+        success: true,
+        data: { protocol: 1 },
+      })
+      expect(host.sent.map((sent) => sent.type)).toEqual(["get_protocol_info"])
+    } finally {
+      Object.defineProperty(process, "platform", platform)
+    }
+  })
+
   test.each(Object.entries(ROWS))("%s", async (_name, row) => {
     const root = mkdtempSync(join(tmpdir(), "dial-"))
     roots.push(root)
