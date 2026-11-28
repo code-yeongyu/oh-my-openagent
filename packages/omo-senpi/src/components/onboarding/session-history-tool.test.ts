@@ -1,10 +1,11 @@
-import { readFile } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "bun:test"
 
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { createTempDirectories, encodeRecord, writeTranscript } from "./session-history/test-support"
 import { createOnboardingSessionHistoryTool, ONBOARDING_SESSION_HISTORY_TOOL_NAME } from "./session-history-tool"
+import { createSessionHistoryRuntimeLoader, SESSION_HISTORY_RUNTIME_ARTIFACT } from "./session-history-runtime-loader"
 import { createOnboardingHarness } from "./test-harness"
 
 const temp = createTempDirectories()
@@ -87,6 +88,53 @@ describe("onboarding session archaeology runs through the engine session-history
     const text = result.content.map((part) => (part.type === "text" ? part.text : "")).join("")
     expect(text).toContain(`- ${workspace} [codex] threads=1`)
     expect(text).toContain(JSON.stringify(stored[0]))
+  })
+
+  // #15352: a thrown tool error reaches the model as its own text, which names local paths, so the tool
+  // answers each failure itself.
+  it("#given a session-history runtime that cannot load #when the tool runs #then it answers with the artifact and the remedy, never the import error's text", async () => {
+    // given
+    const { homes, stateDir } = await fixture()
+    const tool = createOnboardingSessionHistoryTool({
+      stateDir,
+      scanOptions: { homes, omoSessionsRoots: [], now: () => nowMs },
+      loadRuntime: createSessionHistoryRuntimeLoader(() =>
+        Promise.reject(
+          new Error(
+            "Cannot find module '#omo-session-history-runtime' from '/home/SYNTH-USER/plugin/extensions/omo.js'",
+          ),
+        ),
+      ),
+    })
+
+    // when
+    const result = await tool.execute("call-2", {}, undefined, undefined, {} as never)
+
+    // then
+    const text = result.content.map((part) => (part.type === "text" ? part.text : "")).join("")
+    expect(result.isError).toBe(true)
+    expect(text).toContain(SESSION_HISTORY_RUNTIME_ARTIFACT)
+    expect(text).not.toContain("SYNTH-USER")
+  })
+
+  it("#given a digest file the tool cannot read back #when the tool runs #then it answers with the failure kind only", async () => {
+    // given: a directory where the scan's digest file belongs
+    const { homes, stateDir } = await fixture()
+    await mkdir(join(stateDir, "onboarding", "scans", "tui-scan-2", "digests.jsonl"), { recursive: true })
+    const tool = createOnboardingSessionHistoryTool({
+      stateDir,
+      newScanId: () => "tui-scan-2",
+      scanOptions: { homes, omoSessionsRoots: [], now: () => nowMs },
+    })
+
+    // when
+    const result = await tool.execute("call-3", {}, undefined, undefined, {} as never)
+
+    // then: the failure kind, never the runtime's own text for it
+    const text = result.content.map((part) => (part.type === "text" ? part.text : "")).join("")
+    expect(result.isError).toBe(true)
+    expect(text).toContain("EISDIR")
+    expect(text).not.toContain("illegal operation")
   })
 
   // Tool-name contract: the runtime dispatches on the name lane 3 tells the agent to call.
