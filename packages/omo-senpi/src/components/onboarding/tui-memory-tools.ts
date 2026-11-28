@@ -2,7 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static, Type } from "typebox"
 
 import { sessionFactsApplier, type MemoryFactsApplyResponse } from "../memory/facts-apply-rpc"
-import { onboardingRuntimeUnavailable } from "./scan-component"
+import { onboardingRuntimeUnavailable } from "./scan-runtime-loader"
 import type { SessionDigest } from "./session-history"
 import type { OnboardingFactCandidate } from "./understand-contract"
 import type { OnboardingUnderstandingSeams } from "./understand-start"
@@ -67,6 +67,7 @@ export function createOnboardingMemoryTools(options: TuiMemoryToolsOptions): {
     try {
       return await options.loadRuntime()
     } catch {
+      // no-excuse-ok: catch - the tool boundary: any load failure becomes the fixed sentence the model reads (#15352).
       return `${onboardingRuntimeUnavailable()} Continue with the scan rows only.`
     }
   }

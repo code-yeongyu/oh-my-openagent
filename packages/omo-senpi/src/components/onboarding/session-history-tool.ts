@@ -4,7 +4,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { type Static, Type } from "typebox"
 
 import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
-import { loadOnboardingScanRuntime } from "./scan-component"
+import { loadOnboardingScanRuntime } from "./scan-runtime-loader"
 import type { ScanCounts, SessionHistoryOptions, SessionHistoryScanSource } from "./session-history"
 import {
   loadSessionHistoryRuntime,
