@@ -56,6 +56,42 @@
           }
         }
       ]
+    },
+    {
+      "name": "after device.forget a devices.list is refused signed_out (#14881/#15188)",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "device.forget"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "devices.list"
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "signed_out"
+            }
+          }
+        }
+      ]
     }
   ]
 }

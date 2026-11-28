@@ -77,6 +77,9 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       state.endpoints.delete(request.agent_dir)
       return ok()
     case "devices.list":
+      // The account precondition the real owner applies (#14881): a device with no sign-in is refused the
+      // vocabulary's signed-out answer, driven by the same world state the status handler reports.
+      if (state.status.device === null) return refuse("signed_out", "this device is not signed in")
       return ok({ devices: state.world.devices })
     case "enforcement.report": {
       if (role !== "desktop") return refuse("forbidden", "only a desktop client reports enforcement")
