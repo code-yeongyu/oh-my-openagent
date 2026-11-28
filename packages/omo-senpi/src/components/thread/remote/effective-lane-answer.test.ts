@@ -31,7 +31,8 @@ describe("#14333: the relay result's effective_mode follows the receiver's answe
     const a = account({ stateOutcomes: [LOST_PROBE] })
     const { run } = surface(a.remote)
     const sent = await run("thread_send", { thread: "dur-on-b", message: "x" })
-    expect(sent).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    // #15093: a lost probe answer is uncertain (read first), naming that this call sent no record.
+    expect(sent).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain", details: { sent: false } } })
     expect(types(a.sent)).not.toContain(ADMIT)
   })
 

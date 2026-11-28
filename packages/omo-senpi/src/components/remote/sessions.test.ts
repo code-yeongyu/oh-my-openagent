@@ -332,7 +332,9 @@ describe("sessions.send and sessions.read", () => {
     const steer = { text: "s", mode: "steer", idempotency_key: "k-probe" } as const
     const first = failureOf(await client.sessions.send(LIVE, steer))
     const second = failureOf(await client.sessions.send(LIVE, steer))
-    expect([first.code, second.code]).toEqual(["host_unavailable", "host_unavailable"])
+    // #15093: a lost state-read answer is uncertain (read first), never "changed nothing"; nothing was sent, so the key
+    // stays free and the retry reads the device again.
+    expect([first.code, second.code]).toEqual(["idempotency_uncertain", "idempotency_uncertain"])
     expect(sent("get_state")).toHaveLength(2)
     expect(sent("prompt")).toEqual([])
   })

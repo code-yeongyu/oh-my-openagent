@@ -80,9 +80,9 @@ export const READ_UNCERTAIN: Readonly<Record<UncertainReason, "retry" | "too_lar
   result_undecodable: "retry",
 }
 
-// Refusals after which this call changed nothing on the other device: a command that never reached its engine (a lost
-// connection, a failed attach) or a read-only record that failed either way. Retrying is safe, and nothing about that
-// device needs updating.
+// Refusals given before the command reached the other device's engine (a lost connection, a failed attach, a host that
+// did not answer within its bound): this call changed nothing there. Retrying is safe, and nothing about that device
+// needs updating.
 const UNANSWERED: ReadonlySet<string> = new Set([
   "closed",
   "protocol_violation",
@@ -91,12 +91,20 @@ const UNANSWERED: ReadonlySet<string> = new Set([
   "request_timeout",
   "handshake_timeout",
   "attach_failed",
-  "reply_lost",
-  // omo#14130: a read the relay accepted for the device and whose answer was lost changed nothing there either.
-  "delivered_unconfirmed",
   "host_not_answering",
   "peer_not_found",
   "engine_stale",
+])
+
+/**
+ * #15093: the reasons that say a record's answer was lost after it left this device (the device service's uncertain
+ * vocabulary, `delivered_unconfirmed`, `reply_lost`). None of them proves the record changed nothing, so no answer built
+ * on one says so: a mutation's is uncertain (read first), and a read's, which the port refuses with the same reason, is a
+ * retry whose effect is unknown. A send answers its pre-send read's lost answer as uncertain (`relay-transport.ts`).
+ */
+export const LOST_ANSWER: ReadonlySet<string> = new Set([
+  "delivered_unconfirmed",
+  "reply_lost",
   ...Object.entries(READ_UNCERTAIN)
     .filter(([, answer]) => answer === "retry")
     .map(([reason]) => reason),
@@ -149,6 +157,7 @@ export function unreached(outcome: Exclude<RemoteCommandOutcome, { readonly kind
   if (outcome.kind === "uncertain") return true
   return (
     UNANSWERED.has(outcome.reason) ||
+    LOST_ANSWER.has(outcome.reason) ||
     NOT_SIGNED_IN.has(outcome.reason) ||
     outcome.reason === "host_detached" ||
     outcome.reason === "not_attached" ||
@@ -204,7 +213,14 @@ export function outcomeFailure(
       "host_unavailable",
       `Device ${device} did not answer (${reason}); this call changed nothing there.`,
       "Retry; nothing needs to be checked first.",
-      { device, reason },
+      { device, reason, effect: "none" },
+    )
+  if (LOST_ANSWER.has(outcome.reason))
+    return fail(
+      "host_unavailable",
+      `Device ${device}'s answer was lost on the way back (${reason}), so whether that command ran there is unknown.`,
+      "Retry the read. Before sending a message to that device again, read the thread (tool.thread_read({ thread }) in an eval cell): an answer lost like this one does not show whether an earlier send arrived.",
+      { device, reason, effect: "unknown" },
     )
   // The session ended on that device after it was listed (its terminal closed, its host exited), or its host no longer
   // lists it (`route_unlisted`, relay-spec 0018 section 5: it parked; nothing was dispatched, omo#14233): nothing there
