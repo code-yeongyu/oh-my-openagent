@@ -3,7 +3,6 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { HostSessionClient, HostSessionDetachedError } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 import { createSenpiRpcClient } from "./session-transport"
-import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 
 const harness = sessionClientHarness()
 afterEach(harness.release)
@@ -46,7 +45,6 @@ describe("HostSessionClient connection lifetime", () => {
     const dialing = Promise.withResolvers<void>()
     const continueDial = Promise.withResolvers<void>()
     const client = new HostSessionClient({
-      keyRoot: FAKE_HOST_KEY_ROOT,
       socketPath: host.socketPath,
       ports: {
         probeProtocolInfo: () => host.probeProtocolInfo(),
@@ -116,7 +114,6 @@ describe("HostSessionClient connection lifetime", () => {
     const attaching = Promise.withResolvers<void>()
     const continueAttach = Promise.withResolvers<void>()
     const survivor = new HostSessionClient({
-      keyRoot: FAKE_HOST_KEY_ROOT,
       socketPath: host.socketPath,
       ports: {
         probeProtocolInfo: () => host.probeProtocolInfo(),

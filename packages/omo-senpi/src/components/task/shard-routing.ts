@@ -117,8 +117,7 @@ export function createSessionShardRouting(input: SessionShardRoutingInput): Sess
       }),
     ownHostSocket: () => readOwnHostSocket(input.pi),
     insideHost: () => inheritedShardKey(input.pi) !== undefined,
-    // The session's own or inherited host was launched in this agent dir, where it wrote its launch key record.
-    probeHost: input.probeHost ?? ((socket) => probeWithEngine(socket, input.agentDir)),
+    probeHost: input.probeHost ?? probeWithEngine,
     onNotice: (token, detail) => {
       input.notices.add(detail === undefined ? token : `${token} ${detail}`)
     },

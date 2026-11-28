@@ -44,7 +44,7 @@ function parentMode(initial: string): ParentPermissionMode & { change(preset: st
   }
 }
 
-async function realHost(): Promise<{ readonly root: string; readonly socket: string; readonly agentDir: string }> {
+async function realHost(): Promise<{ readonly root: string; readonly socket: string }> {
   const root = mkdtempSync(join(tmpdir(), "rh-follow-"))
   roots.push(root)
   const home = join(root, "home")
@@ -69,7 +69,7 @@ async function realHost(): Promise<{ readonly root: string; readonly socket: str
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
   })
   hosts.push(host)
-  return { root, socket: host.socket, agentDir }
+  return { root, socket: host.socket }
 }
 
 // Every client after the child's own connection belongs to a follow push; the push is over once that client stops.
@@ -107,13 +107,12 @@ function within<T>(promise: Promise<T>, what: string): Promise<T> {
 describe("HostSessionClient following its parent's approval mode on a real host", () => {
   test("#given a child opened in its parent's full-access #when the parent moves to ask #then the host reports the child in ask on the child's own connection", async () => {
     // given
-    const { root, socket, agentDir } = await realHost()
+    const { root, socket } = await realHost()
     const mode = parentMode("full-access")
     const warnings: string[] = []
     const watch = pushWatchingFactory()
     const client = new HostSessionClient({
       socketPath: socket,
-      keyRoot: agentDir,
       ports: { createClient: watch.createClient },
       parent: new ChildParentLink("st_real_follow", undefined, mode, (message) => {
         warnings.push(message)

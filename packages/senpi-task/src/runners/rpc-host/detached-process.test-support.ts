@@ -8,7 +8,6 @@ import { RpcProtocolClient } from "../rpc/protocol-client"
 import { createHostSessionHandle } from "./handle"
 import { FAKE_SESSION, fakeSessionPort } from "./handle.test-support"
 import { HostSessionClient, HostSessionDetachedError } from "./session-client"
-import { FAKE_HOST_KEY_ROOT } from "./__fixtures__/fake-host-key-root"
 
 /**
  * Run outside bun:test so its own exception handlers cannot hide the process-level failure.
@@ -78,7 +77,7 @@ async function drive(): Promise<void> {
     case "site-1-rejection":
     case "site-3":
     case "site-3-close": {
-      const detachedClient = new HostSessionClient({ keyRoot: FAKE_HOST_KEY_ROOT, socketPath: "unused-detached-probe" })
+      const detachedClient = new HostSessionClient({ socketPath: "unused-detached-probe" })
       await detachedClient.detach()
       const port = {
         ...fakeSessionPort(),

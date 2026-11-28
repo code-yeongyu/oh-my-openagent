@@ -2,7 +2,6 @@ import type { RpcChildHandle, RpcRunnerSpec } from "../../types"
 import type { HostSessionCloseChannel } from "../close"
 import { HostSessionClient } from "../session-client"
 import { probeFakeHost } from "./fake-host-probe"
-import { FAKE_HOST_KEY_ROOT } from "./fake-host-key-root"
 
 /**
  * The two seams a parent session injects around the fake daemon: the channel the single close
@@ -12,7 +11,6 @@ import { FAKE_HOST_KEY_ROOT } from "./fake-host-key-root"
 /** The real `closeHostSession` over the fixture's probe - a fake daemon, omo's own close path. */
 export function fakeCloseChannel(socket: string): HostSessionCloseChannel {
   const client = new HostSessionClient({
-    keyRoot: FAKE_HOST_KEY_ROOT,
     socketPath: socket,
     ports: { probeProtocolInfo: () => probeFakeHost(socket) },
   })

@@ -1,7 +1,3 @@
-// First, before anything reads or rewrites argv or the environment: senpi's OSC 7577 hand-off re-execs this same image
-// (same pid) with the token moved off the environment, and everything evaluated before it would run twice, the second
-// time on argv buildSenpiArgs already rewrote (senpi#7493, senpi#7537).
-import "@code-yeongyu/senpi/program-resume-startup"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"

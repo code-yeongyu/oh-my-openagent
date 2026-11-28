@@ -25,7 +25,6 @@ async function world(options: Parameters<typeof startFakeHost>[0] = {}) {
       socket: host.socketPath,
       cwd: "/tmp/parent-cwd",
       tempRoot,
-      agentDir: tempRoot,
       ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
     })
   const of = (type: string) => host.commands.filter((command) => command.type === type)

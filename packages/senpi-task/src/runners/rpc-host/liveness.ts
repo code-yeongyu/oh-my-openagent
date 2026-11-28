@@ -18,10 +18,9 @@ const LIST_TIMEOUT_MS = 10_000
 // Bounded so a wedged accept can never hold a draining host open; the socket is destroyed on connect.
 const BUSY_CONNECT_TIMEOUT_MS = 500
 
-export async function daemonReachable(socket: string, keyRoot: string | undefined): Promise<boolean> {
-  // With no key root named the host cannot be proven, so it is asked nothing: only the busy check below runs.
+export async function daemonReachable(socket: string): Promise<boolean> {
   try {
-    if (keyRoot !== undefined && (await probeWithEngine(socket, keyRoot)) !== undefined) return true
+    if ((await probeWithEngine(socket)) !== undefined) return true
   } catch (error) {
     log("senpi-task daemon probe failed", { socket, error: String(error) })
   }
@@ -39,11 +38,8 @@ export async function daemonReachable(socket: string, keyRoot: string | undefine
  * `list_sessions` and drops `include_workers`, so every task child would read as gone - and a live
  * child that reads as gone is claimed by the next omo session that reconciles the store (#8932).
  */
-export async function liveSessionPaths(socket: string, keyRoot: string | undefined): Promise<readonly string[]> {
-  // With no key root named the host cannot be proven: the listing fails, which the lifecycle reads as "could not ask".
-  if (keyRoot === undefined)
-    throw new Error(`no key root is named for the host on ${socket}; its sessions are not listed`)
-  const reply = await askDaemon(socket, { id: LIST_REQUEST_ID, type: "list_sessions", include_workers: true }, keyRoot)
+export async function liveSessionPaths(socket: string, agentDir?: string): Promise<readonly string[]> {
+  const reply = await askDaemon(socket, { id: LIST_REQUEST_ID, type: "list_sessions", include_workers: true }, agentDir)
   if (reply === undefined) {
     log("senpi-task daemon session list failed", { socket })
     throw new Error(`list_sessions failed on ${socket}`)
@@ -56,8 +52,12 @@ export async function liveSessionPaths(socket: string, keyRoot: string | undefin
 }
 
 // A refusal answers undefined, exactly like no answer: both mean "holds nothing we can see".
-async function askDaemon(socket: string, request: HostReply, keyRoot: string): Promise<HostReply | undefined> {
-  const reply = await askHost(socket, request, LIST_TIMEOUT_MS, { keyRoot })
+async function askDaemon(
+  socket: string,
+  request: HostReply,
+  agentDir: string | undefined,
+): Promise<HostReply | undefined> {
+  const reply = await askHost(socket, request, LIST_TIMEOUT_MS, agentDir === undefined ? {} : { agentDir })
   if (reply?.success !== true) return undefined
   return isRecord(reply.data) ? reply.data : {}
 }

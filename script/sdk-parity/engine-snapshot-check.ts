@@ -104,11 +104,7 @@ export function sessionShapeProblems(snapshot: EngineSnapshot, sessionSchema: un
   return problems
 }
 
-// The runtime exports senpi#7463 adds to `@code-yeongyu/senpi/engine`. The `./engine` entry itself shipped earlier
-// (senpi#7450, in 2026.11.27) without them, so the entry being present says nothing about the contract.
-const CONTRACT_EXPORTS = ["RESULT_FREE_FIELDS", "AUTH_ACCOUNT_CHECK_CODES", "toSessionAuthStatus"] as const
-
-/** Whether omo's pinned engine exports any part of the contract the snapshot copies, read from its `./engine` module. */
-export function pinnedEngineExportsContract(engineExports: object): boolean {
-  return CONTRACT_EXPORTS.some((name) => Object.hasOwn(engineExports, name))
+/** Whether omo's pinned engine package exports the engine contract the snapshot copies. */
+export function pinnedEngineExportsContract(exportsField: Readonly<Record<string, unknown>>): boolean {
+  return Object.hasOwn(exportsField, "./engine")
 }
