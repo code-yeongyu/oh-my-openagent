@@ -22,6 +22,36 @@ function gated(html: string) {
 }
 const underSources = (body: string) => gated(`<h2>Official sources</h2>${body}`)
 
+test("checks a Korean part-of-group fraction but keeps a release date exempt (#11386)", () => {
+  expect(underSources("<li>자료는 10/26에 공개됐다.</li>")).toEqual([])
+  expect(underSources("<li>응답자 중 2/3가 동의했다.</li>")).toContain("untraceable_number")
+  expect(underSources("<li>이용자의 3/4이 이탈했다.</li>")).toContain("untraceable_number")
+})
+
+for (const [date, score] of [
+  ["Date", "Score"],
+  ["날짜", "점수"],
+]) {
+  test(`uses the ${score} header, not the slash alone, to classify a score (#11386)`, () => {
+    const cells = (header: string, value: string) =>
+      `<table><tr><th>${header}</th></tr><tr><td>${value}</td></tr></table>`
+    expect(underSources(cells(date, "7/12"))).toEqual([])
+    expect(underSources(cells(score, "<cite>7/12</cite>"))).toEqual([])
+    expect(underSources(cells(score, "released 10/26"))).toEqual([])
+    expect(underSources(cells(score, "10/26 공개"))).toEqual([])
+    expect(underSources(cells(score, "RM 7/12"))).toContain("untraceable_number")
+  })
+}
+
+test("checks slash fractions used as quantities without flagging a citation date (#11386)", () => {
+  expect(underSources("<li>Results, released 10/26, https://example.com/results</li>")).toEqual([])
+  for (const fraction of ["2/3 of respondents", "3/4 of trials"]) {
+    expect(underSources(`<li>${fraction} met the target, https://example.com/results</li>`)).toContain(
+      "untraceable_number",
+    )
+  }
+})
+
 // Round-4 ruling, guard: a digit run glued to a unit, multiplier, or currency stays a numeral, in a
 // reference-shaped line (EN, KO) and in a Korean sentence where a particle follows the unit.
 const QUANTITIES = ["50M", "10k", "3x", "5.4T", "12%", "2.5GB", "10ms", "320m", "40percent"]

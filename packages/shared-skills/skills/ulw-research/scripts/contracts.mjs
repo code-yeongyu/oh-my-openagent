@@ -62,7 +62,7 @@ export const DEFECT_CODES = deepFreeze({
   unsourced_number: {
     severity: "major",
     integrity: false,
-    hint: "Tag the number MEASURED / ASSUMED / DERIVED or cite its source in the same paragraph; under Sources only citation-field numbers and names (a hash, #12, GPT-4, Q3, 10-Q) are exempt, so quote a reference title that carries a code or a figure, or wrap it in <cite>: an unquoted one is checked, and 10-K / 8-K stay numerals because K is a multiplier. A slashed N/M reads as a month/day, so a fraction or a score (2/3, 7/12) under Sources is not checked (#11386): write it as a percent or tag it.",
+    hint: "Tag the number MEASURED / ASSUMED / DERIVED or cite its source in the same paragraph. Under Sources, put reference titles in quotes or <cite>. A slash date such as 'released 10/26' is exempt; cite fractions such as '2/3 of respondents' and values in score or ratio columns.",
   },
   chart_without_figure: {
     severity: "major",
