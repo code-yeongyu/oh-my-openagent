@@ -2,6 +2,9 @@ import { access, mkdir, readFile, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 
 import { NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import { StrandedGitLockError } from "../git/repo-lock-sweep"
+import { undoBehindKeptLock } from "./rollback-behind-lock"
+import { undoFailedCommit } from "./rollback-failed-commit"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import { claimReceiptTrailers, type ClaimReceipt } from "../provenance"
 import { hasLegacyUserHeader, provenanceStrippedTrailers, restampContent } from "./claim-frontmatter"
@@ -88,7 +91,8 @@ export async function runMemoryApplyPatch(options: RunMemoryApplyPatchOptions): 
           await repo.restorePaths(paths)
           throw new MemoryApplyPatchError(error.message, { cause: error })
         }
-        throw error
+        if (error instanceof StrandedGitLockError) return undoBehindKeptLock(repo, paths, error)
+        return undoFailedCommit(repo, paths, error)
       }
 
       const shortSha = result.sha.slice(0, 7)

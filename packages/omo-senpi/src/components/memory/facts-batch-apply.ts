@@ -216,7 +216,7 @@ async function applyClaimed(options: ClaimedApplyOptions): Promise<Applied> {
         (event) => logAgreementEvent(options.logger, options.ledger.batchId, event),
       )
     } catch (error) {
-      if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty" }
+      if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty", detail: error.message }
       throw error
     }
     if (recovery.paths.length === 0) return { outcome: "unchanged" }

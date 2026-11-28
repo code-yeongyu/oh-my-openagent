@@ -53,7 +53,7 @@ export interface FactsPayload {
 export type ApplyFactsBatchResult =
   | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[] }
   | { readonly outcome: "no_facts"; readonly affectedPaths: readonly [] }
-  | { readonly outcome: "parent_dirty" }
+  | { readonly outcome: "parent_dirty"; readonly detail?: string }
 
 export interface ApplyFactsBatchOptions {
   readonly people?: FactsPeopleRouting
@@ -100,7 +100,7 @@ export async function applyFactsBatch(
       publishRecovery: options.publishRecovery,
     })
   } catch (error) {
-    if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty" }
+    if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty", detail: error.message }
     throw error
   }
 }

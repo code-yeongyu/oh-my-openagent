@@ -185,6 +185,7 @@ describe("reflection worktree finalization", () => {
 
     // #then
     expect(result.status).toBe("parent_dirty")
+    expect(result.detail).toContain("?? local.md")
     expect(await repo.status()).toContain("?? local.md")
     await assertCleaned(worktree, parentDir)
   })

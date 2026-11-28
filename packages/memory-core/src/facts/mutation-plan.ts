@@ -11,6 +11,7 @@ import {
   type AgreementsPolicy,
 } from "../agreements/types"
 import type { GitIndexIdentity, GitMemoryRepo, GitPathState, GitWorktreeFileIdentity } from "../git"
+import { describeDirtyParent } from "../git/porcelain"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
 import { stampReceipt } from "../tools/claim-frontmatter"
 import {
@@ -64,8 +65,8 @@ export async function planFactsMutation(
   for (const event of ledger?.events ?? []) onAgreementEvent?.(event)
   const paths = [...factsRoutingPaths(routing), ...(ledger?.content === undefined ? [] : [AGREEMENTS_PATH])].sort()
   const pre = await repo.pathState.captureAll(paths)
-  if ((await repo.status()).trim().length > 0)
-    throw new FactsPlanParentDirtyError("facts repository changed during planning")
+  const parentStatus = (await repo.status()).trim()
+  if (parentStatus.length > 0) throw new FactsPlanParentDirtyError(describeDirtyParent(parentStatus))
   const content = new Map<string, string>()
   for (const [path, records] of routing.notes) {
     content.set(path, await renderFactsNote(repo.dir, path, records))

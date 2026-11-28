@@ -220,6 +220,7 @@ describe("facts terminal failure recording", () => {
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
     expect(state.entries).toHaveLength(1)
     expect(state.entries[0]).toMatchObject({ streak: 1, lastReason: "parent_dirty", state: "backoff" })
+    expect(state.entries[0]?.lastDetail).toContain("foreign.md")
   }, 30_000)
 
   test("#given a recorded failure #when a later run commits #then the endpoint's record is cleared after consumption", async () => {

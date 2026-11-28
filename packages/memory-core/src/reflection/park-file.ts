@@ -73,7 +73,9 @@ export class ReflectionParkFile {
       if (isReflectionParked(before) || before.streak > 0) await this.write(cleared)
       return { state: cleared, parked: false, justParked: false }
     }
-    if (active === undefined || !isAutomaticReflectionRequest(active.request)) {
+    // A dirty parent is the parent's state, not this identity's health (#15415): it never counts toward the streak, so a
+    // repo left dirty for hours cannot park reflection, and the next run after the tree is clean goes ahead.
+    if (outcome === "parent_dirty" || active === undefined || !isAutomaticReflectionRequest(active.request)) {
       return { state: before, parked: isReflectionParked(before), justParked: false }
     }
     const after = applyReflectionParkFailure(before, {

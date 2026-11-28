@@ -265,4 +265,24 @@ describe("reflection reservation park", () => {
       expect(await item.store.readPark()).toMatchObject({ version: 1, streak: 1 })
     },
   )
+
+  it("#given a parent repo that stays dirty #when automatic runs end parent_dirty past the retryable streak #then the identity never parks (#15415)", async () => {
+    // given
+    const item = await fixture()
+
+    // when
+    for (let index = 0; index < REFLECTION_PARK_RETRYABLE_STREAK + 3; index += 1) {
+      const reserved = await item.store.tryReserve(await automaticRequest(item.journal))
+      if (reserved.status !== "active") throw new Error(`expected an active reservation, got ${reserved.status}`)
+      const completion = await item.store.complete(reserved.run.runId, "parent_dirty", {
+        failure: { fingerprint: "integration_failed:", retryable: true, reason: "integration_failed" },
+      })
+      expect(completion.park?.parked ?? false).toBe(false)
+      item.advance(60_000)
+    }
+
+    // then
+    const next = await item.store.tryReserve(await automaticRequest(item.journal))
+    expect(next.status).toBe("active")
+  })
 })
