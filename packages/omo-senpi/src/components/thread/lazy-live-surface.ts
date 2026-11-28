@@ -109,11 +109,6 @@ export function createLazyLiveThreadSurface(
         if (gateway.releaseSession === undefined) throw new Error("unsupported:releaseSession")
         return await gateway.releaseSession(endpoint, request)
       },
-      classifyLiveness: async (endpoint) => {
-        const gateway = (await load()).gateway
-        if (gateway.classifyLiveness === undefined) throw new Error("unsupported:classifyLiveness")
-        return await gateway.classifyLiveness(endpoint)
-      },
     },
   }
 }

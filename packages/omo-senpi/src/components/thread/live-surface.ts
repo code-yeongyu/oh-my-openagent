@@ -25,7 +25,7 @@ import {
   type EndpointKind,
   type RegistryEndpoint,
 } from "./endpoint-registry"
-import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./gateway/adapter"
+import type { GatewayEndpointPort, GatewayEndpointRef } from "./gateway/adapter"
 import { releaseReply, wakeReply } from "./gateway-replies"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
@@ -279,6 +279,11 @@ export type LiveThreadSurfaceOptions = {
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly exists?: (path: string) => boolean
   /**
+   * Whose endpoint transport this surface speaks: the process's own by default. On win32 a host is reached through a
+   * pipe named from its `<socket>.secret` record, never a socket file.
+   */
+  readonly platform?: NodeJS.Platform
+  /**
    * An engine `host status --all` report to enumerate from instead of the registry (the thread SDK's `engineStatusAll`).
    * The default never runs it: that command is a full diagnostic pass (a /proc walk per endpoint) that took 8.4-8.7 s
    * on a 49-endpoint host, paid by every thread tool call. The registry names the same sockets, and each
@@ -334,9 +339,14 @@ function isConnectRefusal(error: unknown): boolean {
   return code === "ENOENT" || code === "ECONNREFUSED"
 }
 
-/** `dialFor` found nothing to dial: the socket file (POSIX) or the pipe record (Windows) is gone. */
-function isHostUnavailable(error: unknown): boolean {
-  return error instanceof Error && error.message.startsWith("host_unavailable:")
+/**
+ * `dialFor` found nothing to dial: the host's socket file (POSIX) or its pipe record, `<socket>.secret` (Windows), is
+ * gone, and a host removes it when it exits. It answers `host_unavailable:<socket>` as any unavailable host does.
+ */
+class HostGone extends Error {
+  constructor(socket: string) {
+    super(`host_unavailable:${socket}`)
+  }
 }
 
 /**
@@ -354,6 +364,7 @@ export function createLiveThreadSurface(
 ): LiveThreadSurface {
   const env = options.env ?? process.env
   const exists = options.exists ?? existsSync
+  const platform = options.platform ?? process.platform
   const connect = options.connect ?? ((path: string) => createConnection(path))
   const now = options.now ?? Date.now
   const monotonic = options.monotonic ?? (() => performance.now())
@@ -409,9 +420,13 @@ export function createLiveThreadSurface(
         throw new Error(`host_unavailable:${socket}`)
       }
     } else {
-      const transport = await resolveRpcSocketTransport(socket)
-      if (transport === undefined || (process.platform !== "win32" && !exists(socket)))
-        throw new Error(`host_unavailable:${socket}`)
+      const transport = await resolveRpcSocketTransport(socket, platform)
+      // On win32 the pipe is named from `<socket>.secret`: with no such record the host is gone. A record that is there
+      // but could not be read whole (another process holds it, or the host is still writing it) does not prove that:
+      // the host did not answer this time, and the call may be retried.
+      if (transport === undefined)
+        throw exists(`${socket}.secret`) ? new Error(`host_unavailable:${socket}`) : new HostGone(socket)
+      if (platform !== "win32" && !exists(socket)) throw new HostGone(socket)
       secret = transport.secret
       if (transport.address !== socket) dial = () => connect(transport.address)
     }
@@ -796,12 +811,12 @@ export function createLiveThreadSurface(
       // A terminal or a host removes its socket when it exits, so an endpoint whose socket is gone has ended: it holds
       // nothing (`dead`), never a host that did not answer. A host keeps its `host_unavailable:<socket>` error, which is
       // the answer when nothing answers at all. A Windows pipe is no file, so only a terminal is judged by it there.
-      if ((tui || process.platform !== "win32") && !exists(endpoint.socket))
+      if ((tui || platform !== "win32") && !exists(endpoint.socket))
         return degraded(endpoint, tui ? new Error("dead") : error, "dead")
-      // A host that is gone and is judged by its dial instead (a Windows pipe, or a socket file nobody serves) holds
-      // nothing either: it keeps the same `host_unavailable:<socket>` answer, never the dialed address, and is `dead`
-      // as the gateway's `liveness()` judges it, unless the host's own verdict says otherwise.
-      if (!tui && (isConnectRefusal(error) || isHostUnavailable(error)))
+      // A host that is gone and is judged by its dial instead (its Windows pipe record is gone, or nobody serves its
+      // pipe or socket file) holds nothing either: it keeps the same `host_unavailable:<socket>` answer, never the
+      // dialed address, and is `dead` unless the host's own verdict says otherwise.
+      if (!tui && (isConnectRefusal(error) || error instanceof HostGone))
         return degraded(endpoint, new Error(`host_unavailable:${endpoint.socket}`), endpoint.verdict.reason ?? "dead")
       if (isIdentityRefusal(error)) return degraded(endpoint, error, "identity_unproven")
       const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
@@ -909,24 +924,6 @@ export function createLiveThreadSurface(
       ),
   })
 
-  const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
-    const known = (await endpoints()).find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))
-    if (known?.verdict.alive === true) return "routable"
-    if (known?.verdict.reason === "live_unresponsive" || known?.verdict.reason === "dead") return known.verdict.reason
-    try {
-      await callOn(
-        endpoint.socket,
-        "get_protocol_info",
-        {},
-        endpoint.kind === "tui" ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS,
-      )
-      return "routable"
-    } catch (error) {
-      if (isHostUnavailable(error)) return "dead"
-      return isConnectRefusal(error) ? "dead" : "live_unresponsive"
-    }
-  }
-
   /**
    * The routing id of an rpc_host session. A multi-session host refuses every session command that names
    * no session (`missing_session_id`), so an endpoint known only by its durable id (a session read from
@@ -987,7 +984,6 @@ export function createLiveThreadSurface(
         ),
       )
     },
-    classifyLiveness: liveness,
   }
 
   return {

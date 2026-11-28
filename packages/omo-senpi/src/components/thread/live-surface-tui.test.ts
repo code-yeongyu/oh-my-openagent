@@ -555,12 +555,6 @@ describe("thread tools over a terminal (tui) endpoint", () => {
       { kind: "rpc_host", socket: legacy, routing_id: "rpc-1", durable_session_id: "dur-host" },
       ["d2"],
     )
-    const liveness = await w.surface.gateway.classifyLiveness?.({
-      kind: "tui",
-      socket: tui,
-      routing_id: "dur-tui",
-      durable_session_id: "dur-tui",
-    })
     const release = await (
       w.surface.gateway.releaseSession?.(
         { kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" },
@@ -581,7 +575,6 @@ describe("thread tools over a terminal (tui) endpoint", () => {
       delivery_ids: ["d2"],
     })
     expect(release).toBe("unsupported:release_session")
-    expect(liveness).toBe("routable")
     expect(host.frames.some((frame) => frame.type === "prompt")).toBe(false)
   })
 

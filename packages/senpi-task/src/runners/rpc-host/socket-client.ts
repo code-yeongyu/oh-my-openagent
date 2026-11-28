@@ -12,10 +12,15 @@ export type { RpcObject, RpcRequest } from "./socket-auth"
 const WINDOWS_PIPE_PREFIX = "\\\\.\\pipe\\senpi-rpc-"
 const WINDOWS_SECRET_BYTES = 32
 
+/**
+ * How a client reaches an engine endpoint: the socket path itself, or on win32 the pipe named from `<endpoint>.secret`.
+ * Undefined when that record is missing or cannot be read whole.
+ */
 export async function resolveRpcSocketTransport(
   endpoint: string,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<{ readonly address: string; readonly secret?: Buffer } | undefined> {
-  if (process.platform !== "win32") return { address: endpoint }
+  if (platform !== "win32") return { address: endpoint }
   let secret: Buffer
   try {
     secret = await readFile(`${endpoint}.secret`)
