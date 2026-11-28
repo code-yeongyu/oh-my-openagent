@@ -1,6 +1,33 @@
 import type { ApproveOutcome, PhraseVoidNotice } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { MemoryRpcSync } from "./memory-rpc-sync"
+import type { SyncRpcContext, SyncRpcRegistration } from "./sync-rpc-ports"
+
+const SYNC_RPC_VERBS = [
+  "enable",
+  "pending",
+  "approve",
+  "status",
+  "devices",
+  "features",
+  "acknowledge",
+  "disable",
+] as const
+export type SyncRpcVerb = (typeof SYNC_RPC_VERBS)[number]
+
+/** Registers every sync verb name on the RPC surface; each call is answered by `dispatch`. */
+export function handleSyncVerbs(
+  rpc: SyncRpcRegistration,
+  dispatch: (verb: SyncRpcVerb, data: unknown, context?: SyncRpcContext) => unknown,
+): void {
+  for (const verb of SYNC_RPC_VERBS)
+    rpc.handle(`omo.memory.sync.${verb}`, (data, context) => dispatch(verb, data, context))
+}
+
+export const syncRpcUntrusted = () =>
+  ({ kind: "unavailable", reason: "A live trusted connection is required." }) as const
+export const syncRpcHandlerFailure = () =>
+  ({ kind: "unavailable", reason: "The sync operation could not complete.", code: "handler_failed" }) as const
 
 export type SyncEnableMethod = "passkey" | "phrase"
 /** `{}` joins or resumes; creating a genesis needs an explicit `method` (D1). */
