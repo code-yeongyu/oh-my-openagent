@@ -204,7 +204,9 @@ describe("omo#14428 target backlog admission", () => {
       ["queued", "admitting", "admitted"].includes(row.state),
     )
     expect(open.length).toBeLessThanOrEqual(1)
-  })
+    // 100 real gateway sends take seconds of wall clock; under CPU contention the 5 s default
+    // kills the case and its cleanup (#15037). The bound matches the work, not the load.
+  }, 30_000)
 
   test("#given a busy session holding undelivered follow-ups #when its thread is listed #then the row names the backlog and an empty thread names none", async () => {
     const { h, lead, sender } = seat()
