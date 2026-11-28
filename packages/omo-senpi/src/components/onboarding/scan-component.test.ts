@@ -18,9 +18,11 @@ import {
   ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
   createOnboardingScanComponent,
   createOnboardingScanStore,
+  loadOnboardingScanRuntime,
   type OnboardingApplyResponse,
   type OnboardingScanEvent,
   type OnboardingScanResponse,
+  type OnboardingScanRuntime,
   type OnboardingScanStore,
 } from "./scan-component"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
@@ -152,9 +154,15 @@ function fakeHost() {
   return { pi, handlers, events, modelAccess, scan, apply, waitForDone: doneOf, dispatchEvent: api.dispatchEvent }
 }
 
+/** A load failure as the runtime import reports it: an absolute path under the user's home. */
+async function missingRuntime(): Promise<OnboardingScanRuntime> {
+  throw new Error(`Cannot find module '/home/${SECRET}/plugin/extensions/omo-onboarding-scan.js'`)
+}
+
 interface RegisterOptions {
   readonly authStore?: () => EngineAuthStore | undefined
   readonly now?: () => number
+  readonly loadRuntime?: () => Promise<OnboardingScanRuntime>
 }
 
 /** One session with a scan store of its own, so no test sees another test's retained scans. */
@@ -173,6 +181,7 @@ function registerSession(profile: Profile, store: OnboardingScanStore | undefine
     ...(store === undefined ? {} : { scanStore: store }),
     ...(options.authStore === undefined ? {} : { authStore: options.authStore }),
     ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.loadRuntime === undefined ? {} : { loadRuntime: options.loadRuntime }),
   }).register(host.pi, {} as never)
   return host
 }
@@ -406,6 +415,47 @@ describe("onboarding scan RPC", () => {
     const applied = await host.apply({ scanId, stages: ["credentials", "assets", "providers", "model-choices"] })
     expect(applied).toEqual(expect.objectContaining({ scanId, applied: [] }))
     expect(existsSync(profile.agentDir)).toBe(false)
+  })
+
+  // #15352: a scan that cannot run still ends with `done`, and its reason comes from a fixed vocabulary:
+  // the error's own text names local paths and can quote what the scan read.
+  test.each([
+    ["the onboarding runtime cannot load", missingRuntime, "The onboarding runtime could not load."],
+    [
+      "the scan rejects",
+      async (): Promise<OnboardingScanRuntime> => ({
+        ...(await loadOnboardingScanRuntime()),
+        runOnboardingScan: async () => {
+          const path = `/home/${SECRET}/.claude/projects`
+          throw Object.assign(new Error(`EACCES: permission denied, scandir '${path}'`), { code: "EACCES", path })
+        },
+      }),
+      "EACCES",
+    ],
+  ])(
+    "#given %s #when a scan runs #then its done event names the failure without the error's text",
+    async (_name, loadRuntime, reason) => {
+      // given
+      const host = register(emptyProfile(), { loadRuntime })
+
+      // when
+      const { events } = await host.scan({})
+
+      // then
+      expect(events.at(-1)).toMatchObject({ kind: "done", source: "all", reason })
+      expect(JSON.stringify(events)).not.toContain(SECRET)
+    },
+  )
+
+  test("#given the onboarding runtime cannot load #when understanding is requested #then it answers unavailable without the load error's text", async () => {
+    // given
+    const host = register(emptyProfile(), { loadRuntime: missingRuntime })
+
+    // when
+    const reply = await host.handlers.get(ONBOARDING_UNDERSTAND_RPC_METHOD)?.({ scanId: "scan", consent: true })
+
+    // then
+    expect(reply).toEqual({ kind: "unavailable", reason: "The onboarding runtime could not load." })
   })
 
   test("#given a scan id the engine does not hold #when apply runs #then it answers unavailable and writes nothing", async () => {

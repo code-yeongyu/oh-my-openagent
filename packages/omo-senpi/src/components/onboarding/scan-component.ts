@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 
+import { describeReadFailure } from "../../../../omo-native/bin/lib/read-failure.js"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveMemoryModelRegistry, type ChildModelRegistry } from "../memory/model-registry-resolver"
 import {
@@ -43,6 +44,8 @@ declare const OMO_SENPI_BUNDLED: boolean
 export const ONBOARDING_SCAN_RUNTIME_FILE = "omo-onboarding-scan.js"
 /** Finished scans an apply can still use; older ones answer `unavailable`. */
 const RETAINED_SCANS = 8
+/** The reason a client gets when the lazy runtime does not load; the import error names local paths (#15352). */
+const RUNTIME_UNAVAILABLE = "The onboarding runtime could not load."
 /** A scan describes the machine only briefly; after this, an apply answers stale instead of writing. */
 export const ONBOARDING_SCAN_TTL_MS = 10 * 60_000
 
@@ -152,9 +155,9 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         ))
         try {
           return await pending
-        } catch (error) {
+        } catch {
           if (understandingHandlers === pending) understandingHandlers = undefined
-          return `The onboarding runtime could not load: ${error instanceof Error ? error.message : String(error)}`
+          return RUNTIME_UNAVAILABLE
         }
       }
       const understandingDeps: Parameters<typeof createOnboardingUnderstandingHandlers>[1] = {
@@ -203,19 +206,22 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
           }
           pi.rpc?.emit(ONBOARDING_SCAN_RPC_EVENT, event)
         }
-        held.outcome = new Promise((resolve) => setTimeout(resolve, 0))
-          .then(loadRuntime)
-          .then((runtime) => runtime.runOnboardingScan(environment(), { scanId, includeCustomProviders }, emit))
-          .catch((error: unknown) => {
-            emit({
-              scanId,
-              kind: "done",
-              source: "all",
-              elapsedMs: 0,
-              reason: error instanceof Error ? error.message : String(error),
-            })
-            return undefined
-          })
+        // A scan that cannot run still ends with `done`. Its reason comes from a fixed vocabulary: the
+        // error's own text can name local paths or quote a file the scan read (#15352).
+        const fail = (reason: string): undefined => {
+          emit({ scanId, kind: "done", source: "all", elapsedMs: 0, reason })
+          return undefined
+        }
+        held.outcome = new Promise((resolve) => setTimeout(resolve, 0)).then(loadRuntime).then(
+          async (runtime) => {
+            try {
+              return await runtime.runOnboardingScan(environment(), { scanId, includeCustomProviders }, emit)
+            } catch (error) {
+              return fail(describeReadFailure(error))
+            }
+          },
+          () => fail(RUNTIME_UNAVAILABLE),
+        )
         scans.set(scanId, held)
         for (const [id, entry] of scans) {
           if (entry !== held && expired(entry)) scans.delete(id)
