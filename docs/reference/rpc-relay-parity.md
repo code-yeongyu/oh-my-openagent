@@ -4,9 +4,9 @@
 record a relay verdict or a pair test in script/rpc-relay-parity.rows.json, then run `bun script/rpc-relay-parity.ts`. -->
 
 One row per inbound RPC record type the engine classifies: `RPC_METHOD_CLASS` in `@code-yeongyu/senpi`
-2026.11.27 (`dist/modes/rpc/method-classes.js`, read through `describeRpcMethodClasses()`; imported by
+2026.11.28-1 (`dist/modes/rpc/method-classes.js`, read through `describeRpcMethodClasses()`; imported by
 file because the package does not export it, so an engine that moves the file fails the test here), table version
-1, digest `27c8b985864be3f3a7d9605f4f8476e423613eb9fa2bba9b6820e0d0c1d3f9a6`. A method the engine adds, removes or reclassifies changes this
+1, digest `055a33b1d791ce6d0edc996161b19c8298e257d90878f4347bcad7ba8d919f73`. A method the engine adds, removes or reclassifies changes this
 table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#13478).
 
 - **Engine class**: the engine's own class for the record (`dynamic` when the class depends on the record's fields).
@@ -16,7 +16,7 @@ table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#134
   otherwise `not verified`.
 - **Pair test**: the test that proves the local and relay answers agree, or `none`.
 
-137 methods: 1 with a pair test, 15 excluded, 121 with neither.
+138 methods: 1 with a pair test, 15 excluded, 122 with neither.
 
 | Method | Engine class | Local | Through the relay | Pair test |
 | --- | --- | --- | --- | --- |
@@ -94,6 +94,7 @@ table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#134
 | `close_session` | thread | served (not measured) | unsafe-to-probe, harmless form: differs: session unknown_session locally, engine_refused malformed through the relay; endpoint unknown_session locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `unload_session` | thread | served (not measured) | unsafe-to-probe, harmless form: differs: session ok (outcome refused: unknown_session) locally, engine_refused malformed through the relay; endpoint ok (outcome refused: unknown_session) locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `set_session_context` | thread | served (not measured) | differs: session ok locally, session_not_attached through the relay; endpoint missing_session_id both (#13881; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
+| `set_telemetry_consent` | thread | served (not measured) | not verified | none |
 | `attach_session` | thread | served (not measured) | unsafe-to-probe, harmless form: differs: session unknown_session locally, engine_refused malformed through the relay; endpoint unknown_session locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `select_hand` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session hand_selection_unsupported both; endpoint hand_selection_unsupported both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `bash` | device_admin | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
