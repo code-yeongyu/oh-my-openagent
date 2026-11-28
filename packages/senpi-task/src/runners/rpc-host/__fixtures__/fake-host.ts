@@ -6,7 +6,8 @@ import { join } from "node:path"
 import type { SenpiHostProtocolInfo } from "../../../lazy/senpi-barrel"
 import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from "./fake-host-sessions"
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
-import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
+import { fakeHostTransport } from "./fake-host-transport"
+import { FakeInputAdmissions } from "./fake-input-admissions"
 import {
   handleWireLine,
   writeFrame,
@@ -14,7 +15,6 @@ import {
   type FakeHostOpenFailure,
   type FakeHostWarmAnswer,
 } from "./fake-host-wire"
-import { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
  * In-process unix-socket JSONL daemon: enough of the senpi multi-session wire for a child session
@@ -106,7 +106,6 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   // On win32 the pipe instance can outlive `server.close()` while a client handle lingers, so one
   // fixed derivation makes restart race itself with EADDRINUSE. Re-deriving also rotates
   // `<path>.secret`, which is how the real host behaves and how clients already resolve the address.
-  let transport: FakeHostTransport
   const drainRetryAfterMs = options.drainRetryAfterMs ?? 2_000
   const table = new FakeSessionTable({
     transcripts: options.transcripts === true,
@@ -127,7 +126,6 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   let identity = fakeProtocolInfo(options)
   let generation = typeof identity.generation === "number" ? identity.generation : 1
   let openFailure = options.openFailure
-  let server: Server
 
   const record = (command: FakeHostCommand): void => {
     commands.push(command)
@@ -162,10 +160,32 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     }
   }
 
-  const listen = async (): Promise<void> => {
-    transport = fakeHostTransport(socketPath)
-    server = createServer((socket) =>
+  const listen = async () => {
+    const transport = fakeHostTransport(socketPath, process.platform, true)
+    const acceptedSockets = new Set<Socket>()
+    const drop = () => {
+      for (const socket of acceptedSockets) socket.destroy()
+    }
+    let closing = false
+    const server: Server = createServer((socket) => {
+      // A Windows connection belongs to this listener before its handshake completes (#9955).
+      acceptedSockets.add(socket)
+      socket.on("error", () => undefined)
+      socket.on("close", () => {
+        acceptedSockets.delete(socket)
+        sockets.delete(socket)
+        table.detach(socket)
+        settleConnectionWaiters()
+      })
+      if (closing) {
+        socket.destroy()
+        return
+      }
       transport.authenticate(socket, () => {
+        if (closing || socket.destroyed) {
+          socket.destroy()
+          return
+        }
         sockets.add(socket)
         settleConnectionWaiters()
         let buffer = ""
@@ -180,17 +200,29 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
             if (line) handleWireLine(ports, socket, line)
           }
         })
-        socket.on("error", () => undefined)
-        socket.on("close", () => {
-          sockets.delete(socket)
-          table.detach(socket)
-          settleConnectionWaiters()
-        })
-      }),
-    )
-    await new Promise<void>((resolve) => server.listen(transport.listenAddress, resolve))
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject)
+      server.listen(transport.listenAddress, () => {
+        server.off("error", reject)
+        resolve()
+      })
+    })
+    let closed: Promise<void> | undefined
+    return {
+      publish: transport.publish,
+      drop,
+      close: () =>
+        (closed ??= new Promise<void>((resolve) => {
+          closing = true
+          server.close(() => resolve())
+          drop()
+        })),
+    }
   }
-  await listen()
+  let listener = await listen()
+  listener.publish?.()
 
   // The routing tag goes FIRST so a payload may carry a foreign `sessionId` on purpose - that is
   // how a suite proves a client drops records addressed to another session.
@@ -203,19 +235,10 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     for (const socket of session.attachments) writeFrame(socket, { sessionId: session.routingId, ...payload })
   }
 
-  const dropConnections = (): void => {
-    for (const socket of [...sockets]) socket.destroy()
-  }
-
   /** A drain closes its connections gracefully, so the records it just wrote still arrive. */
   const endConnections = (): void => {
     for (const socket of [...sockets]) socket.end()
   }
-
-  const closeServer = (): Promise<void> =>
-    new Promise<void>((resolve) => {
-      server.close(() => resolve())
-    })
 
   return {
     socketPath,
@@ -310,17 +333,19 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       }
       endConnections()
     },
-    cutConnections: () => dropConnections(),
+    cutConnections: () => listener.drop(),
     crash: () => {
       table.clear()
-      dropConnections()
-      server.close()
+      void listener.close()
     },
     restart: async () => {
-      table.clear()
-      dropConnections()
-      await closeServer()
-      await listen()
+      const previous = listener
+      // POSIX reuses the same socket name. Windows prepares a distinct pipe, then publishes it
+      // before dropping the previous listener's peers. Retained session rows belong to the host.
+      if (process.platform !== "win32") await previous.close()
+      listener = await listen()
+      listener.publish?.()
+      await previous.close()
     },
     waitForCommand: (type, count = 1) =>
       new Promise<FakeHostCommand>((resolve) => {
@@ -334,8 +359,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
           }),
     stop: async () => {
       table.clear()
-      dropConnections()
-      await closeServer()
+      await listener.close()
       rmSync(dir, { recursive: true, force: true })
     },
   }
