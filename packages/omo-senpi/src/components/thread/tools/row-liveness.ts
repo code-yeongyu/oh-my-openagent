@@ -17,7 +17,7 @@ export type RowLiveness =
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value)
 
-export function publicHold(value: unknown, depthField: "queueDepth" | "queue_depth"): RowHold | undefined {
+function publicHold(value: unknown, depthField: "queueDepth" | "queue_depth"): RowHold | undefined {
   if (!record(value)) return undefined
   const { kind, key, since } = value
   const depth = value[depthField]
