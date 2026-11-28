@@ -1,8 +1,12 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import {
   BROWSER_CUSTOM_TYPE,
   MASS_ULW_CUSTOM_TYPE,
@@ -15,6 +19,47 @@ import {
 import { dispatchInput, expectPointerInjections, registerSkillPointers } from "./test-support"
 
 describe("omo-senpi skill-pointers component", () => {
+  it("keeps pointer bytes stable across install roots and selects the bundled file on shadowing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pointer-roots-"))
+    const previous = process.env.OMO_BUNDLED_SKILLS_DIR
+    try {
+      const outputs = []
+      for (const install of ["one", "two"]) {
+        const root = join(dir, install)
+        mkdirSync(root)
+        process.env.OMO_BUNDLED_SKILLS_DIR = root
+        const pi = new FakeExtensionAPI()
+        await registerSkillPointers(pi)
+        await dispatchInput(pi, "ulw research")
+        outputs.push(pi.messages.map(({ message }) => message.content))
+      }
+      expect(outputs[0]).toEqual(outputs[1])
+      const pi = new FakeExtensionAPI()
+      const projectPath = join(dir, "project", "ulw-plan", "SKILL.md")
+      pi.getCommands = () => [{ name: "skill:ulw-plan", source: "skill", sourceInfo: { path: projectPath } }]
+      await registerSkillPointers(pi)
+      await dispatchInput(pi, "what is ulw-plan?")
+      expect(pi.messages[0]?.message.content).toContain(join(dir, "two", "ulw-plan", "SKILL.md"))
+      expect(pi.messages[0]?.message.content).not.toContain(projectPath)
+    } finally {
+      if (previous === undefined) delete process.env.OMO_BUNDLED_SKILLS_DIR
+      else process.env.OMO_BUNDLED_SKILLS_DIR = previous
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not expose the install root in conditional, binding, or companion messages (#12549)", async () => {
+    for (const text of ["what is ulw-plan?", "run mass-ulw", "ulw research"]) {
+      const pi = new FakeExtensionAPI()
+      await registerSkillPointers(pi)
+      await dispatchInput(pi, text)
+      expect(pi.messages.length).toBeGreaterThan(0)
+      for (const { message } of pi.messages) {
+        expect(message.content).not.toContain(getBuiltinSkillsRoot())
+      }
+    }
+  })
+
   describe("#given the keyword table", () => {
     it("#when given mass-ulw trigger spellings #then mass-ulw matches", () => {
       const triggers = [
@@ -130,7 +175,7 @@ describe("omo-senpi skill-pointers component", () => {
       // then
       const content = pi.messages[0]?.message["content"]
       if (typeof content !== "string") throw new Error("expected string content")
-      expect(content).toContain("mass-ulw/SKILL.md")
+      expect(content).toContain("the built-in `mass-ulw` skill")
       expect(content).toEndWith("</omo-mass-ulw-mode>")
     })
 

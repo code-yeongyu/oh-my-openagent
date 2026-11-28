@@ -1,5 +1,3 @@
-import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
-
 export interface SkillPointerTarget {
   readonly skillName: string
   readonly customType: string
@@ -31,10 +29,9 @@ export interface SkillCompanion {
 }
 
 // A keyword proves a mention, not a request to run the workflow.
-export function skillPointer(target: SkillPointerTarget, sessionScope: string | null): string {
-  const skillsRoot = getBuiltinSkillsRoot()
+export function skillPointer(target: SkillPointerTarget, sessionScope: string | null, reference: string): string {
   const extra = target.extra?.(sessionScope) ?? ""
-  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. ${ignoreWhenOnlyDiscussed(target.skillName)}${extra}</omo-${target.skillName}-pointer>`
+  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read ${reference} with the read tool and follow it: ${target.instruction}. ${ignoreWhenOnlyDiscussed(target.skillName)}${extra}</omo-${target.skillName}-pointer>`
 }
 
 // The guard every conditional pointer ends with: a keyword proves a mention, so a mention that is only talk is ignored.
@@ -42,10 +39,14 @@ function ignoreWhenOnlyDiscussed(subject: string): string {
   return `If ${subject} is only being discussed, quoted, or relayed from another session, ignore this pointer.`
 }
 
-export function companionPointer(parent: SkillPointerTarget, companion: SkillCompanion, binding: boolean): string {
-  const skillsRoot = getBuiltinSkillsRoot()
+export function companionPointer(
+  parent: SkillPointerTarget,
+  companion: SkillCompanion,
+  binding: boolean,
+  reference: string,
+): string {
   if (binding) {
-    return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. Read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}.</omo-${companion.skillName}-pointer>`
+    return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. Read ${reference} with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}.</omo-${companion.skillName}-pointer>`
   }
-  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. ${ignoreWhenOnlyDiscussed(parent.skillName)}</omo-${companion.skillName}-pointer>`
+  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read ${reference} with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. ${ignoreWhenOnlyDiscussed(parent.skillName)}</omo-${companion.skillName}-pointer>`
 }

@@ -69,7 +69,7 @@ export function expectPointerInjections(
       throw new Error("expected a string skill-pointer message")
     }
     expect(content).toStartWith(`<omo-${entry.skillName}-${entry.mode === true ? "mode" : "pointer"}>`)
-    expect(content).toContain(`${entry.skillName}/SKILL.md`)
+    expect(content).toContain(`the built-in \`${entry.skillName}\` skill`)
   }
 }
 

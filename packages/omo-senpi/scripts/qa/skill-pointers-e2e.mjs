@@ -26,9 +26,9 @@ const SCENARIOS = [
     expectHidden: [
       {
         customType: "omo-mass-ulw:skill-pointer",
-        markers: [MASS_ULW_POINTER_MARKER, "mass-ulw/SKILL.md", "workflow tool"],
+        markers: [MASS_ULW_POINTER_MARKER, "the built-in `mass-ulw` skill", "workflow tool"],
       },
-      { customType: "omo-ulw-loop:skill-pointer", markers: [ULW_LOOP_MARKER, "ulw-loop/SKILL.md", "read tool"] },
+      { customType: "omo-ulw-loop:skill-pointer", markers: [ULW_LOOP_MARKER, "the built-in `ulw-loop` skill", "read tool"] },
     ],
     // Keyword-first without a request verb: the pointer, never the binding mode block.
     forbidMarkers: [
@@ -45,7 +45,7 @@ const SCENARIOS = [
     name: "ulw-plan",
     prompt: "go ulw plan the migration",
     expectHidden: [
-      { customType: "omo-ulw-plan:skill-pointer", markers: [ULW_PLAN_MARKER, "ulw-plan/SKILL.md", "read tool"] },
+      { customType: "omo-ulw-plan:skill-pointer", markers: [ULW_PLAN_MARKER, "the built-in `ulw-plan` skill", "read tool"] },
     ],
     forbidMarkers: [
       MASS_ULW_MARKER,
@@ -62,12 +62,12 @@ const SCENARIOS = [
     name: "mass-ulw-research",
     prompt: "run mass ulw research on the gateway options",
     expectHidden: [
-      { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md"] },
-      { customType: "omo-ulw-research:skill-pointer", markers: [ULW_RESEARCH_MARKER, "ulw-research/SKILL.md"] },
-      { customType: "omo-browser:skill-pointer", markers: [BROWSER_MARKER, "browser/SKILL.md"] },
+      { customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "the built-in `mass-ulw` skill"] },
+      { customType: "omo-ulw-research:skill-pointer", markers: [ULW_RESEARCH_MARKER, "the built-in `ulw-research` skill"] },
+      { customType: "omo-browser:skill-pointer", markers: [BROWSER_MARKER, "the built-in `browser` skill"] },
       {
         customType: "omo-ultimate-browsing:skill-pointer",
-        markers: [ULTIMATE_BROWSING_MARKER, "ultimate-browsing/SKILL.md", 'load_skills: ["ultimate-browsing"]'],
+        markers: [ULTIMATE_BROWSING_MARKER, "the built-in `ultimate-browsing` skill", 'load_skills: ["ultimate-browsing"]'],
       },
     ],
     forbidMarkers: [ULW_PLAN_MARKER, ULW_LOOP_MARKER, MASS_ULW_POINTER_MARKER, ULW_RESEARCH_POINTER_MARKER],
@@ -79,14 +79,14 @@ const SCENARIOS = [
     expectHidden: [
       {
         customType: "omo-ulw-research:skill-pointer",
-        markers: [ULW_RESEARCH_MARKER, "ulw-research/SKILL.md", "read tool"],
+        markers: [ULW_RESEARCH_MARKER, "the built-in `ulw-research` skill", "read tool"],
       },
-      { customType: "omo-browser:skill-pointer", markers: [BROWSER_MARKER, "browser/SKILL.md", "read tool"] },
+      { customType: "omo-browser:skill-pointer", markers: [BROWSER_MARKER, "the built-in `browser` skill", "read tool"] },
       {
         customType: "omo-ultimate-browsing:skill-pointer",
         markers: [
           ULTIMATE_BROWSING_MARKER,
-          "ultimate-browsing/SKILL.md",
+          "the built-in `ultimate-browsing` skill",
           "read tool",
           'load_skills: ["ultimate-browsing"]',
         ],
@@ -104,7 +104,7 @@ const SCENARIOS = [
   {
     name: "plain-mass-ulw",
     prompt: "run mass ulw on the docs refresh",
-    expectHidden: [{ customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "mass-ulw/SKILL.md"] }],
+    expectHidden: [{ customType: "omo-mass-ulw:skill-pointer", markers: [MASS_ULW_MARKER, "the built-in `mass-ulw` skill"] }],
     forbidMarkers: [
       MASS_ULW_POINTER_MARKER,
       ULW_RESEARCH_POINTER_MARKER,
