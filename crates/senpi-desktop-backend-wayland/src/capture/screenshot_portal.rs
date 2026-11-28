@@ -31,9 +31,9 @@ pub enum ShotError {
 async fn version() -> zbus::Result<u32> {
     let connection = zbus::Connection::session().await?;
     let proxy: zbus::Proxy<'_> = zbus::proxy::Builder::new(&connection)
-        .destination(DESTINATION)?
-        .path(PATH)?
-        .interface(INTERFACE)?
+        .destination(DESTINATION)
+        .path(PATH)
+        .interface(INTERFACE)
         .cache_properties(CacheProperties::No)
         .build()
         .await?;
@@ -83,8 +83,10 @@ pub fn take(runtime: &Runtime) -> Result<RgbaImage, ShotError> {
             ))),
         }
     })?;
-    let path = uri
-        .to_file_path()
+    let path = url::Url::parse(uri.as_str())
+        .ok()
+        .and_then(|url| url.to_file_path().ok())
+        .ok_or(())
         .map_err(|()| ShotError::Failed(format!("Screenshot portal returned a non-file URI {uri}")))?;
     let image = decode(&path);
     // The file exists only for this capture; leaving it would pile full

@@ -373,7 +373,7 @@ impl Kwin {
         body: &B,
     ) -> CoreResult<zbus::Result<zbus::Message>>
     where
-        B: serde::Serialize + zbus::zvariant::DynamicType,
+        B: serde::Serialize + zbus::DynamicType,
     {
         let call = self
             .connection
@@ -391,7 +391,7 @@ impl Kwin {
         body: &B,
     ) -> CoreResult<zbus::Message>
     where
-        B: serde::Serialize + zbus::zvariant::DynamicType,
+        B: serde::Serialize + zbus::DynamicType,
     {
         self.try_call(path, iface, method, body)
             .await?

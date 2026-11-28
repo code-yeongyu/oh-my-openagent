@@ -85,10 +85,14 @@ impl Scripting {
             impostor: self.impostor.clone(),
         };
         match self.at {
-            ScriptAt::Kwin6 => server.at(format!("/Scripting/Script{id}"), loaded).await?,
-            ScriptAt::Kwin5 => server.at(format!("/{id}"), loaded).await?,
-            ScriptAt::Nowhere => false,
-        };
+            ScriptAt::Kwin6 => {
+                server.at(format!("/Scripting/Script{id}"), loaded).await?;
+            }
+            ScriptAt::Kwin5 => {
+                server.at(format!("/{id}"), loaded).await?;
+            }
+            ScriptAt::Nowhere => {}
+        }
         Ok(id)
     }
 
@@ -242,7 +246,7 @@ impl FakeKwin {
         let impostor = impostor.then(|| {
             runtime
                 .block_on(async {
-                    zbus::connection::Builder::address(address.as_str())?
+                    zbus::connection::Builder::address(address.as_str())
                         .build()
                         .await
                 })
@@ -257,9 +261,9 @@ impl FakeKwin {
             };
             runtime
                 .block_on(async {
-                    zbus::connection::Builder::address(address.as_str())?
-                        .name("org.kde.KWin")?
-                        .serve_at("/Scripting", scripting)?
+                    zbus::connection::Builder::address(address.as_str())
+                        .name("org.kde.KWin")
+                        .serve_at("/Scripting", scripting)
                         .build()
                         .await
                 })
@@ -277,7 +281,7 @@ impl FakeKwin {
     pub fn connect(&self) -> impl Future<Output = zbus::Result<zbus::Connection>> {
         let address = self.address.clone();
         async move {
-            zbus::connection::Builder::address(address.as_str())?
+            zbus::connection::Builder::address(address.as_str())
                 .build()
                 .await
         }

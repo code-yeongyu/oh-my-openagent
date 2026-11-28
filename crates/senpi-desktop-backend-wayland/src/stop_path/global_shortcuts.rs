@@ -14,8 +14,6 @@ use senpi_desktop_safety::{
     Chord, StopPathError, StopPathId, StopPathListener, StopSource, Supervisor, HEARTBEAT_INTERVAL_MS,
 };
 use tokio::sync::watch;
-use zbus::zvariant::serialized::Context;
-use zbus::zvariant::OwnedObjectPath;
 
 use super::trigger::{preferred_trigger, STOP_SHORTCUT_ID};
 use crate::portal::{portal_runtime, CLOSE_TIMEOUT};
@@ -171,15 +169,15 @@ async fn run(shared: Arc<Shared>, trigger: String, ready: Ready, mut shutdown: w
         Ok(stream) => stream,
         Err(error) => return report(ready, Err(error)),
     };
-    let session = match portal.create_session().await {
+    let session = match portal.create_session(Default::default()).await {
         Ok(session) => session,
         Err(error) => return report(ready, Err(error)),
     };
     let shortcut = NewShortcut::new(STOP_SHORTCUT_ID, DESCRIPTION).preferred_trigger(trigger.as_str());
     let bound = async {
-        let closed = session_closed(&portal, &session).await?;
+        let closed = session.receive_closed().await?;
         portal
-            .bind_shortcuts(&session, &[shortcut], None)
+            .bind_shortcuts(&session, &[shortcut], None, Default::default())
             .await?
             .response()?;
         Ok(closed)
@@ -215,34 +213,13 @@ async fn run(shared: Arc<Shared>, trigger: String, ready: Ready, mut shutdown: w
     close(&session).await;
 }
 
-/// `Session.Closed` for `session`, subscribed on ashpd's own connection
-/// (the portal unicasts it to the session owner). ashpd 0.11's
-/// `Session::receive_closed` decodes the spec's `a{sv}` body as `()` and
-/// drops every signal, so this matches the message itself.
-async fn session_closed(
-    portal: &GlobalShortcuts<'_>,
-    session: &Session<'_, GlobalShortcuts<'_>>,
-) -> Result<zbus::MessageStream, ashpd::Error> {
-    // `Session` encodes as its object path (signature `o`) but keeps the
-    // path accessor crate-private.
-    let encoded = zbus::zvariant::to_bytes(Context::new_dbus(zbus::zvariant::LE, 0), session)?;
-    let (path, _): (OwnedObjectPath, usize) = encoded.deserialize()?;
-    let rule = zbus::MatchRule::builder()
-        .msg_type(zbus::message::Type::Signal)
-        .interface("org.freedesktop.portal.Session")?
-        .member("Closed")?
-        .path(path)?
-        .build();
-    Ok(zbus::MessageStream::for_match_rule(rule, portal.connection(), None).await?)
-}
-
 fn report(ready: Ready, outcome: Result<(), ashpd::Error>) {
     if ready.send(outcome).is_err() {
         eprintln!("senpi-desktop-backend-wayland: GlobalShortcuts bind finished after start gave up");
     }
 }
 
-async fn close(session: &Session<'_, GlobalShortcuts<'_>>) {
+async fn close(session: &Session<GlobalShortcuts>) {
     match tokio::time::timeout(CLOSE_TIMEOUT, session.close()).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => eprintln!("senpi-desktop-backend-wayland: GlobalShortcuts Close: {error}"),

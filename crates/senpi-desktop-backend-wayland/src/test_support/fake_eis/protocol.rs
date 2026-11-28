@@ -46,7 +46,9 @@ pub(super) async fn serve(
     devices: &SharedDevices,
 ) -> Result<(), String> {
     let context = eis::Context::new(stream).map_err(|error| error.to_string())?;
-    let fd = AsyncFd::new(context.clone()).map_err(|error| error.to_string())?;
+    // SAFETY: `eis::Context` clones share one owned socket, which `context` keeps open (and
+    // `as_raw_fd` returns unchanged) for as long as this `AsyncFd` lives.
+    let fd = unsafe { AsyncFd::register(context.clone()) }.map_err(|error| error.to_string())?;
     let mut handshaker = EisHandshaker::new(&context, 0);
     let mut converter: Option<EisRequestConverter> = None;
     let mut seats: Vec<(Seat, bool, bool)> = Vec::new();
@@ -134,32 +136,30 @@ fn add_seats(
     connection: &reis::request::Connection,
     topology: DeviceTopology,
 ) -> Vec<(Seat, bool, bool)> {
-    let capabilities = [
-        DeviceCapability::Pointer,
-        DeviceCapability::PointerAbsolute,
-        DeviceCapability::Keyboard,
-        DeviceCapability::Scroll,
-        DeviceCapability::Button,
-    ];
+    let capabilities = DeviceCapability::Pointer
+        | DeviceCapability::PointerAbsolute
+        | DeviceCapability::Keyboard
+        | DeviceCapability::Scroll
+        | DeviceCapability::Button;
     match topology {
         DeviceTopology::BothSameSeat => vec![(
-            connection.add_seat(Some("default"), &capabilities),
+            connection.add_seat(Some("default"), capabilities),
             true,
             true,
         )],
         DeviceTopology::PointerOnly => vec![(
-            connection.add_seat(Some("pointer"), &capabilities),
+            connection.add_seat(Some("pointer"), capabilities),
             false,
             true,
         )],
         DeviceTopology::SplitSeats => vec![
             (
-                connection.add_seat(Some("pointer"), &capabilities),
+                connection.add_seat(Some("pointer"), capabilities),
                 false,
                 true,
             ),
             (
-                connection.add_seat(Some("keyboard"), &capabilities),
+                connection.add_seat(Some("keyboard"), capabilities),
                 true,
                 false,
             ),
@@ -185,7 +185,7 @@ fn add_devices(
         let keyboard = seat.add_device(
             Some("keyboard"),
             eis::device::DeviceType::Virtual,
-            &[DeviceCapability::Keyboard],
+            DeviceCapability::Keyboard.into(),
             |device| {
                 if let Some(interface) = device.interface::<eis::Keyboard>() {
                     interface.keymap(eis::keyboard::KeymapType::Xkb, size, keymap.as_fd());
@@ -214,11 +214,7 @@ pub(super) fn add_pointer(seat: &Seat, regions: &[EisRegion]) -> reis::request::
     let pointer = seat.add_device(
         Some("pointer"),
         eis::device::DeviceType::Virtual,
-        &[
-            DeviceCapability::PointerAbsolute,
-            DeviceCapability::Button,
-            DeviceCapability::Scroll,
-        ],
+        DeviceCapability::PointerAbsolute | DeviceCapability::Button | DeviceCapability::Scroll,
         |device| {
             for region in regions {
                 device
