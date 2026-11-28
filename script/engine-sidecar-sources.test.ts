@@ -74,22 +74,97 @@ function writeEngine(hostDir: string, specifiers: readonly string[]): void {
   )
 }
 
+const installedLoaderPath = join(
+  realpathSync(join(repoRoot, "node_modules", "@code-yeongyu", "senpi")),
+  "dist",
+  "core",
+  "extensions",
+  "loader.js",
+)
+
+const FACTORIES_BY_TYPESCRIPT: Record<string, readonly string[]> = {
+  createBunExtensionImporter: ["./bun-extension-importer.js"],
+  createJiti: ["jiti", "jiti/static"],
+}
+
+/** Independent of the production check: a factory the loader calls is bound only by an awaited import of its module. */
+function assertFactoryBindingsByTypeScript(source: ts.SourceFile): void {
+  for (const [name, modules] of Object.entries(FACTORIES_BY_TYPESCRIPT)) {
+    let called = false
+    let bindings = 0
+    const awaitedModule = (init: ts.Expression | undefined): string | undefined => {
+      if (init === undefined || !ts.isAwaitExpression(init) || !ts.isCallExpression(init.expression)) return undefined
+      const [first] = init.expression.arguments
+      return first !== undefined && ts.isStringLiteral(first) ? first.text : undefined
+    }
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) called = true
+      if (ts.isBindingElement(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+        const declaration = node.parent.parent
+        const module = ts.isVariableDeclaration(declaration) ? awaitedModule(declaration.initializer) : undefined
+        if (node.propertyName !== undefined || module === undefined || !modules.includes(module))
+          throw new Error(`${name} is bound other than from its module`)
+        bindings += 1
+      } else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+        throw new Error(`${name} is bound to a value of its own`)
+      } else if (
+        (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isClassDeclaration(node)) &&
+        node.name?.text === name
+      ) {
+        throw new Error(`${name} is declared locally`)
+      } else if (ts.isParameter(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+        throw new Error(`${name} is a parameter`)
+      } else if (ts.isImportSpecifier(node) && node.name.text === name) {
+        const module = node.parent.parent.parent.moduleSpecifier
+        if (
+          (node.propertyName !== undefined && node.propertyName.text !== name) ||
+          !ts.isStringLiteral(module) ||
+          !modules.includes(module.text)
+        )
+          throw new Error(`${name} is imported other than from its module`)
+        bindings += 1
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+    if (called && bindings === 0) throw new Error(`${name} is called but never bound from its module`)
+  }
+}
+
+/** Independent of the production check: an option object must reach a call's arguments without being bound to a name. */
+function flowsDirectlyIntoCallByTypeScript(objectNode: ts.Node): boolean {
+  let child = objectNode
+  for (let parent = child.parent; parent !== undefined; child = parent, parent = parent.parent) {
+    if (ts.isCallExpression(parent))
+      return (
+        ts.isIdentifier(parent.expression) &&
+        parent.expression.text === "createJiti" &&
+        parent.arguments.some((argument) => argument === child)
+      )
+    if (ts.isConditionalExpression(parent) && parent.condition === child) return false
+    if (ts.isPropertyAssignment(parent) && parent.initializer !== child) return false
+    if (
+      !ts.isObjectLiteralExpression(parent) &&
+      !ts.isConditionalExpression(parent) &&
+      !ts.isParenthesizedExpression(parent) &&
+      !ts.isSpreadAssignment(parent) &&
+      !ts.isPropertyAssignment(parent)
+    )
+      return false
+  }
+  return false
+}
+
 /**
- * The keys of the table the installed engine's loader passes to createBunExtensionImporter, read with the TypeScript
- * parser: independent of the oxc-based reader under test.
+ * The keys of the table a loader passes to createBunExtensionImporter, read with the TypeScript parser: independent of
+ * the oxc-based reader under test. It refuses, as that reader must, a table used anywhere other than its declaration,
+ * the importer's argument or a `virtualModules` option, since any other use could change its keys after declaration.
  */
-function installedLoaderTableByTypeScript(): string[] {
-  const loaderPath = join(
-    realpathSync(join(repoRoot, "node_modules", "@code-yeongyu", "senpi")),
-    "dist",
-    "core",
-    "extensions",
-    "loader.js",
-  )
+function loaderTableByTypeScript(loaderPath = installedLoaderPath): string[] {
   const source = ts.createSourceFile(loaderPath, readFileSync(loaderPath, "utf8"), ts.ScriptTarget.Latest, true)
+  assertFactoryBindingsByTypeScript(source)
   let tableName: string | undefined
-  let table: string[] | undefined
-  const visit = (node: ts.Node): void => {
+  const findImporter = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
@@ -98,29 +173,49 @@ function installedLoaderTableByTypeScript(): string[] {
       const first = node.arguments[0]
       if (first !== undefined && ts.isIdentifier(first)) tableName = first.text
     }
+    ts.forEachChild(node, findImporter)
+  }
+  findImporter(source)
+  if (tableName === undefined) throw new Error(`no table passed to createBunExtensionImporter in ${loaderPath}`)
+  let declaration: ts.VariableDeclaration | undefined
+  const uses: ts.Identifier[] = []
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === tableName) declaration = node
+    if (ts.isIdentifier(node) && node.text === tableName) uses.push(node)
     ts.forEachChild(node, visit)
   }
   visit(source)
-  const findTable = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === tableName &&
-      node.initializer &&
-      ts.isObjectLiteralExpression(node.initializer)
-    ) {
-      table = node.initializer.properties.map((property) => {
-        if (!ts.isPropertyAssignment(property))
-          throw new Error(`unexpected table entry kind ${ts.SyntaxKind[property.kind]}`)
-        if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
-        throw new Error("unexpected table key")
-      })
-    }
-    ts.forEachChild(node, findTable)
+  const initializer = declaration?.initializer
+  if (declaration === undefined || initializer === undefined || !ts.isObjectLiteralExpression(initializer)) {
+    throw new Error(`${tableName} is not declared as an object literal`)
   }
-  findTable(source)
-  if (table === undefined) throw new Error(`no table passed to createBunExtensionImporter in ${loaderPath}`)
-  return table
+  for (const use of uses) {
+    const parent = use.parent
+    const isDeclaration = parent === declaration
+    const isImporterArgument =
+      ts.isCallExpression(parent) &&
+      ts.isIdentifier(parent.expression) &&
+      parent.expression.text === "createBunExtensionImporter" &&
+      parent.arguments.includes(use)
+    const isVirtualModulesOption =
+      ts.isPropertyAssignment(parent) &&
+      parent.initializer === use &&
+      ts.isIdentifier(parent.name) &&
+      parent.name.text === "virtualModules" &&
+      flowsDirectlyIntoCallByTypeScript(parent.parent)
+    const isMemberName = ts.isPropertyAccessExpression(parent) && parent.name === use
+    if (!isDeclaration && !isImporterArgument && !isVirtualModulesOption && !isMemberName) {
+      throw new Error(
+        `${tableName} is used at ${ts.SyntaxKind[parent.kind]} other than as the importer argument or a virtualModules option`,
+      )
+    }
+  }
+  return initializer.properties.map((property) => {
+    if (!ts.isPropertyAssignment(property))
+      throw new Error(`unexpected table entry kind ${ts.SyntaxKind[property.kind]}`)
+    if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
+    throw new Error("unexpected table key")
+  })
 }
 
 /**
@@ -382,12 +477,216 @@ describe("sidecar parity set", () => {
     },
   )
 
+  test.each([
+    [
+      "a computed member write",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `VIRTUAL_MODULES["ws"] = bundled;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "a dot member write",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `VIRTUAL_MODULES.ws = bundled;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "an Object.assign into it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `Object.assign(VIRTUAL_MODULES, { ws: bundled });\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "a reassignment",
+      loaderSource("    typebox: bundled,")
+        .replace("const VIRTUAL_MODULES", "let VIRTUAL_MODULES")
+        .replace(
+          "export async function createImporter",
+          "VIRTUAL_MODULES = { ws: bundled };\nexport async function createImporter",
+        ),
+    ],
+    [
+      "a delete from it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `delete VIRTUAL_MODULES.typebox;\nexport async function createImporter`,
+      ),
+    ],
+  ] as const)(
+    "#given a loader whose table is changed after its declaration by %s #when its table is read #then both readers refuse it",
+    (_label, source) => {
+      // given
+      const host = join(tmpdir(), `omo-engine-written-table-${process.pid}-${crypto.randomUUID()}`)
+      try {
+        writeEngineLoader(host, source)
+        const loaderPath = join(host, "dist", "core", "extensions", "loader.js")
+
+        // when / then
+        expect(() => engineServedSpecifiers(host)).toThrow(
+          `cannot read the engine's extension module table from ${loaderPath}`,
+        )
+        expect(() => loaderTableByTypeScript(loaderPath)).toThrow("VIRTUAL_MODULES is ")
+      } finally {
+        rmSync(host, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test.each([
+    [
+      "a member write through it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `const o = { virtualModules: VIRTUAL_MODULES };\no.virtualModules.ws = bundled;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "an Object.assign through it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `const o = { virtualModules: VIRTUAL_MODULES };\nObject.assign(o.virtualModules, { ws: bundled });\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "a delete through it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        `const o = { virtualModules: VIRTUAL_MODULES };\ndelete o.virtualModules.typebox;\nexport async function createImporter`,
+      ),
+    ],
+    [
+      "an exported handle to it",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "export const jitiOptions = { virtualModules: VIRTUAL_MODULES };\nexport async function createImporter",
+      ),
+    ],
+  ] as const)(
+    "#given a loader that binds a virtualModules option object to a name, with %s #when its table is read #then both readers refuse it",
+    (_label, source) => {
+      // given - an option object bound to a name can be written through, so its read is not the installed shape
+      const host = join(tmpdir(), `omo-engine-bound-option-${process.pid}-${crypto.randomUUID()}`)
+      try {
+        writeEngineLoader(host, source)
+        const loaderPath = join(host, "dist", "core", "extensions", "loader.js")
+
+        // when / then
+        expect(() => engineServedSpecifiers(host)).toThrow(
+          `cannot read the engine's extension module table from ${loaderPath}`,
+        )
+        expect(() => loaderTableByTypeScript(loaderPath)).toThrow("VIRTUAL_MODULES is ")
+      } finally {
+        rmSync(host, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test.each([
+    [
+      "a wrapper function",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "function mutate(o) { o.virtualModules.ws = bundled; }\nmutate({ virtualModules: VIRTUAL_MODULES });\nexport async function createImporter",
+      ),
+    ],
+    [
+      "an identity call",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "const o = ((x) => x)({ virtualModules: VIRTUAL_MODULES });\no.virtualModules.ws = bundled;\nexport async function createImporter",
+      ),
+    ],
+    [
+      "Object.assign",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "Object.assign({ virtualModules: VIRTUAL_MODULES }, {}).virtualModules.ws = bundled;\nexport async function createImporter",
+      ),
+    ],
+    [
+      "a local function named like the factory",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        "function createJiti(url, o) { o.virtualModules.ws = bundled; }\ncreateJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES });\nexport async function createImporter",
+      ),
+    ],
+    [
+      "a renamed jiti import",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        'export async function load() {\n    const { createJiti: make } = await importNodeOnlyApi("jiti/static");\n    return make(import.meta.url, { virtualModules: VIRTUAL_MODULES });\n}\nexport async function createImporter',
+      ),
+    ],
+    [
+      "the factory bound from another module",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        'export async function load() {\n    const { createJiti } = await import("./mutating-jiti.js");\n    return createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES });\n}\nexport async function createImporter',
+      ),
+    ],
+    [
+      "options returned from a function",
+      loaderSource("    typebox: bundled,").replace(
+        "export async function createImporter",
+        'const options = () => ({ virtualModules: VIRTUAL_MODULES });\nexport async function load() {\n    const { createJiti } = await importNodeOnlyApi("jiti/static");\n    return createJiti(import.meta.url, options());\n}\nexport async function createImporter',
+      ),
+    ],
+    [
+      "a renamed importer import",
+      loaderSource("    typebox: bundled,").replace(
+        'const { createBunExtensionImporter } = await import("./bun-extension-importer.js");\n    return createBunExtensionImporter(VIRTUAL_MODULES, {}, {});',
+        'const { createBunExtensionImporter: make } = await import("./bun-extension-importer.js");\n    make(VIRTUAL_MODULES);\n    return createBunExtensionImporter(VIRTUAL_MODULES, {}, {});',
+      ),
+    ],
+  ] as const)(
+    "#given a loader that hands its table to the factories through %s #when its table is read #then both readers refuse it",
+    (_label, source) => {
+      // given - only the two factories the installed loader calls, bound from their own modules, may receive the table
+      const host = join(tmpdir(), `omo-engine-foreign-sink-${process.pid}-${crypto.randomUUID()}`)
+      try {
+        writeEngineLoader(host, source)
+        const loaderPath = join(host, "dist", "core", "extensions", "loader.js")
+
+        // when / then
+        expect(() => engineServedSpecifiers(host)).toThrow(
+          `cannot read the engine's extension module table from ${loaderPath}`,
+        )
+        expect(() => loaderTableByTypeScript(loaderPath)).toThrow()
+      } finally {
+        rmSync(host, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test("#given a loader that also passes its table as a virtualModules option straight into a call #when its table is read #then both readers read it exactly", () => {
+    // given - the installed loader hands the same table to jiti as `virtualModules`, inside the call's own options
+    const host = join(tmpdir(), `omo-engine-option-table-${process.pid}-${crypto.randomUUID()}`)
+    try {
+      writeEngineLoader(
+        host,
+        loaderSource("    typebox: bundled,").replace(
+          "export async function createImporter",
+          'export async function load(bundled) {\n    const { createJiti } = await importNodeOnlyApi("jiti/static");\n    return createJiti(import.meta.url, {\n        moduleCache: false,\n        ...(bundled ? { virtualModules: VIRTUAL_MODULES, tryNative: false } : { alias: {} }),\n    });\n}\nexport async function createImporter',
+        ),
+      )
+
+      // when / then
+      expect([...engineServedSpecifiers(host)]).toEqual(["typebox"])
+      expect(loaderTableByTypeScript(join(host, "dist", "core", "extensions", "loader.js"))).toEqual(["typebox"])
+    } finally {
+      rmSync(host, { recursive: true, force: true })
+    }
+  })
+
   // Release contract (senpi's binary copier reads the same table): the served set is the object the installed loader
   // actually hands to createBunExtensionImporter, not a sibling module nothing imports. That module lacks the two
   // @code-yeongyu/senpi entries, so reading it fails here.
   test("#given the installed engine #when its served set is read #then it equals the table its loader passes to createBunExtensionImporter", () => {
     // given
-    const loaderTable = installedLoaderTableByTypeScript()
+    const loaderTable = loaderTableByTypeScript()
 
     // when
     const served = engineServedSpecifiers()
@@ -512,7 +811,7 @@ describe("sidecar parity set", () => {
   // @earendil-works/pi-realm-registry, which the engine depends on but does not serve to extensions).
   test("#given the installed engine #when codemode's sidecars are staged #then every bare import of codemode and its staged dependencies resolves to an engine-served module or a staged package", () => {
     // given - what the installed engine's loader serves, read with an independent parser
-    const served = new Set(installedLoaderTableByTypeScript())
+    const served = new Set(loaderTableByTypeScript())
     const codemodeRoot = "node_modules/@code-yeongyu/senpi-codemode"
     const stage = join(tmpdir(), `omo-codemode-stage-${process.pid}-${crypto.randomUUID()}`)
     try {
