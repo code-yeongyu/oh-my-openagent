@@ -3,6 +3,8 @@ import { createRequire } from "node:module"
 import { basename, dirname, join, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { log } from "@oh-my-opencode/utils"
+
 import type { RpcRunnerSpec } from "../types"
 import { rpcChildAncestry } from "../child-ancestry"
 import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
@@ -64,7 +66,7 @@ export type RpcSpawnRuntime = {
   // When omitted or unreadable, the parity check is skipped (candidates are accepted). It is also the
   // launched engine's version when the child runs the compiled engine or the rpc-entry fallback.
   readonly engineVersion?: string
-  // Optional diagnostics for rejected PATH/sibling candidates. Defaults to a no-op.
+  // Diagnostics for rejected PATH/sibling candidates and a dropped --spawned-by. Defaults to the debug log.
   readonly onWarning?: (message: string) => void
 }
 
@@ -141,6 +143,8 @@ function defaultRuntime(): RpcSpawnRuntime {
     parentEnv: process.env,
     resolveRpcEntry: resolveRpcEntrySpecifier,
     engineVersion: readRunningEngineVersion(),
+    // Production warnings go to the debug log, as the host path's spawnedBy drop does (#11352).
+    onWarning: (message) => log(message),
   }
 }
 
@@ -205,8 +209,15 @@ export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRunt
   const spawnedBy = rpcChildAncestry(spec)
   // Only an engine that proves it accepts the flag receives it; an older one may refuse to boot on it.
   const { launcher, engineVersion } = resolveSenpiLaunchTarget(resolved)
-  const ancestryArgs =
-    engineAcceptsSpawnedBy(engineVersion) && spawnedBy !== undefined ? ["--spawned-by", JSON.stringify(spawnedBy)] : []
+  const accepts = engineAcceptsSpawnedBy(engineVersion)
+  const ancestryArgs = accepts && spawnedBy !== undefined ? ["--spawned-by", JSON.stringify(spawnedBy)] : []
+  // The host path logs its drop; this one names the launch target so a dropped ancestry is diagnosable (#11352).
+  if (!accepts && spawnedBy !== undefined) {
+    const target = launcher !== null ? launcher.command : resolved.resolveRpcEntry()
+    resolved.onWarning?.(
+      `senpi-task: launching ${target} without --spawned-by: its engine version (${engineVersion ?? "unknown"}) does not accept it`,
+    )
+  }
   if (launcher !== null) {
     return {
       command: launcher.command,
