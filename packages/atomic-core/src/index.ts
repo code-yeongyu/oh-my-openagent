@@ -14,4 +14,5 @@ export {
   type AtomicVersion,
 } from "./contracts"
 export { AtomicError, type AtomicErrorCode } from "./errors"
+export { type AtomicProbe, type AtomicProbeOptions, probeAtomic } from "./probe"
 export { type AtomicSpawn, type AtomicSpawnOutcome, type AtomicSpawnRequest, spawnAtomicProcess } from "./process"
