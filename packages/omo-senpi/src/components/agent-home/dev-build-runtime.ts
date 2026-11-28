@@ -40,8 +40,12 @@ export function isUnlaunchedSourceRun(moduleUrl: string, env: NodeJS.ProcessEnv 
 
 /** The canonical spelling of a path, symlinks resolved even where their target does not exist yet. */
 function canonical(path: string, depth = 0): string {
+  const absolute = resolve(path)
+  // Bun's realpathSync never returns when the path is the macOS auto_home autofs trigger (/home, #11545). A missing
+  // candidate only reaches it as an ancestor, so its spelling stands unresolved rather than blocking the caller (#14866).
+  if (absolute === "/home") return absolute
   try {
-    return realpathSync(path)
+    return realpathSync(absolute)
   } catch {
     const absolute = resolve(path)
     if (depth > 40) return absolute
