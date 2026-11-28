@@ -10,6 +10,7 @@ import { resolveProvenance } from "../gateway/provenance-resolver"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 import { sendView } from "./send-view"
+import { refuseUnanswered } from "./unknown-send"
 import { stampThisDevice } from "../remote/this-device"
 
 /** A host without the gateway port reaches no endpoint: every gateway send lands `queued_offline`. */
@@ -72,10 +73,13 @@ export function createGatewayServices(
   const resolve: GatewayResolve = async (address, request) => {
     const current = await sendView(options, address, view)
     const book = sendAddressBook(options, current, address, request.all_scope)
-    return await resolveFromEntries(
-      () => toGatewayAddressEntries(withOwnerRefusal(book, current, address)),
-      options.callerWorkspaceRoot,
-    )(address, request)
+    return refuseUnanswered(
+      book,
+      await resolveFromEntries(
+        () => toGatewayAddressEntries(withOwnerRefusal(book, current, address)),
+        options.callerWorkspaceRoot,
+      )(address, request),
+    )
   }
   const store = options.store
   const now = options.now ?? store.now

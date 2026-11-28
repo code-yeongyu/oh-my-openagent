@@ -59,6 +59,7 @@ test("one host missing the listing deadline cannot turn its claimed session inac
   const file = join(dir, "slow.jsonl")
   const transport = fakeHostTransport(fast)
   const slowTransport = fakeHostTransport(slow)
+  let wakes = 0
   const store = createGatewayStore({ agentDir: dir })
   const serverFor = (endpoint: typeof transport, id: string) =>
     createServer((socket) =>
@@ -69,6 +70,7 @@ test("one host missing the listing deadline cannot turn its claimed session inac
           pending += chunk
           for (let end: number; (end = pending.indexOf("\n")) >= 0;) {
             const frame = JSON.parse(pending.slice(0, end))
+            if (frame.type === "wake") wakes++
             pending = pending.slice(end + 1)
             const data =
               frame.type === "list_sessions"
@@ -136,6 +138,18 @@ test("one host missing the listing deadline cannot turn its claimed session inac
       expect(row).toMatchObject({ status: "resumable", state: "inactive", error_note: "live_unresponsive" })
     }
     expect(row).toMatchObject({ state: "unknown" })
+    // A send to the thread a non-answering host claims is refused before anything is stored or woken (contract row 29).
+    const send = tools.find((tool) => tool.name === "thread_send")
+    if (!send) throw new Error("thread_send missing")
+    const args = { thread: "slow", message: "once", idempotency_key: "same-key-after-timeout", all_scope: true }
+    const before = await store.backlogs(["slow"])
+    const refusal = (await send.execute("send", args, undefined, undefined, undefined as never)).details.result
+    expect(refusal).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { retry: true, reason: "host_not_answering" } },
+    })
+    expect(await store.backlogs(["slow"])).toEqual(before)
+    expect(wakes).toBe(0)
     fault = false
     const cleared = (await list.execute("after", { all_scope: true }, undefined, undefined, undefined as never)).details
       .result
@@ -145,6 +159,10 @@ test("one host missing the listing deadline cannot turn its claimed session inac
       state: "running",
       liveness: { kind: "running", activity: "running" },
     })
+    // The same idempotency key retried once the host answers is a first delivery, not a replay of a stored one.
+    const retried = (await send.execute("retry", args, undefined, undefined, undefined as never)).details.result
+    expect(retried).toMatchObject({ kind: "ok", deduplicated: false })
+    expect(wakes).toBe(1)
     // The slow host exits and its socket file goes with it: a host that is gone holds nothing (row 29), so the session
     // it still claims lists inactive, never unknown as a host that did not answer.
     slowSocket = false
