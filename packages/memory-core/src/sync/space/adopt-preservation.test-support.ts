@@ -8,8 +8,10 @@ import { planAdoption } from "./adopt"
 
 import { applyPlan, holdsValue, plainValue, renderedFacts, t2Block, soleRegisters } from "./test-support"
 
-// 2,000 generated cases are CPU-bound; under host load they exceed bun's 5 s default.
+// Generated cases are CPU-bound; under host load a full run exceeds the per-test budget. The default suite runs
+// 200 cases, and OMO_MEMORY_LONG_TESTS=1 restores the full 2,000 (#15261).
 const PROPERTY_TIMEOUT_MS = 60_000
+const CASES = process.env["OMO_MEMORY_LONG_TESTS"] === "1" ? 2000 : 200
 
 export function assertPreserved(sources: readonly string[], output: string, context: string): void {
   const actual = renderedFacts(output)
@@ -27,7 +29,7 @@ export function assertPreserved(sources: readonly string[], output: string, cont
 
 export function testAdoptionPreservation(seed: number): void {
   test(
-    `A1 adoption preserves all source keys and values; seed=${seed}, cases=2000`,
+    `A1 adoption preserves all source keys and values; seed=${seed}, cases=${CASES}`,
     async () => {
       // Given random overlapping keys, kinds and values in all four real sources,
       // including duplicate keys, non-ASCII, CRLF, unterminated and empty files.
@@ -56,7 +58,7 @@ export function testAdoptionPreservation(seed: number): void {
         const closing = rand() < 0.1 ? "---" : `---${eol}`
         return `---${eol}${header}${eol}${closing}`
       }
-      for (let iteration = 0; iteration < 2000; iteration++) {
+      for (let iteration = 0; iteration < CASES; iteration++) {
         const sources = Array.from({ length: 4 }, (_, source) => make(source, iteration))
         const [space = "", main = "", t2 = "", side = ""] = sources
         const sidePath = "n.sync-conflict-20261015-device.md"

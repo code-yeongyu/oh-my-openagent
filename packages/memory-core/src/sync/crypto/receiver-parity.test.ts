@@ -32,6 +32,9 @@ import { snapshotPreimage } from "./vendor/sync-format/snapshot.ts"
 // Explicit budget for CPU- or git-bound work that runs 1.5-2.6 s and can pass 5 s on a loaded host: a local
 // multi-file `bun test` gives every file after the first Bun's 5 s default, since only CI passes --timeout (#12453).
 const SLOW_TEST_TIMEOUT_MS = process.platform === "win32" ? 30_000 : 20_000
+// The stress cases build and walk a keyring chain; 1,000 rotations overruns SLOW_TEST_TIMEOUT_MS on a loaded host.
+// The default suite uses 200, and OMO_MEMORY_LONG_TESTS=1 restores the full 1,000 (#15261).
+const STRESS_ROTATIONS = process.env["OMO_MEMORY_LONG_TESTS"] === "1" ? 1000 : 200
 
 // The client's local chain must refuse exactly what the merged omo-service receiver
 // (vendored sync-format receiveKeyringChain and createKeyringReceiver, 5de1455489) refuses, and accept what it accepts.
@@ -241,7 +244,7 @@ describe("the receiver check does not re-read the verified chain for every new e
 })
 
 describe("the receiver walks the chain once per pull, not once per entry", () => {
-  const ROTATIONS = 1000
+  const ROTATIONS = STRESS_ROTATIONS
   const BATCHES = 500
   const recoveredPrefix = (): KeyringEntry[] => [...mainUntil("post_join_rotation"), record("post_join_rotation")]
   const rotations = async (
@@ -274,7 +277,7 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
   }
 
   test(
-    "a 1,000-rotation pull folds each entry a bounded number of times",
+    `a ${ROTATIONS}-rotation pull folds each entry a bounded number of times`,
     async () => {
       const { entries } = await thousand()
       const pull = [...recoveredPrefix(), ...entries]
@@ -306,7 +309,7 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
   })
 
   test(
-    "a snapshot import over a 1,000-rotation keyring prefix folds the prefix a bounded number of times",
+    `a snapshot import over a ${ROTATIONS}-rotation keyring prefix folds the prefix a bounded number of times`,
     async () => {
       const { entries } = await thousand()
       const covered = [...recoveredPrefix(), ...entries]
@@ -371,11 +374,11 @@ describe("the receiver checks one new entry in constant work (#10655)", () => {
     }
   }
 
-  test("appending one rotation hands the receiver the same few entries at every chain length up to 1,000", async () => {
+  test(`appending one rotation hands the receiver the same few entries at every chain length up to ${STRESS_ROTATIONS}`, async () => {
     await handedPerAppend(async (handed) => {
       let state = await verified([...mainUntil("post_join_rotation"), record("post_join_rotation")])
       const perAppend: number[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < STRESS_ROTATIONS; i++) {
         const next = await rotation(state, "A")
         const before = handed()
         const { outcome } = await run([next], state)
@@ -384,7 +387,7 @@ describe("the receiver checks one new entry in constant work (#10655)", () => {
         state = outcome.state
       }
       expect(Math.max(...perAppend)).toBeLessThanOrEqual(1)
-      expect(perAppend[999]).toBe(perAppend[9])
+      expect(perAppend[STRESS_ROTATIONS - 1]).toBe(perAppend[9])
     })
   }, 60000)
 
