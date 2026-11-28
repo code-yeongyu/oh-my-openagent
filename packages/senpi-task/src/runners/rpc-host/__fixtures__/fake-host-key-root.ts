@@ -1,2 +1,6 @@
-/** A fake host publishes no launch key and never challenges; clients of one name this root, which holds no record. */
-export const FAKE_HOST_KEY_ROOT = "/nonexistent/omo-fake-host-key-root"
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+/** Diagnostic variant (never merged): a real, empty temp dir instead of a POSIX-only nonexistent path. */
+export const FAKE_HOST_KEY_ROOT = mkdtempSync(join(tmpdir(), "omo-fake-host-key-root-"))
