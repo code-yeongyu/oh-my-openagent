@@ -24,7 +24,7 @@ export function createDaemonEngineHarness() {
     // The engine refuses an agent dir any group or other user can write (unsafe_key_record), as a real ~/.omo/agent never
     // is; mkdirSync otherwise takes the process umask, so on a host with umask 002 every shard here failed to start.
     mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true, mode: 0o700 })
-    const env = {
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       TMPDIR: agentDir,
       TEMP: agentDir,
@@ -40,6 +40,7 @@ export function createDaemonEngineHarness() {
       // case's SENPI_RPC_HOST_IDLE_EXIT_MS override stays where it is observed.
       SENPI_RPC_HOST_COLD_START: "transient",
     }
+    delete env.SENPI_RPC_INTERNAL_KEY_STDIN
     return { agentDir, socket, env }
   }
 
