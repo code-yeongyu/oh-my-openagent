@@ -195,6 +195,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       memoryRoot,
       ...(host.settings === undefined ? {} : { settings: host.settings }),
       isHostedIdentity: (name) => hosted.has(name),
+      repoMaintenance: { minLooseObjects, timeoutMs },
       signal,
       now,
       ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger) }),

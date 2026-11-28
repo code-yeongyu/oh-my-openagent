@@ -7,6 +7,7 @@ import {
   DEFAULT_RUNTIME_MAX_BYTES,
   DEFAULT_RUNTIME_RETENTION,
   RETENTION_STAMP_CONFIG_KEY,
+  createRepoMaintenanceHostSweepStep,
   createRetentionHostSweepStep,
   retentionResumePending,
   runRuntimeRetention,
@@ -96,6 +97,8 @@ export interface MaintenanceHostSweepInput {
   readonly memoryRoot: string
   readonly settings?: ForeignMemoryRuntimeSettings
   readonly isHostedIdentity: (name: string) => boolean
+  /** The bound pass's repo maintenance bounds, applied to every foreign identity's repo (#15419). */
+  readonly repoMaintenance: { readonly minLooseObjects: number; readonly timeoutMs: number }
   readonly signal: AbortSignal
   readonly now: () => number
   readonly info?: Log
@@ -112,6 +115,11 @@ export async function runMaintenanceHostSweep(input: MaintenanceHostSweepInput):
         now: input.now,
         signal: input.signal,
         deadline,
+      }),
+      createRepoMaintenanceHostSweepStep({
+        isHostedIdentity: input.isHostedIdentity,
+        ...input.repoMaintenance,
+        signal: input.signal,
       }),
     ],
     maxIdentities: HOST_SWEEP_IDENTITIES_PER_PASS,
