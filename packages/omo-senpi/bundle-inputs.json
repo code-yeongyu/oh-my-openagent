@@ -1835,6 +1835,7 @@
     "packages/omo-senpi/src/components/thread/tools/reply-permission.ts",
     "packages/omo-senpi/src/components/thread/tools/reply-target.ts",
     "packages/omo-senpi/src/components/thread/tools/send-view.ts",
+    "packages/omo-senpi/src/components/thread/tools/session-error.ts",
     "packages/omo-senpi/src/components/thread/tools/thread-row.ts",
     "packages/omo-senpi/src/components/thread/tools/thread-state.ts",
     "packages/omo-senpi/src/components/thread/wake/carrier-connection.ts",

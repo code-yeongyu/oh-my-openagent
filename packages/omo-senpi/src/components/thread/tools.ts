@@ -62,6 +62,7 @@ import {
   setThinkingLevelOn,
 } from "./control/operations"
 import { renameThread } from "./control/rename"
+import { sessionErrorText } from "./tools/session-error"
 import { controlIdentity, controlRefusalOf } from "./control/port"
 import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 import { createMonitorTargetResolver, installMonitorTargetResolution } from "./tools/monitor-target"
@@ -309,7 +310,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       )
     }
     const failed = async (error: unknown): Promise<ToolOutput> => {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = sessionErrorText(error)
       if (receipted)
         await store
           .toolReceiptSettle({ ...scope, now: now(), error_note: message })

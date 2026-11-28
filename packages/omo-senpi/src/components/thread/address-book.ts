@@ -6,6 +6,7 @@ import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
 import { readSessionFacts, readSessionFactsAsync, threadTitle, type SessionFacts } from "./session-facts"
+import { sessionErrorText } from "./tools/session-error"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -42,7 +43,8 @@ export type AddressBookHost = {
   readonly endpoint_kind?: EndpointKind
   /** The engine's liveness verdict for the endpoint (`host status --all` `alive`/`reason`), when it gave one. */
   readonly alive?: boolean
-  readonly reason?: "live_unresponsive" | "dead" | null
+  /** `identity_unproven`: the endpoint answered, but its dial was refused for the host's identity; `error` is that refusal. */
+  readonly reason?: "live_unresponsive" | "dead" | "identity_unproven" | null
   /** The legacy (non-shard) host socket, whose sessions are daemon sessions. */
   readonly legacy?: boolean
 }
@@ -108,6 +110,8 @@ export type AddressEntry = {
   readonly updated_at: string | null
   readonly thread_id: string
   readonly error_note?: string
+  /** The refusal of the thread's endpoint, when its dial was refused for the host's identity: told, never acted on. */
+  readonly identity_refusal?: Error
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
   readonly endpoint: AddressEndpoint | null
   readonly surface: ThreadSurface | null
@@ -160,6 +164,7 @@ function hostSessions(host: AddressBookHost): readonly HostSession[] | null {
 
 function hostFailure(host: AddressBookHost): string | null {
   if (host.reason === "live_unresponsive") return "live_unresponsive"
+  if (host.reason === "identity_unproven") return sessionErrorText(host.error)
   if (host.error !== undefined) return errorMessage(host.error)
   const result = hostOutcome(host)
   if (result === undefined) return "host unavailable"
@@ -194,6 +199,7 @@ function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failu
     updated_at: session.updated_at,
     thread_id: session.durable_id,
     ...(failure === undefined ? {} : { error_note: failure }),
+    ...(host?.reason === "identity_unproven" && host.error instanceof Error ? { identity_refusal: host.error } : {}),
     endpoint,
     surface: endpoint === null ? null : deriveSurface(endpoint.kind, undefined, endpoint.socket),
     alive: false,
@@ -330,6 +336,7 @@ export function toGatewayAddressEntries(entries: readonly AddressEntry[]): Gatew
     updated_at: entry.updated_at,
     endpoint: entry.endpoint,
     liveness: entry.alive ? "routable" : entry.error_note === "live_unresponsive" ? "live_unresponsive" : "dead",
+    ...(entry.identity_refusal === undefined ? {} : { refusal: "host_identity_unproven" as const }),
   }))
 }
 

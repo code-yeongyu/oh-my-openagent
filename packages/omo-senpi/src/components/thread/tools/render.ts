@@ -204,6 +204,8 @@ function queuedLine(delivery: {
       return `queued #${position}: thread is paused or stopped${where}; delivers when it resumes`
     case "wake":
       return `queued #${position}: no engine is running the thread${where}; it starts to take the message`
+    case "host_identity_unproven":
+      return `queued #${position}: stored for the thread's host, which takes it itself; this caller could not prove that host (host_identity_unproven)`
     default:
       return `queued #${position}: waits for the running turn`
   }
