@@ -3,7 +3,8 @@
 // the batch id is the append's idempotency key, so a crash after the server accepted the batch
 // re-sends the same id and gets the original seq back instead of a second entry.
 // The journal keeps an index of pending items with their ops in segment files (outbox.ts), so
-// each step reads and writes one batch's worth, never the whole backlog (#12286).
+// each step reads and writes one batch's ops, never the whole backlog's (#12286). The index is
+// rewritten whole at each step, so that write grows with the number of pending items.
 
 import { createHash, randomBytes } from "node:crypto"
 
