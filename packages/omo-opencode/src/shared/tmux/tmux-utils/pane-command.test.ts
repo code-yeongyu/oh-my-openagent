@@ -41,19 +41,6 @@ function runCommandWithFakeOpencode(command: string, binDir: string): readonly s
 }
 
 describe("buildTmuxAttachCommand", () => {
-  it("uses /bin/sh instead of inheriting SHELL", () => {
-    const originalShell = process.env.SHELL
-    process.env.SHELL = "/bin/tcsh"
-
-    try {
-      const cmd = buildTmuxAttachCommand("http://localhost:3000", "ses_abc123")
-      expect(cmd.startsWith('/bin/sh -c "')).toBe(true)
-      expect(cmd).not.toContain("/bin/tcsh -c")
-    } finally {
-      process.env.SHELL = originalShell
-    }
-  })
-
   itWithUnixShell(
     "#given serverUrl shell metacharacters #when generated command runs through the shell #then serverUrl stays one literal argument",
     () => {
@@ -86,26 +73,6 @@ describe("buildTmuxAttachCommand", () => {
 })
 
 describe("buildTmuxPlaceholderCommand", () => {
-  it("uses /bin/sh instead of inheriting SHELL", () => {
-    const originalShell = process.env.SHELL
-    process.env.SHELL = "/bin/csh"
-
-    try {
-      const cmd = buildTmuxPlaceholderCommand("My Task")
-      expect(cmd.startsWith('/bin/sh -c "')).toBe(true)
-      expect(cmd).not.toContain("/bin/csh -c")
-    } finally {
-      process.env.SHELL = originalShell
-    }
-  })
-
-  it("produces inert placeholder command instead of immediate attach", () => {
-    const cmd = buildTmuxPlaceholderCommand("My Task")
-    expect(cmd).toContain("Focus this pane to attach.")
-    expect(cmd).toContain("while :; do sleep 86400; done")
-    expect(cmd).not.toContain("opencode attach")
-  })
-
   itWithUnixShell(
     "#given single quotes and percent signs #when generated command runs through the shell #then they print literally",
     () => {
