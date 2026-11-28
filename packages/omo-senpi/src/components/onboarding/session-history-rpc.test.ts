@@ -207,14 +207,10 @@ describe("onboarding session-history rpc", () => {
   it("#given a scan that throws #when projects is called #then it answers unavailable with the failure kind only", async () => {
     // given
     const host = rpcOnlyHost()
-    const path = "/home/SYNTH-USER/.claude/projects"
     registerSessionHistoryRpc(host.pi, {
       createScanner: (options: SessionHistoryOptions) => ({
         ...createSessionHistoryScanner(options),
-        scanProjects: () =>
-          Promise.reject(
-            Object.assign(new Error(`EACCES: permission denied, scandir '${path}'`), { code: "EACCES", path }),
-          ),
+        scanProjects: () => Promise.reject(new Error("disk gone")),
       }),
     })
 
@@ -227,7 +223,7 @@ describe("onboarding session-history rpc", () => {
     })
 
     // then
-    expect(reply).toEqual({ kind: "unavailable", reason: "EACCES" })
+    expect(reply).toEqual({ kind: "unavailable", reason: "an unexpected error" })
   })
 
   it("#given the desktop's sessions request #when answered #then it replies a scanId before any event, then pushes each outcome in wire shape and ends with done", async () => {
@@ -344,7 +340,7 @@ describe("onboarding session-history rpc", () => {
           counts: () => ({ found: 1, read: 0, cap: 100 }),
           async *[Symbol.asyncIterator]() {
             yield { _tag: "Skipped" as const }
-            throw new Error("transcript vanished: /home/SYNTH-USER/.codex/sessions/rollout.jsonl")
+            throw new Error("transcript vanished")
           },
         }),
       }),

@@ -5,7 +5,11 @@ import { basename, join } from "node:path"
 import type { ChildHandle, ChildSpec, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
 
 import { FACTS_RECORD_TOOL_NAME, type FactsRecordTool } from "../memory/facts-record-tool"
+import { registrySnapshot } from "../memory/facts-runner.test-support"
 import type { SessionDigest } from "./session-history"
+import type { OnboardingUnderstandBudgetLimits, OnboardingUnderstandEvent } from "./understand-contract"
+import { OnboardingUnderstandingControl } from "./understand-control"
+import { runOnboardingUnderstanding } from "./understand-runtime"
 
 export const UNDERSTAND_MODEL = "omo-mock/mock-1"
 
@@ -14,6 +18,37 @@ export type FakeTurn = (turn: {
   readonly start: number
   readonly record: (text: string) => Promise<boolean>
 }) => Promise<"completed" | "error" | "hang" | "throw">
+
+export async function runUnderstanding(input: {
+  readonly digests: readonly SessionDigest[]
+  readonly turn: FakeTurn
+  readonly control?: OnboardingUnderstandingControl
+  readonly budget?: OnboardingUnderstandBudgetLimits
+  readonly env?: NodeJS.ProcessEnv
+  readonly projectRoots?: ReadonlySet<string>
+  readonly now?: () => number
+  readonly onAbort?: (spec: ChildSpec) => Promise<void>
+}) {
+  const model = fakeModel(input.turn, input.onAbort === undefined ? {} : { onAbort: input.onAbort })
+  const events: OnboardingUnderstandEvent[] = []
+  const done = await runOnboardingUnderstanding(
+    {
+      understandId: "understand-1",
+      scanId: "scan-1",
+      model: UNDERSTAND_MODEL,
+      digests: input.digests,
+      projectRoots: input.projectRoots ?? new Set(input.digests.map((item) => item.cwd)),
+      ...(input.now === undefined ? {} : { now: input.now }),
+      modelRegistry: registrySnapshot(),
+      control: input.control ?? new OnboardingUnderstandingControl(),
+      createRunner: model.createRunner,
+      env: input.env ?? { HOME: "/nonexistent-home" },
+      ...(input.budget === undefined ? {} : { budget: input.budget }),
+    },
+    (event) => events.push(event),
+  )
+  return { done, events, starts: model.starts }
+}
 
 /**
  * A fake model behind the real facts launch path: `launchFactsInProcess` builds the child spec and the
