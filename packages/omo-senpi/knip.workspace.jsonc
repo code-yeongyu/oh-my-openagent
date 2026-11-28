@@ -696,8 +696,6 @@
     "packages/omo-senpi/src/components/memory/palace/people.ts": ["PRIMARY_HUMAN_SLUG", "PRIMARY_HUMAN_CARD_PATH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PALACE_DATA_ELEMENT_ID
     "packages/omo-senpi/src/components/memory/palace/template.ts": ["PALACE_DATA_ELEMENT_ID"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) PolicyCapturingFakeExtensionAPI
-    "packages/omo-senpi/src/components/memory/policy-guard.test-support.ts": ["PolicyCapturingFakeExtensionAPI"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PROJECT_MEMORY_RECALL_MAX_PROJECTS, formatProjectMemoryNudge
     "packages/omo-senpi/src/components/memory/project-memory-nudge.ts": ["PROJECT_MEMORY_RECALL_MAX_PROJECTS", "formatProjectMemoryNudge"],
     // pre-existing at origin dev 4686e425b5: unused export(s) RECALL_TEXT_WINDOW, userText

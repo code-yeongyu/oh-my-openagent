@@ -44,5 +44,6 @@ export function scanForeignRoots(
 
 export function isWithin(root: string, target: string, path: PathApi): boolean {
   const rel = path.relative(root, target)
-  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
+  // Only a leading ".." segment leaves the root; a child named "..x" stays inside (#15367).
+  return rel === "" || (!/^\.\.(?:[\\/]|$)/.test(rel) && !path.isAbsolute(rel))
 }
