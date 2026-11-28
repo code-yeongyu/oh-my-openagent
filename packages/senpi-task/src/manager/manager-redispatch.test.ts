@@ -9,9 +9,9 @@ import { cleanupProjects, baseSpec, makeManager, tempProject } from "./__fixture
 
 afterEach(cleanupProjects)
 
-type RedispatchCapable = {
-  redispatchTask?: (idOrName: string, callerSessionId?: string) => Promise<RedispatchOutcome>
-}
+type Redispatch = (idOrName: string, callerSessionId?: string, allScope?: boolean) => Promise<RedispatchOutcome>
+
+type RedispatchCapable = { redispatchTask?: Redispatch }
 
 type RedispatchOutcome = {
   readonly kind: string
@@ -20,10 +20,8 @@ type RedispatchOutcome = {
   readonly owning_session_id?: string
 }
 
-function redispatcher(manager: unknown): {
-  redispatchTask: (idOrName: string, callerSessionId?: string) => Promise<RedispatchOutcome>
-} {
-  return manager as { redispatchTask: (idOrName: string, callerSessionId?: string) => Promise<RedispatchOutcome> }
+function redispatcher(manager: unknown): { redispatchTask: Redispatch } {
+  return manager as { redispatchTask: Redispatch }
 }
 
 async function flaggedTask(options: { readonly reason?: AwaitingInputReason } = {}) {
@@ -83,15 +81,32 @@ describe("TaskManager.redispatchTask (senpi#3266)", () => {
     expect(outcome.kind).toBe("invalid_state")
   })
 
-  test("#given a flagged task owned by another session #when re-dispatch is attempted without scope #then it is scope_denied", async () => {
+  test("#given another session's name, flagged task, finished task and a missing id #when re-dispatch is attempted without all_scope #then each answers as the missing id, and with all_scope it re-dispatches", async () => {
     // given
-    const { manager, taskId } = await flaggedTask()
+    const { manager, store, taskId } = await flaggedTask()
+    store.mutate(taskId, (record) => ({ ...record, name: "report" }))
+    const finished = await manager.start(baseSpec({ prompt: "finished work" }))
+    if (finished.kind !== "started") throw new Error("expected started")
+    store.transition(finished.task_id, {
+      type: "complete",
+      timestamp: new Date().toISOString(),
+      final_response: "done",
+    })
+    const redispatch: Redispatch = (input, caller, allScope) =>
+      redispatcher(manager).redispatchTask(input, caller, allScope)
 
     // when
-    const outcome = await redispatcher(manager).redispatchTask(taskId, "some-other-session")
+    const missing = await redispatch("st_00000000", "some-other-session")
 
     // then
-    expect(outcome.kind).toBe("scope_denied")
+    expect(missing.kind).toBe("not_found")
+    for (const input of ["report", taskId, finished.task_id]) {
+      expect(await redispatch(input, "some-other-session")).toEqual(
+        JSON.parse(JSON.stringify(missing).replaceAll("st_00000000", input)),
+      )
+    }
+    expect(store.load(taskId)?.awaiting_input).toBeDefined()
+    expect((await redispatch(taskId, "some-other-session", true)).kind).toBe("redispatched")
   })
 
   test("#given an unknown task #when re-dispatch is attempted #then it is not_found", async () => {

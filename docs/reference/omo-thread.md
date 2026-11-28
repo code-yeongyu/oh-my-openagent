@@ -308,7 +308,7 @@ Do not delete or edit files under `rpc/keys`. A host removes its own record when
 
 ### Windows
 
-Windows named pipes use the older `<socket>.secret` handshake. It proves the client to the host, but nothing proves the host to the client. This is an accepted gap until the launch-key challenge is extended to pipes (code-yeongyu/senpi#7571).
+Windows named pipes use the older `<socket>.secret` handshake. The pipe a thread call reaches is named from the 32-byte secret in that file, and the call sends the secret first, so it proves the client to the host. Nothing proves the host to the client: a process that can read `<socket>.secret` (your own account, or one the file's permissions let in) can name the pipe and serve it before the host does. A host that sends no challenge is served on Windows, and the key-record checks above do not run there. This is an accepted gap until the launch-key challenge is extended to pipes (code-yeongyu/senpi#7571).
 
 ## JSON
 
