@@ -89,6 +89,11 @@ export class ParentWakePendingQueue {
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
+      if (latestWake.admittedNotifications) {
+        pendingWake.admittedNotifications = [
+          ...new Set([...(pendingWake.admittedNotifications ?? []), ...latestWake.admittedNotifications]),
+        ]
+      }
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       if (latestWake.gateHoldExpiresAt !== undefined) {
