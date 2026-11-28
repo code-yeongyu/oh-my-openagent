@@ -51,14 +51,14 @@ describe("config.explain routing keys", () => {
     })
   })
 
-  test("#given a key under a category that does not exist #when it is explained #then it answers unknown_path with allowlisted nearest paths", async () => {
+  test("#given a category only a config file defines and one nobody defines #when each is explained #then both answer the same path_not_allowed", async () => {
     sandbox = configSandbox()
+    sandbox.userConfig({ categories: { "zz-guessed": { model: "openai/gpt-5.5" } } })
     const config = sandbox.config()
-    const error = errorOf(await config.explain({ path: "categories.nope.model" }))
-    expect(error.code).toBe("unknown_path")
-    const nearest = error.details?.["nearest"] as readonly string[]
-    expect(nearest.length).toBeGreaterThan(0)
-    for (const path of nearest) expect((await config.explain({ path })).kind).toBe("ok")
+    const defined = await config.explain({ path: "categories.zz-guessed.model" })
+    const undefinedName = await config.explain({ path: "categories.zz-nobody.model" })
+    expect(errorOf(defined).code).toBe("path_not_allowed")
+    expect(defined).toEqual(undefinedName)
   })
 
   test("#given a key outside the allowlist #when it is explained #then it answers path_not_allowed with example paths only", async () => {
@@ -70,6 +70,20 @@ describe("config.explain routing keys", () => {
 })
 
 describe("config.explain engine keys", () => {
+  test("#given a fallback chain key an object inherits #when it is explained #then it is unset or refused, never a withheld default", async () => {
+    sandbox = configSandbox()
+    const config = sandbox.config()
+    expect(valueOf(await config.explain({ path: "engine:retry.fallbackChains.constructor" }))).toEqual({
+      path: "engine:retry.fallbackChains.constructor",
+      set: false,
+      source: "unset",
+      layers: [],
+    })
+    expect(errorOf(await config.explain({ path: "engine:retry.fallbackChains.__proto__" })).code).toBe(
+      "path_not_allowed",
+    )
+  })
+
   test("#given a global engine setting #when its engine: key is explained #then the global value wins over the default", async () => {
     sandbox = configSandbox()
     sandbox.engineGlobal({ compaction: { enabled: false } })

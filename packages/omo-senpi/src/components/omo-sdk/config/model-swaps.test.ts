@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { join } from "node:path"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { join, relative } from "node:path"
 
 import {
   assistantTurn,
@@ -76,6 +77,26 @@ describe("config.modelSwaps", () => {
     expect(answers.map((answer) => errorOf(answer).code)).toEqual(Array(4).fill("session_not_found"))
     expect(JSON.stringify(answers)).not.toContain(sandbox.root)
     expect(JSON.stringify(answers)).not.toContain("0199-missing")
+  })
+
+  test("#given a valid record outside the agent dir's sessions #when it is named by path #then it answers exactly as a missing record does", async () => {
+    sandbox = configSandbox()
+    const inside = sandbox.session(record)
+    const outsideDir = join(sandbox.root, "elsewhere")
+    mkdirSync(outsideDir, { recursive: true })
+    const outside = join(outsideDir, "copy.jsonl")
+    writeFileSync(outside, await Bun.file(inside).text())
+    const missing = await sandbox.config().modelSwaps({ session: join(outsideDir, "missing.jsonl") })
+    const answers = [
+      await sandbox.config().modelSwaps({ session: outside }),
+      await sandbox.config().modelSwaps({ session: relative(sandbox.project, outside) }),
+      await sandbox.config({ env: { PI_SESSION_FILE: outside } }).modelSwaps(),
+      await sandbox.config().check({ session: outside }),
+    ]
+    expect(errorOf(missing).code).toBe("session_not_found")
+    for (const answer of answers.slice(0, 3)) expect(answer).toEqual(missing)
+    expect(valueOf(await sandbox.config().modelSwaps({ session: inside })).swaps).toHaveLength(3)
+    expect(JSON.stringify(answers[3])).not.toContain("quota_swap")
   })
 
   test("#given a record naming credential-shaped models #when it is read #then those ids are withheld", async () => {
