@@ -23,6 +23,19 @@ import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const projects: string[] = []
 
+function withinTestBudget<T>(gate: Promise<T>, event: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([
+    gate,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`waited out the test budget for the ${event}, it never came`)),
+        remainingTestTime(),
+      )
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
 function tempProject(): string {
   const project = mkdtempSync(join(tmpdir(), "omo-senpi-completion-bridge-"))
   projects.push(project)
@@ -250,15 +263,7 @@ describe("completion bridge live background promotion", () => {
 
     // when
     release.resolve()
-    const message = await Promise.race([
-      arrived.promise,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("waited out the test budget for the start-failure notification, it never came")),
-          remainingTestTime(),
-        ),
-      ),
-    ])
+    const message = await withinTestBudget(arrived.promise, "start-failure notification")
 
     // then
     expect(message.details[0]?.task_id).toBe(started.task_id)
@@ -281,15 +286,7 @@ describe("completion bridge live background promotion", () => {
 
     // when
     const ended = harness.manager.endLostPausedTask(paused.task_id, "paused child restore failed (respawn_failed)")
-    const message = await Promise.race([
-      arrived.promise,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("waited out the test budget for the ended-run notification, it never came")),
-          remainingTestTime(),
-        ),
-      ),
-    ])
+    const message = await withinTestBudget(arrived.promise, "ended-run notification")
 
     // then
     expect(ended).toBe(true)
