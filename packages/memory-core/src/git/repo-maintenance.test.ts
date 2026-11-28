@@ -10,12 +10,14 @@ import { runMemoryRepoMaintenance } from "./repo-maintenance"
 
 type Call = readonly string[]
 
-/** A fake git whose `count-objects -v` answer and command log the test controls. */
-function fakeGit(countObjects: string) {
+/** A fake git whose `count-objects -v` answers (in order, the last one repeating) and command log the test controls. */
+function fakeGit(...countObjects: string[]) {
   const calls: Call[] = []
+  let counted = 0
   const git = async (argv: readonly string[]): Promise<{ readonly stdout: string }> => {
     calls.push(argv)
-    if (argv[0] === "count-objects") return { stdout: countObjects }
+    if (argv[0] === "count-objects")
+      return { stdout: countObjects[Math.min(counted++, countObjects.length - 1)] ?? "" }
     return { stdout: "" }
   }
   return { calls, git }
@@ -56,6 +58,15 @@ describe("runMemoryRepoMaintenance pack fold (#15139, #15420)", () => {
 
     expect(result).toEqual({ status: "skipped", looseObjects: 10, packsBefore: 15, packsAfter: 15 })
     expect(calls.filter((argv) => argv[0] === "repack" || argv[0] === "maintenance")).toEqual([])
+  })
+
+  test("#given a fold that leaves more loose objects than the bound #when maintenance runs #then the loose pass is decided on the count after the fold (#15429 L2)", async () => {
+    const { calls, git } = fakeGit(COUNTERS(10, 20), COUNTERS(3_000, 1))
+
+    const result = await runMemoryRepoMaintenance(git, OPTIONS)
+
+    expect(result).toEqual({ status: "packed", looseObjectsBefore: 3_000, looseObjectsAfter: 3_000 })
+    expect(calls.some((argv) => argv[0] === "maintenance")).toBe(true)
   })
 })
 

@@ -34,7 +34,7 @@ export async function runMemoryRepoMaintenance(
   git: MaintenanceGit,
   options: GitMaintenanceOptions,
 ): Promise<GitMaintenanceResult> {
-  const { looseObjects: looseObjectsBefore, packs } = await countObjects(git)
+  const { packs } = await countObjects(git)
   if (packs >= MAX_PACKS_BEFORE_REPACK) {
     await git(["repack", "-d", "-l", "--geometric=2", "--quiet"], options.timeoutMs, options.signal)
     options.signal?.throwIfAborted()
@@ -47,8 +47,9 @@ export async function runMemoryRepoMaintenance(
   options.signal?.throwIfAborted()
   await git(["prune", `--expire=${PRUNE_EXPIRE}`], options.timeoutMs, options.signal)
   options.signal?.throwIfAborted()
+  const { looseObjects: looseObjectsBefore, packs: packsAfter } = await countObjects(git)
   if (looseObjectsBefore < options.minLooseObjects)
-    return { status: "skipped", looseObjects: looseObjectsBefore, packsBefore: packs, packsAfter: await countPacks(git) }
+    return { status: "skipped", looseObjects: looseObjectsBefore, packsBefore: packs, packsAfter }
   await git(["maintenance", "run", "--task=loose-objects", "--quiet"], options.timeoutMs, options.signal)
   options.signal?.throwIfAborted()
   await git(["prune-packed", "--quiet"], options.timeoutMs, options.signal)
@@ -60,10 +61,6 @@ async function countObjects(git: MaintenanceGit): Promise<{ looseObjects: number
   const loose = /^count: (\d+)$/m.exec(stdout)?.[1]
   const packs = /^packs: (\d+)$/m.exec(stdout)?.[1]
   return { looseObjects: loose === undefined ? 0 : Number(loose), packs: packs === undefined ? 0 : Number(packs) }
-}
-
-async function countPacks(git: MaintenanceGit): Promise<number> {
-  return (await countObjects(git)).packs
 }
 
 async function countLooseObjects(git: MaintenanceGit): Promise<number> {
