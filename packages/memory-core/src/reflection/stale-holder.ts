@@ -13,7 +13,7 @@ import { readFile } from "../fs/resilient"
 import {
   getPidLiveness,
   getProcessStartIdentity,
-  startIdentitiesComparable,
+  startIdentitiesProveReuse,
   type ProcessLiveness,
 } from "../locks/process-identity"
 
@@ -92,8 +92,7 @@ export async function reflectionLauncherLiveness(
   const liveness = (probe.getPidLiveness ?? getPidLiveness)(pid)
   if (liveness !== "alive" || typeof recordedStart !== "string") return liveness
   const actualStart = await (probe.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)
-  if (actualStart !== null && startIdentitiesComparable(recordedStart, actualStart) && recordedStart !== actualStart)
-    return "dead" // rule:pid-reused
+  if (actualStart !== null && startIdentitiesProveReuse(recordedStart, actualStart)) return "dead" // rule:pid-reused
   return "alive"
 }
 
