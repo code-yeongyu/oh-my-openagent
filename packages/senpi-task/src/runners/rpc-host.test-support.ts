@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { startFakeHost, type FakeHost, type FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
-import { FAKE_HOST_KEY_ROOT } from "./rpc-host/__fixtures__/fake-host-key-root"
 import type { EnsuredTaskDaemon } from "./rpc-host/daemon"
 import type { ShardResolution } from "./rpc-host/shard-socket"
 import { HostSessionClient } from "./rpc-host/session-client"
@@ -100,7 +99,6 @@ export function hostRunnerHarness(): HostRunnerHarness {
         ensureDaemon: () => Promise.resolve(ensuredDaemon(host.socketPath)),
         createClient: (socketPath) => {
           const client = new HostSessionClient({
-            keyRoot: FAKE_HOST_KEY_ROOT,
             socketPath,
             ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
           })

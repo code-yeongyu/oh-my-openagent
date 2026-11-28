@@ -8,7 +8,6 @@ import { createTaskLifecycle } from "./create"
 import { hostLifecycleDeps } from "./__fixtures__/host-session-fakes"
 import { seedRecord } from "./__fixtures__/lifecycle-fakes"
 import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
-import { FAKE_HOST_KEY_ROOT } from "../runners/rpc-host/__fixtures__/fake-host-key-root"
 
 // The failed rung's child named in `fallback_closing_child` is an obligation of whoever owns the record
 // next. These cases run on the production daemon probe and closer over a real socket, so a refused
@@ -79,8 +78,7 @@ async function crashedHandoff(status: TaskStatus, options: { readonly terminalAt
       return { ok: false, disposition: "retryable", code: "respawn_failed", reason: "launch observed" }
     },
   }).deps
-  // The production probe and closer reach the fake host, which publishes no launch key.
-  return { store, host, taskId, original, closing, launched, deps: { ...deps, hostKeyRoot: FAKE_HOST_KEY_ROOT } }
+  return { store, host, taskId, original, closing, launched, deps }
 }
 
 describe("the failed rung's child as an obligation of the record", () => {

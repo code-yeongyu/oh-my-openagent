@@ -142,8 +142,6 @@ export interface HostDecision {
 export interface EnsureHostInput {
   readonly socket: string
   readonly agentDir?: string
-  // Where the engine's own ensure proves the host it reaches (senpi#7568); omo names the agent dir it launches the host in.
-  readonly keyRoot?: string
   // senpi #3044: the host stops shortly after this caller exits once no peer or turn remains, instead of
   // waiting out the idle window. Engine pins before 2026.10.10-12 ignore it.
   readonly owner?: "caller"
@@ -168,10 +166,7 @@ export interface EnsuredSenpiHost {
   readonly release?: () => void
 }
 
-export type ProbeHostFn = (input: {
-  readonly socket: string
-  readonly keyRoot?: string
-}) => Promise<SenpiHostProtocolInfo | undefined>
+export type ProbeHostFn = (input: { readonly socket: string }) => Promise<SenpiHostProtocolInfo | undefined>
 export type EnsureHostFn = (input: EnsureHostInput) => Promise<EnsuredSenpiHost>
 export type StopHostFn = (input: {
   readonly socket: string

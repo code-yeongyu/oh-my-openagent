@@ -30,12 +30,10 @@ export interface HostSessionCloseChannel extends Pick<HostSessionPort, "send" | 
 
 export type HostSessionClosePorts = {
   readonly createChannel?: (socket: string) => HostSessionCloseChannel
-  /** The agent dir the host was launched in. With none named the host cannot be proven, so nothing is sent to it. */
-  readonly keyRoot?: string
 }
 
-function defaultChannel(socket: string, keyRoot: string): HostSessionCloseChannel {
-  const client = new HostSessionClient({ socketPath: socket, keyRoot })
+function defaultChannel(socket: string): HostSessionCloseChannel {
+  const client = new HostSessionClient({ socketPath: socket })
   return {
     // Re-attaching to close: `retain_on_disconnect` is false so a failure mid-teardown cannot leave
     // the session pinned, and the worker kind keeps it out of every interactive session list.
@@ -58,14 +56,7 @@ export async function closeHostSession(
   input: HostSessionCloseInput,
   ports: HostSessionClosePorts = {},
 ): Promise<HostSessionCloseOutcome> {
-  const { keyRoot } = ports
-  const create =
-    ports.createChannel ?? (keyRoot === undefined ? undefined : (socket: string) => defaultChannel(socket, keyRoot))
-  if (create === undefined) {
-    log("senpi-task host session close names no key root for its host", { sessionPath: input.hostSession.session_path })
-    return "unreachable"
-  }
-  const channel = create(input.hostSession.socket)
+  const channel = (ports.createChannel ?? defaultChannel)(input.hostSession.socket)
   try {
     await channel.open({ sessionPath: input.hostSession.session_path, cwd: input.cwd ?? process.cwd() })
   } catch (error) {
